@@ -13,7 +13,7 @@ The Lean Ethereum protocol specifications and cryptographic subspecifications.
 
 ```bash
 # Clone this repository
-git clone https://github.com/leanEthereum/lean-spec leanSpec
+git clone https://github.com/leanEthereum/leanSpec leanSpec
 cd leanSpec
 
 # Install dependencies
