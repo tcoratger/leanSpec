@@ -1,19 +1,10 @@
-"""
-Specifications for KoalaBear finite field.
-"""
-
-
-# subspecs/koalabear/__init__.py
-
-"""
-Specifications for the KoalaBear finite field.
-"""
+"""Specifications for the KoalaBear finite field."""
 
 from .field import (
-    P,
     P_BITS,
     TWO_ADICITY,
     Fp,
+    P,
 )
 
 __all__ = [
