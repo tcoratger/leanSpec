@@ -2,12 +2,14 @@
 Core definition of the KoalaBear prime field Fp.
 """
 
+from typing import Self
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+
 # ==============================================================================
 # Field Constants
 #
 # The prime is chosen because the cube map (x -> x^3) is an
 # automorphism of the multiplicative group.
-#
 # ==============================================================================
 
 # The KoalaBear Prime: P = 2^31 - 2^24 + 1
@@ -39,57 +41,71 @@ TWO_ADIC_GENERATORS: list[int] = [
 # All arithmetic is performed modulo P.
 # ==============================================================================
 
-class Fp:
-    """An element in the KoalaBear prime field F_p."""
+class Fp(BaseModel):
+    """
+    An element in the KoalaBear prime field F_p.
+    """
+    model_config = ConfigDict(frozen=True)
 
-    def __init__(self, value: int):
-        """Initializes a field element, reducing the value modulo P."""
-        self.value = value % P
+    value: int = Field(
+        ge=0,
+        lt=P,
+        description="Field element value in the range [0, P)"
+    )
 
-    def __add__(self, other: "Fp") -> "Fp":
+    @field_validator('value', mode='before')
+    @classmethod
+    def reduce_modulo_p(cls, v: int) -> int:
+        """Reduces an integer input modulo P before validation."""
+        return v % P
+
+    def __add__(self, other: Self) -> Self:
         """Field addition."""
-        return Fp(self.value + other.value)
+        return self.__class__(value=self.value + other.value)
 
-    def __sub__(self, other: "Fp") -> "Fp":
+    def __sub__(self, other: Self) -> Self:
         """Field subtraction."""
-        return Fp(self.value - other.value)
+        return self.__class__(value=self.value - other.value)
 
-    def __neg__(self) -> "Fp":
+    def __neg__(self) -> Self:
         """Field negation."""
-        return Fp(-self.value)
+        return self.__class__(value=-self.value)
 
-    def __mul__(self, other: "Fp") -> "Fp":
+    def __mul__(self, other: Self) -> Self:
         """Field multiplication."""
-        return Fp(self.value * other.value)
+        return self.__class__(value=self.value * other.value)
 
-    def __pow__(self, exponent: int) -> "Fp":
+    def __pow__(self, exponent: int) -> Self:
         """Field exponentiation."""
-        return Fp(pow(self.value, exponent, P))
+        return self.__class__(value=pow(self.value, exponent, P))
 
-    def inverse(self) -> "Fp":
+    def inverse(self) -> Self:
         """Computes the multiplicative inverse using Fermat's Little Theorem."""
         if self.value == 0:
             raise ZeroDivisionError("Cannot invert the zero element.")
         # a^(P-2) is the multiplicative inverse of a in F_p
         return self ** (P - 2)
 
-    def __truediv__(self, other: "Fp") -> "Fp":
+    def __truediv__(self, other: Self) -> Self:
         """Field division."""
         return self * other.inverse()
 
-    def __eq__(self, other: object) -> bool:
-        """Equality check."""
-        if not isinstance(other, Fp):
-            return NotImplemented
-        return self.value == other.value
-
-    @staticmethod
-    def two_adic_generator(bits: int) -> "Fp":
+    @classmethod
+    def two_adic_generator(cls, bits: int) -> Self:
         """
-        Returns a generator of the multiplicative subgroup of order 2^bits.
+        Get a generator for the multiplicative subgroup of order 2^bits.
 
-        This is a direct lookup from the pre-computed list.
+        This is a direct lookup from a pre-computed list of generators.
+
+        Args:
+            bits: The order of the subgroup will be 2^bits. Must be in [0, TWO_ADICITY].
+
+        Returns:
+            A generator of the multiplicative subgroup of order 2^bits.
+
+        Raises:
+            ValueError: If `bits` is outside the valid range.
         """
         if not (0 <= bits <= TWO_ADICITY):
             raise ValueError(f"bits must be between 0 and {TWO_ADICITY}")
-        return Fp(TWO_ADIC_GENERATORS[bits])
+        return cls(value=TWO_ADIC_GENERATORS[bits])
