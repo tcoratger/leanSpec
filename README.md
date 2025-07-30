@@ -27,11 +27,11 @@ uv run pytest
 
 ```
 ├── src/
-│   ├── lean_spec/             # Main specification modules
+│   ├── lean_spec/             # Main specifications
 │   │   ├── __init__.py
 │   │   └── ...
-│   └── subspecs/              # Sub-specifications (EIPs)
-│       ├── poseidon2/         # Example implementation
+│   └── subspecs/              # Sub-specifications
+│       ├── poseidon2/
 │       │   ├── __init__.py
 │       │   ├── poseidon2.py
 │       │   └── ...
