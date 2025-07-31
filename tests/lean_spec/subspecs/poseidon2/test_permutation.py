@@ -131,7 +131,7 @@ def test_permutation_vector(
     output_state = permute(input_state, params)
 
     # Verify the output
-    assert len(output_state) == params.WIDTH
+    assert len(output_state) == params.width
     assert output_state == expected_output, (
-        f"Permutation output for width {params.WIDTH} did not match."
+        f"Permutation output for width {params.width} did not match."
     )

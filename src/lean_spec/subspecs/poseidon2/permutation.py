@@ -1,3 +1,5 @@
+# subspecs/poseidon2/permutation.py
+
 """
 A minimal Python specification for the Poseidon2 permutation.
 
@@ -6,7 +8,9 @@ Hash Function" (https://eprint.iacr.org/2023/323).
 """
 
 from itertools import chain
-from typing import List, NamedTuple
+from typing import List
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..koalabear.field import Fp
 
@@ -24,30 +28,44 @@ For KoalaBear, `d=3` is chosen for its low degree.
 """
 
 
-class Poseidon2Params(NamedTuple):
+class Poseidon2Params(BaseModel):
     """
     Encapsulates all necessary parameters for a specific Poseidon2 instance.
 
     This structure holds the configuration for a given state width, including
     the number of rounds and the constants for the internal linear layer.
-
-    Attributes:
-        WIDTH (int): The size of the state (t).
-
-        ROUNDS_F (int): The total number of "full" rounds, where the S-box is
-        applied to the entire state.
-
-        ROUNDS_P (int): The number of "partial" rounds, where the S-box is
-        applied to only the first element of the state.
-
-        INTERNAL_DIAG_VECTORS (List[Fp]): The diagonal vectors for the
-        efficient internal linear layer matrix (M_I).
     """
 
-    WIDTH: int
-    ROUNDS_F: int
-    ROUNDS_P: int
-    INTERNAL_DIAG_VECTORS: List[Fp]
+    # Configuration to make the model immutable and prevent extra arguments.
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
+
+    width: int = Field(gt=0, description="The size of the state (t).")
+    rounds_f: int = Field(gt=0, description="Total number of 'full' rounds.")
+    rounds_p: int = Field(
+        ge=0, description="Total number of 'partial' rounds."
+    )
+    internal_diag_vectors: List[Fp] = Field(
+        min_length=1,
+        description=(
+            "Diagonal vectors for the efficient "
+            "internal linear layer matrix (M_I)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def check_vector_length(self) -> "Poseidon2Params":
+        """Length of the diagonal vector should match the state width."""
+        if len(self.internal_diag_vectors) != self.width:
+            raise ValueError(
+                f"Length of internal diagonal vector "
+                "({len(self.internal_diag_vectors)}) "
+                f"must be equal to width ({self.width})."
+            )
+        return self
 
 
 def _generate_round_constants(params: Poseidon2Params) -> List[Fp]:
@@ -66,11 +84,11 @@ def _generate_round_constants(params: Poseidon2Params) -> List[Fp]:
     # The total number of constants needed for the entire permutation.
     #
     # This is the sum of constants for all full rounds and all partial rounds.
-    #   - Full rounds require `WIDTH` constants each
+    #   - Full rounds require `width` constants each
     #   (one for each state element).
     #   - Partial rounds require 1 constant each
     #   (for the first state element).
-    total_constants = (params.ROUNDS_F * params.WIDTH) + params.ROUNDS_P
+    total_constants = (params.rounds_f * params.width) + params.rounds_p
 
     # For the specification, we generate the constants as a deterministic d
     # sequence of integers.
@@ -84,10 +102,10 @@ def _generate_round_constants(params: Poseidon2Params) -> List[Fp]:
 
 # Parameters for WIDTH = 16
 PARAMS_16 = Poseidon2Params(
-    WIDTH=16,
-    ROUNDS_F=8,
-    ROUNDS_P=20,
-    INTERNAL_DIAG_VECTORS=[
+    width=16,
+    rounds_f=8,
+    rounds_p=20,
+    internal_diag_vectors=[
         Fp(value=-2),
         Fp(value=1),
         Fp(value=2),
@@ -109,10 +127,10 @@ PARAMS_16 = Poseidon2Params(
 
 # Parameters for WIDTH = 24
 PARAMS_24 = Poseidon2Params(
-    WIDTH=24,
-    ROUNDS_F=8,
-    ROUNDS_P=23,
-    INTERNAL_DIAG_VECTORS=[
+    width=24,
+    rounds_f=8,
+    rounds_p=23,
+    internal_diag_vectors=[
         Fp(value=-2),
         Fp(value=1),
         Fp(value=2),
@@ -203,9 +221,12 @@ def external_linear_layer(state: List[Fp], width: int) -> List[Fp]:
 
     # Apply the outer circulant structure for global diffusion.
     #
+    # This is equivalent to multiplying by circ(2*I, I, ..., I)
+    # after the M4 stage.
+    #
     # We precompute the four sums of elements at the same offset in each chunk.
     # For each k in 0..4:
-    #     sums[k] = state[k] + state[4 + k] + state[8 + k] + ... up to width
+    #       sums[k] = state[k] + state[4 + k] + state[8 + k] + ... up to width
     sums = [
         sum((state_after_m4[j + k] for j in range(0, width, 4)), Fp(value=0))
         for k in range(4)
@@ -245,7 +266,7 @@ def internal_linear_layer(
     # This is the efficient computation of (J + D)s.
     new_state = [
         s * d + s_sum
-        for s, d in zip(state, params.INTERNAL_DIAG_VECTORS, strict=False)
+        for s, d in zip(state, params.internal_diag_vectors, strict=False)
     ]
     return new_state
 
@@ -270,13 +291,13 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
         The new state after applying the permutation.
     """
     # Ensure the input state has the correct dimensions.
-    if len(state) != params.WIDTH:
-        raise ValueError(f"Input state must have length {params.WIDTH}")
+    if len(state) != params.width:
+        raise ValueError(f"Input state must have length {params.width}")
 
     # Generate the deterministic round constants for this parameter set.
     round_constants = _generate_round_constants(params)
     # The number of full rounds is split between the beginning and end.
-    half_rounds_f = params.ROUNDS_F // 2
+    half_rounds_f = params.rounds_f // 2
     # Initialize index for accessing the flat list of round constants.
     const_idx = 0
 
@@ -284,7 +305,7 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
     #
     # Another linear layer is applied at the start to prevent certain algebraic
     # attacks by ensuring the permutation begins with a diffusion layer.
-    state = external_linear_layer(list(state), params.WIDTH)
+    state = external_linear_layer(list(state), params.width)
 
     # 2. First Half of Full Rounds (R_F / 2)
     for _r in range(half_rounds_f):
@@ -292,14 +313,14 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
         state = [
             s + round_constants[const_idx + i] for i, s in enumerate(state)
         ]
-        const_idx += params.WIDTH
+        const_idx += params.width
         # Apply the S-box (x -> x^d) to the full state.
         state = [s**S_BOX_DEGREE for s in state]
         # Apply the external linear layer for diffusion.
-        state = external_linear_layer(state, params.WIDTH)
+        state = external_linear_layer(state, params.width)
 
     # 3. Partial Rounds (R_P)
-    for _r in range(params.ROUNDS_P):
+    for _r in range(params.rounds_p):
         # Add a single round constant to the first state element.
         state[0] += round_constants[const_idx]
         const_idx += 1
@@ -316,10 +337,10 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
         state = [
             s + round_constants[const_idx + i] for i, s in enumerate(state)
         ]
-        const_idx += params.WIDTH
+        const_idx += params.width
         # Apply the S-box to the full state.
         state = [s**S_BOX_DEGREE for s in state]
         # Apply the external linear layer for diffusion.
-        state = external_linear_layer(state, params.WIDTH)
+        state = external_linear_layer(state, params.width)
 
     return state
