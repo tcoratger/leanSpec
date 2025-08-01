@@ -68,35 +68,27 @@ class Poseidon2Params(BaseModel):
         return self
 
 
-def _generate_round_constants(params: Poseidon2Params) -> List[Fp]:
+def _generate_spec_test_round_constants(params: Poseidon2Params) -> List[Fp]:
     """
-    Generates a deterministic list of round constants for the permutation.
+    Generates a deterministic list of round constants for testing the spec.
 
-    Round constants are added in each round to break symmetries and prevent
-    attacks like slide or interpolation attacks.
+    !!! WARNING !!!
+    This function produces a simple, predictable sequence of integers for the
+    sole purpose of testing the permutation's algebraic structure. Production
+    implementations MUST use constants generated from a secure,
+    unpredictable source.
 
     Args:
         params: The object defining the permutation's configuration.
 
     Returns:
-        A list of Fp elements to be used as round constants.
+        A list of Fp elements to be used as round constants for tests.
     """
     # The total number of constants needed for the entire permutation.
-    #
-    # This is the sum of constants for all full rounds and all partial rounds.
-    #   - Full rounds require `width` constants each
-    #   (one for each state element).
-    #   - Partial rounds require 1 constant each
-    #   (for the first state element).
     total_constants = (params.rounds_f * params.width) + params.rounds_p
 
-    # For the specification, we generate the constants as a deterministic d
-    # sequence of integers.
-    #
-    # This is sufficient to define the algorithm's mechanics.
-    #
-    # Real-world implementations would use constants generated from a secure,
-    # pseudo-random source.
+    # For the specification, we generate the constants as a deterministic
+    # sequence of integers. This is sufficient to define the mechanics.
     return [Fp(value=i) for i in range(total_constants)]
 
 
@@ -295,7 +287,7 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
         raise ValueError(f"Input state must have length {params.width}")
 
     # Generate the deterministic round constants for this parameter set.
-    round_constants = _generate_round_constants(params)
+    round_constants = _generate_spec_test_round_constants(params)
     # The number of full rounds is split between the beginning and end.
     half_rounds_f = params.rounds_f // 2
     # Initialize index for accessing the flat list of round constants.
