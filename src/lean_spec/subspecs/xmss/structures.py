@@ -5,7 +5,7 @@ from typing import List
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..koalabear import Fp
-from .constants import HASH_LEN, PARAMETER_LEN, RAND_LEN
+from .constants import HASH_LEN_FE, PARAMETER_LEN, RAND_LEN_FE
 
 
 class HashTreeOpening(BaseModel):
@@ -26,7 +26,7 @@ class PublicKey(BaseModel):
     """The public key for the Generalized XMSS scheme."""
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
-    root: List[Fp] = Field(..., max_length=HASH_LEN, min_length=HASH_LEN)
+    root: List[Fp] = Field(..., max_length=HASH_LEN_FE, min_length=HASH_LEN_FE)
     parameter: List[Fp] = Field(
         ..., max_length=PARAMETER_LEN, min_length=PARAMETER_LEN
     )
@@ -37,7 +37,7 @@ class Signature(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
     path: HashTreeOpening
-    rho: List[Fp] = Field(..., max_length=RAND_LEN, min_length=RAND_LEN)
+    rho: List[Fp] = Field(..., max_length=RAND_LEN_FE, min_length=RAND_LEN_FE)
     hashes: List[List[Fp]]
 
 

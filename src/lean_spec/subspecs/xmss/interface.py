@@ -1,17 +1,16 @@
 """
 Defines the core interface for the Generalized XMSS signature scheme.
 
-This file specifies the high-level functions (`key_gen`, `sign`, `verify`)
+Specification for the high-level functions (`key_gen`, `sign`, `verify`)
 that constitute the public API of the signature scheme. For the purpose of this
 specification, these are defined as placeholders with detailed documentation.
 """
 
-from typing import List, Tuple
+from __future__ import annotations
 
-from ..koalabear import Fp
-from .constants import BASE, CHUNK_SIZE, DIMENSION, LIFETIME, MESSAGE_LENGTH
+from typing import Tuple
+
 from .structures import PublicKey, SecretKey, Signature
-from .utils import chain, encode, hash_tree_verify, tweakable_hash
 
 
 def key_gen() -> Tuple[PublicKey, SecretKey]:
@@ -55,34 +54,46 @@ def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
 
 
 def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
+    r"""
+    Verifies a digital signature against a public key, message, and epoch.
+
+    This function is a placeholder. The complete verification logic is detailed
+    below and will be implemented in a future update.
+
+    ### Verification Algorithm
+
+    1.  **Re-encode Message**: The verifier uses the randomness `rho` from the
+        signature to re-compute the codeword $x = (x_1, \dots, x_v)$ from the
+        message `m`. This includes calculating the checksum or checking the target sum.
+
+    2.  **Reconstruct One-Time Public Key**: For each intermediate hash `y_i`
+        in the signature, the verifier completes the corresponding hash chain.
+        Since `y_i` was computed with $x_i$ steps, the verifier applies the
+        hash function an additional $w - 1 - x_i$ times to arrive at the
+        one-time public key component `otpk_{ep,i}`.
+
+    3.  **Compute Merkle Leaf**: The verifier hashes the reconstructed one-time
+        public key components to compute the expected Merkle leaf for `epoch`.
+
+    4.  **Verify Merkle Path**: The verifier uses the `path` from the signature
+        to compute a candidate Merkle root starting from the computed leaf.
+        Verification succeeds if and only if this candidate root matches the
+        `root` in the `PublicKey`.
+
+    Args:
+        pk: The public key to verify against.
+        epoch: The epoch the signature corresponds to.
+        message: The message that was supposedly signed.
+        sig: The signature object to be verified.
+
+    Returns:
+        `True` if the signature is valid, `False` otherwise.
+
+    For the formal specification of this process, please refer to:
+    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum" [DKKW25a]
+    - "Technical Note: LeanSig for Post-Quantum Ethereum" [DKKW25b]
+    - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
-    Verifies a digital signature against:
-        - a public key,
-        - a message,
-        - epoch.
-    """
-    assert len(message) == MESSAGE_LENGTH, "Invalid message length"
-    assert 0 <= epoch < LIFETIME, "Epoch out of valid range"
-
-    # Re-encode the message to get the expected codeword.
-    codeword = encode(pk.parameter, message, sig.rho, epoch)
-    if codeword is None:
-        return False
-
-    # Reconstruct the one-time public key from the signature's hashes.
-    chain_ends: List[List[Fp]] = []
-    for i in range(DIMENSION):
-        steps_to_end = (BASE**CHUNK_SIZE - 1) - codeword[i]
-        end_of_chain = chain(
-            pk.parameter, epoch, i, codeword[i], steps_to_end, sig.hashes[i]
-        )
-        chain_ends.append(end_of_chain)
-
-    # Compute the Merkle leaf by hashing the reconstructed one-time public key.
-    # Note: A proper tweak would be used here. For simplicity, we omit it.
-    computed_leaf = tweakable_hash(pk.parameter, [], chain_ends)
-
-    # Verify the Merkle path against the public key's root.
-    return hash_tree_verify(
-        pk.parameter, pk.root, epoch, computed_leaf, sig.path
+    raise NotImplementedError(
+        "verify will be implemented in a future update to the specification."
     )
