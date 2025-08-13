@@ -9,7 +9,7 @@ from ..koalabear import Fp
 MESSAGE_LENGTH: int = 32
 """The length in bytes for all messages to be signed."""
 
-LOG_LIFETIME: int = 18
+LOG_LIFETIME: int = 32
 """The base-2 logarithm of the scheme's maximum lifetime."""
 
 LIFETIME: int = 1 << LOG_LIFETIME
@@ -54,10 +54,10 @@ TWEAK_LEN_FE: int = 2
 MSG_LEN_FE: int = 9
 """The length of a message after being encoded into field elements."""
 
-RAND_LEN_FE: int = 6
+RAND_LEN_FE: int = 7
 """The length of the randomness `rho` used during message encoding."""
 
-HASH_LEN_FE: int = 7
+HASH_LEN_FE: int = 8
 """The output length of the main tweakable hash function."""
 
 CAPACITY: int = 9
