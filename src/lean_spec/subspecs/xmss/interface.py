@@ -64,7 +64,8 @@ def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
 
     1.  **Re-encode Message**: The verifier uses the randomness `rho` from the
         signature to re-compute the codeword $x = (x_1, \dots, x_v)$ from the
-        message `m`. This includes calculating the checksum or checking the target sum.
+        message `m`.
+        This includes calculating the checksum or checking the target sum.
 
     2.  **Reconstruct One-Time Public Key**: For each intermediate hash `y_i`
         in the signature, the verifier completes the corresponding hash chain.
