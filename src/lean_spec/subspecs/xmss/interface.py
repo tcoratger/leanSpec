@@ -74,11 +74,11 @@ def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
         message `m`.
         This includes calculating the checksum or checking the target sum.
 
-    2.  **Reconstruct One-Time Public Key**: For each intermediate hash `y_i`
+    2.  **Reconstruct One-Time Public Key**: For each intermediate hash $y_i$
         in the signature, the verifier completes the corresponding hash chain.
-        Since `y_i` was computed with $x_i$ steps, the verifier applies the
+        Since $y_i$ was computed with $x_i$ steps, the verifier applies the
         hash function an additional $w - 1 - x_i$ times to arrive at the
-        one-time public key component `otpk_{ep,i}`.
+        one-time public key component $pk_{ep,i}$.
 
     3.  **Compute Merkle Leaf**: The verifier hashes the reconstructed one-time
         public key components to compute the expected Merkle leaf for `epoch`.

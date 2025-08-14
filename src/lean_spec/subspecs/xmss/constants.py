@@ -1,4 +1,18 @@
-"""Defines the cryptographic constants for the XMSS specification."""
+"""
+Defines the cryptographic constants for the XMSS specification.
+
+This specification corresponds to the "hashing-optimized" Top Level Target Sum
+instantiation from the canonical Rust implementation.
+
+.. note::
+   This specification uses the **KoalaBear** prime field, which is consistent
+   with the formal analysis in the reference papers (e.g., Section 5 of the
+   "LeanSig" technical note: https://eprint.iacr.org/2025/1332).
+
+   The canonical Rust implementation currently uses the `BabyBear` field for
+   practical reasons but is expected to align with this
+   specification in the future.
+"""
 
 from ..koalabear import Fp
 
