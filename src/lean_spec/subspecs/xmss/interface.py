@@ -17,7 +17,7 @@ def key_gen(
     activation_epoch: int, num_active_epochs: int
 ) -> Tuple[PublicKey, SecretKey]:
     """
-    Generates a new cryptographic key pair.
+    Generates a new cryptographic key pair. This is a **randomized** algorithm.
 
     This function is a placeholder. In a real implementation, it would involve
     generating a master secret, deriving all one-time keys, and constructing
@@ -41,7 +41,8 @@ def key_gen(
 
 def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
     """
-    Produces a digital signature for a given message at a specific epoch.
+    Produces a digital signature for a given message at a specific epoch. This
+    is a **randomized** algorithm.
 
     This function is a placeholder. The signing process involves encoding the
     message, generating a one-time signature, and providing a Merkle path.
@@ -62,7 +63,8 @@ def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
 
 def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
     r"""
-    Verifies a digital signature against a public key, message, and epoch.
+    Verifies a digital signature against a public key, message, and epoch. This
+    is a **deterministic** algorithm.
 
     This function is a placeholder. The complete verification logic is detailed
     below and will be implemented in a future update.

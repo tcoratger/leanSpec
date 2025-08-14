@@ -1,23 +1,29 @@
 """Defines the data structures for the Generalized XMSS signature scheme."""
 
-from typing import List
+from typing import Annotated, List
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..koalabear import Fp
 from .constants import HASH_LEN_FE, PARAMETER_LEN, RAND_LEN_FE
 
-HashDigest = List[Fp]
+HashDigest = Annotated[
+    List[Fp], Field(min_length=HASH_LEN_FE, max_length=HASH_LEN_FE)
+]
 """
 A type alias representing a hash digest.
 """
 
-Parameter = List[Fp]
+Parameter = Annotated[
+    List[Fp], Field(min_length=PARAMETER_LEN, max_length=PARAMETER_LEN)
+]
 """
 A type alias representing the public parameter `P`.
 """
 
-Randomness = List[Fp]
+Randomness = Annotated[
+    List[Fp], Field(min_length=RAND_LEN_FE, max_length=RAND_LEN_FE)
+]
 """
 A type alias representing the randomness `rho`.
 """
@@ -55,7 +61,7 @@ class Signature(BaseModel):
     rho: Randomness = Field(
         ..., max_length=RAND_LEN_FE, min_length=RAND_LEN_FE
     )
-    hashes: List[List[Fp]]
+    hashes: List[HashDigest]
 
 
 class SecretKey(BaseModel):
