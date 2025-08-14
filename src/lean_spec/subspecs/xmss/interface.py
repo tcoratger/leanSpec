@@ -13,7 +13,9 @@ from typing import Tuple
 from .structures import PublicKey, SecretKey, Signature
 
 
-def key_gen() -> Tuple[PublicKey, SecretKey]:
+def key_gen(
+    activation_epoch: int, num_active_epochs: int
+) -> Tuple[PublicKey, SecretKey]:
     """
     Generates a new cryptographic key pair.
 
