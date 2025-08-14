@@ -23,6 +23,11 @@ def key_gen(
     generating a master secret, deriving all one-time keys, and constructing
     the full Merkle tree.
 
+    Args:
+        activation_epoch: The starting epoch for which this key is active.
+        num_active_epochs: The number of consecutive epochs
+        the key is active for.
+
     For the formal specification of this process, please refer to:
     - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
     - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
