@@ -22,8 +22,8 @@ def key_gen() -> Tuple[PublicKey, SecretKey]:
     the full Merkle tree.
 
     For the formal specification of this process, please refer to:
-    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum" [DKKW25a]
-    - "Technical Note: LeanSig for Post-Quantum Ethereum" [DKKW25b]
+    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
+    - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
     raise NotImplementedError(
@@ -43,8 +43,8 @@ def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
     key and epoch for different messages, as this would compromise security.
 
     For the formal specification of this process, please refer to:
-    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum" [DKKW25a]
-    - "Technical Note: LeanSig for Post-Quantum Ethereum" [DKKW25b]
+    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
+    - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
     raise NotImplementedError(
@@ -91,8 +91,8 @@ def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
         `True` if the signature is valid, `False` otherwise.
 
     For the formal specification of this process, please refer to:
-    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum" [DKKW25a]
-    - "Technical Note: LeanSig for Post-Quantum Ethereum" [DKKW25b]
+    - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
+    - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
     raise NotImplementedError(
