@@ -3,7 +3,7 @@
 from pydantic import Field
 from typing_extensions import Annotated
 
-from ..types import uint64
+from ..types.uint64 import uint64
 
 # A type alias for basis points
 #
