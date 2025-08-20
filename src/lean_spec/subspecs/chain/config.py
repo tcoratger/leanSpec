@@ -8,7 +8,7 @@ Lean Consensus Experimental Chain.
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Final
 
-from lean_spec.subspecs.types import BasisPoint, uint64
+from ..types import BasisPoint, uint64
 
 # --- Time Parameters ---
 
