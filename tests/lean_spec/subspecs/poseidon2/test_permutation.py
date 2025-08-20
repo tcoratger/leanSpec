@@ -121,7 +121,7 @@ EXPECTED_24 = [
 )
 def test_permutation_vector(
     params: Poseidon2Params, input_state: List[Fp], expected_output: List[Fp]
-):
+) -> None:
     """
     Tests the Poseidon2 permutation against known answer vectors.
 

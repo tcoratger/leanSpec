@@ -12,7 +12,7 @@ from lean_spec.subspecs.koalabear.field import (
 )
 
 
-def test_constants():
+def test_constants() -> None:
     """Verify field constants."""
     assert P == 2**31 - 2**24 + 1
     assert (P - 1) % (2**TWO_ADICITY) == 0
@@ -20,7 +20,7 @@ def test_constants():
     assert len(TWO_ADIC_GENERATORS) == TWO_ADICITY + 1
 
 
-def test_base_field_arithmetic():
+def test_base_field_arithmetic() -> None:
     """
     Test basic arithmetic, equality, and error handling
     in the base field Fp.
@@ -38,8 +38,8 @@ def test_base_field_arithmetic():
     # Test equality against the same and different types
     assert a == Fp(value=5)
     assert a != b
-    assert (a == 5) is False
-    assert (a != "5") is True
+    assert a != 5  # type: ignore[comparison-overlap]
+    assert a != "5"  # type: ignore[comparison-overlap]
 
     # Test error on inverting the zero element
     with pytest.raises(
@@ -48,7 +48,7 @@ def test_base_field_arithmetic():
         Fp(value=0).inverse()
 
 
-def test_two_adicity():
+def test_two_adicity() -> None:
     """Test the properties and error handling of the two-adic generators."""
     bits = 4  # 2^4 = 16
     gen = Fp.two_adic_generator(bits)
