@@ -110,11 +110,8 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 no_implicit_reexport = true
-namespace_packages = true
-explicit_package_bases = true
-overrides = [
-    { module = "tests.*", ignore_errors = true },
-]
+namespace_packages = false
+explicit_package_bases = false
 
 [tool.pytest.ini_options]
 minversion = "8.3.3"
