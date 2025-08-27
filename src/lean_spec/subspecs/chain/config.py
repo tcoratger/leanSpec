@@ -8,7 +8,7 @@ Lean Consensus Experimental Chain.
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Final
 
-from lean_spec.types import BasisPoint, uint64
+from lean_spec.types import BasisPoint, Uint64
 
 # --- Time Parameters ---
 
@@ -73,15 +73,15 @@ class _ChainConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     # Time Parameters
-    slot_duration_ms: uint64
+    slot_duration_ms: Uint64
     proposer_reorg_cutoff_bps: BasisPoint
     vote_due_bps: BasisPoint
     fast_confirm_due_bps: BasisPoint
     view_freeze_cutoff_bps: BasisPoint
 
     # State List Length Presets
-    historical_roots_limit: uint64
-    validator_registry_limit: uint64
+    historical_roots_limit: Uint64
+    validator_registry_limit: Uint64
 
 
 # The Devnet Chain Configuration.

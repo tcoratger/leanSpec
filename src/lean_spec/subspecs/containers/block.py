@@ -3,7 +3,7 @@
 from pydantic import Field
 from typing_extensions import Annotated
 
-from lean_spec.types import Bytes32, StrictBaseModel, uint64
+from lean_spec.types import Bytes32, StrictBaseModel, Uint64
 
 from ..chain import config
 from .vote import Vote
@@ -26,10 +26,10 @@ class BlockBody(StrictBaseModel):
 class BlockHeader(StrictBaseModel):
     """The header of a block, containing metadata."""
 
-    slot: uint64
+    slot: Uint64
     """The slot in which the block was proposed."""
 
-    proposer_index: uint64
+    proposer_index: Uint64
     """The index of the validator that proposed the block."""
 
     parent_root: Bytes32
@@ -45,10 +45,10 @@ class BlockHeader(StrictBaseModel):
 class Block(StrictBaseModel):
     """Represents a single block in the chain."""
 
-    slot: uint64
+    slot: Uint64
     """The slot in which the block was proposed."""
 
-    proposer_index: uint64
+    proposer_index: Uint64
     """The index of the validator that proposed the block."""
 
     parent_root: Bytes32

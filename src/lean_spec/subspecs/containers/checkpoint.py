@@ -1,6 +1,6 @@
 """Checkpoint Container."""
 
-from lean_spec.types import Bytes32, StrictBaseModel, uint64
+from lean_spec.types import Bytes32, StrictBaseModel, Uint64
 
 
 class Checkpoint(StrictBaseModel):
@@ -9,5 +9,5 @@ class Checkpoint(StrictBaseModel):
     root: Bytes32
     """The root hash of the checkpoint's block."""
 
-    slot: uint64
+    slot: Uint64
     """The slot number of the checkpoint's block."""

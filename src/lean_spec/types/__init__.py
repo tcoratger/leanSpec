@@ -3,10 +3,10 @@
 from .base import StrictBaseModel
 from .basispt import BasisPoint
 from .hash import Bytes32
-from .uint64 import uint64
+from .uint64 import Uint64
 
 __all__ = [
-    "uint64",
+    "Uint64",
     "BasisPoint",
     "Bytes32",
     "StrictBaseModel",
