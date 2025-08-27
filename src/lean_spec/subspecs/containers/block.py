@@ -1,17 +1,15 @@
 """Block Containers."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 from typing_extensions import Annotated
 
 from ..chain import config
-from ..types import Bytes32, uint64
+from ..types import Bytes32, StrictBaseModel, uint64
 from .vote import Vote
 
 
-class BlockBody(BaseModel):
+class BlockBody(StrictBaseModel):
     """The body of a block, containing payload data."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     votes: Annotated[
         list[Vote],
@@ -24,10 +22,8 @@ class BlockBody(BaseModel):
     """
 
 
-class BlockHeader(BaseModel):
+class BlockHeader(StrictBaseModel):
     """The header of a block, containing metadata."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     slot: uint64
     """The slot in which the block was proposed."""
@@ -45,10 +41,8 @@ class BlockHeader(BaseModel):
     """The root of the block's body."""
 
 
-class Block(BaseModel):
+class Block(StrictBaseModel):
     """Represents a single block in the chain."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     slot: uint64
     """The slot in which the block was proposed."""
@@ -66,10 +60,8 @@ class Block(BaseModel):
     """The block's payload."""
 
 
-class SignedBlock(BaseModel):
+class SignedBlock(StrictBaseModel):
     """A container for a block and the proposer's signature."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     message: Block
     """The block data that was signed."""

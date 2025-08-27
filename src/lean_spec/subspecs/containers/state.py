@@ -1,21 +1,18 @@
 """State Container."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 from typing_extensions import Annotated
 
-from lean_spec.subspecs.chain.config import DEVNET_CONFIG
-
-from ..types import uint64
+from ..chain import DEVNET_CONFIG
+from ..types import StrictBaseModel, uint64
 from ..types.hash import Bytes32
 from .block import BlockHeader
 from .checkpoint import Checkpoint
 from .config import Config
 
 
-class State(BaseModel):
+class State(StrictBaseModel):
     """The main consensus state object."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     # Configuration
     config: Config

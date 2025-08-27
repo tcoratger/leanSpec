@@ -1,15 +1,11 @@
 """Vote Containers."""
 
-from pydantic import BaseModel, ConfigDict
-
-from ..types import Bytes32, uint64
+from ..types import Bytes32, StrictBaseModel, uint64
 from .checkpoint import Checkpoint
 
 
-class Vote(BaseModel):
+class Vote(StrictBaseModel):
     """Represents a validator's vote for chain head."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     validator_id: uint64
     """The index of the voting validator."""
@@ -27,10 +23,8 @@ class Vote(BaseModel):
     """The last justified checkpoint known to the validator."""
 
 
-class SignedVote(BaseModel):
+class SignedVote(StrictBaseModel):
     """A container for a vote and its corresponding signature."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     data: Vote
     """The vote data."""
