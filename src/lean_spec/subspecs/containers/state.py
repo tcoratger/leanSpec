@@ -3,9 +3,9 @@
 from pydantic import Field
 from typing_extensions import Annotated
 
-from ..chain import DEVNET_CONFIG
-from ..types import StrictBaseModel, uint64
-from ..types.hash import Bytes32
+from lean_spec.subspecs.chain import DEVNET_CONFIG
+from lean_spec.types import Bytes32, StrictBaseModel, uint64
+
 from .block import BlockHeader
 from .checkpoint import Checkpoint
 from .config import Config

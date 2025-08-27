@@ -3,8 +3,9 @@
 from pydantic import Field
 from typing_extensions import Annotated
 
+from lean_spec.types import Bytes32, StrictBaseModel, uint64
+
 from ..chain import config
-from ..types import Bytes32, StrictBaseModel, uint64
 from .vote import Vote
 
 

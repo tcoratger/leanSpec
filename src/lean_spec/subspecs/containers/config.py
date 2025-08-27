@@ -1,6 +1,6 @@
 """Consensus Configuration Container."""
 
-from ..types import StrictBaseModel, uint64
+from lean_spec.types import StrictBaseModel, uint64
 
 
 class Config(StrictBaseModel):

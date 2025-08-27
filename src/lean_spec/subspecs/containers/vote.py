@@ -1,6 +1,7 @@
 """Vote Containers."""
 
-from ..types import Bytes32, StrictBaseModel, uint64
+from lean_spec.types import Bytes32, StrictBaseModel, uint64
+
 from .checkpoint import Checkpoint
 
 
