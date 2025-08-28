@@ -8,8 +8,8 @@ domain. All messages are SSZ-encoded and then compressed with Snappy frames.
 from pydantic import Field
 from typing_extensions import Annotated
 
-from lean_spec.subspecs.containers import SignedBlock
-from lean_spec.types import Bytes32, StrictBaseModel, Uint64
+from lean_spec.subspecs.containers import Checkpoint, SignedBlock
+from lean_spec.types import Bytes32, StrictBaseModel
 
 from .config import MAX_REQUEST_BLOCKS
 from .types import ProtocolId
@@ -29,17 +29,11 @@ class Status(StrictBaseModel):
     determine if they are on the same chain.
     """
 
-    finalized_root: Bytes32
-    """The root of the client's last finalized checkpoint."""
+    finalized: Checkpoint
+    """The client's latest finalized checkpoint."""
 
-    finalized_slot: Uint64
-    """The slot of the client's last finalized checkpoint."""
-
-    head_root: Bytes32
-    """The root of the client's current head block."""
-
-    head_slot: Uint64
-    """The slot of the client's current head block."""
+    head: Checkpoint
+    """The client's current head checkpoint."""
 
 
 # --- BlocksByRoot v1 ---
