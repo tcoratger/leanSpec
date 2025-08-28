@@ -4,7 +4,7 @@ from pydantic import Field
 from typing_extensions import Annotated
 
 from lean_spec.subspecs.chain import DEVNET_CONFIG
-from lean_spec.types import Bytes32, StrictBaseModel, Uint64
+from lean_spec.types import Bytes32, StrictBaseModel, Uint64, ValidatorIndex
 
 from .block import BlockHeader
 from .checkpoint import Checkpoint
@@ -62,3 +62,7 @@ class State(StrictBaseModel):
         ),
     ]
     """A bitlist of validators who participated in justifications."""
+
+    def is_proposer(self, validator_index: ValidatorIndex) -> bool:
+        """Check if a validator is the proposer for the current slot."""
+        return self.slot % self.config.num_validators == validator_index
