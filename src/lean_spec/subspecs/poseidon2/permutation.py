@@ -1,5 +1,3 @@
-# subspecs/poseidon2/permutation.py
-
 """
 A minimal Python specification for the Poseidon2 permutation.
 
