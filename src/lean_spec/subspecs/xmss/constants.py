@@ -16,6 +16,20 @@ instantiation from the canonical Rust implementation.
 
 from ..koalabear import Fp
 
+PRF_KEY_LENGTH: int = 32
+"""The length of the PRF secret key in bytes."""
+
+
+MAX_TRIES: int = 100_000
+"""
+How often one should try at most to resample a random value.
+
+This is currently based on experiments with the Rust implementation.
+
+Should probably be modified in production.
+"""
+
+
 # =================================================================
 # Core Scheme Configuration
 # =================================================================

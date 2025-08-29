@@ -7,7 +7,14 @@ It exposes the core data structures and the main interface functions.
 
 from .constants import LIFETIME, MESSAGE_LENGTH
 from .interface import key_gen, sign, verify
-from .structures import HashTreeOpening, PublicKey, SecretKey, Signature
+from .merkle_tree import build_tree, get_path, get_root, verify_path
+from .structures import (
+    HashTree,
+    HashTreeOpening,
+    PublicKey,
+    SecretKey,
+    Signature,
+)
 
 __all__ = [
     "key_gen",
@@ -19,4 +26,9 @@ __all__ = [
     "HashTreeOpening",
     "LIFETIME",
     "MESSAGE_LENGTH",
+    "build_tree",
+    "get_path",
+    "get_root",
+    "verify_path",
+    "HashTree",
 ]

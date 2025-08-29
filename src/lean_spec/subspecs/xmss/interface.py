@@ -8,9 +8,21 @@ specification, these are defined as placeholders with detailed documentation.
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import List, Tuple
 
-from .structures import PublicKey, SecretKey, Signature
+from .constants import BASE, DIMENSION, LIFETIME, LOG_LIFETIME
+from .merkle_tree import build_tree, get_root
+from .prf import apply as apply_prf
+from .prf import key_gen as prf_key_gen
+from .structures import HashDigest, PublicKey, SecretKey, Signature
+from .tweak_hash import (
+    TreeTweak,
+    hash_chain,
+    rand_parameter,
+)
+from .tweak_hash import (
+    apply as apply_tweakable_hash,
+)
 
 
 def key_gen(
@@ -19,9 +31,17 @@ def key_gen(
     """
     Generates a new cryptographic key pair. This is a **randomized** algorithm.
 
-    This function is a placeholder. In a real implementation, it would involve
-    generating a master secret, deriving all one-time keys, and constructing
-    the full Merkle tree.
+    This function executes the full key generation process:
+    1.  Generates a master secret (PRF key) and a public hash parameter.
+    2.  For each epoch in the active range, it uses the PRF to derive the
+        secret starting points for all `DIMENSION` hash chains.
+    3.  It computes the public endpoint of each chain by
+        hashing `BASE - 1` times.
+    4.  The list of all chain endpoints for an epoch forms the
+        one-time public key.
+        This one-time public key is hashed to create a single Merkle leaf.
+    5.  A Merkle tree is built over all generated leaves, and its root becomes
+        part of the final public key.
 
     Args:
         activation_epoch: The starting epoch for which this key is active.
@@ -33,10 +53,52 @@ def key_gen(
     - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
-    raise NotImplementedError(
-        "key_gen is not part of this specification. "
-        "See the Rust reference implementation."
+    # Validate the activation range against the scheme's total lifetime.
+    if activation_epoch + num_active_epochs > LIFETIME:
+        raise ValueError("Activation range exceeds the key's lifetime.")
+
+    # Generate the random public parameter `P` and the master PRF key.
+    parameter = rand_parameter()
+    prf_key = prf_key_gen()
+
+    # For each epoch, generate the corresponding Merkle leaf hash.
+    leaf_hashes: List[HashDigest] = []
+    for epoch in range(activation_epoch, activation_epoch + num_active_epochs):
+        # For each epoch, we compute `DIMENSION` chain endpoints.
+        chain_ends: List[HashDigest] = []
+        for chain_index in range(DIMENSION):
+            # Derive the secret start of the chain from the master key.
+            start_digest = apply_prf(prf_key, epoch, chain_index)
+            # Compute the public end of the chain by hashing BASE - 1 times.
+            end_digest = hash_chain(
+                parameter=parameter,
+                epoch=epoch,
+                chain_index=chain_index,
+                start_step=0,
+                num_steps=BASE - 1,
+                start_digest=start_digest,
+            )
+            chain_ends.append(end_digest)
+
+        # The Merkle leaf is the hash of all chain endpoints for this epoch.
+        leaf_tweak = TreeTweak(level=0, index=epoch)
+        leaf_hash = apply_tweakable_hash(parameter, leaf_tweak, chain_ends)
+        leaf_hashes.append(leaf_hash)
+
+    # Build the Merkle tree over the generated leaves.
+    tree = build_tree(LOG_LIFETIME, activation_epoch, parameter, leaf_hashes)
+    root = get_root(tree)
+
+    # Assemble and return the public and secret keys.
+    pk = PublicKey(root=root, parameter=parameter)
+    sk = SecretKey(
+        prf_key=prf_key,
+        tree=tree,
+        parameter=parameter,
+        activation_epoch=activation_epoch,
+        num_active_epochs=num_active_epochs,
     )
+    return pk, sk
 
 
 def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
@@ -44,17 +106,65 @@ def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
     Produces a digital signature for a given message at a specific epoch. This
     is a **randomized** algorithm.
 
-    This function is a placeholder. The signing process involves encoding the
-    message, generating a one-time signature, and providing a Merkle path.
-
     **CRITICAL**: This function must never be called twice with the same secret
     key and epoch for different messages, as this would compromise security.
+
+    The signing process involves:
+        1.  Repeatedly attempting to encode the message with fresh randomness
+            (`rho`) until a valid codeword is found.
+        2.  Computing the one-time signature, which consists of intermediate
+            values from the secret hash chains, determined by the digits of
+            the codeword.
+        3.  Retrieving the Merkle authentication path for the given epoch.
 
     For the formal specification of this process, please refer to:
     - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
     - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
+    # # 1. Check that the key is active for the requested signing epoch.
+    # active_range = range(
+    #     sk.activation_epoch, sk.activation_epoch + sk.num_active_epochs
+    # )
+    # if epoch not in active_range:
+    #     raise ValueError("Key is not active for the specified epoch.")
+
+    # # 2. Find a valid message encoding by trying different randomness `rho`.
+    # codeword = None
+    # rho = None
+    # for _ in range(MAX_TRIES):
+    #     current_rho = rand_rho()
+    #     current_codeword = encode(sk.parameter, message, current_rho, epoch)
+    #     if current_codeword is not None:
+    #         codeword = current_codeword
+    #         rho = current_rho
+    #         break
+
+    # # If no valid encoding is found after many tries, signing fails.
+    # if codeword is None or rho is None:
+    #     raise RuntimeError("Failed to find a valid message encoding.")
+
+    # # 3. Compute the one-time signature hashes based on the codeword.
+    # ots_hashes: List[HashDigest] = []
+    # for chain_index, steps in enumerate(codeword):
+    #     # Derive the secret start of the chain from the master key.
+    #     start_digest = apply_prf(sk.prf_key, epoch, chain_index)
+    #     # Walk the chain for the number of steps given by the codeword digit.
+    #     ots_digest = hash_chain(
+    #         parameter=sk.parameter,
+    #         epoch=epoch,
+    #         chain_index=chain_index,
+    #         start_step=0,
+    #         num_steps=steps,
+    #         start_digest=start_digest,
+    #     )
+    #     ots_hashes.append(ots_digest)
+
+    # # 4. Get the Merkle authentication path for the current epoch.
+    # path = get_path(sk.tree, epoch)
+
+    # # 5. Assemble and return the final signature.
+    # return Signature(path=path, rho=rho, hashes=ots_hashes)
     raise NotImplementedError(
         "sign is not part of this specification. "
         "See the Rust reference implementation."
@@ -104,6 +214,40 @@ def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
     - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
+    # # 1. Re-encode the message using the randomness `rho` from the signature.
+    # #    If the encoding is invalid, the signature is invalid.
+    # codeword = encode(pk.parameter, message, sig.rho, epoch)
+    # if codeword is None:
+    #     return False
+
+    # # 2. Reconstruct the one-time public key (the list of chain endpoints).
+    # chain_ends: List[HashDigest] = []
+    # for chain_index, xi in enumerate(codeword):
+    #     # The signature provides the hash value after `xi` steps.
+    #     start_digest = sig.hashes[chain_index]
+    #     # We must perform the remaining `BASE - 1 - xi` steps
+    #     # to get to the end.
+    #     num_steps_remaining = BASE - 1 - xi
+    #     end_digest = hash_chain(
+    #         parameter=pk.parameter,
+    #         epoch=epoch,
+    #         chain_index=chain_index,
+    #         start_step=xi,
+    #         num_steps=num_steps_remaining,
+    #         start_digest=start_digest,
+    #     )
+    #     chain_ends.append(end_digest)
+
+    # # 3. Verify the Merkle path. This function internally hashes `chain_ends`
+    # #    to get the leaf node and then climbs the tree to recompute the root.
+    # return verify_path(
+    #     parameter=pk.parameter,
+    #     root=pk.root,
+    #     position=epoch,
+    #     leaf_parts=chain_ends,
+    #     opening=sig.path,
+    # )
     raise NotImplementedError(
-        "verify will be implemented in a future update to the specification."
+        "sign is not part of this specification. "
+        "See the Rust reference implementation."
     )
