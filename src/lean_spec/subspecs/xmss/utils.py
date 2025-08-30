@@ -39,3 +39,25 @@ PROD_RAND = Rand(PROD_CONFIG)
 
 TEST_RAND = Rand(TEST_CONFIG)
 """A lightweight instance for test environments."""
+
+
+def int_to_base_p(value: int, num_limbs: int) -> List[Fp]:
+    """
+    Decomposes a large integer into a list of base-P field elements.
+
+    This function performs a standard base conversion, where each "digit"
+    is an element in the prime field F_p.
+
+    Args:
+        value: The integer to decompose.
+        num_limbs: The desired number of output field elements (limbs).
+
+    Returns:
+        A list of `num_limbs` field elements representing the integer.
+    """
+    limbs: List[Fp] = []
+    acc = value
+    for _ in range(num_limbs):
+        limbs.append(Fp(value=acc % P))
+        acc //= P
+    return limbs

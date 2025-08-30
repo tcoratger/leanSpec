@@ -2,8 +2,6 @@
 Tests for the "Top Level" message hashing and encoding logic.
 """
 
-from typing import List
-
 from lean_spec.subspecs.koalabear import Fp, P
 from lean_spec.subspecs.xmss.constants import (
     TEST_CONFIG,
@@ -12,7 +10,7 @@ from lean_spec.subspecs.xmss.constants import (
 from lean_spec.subspecs.xmss.message_hash import (
     TEST_MESSAGE_HASHER,
 )
-from lean_spec.subspecs.xmss.utils import TEST_RAND
+from lean_spec.subspecs.xmss.utils import TEST_RAND, int_to_base_p
 
 
 def test_encode_message() -> None:
@@ -29,10 +27,7 @@ def test_encode_message() -> None:
     # All-max message (0xff)
     msg_max = b"\xff" * config.MESSAGE_LENGTH
     acc = int.from_bytes(msg_max, "little")
-    expected_max: List[Fp] = []
-    for _ in range(config.MSG_LEN_FE):
-        expected_max.append(Fp(value=acc))
-        acc //= P
+    expected_max = int_to_base_p(acc, config.MSG_LEN_FE)
     assert hasher.encode_message(msg_max) == expected_max
 
 
@@ -47,10 +42,7 @@ def test_encode_epoch() -> None:
     test_epochs = [0, 42, 2**32 - 1]
     for epoch in test_epochs:
         acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE.value
-        expected: List[Fp] = []
-        for _ in range(config.TWEAK_LEN_FE):
-            expected.append(Fp(value=acc))
-            acc //= P
+        expected = int_to_base_p(acc, config.TWEAK_LEN_FE)
         assert hasher.encode_epoch(epoch) == expected
 
     # Test for injectivity. It is highly unlikely for a collision to occur

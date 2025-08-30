@@ -21,9 +21,10 @@ from lean_spec.subspecs.xmss.poseidon import (
     TEST_POSEIDON,
     PoseidonXmss,
 )
+from lean_spec.subspecs.xmss.utils import int_to_base_p
 from lean_spec.types.base import StrictBaseModel
 
-from ..koalabear import Fp, P
+from ..koalabear import Fp
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
@@ -102,11 +103,7 @@ class TweakHasher:
         # This is a standard base-P decomposition.
         #
         # The number of elements is determined by the `length` parameter.
-        elements: List[Fp] = []
-        for _ in range(length):
-            elements.append(Fp(value=acc))
-            acc //= P
-        return elements
+        return int_to_base_p(acc, length)
 
     def apply(
         self,

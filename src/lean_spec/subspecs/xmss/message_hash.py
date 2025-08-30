@@ -20,6 +20,7 @@ from lean_spec.subspecs.xmss.poseidon import (
     TEST_POSEIDON,
     PoseidonXmss,
 )
+from lean_spec.subspecs.xmss.utils import int_to_base_p
 
 from ..koalabear import Fp, P
 from .constants import (
@@ -51,11 +52,7 @@ class MessageHasher:
         acc = int.from_bytes(message, "little")
 
         # Decompose the integer into a list of field elements (base-P).
-        elements: List[Fp] = []
-        for _ in range(self.config.MSG_LEN_FE):
-            elements.append(Fp(value=acc))
-            acc //= P
-        return elements
+        return int_to_base_p(acc, self.config.MSG_LEN_FE)
 
     def encode_epoch(self, epoch: int) -> List[Fp]:
         """Encodes epoch and domain separator into a list of field elements."""
@@ -63,11 +60,7 @@ class MessageHasher:
         acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE.value
 
         # Decompose the integer into its base-P representation.
-        elements: List[Fp] = []
-        for _ in range(self.config.TWEAK_LEN_FE):
-            elements.append(Fp(value=acc))
-            acc //= P
-        return elements
+        return int_to_base_p(acc, self.config.TWEAK_LEN_FE)
 
     def _map_into_hypercube_part(self, field_elements: List[Fp]) -> List[int]:
         """

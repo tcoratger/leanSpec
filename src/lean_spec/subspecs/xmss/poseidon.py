@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import List
 
-from ..koalabear import Fp, P
+from lean_spec.subspecs.xmss.utils import int_to_base_p
+
+from ..koalabear import Fp
 from ..poseidon2.permutation import PARAMS_16, PARAMS_24, permute
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
 from .structures import HashDigest
@@ -76,10 +78,7 @@ class PoseidonXmss:
         # Decompose the integer into a list of 24 field elements for hashing.
         #
         # 24 is the fixed input width for this specific domain separation hash.
-        input_vec: List[Fp] = []
-        for _ in range(24):
-            input_vec.append(Fp(value=acc))
-            acc //= P
+        input_vec = int_to_base_p(acc, 24)
 
         # Compress the decomposed vector to produce the capacity value.
         return self.compress(input_vec, 24, capacity_len)
