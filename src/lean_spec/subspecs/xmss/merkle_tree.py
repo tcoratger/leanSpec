@@ -24,7 +24,7 @@ from lean_spec.subspecs.xmss.constants import (
     XmssConfig,
 )
 
-from .structures import (
+from .containers import (
     HashDigest,
     HashTree,
     HashTreeLayer,
@@ -113,6 +113,10 @@ class MerkleTree:
         Returns:
             The fully constructed `HashTree` object.
         """
+        # Check there is enough space for the leafs in the tree.
+        if start_index + len(leaf_hashes) > 2**depth:
+            raise ValueError("Not enough space for leafs in the tree.")
+
         # Start with the leaf hashes and apply the initial padding.
         layers: List[HashTreeLayer] = []
         current_layer = self._get_padded_layer(leaf_hashes, start_index)
@@ -147,12 +151,12 @@ class MerkleTree:
 
         return HashTree(depth=depth, layers=layers)
 
-    def get_root(self, tree: HashTree) -> HashDigest:
+    def root(self, tree: HashTree) -> HashDigest:
         """Extracts the root digest from a constructed Merkle tree."""
         # The root is the single node in the final layer.
         return tree.layers[-1].nodes[0]
 
-    def get_path(self, tree: HashTree, position: int) -> HashTreeOpening:
+    def path(self, tree: HashTree, position: int) -> HashTreeOpening:
         """
         Computes the Merkle authentication path for a leaf at a given position.
 
@@ -167,6 +171,17 @@ class MerkleTree:
         Returns:
             A `HashTreeOpening` object containing the co-path.
         """
+        # Check that there is at least one layer in the tree.
+        if len(tree.layers) == 0:
+            raise ValueError("Cannot generate path for empty tree.")
+
+        # Check that the position is within the tree's range.
+        if position < tree.layers[0].start_index:
+            raise ValueError("Position (before start) is invalid.")
+
+        if position >= tree.layers[0].start_index + len(tree.layers[0].nodes):
+            raise ValueError("Position (after end) is invalid.")
+
         co_path: List[HashDigest] = []
         current_position = position
 
@@ -212,6 +227,17 @@ class MerkleTree:
         Returns:
             `True` if the path is valid, `False` otherwise.
         """
+        # Compute the depth
+        depth = len(opening.siblings)
+        # Compute the number of leafs in the tree
+        num_leafs = 2**depth
+        # Check that the tree depth is at most 32.
+        if len(opening.siblings) > 32:
+            raise ValueError("Tree depth must be at most 32.")
+        # Check that the position and path length match.
+        if position >= num_leafs:
+            raise ValueError("Position and path length do not match.")
+
         # The first step is to hash the constituent parts of the leaf to get
         # the actual node at layer 0 of the tree.
         leaf_tweak = TreeTweak(level=0, index=position)

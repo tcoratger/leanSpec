@@ -1,4 +1,4 @@
-"""Defines the data structures for the Generalized XMSS signature scheme."""
+"""Defines the data containers for the Generalized XMSS signature scheme."""
 
 from typing import Annotated, List
 

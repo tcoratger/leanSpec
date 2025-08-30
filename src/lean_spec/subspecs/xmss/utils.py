@@ -5,7 +5,7 @@ from typing import List
 
 from ..koalabear import Fp, P
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .structures import HashDigest, Parameter, Randomness
+from .containers import HashDigest, Parameter, Randomness
 
 
 class Rand:

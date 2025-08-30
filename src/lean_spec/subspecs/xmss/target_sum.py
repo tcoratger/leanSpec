@@ -9,12 +9,12 @@ top of the message hash output.
 from typing import List, Optional
 
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
+from .containers import Parameter, Randomness
 from .message_hash import (
     PROD_MESSAGE_HASHER,
     TEST_MESSAGE_HASHER,
     MessageHasher,
 )
-from .structures import Parameter, Randomness
 
 
 class TargetSumEncoder:
@@ -33,8 +33,7 @@ class TargetSumEncoder:
 
         This function first uses the message hash to map the input to a vertex
         in the hypercube. It then checks if the sum of the vertex's coordinates
-        matches the scheme's `TARGET_SUM`. This filtering step is the core of
-        the Target Sum scheme.
+        matches the scheme's `TARGET_SUM`.
 
         Args:
             parameter: The public parameter `P`.

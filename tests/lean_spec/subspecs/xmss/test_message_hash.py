@@ -2,7 +2,7 @@
 Tests for the "Top Level" message hashing and encoding logic.
 """
 
-from lean_spec.subspecs.koalabear import Fp, P
+from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.constants import (
     TEST_CONFIG,
     TWEAK_PREFIX_MESSAGE,

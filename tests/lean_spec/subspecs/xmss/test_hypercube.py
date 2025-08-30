@@ -1,12 +1,4 @@
-"""
-Tests for the hypercube mathematical operations.
-
-This module provides extensive tests for the hypercube logic, ensuring that
-the precomputation of layer sizes is correct and that the mappings between
-integer indices and hypercube vertices are bijective and accurate.
-
-The tests are designed to be an exact equivalent of the Rust reference tests.
-"""
+"""Tests for the hypercube mathematical operations."""
 
 import math
 from functools import lru_cache
@@ -16,9 +8,9 @@ import pytest
 
 from lean_spec.subspecs.xmss.hypercube import (
     MAX_DIMENSION,
-    find_layer,
-    get_hypercube_part_size,
     get_layer_size,
+    hypercube_find_layer,
+    hypercube_part_size,
     map_to_vertex,
     prepare_layer_info,
 )
@@ -27,6 +19,7 @@ from lean_spec.subspecs.xmss.hypercube import (
 def map_to_integer(w: int, v: int, d: int, a: List[int]) -> int:
     """
     Maps a vertex `a` in layer `d` back to its integer index.
+
     This is a direct translation of the reference Rust implementation.
     """
     if len(a) != v:
@@ -144,39 +137,39 @@ def test_get_hypercube_part_size(
     w: int, v: int, d: int, expected_size: int
 ) -> None:
     """
-    Tests `get_hypercube_part_size` with known values from the Rust tests.
+    Tests `hypercube_part_size` with known values from the Rust tests.
     """
-    assert get_hypercube_part_size(w, v, d) == expected_size
+    assert hypercube_part_size(w, v, d) == expected_size
 
 
 def test_find_layer_boundaries() -> None:
     """
-    Tests `find_layer` with specific boundary-crossing values.
+    Tests `hypercube_find_layer` with specific boundary-crossing values.
     """
     w, v = 3, 2
     # Layer sizes for (w=3, v=2) are [1, 2, 3, 2, 1]
     # Prefix sums are [1, 3, 6, 8, 9]
 
     # x=0 is the 1st element, which is in layer 0. Remainder is 0.
-    assert find_layer(w, v, 0) == (0, 0)
+    assert hypercube_find_layer(w, v, 0) == (0, 0)
     # x=1 is the 2nd element, which is the 1st element in layer 1.
     # Remainder is 0.
-    assert find_layer(w, v, 1) == (1, 0)
+    assert hypercube_find_layer(w, v, 1) == (1, 0)
     # x=2 is the 3rd element, which is the 2nd element in layer 1.
     # Remainder is 1.
-    assert find_layer(w, v, 2) == (1, 1)
+    assert hypercube_find_layer(w, v, 2) == (1, 1)
     # x=3 is the 4th element, which is the 1st element in layer 2.
     # Remainder is 0.
-    assert find_layer(w, v, 3) == (2, 0)
+    assert hypercube_find_layer(w, v, 3) == (2, 0)
     # x=5 is the 6th element, which is the third (last) element in layer 3.
     # Remainder is 2.
-    assert find_layer(w, v, 5) == (2, 2)
+    assert hypercube_find_layer(w, v, 5) == (2, 2)
     # x=6 is the 7th element, which is the first element in layer 3.
     # Remainder is 0.
-    assert find_layer(w, v, 6) == (3, 0)
+    assert hypercube_find_layer(w, v, 6) == (3, 0)
     # x=8 is the 9th element, which is the 1st element in layer 4.
     # Remainder is 0.
-    assert find_layer(w, v, 8) == (4, 0)
+    assert hypercube_find_layer(w, v, 8) == (4, 0)
 
 
 def test_map_to_vertex_roundtrip() -> None:

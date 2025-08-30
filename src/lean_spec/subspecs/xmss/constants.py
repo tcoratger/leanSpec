@@ -18,8 +18,6 @@ We also provide a test instantiation for testing purposes.
    specification in the future.
 """
 
-from typing import TypeVar
-
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Final
 
@@ -47,7 +45,6 @@ class XmssConfig(BaseModel):
         """
         return 1 << self.LOG_LIFETIME
 
-    # --- Target Sum WOTS Parameters ---
     DIMENSION: int
     """The total number of hash chains, `v`."""
 
@@ -67,8 +64,6 @@ class XmssConfig(BaseModel):
     This is currently based on experiments with the Rust implementation.
     Should probably be modified in production.
     """
-
-    # --- Hash and Encoding Length Parameters (in field elements) ---
 
     PARAMETER_LEN: int
     """
@@ -103,9 +98,6 @@ class XmssConfig(BaseModel):
         """Total output length for the message hash."""
         return self.POS_OUTPUT_LEN_PER_INV_FE * self.POS_INVOCATIONS
 
-
-Config = TypeVar("Config", bound=XmssConfig)
-"""A type variable representing any XmssConfig instance."""
 
 PROD_CONFIG: Final = XmssConfig(
     MESSAGE_LENGTH=32,

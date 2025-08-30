@@ -1,4 +1,4 @@
-"""Defines the Tweakable Hash function using the Poseidon2 permutation."""
+"""Defines the Poseidon2 hash functions for the Generalized XMSS scheme."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ..poseidon2.permutation import (
     Poseidon2Params,
     permute,
 )
-from .structures import HashDigest
+from .containers import HashDigest
 
 
 class PoseidonXmss:
@@ -40,6 +40,12 @@ class PoseidonXmss:
         Returns:
             A hash digest of `output_len` field elements.
         """
+        # Check that the input vector is long enough to produce the output.
+        if len(input_vec) < output_len:
+            raise ValueError(
+                "Input vector is too short for requested output length."
+            )
+
         # Select the correct permutation parameters based on the state width.
         assert width in (16, 24), "Width must be 16 or 24"
         params = self.params16 if width == 16 else self.params24
@@ -90,7 +96,11 @@ class PoseidonXmss:
         return self.compress(input_vec, 24, capacity_len)
 
     def sponge(
-        self, input_vec: List[Fp], capacity_value: List[Fp], output_len: int
+        self,
+        input_vec: List[Fp],
+        capacity_value: List[Fp],
+        output_len: int,
+        width: int,
     ) -> HashDigest:
         """
         A low-level wrapper for Poseidon2 in sponge mode.
@@ -99,13 +109,20 @@ class PoseidonXmss:
             input_vec: The input data of arbitrary length.
             capacity_value: A domain-separating value.
             output_len: The number of field elements in the output digest.
+            width: The width of the Poseidon2 permutation.
 
         Returns:
             A hash digest of `output_len` field elements.
         """
-        # Use the width-24 permutation for the sponge.
-        params = self.params24
-        width = params.width
+        # Ensure that the capacity value is not too long.
+        if len(capacity_value) >= width:
+            raise ValueError(
+                "Capacity length must be smaller than the state width."
+            )
+
+        # Get the correct permutation parameters.
+        assert width in (16, 24), "Width must be 16 or 24"
+        params = self.params16 if width == 16 else self.params24
         rate = width - len(capacity_value)
 
         # Pad the input vector to be an exact multiple of the rate.

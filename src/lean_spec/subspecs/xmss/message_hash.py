@@ -29,8 +29,12 @@ from .constants import (
     TWEAK_PREFIX_MESSAGE,
     XmssConfig,
 )
-from .hypercube import find_layer, get_hypercube_part_size, map_to_vertex
-from .structures import Parameter, Randomness
+from .containers import Parameter, Randomness
+from .hypercube import (
+    hypercube_find_layer,
+    hypercube_part_size,
+    map_to_vertex,
+)
 
 
 class MessageHasher:
@@ -79,13 +83,15 @@ class MessageHasher:
         #
         # The target domain is the set of all vertices
         # in layers 0..FINAL_LAYER.
-        domain_size = get_hypercube_part_size(
+        domain_size = hypercube_part_size(
             config.BASE, config.DIMENSION, config.FINAL_LAYER
         )
         acc %= domain_size
 
         # Find which layer the resulting index falls into, and its offset.
-        layer, offset = find_layer(config.BASE, config.DIMENSION, acc)
+        layer, offset = hypercube_find_layer(
+            config.BASE, config.DIMENSION, acc
+        )
 
         # Map the offset within the layer to a unique vertex.
         return map_to_vertex(config.BASE, config.DIMENSION, layer, offset)

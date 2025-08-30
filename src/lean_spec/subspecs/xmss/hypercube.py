@@ -7,7 +7,7 @@ is the partitioning of the hypercube's vertices into "layers". A vertex belongs
 to layer `d`, where `d` is its distance from the sink vertex `(w-1, ..., w-1)`.
 
 The core functionalities are:
-1.  **Precomputation and Caching**: Efficiently calculates and caches the sizes
+1.  **Precomputation and Caching**: Computes and caches the sizes
     of each layer for different hypercube configurations (`w` and `v`).
 2.  **Mapping**: Provides bijective mappings between an integer index within a
     layer and the unique vertex (a list of coordinates) it represents.
@@ -60,15 +60,11 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
     """
     Precomputes and caches the number of vertices in each layer of a hypercube.
 
-    This function is a crucial precomputation step for the mapping algorithms
-    used in the "Top Level Target Sum" encoding.
     It calculates the size of every layer for hypercubes with a given
     base `w` (where coordinates are in `[0, w-1]`) for all dimensions
     `v` up to `MAX_DIMENSION`.
 
-    The calculation is inductive: the layer sizes for a `v`-dimensional
-    hypercube are efficiently derived from the already-computed sizes
-    of a `(v-1)`-dimensional hypercube, based on the recurrence relation from
+    This precomputation is based on the recurrence relation from
     Lemma 8 of the paper "At the top of the hypercube" (eprint 2025/889).
 
     Args:
@@ -87,6 +83,7 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
     #
     # For a 1-dimensional hypercube (v=1), which is just a line of `w` points
     # with coordinates [0], [1], ..., [w-1].
+    #
     # The distance `d` from the sink `[w-1]` is simply `(w-1) - coordinate`.
 
     # Each of the `w` possible layers contains exactly one vertex.
@@ -96,8 +93,6 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
     # Store the result for v=1, which will seed the inductive step.
     all_info[1] = LayerInfo(sizes=dim1_sizes, prefix_sums=dim1_prefix_sums)
 
-    # INDUCTIVE STEP
-    #
     # Now, build the layer info for all higher dimensions up to the maximum.
     for v in range(2, MAX_DIMENSION + 1):
         # The maximum possible distance `d` in a v-dimensional hypercube.
@@ -118,17 +113,19 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
 
             # Translate the sum over `j` to an index range `k`,
             # where k = d - j.
+            #
             # This allows for an efficient lookup using prefix sums.
             k_min = d - j_max
             k_max = d - j_min
 
-            # Efficiently calculate the sum using the precomputed prefix sums
+            # Calculate the sum using the precomputed prefix sums
             # from the previous dimension's `LayerInfo`.
             layer_size = prev_layer_info.sizes_sum_in_range(k_min, k_max)
             current_sizes.append(layer_size)
 
         # After computing all layer sizes for dimension `v`, we compute their
         # prefix sums.
+        #
         # This is needed for the *next* iteration (for dimension v+1).
         current_prefix_sums: List[int] = []
         current_sum = 0
@@ -150,12 +147,12 @@ def get_layer_size(w: int, v: int, d: int) -> int:
     return prepare_layer_info(w)[v].sizes[d]
 
 
-def get_hypercube_part_size(w: int, v: int, d: int) -> int:
+def hypercube_part_size(w: int, v: int, d: int) -> int:
     """Returns the total size of layers 0 to `d` (inclusive)."""
     return prepare_layer_info(w)[v].prefix_sums[d]
 
 
-def find_layer(w: int, v: int, x: int) -> Tuple[int, int]:
+def hypercube_find_layer(w: int, v: int, x: int) -> Tuple[int, int]:
     """
     Given a global index `x`, finds the layer `d` it belongs to and its
     local index (`remainder`) within that layer.
@@ -173,8 +170,16 @@ def find_layer(w: int, v: int, x: int) -> Tuple[int, int]:
     d = bisect.bisect_left(prefix_sums, x + 1)
 
     if d == 0:
+        # `x` is in the very first layer (d=0).
+        #
+        # The remainder is `x` itself, as the cumulative size of
+        # preceding layers is zero.
         remainder = x
     else:
+        # The cumulative size of all layers up to `d-1` is
+        # at `prefix_sums[d - 1]`.
+        #
+        # The remainder is `x` minus this cumulative size.
         remainder = x - prefix_sums[d - 1]
 
     return d, remainder

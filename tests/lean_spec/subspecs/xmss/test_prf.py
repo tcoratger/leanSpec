@@ -1,6 +1,4 @@
-"""
-Tests for the SHAKE128-based pseudorandom function (PRF).
-"""
+"""Tests for the SHAKE128-based pseudorandom function (PRF)."""
 
 from lean_spec.subspecs.xmss.constants import (
     PRF_KEY_LENGTH,

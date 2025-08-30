@@ -9,10 +9,6 @@ from lean_spec.subspecs.xmss.interface import (
     GeneralizedXmssScheme,
 )
 
-# =================================================================
-# Test Helper Function
-# =================================================================
-
 
 def _test_correctness_roundtrip(
     scheme: GeneralizedXmssScheme,
@@ -74,10 +70,7 @@ def _test_correctness_roundtrip(
 def test_signature_scheme_correctness(
     activation_epoch: int, num_active_epochs: int, description: str
 ) -> None:
-    """
-    Runs an end-to-end test of the signature scheme using the lightweight
-    TEST_SCHEME configuration across various lifetime scenarios.
-    """
+    """Runs an end-to-end test of the signature scheme."""
     _test_correctness_roundtrip(
         scheme=TEST_SIGNATURE_SCHEME,
         activation_epoch=activation_epoch,

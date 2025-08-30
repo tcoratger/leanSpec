@@ -1,18 +1,12 @@
-"""
-Tests for the sparse Merkle tree implementation.
-
-This module verifies the correctness of the Merkle tree construction,
-path generation, and verification logic by performing a full
-"commit-open-verify" roundtrip across various tree configurations.
-"""
+"""Tests for the sparse Merkle tree implementation."""
 
 import pytest
 
+from lean_spec.subspecs.xmss.containers import HashDigest
 from lean_spec.subspecs.xmss.merkle_tree import (
     PROD_MERKLE_TREE,
     MerkleTree,
 )
-from lean_spec.subspecs.xmss.structures import HashDigest
 from lean_spec.subspecs.xmss.tweak_hash import (
     TreeTweak,
 )
@@ -59,12 +53,12 @@ def _run_commit_open_verify_roundtrip(
 
     # COMMIT: Build the Merkle tree from the leaf hashes.
     tree = merkle_tree.build(depth, start_index, parameter, leaf_hashes)
-    root = merkle_tree.get_root(tree)
+    root = merkle_tree.root(tree)
 
     # OPEN & VERIFY: For each leaf, generate and verify its path.
     for i, leaf_parts in enumerate(leaves):
         position = start_index + i
-        opening = merkle_tree.get_path(tree, position)
+        opening = merkle_tree.path(tree, position)
         is_valid = merkle_tree.verify_path(
             parameter, root, position, leaf_parts, opening
         )
@@ -91,10 +85,7 @@ def test_commit_open_verify_roundtrip(
     leaf_parts_len: int,
     description: str,
 ) -> None:
-    """
-    Tests the Merkle tree logic for various configurations using test-specific
-    tree depths for efficiency.
-    """
+    """Tests the Merkle tree logic for various configurations."""
     # Ensure the test case parameters are valid for the specified tree depth.
     assert start_index + num_leaves <= (1 << depth)
 

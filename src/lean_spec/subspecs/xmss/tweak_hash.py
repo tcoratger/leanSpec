@@ -1,13 +1,4 @@
-"""
-Defines the Tweakable Hash function using Poseidon2.
-
-This module implements the core hashing logic for the XMSS scheme, including:
-1.  **Tweak Encoding**: Domain-separating different hash usages (chains/trees).
-2.  **Poseidon2 Compression**: Hashing fixed-size inputs.
-3.  **Poseidon2 Sponge**: Hashing variable-length inputs (e.g., leaf nodes).
-4.  **A unified `apply` function** that dispatches to the correct mode.
-5.  **A `chain` utility** to perform repeated hashing for WOTS chains.
-"""
+"""Defines the Tweakable Hash function using Poseidon2."""
 
 from __future__ import annotations
 
@@ -32,7 +23,7 @@ from .constants import (
     TWEAK_PREFIX_TREE,
     XmssConfig,
 )
-from .structures import HashDigest, Parameter
+from .containers import HashDigest, Parameter
 
 
 class TreeTweak(StrictBaseModel):
@@ -168,7 +159,7 @@ class TweakHasher:
             )
 
             return self.poseidon.sponge(
-                input_vec, capacity_value, config.HASH_LEN_FE
+                input_vec, capacity_value, config.HASH_LEN_FE, 24
             )
 
     def hash_chain(

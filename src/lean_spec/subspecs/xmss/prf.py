@@ -20,7 +20,7 @@ from lean_spec.subspecs.xmss.constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from lean_spec.subspecs.xmss.structures import PRFKey
+from lean_spec.subspecs.xmss.containers import PRFKey
 from lean_spec.types.uint64 import Uint64
 
 PRF_DOMAIN_SEP: bytes = bytes(

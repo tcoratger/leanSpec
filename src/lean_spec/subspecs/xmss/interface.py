@@ -21,13 +21,13 @@ from .constants import (
     TEST_CONFIG,
     XmssConfig,
 )
+from .containers import HashDigest, PublicKey, SecretKey, Signature
 from .merkle_tree import (
     PROD_MERKLE_TREE,
     TEST_MERKLE_TREE,
     MerkleTree,
 )
 from .prf import PROD_PRF, TEST_PRF, Prf
-from .structures import HashDigest, PublicKey, SecretKey, Signature
 from .tweak_hash import (
     PROD_TWEAK_HASHER,
     TEST_TWEAK_HASHER,
@@ -130,7 +130,7 @@ class GeneralizedXmssScheme:
         tree = self.merkle_tree.build(
             config.LOG_LIFETIME, activation_epoch, parameter, leaf_hashes
         )
-        root = self.merkle_tree.get_root(tree)
+        root = self.merkle_tree.root(tree)
 
         # Assemble and return the public and secret keys.
         pk = PublicKey(root=root, parameter=parameter)
@@ -180,10 +180,13 @@ class GeneralizedXmssScheme:
         codeword = None
         rho = None
         for _ in range(config.MAX_TRIES):
+            # Sample a randomness `rho` and try to encode the message.
             current_rho = self.rand.rho()
             current_codeword = self.encoder.encode(
                 sk.parameter, message, current_rho, epoch
             )
+
+            # If a valid codeword is found, break out of the loop.
             if current_codeword is not None:
                 codeword = current_codeword
                 rho = current_rho
@@ -192,6 +195,12 @@ class GeneralizedXmssScheme:
         # If no valid encoding is found after many tries, signing fails.
         if codeword is None or rho is None:
             raise RuntimeError("Failed to find a valid message encoding.")
+
+        # Sanity check: the encoding must have the correct number of chunks.
+        if len(codeword) != self.config.DIMENSION:
+            raise RuntimeError(
+                "Encoding is broken: returned too many or too few chunks."
+            )
 
         # Compute the one-time signature hashes based on the codeword.
         ots_hashes: List[HashDigest] = []
@@ -211,7 +220,7 @@ class GeneralizedXmssScheme:
             ots_hashes.append(ots_digest)
 
         # Get the Merkle authentication path for the current epoch.
-        path = self.merkle_tree.get_path(sk.tree, epoch)
+        path = self.merkle_tree.path(sk.tree, epoch)
 
         # Assemble and return the final signature.
         return Signature(path=path, rho=rho, hashes=ots_hashes)
@@ -229,6 +238,7 @@ class GeneralizedXmssScheme:
         1.  **Re-encode Message**: The verifier uses the randomness `rho`
             from the signature to re-compute the codeword
             $x = (x_1, \dots, x_v)$ from the message `m`.
+
             This includes calculating the checksum or checking the target sum.
 
         2.  **Reconstruct One-Time Public Key**: For each intermediate
@@ -246,6 +256,7 @@ class GeneralizedXmssScheme:
         4.  **Verify Merkle Path**: The verifier uses the `path` from
             the signature to compute a candidate Merkle root starting from
             the computed leaf.
+
             Verification succeeds if and only if this candidate root matches
             the `root` in the `PublicKey`.
 
@@ -265,6 +276,10 @@ class GeneralizedXmssScheme:
         """
         # Get the config for this scheme.
         config = self.config
+
+        # Check that the signature is for a valid epoch.
+        if epoch > self.config.LIFETIME:
+            raise ValueError("The signature is for a future epoch.")
 
         # Re-encode the message using the randomness `rho` from the signature.
         #
@@ -291,8 +306,10 @@ class GeneralizedXmssScheme:
             )
             chain_ends.append(end_digest)
 
-        # Verify the Merkle path. This function internally hashes `chain_ends`
-        # to get the leaf node and then climbs the tree to recompute the root.
+        # Verify the Merkle path.
+        #
+        # This function internally hashes `chain_ends` to get the leaf node
+        # and then climbs the tree to recompute the root.
         return self.merkle_tree.verify_path(
             parameter=pk.parameter,
             root=pk.root,
