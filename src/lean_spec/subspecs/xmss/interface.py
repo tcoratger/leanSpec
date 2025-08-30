@@ -1,17 +1,19 @@
 """
 Defines the core interface for the Generalized XMSS signature scheme.
 
-Specification for the high-level functions (`key_gen`, `sign`, `verify`)
-that constitute the public API of the signature scheme. For the purpose of this
-specification, these are defined as placeholders with detailed documentation.
+Specification for the high-level functions (`key_gen`, `sign`, `verify`).
+
+This constitutes the public API of the signature scheme.
 """
 
 from __future__ import annotations
 
 from typing import List, Tuple
 
-from .constants import BASE, DIMENSION, LIFETIME, LOG_LIFETIME
-from .merkle_tree import build_tree, get_root
+from lean_spec.subspecs.xmss.target_sum import encode
+
+from .constants import BASE, DIMENSION, LIFETIME, LOG_LIFETIME, MAX_TRIES
+from .merkle_tree import build_tree, get_path, get_root, verify_path
 from .prf import apply as apply_prf
 from .prf import key_gen as prf_key_gen
 from .structures import HashDigest, PublicKey, SecretKey, Signature
@@ -22,7 +24,7 @@ from .tweak_hash import (
 from .tweak_hash import (
     apply as apply_tweakable_hash,
 )
-from .utils import rand_parameter
+from .utils import rand_parameter, rand_rho
 
 
 def key_gen(
@@ -122,53 +124,49 @@ def sign(sk: SecretKey, epoch: int, message: bytes) -> Signature:
     - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
-    # # 1. Check that the key is active for the requested signing epoch.
-    # active_range = range(
-    #     sk.activation_epoch, sk.activation_epoch + sk.num_active_epochs
-    # )
-    # if epoch not in active_range:
-    #     raise ValueError("Key is not active for the specified epoch.")
-
-    # # 2. Find a valid message encoding by trying different randomness `rho`.
-    # codeword = None
-    # rho = None
-    # for _ in range(MAX_TRIES):
-    #     current_rho = rand_rho()
-    #     current_codeword = encode(sk.parameter, message, current_rho, epoch)
-    #     if current_codeword is not None:
-    #         codeword = current_codeword
-    #         rho = current_rho
-    #         break
-
-    # # If no valid encoding is found after many tries, signing fails.
-    # if codeword is None or rho is None:
-    #     raise RuntimeError("Failed to find a valid message encoding.")
-
-    # # 3. Compute the one-time signature hashes based on the codeword.
-    # ots_hashes: List[HashDigest] = []
-    # for chain_index, steps in enumerate(codeword):
-    #     # Derive the secret start of the chain from the master key.
-    #     start_digest = apply_prf(sk.prf_key, epoch, chain_index)
-    #     # Walk the chain for the number of steps given by the codeword digit.
-    #     ots_digest = hash_chain(
-    #         parameter=sk.parameter,
-    #         epoch=epoch,
-    #         chain_index=chain_index,
-    #         start_step=0,
-    #         num_steps=steps,
-    #         start_digest=start_digest,
-    #     )
-    #     ots_hashes.append(ots_digest)
-
-    # # 4. Get the Merkle authentication path for the current epoch.
-    # path = get_path(sk.tree, epoch)
-
-    # # 5. Assemble and return the final signature.
-    # return Signature(path=path, rho=rho, hashes=ots_hashes)
-    raise NotImplementedError(
-        "sign is not part of this specification. "
-        "See the Rust reference implementation."
+    # Check that the key is active for the requested signing epoch.
+    active_range = range(
+        sk.activation_epoch, sk.activation_epoch + sk.num_active_epochs
     )
+    if epoch not in active_range:
+        raise ValueError("Key is not active for the specified epoch.")
+
+    # Find a valid message encoding by trying different randomness `rho`.
+    codeword = None
+    rho = None
+    for _ in range(MAX_TRIES):
+        current_rho = rand_rho()
+        current_codeword = encode(sk.parameter, message, current_rho, epoch)
+        if current_codeword is not None:
+            codeword = current_codeword
+            rho = current_rho
+            break
+
+    # If no valid encoding is found after many tries, signing fails.
+    if codeword is None or rho is None:
+        raise RuntimeError("Failed to find a valid message encoding.")
+
+    # Compute the one-time signature hashes based on the codeword.
+    ots_hashes: List[HashDigest] = []
+    for chain_index, steps in enumerate(codeword):
+        # Derive the secret start of the chain from the master key.
+        start_digest = apply_prf(sk.prf_key, epoch, chain_index)
+        # Walk the chain for the number of steps given by the codeword digit.
+        ots_digest = hash_chain(
+            parameter=sk.parameter,
+            epoch=epoch,
+            chain_index=chain_index,
+            start_step=0,
+            num_steps=steps,
+            start_digest=start_digest,
+        )
+        ots_hashes.append(ots_digest)
+
+    # Get the Merkle authentication path for the current epoch.
+    path = get_path(sk.tree, epoch)
+
+    # Assemble and return the final signature.
+    return Signature(path=path, rho=rho, hashes=ots_hashes)
 
 
 def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
@@ -214,40 +212,37 @@ def verify(pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
     - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
     - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
     """
-    # # 1. Re-encode the message using the randomness `rho` from the signature.
-    # #    If the encoding is invalid, the signature is invalid.
-    # codeword = encode(pk.parameter, message, sig.rho, epoch)
-    # if codeword is None:
-    #     return False
+    # Re-encode the message using the randomness `rho` from the signature.
+    #
+    # If the encoding is invalid, the signature is invalid.
+    codeword = encode(pk.parameter, message, sig.rho, epoch)
+    if codeword is None:
+        return False
 
-    # # 2. Reconstruct the one-time public key (the list of chain endpoints).
-    # chain_ends: List[HashDigest] = []
-    # for chain_index, xi in enumerate(codeword):
-    #     # The signature provides the hash value after `xi` steps.
-    #     start_digest = sig.hashes[chain_index]
-    #     # We must perform the remaining `BASE - 1 - xi` steps
-    #     # to get to the end.
-    #     num_steps_remaining = BASE - 1 - xi
-    #     end_digest = hash_chain(
-    #         parameter=pk.parameter,
-    #         epoch=epoch,
-    #         chain_index=chain_index,
-    #         start_step=xi,
-    #         num_steps=num_steps_remaining,
-    #         start_digest=start_digest,
-    #     )
-    #     chain_ends.append(end_digest)
+    # Reconstruct the one-time public key (the list of chain endpoints).
+    chain_ends: List[HashDigest] = []
+    for chain_index, xi in enumerate(codeword):
+        # The signature provides the hash value after `xi` steps.
+        start_digest = sig.hashes[chain_index]
+        # We must perform the remaining `BASE - 1 - xi` steps
+        # to get to the end.
+        num_steps_remaining = BASE - 1 - xi
+        end_digest = hash_chain(
+            parameter=pk.parameter,
+            epoch=epoch,
+            chain_index=chain_index,
+            start_step=xi,
+            num_steps=num_steps_remaining,
+            start_digest=start_digest,
+        )
+        chain_ends.append(end_digest)
 
-    # # 3. Verify the Merkle path. This function internally hashes `chain_ends`
-    # #    to get the leaf node and then climbs the tree to recompute the root.
-    # return verify_path(
-    #     parameter=pk.parameter,
-    #     root=pk.root,
-    #     position=epoch,
-    #     leaf_parts=chain_ends,
-    #     opening=sig.path,
-    # )
-    raise NotImplementedError(
-        "sign is not part of this specification. "
-        "See the Rust reference implementation."
+    # Verify the Merkle path. This function internally hashes `chain_ends`
+    # to get the leaf node and then climbs the tree to recompute the root.
+    return verify_path(
+        parameter=pk.parameter,
+        root=pk.root,
+        position=epoch,
+        leaf_parts=chain_ends,
+        opening=sig.path,
     )
