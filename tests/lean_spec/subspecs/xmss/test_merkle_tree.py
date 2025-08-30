@@ -17,11 +17,13 @@ from lean_spec.subspecs.xmss.merkle_tree import (
 from lean_spec.subspecs.xmss.structures import HashDigest, Parameter
 from lean_spec.subspecs.xmss.tweak_hash import (
     TreeTweak,
-    rand_domain,
-    rand_parameter,
 )
 from lean_spec.subspecs.xmss.tweak_hash import (
     apply as apply_tweakable_hash,
+)
+from lean_spec.subspecs.xmss.utils import (
+    rand_domain,
+    rand_parameter,
 )
 
 

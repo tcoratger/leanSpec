@@ -19,8 +19,7 @@ from lean_spec.subspecs.xmss.message_hash import (
     encode_epoch,
     encode_message,
 )
-from lean_spec.subspecs.xmss.tweak_hash import rand_parameter
-from lean_spec.subspecs.xmss.utils import rand_rho
+from lean_spec.subspecs.xmss.utils import rand_parameter, rand_rho
 
 
 def test_encode_message() -> None:

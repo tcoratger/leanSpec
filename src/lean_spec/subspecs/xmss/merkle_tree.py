@@ -25,8 +25,9 @@ from .structures import (
     HashTreeOpening,
     Parameter,
 )
-from .tweak_hash import TreeTweak, rand_domain
+from .tweak_hash import TreeTweak
 from .tweak_hash import apply as apply_tweakable_hash
+from .utils import rand_domain
 
 
 def _get_padded_layer(

@@ -18,11 +18,11 @@ from .structures import HashDigest, PublicKey, SecretKey, Signature
 from .tweak_hash import (
     TreeTweak,
     hash_chain,
-    rand_parameter,
 )
 from .tweak_hash import (
     apply as apply_tweakable_hash,
 )
+from .utils import rand_parameter
 
 
 def key_gen(

@@ -11,7 +11,6 @@ This module implements the core hashing logic for the XMSS scheme, including:
 
 from __future__ import annotations
 
-import secrets
 from itertools import chain
 from typing import List, Union
 
@@ -296,32 +295,3 @@ def hash_chain(
         # Apply the hash function.
         current_digest = apply(parameter, tweak, [current_digest])
     return current_digest
-
-
-def rand_parameter() -> Parameter:
-    """
-    Generates a cryptographically secure random public parameter.
-
-    Returns:
-        A new, randomly generated list of `PARAMETER_LEN` field elements.
-    """
-    # For each element in the list, generate a secure random integer
-    # in the range [0, P-1] and convert it to a field element.
-    # `secrets.randbelow(P)` is used to avoid modulo bias.
-    return [Fp(value=secrets.randbelow(P)) for _ in range(PARAMETER_LEN)]
-
-
-def rand_domain() -> HashDigest:
-    """
-    Generates a cryptographically secure random hash digest.
-
-    This is used for testing or as a starting point for hash chains
-    where a random seed is required.
-
-    Returns:
-        A new, randomly generated list of `HASH_LEN_FE` field elements.
-    """
-    # For each element in the list, generate a secure random integer
-    # in the range [0, P-1] and convert it to a field element.
-    # `secrets.randbelow(P)` is used to avoid modulo bias.
-    return [Fp(value=secrets.randbelow(P)) for _ in range(HASH_LEN_FE)]
