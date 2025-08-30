@@ -83,7 +83,8 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
     # Index 0 is unused to allow for direct indexing, e.g., `all_info[v]`.
     all_info = [LayerInfo(sizes=[], prefix_sums=[])] * (MAX_DIMENSION + 1)
 
-    # -- BASE CASE --
+    # BASE CASE
+    #
     # For a 1-dimensional hypercube (v=1), which is just a line of `w` points
     # with coordinates [0], [1], ..., [w-1].
     # The distance `d` from the sink `[w-1]` is simply `(w-1) - coordinate`.
@@ -95,7 +96,8 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
     # Store the result for v=1, which will seed the inductive step.
     all_info[1] = LayerInfo(sizes=dim1_sizes, prefix_sums=dim1_prefix_sums)
 
-    # -- INDUCTIVE STEP --
+    # INDUCTIVE STEP
+    #
     # Now, build the layer info for all higher dimensions up to the maximum.
     for v in range(2, MAX_DIMENSION + 1):
         # The maximum possible distance `d` in a v-dimensional hypercube.
