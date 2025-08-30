@@ -57,7 +57,7 @@ def encode_epoch(epoch: int) -> List[Fp]:
     # Decompose the integer into its base-P representation.
     elements: List[Fp] = []
     for _ in range(TWEAK_LEN_FE):
-        elements.append(Fp(value=acc % P))
+        elements.append(Fp(value=acc))
         acc //= P
     return elements
 
