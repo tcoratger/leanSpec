@@ -5,9 +5,7 @@ hash-based signature scheme.
 It exposes the core data structures and the main interface functions.
 """
 
-from .constants import LIFETIME, MESSAGE_LENGTH
-from .interface import key_gen, sign, verify
-from .merkle_tree import build_tree, get_path, get_root, verify_path
+from .interface import GeneralizedXmssScheme
 from .structures import (
     HashTree,
     HashTreeOpening,
@@ -17,18 +15,10 @@ from .structures import (
 )
 
 __all__ = [
-    "key_gen",
-    "sign",
-    "verify",
+    "GeneralizedXmssScheme",
     "PublicKey",
     "Signature",
     "SecretKey",
     "HashTreeOpening",
-    "LIFETIME",
-    "MESSAGE_LENGTH",
-    "build_tree",
-    "get_path",
-    "get_root",
-    "verify_path",
     "HashTree",
 ]

@@ -9,26 +9,21 @@ path generation, and verification logic by performing a full
 import pytest
 
 from lean_spec.subspecs.xmss.merkle_tree import (
-    build_tree,
-    get_path,
-    get_root,
-    verify_path,
+    PROD_MERKLE_TREE,
+    MerkleTree,
 )
-from lean_spec.subspecs.xmss.structures import HashDigest, Parameter
+from lean_spec.subspecs.xmss.structures import HashDigest
 from lean_spec.subspecs.xmss.tweak_hash import (
     TreeTweak,
-)
-from lean_spec.subspecs.xmss.tweak_hash import (
-    apply as apply_tweakable_hash,
-)
-from lean_spec.subspecs.xmss.utils import (
-    rand_domain,
-    rand_parameter,
 )
 
 
 def _run_commit_open_verify_roundtrip(
-    num_leaves: int, depth: int, start_index: int, leaf_parts_len: int
+    merkle_tree: MerkleTree,
+    num_leaves: int,
+    depth: int,
+    start_index: int,
+    leaf_parts_len: int,
 ) -> None:
     """
     A helper function to perform a full Merkle tree roundtrip test.
@@ -46,15 +41,15 @@ def _run_commit_open_verify_roundtrip(
         leaf_parts_len: The number of digests that constitute a single leaf.
     """
     # SETUP: Generate a random parameter and the raw leaf data.
-    parameter: Parameter = rand_parameter()
+    parameter = merkle_tree.rand.parameter()
     leaves: list[list[HashDigest]] = [
-        [rand_domain() for _ in range(leaf_parts_len)]
+        [merkle_tree.rand.domain() for _ in range(leaf_parts_len)]
         for _ in range(num_leaves)
     ]
 
     # HASH LEAVES: Compute the layer 0 nodes by hashing the leaf parts.
     leaf_hashes: list[HashDigest] = [
-        apply_tweakable_hash(
+        merkle_tree.hasher.apply(
             parameter,
             TreeTweak(level=0, index=start_index + i),
             leaf_parts,
@@ -63,14 +58,16 @@ def _run_commit_open_verify_roundtrip(
     ]
 
     # COMMIT: Build the Merkle tree from the leaf hashes.
-    tree = build_tree(depth, start_index, parameter, leaf_hashes)
-    root = get_root(tree)
+    tree = merkle_tree.build(depth, start_index, parameter, leaf_hashes)
+    root = merkle_tree.get_root(tree)
 
     # OPEN & VERIFY: For each leaf, generate and verify its path.
     for i, leaf_parts in enumerate(leaves):
         position = start_index + i
-        opening = get_path(tree, position)
-        is_valid = verify_path(parameter, root, position, leaf_parts, opening)
+        opening = merkle_tree.get_path(tree, position)
+        is_valid = merkle_tree.verify_path(
+            parameter, root, position, leaf_parts, opening
+        )
         assert is_valid, f"Verification failed for leaf at position {position}"
 
 
@@ -102,5 +99,5 @@ def test_commit_open_verify_roundtrip(
     assert start_index + num_leaves <= (1 << depth)
 
     _run_commit_open_verify_roundtrip(
-        num_leaves, depth, start_index, leaf_parts_len
+        PROD_MERKLE_TREE, num_leaves, depth, start_index, leaf_parts_len
     )

@@ -11,10 +11,16 @@ from __future__ import annotations
 
 import hashlib
 import os
+from typing import List
 
 from lean_spec.subspecs.koalabear import Fp
-from lean_spec.subspecs.xmss.constants import HASH_LEN_FE, PRF_KEY_LENGTH
-from lean_spec.subspecs.xmss.structures import HashDigest, PRFKey
+from lean_spec.subspecs.xmss.constants import (
+    PRF_KEY_LENGTH,
+    PROD_CONFIG,
+    TEST_CONFIG,
+    XmssConfig,
+)
+from lean_spec.subspecs.xmss.structures import PRFKey
 from lean_spec.types.uint64 import Uint64
 
 PRF_DOMAIN_SEP: bytes = bytes(
@@ -55,81 +61,91 @@ random.
 """
 
 
-PRFOutput = HashDigest
-"""
-A type alias for the output of the PRF.
-It is a list of field elements.
-"""
+class Prf:
+    """An instance of the SHAKE128-based PRF for a given config."""
 
+    def __init__(self, config: XmssConfig):
+        """Initializes the PRF with a specific parameter set."""
+        self.config = config
 
-def key_gen() -> PRFKey:
-    """
-    Generates a cryptographically secure random key for the PRF.
+    def key_gen(self) -> PRFKey:
+        """
+        Generates a cryptographically secure random key for the PRF.
 
-    This function sources randomness from the operating system's entropy pool.
+        This function sources randomness from the operating system's entropy pool.
 
-    Returns:
-        A new, randomly generated PRF key of `PRF_KEY_LENGTH` bytes.
-    """
-    # Use os.urandom for cryptographically secure random bytes.
-    return os.urandom(PRF_KEY_LENGTH)
+        Returns:
+            A new, randomly generated PRF key of `PRF_KEY_LENGTH` bytes.
+        """
+        return os.urandom(PRF_KEY_LENGTH)
 
+    def apply(self, key: PRFKey, epoch: int, chain_index: Uint64) -> List[Fp]:
+        """
+        Applies the PRF to derive the secret values for a specific epoch
+        and chain.
 
-def apply(key: PRFKey, epoch: int, chain_index: Uint64) -> PRFOutput:
-    """
-    Applies the PRF to derive the secret values for a specific epoch and chain.
+        The function computes:
+        `SHAKE128(DOMAIN_SEP || key || epoch || chain_index)`
+        and interprets the output as a list of field elements.
 
-    The function computes `SHAKE128(DOMAIN_SEP || key || epoch || chain_index)`
-    and interprets the output as a list of field elements.
+        Args:
+            key: The secret PRF key.
+            epoch: The epoch number (a 32-bit unsigned integer).
+            chain_index: The index of the hash chain (a 64-bit uint).
 
-    Args:
-        key: The secret PRF key.
-        epoch: The epoch number (a 32-bit unsigned integer).
-        chain_index: The index of the hash chain (a 64-bit unsigned integer).
+        Returns:
+            A list of `DIMENSION` field elements, which are the secret starting
+            points for the hash chains of the specified epoch.
+        """
+        # Get the config for this scheme.
+        config = self.config
 
-    Returns:
-        A list of `DIMENSION` field elements, which are the secret starting
-        points for the hash chains of the specified epoch.
-    """
-    # Create a new SHAKE128 hash instance.
-    hasher = hashlib.shake_128()
+        # Create a new SHAKE128 hash instance.
+        hasher = hashlib.shake_128()
 
-    # Absorb the domain separator to contextualize the hash.
-    hasher.update(PRF_DOMAIN_SEP)
+        # Absorb the domain separator to contextualize the hash.
+        hasher.update(PRF_DOMAIN_SEP)
 
-    # Absorb the secret key.
-    hasher.update(key)
+        # Absorb the secret key.
+        hasher.update(key)
 
-    # Absorb the epoch, represented as a 4-byte big-endian integer.
-    #
-    # This ensures that each epoch produces a unique set of secrets.
-    hasher.update(epoch.to_bytes(4, "big"))
-
-    # Absorb the chain index, as an 8-byte big-endian integer.
-    #
-    # This is used to derive a unique start value for each hash chain.
-    hasher.update(chain_index.to_bytes(8, "big"))
-
-    # Determine the total number of bytes to extract from the SHAKE output.
-    #
-    # For key generation, we need one field element per chain.
-    num_bytes_to_read = PRF_BYTES_PER_FE * HASH_LEN_FE
-    prf_output_bytes = hasher.digest(num_bytes_to_read)
-
-    # Convert the byte output into a list of field elements.
-    output_elements: PRFOutput = []
-    for i in range(HASH_LEN_FE):
-        # Extract an 8-byte chunk for the current field element.
-        start = i * PRF_BYTES_PER_FE
-        end = start + PRF_BYTES_PER_FE
-        chunk = prf_output_bytes[start:end]
-
-        # Convert the chunk to a large integer.
-        integer_value = int.from_bytes(chunk, "big")
-
-        # Reduce the integer modulo the field prime `P`.
+        # Absorb the epoch, represented as a 4-byte big-endian integer.
         #
-        # The Fp constructor handles the modulo operation automatically.
-        output_elements.append(Fp(value=integer_value))
+        # This ensures that each epoch produces a unique set of secrets.
+        hasher.update(epoch.to_bytes(4, "big"))
 
-    return output_elements
+        # Absorb the chain index, as an 8-byte big-endian integer.
+        #
+        # This is used to derive a unique start value for each hash chain.
+        hasher.update(chain_index.to_bytes(8, "big"))
+
+        # Determine the total number of bytes to extract from the SHAKE output.
+        #
+        # For key generation, we need one field element per chain.
+        num_bytes_to_read = PRF_BYTES_PER_FE * config.HASH_LEN_FE
+        prf_output_bytes = hasher.digest(num_bytes_to_read)
+
+        # Convert the byte output into a list of field elements.
+        output_elements: List[Fp] = []
+        for i in range(config.HASH_LEN_FE):
+            # Extract an 8-byte chunk for the current field element.
+            start = i * PRF_BYTES_PER_FE
+            end = start + PRF_BYTES_PER_FE
+            chunk = prf_output_bytes[start:end]
+
+            # Convert the chunk to a large integer.
+            integer_value = int.from_bytes(chunk, "big")
+
+            # Reduce the integer modulo the field prime `P`.
+            #
+            # The Fp constructor handles the modulo operation automatically.
+            output_elements.append(Fp(value=integer_value))
+
+        return output_elements
+
+
+PROD_PRF = Prf(PROD_CONFIG)
+"""An instance configured for production-level parameters."""
+
+TEST_PRF = Prf(TEST_CONFIG)
+"""A lightweight instance for test environments."""

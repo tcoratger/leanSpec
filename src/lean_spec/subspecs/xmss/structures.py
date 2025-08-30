@@ -5,7 +5,7 @@ from typing import Annotated, List
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..koalabear import Fp
-from .constants import HASH_LEN_FE, PARAMETER_LEN, PRF_KEY_LENGTH, RAND_LEN_FE
+from .constants import PRF_KEY_LENGTH
 
 PRFKey = Annotated[
     bytes, Field(min_length=PRF_KEY_LENGTH, max_length=PRF_KEY_LENGTH)
@@ -17,23 +17,17 @@ It is a byte string of `PRF_KEY_LENGTH` bytes.
 """
 
 
-HashDigest = Annotated[
-    List[Fp], Field(min_length=HASH_LEN_FE, max_length=HASH_LEN_FE)
-]
+HashDigest = List[Fp]
 """
 A type alias representing a hash digest.
 """
 
-Parameter = Annotated[
-    List[Fp], Field(min_length=PARAMETER_LEN, max_length=PARAMETER_LEN)
-]
+Parameter = List[Fp]
 """
 A type alias representing the public parameter `P`.
 """
 
-Randomness = Annotated[
-    List[Fp], Field(min_length=RAND_LEN_FE, max_length=RAND_LEN_FE)
-]
+Randomness = List[Fp]
 """
 A type alias representing the randomness `rho`.
 """
@@ -92,10 +86,8 @@ class PublicKey(BaseModel):
     """The public key for the Generalized XMSS scheme."""
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
-    root: List[Fp] = Field(..., max_length=HASH_LEN_FE, min_length=HASH_LEN_FE)
-    parameter: Parameter = Field(
-        ..., max_length=PARAMETER_LEN, min_length=PARAMETER_LEN
-    )
+    root: List[Fp]
+    parameter: Parameter
 
 
 class Signature(BaseModel):
@@ -103,9 +95,7 @@ class Signature(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
     path: HashTreeOpening
-    rho: Randomness = Field(
-        ..., max_length=RAND_LEN_FE, min_length=RAND_LEN_FE
-    )
+    rho: Randomness
     hashes: List[HashDigest]
 
 
