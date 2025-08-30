@@ -7,17 +7,22 @@ from typing import List
 from lean_spec.subspecs.xmss.utils import int_to_base_p
 
 from ..koalabear import Fp
-from ..poseidon2.permutation import PARAMS_16, PARAMS_24, permute
-from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
+from ..poseidon2.permutation import (
+    PARAMS_16,
+    PARAMS_24,
+    Poseidon2Params,
+    permute,
+)
 from .structures import HashDigest
 
 
 class PoseidonXmss:
     """An instance of the Poseidon2-based tweakable hash for a given config."""
 
-    def __init__(self, config: XmssConfig):
-        """Initializes the hasher with a specific parameter set."""
-        self.config = config
+    def __init__(self, params16: Poseidon2Params, params24: Poseidon2Params):
+        """Initializes the hasher with specific Poseidon2 permutations."""
+        self.params16 = params16
+        self.params24 = params24
 
     def compress(
         self, input_vec: List[Fp], width: int, output_len: int
@@ -36,7 +41,8 @@ class PoseidonXmss:
             A hash digest of `output_len` field elements.
         """
         # Select the correct permutation parameters based on the state width.
-        params = PARAMS_16 if width == 16 else PARAMS_24
+        assert width in (16, 24), "Width must be 16 or 24"
+        params = self.params16 if width == 16 else self.params24
 
         # Create a fixed-width buffer and copy the input, padding with zeros.
         padded_input = [Fp(value=0)] * width
@@ -98,7 +104,7 @@ class PoseidonXmss:
             A hash digest of `output_len` field elements.
         """
         # Use the width-24 permutation for the sponge.
-        params = PARAMS_24
+        params = self.params24
         width = params.width
         rate = width - len(capacity_value)
 
@@ -129,8 +135,8 @@ class PoseidonXmss:
         return output[:output_len]
 
 
-PROD_POSEIDON = PoseidonXmss(PROD_CONFIG)
-"""An instance configured for production-level parameters."""
+# An instance configured for production-level parameters.
+PROD_POSEIDON = PoseidonXmss(PARAMS_16, PARAMS_24)
 
-TEST_POSEIDON = PoseidonXmss(TEST_CONFIG)
-"""A lightweight instance for test environments."""
+# A lightweight instance for test environments.
+TEST_POSEIDON = PoseidonXmss(PARAMS_16, PARAMS_24)
