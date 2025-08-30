@@ -1,8 +1,12 @@
 """
-Defines the cryptographic constants and configuration presets for the XMSS spec.
+Defines the cryptographic constants and configuration presets for the
+XMSS spec.
 
 This specification corresponds to the "hashing-optimized" Top Level Target Sum
-instantiation from the canonical Rust implementation.
+instantiation from the canonical Rust implementation
+(production instantiation).
+
+We also provide a test instantiation for testing purposes.
 
 .. note::
    This specification uses the **KoalaBear** prime field, which is consistent
@@ -35,7 +39,7 @@ class XmssConfig(BaseModel):
     """The base-2 logarithm of the scheme's maximum lifetime."""
 
     @property
-    def LIFETIME(self) -> int:
+    def LIFETIME(self) -> int:  # noqa: N802
         """
         The maximum number of epochs supported by this configuration.
 
@@ -51,7 +55,7 @@ class XmssConfig(BaseModel):
     """The alphabet size for the digits of the encoded message."""
 
     FINAL_LAYER: int
-    """The number of top layers of the hypercube to map the hash output into."""
+    """Number of top layers of the hypercube to map the hash output into."""
 
     TARGET_SUM: int
     """The required sum of all codeword chunks for a signature to be valid."""
@@ -95,7 +99,7 @@ class XmssConfig(BaseModel):
     """Number of invocations for the message hash."""
 
     @property
-    def POS_OUTPUT_LEN_FE(self) -> int:
+    def POS_OUTPUT_LEN_FE(self) -> int:  # noqa: N802
         """Total output length for the message hash."""
         return self.POS_OUTPUT_LEN_PER_INV_FE * self.POS_INVOCATIONS
 

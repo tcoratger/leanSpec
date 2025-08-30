@@ -72,7 +72,8 @@ class Prf:
         """
         Generates a cryptographically secure random key for the PRF.
 
-        This function sources randomness from the operating system's entropy pool.
+        This function sources randomness from the operating system's
+        entropy pool.
 
         Returns:
             A new, randomly generated PRF key of `PRF_KEY_LENGTH` bytes.

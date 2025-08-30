@@ -38,7 +38,7 @@ from .utils import PROD_RAND, TEST_RAND, Rand
 
 
 class GeneralizedXmssScheme:
-    """An instance of the Generalized XMSS signature scheme for a given config."""
+    """Instance of the Generalized XMSS signature scheme for a given config."""
 
     def __init__(
         self,
@@ -61,7 +61,9 @@ class GeneralizedXmssScheme:
         self, activation_epoch: int, num_active_epochs: int
     ) -> Tuple[PublicKey, SecretKey]:
         """
-        Generates a new cryptographic key pair. This is a **randomized** algorithm.
+        Generates a new cryptographic key pair.
+
+        This is a **randomized** algorithm.
 
         This function executes the full key generation process:
         1.  Generates a master secret (PRF key) and a public hash parameter.
@@ -72,8 +74,8 @@ class GeneralizedXmssScheme:
         4.  The list of all chain endpoints for an epoch forms the
             one-time public key.
             This one-time public key is hashed to create a single Merkle leaf.
-        5.  A Merkle tree is built over all generated leaves, and its root becomes
-            part of the final public key.
+        5.  A Merkle tree is built over all generated leaves, and its root
+            becomes part of the final public key.
 
         Args:
             activation_epoch: The starting epoch for which this key is active.
@@ -143,18 +145,20 @@ class GeneralizedXmssScheme:
 
     def sign(self, sk: SecretKey, epoch: int, message: bytes) -> Signature:
         """
-        Produces a digital signature for a given message at a specific epoch. This
-        is a **randomized** algorithm.
+        Produces a digital signature for a given message at a specific epoch.
 
-        **CRITICAL**: This function must never be called twice with the same secret
-        key and epoch for different messages, as this would compromise security.
+        This is a **randomized** algorithm.
+
+        **CRITICAL**: This function must never be called twice with the same
+        secret key and epoch for different messages, as this
+        would compromise security.
 
         The signing process involves:
-            1.  Repeatedly attempting to encode the message with fresh randomness
-                (`rho`) until a valid codeword is found.
-            2.  Computing the one-time signature, which consists of intermediate
-                values from the secret hash chains, determined by the digits of
-                the codeword.
+            1.  Repeatedly attempting to encode the message with
+                fresh randomness (`rho`) until a valid codeword is found.
+            2.  Computing the one-time signature, which consists of
+                intermediate values from the secret hash chains,
+                determined by the digits of the codeword.
             3.  Retrieving the Merkle authentication path for the given epoch.
 
         For the formal specification of this process, please refer to:
@@ -216,32 +220,34 @@ class GeneralizedXmssScheme:
         self, pk: PublicKey, epoch: int, message: bytes, sig: Signature
     ) -> bool:
         r"""
-        Verifies a digital signature against a public key, message, and epoch. This
-        is a **deterministic** algorithm.
+        Verifies a digital signature against a public key, message, and epoch.
 
-        This function is a placeholder. The complete verification logic is detailed
-        below and will be implemented in a future update.
+        This is a **deterministic** algorithm.
 
         ### Verification Algorithm
 
-        1.  **Re-encode Message**: The verifier uses the randomness `rho` from the
-            signature to re-compute the codeword $x = (x_1, \dots, x_v)$ from the
-            message `m`.
+        1.  **Re-encode Message**: The verifier uses the randomness `rho`
+            from the signature to re-compute the codeword
+            $x = (x_1, \dots, x_v)$ from the message `m`.
             This includes calculating the checksum or checking the target sum.
 
-        2.  **Reconstruct One-Time Public Key**: For each intermediate hash $y_i$
-            in the signature, the verifier completes the corresponding hash chain.
+        2.  **Reconstruct One-Time Public Key**: For each intermediate
+            hash $y_i$ in the signature, the verifier completes the
+            corresponding hash chain.
+
             Since $y_i$ was computed with $x_i$ steps, the verifier applies the
             hash function an additional $w - 1 - x_i$ times to arrive at the
             one-time public key component $pk_{ep,i}$.
 
-        3.  **Compute Merkle Leaf**: The verifier hashes the reconstructed one-time
-            public key components to compute the expected Merkle leaf for `epoch`.
+        3.  **Compute Merkle Leaf**: The verifier hashes the reconstructed
+            one-time public key components to compute the expected Merkle
+            leaf for `epoch`.
 
-        4.  **Verify Merkle Path**: The verifier uses the `path` from the signature
-            to compute a candidate Merkle root starting from the computed leaf.
-            Verification succeeds if and only if this candidate root matches the
-            `root` in the `PublicKey`.
+        4.  **Verify Merkle Path**: The verifier uses the `path` from
+            the signature to compute a candidate Merkle root starting from
+            the computed leaf.
+            Verification succeeds if and only if this candidate root matches
+            the `root` in the `PublicKey`.
 
         Args:
             pk: The public key to verify against.

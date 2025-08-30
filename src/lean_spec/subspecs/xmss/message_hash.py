@@ -84,7 +84,8 @@ class MessageHasher:
 
         # Reduce this integer modulo the size of the target domain.
         #
-        # The target domain is the set of all vertices in layers 0..FINAL_LAYER.
+        # The target domain is the set of all vertices
+        # in layers 0..FINAL_LAYER.
         domain_size = get_hypercube_part_size(
             config.BASE, config.DIMENSION, config.FINAL_LAYER
         )
@@ -106,8 +107,8 @@ class MessageHasher:
         """
         Applies the full "Top Level" message hash procedure.
 
-        This involves multiple invocations of Poseidon2, with the combined output
-        mapped into a specific region of the hypercube.
+        This involves multiple invocations of Poseidon2, with the
+        combined output mapped into a specific region of the hypercube.
 
         Args:
             parameter: The public parameter `P`.
@@ -116,7 +117,8 @@ class MessageHasher:
             message: The 32-byte message to be hashed.
 
         Returns:
-            A vertex in the hypercube, represented as a list of `DIMENSION` ints.
+            A vertex in the hypercube, represented as a list
+            of `DIMENSION` ints.
         """
         # Encode the message and epoch as field elements.
         message_fe = self.encode_message(message)
@@ -125,7 +127,8 @@ class MessageHasher:
         # Iteratively call Poseidon2 to generate a long hash output.
         poseidon_outputs: List[Fp] = []
         for i in range(self.config.POS_INVOCATIONS):
-            # Use the iteration number as a domain separator for each hash call.
+            # Use the iteration number as a domain separator for
+            # each hash call.
             iteration_separator = [Fp(value=i)]
 
             # The input is: rho || P || epoch || message || iteration.

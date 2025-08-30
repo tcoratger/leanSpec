@@ -31,10 +31,10 @@ class TargetSumEncoder:
         """
         Encodes a message into a codeword if it meets the target sum criteria.
 
-        This function first uses the message hash to map the input to a vertex in
-        the hypercube. It then checks if the sum of the vertex's coordinates
-        matches the scheme's `TARGET_SUM`. This filtering step is the core of the
-        Target Sum scheme.
+        This function first uses the message hash to map the input to a vertex
+        in the hypercube. It then checks if the sum of the vertex's coordinates
+        matches the scheme's `TARGET_SUM`. This filtering step is the core of
+        the Target Sum scheme.
 
         Args:
             parameter: The public parameter `P`.
@@ -56,7 +56,8 @@ class TargetSumEncoder:
             # If the sum is correct, this is a valid codeword.
             return codeword_candidate
         else:
-            # If the sum does not match, this `rho` is invalid for this message.
+            # If the sum does not match, this `rho` is invalid for
+            # this message.
             #
             # The caller (the `sign` function) will need to try again with new
             # randomness.

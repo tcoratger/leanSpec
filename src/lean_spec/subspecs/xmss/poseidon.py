@@ -58,7 +58,8 @@ class PoseidonXmss:
         Computes a domain separator for the sponge construction.
 
         This function hashes a list of length parameters to create a unique
-        "capacity value" that configures the sponge for a specific hashing task.
+        "capacity value" that configures the sponge for a
+        specific hashing task.
 
         Args:
             lengths: A list of integer parameters defining the hash context.

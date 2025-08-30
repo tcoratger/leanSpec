@@ -66,8 +66,8 @@ class TweakHasher:
 
         This function packs the tweak's integer components into a single large
         integer, then performs a base-`P` decomposition to get field elements.
-        This ensures a unique and deterministic mapping from any tweak to a format
-        consumable by the hash function.
+        This ensures a unique and deterministic mapping from any tweak to a
+        format consumable by the hash function.
 
         The packing scheme is designed to be injective:
         - `TreeTweak`: `(level << 40) | (index << 8) | TWEAK_PREFIX_TREE`
@@ -117,9 +117,9 @@ class TweakHasher:
         """
         Applies the tweakable Poseidon2 hash function to a message.
 
-        This function serves as the main entry point for all hashing operations.
-        It automatically selects the correct Poseidon2 mode (compression or sponge)
-        based on the number of message parts provided.
+        This function is the main entry point for all hashing operations.
+        It automatically selects the correct Poseidon2 mode
+        (compression or sponge) based on the number of message parts provided.
 
         Args:
             parameter: The public parameter `P` for the hash function.

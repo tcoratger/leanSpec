@@ -55,10 +55,10 @@ class MerkleTree:
         """
         Pads a layer to ensure its nodes can always be paired up.
 
-        This helper function adds random padding to the start and/or end of a list
-        of nodes to enforce an invariant: every layer must start at an even index
-        and end at an odd index. This guarantees that every node has a sibling,
-        simplifying the construction of the next layer up.
+        This helper function adds random padding to the start and/or end of
+        a list of nodes to enforce an invariant: every layer must start at an
+        even index and end at an odd index. This guarantees that every node has
+        a sibling, simplifying the construction of the next layer up.
 
         Args:
             nodes: The list of active nodes for the current layer.
@@ -100,14 +100,15 @@ class MerkleTree:
         Builds a new sparse Merkle tree from a list of leaf hashes.
 
         The construction proceeds bottom-up, from the leaf layer to the root.
-        At each level, pairs of sibling nodes are hashed to create their parents
-        for the next level up.
+        At each level, pairs of sibling nodes are hashed to create
+        their parents for the next level up.
 
         Args:
             depth: The depth of the tree (e.g., 32 for a 2^32 leaf space).
             start_index: The index of the first leaf in `leaf_hashes`.
             parameter: The public parameter `P` for the hash function.
-            leaf_hashes: The list of pre-hashed leaf nodes to build the tree on.
+            leaf_hashes: The list of pre-hashed leaf nodes to
+            build the tree on.
 
         Returns:
             The fully constructed `HashTree` object.
@@ -128,7 +129,8 @@ class MerkleTree:
                     strict=False,
                 )
             ):
-                # Calculate the position of the parent node in the next level up.
+                # Calculate the position of the parent node in the
+                # next level up.
                 parent_index = (current_layer.start_index // 2) + i
                 # Create the tweak for hashing these two children.
                 tweak = TreeTweak(level=level + 1, index=parent_index)
@@ -154,12 +156,13 @@ class MerkleTree:
         """
         Computes the Merkle authentication path for a leaf at a given position.
 
-        The path consists of the list of sibling nodes required to reconstruct the
-        root, starting from the leaf's sibling and going up the tree.
+        The path consists of the list of sibling nodes required to reconstruct
+        the root, starting from the leaf's sibling and going up the tree.
 
         Args:
             tree: The `HashTree` from which to extract the path.
-            position: The absolute index of the leaf for which to generate path.
+            position: The absolute index of the leaf for which to
+            generate path.
 
         Returns:
             A `HashTreeOpening` object containing the co-path.
@@ -167,7 +170,8 @@ class MerkleTree:
         co_path: List[HashDigest] = []
         current_position = position
 
-        # Iterate from the bottom layer (level 0) up to the layer below the root.
+        # Iterate from the bottom layer (level 0) up to the layer
+        # below the root.
         for level in range(tree.depth):
             # Determine the sibling's position using an XOR operation.
             sibling_position = current_position ^ 1
@@ -192,9 +196,9 @@ class MerkleTree:
         """
         Verifies a Merkle authentication path.
 
-        This function reconstructs a candidate root by starting with the leaf node
-        and repeatedly hashing it with the sibling nodes provided in the opening
-        path.
+        This function reconstructs a candidate root by starting with the leaf
+        node and repeatedly hashing it with the sibling nodes provided
+        in the opening path.
 
         The verification succeeds if the candidate root matches the true root.
 
