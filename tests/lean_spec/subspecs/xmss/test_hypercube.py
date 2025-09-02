@@ -133,9 +133,7 @@ def test_prepare_layer_sizes_against_reference() -> None:
         (2, 3, 3, 8),
     ],
 )
-def test_get_hypercube_part_size(
-    w: int, v: int, d: int, expected_size: int
-) -> None:
+def test_get_hypercube_part_size(w: int, v: int, d: int, expected_size: int) -> None:
     """
     Tests `hypercube_part_size` with known values from the Rust tests.
     """
@@ -182,9 +180,7 @@ def test_map_to_vertex_roundtrip() -> None:
 
     # Iterate through every possible index in a specific layer
     # and check roundtrip
-    for x in range(
-        min(max_x, 100)
-    ):  # Capped at 100 iterations to keep test fast
+    for x in range(min(max_x, 100)):  # Capped at 100 iterations to keep test fast
         vertex = map_to_vertex(w, v, d, x)
 
         # Check that the vertex sum corresponds to the correct layer

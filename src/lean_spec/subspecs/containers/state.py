@@ -55,10 +55,7 @@ class State(StrictBaseModel):
     justifications_validators: Annotated[
         list[bool],
         Field(
-            max_length=(
-                DEVNET_CONFIG.historical_roots_limit
-                * DEVNET_CONFIG.historical_roots_limit
-            )
+            max_length=(DEVNET_CONFIG.historical_roots_limit * DEVNET_CONFIG.historical_roots_limit)
         ),
     ]
     """A bitlist of validators who participated in justifications."""

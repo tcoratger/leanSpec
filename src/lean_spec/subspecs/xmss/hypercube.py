@@ -134,9 +134,7 @@ def prepare_layer_info(w: int) -> List[LayerInfo]:
             current_prefix_sums.append(current_sum)
 
         # Store the complete layer info for the current dimension `v`.
-        all_info[v] = LayerInfo(
-            sizes=current_sizes, prefix_sums=current_prefix_sums
-        )
+        all_info[v] = LayerInfo(sizes=current_sizes, prefix_sums=current_prefix_sums)
 
     # Return the complete table of layer information for the given base `w`.
     return all_info
@@ -236,9 +234,7 @@ def map_to_vertex(w: int, v: int, d: int, x: int) -> List[int]:
                 break
 
         if ji == -1:
-            raise RuntimeError(
-                "Internal logic error: failed to find coordinate"
-            )
+            raise RuntimeError("Internal logic error: failed to find coordinate")
 
         # Convert the block's distance contribution `ji` to a coordinate `ai`.
         ai = w - 1 - ji

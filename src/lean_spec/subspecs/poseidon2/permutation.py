@@ -37,15 +37,10 @@ class Poseidon2Params(BaseModel):
 
     width: int = Field(gt=0, description="The size of the state (t).")
     rounds_f: int = Field(gt=0, description="Total number of 'full' rounds.")
-    rounds_p: int = Field(
-        ge=0, description="Total number of 'partial' rounds."
-    )
+    rounds_p: int = Field(ge=0, description="Total number of 'partial' rounds.")
     internal_diag_vectors: List[Fp] = Field(
         min_length=1,
-        description=(
-            "Diagonal vectors for the efficient "
-            "internal linear layer matrix (M_I)."
-        ),
+        description=("Diagonal vectors for the efficient internal linear layer matrix (M_I)."),
     )
     round_constants: List[Fp] = Field(
         min_length=1,
@@ -56,9 +51,7 @@ class Poseidon2Params(BaseModel):
     def check_lengths(self) -> "Poseidon2Params":
         """Ensures vector lengths match the configuration."""
         if len(self.internal_diag_vectors) != self.width:
-            raise ValueError(
-                "Length of internal_diag_vectors must equal width."
-            )
+            raise ValueError("Length of internal_diag_vectors must equal width.")
 
         expected_constants = (self.rounds_f * self.width) + self.rounds_p
         if len(self.round_constants) != expected_constants:
@@ -183,9 +176,7 @@ def external_linear_layer(state: List[Fp], width: int) -> List[Fp]:
     #
     # This provides strong local diffusion within each block.
     state_after_m4 = list(
-        chain.from_iterable(
-            _apply_m4(state[i : i + 4]) for i in range(0, width, 4)
-        )
+        chain.from_iterable(_apply_m4(state[i : i + 4]) for i in range(0, width, 4))
     )
 
     # Apply the outer circulant structure for global diffusion.
@@ -196,22 +187,15 @@ def external_linear_layer(state: List[Fp], width: int) -> List[Fp]:
     # We precompute the four sums of elements at the same offset in each chunk.
     # For each k in 0..4:
     #       sums[k] = state[k] + state[4 + k] + state[8 + k] + ... up to width
-    sums = [
-        sum((state_after_m4[j + k] for j in range(0, width, 4)), Fp(value=0))
-        for k in range(4)
-    ]
+    sums = [sum((state_after_m4[j + k] for j in range(0, width, 4)), Fp(value=0)) for k in range(4)]
 
     # Add the corresponding sum to each element of the state.
-    state_after_circulant = [
-        s + sums[i % 4] for i, s in enumerate(state_after_m4)
-    ]
+    state_after_circulant = [s + sums[i % 4] for i, s in enumerate(state_after_m4)]
 
     return state_after_circulant
 
 
-def internal_linear_layer(
-    state: List[Fp], params: Poseidon2Params
-) -> List[Fp]:
+def internal_linear_layer(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
     """
     Applies the internal linear layer (M_I).
 
@@ -233,10 +217,7 @@ def internal_linear_layer(
     s_sum = sum(state, Fp(value=0))
     # For each element s_i, compute s_i' = d_i * s_i + sum(s).
     # This is the efficient computation of (J + D)s.
-    new_state = [
-        s * d + s_sum
-        for s, d in zip(state, params.internal_diag_vectors, strict=False)
-    ]
+    new_state = [s * d + s_sum for s, d in zip(state, params.internal_diag_vectors, strict=False)]
     return new_state
 
 
@@ -279,9 +260,7 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
     # 2. First Half of Full Rounds (R_F / 2)
     for _r in range(half_rounds_f):
         # Add round constants to the entire state.
-        state = [
-            s + round_constants[const_idx + i] for i, s in enumerate(state)
-        ]
+        state = [s + round_constants[const_idx + i] for i, s in enumerate(state)]
         const_idx += params.width
         # Apply the S-box (x -> x^d) to the full state.
         state = [s**S_BOX_DEGREE for s in state]
@@ -303,9 +282,7 @@ def permute(state: List[Fp], params: Poseidon2Params) -> List[Fp]:
     # 4. Second Half of Full Rounds (R_F / 2)
     for _r in range(half_rounds_f):
         # Add round constants to the entire state.
-        state = [
-            s + round_constants[const_idx + i] for i, s in enumerate(state)
-        ]
+        state = [s + round_constants[const_idx + i] for i, s in enumerate(state)]
         const_idx += params.width
         # Apply the S-box to the full state.
         state = [s**S_BOX_DEGREE for s in state]
