@@ -84,7 +84,7 @@ class LayerInfo(BaseModel):
 
 def _calculate_layer_size(w: int, v: int, d: int) -> int:
     """
-    Calculates a hypercube layer's size using a direct combinatorial formula. 🎲
+    Calculates a hypercube layer's size using a direct combinatorial formula.
 
     This function answers the question: "How many unique coordinate vectors
     (vertices) exist in a specific layer `d`?"
