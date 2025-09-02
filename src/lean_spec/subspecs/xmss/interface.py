@@ -57,59 +57,70 @@ class GeneralizedXmssScheme:
         self.encoder = encoder
         self.rand = rand
 
-    def key_gen(
-        self, activation_epoch: int, num_active_epochs: int
-    ) -> Tuple[PublicKey, SecretKey]:
+    def key_gen(self, activation_epoch: int, num_active_epochs: int) -> Tuple[PublicKey, SecretKey]:
         """
-        Generates a new cryptographic key pair.
+        Generates a new cryptographic key pair for a specified range of epochs.
 
-        This is a **randomized** algorithm.
+        This is a **randomized** algorithm that establishes a signer's identity.
+        The generated secret key is stateful and tied to the progression of epochs.
 
-        This function executes the full key generation process:
-        1.  Generates a master secret (PRF key) and a public hash parameter.
-        2.  For each epoch in the active range, it uses the PRF to derive the
-            secret starting points for all `DIMENSION` hash chains.
-        3.  It computes the public endpoint of each chain by
-            hashing `BASE - 1` times.
-        4.  The list of all chain endpoints for an epoch forms the
-            one-time public key.
-            This one-time public key is hashed to create a single Merkle leaf.
-        5.  A Merkle tree is built over all generated leaves, and its root
-            becomes part of the final public key.
+        ### Key Generation Algorithm
+
+        1.  **Master Secrets**: A master secret (the PRF key) and a public hash
+            parameter (`P`) are randomly generated. The PRF key allows for the
+            deterministic derivation of one-time secrets for each epoch.
+
+        2.  **Hash Chains**: For each epoch in the key's active lifetime, the algorithm
+            derives the secret starting points for all `DIMENSION` hash chains using the PRF.
+            It then computes the public endpoint of each chain by hashing it `BASE - 1` times.
+
+        3.  **One-Time Public Keys**: The collection of all chain endpoints for a given
+            epoch constitutes that epoch's one-time public key.
+
+        4.  **Merkle Tree Construction**: Each one-time public key is hashed to form a
+            single Merkle leaf. A Merkle tree is then constructed over all the leaves
+            for the active epochs. The root of this tree serves as the single, compact
+            public commitment for the entire key lifetime.
 
         Args:
-            activation_epoch: The starting epoch for which this key is active.
-            num_active_epochs: The number of consecutive epochs
-            the key is active for.
+            activation_epoch: The starting epoch for which this key is valid.
+            num_active_epochs: The number of consecutive epochs the key can be used for.
+
+        Returns:
+            A tuple containing the `PublicKey` and `SecretKey`.
 
         For the formal specification of this process, please refer to:
         - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
         - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
         - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
         """
-        # Get the config for this scheme.
+        # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Validate the activation range against the scheme's total lifetime.
+        # Ensure the requested activation range is within the scheme's total supported lifetime.
         if activation_epoch + num_active_epochs > config.LIFETIME:
             raise ValueError("Activation range exceeds the key's lifetime.")
 
         # Generate the random public parameter `P` and the master PRF key.
+        # - `P` ensures hash function outputs are unique to this key pair.
+        # - PRF key is the single master secret from which all one-time keys are derived.
         parameter = self.rand.parameter()
         prf_key = self.prf.key_gen()
 
-        # For each epoch, generate the corresponding Merkle leaf hash.
+        # Iterate through each epoch to generate its corresponding Merkle leaf.
         leaf_hashes: List[HashDigest] = []
-        for epoch in range(
-            activation_epoch, activation_epoch + num_active_epochs
-        ):
-            # For each epoch, we compute `DIMENSION` chain endpoints.
+        for epoch in range(activation_epoch, activation_epoch + num_active_epochs):
+            # For each epoch, compute the one-time public key, which consists
+            # of the public endpoints of `DIMENSION` independent hash chains.
             chain_ends: List[HashDigest] = []
             for chain_index in range(config.DIMENSION):
-                # Derive the secret start of the chain from the master key.
+                # Derive the secret start of the chain from the master PRF key.
+                #
+                # This ensures each chain is unique and cryptographically secure.
                 start_digest = self.prf.apply(prf_key, epoch, chain_index)
-                # Compute the public end of the chain by hashing
-                # BASE - 1 times.
+
+                # Compute the public end of the chain by applying the hash function
+                # `BASE - 1` times. This is the public part of the one-time key.
                 end_digest = self.hasher.hash_chain(
                     parameter=parameter,
                     epoch=epoch,
@@ -120,16 +131,16 @@ class GeneralizedXmssScheme:
                 )
                 chain_ends.append(end_digest)
 
-            # The Merkle leaf is the hash of all chain endpoints
-            # for this epoch.
+            # The Merkle leaf for this epoch is the hash of its one-time public key.
+            #
+            # A unique tweak is used to domain-separate this hash from other hashes in the scheme.
             leaf_tweak = TreeTweak(level=0, index=epoch)
             leaf_hash = self.hasher.apply(parameter, leaf_tweak, chain_ends)
             leaf_hashes.append(leaf_hash)
 
-        # Build the Merkle tree over the generated leaves.
-        tree = self.merkle_tree.build(
-            config.LOG_LIFETIME, activation_epoch, parameter, leaf_hashes
-        )
+        # Build the Merkle tree over the list of all generated leaf hashes.
+        tree = self.merkle_tree.build(config.LOG_LIFETIME, activation_epoch, parameter, leaf_hashes)
+        # The root of the tree is the primary component of the public key.
         root = self.merkle_tree.root(tree)
 
         # Assemble and return the public and secret keys.
@@ -149,66 +160,85 @@ class GeneralizedXmssScheme:
 
         This is a **randomized** algorithm.
 
-        **CRITICAL**: This function must never be called twice with the same
-        secret key and epoch for different messages, as this
-        would compromise security.
+        **CRITICAL SECURITY WARNING**: A secret key for a given epoch must **NEVER** be used
+        to sign two different messages. Doing so would reveal parts of the secret key
+        and allow an attacker to forge signatures. This is the fundamental security
+        property of a synchronized (stateful) signature scheme.
 
-        The signing process involves:
-            1.  Repeatedly attempting to encode the message with
-                fresh randomness (`rho`) until a valid codeword is found.
-            2.  Computing the one-time signature, which consists of
-                intermediate values from the secret hash chains,
-                determined by the digits of the codeword.
-            3.  Retrieving the Merkle authentication path for the given epoch.
+        ### Signing Algorithm
+
+        1.  **Message Encoding with Randomness (`rho`)**: The "Target Sum" scheme
+            requires the message hash to be encoded into a `codeword` whose digits
+            sum to a predefined target. A direct hash of the message is unlikely to
+            satisfy this. Therefore, the algorithm repeatedly hashes the message
+            combined with fresh randomness (`rho`) until a valid `codeword` is found.
+
+        2.  **One-Time Signature**: The `codeword` dictates how the one-time signature is
+            formed. For each digit `x_i` in the codeword, the signer reveals an intermediate
+            hash value by applying the hash function `x_i` times to the secret start of the
+            `i`-th hash chain.
+            The collection of these intermediate hashes forms the one-time signature.
+
+        3.  **Merkle Path**: The signer retrieves the Merkle authentication path for the leaf
+            corresponding to the current `epoch`. This path proves that the one-time public key
+            for this epoch is part of the main public key (the Merkle root).
+
+        Args:
+            sk: The secret key to use for signing.
+            epoch: The epoch for which the signature is being created.
+            message: The message to be signed.
+
+        Returns:
+            The resulting `Signature` object.
 
         For the formal specification of this process, please refer to:
         - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
         - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
         - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
         """
-        # Get the config for this scheme.
+        # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Check that the key is active for the requested signing epoch.
-        active_range = range(
-            sk.activation_epoch, sk.activation_epoch + sk.num_active_epochs
-        )
+        # Verify that the secret key is currently active for the requested signing epoch.
+        active_range = range(sk.activation_epoch, sk.activation_epoch + sk.num_active_epochs)
         if epoch not in active_range:
             raise ValueError("Key is not active for the specified epoch.")
 
-        # Find a valid message encoding by trying different randomness `rho`.
-        codeword = None
-        rho = None
+        # Find a valid message encoding.
+        #
+        # This loop repeatedly tries different randomness `rho` until the encoder
+        # produces a valid codeword (i.e., one that meets the target sum constraint).
         for _ in range(config.MAX_TRIES):
-            # Sample a randomness `rho` and try to encode the message.
-            current_rho = self.rand.rho()
-            current_codeword = self.encoder.encode(
-                sk.parameter, message, current_rho, epoch
-            )
-
-            # If a valid codeword is found, break out of the loop.
-            if current_codeword is not None:
-                codeword = current_codeword
-                rho = current_rho
+            # Sample fresh randomness `rho`.
+            rho = self.rand.rho()
+            # Attempt to encode the message with the new `rho`.
+            codeword = self.encoder.encode(sk.parameter, message, rho, epoch)
+            # If encoding is successful, we've found our `rho` and `codeword`.
+            #
+            # We can exit the loop.
+            if codeword is not None:
                 break
-
-        # If no valid encoding is found after many tries, signing fails.
-        if codeword is None or rho is None:
-            raise RuntimeError("Failed to find a valid message encoding.")
-
-        # Sanity check: the encoding must have the correct number of chunks.
-        if len(codeword) != self.config.DIMENSION:
+        else:
+            # This block executes only if the `for` loop completes without a `break`.
+            #
+            # This means that no valid encoding was found after the maximum number of tries.
             raise RuntimeError(
-                "Encoding is broken: returned too many or too few chunks."
+                f"Failed to find a valid message encoding after {config.MAX_TRIES} tries."
             )
+
+        # Sanity check to ensure the encoder returned a codeword of the correct length.
+        if len(codeword) != self.config.DIMENSION:
+            raise RuntimeError("Encoding is broken: returned too many or too few chunks.")
 
         # Compute the one-time signature hashes based on the codeword.
         ots_hashes: List[HashDigest] = []
         for chain_index, steps in enumerate(codeword):
-            # Derive the secret start of the chain from the master key.
+            # Derive the secret start of the current chain using the master PRF key.
             start_digest = self.prf.apply(sk.prf_key, epoch, chain_index)
-            # Walk the chain for the number of steps given
-            # by the codeword digit.
+            # Walk the hash chain for the number of `steps` specified by the
+            # corresponding digit in the codeword.
+            #
+            # The result is one component of the OTS.
             ots_digest = self.hasher.hash_chain(
                 parameter=sk.parameter,
                 epoch=epoch,
@@ -219,15 +249,16 @@ class GeneralizedXmssScheme:
             )
             ots_hashes.append(ots_digest)
 
-        # Get the Merkle authentication path for the current epoch.
+        # Retrieve the Merkle authentication path for the current epoch's leaf.
         path = self.merkle_tree.path(sk.tree, epoch)
 
-        # Assemble and return the final signature.
+        # Assemble and return the final signature, which contains:
+        # - The OTS,
+        # - The Merkle path,
+        # - The randomness `rho` needed for verification.
         return Signature(path=path, rho=rho, hashes=ots_hashes)
 
-    def verify(
-        self, pk: PublicKey, epoch: int, message: bytes, sig: Signature
-    ) -> bool:
+    def verify(self, pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
         r"""
         Verifies a digital signature against a public key, message, and epoch.
 
@@ -235,30 +266,23 @@ class GeneralizedXmssScheme:
 
         ### Verification Algorithm
 
-        1.  **Re-encode Message**: The verifier uses the randomness `rho`
-            from the signature to re-compute the codeword
-            $x = (x_1, \dots, x_v)$ from the message `m`.
+        1.  **Re-encode Message**: The verifier uses the randomness `rho` from the
+            signature to re-compute the codeword $x = (x_1, \dots, x_v)$ from the message `m`.
+            If the encoding is invalid (e.g., does not meet the target sum), verification fails.
 
-            This includes calculating the checksum or checking the target sum.
+        2.  **Reconstruct One-Time Public Key**: For each intermediate hash $y_i$ in the
+            signature's `hashes` field, the verifier completes the corresponding hash chain.
+            Since $y_i$ was computed by hashing $x_i$ times, the verifier applies the
+            hash function an additional `BASE - 1 - x_i` times to arrive at the
+            chain's public endpoint, which is one component of the one-time public key.
 
-        2.  **Reconstruct One-Time Public Key**: For each intermediate
-            hash $y_i$ in the signature, the verifier completes the
-            corresponding hash chain.
+        3.  **Compute Merkle Leaf**: The verifier hashes the full set of reconstructed
+            chain endpoints to compute the expected Merkle leaf for the given `epoch`.
 
-            Since $y_i$ was computed with $x_i$ steps, the verifier applies the
-            hash function an additional $w - 1 - x_i$ times to arrive at the
-            one-time public key component $pk_{ep,i}$.
-
-        3.  **Compute Merkle Leaf**: The verifier hashes the reconstructed
-            one-time public key components to compute the expected Merkle
-            leaf for `epoch`.
-
-        4.  **Verify Merkle Path**: The verifier uses the `path` from
-            the signature to compute a candidate Merkle root starting from
-            the computed leaf.
-
-            Verification succeeds if and only if this candidate root matches
-            the `root` in the `PublicKey`.
+        4.  **Verify Merkle Path**: The verifier uses the authentication `path` from the
+            signature to compute a candidate Merkle root, starting from the leaf computed
+            in the previous step. Verification succeeds if and only if this candidate root
+            matches the `root` stored in the `PublicKey`.
 
         Args:
             pk: The public key to verify against.
@@ -274,16 +298,16 @@ class GeneralizedXmssScheme:
         - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
         - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
         """
-        # Get the config for this scheme.
+        # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Check that the signature is for a valid epoch.
+        # A signature for an epoch beyond the scheme's lifetime is invalid.
         if epoch > self.config.LIFETIME:
             raise ValueError("The signature is for a future epoch.")
 
         # Re-encode the message using the randomness `rho` from the signature.
         #
-        # If the encoding is invalid, the signature is invalid.
+        # If the encoding is invalid (e.g., fails the target sum check), the signature is invalid.
         codeword = self.encoder.encode(pk.parameter, message, sig.rho, epoch)
         if codeword is None:
             return False
@@ -291,10 +315,10 @@ class GeneralizedXmssScheme:
         # Reconstruct the one-time public key (the list of chain endpoints).
         chain_ends: List[HashDigest] = []
         for chain_index, xi in enumerate(codeword):
-            # The signature provides the hash value after `xi` steps.
+            # The signature provides `start_digest`, which is the hash value after `xi` steps.
             start_digest = sig.hashes[chain_index]
-            # We must perform the remaining `BASE - 1 - xi` steps
-            # to get to the end.
+            # We must perform the remaining `BASE - 1 - xi` hashing steps
+            # to compute the public endpoint of the chain.
             num_steps_remaining = config.BASE - 1 - xi
             end_digest = self.hasher.hash_chain(
                 parameter=pk.parameter,
@@ -308,8 +332,10 @@ class GeneralizedXmssScheme:
 
         # Verify the Merkle path.
         #
-        # This function internally hashes `chain_ends` to get the leaf node
-        # and then climbs the tree to recompute the root.
+        # This function internally:
+        # - Hashes the `chain_ends` to get the leaf node for the epoch,
+        # - Uses the `opening` path from the signature to compute a candidate root.
+        # - It returns true if and only if this candidate root matches the public key's root.
         return self.merkle_tree.verify_path(
             parameter=pk.parameter,
             root=pk.root,

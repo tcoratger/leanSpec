@@ -18,7 +18,12 @@ from .message_hash import (
 
 
 class TargetSumEncoder:
-    """An instance of the Target Sum encoder for a given config."""
+    """
+    An instance of the Target Sum encoder for a given configuration.
+
+    This class encapsulates the logic for validating a message hash against the
+    scheme's target sum constraint.
+    """
 
     def __init__(self, config: XmssConfig, message_hasher: MessageHasher):
         """Initializes the encoder with a specific parameter set."""
@@ -31,28 +36,38 @@ class TargetSumEncoder:
         """
         Encodes a message into a codeword if it meets the target sum criteria.
 
-        This function first uses the message hash to map the input to a vertex
-        in the hypercube. It then checks if the sum of the vertex's coordinates
-        matches the scheme's `TARGET_SUM`.
+        ### Encoding Algorithm
+
+        1.  **Hashing to a Vertex**: The function first hashes the inputs (`message`,
+            `rho`, etc.) to produce a candidate codeword. This can be viewed as
+            mapping the inputs to a vertex in a high-dimensional hypercube, where
+            the vertex's coordinates are the digits of the codeword.
+
+        2.  **Target Sum Validation**: It then checks if the sum of the candidate's digits
+            matches the scheme's predefined `TARGET_SUM`. This is equivalent to
+            verifying that the vertex lies on the correct hypercube layer. This
+            constraint is critical for the scheme's security and ensures a
+            predictable number of hash operations during signature verification.
 
         Args:
-            parameter: The public parameter `P`.
+            parameter: The public parameter `P`, used for domain separation.
             message: The message to encode.
-            rho: The randomness used for this encoding attempt.
-            epoch: The current epoch.
+            rho: The randomness used for this specific encoding attempt.
+            epoch: The current epoch, used as part of the hash input.
 
         Returns:
-            The codeword (a list of integers) if the sum is correct,
-            otherwise `None`.
+            - The codeword (a list of integers) if the sum matches the target.
+            - Otherwise, it returns `None` to signal that this attempt failed and
+            a new `rho` must be tried.
         """
-        # Apply the message hash to get a potential codeword (a vertex).
-        codeword_candidate = self.message_hasher.apply(
-            parameter, epoch, rho, message
-        )
+        # Hash the inputs to map them to a potential codeword (a vertex in the hypercube).
+        codeword_candidate = self.message_hasher.apply(parameter, epoch, rho, message)
 
-        # Check if the candidate satisfies the target sum condition.
+        # A codeword is valid only if it lies on the predefined hypercube layer.
+        #
+        # This is verified by checking if the sum of its coordinates equals TARGET_SUM.
         if sum(codeword_candidate) == self.config.TARGET_SUM:
-            # If the sum is correct, this is a valid codeword.
+            # If the sum is correct, this is a valid codeword for the one-time signature.
             return codeword_candidate
         else:
             # If the sum does not match, this `rho` is invalid for

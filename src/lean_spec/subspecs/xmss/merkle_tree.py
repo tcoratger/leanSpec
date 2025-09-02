@@ -1,29 +1,42 @@
 """
 Implements the sparse Merkle tree used in the Generalized XMSS scheme.
 
-This module provides the data structures and algorithms for building a Merkle
-tree over a contiguous subset of leaves, computing authentication paths, and
-verifying those paths.
+### Usage of Merkle Trees in XMSS scheme: Aggregating Keys
 
-The key features are:
-1.  **Sparsity**: The tree can represent a massive address space (e.g., 2^32
-    leaves) while only storing the nodes relevant to a smaller, active range of
-    leaves (e.g., 2^20 leaves).
-2.  **Random Padding**: To simplify the logic for pairing sibling nodes, the
-    active layers are padded with random hash values to ensure they always
-    start at an even index and end at an odd index.
+A Merkle tree is a cryptographic data structure that allows for the efficient
+aggregation and verification of large sets of data. In XMSS, its role is to
+aggregate **one-time public keys** (the leaves of the tree) into a single,
+compact **master public key** (the root of the tree).
+
+A verifier who knows only the root can be given a small proof (an "authentication
+path") to efficiently verify that a specific one-time public key is a legitimate
+part of the overall scheme.
+
+### Key Optimizations for XMSS
+
+This implementation includes two important features tailored for this use case:
+
+1.  **Sparsity**: A key pair might have a massive theoretical lifetime (e.g., 2^32 epochs),
+    but in practice, a signer only needs to generate and store the keys for a
+    much smaller, active range (e.g., 2^20 epochs). This implementation builds a
+    "sparse" tree, only computing and storing the nodes and branches relevant to
+    this active range of leaves, leading to enormous savings in computation and memory.
+
+2.  **Random Padding**: To simplify the algorithm that builds the tree, each active
+    layer is padded with random hash values. This ensures that every node can
+    always be paired with a sibling, eliminating complex edge-case logic for
+    "orphan" nodes at the boundaries of the sparse region.
 """
 
 from __future__ import annotations
 
 from typing import List
 
-from lean_spec.subspecs.xmss.constants import (
+from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
     XmssConfig,
 )
-
 from .containers import (
     HashDigest,
     HashTree,
@@ -49,23 +62,22 @@ class MerkleTree:
         self.hasher = hasher
         self.rand = rand
 
-    def _get_padded_layer(
-        self, nodes: List[HashDigest], start_index: int
-    ) -> HashTreeLayer:
+    def _get_padded_layer(self, nodes: List[HashDigest], start_index: int) -> HashTreeLayer:
         """
-        Pads a layer to ensure its nodes can always be paired up.
+        Pads a layer of nodes with random hashes to simplify tree construction.
 
-        This helper function adds random padding to the start and/or end of
-        a list of nodes to enforce an invariant: every layer must start at an
-        even index and end at an odd index. This guarantees that every node has
-        a sibling, simplifying the construction of the next layer up.
+        This helper enforces a crucial invariant: every active layer must start at an
+        even index and end at an odd index. This guarantees that every node within
+        the layer can be neatly paired with a sibling (a left child with a right
+        child), which dramatically simplifies the parent generation logic by
+        removing the need to handle edge cases.
 
         Args:
             nodes: The list of active nodes for the current layer.
             start_index: The starting index of the first node in `nodes`.
 
         Returns:
-            A new `HashTreeLayer` with padding applied.
+            A new `HashTreeLayer` with the necessary padding applied.
         """
         nodes_with_padding: List[HashDigest] = []
         end_index = start_index + len(nodes) - 1
@@ -85,9 +97,7 @@ class MerkleTree:
         if end_index % 2 == 0:
             nodes_with_padding.append(self.rand.domain())
 
-        return HashTreeLayer(
-            start_index=actual_start_index, nodes=nodes_with_padding
-        )
+        return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
 
     def build(
         self,
@@ -97,21 +107,35 @@ class MerkleTree:
         leaf_hashes: List[HashDigest],
     ) -> HashTree:
         """
-        Builds a new sparse Merkle tree from a list of leaf hashes.
+        Builds a new sparse Merkle tree from a contiguous range of leaf hashes.
 
-        The construction proceeds bottom-up, from the leaf layer to the root.
-        At each level, pairs of sibling nodes are hashed to create
-        their parents for the next level up.
+        ### Construction Algorithm
+
+        1.  **Initialization**: The process starts with the provided `leaf_hashes`
+            at the bottom of the tree (level 0). This layer is padded.
+
+        2.  **Bottom-Up Iteration**: The tree is built level by level, from the
+            leaves towards the root.
+
+        3.  **Parent Generation**: In each level, the current layer's nodes are
+            grouped into pairs (left child, right child). Each pair is then
+            hashed together (using a level- and index-specific tweak) to create
+            a parent node in the level above.
+
+        4.  **Padding**: The new list of parent nodes is padded to prepare for the
+            next iteration, ensuring the sibling-pairing logic remains simple.
+
+        5.  **Termination**: This process repeats until a layer with a single
+            node is produced. This final node is the tree's root.
 
         Args:
-            depth: The depth of the tree (e.g., 32 for a 2^32 leaf space).
-            start_index: The index of the first leaf in `leaf_hashes`.
+            depth: The total depth of the tree (e.g., 32 for a 2^32 leaf space).
+            start_index: The absolute index of the first leaf in `leaf_hashes`.
             parameter: The public parameter `P` for the hash function.
-            leaf_hashes: The list of pre-hashed leaf nodes to
-            build the tree on.
+            leaf_hashes: The list of pre-hashed leaf nodes.
 
         Returns:
-            The fully constructed `HashTree` object.
+            The fully constructed `HashTree` object containing all computed layers.
         """
         # Check there is enough space for the leafs in the tree.
         if start_index + len(leaf_hashes) > 2**depth:
@@ -125,7 +149,9 @@ class MerkleTree:
         # Iterate from the leaf layer (level 0) up to the root.
         for level in range(depth):
             parents: List[HashDigest] = []
-            # Group the current layer's nodes into pairs of siblings.
+            # Group the current layer's nodes into pairs of (left, right) siblings.
+            #
+            # The padding guarantees this works perfectly without leaving orphan nodes.
             for i, children in enumerate(
                 zip(
                     current_layer.nodes[0::2],
@@ -133,15 +159,12 @@ class MerkleTree:
                     strict=False,
                 )
             ):
-                # Calculate the position of the parent node in the
-                # next level up.
+                # Calculate the position of the parent node in the next level up.
                 parent_index = (current_layer.start_index // 2) + i
                 # Create the tweak for hashing these two children.
                 tweak = TreeTweak(level=level + 1, index=parent_index)
                 # Hash the left and right children to get their parent.
-                parent_node = self.hasher.apply(
-                    parameter, tweak, list(children)
-                )
+                parent_node = self.hasher.apply(parameter, tweak, list(children))
                 parents.append(parent_node)
 
             # Pad the new list of parents to prepare for the next iteration.
@@ -149,27 +172,39 @@ class MerkleTree:
             current_layer = self._get_padded_layer(parents, new_start_index)
             layers.append(current_layer)
 
+        # Return the completed tree containing all computed layers.
         return HashTree(depth=depth, layers=layers)
 
     def root(self, tree: HashTree) -> HashDigest:
-        """Extracts the root digest from a constructed Merkle tree."""
+        """
+        Extracts the root digest from a constructed Merkle tree.
+
+        The root is the single node in the final, highest layer of the `HashTree`
+        and serves as the primary component of the master public key.
+        """
         # The root is the single node in the final layer.
         return tree.layers[-1].nodes[0]
 
     def path(self, tree: HashTree, position: int) -> HashTreeOpening:
         """
-        Computes the Merkle authentication path for a leaf at a given position.
+        Computes the authentication path for a leaf.
 
-        The path consists of the list of sibling nodes required to reconstruct
-        the root, starting from the leaf's sibling and going up the tree.
+        The path is the minimal set of sibling nodes a verifier needs to reconstruct
+        the root from a given leaf. This `O(log N)` proof is what makes Merkle
+        tree verification highly efficient.
+
+        ### Path Generation Algorithm
+        The algorithm "climbs" the tree from the leaf level to the root. At each
+        level, it identifies the sibling of the current node on the path and adds
+        it to the `co_path`. It then moves up to the parent's position for the
+        next level.
 
         Args:
             tree: The `HashTree` from which to extract the path.
-            position: The absolute index of the leaf for which to
-            generate path.
+            position: The absolute index of the leaf whose path is needed.
 
         Returns:
-            A `HashTreeOpening` object containing the co-path.
+            A `HashTreeOpening` object containing the list of sibling hashes.
         """
         # Check that there is at least one layer in the tree.
         if len(tree.layers) == 0:
@@ -185,12 +220,11 @@ class MerkleTree:
         co_path: List[HashDigest] = []
         current_position = position
 
-        # Iterate from the bottom layer (level 0) up to the layer
-        # below the root.
+        # Iterate from the leaf layer (level 0) up to the layer below the root.
         for level in range(tree.depth):
-            # Determine the sibling's position using an XOR operation.
+            # Determine the sibling's position by flipping the last bit (XOR with 1).
             sibling_position = current_position ^ 1
-            # Find the sibling's index within the sparse `nodes` vector.
+            # Find the sibling's index within our sparsely stored `nodes` vector.
             layer = tree.layers[level]
             sibling_index_in_vec = sibling_position - layer.start_index
             # Add the sibling's hash to the co-path.
@@ -209,23 +243,40 @@ class MerkleTree:
         opening: HashTreeOpening,
     ) -> bool:
         """
-        Verifies a Merkle authentication path.
+        Verifies a Merkle authentication path against a known, trusted root.
 
-        This function reconstructs a candidate root by starting with the leaf
-        node and repeatedly hashing it with the sibling nodes provided
-        in the opening path.
+        This function is the final check in signature verification. It proves that the
+        one-time public key used for the signature (represented by `leaf_parts`) is a
+        legitimate member of the set committed to by the Merkle `root`.
 
-        The verification succeeds if the candidate root matches the true root.
+        ### Verification Algorithm
+
+        1.  **Leaf Computation**: The process begins at the bottom. The verifier first
+            hashes the `leaf_parts` to compute the actual leaf digest. This becomes the
+            starting `current_node` for the climb up the tree.
+
+        2.  **Bottom-Up Reconstruction**: The verifier iterates through the `opening.siblings`
+            path. At each `level`, it takes the `current_node` and the `sibling_node`
+            from the path.
+
+        3.  **Parent Calculation**: It determines if the `current_node` is a left or
+            right child based on its `position`. The two nodes are placed in the
+            correct `(left, right)` order and hashed (with the correct `TreeTweak`)
+            to compute the parent. This parent becomes the `current_node` for the
+            next level.
+
+        4.  **Final Comparison**: After all siblings are used, the final `current_node`
+            is the candidate root. The path is valid if and only if it matches the trusted `root`.
 
         Args:
             parameter: The public parameter `P` for the hash function.
-            root: The known, trusted Merkle root.
+            root: The known, trusted Merkle root from the public key.
             position: The absolute index of the leaf being verified.
             leaf_parts: The list of digests that constitute the original leaf.
             opening: The `HashTreeOpening` object containing the sibling path.
 
         Returns:
-            `True` if the path is valid, `False` otherwise.
+            `True` if the path is valid and reconstructs the root, `False` otherwise.
         """
         # Compute the depth
         depth = len(opening.siblings)

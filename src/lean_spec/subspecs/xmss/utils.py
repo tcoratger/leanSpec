@@ -17,8 +17,7 @@ class Rand:
 
     def field_elements(self, length: int) -> List[Fp]:
         """Generates a random list of field elements."""
-        # For each element, generate a secure random integer
-        # in the range [0, P-1].
+        # For each element, generate a secure random integer in the range [0, P-1].
         return [Fp(value=secrets.randbelow(P)) for _ in range(length)]
 
     def parameter(self) -> Parameter:
