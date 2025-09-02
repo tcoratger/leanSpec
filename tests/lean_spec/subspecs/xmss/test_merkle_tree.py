@@ -37,8 +37,7 @@ def _run_commit_open_verify_roundtrip(
     # SETUP: Generate a random parameter and the raw leaf data.
     parameter = merkle_tree.rand.parameter()
     leaves: list[list[HashDigest]] = [
-        [merkle_tree.rand.domain() for _ in range(leaf_parts_len)]
-        for _ in range(num_leaves)
+        [merkle_tree.rand.domain() for _ in range(leaf_parts_len)] for _ in range(num_leaves)
     ]
 
     # HASH LEAVES: Compute the layer 0 nodes by hashing the leaf parts.
@@ -59,9 +58,7 @@ def _run_commit_open_verify_roundtrip(
     for i, leaf_parts in enumerate(leaves):
         position = start_index + i
         opening = merkle_tree.path(tree, position)
-        is_valid = merkle_tree.verify_path(
-            parameter, root, position, leaf_parts, opening
-        )
+        is_valid = merkle_tree.verify_path(parameter, root, position, leaf_parts, opening)
         assert is_valid, f"Verification failed for leaf at position {position}"
 
 

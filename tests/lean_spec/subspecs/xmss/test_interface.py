@@ -53,9 +53,7 @@ def _test_correctness_roundtrip(
     if num_active_epochs > 1:
         wrong_epoch = test_epoch + 1
         is_invalid_epoch = scheme.verify(pk, wrong_epoch, message, signature)
-        assert not is_invalid_epoch, (
-            "Verification succeeded for an incorrect epoch"
-        )
+        assert not is_invalid_epoch, "Verification succeeded for an incorrect epoch"
 
 
 @pytest.mark.parametrize(

@@ -88,8 +88,6 @@ def test_apply_output_is_in_correct_hypercube_part() -> None:
     #
     # This is equivalent to `sum(coords) >= v*(w-1) - FINAL_LAYER`.
     coord_sum = sum(vertex)
-    min_required_sum = (
-        config.BASE - 1
-    ) * config.DIMENSION - config.FINAL_LAYER
+    min_required_sum = (config.BASE - 1) * config.DIMENSION - config.FINAL_LAYER
 
     assert coord_sum >= min_required_sum, "Vertex is not in the top layers"

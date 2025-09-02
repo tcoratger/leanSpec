@@ -14,14 +14,15 @@ import os
 from typing import List
 
 from lean_spec.subspecs.koalabear import Fp
-from lean_spec.subspecs.xmss.constants import (
+from lean_spec.types.uint64 import Uint64
+
+from .constants import (
     PRF_KEY_LENGTH,
     PROD_CONFIG,
     TEST_CONFIG,
     XmssConfig,
 )
-from lean_spec.subspecs.xmss.containers import PRFKey
-from lean_spec.types.uint64 import Uint64
+from .containers import PRFKey
 
 PRF_DOMAIN_SEP: bytes = bytes(
     [
@@ -82,67 +83,60 @@ class Prf:
 
     def apply(self, key: PRFKey, epoch: int, chain_index: Uint64) -> List[Fp]:
         """
-        Applies the PRF to derive the secret values for a specific epoch
-        and chain.
+        Applies the PRF to derive the secret starting value for a single hash chain.
 
-        The function computes:
+        ### PRF Construction
+
+        The function constructs a unique input for the underlying SHAKE128 function
+        by concatenating several components:
         `SHAKE128(DOMAIN_SEP || key || epoch || chain_index)`
-        and interprets the output as a list of field elements.
+
+        The arbitrary-length output of SHAKE128 is then processed to produce a
+        list of field elements, which serves as the secret starting digest for one chain.
 
         Args:
-            key: The secret PRF key.
-            epoch: The epoch number (a 32-bit unsigned integer).
-            chain_index: The index of the hash chain (a 64-bit uint).
+            key: The secret master PRF key.
+            epoch: The epoch number, identifying the one-time signature instance.
+            chain_index: The index of the hash chain within that epoch's OTS.
 
         Returns:
-            A list of `DIMENSION` field elements, which are the secret starting
-            points for the hash chains of the specified epoch.
+            A list of field elements representing the secret start of a single
+            hash chain (i.e., a `HashDigest`).
         """
-        # Get the config for this scheme.
+        # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Create a new SHAKE128 hash instance.
-        hasher = hashlib.shake_128()
-
-        # Absorb the domain separator to contextualize the hash.
-        hasher.update(PRF_DOMAIN_SEP)
-
-        # Absorb the secret key.
-        hasher.update(key)
-
-        # Absorb the epoch, represented as a 4-byte big-endian integer.
+        # Construct the unique input for the PRF by concatenating its components:
         #
-        # This ensures that each epoch produces a unique set of secrets.
-        hasher.update(epoch.to_bytes(4, "big"))
-
-        # Absorb the chain index, as an 8-byte big-endian integer.
-        #
-        # This is used to derive a unique start value for each hash chain.
-        hasher.update(chain_index.to_bytes(8, "big"))
+        # - Domain Separation: Uniquely tag the PRF for this specific use case.
+        # - Key Input: The master secret key.
+        # - Epoch: A 4-byte integer ensuring every epoch derives a different set of secrets.
+        # - Chain Index: An 8-byte integer ensuring each parallel hash chain gets a unique secret.
+        input_data = (
+            PRF_DOMAIN_SEP + key + epoch.to_bytes(4, "big") + chain_index.to_bytes(8, "big")
+        )
 
         # Determine the total number of bytes to extract from the SHAKE output.
         #
-        # For key generation, we need one field element per chain.
+        # We need enough bytes to produce `HASH_LEN_FE` field elements.
         num_bytes_to_read = PRF_BYTES_PER_FE * config.HASH_LEN_FE
-        prf_output_bytes = hasher.digest(num_bytes_to_read)
+        prf_output_bytes = hashlib.shake_128(input_data).digest(num_bytes_to_read)
 
-        # Convert the byte output into a list of field elements.
-        output_elements: List[Fp] = []
-        for i in range(config.HASH_LEN_FE):
-            # Extract an 8-byte chunk for the current field element.
-            start = i * PRF_BYTES_PER_FE
-            end = start + PRF_BYTES_PER_FE
-            chunk = prf_output_bytes[start:end]
-
-            # Convert the chunk to a large integer.
-            integer_value = int.from_bytes(chunk, "big")
-
-            # Reduce the integer modulo the field prime `P`.
-            #
-            # The Fp constructor handles the modulo operation automatically.
-            output_elements.append(Fp(value=integer_value))
-
-        return output_elements
+        # Convert the raw byte output into a list of field elements.
+        #
+        # For each required field element, this performs the following steps:
+        # - Slice an 8-byte (64-bit) chunk from the `prf_output_bytes`.
+        # - Convert that chunk from a big-endian byte representation to an integer.
+        # - Create a field element from the integer (the Fp constructor handles the modulo).
+        return [
+            Fp(
+                value=int.from_bytes(
+                    prf_output_bytes[i * PRF_BYTES_PER_FE : (i + 1) * PRF_BYTES_PER_FE],
+                    "big",
+                )
+            )
+            for i in range(config.HASH_LEN_FE)
+        ]
 
 
 PROD_PRF = Prf(PROD_CONFIG)
