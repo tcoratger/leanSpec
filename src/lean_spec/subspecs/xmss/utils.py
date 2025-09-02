@@ -57,6 +57,6 @@ def int_to_base_p(value: int, num_limbs: int) -> List[Fp]:
     limbs: List[Fp] = []
     acc = value
     for _ in range(num_limbs):
-        limbs.append(Fp(value=acc % P))
+        limbs.append(Fp(value=acc))
         acc //= P
     return limbs
