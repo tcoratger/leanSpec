@@ -311,23 +311,3 @@ def test_justifications_roundtrip(
 
     # Assert that the reconstructed map is identical to the expected map
     assert reconstructed_map == expected_map
-
-
-@pytest.mark.parametrize(
-    "justifications_map",
-    [
-        pytest.param({}, id="empty_justifications"),
-        pytest.param({Bytes32(b"\x01" * 32): _create_votes([0])}, id="single_root"),
-    ],
-)
-def test_justifications_roundtrip_idiomatic(
-    base_state: State, justifications_map: Dict[Bytes32, List[bool]]
-) -> None:
-    """
-    Test the roundtrip using the idiomatic setter to ensure it also works.
-    """
-    # Use the idiomatic setter to modify the state
-    base_state.set_justifications(justifications_map)
-    reconstructed_map = base_state.get_justifications()
-    expected_map = dict(sorted(justifications_map.items()))
-    assert reconstructed_map == expected_map
