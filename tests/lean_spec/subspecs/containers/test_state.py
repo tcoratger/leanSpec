@@ -42,17 +42,17 @@ def sample_checkpoint() -> Checkpoint:
 
 @pytest.fixture
 def base_state(
-    sample_config: Config,
-    sample_block_header: BlockHeader,
-    sample_checkpoint: Checkpoint,
+    config: Config,
+    block_header: BlockHeader,
+    checkpoint: Checkpoint,
 ) -> State:
     """Provides a base State object with default empty values."""
     return State(
-        config=sample_config,
+        config=config,
         slot=Uint64(0),
-        latest_block_header=sample_block_header,
-        latest_justified=sample_checkpoint,
-        latest_finalized=sample_checkpoint,
+        latest_block_header=block_header,
+        latest_justified=checkpoint,
+        latest_finalized=checkpoint,
         historical_block_hashes=[],
         justified_slots=[],
         justifications_roots=[],
