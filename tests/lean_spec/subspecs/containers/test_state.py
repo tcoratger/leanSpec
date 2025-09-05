@@ -257,7 +257,6 @@ def test_set_justifications_invalid_length(base_state: State) -> None:
         base_state.set_justifications(justifications)
 
 
-# A helper function to create vote lists concisely for parameterization.
 def _create_votes(indices: List[int]) -> List[bool]:
     """Creates a vote list with `True` at the specified indices."""
     votes = [False] * DEVNET_CONFIG.validator_registry_limit
@@ -266,7 +265,6 @@ def _create_votes(indices: List[int]) -> List[bool]:
     return votes
 
 
-# Define test cases directly in the parametrize decorator for co-location.
 @pytest.mark.parametrize(
     "justifications_map",
     [
