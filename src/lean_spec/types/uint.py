@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Literal, SupportsIndex, SupportsInt
 
-from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
-from pydantic.json_schema import JsonSchemaValue
+from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 from typing_extensions import Self
 
@@ -32,33 +31,32 @@ class BaseUint(int):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        """Hook into Pydantic's validation system."""
+        """
+        Hook into Pydantic's validation system.
 
-        def validate(value: Any) -> BaseUint:
-            """Pydantic validation function that calls the class constructor."""
-            try:
-                return cls(value)
-            except (OverflowError, TypeError) as e:
-                raise ValueError(str(e)) from e
+        This schema defines how to handle the custom Uint type:
+        1. If the input is already an instance of the class, accept it.
+        2. Otherwise, validate the input as an integer within the defined bit range
+            and then instantiate the class.
+        3. For serialization (e.g., to JSON), convert the instance to a plain int.
+        """
+        # Validator that takes an integer and returns an instance of the class.
+        from_int_validator = core_schema.no_info_plain_validator_function(cls)
 
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.int_schema(ge=0, lt=2**cls.BITS),
-            python_schema=core_schema.plain_validator_function(validate),  # type: ignore[operator]
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda instance: int(instance)
-            ),
+        # Schema that first validates the input as an int, then calls our validator.
+        python_schema = core_schema.chain_schema(
+            [core_schema.int_schema(ge=0, lt=2**cls.BITS), from_int_validator]
         )
 
-    @classmethod
-    def __get_pydantic_json_schema__(
-        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
-    ) -> JsonSchemaValue:
-        """Hook into Pydantic's JSON Schema generation system."""
-        # Get the default integer schema from Pydantic
-        json_schema = handler(core_schema)
-        # Add a more specific format for better documentation
-        json_schema.update(format=f"uint{cls.BITS}")
-        return json_schema
+        return core_schema.union_schema(
+            [
+                # Case 1: The value is already the correct type.
+                core_schema.is_instance_schema(cls),
+                # Case 2: The value needs to be parsed and validated.
+                python_schema,
+            ],
+            serialization=core_schema.plain_serializer_function_ser_schema(int),
+        )
 
     def to_bytes(
         self,
