@@ -58,6 +58,10 @@ class BaseUint(int):
             serialization=core_schema.plain_serializer_function_ser_schema(int),
         )
 
+    def as_int(self) -> int:
+        """Convert the unsigned integer to a plain integer."""
+        return int(self)
+
     def to_bytes(
         self,
         length: SupportsIndex | None = None,
