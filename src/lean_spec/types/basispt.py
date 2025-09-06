@@ -3,7 +3,7 @@
 from pydantic import Field
 from typing_extensions import Annotated
 
-from ..types.uint64 import Uint64
+from ..types.uint import Uint64
 
 BasisPoint = Annotated[
     Uint64,
