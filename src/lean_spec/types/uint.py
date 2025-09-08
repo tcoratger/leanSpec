@@ -63,10 +63,10 @@ class BaseUint(int):
             serialization=core_schema.plain_serializer_function_ser_schema(int),
         )
 
-    @property
-    def max(self) -> Self:
-        """The maximum value for this unsigned integer type as an instance."""
-        return type(self)((2 ** type(self).BITS) - 1)
+    @classmethod
+    def max_value(cls) -> Self:
+        """The maximum value for this unsigned integer."""
+        return cls(2**cls.BITS - 1)
 
     def as_int(self) -> int:
         """Convert the unsigned integer to a plain integer."""
