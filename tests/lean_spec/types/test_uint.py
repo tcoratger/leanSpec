@@ -43,10 +43,13 @@ def test_instantiation_too_large(uint_class: Type[BaseUint]) -> None:
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-def test_instantiation_from_float(uint_class: Type[BaseUint]) -> None:
-    """Tests that floats are correctly truncated during instantiation."""
-    assert uint_class(0.1) == uint_class(0)
-    assert uint_class(1.9) == uint_class(1)
+def test_instantiation_from_float_raises_error(uint_class: Type[BaseUint]) -> None:
+    """Tests that instantiating with a float raises a TypeError."""
+    with pytest.raises(TypeError, match="Cannot instantiate .* from a float"):
+        uint_class(0.1)
+
+    with pytest.raises(TypeError, match="Cannot instantiate .* from a float"):
+        uint_class(1.9)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)

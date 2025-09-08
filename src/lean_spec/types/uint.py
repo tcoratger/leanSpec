@@ -20,8 +20,16 @@ class BaseUint(int):
         Create and validate a new Uint instance.
 
         Raises:
+            TypeError: If `value` is a float, to prevent silent truncation.
             OverflowError: If `value` is outside the allowed range [0, 2**BITS - 1].
         """
+        # Prevent silent truncation of floats
+        if isinstance(value, float):
+            raise TypeError(
+                f"Cannot instantiate {cls.__name__} from a float. "
+                "Please cast explicitly to an integer first (e.g., int(your_float))."
+            )
+
         int_value = int(value)
         if not (0 <= int_value < (2**cls.BITS)):
             raise OverflowError(f"{int_value} is out of range for {cls.__name__}")
