@@ -124,10 +124,10 @@ def test_arithmetic_operators(uint_class: Type[BaseUint]) -> None:
     assert a % b == uint_class(a_val % b_val)
 
     # Exponentiation
-    assert uint_class(b_val) ** uint_class(4) == uint_class(b_val**4)
+    assert uint_class(b_val) ** 4 == uint_class(b_val**4)
     if uint_class.BITS <= 16:  # Pow gets too big quickly
         with pytest.raises(OverflowError):
-            _ = a**b
+            _ = a ** b.as_int()
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -143,8 +143,6 @@ def test_reverse_arithmetic_operators_raise_error(uint_class: Type[BaseUint]) ->
         _ = 100 // uint_class(3)
     with pytest.raises(TypeError):
         _ = 100 % uint_class(3)
-    with pytest.raises(TypeError):
-        _ = 2 ** uint_class(3)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -182,8 +180,8 @@ def test_bitwise_operators(uint_class: Type[BaseUint]) -> None:
     assert a & b == uint_class(0b1000)
     assert a | b == uint_class(0b1110)
     assert a ^ b == uint_class(0b0110)
-    assert a << uint_class(2) == uint_class(0b110000)
-    assert a >> uint_class(2) == uint_class(0b11)
+    assert a << 2 == uint_class(0b110000)
+    assert a >> 2 == uint_class(0b11)
 
     with pytest.raises(TypeError):
         _ = a & 1

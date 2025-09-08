@@ -95,6 +95,14 @@ class BaseUint(int):
             f"'{type(self).__name__}' and '{type(other).__name__}'"
         )
 
+    def _validate_int_operand(self, other: Any, op_symbol: str) -> None:
+        """Helper to ensure an operand is a true integer, not a bool."""
+        if type(other) is not int:
+            raise TypeError(
+                f"Unsupported operand type for {op_symbol}: "
+                f"expected 'int' but got '{type(other).__name__}'"
+            )
+
     def __add__(self, other: Any) -> Self:
         """Handle the addition operator (`+`)."""
         if not isinstance(other, type(self)):
@@ -157,18 +165,16 @@ class BaseUint(int):
 
     def __pow__(self, exponent: Any, modulo: Any | None = None) -> Any:
         """Handle the exponentiation operator (`**`) and `pow(self, exp, mod)`."""
-        if not isinstance(exponent, type(self)) or (
-            modulo is not None and not isinstance(modulo, type(self))
-        ):
-            self._raise_type_error(exponent, "** or pow()")
+        self._validate_int_operand(exponent, "** or pow()")
+        if modulo is not None:
+            self._validate_int_operand(modulo, "** or pow()")
 
         result = pow(int(self), int(exponent), int(modulo) if modulo is not None else None)
         return type(self)(result)
 
     def __rpow__(self, base: Any) -> Any:  # type: ignore[override]
         """Handle the reverse exponentiation operator (`**`)."""
-        if not isinstance(base, type(self)):
-            self._raise_type_error(base, "**")
+        self._validate_int_operand(base, "**")
         result = pow(int(base), int(self))
         return type(self)(result)
 
@@ -218,26 +224,22 @@ class BaseUint(int):
 
     def __lshift__(self, other: Any) -> Self:
         """Handle the left bit-shift operator (`<<`)."""
-        if not isinstance(other, type(self)):
-            self._raise_type_error(other, "<<")
+        self._validate_int_operand(other, "<<")
         return type(self)(super().__lshift__(other))
 
     def __rlshift__(self, other: Any) -> Self:
         """Handle the reverse left bit-shift operator (`<<`)."""
-        if not isinstance(other, type(self)):
-            self._raise_type_error(other, "<<")
+        self._validate_int_operand(other, "<<")
         return type(self)(int(other) << int(self))
 
     def __rshift__(self, other: Any) -> Self:
         """Handle the right bit-shift operator (`>>`)."""
-        if not isinstance(other, type(self)):
-            self._raise_type_error(other, ">>")
+        self._validate_int_operand(other, ">>")
         return type(self)(super().__rshift__(other))
 
     def __rrshift__(self, other: Any) -> Self:
         """Handle the reverse right bit-shift operator (`>>`)."""
-        if not isinstance(other, type(self)):
-            self._raise_type_error(other, ">>")
+        self._validate_int_operand(other, ">>")
         return type(self)(int(other) >> int(self))
 
     def __eq__(self, other: object) -> bool:
