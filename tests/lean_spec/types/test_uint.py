@@ -3,6 +3,7 @@
 from typing import Type
 
 import pytest
+from typing_extensions import Any
 
 from lean_spec.types.uint import (
     BaseUint,
@@ -16,6 +17,27 @@ from lean_spec.types.uint import (
 
 ALL_UINT_TYPES = (Uint8, Uint16, Uint32, Uint64, Uint128, Uint256)
 """A collection of all Uint types to test against."""
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+@pytest.mark.parametrize(
+    "invalid_value, expected_type_name",
+    [
+        (1.0, "float"),
+        ("1", "str"),
+        (True, "bool"),
+        (False, "bool"),
+        (b"1", "bytes"),
+        (None, "NoneType"),
+    ],
+)
+def test_instantiation_from_invalid_types_raises_error(
+    uint_class: Type[BaseUint], invalid_value: Any, expected_type_name: str
+) -> None:
+    """Tests that instantiating with non-integer types raises a TypeError."""
+    expected_msg = f"Expected int, got {expected_type_name}"
+    with pytest.raises(TypeError, match=expected_msg):
+        uint_class(invalid_value)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -40,16 +62,6 @@ def test_instantiation_too_large(uint_class: Type[BaseUint]) -> None:
     max_value = 2**uint_class.BITS
     with pytest.raises(OverflowError):
         uint_class(max_value)
-
-
-@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-def test_instantiation_from_float_raises_error(uint_class: Type[BaseUint]) -> None:
-    """Tests that instantiating with a float raises a TypeError."""
-    with pytest.raises(TypeError, match="Cannot instantiate .* from a float"):
-        uint_class(0.1)
-
-    with pytest.raises(TypeError, match="Cannot instantiate .* from a float"):
-        uint_class(1.9)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
