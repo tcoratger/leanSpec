@@ -1,9 +1,9 @@
 """Unsigned Integer Type Tests."""
 
-from typing import Type
+from typing import Any, Protocol, Type
 
 import pytest
-from typing_extensions import Any
+from pydantic import BaseModel, ValidationError, create_model
 
 from lean_spec.types.uint import (
     BaseUint,
@@ -17,6 +17,35 @@ from lean_spec.types.uint import (
 
 ALL_UINT_TYPES = (Uint8, Uint16, Uint32, Uint64, Uint128, Uint256)
 """A collection of all Uint types to test against."""
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_pydantic_validation_accepts_valid_int(uint_class: Type[BaseUint]) -> None:
+    """Tests that Pydantic validation correctly accepts a valid integer."""
+    # Create the model dynamically
+    model = create_model("Model", value=(uint_class, ...))
+
+    # This should pass without errors
+    instance: Any = model(value=10)
+    assert isinstance(instance.value, uint_class)
+    # This assert will also be fixed by the changes in the next section
+    assert instance.value == uint_class(10)
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+@pytest.mark.parametrize("invalid_value", [1.0, "1", True, False])
+def test_pydantic_strict_mode_rejects_invalid_types(
+    uint_class: Type[BaseUint], invalid_value: Any
+) -> None:
+    """
+    Tests that Pydantic's strict mode rejects types that could be coerced to an int.
+    """
+    # Create the model dynamically
+    model = create_model("Model", value=(uint_class, ...))
+
+    # Pydantic should raise a ValidationError because of the strict=True flag
+    with pytest.raises(ValidationError):
+        model(value=invalid_value)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
