@@ -94,6 +94,13 @@ def test_instantiation_too_large(uint_class: Type[BaseUint]) -> None:
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_max_method_returns_correct_value(uint_class: Type[BaseUint]) -> None:
+    """Tests that the max_value() class method returns the correct value."""
+    expected_max_int = (2**uint_class.BITS) - 1
+    assert uint_class.max_value() == uint_class(expected_max_int)
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
 def test_arithmetic_operators(uint_class: Type[BaseUint]) -> None:
     """Tests all standard arithmetic operators."""
     # Use smaller values for high-bit integers to avoid massive numbers
