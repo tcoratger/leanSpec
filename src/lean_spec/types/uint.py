@@ -50,7 +50,7 @@ class BaseUint(int):
 
         # Schema that first validates the input as an int, then calls our validator.
         python_schema = core_schema.chain_schema(
-            [core_schema.int_schema(ge=0, lt=2**cls.BITS), from_int_validator]
+            [core_schema.int_schema(ge=0, lt=2**cls.BITS, strict=True), from_int_validator]
         )
 
         return core_schema.union_schema(
