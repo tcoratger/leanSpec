@@ -1,9 +1,9 @@
 """Unsigned Integer Type Tests."""
 
-from typing import Any, Protocol, Type
+from typing import Any, Type
 
 import pytest
-from pydantic import BaseModel, ValidationError, create_model
+from pydantic import ValidationError, create_model
 
 from lean_spec.types.uint import (
     BaseUint,
