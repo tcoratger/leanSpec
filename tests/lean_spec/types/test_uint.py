@@ -1,6 +1,7 @@
 """Unsigned Integer Type Tests."""
 
-from typing import Any, Type
+import io
+from typing import IO, Any, Type
 
 import pytest
 from pydantic import ValidationError, create_model
@@ -263,3 +264,94 @@ def test_to_bytes_overflow() -> None:
 
     with pytest.raises(OverflowError):
         Uint32(100).to_bytes(length=0)
+
+
+class TestUintSSZ:
+    """A collection of tests for the SSZ interface of Uint types."""
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_is_fixed_size(self, uint_class: Type[BaseUint]) -> None:
+        """Tests that all Uint types are correctly identified as fixed-size."""
+        assert uint_class.is_fixed_size() is True
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_get_byte_length(self, uint_class: Type[BaseUint]) -> None:
+        """Tests that the byte length is correctly calculated from the bit width."""
+        expected_length = uint_class.BITS // 8
+        assert uint_class.get_byte_length() == expected_length
+
+    @pytest.mark.parametrize(
+        "uint_class, value, expected_hex",
+        [
+            (Uint8, 0x00, "00"),
+            (Uint8, 0x01, "01"),
+            (Uint8, 0xAB, "ab"),
+            (Uint16, 0x0000, "0000"),
+            (Uint16, 0xABCD, "cdab"),
+            (Uint32, 0x00000000, "00000000"),
+            (Uint32, 0x01234567, "67452301"),
+            (Uint64, 0x0000000000000000, "0000000000000000"),
+            (Uint64, 0x0123456789ABCDEF, "efcdab8967452301"),
+            (Uint128, 0x0, "00000000000000000000000000000000"),
+            (Uint128, 0x11223344556677880123456789ABCDEF, "efcdab89674523018877665544332211"),
+            (Uint256, 0x0, "00" * 32),
+        ],
+    )
+    def test_encode_decode_roundtrip(
+        self, uint_class: Type[BaseUint], value: int, expected_hex: str
+    ) -> None:
+        """Tests the roundtrip of encoding and decoding for specific values."""
+        # Create an instance of the specific Uint type.
+        instance = uint_class(value)
+
+        # 1. Test encoding (serialization)
+        encoded = instance.encode_bytes()
+        assert encoded.hex() == expected_hex
+
+        # 2. Test decoding (deserialization)
+        decoded = uint_class.decode_bytes(encoded)
+        assert decoded == instance
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_decode_bytes_invalid_length(self, uint_class: Type[BaseUint]) -> None:
+        """Tests that `decode_bytes` raises a ValueError for data of the wrong length."""
+        # Create byte string that is one byte too short.
+        invalid_data = b"\x00" * (uint_class.get_byte_length() - 1)
+        with pytest.raises(ValueError, match="Invalid byte length"):
+            uint_class.decode_bytes(invalid_data)
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_serialize_deserialize_stream_roundtrip(self, uint_class: Type[BaseUint]) -> None:
+        """Tests the round trip of serializing to and deserializing from a stream."""
+        # Create a test instance with a non-zero value.
+        instance = uint_class(123)
+        byte_length = uint_class.get_byte_length()
+
+        # 1. Test serialization to a stream
+        stream = io.BytesIO()
+        bytes_written = instance.serialize(stream)
+        assert bytes_written == byte_length
+        stream.seek(0)  # Rewind stream to the beginning for reading.
+        assert stream.read() == instance.encode_bytes()
+
+        # 2. Test deserialization from a stream
+        stream.seek(0)  # Rewind again for the deserialization test.
+        decoded = uint_class.deserialize(stream, scope=byte_length)
+        assert decoded == instance
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_deserialize_invalid_scope(self, uint_class: Type[BaseUint]) -> None:
+        """Tests that `deserialize` raises a ValueError if the scope is incorrect."""
+        stream = io.BytesIO(b"\x00" * uint_class.get_byte_length())
+        invalid_scope = uint_class.get_byte_length() - 1
+        with pytest.raises(ValueError, match="Invalid scope"):
+            uint_class.deserialize(stream, scope=invalid_scope)
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_deserialize_stream_too_short(self, uint_class: Type[BaseUint]) -> None:
+        """Tests that `deserialize` raises an IOError if the stream ends prematurely."""
+        byte_length = uint_class.get_byte_length()
+        # Create a stream that is shorter than what the type requires.
+        stream = io.BytesIO(b"\x00" * (byte_length - 1))
+        with pytest.raises(IOError, match="Stream ended prematurely"):
+            uint_class.deserialize(stream, scope=byte_length)

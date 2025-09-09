@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Literal, SupportsIndex, SupportsInt
+from typing import IO, Any, ClassVar, Literal, SupportsIndex, SupportsInt
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 from typing_extensions import Self
 
+from .ssz_base import SSZType
 
-class BaseUint(int):
+
+class BaseUint(int, SSZType):
     """A base class for custom unsigned integer types that inherits from `int`."""
 
     BITS: ClassVar[int]
@@ -62,6 +64,106 @@ class BaseUint(int):
             ],
             serialization=core_schema.plain_serializer_function_ser_schema(int),
         )
+
+    @classmethod
+    def is_fixed_size(cls) -> bool:
+        """
+        Determine if this is a fixed-size type.
+
+        Returns:
+            bool: True, as all Uint types are fixed-size.
+        """
+        return True
+
+    @classmethod
+    def get_byte_length(cls) -> int:
+        """
+        Get the number of bytes for this Uint type.
+
+        Returns:
+            int: The byte length of the integer.
+        """
+        return cls.BITS // 8
+
+    def encode_bytes(self) -> bytes:
+        """
+        Serializes the Uint to its little-endian byte representation.
+
+        Returns:
+            bytes: The SSZ serialized bytes.
+        """
+        # The `to_bytes` method from `int` is used directly.
+        return self.to_bytes(length=self.get_byte_length(), byteorder="little")
+
+    @classmethod
+    def decode_bytes(cls, data: bytes) -> Self:
+        """
+        Deserializes a byte string into a Uint instance.
+
+        Args:
+            data (bytes): The SSZ byte string to deserialize.
+
+        Raises:
+            ValueError: If the byte string has an incorrect length.
+
+        Returns:
+            Self: A new instance of the Uint class.
+        """
+        # Ensure the input data has the correct number of bytes.
+        expected_length = cls.get_byte_length()
+        if len(data) != expected_length:
+            raise ValueError(
+                f"Invalid byte length for {cls.__name__}: "
+                f"expected {expected_length}, got {len(data)}"
+            )
+        # The `from_bytes` class method from `int` is used to convert the data.
+        return cls(int.from_bytes(data, "little"))
+
+    def serialize(self, stream: IO[bytes]) -> int:
+        """
+        Serializes the Uint and writes it to a binary stream.
+
+        Args:
+            stream (IO[bytes]): The stream to write the serialized data to.
+
+        Returns:
+            int: The number of bytes written.
+        """
+        # Get the serialized bytes.
+        encoded_data = self.encode_bytes()
+        # Write the data to the stream.
+        stream.write(encoded_data)
+        # Return the number of bytes written.
+        return len(encoded_data)
+
+    @classmethod
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
+        """
+        Deserializes a Uint from a binary stream within a given scope.
+
+        Args:
+            stream (IO[bytes]): The stream to read from.
+            scope (int): The number of bytes available to read for this object.
+
+        Raises:
+            ValueError: If the scope does not match the type's byte length.
+
+        Returns:
+            Self: A new instance of the Uint class.
+        """
+        # For a fixed-size type, the scope must exactly match the byte length.
+        byte_length = cls.get_byte_length()
+        if scope != byte_length:
+            raise ValueError(
+                f"Invalid scope for {cls.__name__}: expected {byte_length}, got {scope}"
+            )
+        # Read the required number of bytes from the stream.
+        data = stream.read(byte_length)
+        # Ensure the correct number of bytes was read.
+        if len(data) != byte_length:
+            raise IOError(f"Stream ended prematurely while decoding {cls.__name__}")
+        # Decode the bytes into a new instance.
+        return cls.decode_bytes(data)
 
     @classmethod
     def max_value(cls) -> Self:
