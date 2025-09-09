@@ -2,7 +2,7 @@
 
 import hashlib
 
-from lean_spec.types.hash import Bytes32
+from lean_spec.types.byte_arrays import Bytes32
 
 
 def get_power_of_two_ceil(x: int) -> int:
@@ -18,4 +18,4 @@ def get_power_of_two_ceil(x: int) -> int:
 
 def hash_nodes(node_a: Bytes32, node_b: Bytes32) -> Bytes32:
     """Hashes two 32-byte nodes together using SHA-256."""
-    return hashlib.sha256(node_a + node_b).digest()
+    return Bytes32(hashlib.sha256(node_a + node_b).digest())

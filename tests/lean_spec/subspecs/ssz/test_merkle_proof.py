@@ -10,12 +10,13 @@ from lean_spec.subspecs.ssz.gindex import GeneralizedIndex
 from lean_spec.subspecs.ssz.merkle.proof import MerkleProof, ProofHashes
 from lean_spec.subspecs.ssz.merkle.tree import build_merkle_tree
 from lean_spec.subspecs.ssz.utils import get_power_of_two_ceil
+from lean_spec.types.byte_arrays import Bytes32
 
 
 @pytest.fixture
 def sample_tree_data() -> Dict[str, Any]:
     """Provides a pre-computed Merkle tree and its components."""
-    leaves = [os.urandom(32) for _ in range(11)]
+    leaves = [Bytes32(os.urandom(32)) for _ in range(11)]
     tree = build_merkle_tree(leaves)
     root = tree[1]
     bottom_layer_start_index = get_power_of_two_ceil(len(leaves))
@@ -38,7 +39,7 @@ def test_merkle_proof_instantiation_valid(sample_tree_data: Dict[str, Any]) -> N
 
 def test_merkle_proof_instantiation_mismatched_lengths() -> None:
     """Tests that instantiation fails if leaves and indices have different lengths."""
-    leaf = os.urandom(32)
+    leaf = Bytes32(os.urandom(32))
     index1 = GeneralizedIndex(value=8)
     index2 = GeneralizedIndex(value=9)
     with pytest.raises(ValueError, match="The number of leaves must match the number of indices."):
@@ -49,7 +50,7 @@ def test_from_single_leaf_factory(sample_tree_data: Dict[str, Any]) -> None:
     """Tests the `from_single_leaf` class method factory."""
     leaf = sample_tree_data["leaves"][0]
     index = GeneralizedIndex(value=sample_tree_data["bottom_layer_start_index"])
-    proof_hashes = [os.urandom(32)] * index.depth
+    proof_hashes = [Bytes32(os.urandom(32))] * index.depth
 
     proof = MerkleProof.from_single_leaf(leaf, proof_hashes, index)
     assert proof.leaves == [leaf]
@@ -76,7 +77,7 @@ def test_single_leaf_proof_verification(
 
     assert proof.calculate_root() == root
     assert proof.verify(root) is True
-    assert proof.verify(os.urandom(32)) is False
+    assert proof.verify(Bytes32(os.urandom(32))) is False
 
 
 def test_single_leaf_invalid_proof_length(sample_tree_data: Dict[str, Any]) -> None:
@@ -86,7 +87,7 @@ def test_single_leaf_invalid_proof_length(sample_tree_data: Dict[str, Any]) -> N
     leaf = sample_tree_data["leaves"][2]
 
     # Create a proof that is too short
-    proof_hashes = [os.urandom(32)] * (gindex.depth - 1)
+    proof_hashes = [Bytes32(os.urandom(32))] * (gindex.depth - 1)
     proof = MerkleProof.from_single_leaf(leaf, proof_hashes, gindex)
 
     assert proof.verify(root) is False
@@ -125,7 +126,7 @@ def test_multi_leaf_proof_verification(
 
     assert proof.calculate_root() == root
     assert proof.verify(root) is True
-    assert proof.verify(os.urandom(32)) is False
+    assert proof.verify(Bytes32(os.urandom(32))) is False
 
 
 def test_multi_leaf_invalid_proof_length(sample_tree_data: Dict[str, Any]) -> None:

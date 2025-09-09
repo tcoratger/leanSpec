@@ -2,7 +2,7 @@
 
 from .base import StrictBaseModel
 from .basispt import BasisPoint
-from .hash import Bytes32
+from .byte_arrays import Bytes32
 from .uint import Uint64
 from .validator import ValidatorIndex
 
