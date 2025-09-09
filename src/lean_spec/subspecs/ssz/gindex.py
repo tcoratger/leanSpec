@@ -2,7 +2,7 @@
 
 from typing import List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GeneralizedIndex(BaseModel):
@@ -12,7 +12,13 @@ class GeneralizedIndex(BaseModel):
     Helper methods are provided for tree navigation.
     """
 
+    model_config = ConfigDict(strict=True)
+
     value: int = Field(..., gt=0, description="The index value, must be a positive integer.")
+
+    def __hash__(self) -> int:
+        """Hashes the index value."""
+        return hash(self.value)
 
     @property
     def depth(self) -> int:
@@ -35,12 +41,26 @@ class GeneralizedIndex(BaseModel):
             raise ValueError("Root node has no parent.")
         return type(self)(value=self.value // 2)
 
+    def child(self, right_side: bool) -> "GeneralizedIndex":
+        """
+        Returns the index of a child node.
+
+        - `right_side=False` for the left child (2k),
+        - `right_side=True` for the right child (2k+1).
+        """
+        return type(self)(value=self.value * 2 + int(right_side))
+
     def get_branch_indices(self) -> List["GeneralizedIndex"]:
         """Gets the indices of the sibling nodes along the path to the root."""
-        indices = [self.sibling]
-        while indices[-1].value > 1:
-            indices.append(indices[-1].parent.sibling)
-        return indices[:-1]
+        indices: List["GeneralizedIndex"] = []
+        current_index = self.value
+        while current_index > 1:
+            # Sibling is the current index XOR 1
+            sibling_index = current_index ^ 1
+            indices.append(type(self)(value=sibling_index))
+            # Move up to the parent
+            current_index //= 2
+        return indices
 
     def get_path_indices(self) -> List["GeneralizedIndex"]:
         """Gets the indices of the nodes along the path to the root."""
