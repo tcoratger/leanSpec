@@ -1,5 +1,6 @@
-"""Tests for the Boolean Type."""
+""" "Tests for the Boolean Type."""
 
+import io
 from typing import Any, Callable
 
 import pytest
@@ -51,12 +52,6 @@ def test_instantiation_and_type() -> None:
     value = Boolean(True)
     assert isinstance(value, int)
     assert isinstance(value, Boolean)
-
-
-def test_to_bytes() -> None:
-    r"""Tests that serialization to bytes matches the SSZ spec."""
-    assert Boolean(True).to_bytes() == b"\x01"
-    assert Boolean(False).to_bytes() == b"\x00"
 
 
 @pytest.mark.parametrize(
@@ -179,3 +174,78 @@ def test_hash() -> None:
     assert hash(Boolean(False)) != hash(False)
     assert hash(Boolean(True)) == hash(Boolean(1))
     assert hash(Boolean(True)) != hash(Boolean(False))
+
+
+class TestBooleanSSZ:
+    """Tests for SSZ serialization and deserialization of the Boolean type."""
+
+    def test_ssz_properties(self) -> None:
+        """Tests the static SSZ properties of the Boolean type."""
+        assert Boolean.is_fixed_size() is True
+        assert Boolean.get_byte_length() == 1
+
+    @pytest.mark.parametrize(
+        "value, expected_bytes",
+        [
+            (True, b"\x01"),
+            (False, b"\x00"),
+        ],
+    )
+    def test_encode_decode_roundtrip(self, value: bool, expected_bytes: bytes) -> None:
+        """Tests the encode_bytes and decode_bytes round-trip."""
+        boolean_instance = Boolean(value)
+
+        # Test encoding
+        encoded = boolean_instance.encode_bytes()
+        assert encoded == expected_bytes
+
+        # Test decoding
+        decoded = Boolean.decode_bytes(encoded)
+        assert decoded == boolean_instance
+        assert isinstance(decoded, Boolean)
+
+    def test_decode_invalid_length(self) -> None:
+        """Tests that decode_bytes fails with incorrect byte length."""
+        with pytest.raises(ValueError, match="Expected 1 byte"):
+            Boolean.decode_bytes(b"")
+        with pytest.raises(ValueError, match="Expected 1 byte"):
+            Boolean.decode_bytes(b"\x00\x01")
+
+    def test_decode_invalid_value(self) -> None:
+        """Tests that decode_bytes fails with an invalid byte value."""
+        with pytest.raises(ValueError, match="must be 0x00 or 0x01"):
+            Boolean.decode_bytes(b"\x02")
+        with pytest.raises(ValueError, match="must be 0x00 or 0x01"):
+            Boolean.decode_bytes(b"\xff")
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_serialize_deserialize_roundtrip(self, value: bool) -> None:
+        """Tests the serialize and deserialize round-trip."""
+        boolean_instance = Boolean(value)
+        stream = io.BytesIO()
+
+        # Test serialization
+        bytes_written = boolean_instance.serialize(stream)
+        assert bytes_written == 1
+
+        # Test deserialization
+        stream.seek(0)
+        decoded = Boolean.deserialize(stream, scope=1)
+        assert decoded == boolean_instance
+        assert isinstance(decoded, Boolean)
+
+    def test_deserialize_invalid_scope(self) -> None:
+        """Tests that deserialize fails with an incorrect scope."""
+        stream = io.BytesIO(b"\x01")
+        with pytest.raises(ValueError, match="Invalid scope for Boolean"):
+            Boolean.deserialize(stream, scope=0)
+
+        stream.seek(0)
+        with pytest.raises(ValueError, match="Invalid scope for Boolean"):
+            Boolean.deserialize(stream, scope=2)
+
+    def test_deserialize_premature_stream_end(self) -> None:
+        """Tests that deserialize fails if the stream ends prematurely."""
+        stream = io.BytesIO(b"")  # Empty stream
+        with pytest.raises(IOError, match="Stream ended prematurely"):
+            Boolean.deserialize(stream, scope=1)
