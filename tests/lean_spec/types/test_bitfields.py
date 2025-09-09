@@ -1,5 +1,6 @@
-"""Tests for the Bitvector and Bitlist types."""
+""" "Tests for the Bitvector and Bitlist types."""
 
+import io
 from typing import Any
 
 import pytest
@@ -201,28 +202,6 @@ class TestBitfieldSerialization:
             (4, (False, True, False, True), "0a"),
             (3, (False, True, False), "02"),
             (10, (1, False, True, False, False, False, True, True, False, True), "c502"),
-            (
-                16,
-                (
-                    True,
-                    False,
-                    True,
-                    False,
-                    False,
-                    False,
-                    True,
-                    True,
-                    False,
-                    True,
-                    False,
-                    False,
-                    False,
-                    False,
-                    True,
-                    True,
-                ),
-                "c5c2",
-            ),
         ],
     )
     def test_bitvector_serialization_deserialization(
@@ -274,7 +253,106 @@ class TestBitfieldSerialization:
     def test_bitlist_decode_invalid_data(self) -> None:
         """Tests that Bitlist.decode_bytes fails for invalid byte strings."""
         list_type = Bitlist[8]  # type: ignore
-        with pytest.raises(ValueError, match="Cannot decode empty bytes"):
+        with pytest.raises(ValueError, match="data cannot be empty"):
             list_type.decode_bytes(b"")
         with pytest.raises(ValueError, match="last byte cannot be zero"):
             list_type.decode_bytes(b"\xff\x00")
+
+
+class TestBitfieldSSZ:
+    """Tests the SSZType interface methods for bitfields."""
+
+    def test_bitvector_ssz_properties(self) -> None:
+        vec_type = Bitvector[10]  # type: ignore
+        assert vec_type.is_fixed_size() is True
+        assert vec_type.get_byte_length() == 2  # (10+7)//8
+
+    def test_bitlist_ssz_properties(self) -> None:
+        list_type = Bitlist[10]  # type: ignore
+        assert list_type.is_fixed_size() is False
+        with pytest.raises(TypeError):
+            list_type.get_byte_length()
+
+    def test_bitvector_deserialize_invalid_scope(self) -> None:
+        vec_type = Bitvector[8]  # type: ignore
+        stream = io.BytesIO(b"\xff")
+        with pytest.raises(ValueError, match="Invalid scope"):
+            vec_type.deserialize(stream, scope=2)
+
+    def test_bitvector_deserialize_premature_end(self) -> None:
+        vec_type = Bitvector[16]  # type: ignore
+        stream = io.BytesIO(b"\xff")  # Only 1 byte, expects 2
+        with pytest.raises(IOError, match="Stream ended prematurely"):
+            vec_type.deserialize(stream, scope=2)
+
+    def test_bitlist_deserialize_premature_end(self) -> None:
+        list_type = Bitlist[16]  # type: ignore
+        stream = io.BytesIO(b"\xff")  # Only 1 byte
+        with pytest.raises(IOError, match="Stream ended prematurely"):
+            list_type.deserialize(stream, scope=2)  # Scope says to read 2
+
+    @pytest.mark.parametrize(
+        "length,value,expected_hex",
+        [
+            (8, (1, 1, 0, 1, 0, 1, 0, 0), "2b"),
+            (4, (0, 1, 0, 1), "0a"),
+            (3, (0, 1, 0), "02"),
+            (10, (1, 0, 1, 0, 0, 0, 1, 1, 0, 1), "c502"),
+            (16, (1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1), "c5c2"),
+            (512, tuple([1] * 512), "ff" * 64),
+            (513, tuple([1] * 513), ("ff" * 64) + "01"),
+        ],
+    )
+    def test_bitvector_encode_decode(
+        self, length: int, value: Tuple[int, ...], expected_hex: str
+    ) -> None:
+        vec_t = Bitvector[length]  # type: ignore
+        instance = vec_t(value)
+        encoded = instance.encode_bytes()
+        assert encoded.hex() == expected_hex
+
+        # round-trip via classmethod
+        decoded = vec_t.decode_bytes(encoded)
+        assert decoded == instance
+
+        # round-trip via stream serialize/deserialize
+        stream = io.BytesIO()
+        written = instance.serialize(stream)
+        assert written == vec_t.get_byte_length()
+        stream.seek(0)
+        decoded2 = vec_t.deserialize(stream, scope=written)
+        assert decoded2 == instance
+
+    @pytest.mark.parametrize(
+        "limit,value,expected_hex",
+        [
+            (8, (), "01"),
+            (8, (1, 1, 0, 1, 0, 1, 0, 0), "2b01"),
+            (4, (0, 1, 0, 1), "1a"),
+            (3, (0, 1, 0), "0a"),
+            (16, (1, 0, 1, 0, 0, 0, 1, 1, 0, 1), "c506"),
+            (512, (1,), "03"),
+            (512, tuple([1] * 512), ("ff" * 64) + "01"),
+            (513, tuple([1] * 513), ("ff" * 64) + "03"),
+        ],
+    )
+    def test_bitlist_encode_decode(
+        self, limit: int, value: Tuple[int, ...], expected_hex: str
+    ) -> None:
+        list_t = Bitlist[limit]  # type: ignore
+        instance = list_t(value)
+        encoded = instance.encode_bytes()
+        assert encoded.hex() == expected_hex
+
+        # round-trip via classmethod
+        decoded = list_t.decode_bytes(encoded)
+        assert decoded == instance
+
+        # round-trip via stream serialize/deserialize
+        stream = io.BytesIO()
+        written = instance.serialize(stream)
+        # variable-size, so we assert the written size matches the encoding length
+        assert written == len(encoded)
+        stream.seek(0)
+        decoded2 = list_t.deserialize(stream, scope=written)
+        assert decoded2 == instance

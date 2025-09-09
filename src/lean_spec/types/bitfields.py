@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import (
+    IO,
     Any,
     ClassVar,
     Dict,
@@ -18,12 +19,13 @@ from pydantic_core import CoreSchema, core_schema
 from typing_extensions import List, Self
 
 from .boolean import Boolean
+from .ssz_base import SSZType
 
 _BITVECTOR_CACHE: Dict[Tuple[Type[Any], int], Type[Bitvector]] = {}
 """A cache to store and reuse dynamically generated Bitvector types."""
 
 
-class Bitvector(tuple[Boolean, ...]):
+class Bitvector(tuple[Boolean, ...], SSZType):
     """A strict Bitvector type: a fixed-length, immutable sequence of booleans."""
 
     LENGTH: ClassVar[int]
@@ -142,6 +144,37 @@ class Bitvector(tuple[Boolean, ...]):
             ),
         )
 
+    @classmethod
+    def is_fixed_size(cls) -> bool:
+        """Return whether the type is fixed-size."""
+        return True
+
+    @classmethod
+    def get_byte_length(cls) -> int:
+        """Return the byte length of the type."""
+        if not hasattr(cls, "LENGTH"):
+            raise TypeError("Cannot get length of raw Bitvector type.")
+        return (cls.LENGTH + 7) // 8
+
+    def serialize(self, stream: IO[bytes]) -> int:
+        """Serialize the bitvector to a binary stream."""
+        encoded_data = self.encode_bytes()
+        stream.write(encoded_data)
+        return len(encoded_data)
+
+    @classmethod
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
+        """Deserialize a bitvector from a binary stream."""
+        byte_length = cls.get_byte_length()
+        if scope != byte_length:
+            raise ValueError(
+                f"Invalid scope for {cls.__name__}: expected {byte_length}, got {scope}"
+            )
+        data = stream.read(byte_length)
+        if len(data) != byte_length:
+            raise IOError(f"Stream ended prematurely while decoding {cls.__name__}")
+        return cls.decode_bytes(data)
+
     def encode_bytes(self) -> bytes:
         """Serializes the Bitvector into a byte string according to SSZ spec."""
         # Calculate the number of bytes required to hold all bits.
@@ -192,7 +225,7 @@ _BITLIST_CACHE: Dict[Tuple[Type[Any], int], Type[Bitlist]] = {}
 """A cache to store and reuse dynamically generated Bitlist types."""
 
 
-class Bitlist(list[Boolean]):
+class Bitlist(list[Boolean], SSZType):
     """
     A strict Bitlist type: a variable-length, mutable sequence of booleans
     with a maximum capacity.
@@ -307,13 +340,38 @@ class Bitlist(list[Boolean]):
             ),
         )
 
+    @classmethod
+    def is_fixed_size(cls) -> bool:
+        """Return whether the type is fixed-size."""
+        return False
+
+    @classmethod
+    def get_byte_length(cls) -> int:
+        """Raise TypeError, as the type is variable-size."""
+        raise TypeError(f"Type {cls.__name__} is not fixed-size")
+
+    def serialize(self, stream: IO[bytes]) -> int:
+        """Serialize the bitlist to a binary stream."""
+        encoded_data = self.encode_bytes()
+        stream.write(encoded_data)
+        return len(encoded_data)
+
+    @classmethod
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
+        """Deserialize a bitlist from a binary stream."""
+        data = stream.read(scope)
+        if len(data) != scope:
+            raise IOError(f"Stream ended prematurely while decoding {cls.__name__}")
+        return cls.decode_bytes(data)
+
     def encode_bytes(self) -> bytes:
         """Serializes the Bitlist into a byte string with a trailing delimiter bit."""
         # Get the number of bits in the list.
         num_bits = len(self)
-        # The required byte length is the ceiling of (bits + 1) / 8.
-        byte_len = (num_bits + 8) // 8
-        # Create a mutable byte array.
+        if num_bits == 0:
+            return b"\x01"
+
+        byte_len = (num_bits + 7) // 8
         byte_array = bytearray(byte_len)
 
         # Pack the bits into the byte array.
@@ -323,12 +381,16 @@ class Bitlist(list[Boolean]):
                 bit_index_in_byte = i % 8
                 byte_array[byte_index] |= 1 << bit_index_in_byte
 
-        # Add the mandatory delimiter bit at the position right after the last data bit.
-        delimiter_byte_index = num_bits // 8
-        delimiter_bit_index = num_bits % 8
-        byte_array[delimiter_byte_index] |= 1 << delimiter_bit_index
-
-        return bytes(byte_array)
+        # Add the mandatory delimiter bit.
+        if num_bits % 8 == 0:
+            # If the data perfectly fills the last byte, append a new byte for the delimiter.
+            return bytes(byte_array) + b"\x01"
+        else:
+            # Otherwise, set the bit after the last data bit in the existing last byte.
+            delimiter_byte_index = num_bits // 8
+            delimiter_bit_index = num_bits % 8
+            byte_array[delimiter_byte_index] |= 1 << delimiter_bit_index
+            return bytes(byte_array)
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
@@ -338,7 +400,7 @@ class Bitlist(list[Boolean]):
             raise TypeError("Cannot decode to raw Bitlist; specify a limit, e.g., `Bitlist[4]`.")
         # The encoded data must not be empty (it must at least contain the delimiter).
         if not data:
-            raise ValueError("Cannot decode empty bytes into a Bitlist.")
+            raise ValueError("Invalid Bitlist encoding: data cannot be empty.")
 
         # The length in bits is determined by finding the position of the delimiter.
         num_bits = (len(data) - 1) * 8

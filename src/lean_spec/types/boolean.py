@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import IO, Any
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 from typing_extensions import Self
 
+from .ssz_base import SSZType
 
-class Boolean(int):
+
+class Boolean(int, SSZType):
     """
     A strict SSZ Boolean type that inherits from `int` for `True`/`False` representation.
 
@@ -70,6 +72,16 @@ class Boolean(int):
             serialization=core_schema.plain_serializer_function_ser_schema(bool),
         )
 
+    @classmethod
+    def is_fixed_size(cls) -> bool:
+        """Return whether the type is fixed-size."""
+        return True
+
+    @classmethod
+    def get_byte_length(cls) -> int:
+        """Return the byte length of the type."""
+        return 1
+
     def encode_bytes(self) -> bytes:
         r"""
         Serializes the boolean to its SSZ byte representation.
@@ -77,6 +89,31 @@ class Boolean(int):
         - `False` -> `b'\\x00'`
         """
         return b"\x01" if self else b"\x00"
+
+    @classmethod
+    def decode_bytes(cls, data: bytes) -> Self:
+        """Deserialize a single byte into a Boolean instance."""
+        if len(data) != 1:
+            raise ValueError(f"Expected 1 byte for Boolean, got {len(data)}")
+        if data[0] not in (0, 1):
+            raise ValueError(f"Boolean byte must be 0x00 or 0x01, got {data[0]:#04x}")
+        return cls(data[0])
+
+    def serialize(self, stream: IO[bytes]) -> int:
+        """Serialize the boolean to a binary stream."""
+        encoded_data = self.encode_bytes()
+        stream.write(encoded_data)
+        return len(encoded_data)
+
+    @classmethod
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
+        """Deserialize a boolean from a binary stream."""
+        if scope != 1:
+            raise ValueError(f"Invalid scope for Boolean: expected 1, got {scope}")
+        data = stream.read(1)
+        if len(data) != 1:
+            raise IOError("Stream ended prematurely while decoding Boolean")
+        return cls.decode_bytes(data)
 
     def _raise_type_error(self, other: Any, op_symbol: str) -> None:
         """Helper to raise a consistent TypeError for unsupported operations."""
