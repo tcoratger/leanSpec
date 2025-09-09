@@ -8,13 +8,13 @@ from typing_extensions import List
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.merkle.tree import build_merkle_tree
 from lean_spec.subspecs.ssz.utils import hash_nodes
-from lean_spec.types.hash import Bytes32
+from lean_spec.types.byte_arrays import Bytes32
 
 # Create some deterministic leaves for predictable results
-LEAF_A = b"\xaa" * 32
-LEAF_B = b"\xbb" * 32
-LEAF_C = b"\xcc" * 32
-LEAF_D = b"\xdd" * 32
+LEAF_A = Bytes32(b"\xaa" * 32)
+LEAF_B = Bytes32(b"\xbb" * 32)
+LEAF_C = Bytes32(b"\xcc" * 32)
+LEAF_D = Bytes32(b"\xdd" * 32)
 
 
 def test_build_merkle_tree_empty() -> None:
@@ -80,7 +80,7 @@ def test_build_merkle_tree_larger_trees(num_leaves: int) -> None:
     Tests larger trees by verifying the root and structure without
     checking every intermediate node by hand.
     """
-    leaves = [os.urandom(32) for _ in range(num_leaves)]
+    leaves = [Bytes32(os.urandom(32)) for _ in range(num_leaves)]
     tree = build_merkle_tree(leaves)
 
     # Check tree length

@@ -4,7 +4,7 @@ from typing import List, Sequence
 
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.utils import get_power_of_two_ceil, hash_nodes
-from lean_spec.types.hash import Bytes32
+from lean_spec.types.byte_arrays import Bytes32
 
 
 def build_merkle_tree(leaves: Sequence[Bytes32]) -> List[Bytes32]:

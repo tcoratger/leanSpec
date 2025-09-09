@@ -7,13 +7,13 @@ from typing import Dict, List, Sequence, Set
 from pydantic import Field, model_validator
 
 from lean_spec.types.base import StrictBaseModel
-from lean_spec.types.hash import Bytes32
+from lean_spec.types.byte_arrays import Bytes32
 
 from ..constants import ZERO_HASH
 from ..gindex import GeneralizedIndex
 from ..utils import hash_nodes
 
-Root = bytes
+Root = Bytes32
 """The type of a Merkle tree root."""
 Proof = Sequence[Bytes32]
 """The type of a Merkle proof."""
