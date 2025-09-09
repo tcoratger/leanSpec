@@ -124,26 +124,26 @@ class _ByteVectorBase(SSZType):
             )
         return cls(data)
 
-    def __len__(self) -> int:  # pragma: no cover - trivial
+    def __len__(self) -> int:
         return self.LENGTH
 
-    def __iter__(self) -> Iterator[int]:  # pragma: no cover - trivial
+    def __iter__(self) -> Iterator[int]:
         return iter(self._b)
 
-    def __bytes__(self) -> bytes:  # pragma: no cover - trivial
+    def __bytes__(self) -> bytes:
         return self._b
 
-    def __add__(self, other: Any) -> bytes:  # pragma: no cover - trivial
+    def __add__(self, other: Any) -> bytes:
         if isinstance(other, (bytes, bytearray)):
             return self._b + bytes(other)
         return self._b + bytes(other)
 
-    def __radd__(self, other: Any) -> bytes:  # pragma: no cover - trivial
+    def __radd__(self, other: Any) -> bytes:
         if isinstance(other, (bytes, bytearray)):
             return bytes(other) + self._b
         return bytes(other) + self._b
 
-    def __getitem__(self, i: int) -> int:  # pragma: no cover - trivial
+    def __getitem__(self, i: int) -> int:
         return self._b[i]
 
     def __repr__(self) -> str:
@@ -251,19 +251,19 @@ class Bytes8(_ByteVectorBase):
 
 
 class Bytes32(_ByteVectorBase):
-    """Fixed-size byte vector of exactly 32 bytes (commonly used for hashes and roots)."""
+    """Fixed-size byte vector of exactly 32 bytes."""
 
     LENGTH = 32
 
 
 class Bytes48(_ByteVectorBase):
-    """Fixed-size byte vector of exactly 48 bytes (commonly used for BLS12-381 public keys)."""
+    """Fixed-size byte vector of exactly 48 bytes."""
 
     LENGTH = 48
 
 
 class Bytes96(_ByteVectorBase):
-    """Fixed-size byte vector of exactly 96 bytes (commonly used for BLS12-381 signatures)."""
+    """Fixed-size byte vector of exactly 96 bytes."""
 
     LENGTH = 96
 
@@ -278,7 +278,8 @@ class _ByteListBase(SSZType):
     Instances are immutable byte blobs whose length can vary up to `LIMIT`.
     """
 
-    LIMIT: ClassVar[int]  # set by the specialization factory
+    LIMIT: ClassVar[int]
+    """Maximum number of bytes the instance may contain."""
 
     def __init__(self, data: Any = b"") -> None:
         """
@@ -346,28 +347,26 @@ class _ByteListBase(SSZType):
             raise ValueError(f"ByteList[{cls.LIMIT}] length {len(data)} exceeds limit")
         return cls(data)
 
-    # --- Convenience ----------------------------------------------------------
-
-    def __len__(self) -> int:  # pragma: no cover - trivial
+    def __len__(self) -> int:
         return len(self._b)
 
-    def __iter__(self) -> Iterator[int]:  # pragma: no cover - trivial
+    def __iter__(self) -> Iterator[int]:
         return iter(self._b)
 
-    def __bytes__(self) -> bytes:  # pragma: no cover - trivial
+    def __bytes__(self) -> bytes:
         return self._b
 
-    def __add__(self, other: Any) -> bytes:  # pragma: no cover - trivial
+    def __add__(self, other: Any) -> bytes:
         if isinstance(other, (bytes, bytearray)):
             return self._b + bytes(other)
         return self._b + bytes(other)
 
-    def __radd__(self, other: Any) -> bytes:  # pragma: no cover - trivial
+    def __radd__(self, other: Any) -> bytes:
         if isinstance(other, (bytes, bytearray)):
             return bytes(other) + self._b
         return bytes(other) + self._b
 
-    def __getitem__(self, i: int) -> int:  # pragma: no cover - trivial
+    def __getitem__(self, i: int) -> int:
         return self._b[i]
 
     def __repr__(self) -> str:
@@ -449,15 +448,3 @@ class ByteList(SSZType):
         typ = type(name, bases, attrs)
         cls._CACHE[limit] = typ
         return typ
-
-
-__all__ = [
-    "ByteVector",
-    "ByteList",
-    "Bytes1",
-    "Bytes4",
-    "Bytes8",
-    "Bytes32",
-    "Bytes48",
-    "Bytes96",
-]
