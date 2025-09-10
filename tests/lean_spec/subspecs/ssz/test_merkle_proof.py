@@ -6,9 +6,9 @@ from typing import Dict
 import pytest
 from typing_extensions import Any
 
-from lean_spec.subspecs.ssz.gindex import GeneralizedIndex
-from lean_spec.subspecs.ssz.merkle.proof import MerkleProof, ProofHashes
-from lean_spec.subspecs.ssz.merkle.tree import build_merkle_tree
+from lean_spec.subspecs.ssz.merkle_proof.gindex import GeneralizedIndex
+from lean_spec.subspecs.ssz.merkle_proof.proof import MerkleProof, ProofHashes
+from lean_spec.subspecs.ssz.merkle_proof.tree import build_merkle_tree
 from lean_spec.subspecs.ssz.utils import get_power_of_two_ceil
 from lean_spec.types.byte_arrays import Bytes32
 

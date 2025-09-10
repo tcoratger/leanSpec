@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 from typing_extensions import Any
 
-from lean_spec.subspecs.ssz.gindex import GeneralizedIndex
+from lean_spec.subspecs.ssz.merkle_proof.gindex import GeneralizedIndex
 
 
 def test_pydantic_validation_accepts_valid_int() -> None:

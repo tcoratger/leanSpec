@@ -10,8 +10,8 @@ from lean_spec.types.base import StrictBaseModel
 from lean_spec.types.byte_arrays import Bytes32
 
 from ..constants import ZERO_HASH
-from ..gindex import GeneralizedIndex
 from ..utils import hash_nodes
+from .gindex import GeneralizedIndex
 
 Root = Bytes32
 """The type of a Merkle tree root."""

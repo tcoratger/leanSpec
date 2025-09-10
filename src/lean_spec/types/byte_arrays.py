@@ -43,7 +43,7 @@ def _coerce_to_bytes(value: Any) -> bytes:
     return bytes(value)
 
 
-class _ByteVectorBase(SSZType):
+class ByteVectorBase(SSZType):
     """
     Base class for specialized `ByteVector[N]`.
 
@@ -88,7 +88,7 @@ class _ByteVectorBase(SSZType):
         return len(self._b)
 
     @classmethod
-    def deserialize(cls, stream: IO[bytes], scope: int) -> _ByteVectorBase:
+    def deserialize(cls, stream: IO[bytes], scope: int) -> ByteVectorBase:
         """
         Read exactly `scope` bytes from `stream` and build an instance.
 
@@ -112,7 +112,7 @@ class _ByteVectorBase(SSZType):
         return self._b
 
     @classmethod
-    def decode_bytes(cls, data: bytes) -> _ByteVectorBase:
+    def decode_bytes(cls, data: bytes) -> ByteVectorBase:
         """
         Parse `data` as a value of this type.
 
@@ -125,35 +125,44 @@ class _ByteVectorBase(SSZType):
         return cls(data)
 
     def __len__(self) -> int:
+        """Return the length of the byte vector."""
         return self.LENGTH
 
     def __iter__(self) -> Iterator[int]:
+        """Return an iterator over the byte vector."""
         return iter(self._b)
 
     def __bytes__(self) -> bytes:
+        """Return the byte vector as a bytes object."""
         return self._b
 
     def __add__(self, other: Any) -> bytes:
+        """Return the concatenation of the byte vector and the argument."""
         if isinstance(other, (bytes, bytearray)):
             return self._b + bytes(other)
         return self._b + bytes(other)
 
     def __radd__(self, other: Any) -> bytes:
+        """Return the concatenation of the argument and the byte vector."""
         if isinstance(other, (bytes, bytearray)):
             return bytes(other) + self._b
         return bytes(other) + self._b
 
     def __getitem__(self, i: int) -> int:
+        """Return the i-th byte of the byte vector."""
         return self._b[i]
 
     def __repr__(self) -> str:
+        """Return a string representation of the byte vector."""
         tname = type(self).__name__
         return f"{tname}({self._b.hex()})"
 
     def __eq__(self, other: object) -> bool:
+        """Return whether the two byte vectors are equal."""
         return isinstance(other, type(self)) and self._b == other._b
 
     def __hash__(self) -> int:
+        """Return the hash of the byte vector."""
         return hash((type(self), self._b))
 
     def hex(self) -> str:
@@ -161,6 +170,7 @@ class _ByteVectorBase(SSZType):
         return self._b.hex()
 
     def __lt__(self, other: object) -> bool:
+        """Return whether the byte vector is less than the other byte vector."""
         if not isinstance(other, type(self)):
             return NotImplemented
         return self._b < other._b
@@ -178,12 +188,12 @@ class _ByteVectorBase(SSZType):
         Serialize to raw `bytes`.
         """
 
-        def validator(v: Any) -> _ByteVectorBase:
+        def validator(v: Any) -> ByteVectorBase:
             if isinstance(v, cls):
                 return v
             return cls(v)
 
-        def serializer(x: _ByteVectorBase) -> bytes:
+        def serializer(x: ByteVectorBase) -> bytes:
             return x.encode_bytes()
 
         return core_schema.union_schema(
@@ -203,10 +213,10 @@ class ByteVector(SSZType):
         Bytes32 = ByteVector[32]
     """
 
-    _CACHE: ClassVar[dict[int, Type[_ByteVectorBase]]] = {}
+    _CACHE: ClassVar[dict[int, Type[ByteVectorBase]]] = {}
 
     @classmethod
-    def __class_getitem__(cls, length: int) -> Type[_ByteVectorBase]:
+    def __class_getitem__(cls, length: int) -> Type[ByteVectorBase]:
         """
         Specialize the factory into a concrete ``ByteVector[length]`` class.
 
@@ -214,7 +224,7 @@ class ByteVector(SSZType):
             length: Exact number of bytes the specialized type must contain (N ≥ 0).
 
         Returns:
-            A new subclass of ``_ByteVectorBase`` whose ``LENGTH`` is ``length``.
+            A new subclass of ``ByteVectorBase`` whose ``LENGTH`` is ``length``.
 
         Raises:
             TypeError: If ``length`` is not a non-negative integer.
@@ -225,50 +235,50 @@ class ByteVector(SSZType):
         if cached is not None:
             return cached
         name = f"ByteVector[{length}]"
-        bases = (_ByteVectorBase,)
+        bases = (ByteVectorBase,)
         attrs = {"LENGTH": length, "__module__": cls.__module__}
         typ = type(name, bases, attrs)
         cls._CACHE[length] = typ
         return typ
 
 
-class Bytes1(_ByteVectorBase):
+class Bytes1(ByteVectorBase):
     """Fixed-size byte vector of exactly 1 byte."""
 
     LENGTH = 1
 
 
-class Bytes4(_ByteVectorBase):
+class Bytes4(ByteVectorBase):
     """Fixed-size byte vector of exactly 4 bytes."""
 
     LENGTH = 4
 
 
-class Bytes8(_ByteVectorBase):
+class Bytes8(ByteVectorBase):
     """Fixed-size byte vector of exactly 8 bytes."""
 
     LENGTH = 8
 
 
-class Bytes32(_ByteVectorBase):
+class Bytes32(ByteVectorBase):
     """Fixed-size byte vector of exactly 32 bytes."""
 
     LENGTH = 32
 
 
-class Bytes48(_ByteVectorBase):
+class Bytes48(ByteVectorBase):
     """Fixed-size byte vector of exactly 48 bytes."""
 
     LENGTH = 48
 
 
-class Bytes96(_ByteVectorBase):
+class Bytes96(ByteVectorBase):
     """Fixed-size byte vector of exactly 96 bytes."""
 
     LENGTH = 96
 
 
-class _ByteListBase(SSZType):
+class ByteListBase(SSZType):
     """
     Base class for specialized `ByteList[L]`.
 
@@ -312,7 +322,7 @@ class _ByteListBase(SSZType):
         return len(self._b)
 
     @classmethod
-    def deserialize(cls, stream: IO[bytes], scope: int) -> _ByteListBase:
+    def deserialize(cls, stream: IO[bytes], scope: int) -> ByteListBase:
         """
         Read exactly `scope` bytes from `stream` and build an instance.
 
@@ -337,7 +347,7 @@ class _ByteListBase(SSZType):
         return self._b
 
     @classmethod
-    def decode_bytes(cls, data: bytes) -> _ByteListBase:
+    def decode_bytes(cls, data: bytes) -> ByteListBase:
         """
         Parse `data` as a value of this type.
 
@@ -348,35 +358,44 @@ class _ByteListBase(SSZType):
         return cls(data)
 
     def __len__(self) -> int:
+        """Return the length of the byte list."""
         return len(self._b)
 
     def __iter__(self) -> Iterator[int]:
+        """Return an iterator over the byte list."""
         return iter(self._b)
 
     def __bytes__(self) -> bytes:
+        """Return the byte list as a bytes object."""
         return self._b
 
     def __add__(self, other: Any) -> bytes:
+        """Return the concatenation of the byte list and the argument."""
         if isinstance(other, (bytes, bytearray)):
             return self._b + bytes(other)
         return self._b + bytes(other)
 
     def __radd__(self, other: Any) -> bytes:
+        """Return the concatenation of the argument and the byte list."""
         if isinstance(other, (bytes, bytearray)):
             return bytes(other) + self._b
         return bytes(other) + self._b
 
     def __getitem__(self, i: int) -> int:
+        """Return the i-th byte of the byte list."""
         return self._b[i]
 
     def __repr__(self) -> str:
+        """Return a string representation of the byte list."""
         tname = type(self).__name__
         return f"{tname}({self._b.hex()})"
 
     def __eq__(self, other: object) -> bool:
+        """Return whether the two byte lists are equal."""
         return isinstance(other, type(self)) and self._b == other._b
 
     def __hash__(self) -> int:
+        """Return the hash of the byte list."""
         return hash((type(self), self._b))
 
     def hex(self) -> str:
@@ -396,12 +415,12 @@ class _ByteListBase(SSZType):
         Serialize to raw `bytes`.
         """
 
-        def validator(v: Any) -> _ByteListBase:
+        def validator(v: Any) -> ByteListBase:
             if isinstance(v, cls):
                 return v
             return cls(v)
 
-        def serializer(x: _ByteListBase) -> bytes:
+        def serializer(x: ByteListBase) -> bytes:
             return x.encode_bytes()
 
         return core_schema.union_schema(
@@ -421,10 +440,10 @@ class ByteList(SSZType):
         Payload = ByteList[2048]
     """
 
-    _CACHE: ClassVar[dict[int, Type[_ByteListBase]]] = {}
+    _CACHE: ClassVar[dict[int, Type[ByteListBase]]] = {}
 
     @classmethod
-    def __class_getitem__(cls, limit: int) -> Type[_ByteListBase]:
+    def __class_getitem__(cls, limit: int) -> Type[ByteListBase]:
         """
         Specialize the factory into a concrete ``ByteList[limit]`` class.
 
@@ -432,7 +451,7 @@ class ByteList(SSZType):
             limit: Maximum number of bytes instances may contain (L ≥ 0).
 
         Returns:
-            A new subclass of ``_ByteListBase`` whose ``LIMIT`` is ``limit``.
+            A new subclass of ``ByteListBase`` whose ``LIMIT`` is ``limit``.
 
         Raises:
             TypeError: If ``limit`` is not a non-negative integer.
@@ -443,7 +462,7 @@ class ByteList(SSZType):
         if cached is not None:
             return cached
         name = f"ByteList[{limit}]"
-        bases = (_ByteListBase,)
+        bases = (ByteListBase,)
         attrs = {"LIMIT": limit, "__module__": cls.__module__}
         typ = type(name, bases, attrs)
         cls._CACHE[limit] = typ

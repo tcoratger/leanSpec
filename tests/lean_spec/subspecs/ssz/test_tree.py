@@ -6,7 +6,7 @@ import pytest
 from typing_extensions import List
 
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
-from lean_spec.subspecs.ssz.merkle.tree import build_merkle_tree
+from lean_spec.subspecs.ssz.merkle_proof.tree import build_merkle_tree
 from lean_spec.subspecs.ssz.utils import hash_nodes
 from lean_spec.types.byte_arrays import Bytes32
 
