@@ -3,7 +3,13 @@
 from lean_spec.types.byte_arrays import Bytes32
 
 BYTES_PER_CHUNK: int = 32
-"""The number of bytes in a Merkle tree chunk."""
+"""Number of bytes per Merkle chunk."""
+
+BYTES_PER_LENGTH_OFFSET: int = 4
+"""Number of bytes per serialized length offset."""
+
+BITS_PER_BYTE: int = 8
+"""Number of bits per byte."""
 
 ZERO_HASH: Bytes32 = Bytes32(b"\x00" * BYTES_PER_CHUNK)
-"""A zero hash, used for padding in the Merkle tree."""
+"""A zero hash, used for padding in Merkleization."""

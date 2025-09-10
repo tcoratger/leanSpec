@@ -16,8 +16,8 @@ from lean_spec.types.byte_arrays import (
     Bytes32,
     Bytes48,
     Bytes96,
-    _ByteVectorBase,
-    _ByteListBase,
+    ByteVectorBase,
+    ByteListBase,
 )
 
 
@@ -27,7 +27,7 @@ def sha256(b: bytes) -> bytes:
 
 def test_bytevector_factory_ok() -> None:
     B7 = ByteVector.__class_getitem__(7)
-    assert issubclass(B7, _ByteVectorBase)
+    assert issubclass(B7, ByteVectorBase)
     assert B7.LENGTH == 7
     v = B7(b"\x00" * 7)
     assert isinstance(v, B7)
@@ -47,7 +47,7 @@ def test_bytevector_factory_negative() -> None:
 
 def test_bytelist_factory_ok() -> None:
     L9 = ByteList.__class_getitem__(9)
-    assert issubclass(L9, _ByteListBase)
+    assert issubclass(L9, ByteListBase)
     assert L9.LIMIT == 9
     v = L9(b"\x01\x02")
     assert isinstance(v, L9)
@@ -171,7 +171,7 @@ def test_hashlib_accepts_bytes32_via_add() -> None:
         (Bytes96, bytes(range(96))),
     ],
 )
-def test_encode_decode_roundtrip_vector(Typ: Type[_ByteVectorBase], payload: bytes) -> None:
+def test_encode_decode_roundtrip_vector(Typ: Type[ByteVectorBase], payload: bytes) -> None:
     v = Typ(payload)
     assert v.encode_bytes() == payload
     assert Typ.decode_bytes(payload) == v
