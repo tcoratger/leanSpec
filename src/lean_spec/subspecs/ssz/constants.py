@@ -5,7 +5,6 @@ from lean_spec.types.byte_arrays import Bytes32
 BYTES_PER_CHUNK: int = 32
 """Number of bytes per Merkle chunk."""
 
-
 BITS_PER_BYTE: int = 8
 """Number of bits per byte."""
 
