@@ -50,9 +50,6 @@ class HashTreeRoot:
         return hash_tree_root(value)
 
 
-# ---------------------- Basics: uint / boolean / bytes ----------------------
-
-
 @hash_tree_root.register
 def _htr_uint(value: BaseUint) -> Bytes32:
     """Basic scalars merkleize as `merkleize(pack(bytes))`."""
@@ -81,9 +78,6 @@ def _htr_memoryview(value: memoryview) -> Bytes32:
     return Merkle.merkleize(Packer.pack_bytes(data))
 
 
-# ---------------------------- ByteVector / ByteList -------------------------
-
-
 @hash_tree_root.register
 def _htr_bytevector(value: ByteVectorBase) -> Bytes32:
     return Merkle.merkleize(Packer.pack_bytes(value.encode_bytes()))
@@ -95,9 +89,6 @@ def _htr_bytelist(value: ByteListBase) -> Bytes32:
     limit_chunks = ceil(type(value).LIMIT / BYTES_PER_CHUNK)
     root = Merkle.merkleize(Packer.pack_bytes(data), limit=limit_chunks)
     return Merkle.mix_in_length(root, len(data))
-
-
-# -------------------------------- Bitfields ---------------------------------
 
 
 @hash_tree_root.register
@@ -114,9 +105,6 @@ def _htr_bitlist(value: Bitlist) -> Bytes32:
     chunks = Packer.pack_bits(tuple(bool(b) for b in value))
     root = Merkle.merkleize(chunks, limit=limit)
     return Merkle.mix_in_length(root, len(value))
-
-
-# ----------------------------- Vector / List --------------------------------
 
 
 @hash_tree_root.register
@@ -155,17 +143,11 @@ def _htr_list(value: List) -> Bytes32:
     return Merkle.mix_in_length(root, len(value))
 
 
-# -------------------------------- Container ---------------------------------
-
-
 @hash_tree_root.register
 def _htr_container(value: Container) -> Bytes32:
     # Preserve declared field order from the Pydantic model.
     leaves = [hash_tree_root(getattr(value, fname)) for fname in type(value).model_fields.keys()]
     return Merkle.merkleize(leaves)
-
-
-# --------------------------------- Union ------------------------------------
 
 
 @hash_tree_root.register
