@@ -1,4 +1,4 @@
-"""State Container."""
+""" "State Container."""
 
 from typing import Dict, List, cast
 
@@ -467,7 +467,7 @@ class State(StrictBaseModel, Container):
         # Keep local copies of moving checkpoints and justified bitfield.
         latest_justified = self.latest_justified
         latest_finalized = self.latest_finalized
-        justified_slots = self.justified_slots
+        justified_slots = list(self.justified_slots)
 
         # Walk through all votes in this block.
         for signed_vote_untyped in attestations:
@@ -529,6 +529,10 @@ class State(StrictBaseModel, Container):
             if 3 * count >= 2 * self.config.num_validators.as_int():
                 # Mark the target as justified.
                 latest_justified = vote.target
+
+                # Ensure the justified_slots list is long enough before assignment.
+                while len(justified_slots) <= target_slot_int:
+                    justified_slots.append(Boolean(False))
                 justified_slots[target_slot_int] = Boolean(True)
 
                 # Drop per-target vote tracking now that it is justified.
@@ -552,6 +556,6 @@ class State(StrictBaseModel, Container):
             update={
                 "latest_justified": latest_justified,
                 "latest_finalized": latest_finalized,
-                "justified_slots": justified_slots,
+                "justified_slots": self.justified_slots.__class__(justified_slots),
             }
         )
