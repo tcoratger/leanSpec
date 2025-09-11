@@ -1,4 +1,4 @@
-""" "State Container."""
+"""State Container."""
 
 from typing import Dict, List, cast
 
@@ -79,8 +79,7 @@ class State(StrictBaseModel, Container):
         # Build an empty block body for genesis.
         #
         # This body has no attestations and serves only to derive body_root.
-        AttestationListType = BlockBody.model_fields["attestations"].annotation
-        empty_body = BlockBody(attestations=AttestationListType())
+        empty_body = BlockBody(attestations=[])
 
         # Create the zeroed header that anchors the chain at genesis.
         genesis_header = BlockHeader(
@@ -494,7 +493,8 @@ class State(StrictBaseModel, Container):
                 )
                 # Source root must match history.
                 and source_root == self.historical_block_hashes[source_slot_int]
-                # Target root must match history, or if not in history, must match the latest header.
+                # Target root must match history, or if not in history,
+                # must match the latest header.
                 and (
                     (
                         target_slot_int < len(self.historical_block_hashes)

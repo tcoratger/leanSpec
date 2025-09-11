@@ -541,8 +541,7 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
 
     # --- Process attestations ---
     # Get the correct specialized list type from the BlockBody model
-    AttestationListType = BlockBody.model_fields["attestations"].annotation
-    new_state = state.process_attestations(AttestationListType(votes_for_4))
+    new_state = state.process_attestations(votes_for_4)
 
     # --- Assertions ---
     # Checkpoint 4 should now be justified.
