@@ -390,11 +390,11 @@ class State(StrictBaseModel, Container):
                 update={"root": parent_root}
             )
 
-        # Create mutable copies to work with to avoid type ambiguity with the `+` operator.
-        new_historical_hashes = self.historical_block_hashes
+        # Create mutable copies to work with to avoid modifying the original object.
+        new_historical_hashes = list(self.historical_block_hashes)
         new_historical_hashes.append(parent_root)
 
-        new_justified_slots = self.justified_slots
+        new_justified_slots = list(self.justified_slots)
         new_justified_slots.append(Boolean(self.latest_block_header.slot == Slot(0)))
 
         # If there were empty slots between parent and this block, fill them.
@@ -481,19 +481,33 @@ class State(StrictBaseModel, Container):
             target_root = vote.target.root
             source_root = vote.source.root
 
+            target_slot_int = target_slot.as_int()
+            source_slot_int = source_slot.as_int()
+
             # Validate the vote before counting it.
-            # Conditions:
-            # - Source slot must already be justified.
-            # - Target slot must not already be justified.
-            # - Source and target roots must match our recorded history.
-            # - Target slot must be strictly greater than source slot.
-            # - Target slot must be justifiable relative to the latest finalized slot.
             if not (
-                justified_slots[source_slot.as_int()]
-                and not justified_slots[target_slot.as_int()]
-                and source_root == self.historical_block_hashes[source_slot.as_int()]
-                and target_root == self.historical_block_hashes[target_slot.as_int()]
+                # Source must be justified.
+                justified_slots[source_slot_int]
+                # Target must NOT be justified. If slot is not in history, it isn't justified.
+                and not (
+                    target_slot_int < len(justified_slots) and justified_slots[target_slot_int]
+                )
+                # Source root must match history.
+                and source_root == self.historical_block_hashes[source_slot_int]
+                # Target root must match history, or if not in history, must match the latest header.
+                and (
+                    (
+                        target_slot_int < len(self.historical_block_hashes)
+                        and target_root == self.historical_block_hashes[target_slot_int]
+                    )
+                    or (
+                        target_slot == self.latest_block_header.slot
+                        and target_root == hash_tree_root(self.latest_block_header)
+                    )
+                )
+                # Target must be after source.
                 and target_slot > source_slot
+                # Target must be a justifiable slot.
                 and target_slot.is_justifiable_after(latest_finalized.slot)
             ):
                 # Skip invalid or redundant votes.
@@ -509,13 +523,13 @@ class State(StrictBaseModel, Container):
                 justifications[target_root][validator_id] = Boolean(True)
 
             # Count current support for the target.
-            count = sum(justifications[target_root])
+            count = sum(int(v) for v in justifications[target_root])
 
             # Check the 2/3-supermajority threshold without integer division.
-            if 3 * count >= 2 * self.config.num_validators:
+            if 3 * count >= 2 * self.config.num_validators.as_int():
                 # Mark the target as justified.
                 latest_justified = vote.target
-                justified_slots[target_slot.as_int()] = Boolean(True)
+                justified_slots[target_slot_int] = Boolean(True)
 
                 # Drop per-target vote tracking now that it is justified.
                 del justifications[target_root]
@@ -524,7 +538,7 @@ class State(StrictBaseModel, Container):
                 # No other justifiable slot must exist strictly between source and target.
                 is_finalizable = not any(
                     Slot(s).is_justifiable_after(latest_finalized.slot)
-                    for s in range(source_slot.as_int() + 1, target_slot.as_int())
+                    for s in range(source_slot_int + 1, target_slot_int)
                 )
                 if is_finalizable:
                     # Finalize the source checkpoint.

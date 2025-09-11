@@ -1,4 +1,4 @@
-"""Tests for the State container and its methods."""
+""" "Tests for the State container and its methods."""
 
 from typing import Dict, List, cast
 
@@ -493,105 +493,105 @@ def test_process_block_header_invalid(
         state_at_slot_1.process_block_header(block)
 
 
-# def test_process_attestations_justification_and_finalization(genesis_state: State) -> None:
-#     """
-#     Tests `process_attestations` in a multi-slot scenario to verify
-#     the full justification and finalization lifecycle.
-#     """
-#     # --- Setup: build a short chain: genesis -> slot 1 -> slot 4 ---
-#     state = genesis_state
+def test_process_attestations_justification_and_finalization(genesis_state: State) -> None:
+    """
+    Tests `process_attestations` in a multi-slot scenario to verify
+    the full justification and finalization lifecycle.
+    """
+    # --- Setup: build a short chain: genesis -> slot 1 -> slot 4 ---
+    state = genesis_state
 
-#     # Move to slot 1 (so we can produce a block at slot 1)
-#     state_at_slot_1 = state.process_slots(Slot(1))
-#     block1 = _create_block(1, state_at_slot_1.latest_block_header)
-#     state = state_at_slot_1.process_block(block1.message)
+    # Move to slot 1 (so we can produce a block at slot 1)
+    state_at_slot_1 = state.process_slots(Slot(1))
+    block1 = _create_block(1, state_at_slot_1.latest_block_header)
+    state = state_at_slot_1.process_block(block1.message)
 
-#     # Move to slot 4 and produce a block there
-#     state_at_slot_4 = state.process_slots(Slot(4))
-#     block4 = _create_block(4, state_at_slot_4.latest_block_header)
-#     state = state_at_slot_4.process_block(block4.message)
+    # Move to slot 4 and produce a block there
+    state_at_slot_4 = state.process_slots(Slot(4))
+    block4 = _create_block(4, state_at_slot_4.latest_block_header)
+    state = state_at_slot_4.process_block(block4.message)
 
-#     # Advance to slot 5 to fill in the state root for the block at slot 4.
-#     state = state.process_slots(Slot(5))
+    # Advance to slot 5 to fill in the state root for the block at slot 4.
+    state = state.process_slots(Slot(5))
 
-#     # Checkpoints: source = genesis, target = slot 4
-#     genesis_checkpoint = Checkpoint(
-#         root=state.historical_block_hashes[0],  # Canonical root for slot 0
-#         slot=Slot(0),
-#     )
-#     checkpoint4 = Checkpoint(
-#         root=hash_tree_root(state.latest_block_header),  # Root of the block at slot 4
-#         slot=Slot(4),
-#     )
+    # Checkpoints: source = genesis, target = slot 4
+    genesis_checkpoint = Checkpoint(
+        root=state.historical_block_hashes[0],  # Canonical root for slot 0
+        slot=Slot(0),
+    )
+    checkpoint4 = Checkpoint(
+        root=hash_tree_root(state.latest_block_header),  # Root of the block at slot 4
+        slot=Slot(4),
+    )
 
-#     # --- Create votes: 7 of 10 validators vote to justify slot 4 from genesis ---
-#     votes_for_4 = [
-#         SignedVote(
-#             data=Vote(
-#                 validator_id=ValidatorIndex(i),
-#                 slot=Slot(4),
-#                 head=checkpoint4,
-#                 target=checkpoint4,
-#                 source=genesis_checkpoint,
-#             ),
-#             signature=Bytes32(b"\x00" * 32),
-#         )
-#         for i in range(7)
-#     ]
+    # --- Create votes: 7 of 10 validators vote to justify slot 4 from genesis ---
+    votes_for_4 = [
+        SignedVote(
+            data=Vote(
+                validator_id=ValidatorIndex(i),
+                slot=Slot(4),
+                head=checkpoint4,
+                target=checkpoint4,
+                source=genesis_checkpoint,
+            ),
+            signature=Bytes32(b"\x00" * 32),
+        )
+        for i in range(7)
+    ]
 
-#     # --- Process attestations ---
-#     # Get the correct specialized list type from the BlockBody model
-#     AttestationListType = BlockBody.model_fields["attestations"].annotation
-#     new_state = state.process_attestations(AttestationListType(votes_for_4))
+    # --- Process attestations ---
+    # Get the correct specialized list type from the BlockBody model
+    AttestationListType = BlockBody.model_fields["attestations"].annotation
+    new_state = state.process_attestations(AttestationListType(votes_for_4))
 
-#     # --- Assertions ---
-#     # Checkpoint 4 should now be justified.
-#     assert new_state.latest_justified == checkpoint4
-#     # The justified bit for slot 4 should be set.
-#     assert bool(cast(Boolean, new_state.justified_slots[4])) is True
-#     # Because there are no other justifiable slots between 0 and 4,
-#     # the source (genesis) should be finalized.
-#     assert new_state.latest_finalized == genesis_checkpoint
-#     # The per-root votes for the now-justified root should be cleared.
-#     assert checkpoint4.root not in new_state.get_justifications()
+    # --- Assertions ---
+    # Checkpoint 4 should now be justified.
+    assert new_state.latest_justified == checkpoint4
+    # The justified bit for slot 4 should be set.
+    assert bool(cast(Boolean, new_state.justified_slots[4])) is True
+    # Because there are no other justifiable slots between 0 and 4,
+    # the source (genesis) should be finalized.
+    assert new_state.latest_finalized == genesis_checkpoint
+    # The per-root votes for the now-justified root should be cleared.
+    assert checkpoint4.root not in new_state.get_justifications()
 
 
-# def test_state_transition_full(genesis_state: State) -> None:
-#     """
-#     Performs an end-to-end test of the `state_transition` function,
-#     simulating a complete block processing cycle.
-#     """
-#     # 1. Start from a known state (genesis).
-#     state = genesis_state
+def test_state_transition_full(genesis_state: State) -> None:
+    """
+    Performs an end-to-end test of the `state_transition` function,
+    simulating a complete block processing cycle.
+    """
+    # 1. Start from a known state (genesis).
+    state = genesis_state
 
-#     # 2. Create a valid block for the next slot.
-#     state_at_slot_1 = state.process_slots(Slot(1))
-#     signed_block = _create_block(1, state_at_slot_1.latest_block_header)
-#     block = signed_block.message
+    # 2. Create a valid block for the next slot.
+    state_at_slot_1 = state.process_slots(Slot(1))
+    signed_block = _create_block(1, state_at_slot_1.latest_block_header)
+    block = signed_block.message
 
-#     # 3. Manually compute the expected post-state.
-#     expected_state = state_at_slot_1.process_block(block)
-#     # The block must commit to the correct final state root.
-#     block_with_correct_root = block.model_copy(
-#         update={"state_root": hash_tree_root(expected_state)}
-#     )
-#     final_signed_block = SignedBlock(
-#         message=block_with_correct_root, signature=signed_block.signature
-#     )
+    # 3. Manually compute the expected post-state.
+    expected_state = state_at_slot_1.process_block(block)
+    # The block must commit to the correct final state root.
+    block_with_correct_root = block.model_copy(
+        update={"state_root": hash_tree_root(expected_state)}
+    )
+    final_signed_block = SignedBlock(
+        message=block_with_correct_root, signature=signed_block.signature
+    )
 
-#     # 4. Call the state transition function.
-#     final_state = state.state_transition(final_signed_block, valid_signatures=True)
+    # 4. Call the state transition function.
+    final_state = state.state_transition(final_signed_block, valid_signatures=True)
 
-#     # 5. The resulting state must be identical to the manually computed one.
-#     assert final_state == expected_state
+    # 5. The resulting state must be identical to the manually computed one.
+    assert final_state == expected_state
 
-#     # 6. Test failure cases.
-#     with pytest.raises(AssertionError, match="Block signatures must be valid"):
-#         state.state_transition(final_signed_block, valid_signatures=False)
+    # 6. Test failure cases.
+    with pytest.raises(AssertionError, match="Block signatures must be valid"):
+        state.state_transition(final_signed_block, valid_signatures=False)
 
-#     block_with_bad_root = block.model_copy(update={"state_root": Bytes32(b"\x00" * 32)})
-#     signed_block_with_bad_root = SignedBlock(
-#         message=block_with_bad_root, signature=signed_block.signature
-#     )
-#     with pytest.raises(AssertionError, match="Invalid block state root"):
-#         state.state_transition(signed_block_with_bad_root, valid_signatures=True)
+    block_with_bad_root = block.model_copy(update={"state_root": Bytes32(b"\x00" * 32)})
+    signed_block_with_bad_root = SignedBlock(
+        message=block_with_bad_root, signature=signed_block.signature
+    )
+    with pytest.raises(AssertionError, match="Invalid block state root"):
+        state.state_transition(signed_block_with_bad_root, valid_signatures=True)
