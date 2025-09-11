@@ -1,5 +1,6 @@
 """Vote Containers."""
 
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.types import Bytes32, StrictBaseModel, Uint64
 
 from .checkpoint import Checkpoint
@@ -11,7 +12,7 @@ class Vote(StrictBaseModel):
     validator_id: Uint64
     """The index of the voting validator."""
 
-    slot: Uint64
+    slot: Slot
     """The slot for which this vote is cast."""
 
     head: Checkpoint
