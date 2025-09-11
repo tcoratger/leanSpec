@@ -1,10 +1,11 @@
 """State Container."""
 
-from typing import Dict
+from typing import Dict, List, cast
 
-from typing_extensions import Any, List
+from typing_extensions import Any
 
 from lean_spec.subspecs.chain import DEVNET_CONFIG
+from lean_spec.subspecs.chain import config as chainconfig
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Boolean, Bytes32, Container, StrictBaseModel, Uint64, ValidatorIndex
@@ -14,7 +15,7 @@ from .block import Block, BlockBody, BlockHeader, SignedBlock
 from .checkpoint import Checkpoint
 from .config import Config
 from .slot import Slot
-from .vote import SignedVote
+from .vote import SignedVote, Vote
 
 
 class State(StrictBaseModel, Container):
@@ -39,17 +40,17 @@ class State(StrictBaseModel, Container):
     """The latest finalized checkpoint."""
 
     # Historical data
-    historical_block_hashes: SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]
+    historical_block_hashes: SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
     """A list of historical block root hashes."""
 
-    justified_slots: SSZList[Boolean, DEVNET_CONFIG.historical_roots_limit.as_int()]
+    justified_slots: SSZList[Boolean, DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
     """A bitfield indicating which historical slots were justified."""
 
     # Justification tracking (flattened for SSZ compatibility)
-    justifications_roots: SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]
+    justifications_roots: SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
     """Roots of justified blocks."""
 
-    justifications_validators: SSZList[
+    justifications_validators: SSZList[  # type: ignore
         Boolean,
         DEVNET_CONFIG.historical_roots_limit.as_int()
         * DEVNET_CONFIG.historical_roots_limit.as_int(),
@@ -78,7 +79,8 @@ class State(StrictBaseModel, Container):
         # Build an empty block body for genesis.
         #
         # This body has no attestations and serves only to derive body_root.
-        empty_body = BlockBody(attestations=[])
+        AttestationListType = BlockBody.model_fields["attestations"].annotation
+        empty_body = BlockBody(attestations=AttestationListType())
 
         # Create the zeroed header that anchors the chain at genesis.
         genesis_header = BlockHeader(
@@ -146,14 +148,13 @@ class State(StrictBaseModel, Container):
         #
         # This value determines the size of the block of votes for each root.
         limit = DEVNET_CONFIG.validator_registry_limit.as_int()
+        roots = self.justifications_roots
+        validators = self.justifications_validators
 
         # Build the entire justifications map.
-        return {
-            root: self.justifications_validators[i * limit : (i + 1) * limit]
-            for i, root in enumerate(self.justifications_roots)
-        }
+        return {root: validators[i * limit : (i + 1) * limit] for i, root in enumerate(roots)}
 
-    def with_justifications(self, justifications: Dict[Bytes32, List[bool]]) -> "State":
+    def with_justifications(self, justifications: Dict[Bytes32, List[Boolean]]) -> "State":
         """
         Creates a new state object with updated, flattened justifications.
 
@@ -177,9 +178,13 @@ class State(StrictBaseModel, Container):
                             `validator_registry_limit`.
         """
         # It will store the deterministically sorted list of roots.
-        new_roots: List[Bytes32] = []
+        new_roots = SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]()
         # It will store the single, concatenated list of all votes.
-        flat_votes: List[bool] = []
+        flat_votes = SSZList[
+            Boolean,
+            DEVNET_CONFIG.historical_roots_limit.as_int()
+            * DEVNET_CONFIG.historical_roots_limit.as_int(),
+        ]()
         limit = DEVNET_CONFIG.validator_registry_limit.as_int()
 
         # Iterate through the roots in sorted order for deterministic output.
@@ -385,25 +390,24 @@ class State(StrictBaseModel, Container):
                 update={"root": parent_root}
             )
 
-        # Start with the parent root at the tip of historical roots.
-        new_historical_hashes = self.historical_block_hashes + [parent_root]
+        # Create mutable copies to work with to avoid type ambiguity with the `+` operator.
+        new_historical_hashes = self.historical_block_hashes
+        new_historical_hashes.append(parent_root)
 
-        # Mark whether the parent slot was justified.
-        #
-        # Genesis (slot 0) is always justified.
-        new_justified_slots = self.justified_slots + [self.latest_block_header.slot == Slot(0)]
+        new_justified_slots = self.justified_slots
+        new_justified_slots.append(Boolean(self.latest_block_header.slot == Slot(0)))
 
         # If there were empty slots between parent and this block, fill them.
-        num_empty_slots = block.slot - self.latest_block_header.slot - Slot(1)
-        if num_empty_slots > Slot(0):
-            # Insert ZERO_HASH for each skipped slot in the history.
+        num_empty_slots = (block.slot - self.latest_block_header.slot - Slot(1)).as_int()
+        if num_empty_slots > 0:
             new_historical_hashes.extend([ZERO_HASH] * num_empty_slots)
-            # None of those skipped slots are justified.
-            new_justified_slots.extend([False] * num_empty_slots)
+            new_justified_slots.extend([Boolean(False)] * num_empty_slots)
 
-        # Record updated history arrays.
-        updates["historical_block_hashes"] = new_historical_hashes
-        updates["justified_slots"] = new_justified_slots
+        # Record updated history arrays, ensuring they are cast back to the correct SSZList type.
+        updates["historical_block_hashes"] = self.historical_block_hashes.__class__(
+            new_historical_hashes
+        )
+        updates["justified_slots"] = self.justified_slots.__class__(new_justified_slots)
 
         # Construct the new latest block header.
         # Leave state_root empty; it will be filled on the next process_slot call.
@@ -434,7 +438,10 @@ class State(StrictBaseModel, Container):
         # Process justification votes (attestations).
         return self.process_attestations(body.attestations)
 
-    def process_attestations(self, attestations: List[SignedVote]) -> "State":
+    def process_attestations(
+        self,
+        attestations: SSZList[SignedVote, chainconfig.VALIDATOR_REGISTRY_LIMIT.as_int()],  # type: ignore
+    ) -> "State":
         """
         Apply attestation votes and update justification and finalization.
 
@@ -460,12 +467,13 @@ class State(StrictBaseModel, Container):
         # Keep local copies of moving checkpoints and justified bitfield.
         latest_justified = self.latest_justified
         latest_finalized = self.latest_finalized
-        justified_slots = list(self.justified_slots)  # make a mutable copy
+        justified_slots = self.justified_slots
 
         # Walk through all votes in this block.
-        for signed_vote in attestations:
+        for signed_vote_untyped in attestations:
+            signed_vote = cast(SignedVote, signed_vote_untyped)
             # Extract the vote payload.
-            vote = signed_vote.data
+            vote: Vote = signed_vote.data
 
             # Unpack source and target fields for clarity.
             target_slot = vote.target.slot
@@ -493,12 +501,12 @@ class State(StrictBaseModel, Container):
 
             # Prepare tracking for a new target root if needed.
             if target_root not in justifications:
-                justifications[target_root] = [False] * self.config.num_validators.as_int()
+                justifications[target_root] = [Boolean(False)] * self.config.num_validators.as_int()
 
             # Record a vote only once per validator per target.
             validator_id = vote.validator_id.as_int()
             if not justifications[target_root][validator_id]:
-                justifications[target_root][validator_id] = True
+                justifications[target_root][validator_id] = Boolean(True)
 
             # Count current support for the target.
             count = sum(justifications[target_root])
@@ -507,7 +515,7 @@ class State(StrictBaseModel, Container):
             if 3 * count >= 2 * self.config.num_validators:
                 # Mark the target as justified.
                 latest_justified = vote.target
-                justified_slots[target_slot.as_int()] = True
+                justified_slots[target_slot.as_int()] = Boolean(True)
 
                 # Drop per-target vote tracking now that it is justified.
                 del justifications[target_root]

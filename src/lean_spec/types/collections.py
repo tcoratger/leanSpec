@@ -397,36 +397,3 @@ class List(list[SSZType]):
         """Insert an element at an index, checking the limit."""
         self._check_capacity(1)
         super().insert(index, cast(Any, self.ELEMENT_TYPE)(value))
-
-    def copy(self) -> Self:  # type: ignore[override]
-        """Return a new specialized SSZ List with the same items (preserves type & limit)."""
-        return type(self)(self)
-
-    def appended(self, value: Any) -> Self:
-        """
-        Return a new SSZ List with `value` appended.
-        Does not mutate the original.
-        Enforces limit and element type.
-        """
-        new_list = self.copy()
-        new_list.append(value)
-        return new_list
-
-    def extended(self, values: Iterable[Any]) -> Self:
-        """
-        Return a new SSZ List with `values` appended.
-        Does not mutate the original.
-        Enforces limit and element type.
-        """
-        new_list = self.copy()
-        new_list.extend(values)
-        return new_list
-
-    def __add__(self, other: Iterable[Any]) -> Self:
-        """Immutable-style concatenation that preserves SSZ List type."""
-        return self.extended(other)
-
-    def __iadd__(self, other: Iterable[Any]) -> Self:
-        """In-place concatenation; mutates self (preserves existing list semantics)."""
-        self.extend(other)
-        return self
