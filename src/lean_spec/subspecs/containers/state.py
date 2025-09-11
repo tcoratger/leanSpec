@@ -2,21 +2,20 @@
 
 from typing import Dict, List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 from typing_extensions import Annotated
 
 from lean_spec.subspecs.chain import DEVNET_CONFIG
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types.base import StrictBaseModel
 
 from .block import BlockHeader
 from .checkpoint import Checkpoint
 from .config import Config
 
 
-class State(BaseModel):
+class State(StrictBaseModel):
     """The main consensus state object."""
-
-    model_config = ConfigDict(frozen=False, extra="forbid")
 
     # Configuration
     config: Config
@@ -107,9 +106,9 @@ class State(BaseModel):
             for i, root in enumerate(self.justifications_roots)
         }
 
-    def set_justifications(self, justifications: Dict[Bytes32, List[bool]]) -> None:
+    def with_justifications(self, justifications: Dict[Bytes32, List[bool]]) -> "State":
         """
-        Flattens and sets a justifications map on the state in-place.
+        Creates a new state object with updated, flattened justifications.
 
         This method performs the inverse of `get_justifications`. It takes a
         human-readable dictionary of votes and serializes it into the two
@@ -147,6 +146,10 @@ class State(BaseModel):
             # Extend the flattened list with the votes for this root.
             flat_votes.extend(votes)
 
-        # Modify the State instance in-place with the updated fields.
-        self.justifications_roots = new_roots
-        self.justifications_validators = flat_votes
+        # Return a new state object with the updated fields.
+        return self.model_copy(
+            update={
+                "justifications_roots": new_roots,
+                "justifications_validators": flat_votes,
+            }
+        )

@@ -1,6 +1,4 @@
-"""
-Tests for the State container and its methods.
-"""
+"""Tests for the State container and its methods."""
 
 from typing import Dict, List
 
@@ -182,8 +180,7 @@ def test_get_justifications_multiple_roots(base_state: State) -> None:
 
     votes3 = [True] * limit  # All validators vote for root3
 
-    # Create a new state instance with the desired justification data,
-    # as the State model is frozen and cannot be mutated after creation.
+    # Create a new state instance with the desired justification data.
     state_with_data = base_state.model_copy(
         update={
             "justifications_roots": [root1, root2, root3],
@@ -207,25 +204,42 @@ def test_get_justifications_multiple_roots(base_state: State) -> None:
     assert len(justifications) == 3
 
 
-def test_set_justifications_empty(base_state: State) -> None:
+def test_with_justifications_empty(
+    sample_config: Config,
+    sample_block_header: BlockHeader,
+    sample_checkpoint: Checkpoint,
+) -> None:
     """
-    Test `set_justifications` correctly clears the state with an empty map.
+    Test `with_justifications` returns a new state with cleared justifications.
     """
-    # Start with some data to ensure it gets cleared
-    base_state.justifications_roots = [Bytes32(b"\x01" * 32)]
-    base_state.justifications_validators = [True] * DEVNET_CONFIG.validator_registry_limit.as_int()
+    # Create an initial state that has some justification data
+    initial_state = State(
+        config=sample_config,
+        slot=Uint64(0),
+        latest_block_header=sample_block_header,
+        latest_justified=sample_checkpoint,
+        latest_finalized=sample_checkpoint,
+        historical_block_hashes=[],
+        justified_slots=[],
+        justifications_roots=[Bytes32(b"\x01" * 32)],
+        justifications_validators=[True] * DEVNET_CONFIG.validator_registry_limit.as_int(),
+    )
 
-    # Set with an empty map
-    base_state.set_justifications({})
+    # Create a new state by setting an empty map
+    new_state = initial_state.with_justifications({})
 
-    # Verify that the state lists are now empty
-    assert not base_state.justifications_roots
-    assert not base_state.justifications_validators
+    # Verify that the new state's lists are empty
+    assert not new_state.justifications_roots
+    assert not new_state.justifications_validators
+
+    # Verify that the original state remains unchanged (immutability)
+    assert initial_state.justifications_roots
+    assert initial_state.justifications_validators
 
 
-def test_set_justifications_deterministic_order(base_state: State) -> None:
+def test_with_justifications_deterministic_order(base_state: State) -> None:
     """
-    Test `set_justifications` always sorts roots for deterministic output.
+    Test `with_justifications` always sorts roots for deterministic output.
     """
     root1 = Bytes32(b"\x01" * 32)
     root2 = Bytes32(b"\x02" * 32)
@@ -235,26 +249,28 @@ def test_set_justifications_deterministic_order(base_state: State) -> None:
 
     # Provide the dictionary in an unsorted order (root2 comes before root1)
     justifications = {root2: votes2, root1: votes1}
-    base_state.set_justifications(justifications)
+    new_state = base_state.with_justifications(justifications)
 
-    # Verify that the roots in the state are sorted
-    assert base_state.justifications_roots == [root1, root2]
+    # Verify that the roots in the new state are sorted
+    assert new_state.justifications_roots == [root1, root2]
     # Verify that the flattened validators list matches the sorted order
-    assert base_state.justifications_validators == votes1 + votes2
+    assert new_state.justifications_validators == votes1 + votes2
+    # Verify the original state is unchanged
+    assert not base_state.justifications_roots
 
 
-def test_set_justifications_invalid_length(base_state: State) -> None:
+def test_with_justifications_invalid_length(base_state: State) -> None:
     """
-    Test `set_justifications` raises an AssertionError for incorrect vote lengths.
+    Test `with_justifications` raises an AssertionError for incorrect vote lengths.
     """
     root1 = Bytes32(b"\x01" * 32)
     # Create a list of votes that is one short of the required length
     invalid_votes = [True] * (DEVNET_CONFIG.validator_registry_limit - Uint64(1)).as_int()
     justifications = {root1: invalid_votes}
 
-    # Verify that calling the setter with this data raises an assertion error
+    # Verify that calling the method with this data raises an assertion error
     with pytest.raises(AssertionError):
-        base_state.set_justifications(justifications)
+        base_state.with_justifications(justifications)
 
 
 def _create_votes(indices: List[int]) -> List[bool]:
@@ -298,13 +314,13 @@ def test_justifications_roundtrip(
     base_state: State, justifications_map: Dict[Bytes32, List[bool]]
 ) -> None:
     """
-    Test that data remains consistent after a set -> get cycle.
+    Test that data remains consistent after a with_justifications -> get cycle.
     """
-    # Use the standard setter to modify the state
-    base_state.set_justifications(justifications_map)
+    # Create a new state with the provided justifications map
+    new_state = base_state.with_justifications(justifications_map)
 
-    # Reconstruct the map using the getter
-    reconstructed_map = base_state.get_justifications()
+    # Reconstruct the map using the getter from the new state
+    reconstructed_map = new_state.get_justifications()
 
     # The expected result is the original map with sorted keys
     expected_map = dict(sorted(justifications_map.items()))
