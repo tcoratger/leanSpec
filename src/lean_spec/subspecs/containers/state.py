@@ -79,7 +79,7 @@ class State(StrictBaseModel, Container):
         # Build an empty block body for genesis.
         #
         # This body has no attestations and serves only to derive body_root.
-        empty_body = BlockBody(attestations=[])
+        empty_body = BlockBody(attestations=[])  # type: ignore
 
         # Create the zeroed header that anchors the chain at genesis.
         genesis_header = BlockHeader(
@@ -100,10 +100,10 @@ class State(StrictBaseModel, Container):
             latest_block_header=genesis_header,
             latest_justified=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
             latest_finalized=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
-            historical_block_hashes=[],
-            justified_slots=[],
-            justifications_roots=[],
-            justifications_validators=[],
+            historical_block_hashes=[],  # type: ignore
+            justified_slots=[],  # type: ignore
+            justifications_roots=[],  # type: ignore
+            justifications_validators=[],  # type: ignore
         )
 
     def is_proposer(self, validator_index: ValidatorIndex) -> bool:
@@ -151,7 +151,10 @@ class State(StrictBaseModel, Container):
         validators = self.justifications_validators
 
         # Build the entire justifications map.
-        return {root: validators[i * limit : (i + 1) * limit] for i, root in enumerate(roots)}
+        return cast(
+            Dict[Bytes32, List[Boolean]],
+            {root: validators[i * limit : (i + 1) * limit] for i, root in enumerate(roots)},
+        )
 
     def with_justifications(self, justifications: Dict[Bytes32, List[Boolean]]) -> "State":
         """
@@ -177,13 +180,13 @@ class State(StrictBaseModel, Container):
                             `validator_registry_limit`.
         """
         # It will store the deterministically sorted list of roots.
-        new_roots = SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]()
+        new_roots = SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]()  # type: ignore
         # It will store the single, concatenated list of all votes.
         flat_votes = SSZList[
             Boolean,
             DEVNET_CONFIG.historical_roots_limit.as_int()
             * DEVNET_CONFIG.historical_roots_limit.as_int(),
-        ]()
+        ]()  # type: ignore
         limit = DEVNET_CONFIG.validator_registry_limit.as_int()
 
         # Iterate through the roots in sorted order for deterministic output.
