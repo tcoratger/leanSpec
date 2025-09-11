@@ -41,7 +41,7 @@ def _create_block(
     slot: int, parent_header: BlockHeader, votes: List[SignedVote] | None = None
 ) -> SignedBlock:
     """Helper to create a basic, valid signed block for testing."""
-    body = BlockBody(attestations=votes or [])
+    body = BlockBody(attestations=votes or [])  # type: ignore
     block_message = Block(
         slot=Slot(slot),
         proposer_index=ValidatorIndex(slot % 10),  # Using sample_config num_validators
@@ -91,10 +91,10 @@ def base_state(
         latest_block_header=sample_block_header,
         latest_justified=sample_checkpoint,
         latest_finalized=sample_checkpoint,
-        historical_block_hashes=[],
-        justified_slots=[],
-        justifications_roots=[],
-        justifications_validators=[],
+        historical_block_hashes=[],  # type: ignore
+        justified_slots=[],  # type: ignore
+        justifications_roots=[],  # type: ignore
+        justifications_validators=[],  # type: ignore
     )
 
 
@@ -116,10 +116,10 @@ def test_is_proposer(
             latest_block_header=sample_block_header,
             latest_justified=sample_checkpoint,
             latest_finalized=sample_checkpoint,
-            historical_block_hashes=[],
-            justified_slots=[],
-            justifications_roots=[],
-            justifications_validators=[],
+            historical_block_hashes=[],  # type: ignore
+            justified_slots=[],  # type: ignore
+            justifications_roots=[],  # type: ignore
+            justifications_validators=[],  # type: ignore
         )
 
     # At slot 0, validator 0 should be the proposer (0 % 10 == 0)
@@ -259,10 +259,10 @@ def test_with_justifications_empty(
         latest_block_header=sample_block_header,
         latest_justified=sample_checkpoint,
         latest_finalized=sample_checkpoint,
-        historical_block_hashes=[],
-        justified_slots=[],
-        justifications_roots=[Bytes32(b"\x01" * 32)],
-        justifications_validators=[Boolean(True)] * DEVNET_CONFIG.validator_registry_limit.as_int(),
+        historical_block_hashes=[],  # type: ignore
+        justified_slots=[],  # type: ignore
+        justifications_roots=[Bytes32(b"\x01" * 32)],  # type: ignore
+        justifications_validators=[Boolean(True)] * DEVNET_CONFIG.validator_registry_limit.as_int(),  # type: ignore
     )
 
     # Create a new state by setting an empty map
@@ -378,7 +378,7 @@ def test_generate_genesis(sample_config: Config) -> None:
     # Verify the chain starts at slot 0.
     assert state.slot == Slot(0)
     # The body root of the initial header should be the hash of an empty body.
-    assert state.latest_block_header.body_root == hash_tree_root(BlockBody(attestations=[]))
+    assert state.latest_block_header.body_root == hash_tree_root(BlockBody(attestations=[]))  # type: ignore
     # All historical and justification lists should be empty at genesis.
     assert not state.historical_block_hashes
     assert not state.justified_slots
@@ -485,7 +485,7 @@ def test_process_block_header_invalid(
         proposer_index=ValidatorIndex(bad_proposer),
         parent_root=bad_parent_root or parent_root,
         state_root=Bytes32(b"\x00" * 32),
-        body=BlockBody(attestations=[]),
+        body=BlockBody(attestations=[]),  # type: ignore
     )
 
     # Expect an assertion error with a specific message.
@@ -516,7 +516,7 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
 
     # Checkpoints: source = genesis, target = slot 4
     genesis_checkpoint = Checkpoint(
-        root=state.historical_block_hashes[0],  # Canonical root for slot 0
+        root=cast(Bytes32, state.historical_block_hashes[0]),  # Canonical root for slot 0
         slot=Slot(0),
     )
     checkpoint4 = Checkpoint(
@@ -541,7 +541,7 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
 
     # --- Process attestations ---
     # Get the correct specialized list type from the BlockBody model
-    new_state = state.process_attestations(votes_for_4)
+    new_state = state.process_attestations(votes_for_4)  # type: ignore
 
     # --- Assertions ---
     # Checkpoint 4 should now be justified.
