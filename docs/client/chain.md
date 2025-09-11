@@ -206,7 +206,7 @@ def process_slots(state: State, slot: Slot) -> None:
 ```python
 def process_slot(state: BeaconState) -> None:
     # Cache latest block header state root
-    if state.latest_block_header.state_root == Bytes32():
+    if state.latest_block_header.state_root == Bytes32.zero():
         previous_state_root = hash_tree_root(state)
         state.latest_block_header.state_root = previous_state_root
 ```
@@ -233,9 +233,9 @@ def process_block_header(state: State, block: Block) -> None:
     assert block.parent_root == hash_tree_root(state.latest_block_header)
 
     # If this was first block post genesis, 3sf mini special treatment is required
-    # to correctly set genesis block root as already justified and finalized. 
-    # This is not possible at the time of genesis state generation and are set at 
-    # zero bytes because genesis block is calculated using genesis state causing a 
+    # to correctly set genesis block root as already justified and finalized.
+    # This is not possible at the time of genesis state generation and are set at
+    # zero bytes because genesis block is calculated using genesis state causing a
     # circular dependency
     if state.latest_block_header.slot == 0:
         # block.parent_root is the genesis root
@@ -259,7 +259,7 @@ def process_block_header(state: State, block: Block) -> None:
         slot=block.slot,
         proposer_index=block.proposer_index,
         parent_root=block.parent_root,
-        state_root=Bytes32(),  # Overwritten in the next process_slot call
+        state_root=Bytes32.zero(),  # Overwritten in the next process_slot call
         body_root=hash_tree_root(block.body),
     )
 ```
@@ -289,7 +289,7 @@ def process_attestations(state: State, attestations: List[SignedVote]) -> None:
             state.justified_slots[vote.source.slot] is False
             # This condition is missing in 3sf mini but has been added here because
             # we don't want to re-introduce the target again for remaining votes if
-            # the slot is already justified and its tracking already cleared out 
+            # the slot is already justified and its tracking already cleared out
             # from justifications map
             or state.justified_slots[vote.target.slot] is True
             or vote.source.root != state.historical_block_hashes[vote.source.slot]

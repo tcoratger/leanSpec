@@ -54,7 +54,7 @@ def test_hash_nodes_with_zero() -> None:
     """
     # Define a node and a zero node.
     node_a = Bytes32((42).to_bytes(32, "little"))
-    zero_node = Bytes32(b"\x00" * 32)
+    zero_node = Bytes32.zero()
 
     # Manually compute the expected hash.
     expected_digest = hashlib.sha256(node_a + zero_node).digest()
