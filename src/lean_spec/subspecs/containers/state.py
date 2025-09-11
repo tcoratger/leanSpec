@@ -85,8 +85,8 @@ class State(StrictBaseModel, Container):
         genesis_header = BlockHeader(
             slot=Slot(0),
             proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32(b"\x00" * 32),
-            state_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
+            state_root=Bytes32.zero(),
             body_root=hash_tree_root(empty_body),
         )
 
@@ -98,8 +98,8 @@ class State(StrictBaseModel, Container):
             ),
             slot=Slot(0),
             latest_block_header=genesis_header,
-            latest_justified=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
-            latest_finalized=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
+            latest_justified=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
+            latest_finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
             historical_block_hashes=[],  # type: ignore
             justified_slots=[],  # type: ignore
             justifications_roots=[],  # type: ignore
@@ -297,7 +297,7 @@ class State(StrictBaseModel, Container):
         # If the latest block header has no state root, fill it now.
         #
         # This occurs on the first slot after a block.
-        if self.latest_block_header.state_root == Bytes32(b"\x00" * 32):
+        if self.latest_block_header.state_root == Bytes32.zero():
             # Compute the root of the current (pre-block) state.
             previous_state_root = hash_tree_root(self)
 
@@ -418,7 +418,7 @@ class State(StrictBaseModel, Container):
             proposer_index=block.proposer_index,
             parent_root=block.parent_root,
             body_root=hash_tree_root(block.body),
-            state_root=Bytes32(b"\x00" * 32),
+            state_root=Bytes32.zero(),
         )
 
         # Return the state with all header updates applied.

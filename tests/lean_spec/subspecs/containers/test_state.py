@@ -46,10 +46,10 @@ def _create_block(
         slot=Slot(slot),
         proposer_index=ValidatorIndex(slot % 10),  # Using sample_config num_validators
         parent_root=hash_tree_root(parent_header),
-        state_root=Bytes32(b"\x00" * 32),  # Placeholder, to be filled in by STF
+        state_root=Bytes32.zero(),  # Placeholder, to be filled in by STF
         body=body,
     )
-    return SignedBlock(message=block_message, signature=Bytes32(b"\x00" * 32))
+    return SignedBlock(message=block_message, signature=Bytes32.zero())
 
 
 def _create_votes(indices: List[int]) -> List[Boolean]:
@@ -66,16 +66,16 @@ def sample_block_header() -> BlockHeader:
     return BlockHeader(
         slot=Slot(0),
         proposer_index=Uint64(0),
-        parent_root=Bytes32(b"\x00" * 32),
-        state_root=Bytes32(b"\x00" * 32),
-        body_root=Bytes32(b"\x00" * 32),
+        parent_root=Bytes32.zero(),
+        state_root=Bytes32.zero(),
+        body_root=Bytes32.zero(),
     )
 
 
 @pytest.fixture
 def sample_checkpoint() -> Checkpoint:
     """Provides a sample, empty checkpoint for state initialization."""
-    return Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0))
+    return Checkpoint(root=Bytes32.zero(), slot=Slot(0))
 
 
 @pytest.fixture
@@ -392,7 +392,7 @@ def test_process_slot(genesis_state: State) -> None:
     in the latest block header on the first slot after a block.
     """
     # The genesis state's latest_block_header has an empty state_root.
-    assert genesis_state.latest_block_header.state_root == Bytes32(b"\x00" * 32)
+    assert genesis_state.latest_block_header.state_root == Bytes32.zero()
 
     # Processing the next slot (slot 0 -> 1) should fill it.
     state_after_slot = genesis_state.process_slot()
@@ -453,7 +453,7 @@ def test_process_block_header_valid(genesis_state: State) -> None:
     assert new_state.latest_block_header.slot == block.slot
     assert new_state.latest_block_header.parent_root == block.parent_root
     # The new header's state_root is empty, to be filled in the next slot.
-    assert new_state.latest_block_header.state_root == Bytes32(b"\x00" * 32)
+    assert new_state.latest_block_header.state_root == Bytes32.zero()
 
 
 @pytest.mark.parametrize(
@@ -484,7 +484,7 @@ def test_process_block_header_invalid(
         slot=Slot(bad_slot),
         proposer_index=ValidatorIndex(bad_proposer),
         parent_root=bad_parent_root or parent_root,
-        state_root=Bytes32(b"\x00" * 32),
+        state_root=Bytes32.zero(),
         body=BlockBody(attestations=[]),  # type: ignore
     )
 
@@ -534,7 +534,7 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
                 target=checkpoint4,
                 source=genesis_checkpoint,
             ),
-            signature=Bytes32(b"\x00" * 32),
+            signature=Bytes32.zero(),
         )
         for i in range(7)
     ]
@@ -588,7 +588,7 @@ def test_state_transition_full(genesis_state: State) -> None:
     with pytest.raises(AssertionError, match="Block signatures must be valid"):
         state.state_transition(final_signed_block, valid_signatures=False)
 
-    block_with_bad_root = block.model_copy(update={"state_root": Bytes32(b"\x00" * 32)})
+    block_with_bad_root = block.model_copy(update={"state_root": Bytes32.zero()})
     signed_block_with_bad_root = SignedBlock(
         message=block_with_bad_root, signature=signed_block.signature
     )

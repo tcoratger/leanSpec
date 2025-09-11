@@ -13,7 +13,7 @@ from typing import IO, Any, ClassVar, Iterable, Type
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
-from typing_extensions import Iterator
+from typing_extensions import Iterator, Self
 
 from .ssz_base import SSZType
 
@@ -73,6 +73,16 @@ class ByteVectorBase(SSZType):
         self._b = b
 
     @classmethod
+    def zero(cls) -> Self:
+        """
+        Create a new instance of the vector filled with zero bytes.
+
+        Returns:
+            A new instance of this `ByteVector` class, zero-initialized.
+        """
+        return cls(b"\x00" * cls.LENGTH)
+
+    @classmethod
     def is_fixed_size(cls) -> bool:
         """ByteVector is fixed-size (length known at the type level)."""
         return True
@@ -88,7 +98,7 @@ class ByteVectorBase(SSZType):
         return len(self._b)
 
     @classmethod
-    def deserialize(cls, stream: IO[bytes], scope: int) -> ByteVectorBase:
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """
         Read exactly `scope` bytes from `stream` and build an instance.
 
@@ -112,7 +122,7 @@ class ByteVectorBase(SSZType):
         return self._b
 
     @classmethod
-    def decode_bytes(cls, data: bytes) -> ByteVectorBase:
+    def decode_bytes(cls, data: bytes) -> Self:
         """
         Parse `data` as a value of this type.
 
@@ -322,7 +332,7 @@ class ByteListBase(SSZType):
         return len(self._b)
 
     @classmethod
-    def deserialize(cls, stream: IO[bytes], scope: int) -> ByteListBase:
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """
         Read exactly `scope` bytes from `stream` and build an instance.
 
@@ -347,7 +357,7 @@ class ByteListBase(SSZType):
         return self._b
 
     @classmethod
-    def decode_bytes(cls, data: bytes) -> ByteListBase:
+    def decode_bytes(cls, data: bytes) -> Self:
         """
         Parse `data` as a value of this type.
 

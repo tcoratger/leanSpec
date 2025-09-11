@@ -32,7 +32,7 @@ def test_build_merkle_tree_single_leaf() -> None:
     Tests that a tree with a single leaf has the leaf as its root.
     Note: The 0-index is a placeholder.
     """
-    # Assuming the placeholder at index 0 is ZERO_HASH, not Bytes32(b"\x00" * 32)
+    # Assuming the placeholder at index 0 is ZERO_HASH, not Bytes32.zero()
     expected_tree = [ZERO_HASH, LEAF_A]
     assert build_merkle_tree([LEAF_A]) == expected_tree
 
