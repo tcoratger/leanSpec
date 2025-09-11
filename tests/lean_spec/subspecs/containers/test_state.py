@@ -11,6 +11,7 @@ from lean_spec.subspecs.containers import (
     Config,
     State,
 )
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
 
@@ -72,7 +73,7 @@ def test_is_proposer(
         """Helper function to create a state object at a specific slot."""
         return State(
             config=sample_config,
-            slot=Uint64(slot),
+            slot=Slot(slot),
             latest_block_header=sample_block_header,
             latest_justified=sample_checkpoint,
             latest_finalized=sample_checkpoint,

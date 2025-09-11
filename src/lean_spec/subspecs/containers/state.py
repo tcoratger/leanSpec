@@ -6,7 +6,8 @@ from pydantic import Field
 from typing_extensions import Annotated
 
 from lean_spec.subspecs.chain import DEVNET_CONFIG
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.types import Bytes32, ValidatorIndex
 from lean_spec.types.base import StrictBaseModel
 
 from .block import BlockHeader
@@ -22,7 +23,7 @@ class State(StrictBaseModel):
     """The chain's configuration parameters."""
 
     # Slot and block tracking
-    slot: Uint64
+    slot: Slot
     """The current slot number."""
 
     latest_block_header: BlockHeader
