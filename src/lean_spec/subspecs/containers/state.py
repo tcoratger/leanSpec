@@ -441,39 +441,53 @@ class State(StrictBaseModel, Container):
         attestations: SSZList[SignedVote, chainconfig.VALIDATOR_REGISTRY_LIMIT.as_int()],  # type: ignore
     ) -> "State":
         """
-        Apply attestation votes and update justification and finalization.
+        Apply attestation votes and update justification/finalization
+        according to the Lean Consensus 3SF-mini rules.
 
-        Flow:
-          - Load the current justifications map from the flattened state.
-          - Iterate over all attestations in the block.
-          - Validate each vote against source/target rules and history.
-          - Track unique validator votes per target root.
-          - When a target reaches 2/3 support, mark it justified.
-          - If there is no other justifiable slot between source and target,
-            mark the source as finalized.
-          - Re-flatten the justifications map back into the state.
+        Overview
+        --------
+        This method consumes a block's attestations and updates three parts of the state:
+          1) The in-progress per-target vote tracker (the "justifications" map),
+          2) The latest justified checkpoint,
+          3) The latest finalized checkpoint.
 
-        Args:
-            attestations: The list of SignedVote objects in the block.
+        Votes are only counted if they satisfy the following invariants:
+          - The vote's source slot is already justified.
+          - The target slot is not already justified.
+          - The vote's source root matches history at its slot.
+          - The vote's target root matches history at its slot, or (if target is the latest header)
+            it matches the latest header root.
+          - The target slot is strictly after the source slot.
+          - The target slot is a justifiable slot with respect to the current finalized slot.
+
+        When a target gathers a 2/3 supermajority (using exact arithmetic: 3 * count >= 2 * N),
+        that target becomes justified, the corresponding per-target votes are discarded,
+        and the source may become finalized if there exists no other justifiable slot strictly
+        between the source and the target.
 
         Returns:
-            A new state reflecting updated justification and finalization.
+        -------
+        A new State with:
+          - updated latest_justified / latest_finalized checkpoints,
+          - updated justified_slots bitfield,
+          - persisted justifications map re-flattened into SSZ lists.
         """
         # Reconstruct the in-memory map of target_root -> [votes by validator].
         justifications = self.get_justifications()
 
-        # Keep local copies of moving checkpoints and justified bitfield.
+        # Snapshot moving checkpoints and a mutable copy of the justified bitfield.
         latest_justified = self.latest_justified
         latest_finalized = self.latest_finalized
         justified_slots = list(self.justified_slots)
 
-        # Walk through all votes in this block.
+        # Process every attestation in the block.
         for signed_vote_untyped in attestations:
+            # Typed view
             signed_vote = cast(SignedVote, signed_vote_untyped)
-            # Extract the vote payload.
+            # Convenience alias
             vote: Vote = signed_vote.data
 
-            # Unpack source and target fields for clarity.
+            # Unpack frequently used fields.
             target_slot = vote.target.slot
             source_slot = vote.source.slot
             target_root = vote.target.root
@@ -482,63 +496,78 @@ class State(StrictBaseModel, Container):
             target_slot_int = target_slot.as_int()
             source_slot_int = source_slot.as_int()
 
-            # Validate the vote before counting it.
-            if not (
-                # Source must be justified.
-                justified_slots[source_slot_int]
-                # Target must NOT be justified. If slot is not in history, it isn't justified.
-                and not (
-                    target_slot_int < len(justified_slots) and justified_slots[target_slot_int]
-                )
-                # Source root must match history.
-                and source_root == self.historical_block_hashes[source_slot_int]
-                # Target root must match history, or if not in history,
-                # must match the latest header.
-                and (
-                    (
-                        target_slot_int < len(self.historical_block_hashes)
-                        and target_root == self.historical_block_hashes[target_slot_int]
-                    )
-                    or (
-                        target_slot == self.latest_block_header.slot
-                        and target_root == hash_tree_root(self.latest_block_header)
-                    )
-                )
-                # Target must be after source.
-                and target_slot > source_slot
-                # Target must be a justifiable slot.
-                and target_slot.is_justifiable_after(latest_finalized.slot)
-            ):
+            # Validate the vote.
+
+            # Source must already be justified.
+            source_is_justified = justified_slots[source_slot_int]
+
+            # Target must not already be justified (if index exists in bitfield).
+            target_already_justified = (
+                target_slot_int < len(justified_slots) and justified_slots[target_slot_int]
+            )
+
+            # Source root must match history at the source slot.
+            source_root_matches_history = (
+                source_root == self.historical_block_hashes[source_slot_int]
+            )
+
+            # - Target root must match history at the target slot,
+            # - Or, if target is the latest header, it must match the latest header's root.
+            target_root_matches_history = (
+                target_slot_int < len(self.historical_block_hashes)
+                and target_root == self.historical_block_hashes[target_slot_int]
+            )
+            target_matches_latest_header = (
+                target_slot == self.latest_block_header.slot
+                and target_root == hash_tree_root(self.latest_block_header)
+            )
+            target_root_is_valid = target_root_matches_history or target_matches_latest_header
+
+            # Target must be strictly after source.
+            target_is_after_source = target_slot > source_slot
+
+            # Target must be a justifiable slot with respect to the latest finalized slot.
+            target_is_justifiable = target_slot.is_justifiable_after(latest_finalized.slot)
+
+            # Final validity check.
+            is_valid_vote = (
+                source_is_justified
+                and not target_already_justified
+                and source_root_matches_history
+                and target_root_is_valid
+                and target_is_after_source
+                and target_is_justifiable
+            )
+            if not is_valid_vote:
                 # Skip invalid or redundant votes.
                 continue
 
-            # Prepare tracking for a new target root if needed.
+            # Track a unique vote for (target_root, validator_id) only
             if target_root not in justifications:
+                # Initialize a fresh bitvector for this target root (all False).
                 justifications[target_root] = [Boolean(False)] * self.config.num_validators.as_int()
 
-            # Record a vote only once per validator per target.
             validator_id = vote.validator_id.as_int()
             if not justifications[target_root][validator_id]:
+                # Record the vote once per validator per target.
                 justifications[target_root][validator_id] = Boolean(True)
 
-            # Count current support for the target.
+            # Check for 2/3 supermajority to justify target
             count = sum(int(v) for v in justifications[target_root])
-
-            # Check the 2/3-supermajority threshold without integer division.
             if 3 * count >= 2 * self.config.num_validators.as_int():
-                # Mark the target as justified.
+                # Promote target to latest justified.
                 latest_justified = vote.target
 
-                # Ensure the justified_slots list is long enough before assignment.
+                # Ensure justified_slots is long enough, then mark the target slot.
                 while len(justified_slots) <= target_slot_int:
                     justified_slots.append(Boolean(False))
                 justified_slots[target_slot_int] = Boolean(True)
 
-                # Drop per-target vote tracking now that it is justified.
+                # Drop per-target tracking once justified.
                 del justifications[target_root]
 
-                # Check finalization condition.
-                # No other justifiable slot must exist strictly between source and target.
+                # Finalization: source becomes finalized
+                # If no justifiable slot exists strictly between source and target.
                 is_finalizable = not any(
                     Slot(s).is_justifiable_after(latest_finalized.slot)
                     for s in range(source_slot_int + 1, target_slot_int)
@@ -547,10 +576,10 @@ class State(StrictBaseModel, Container):
                     # Finalize the source checkpoint.
                     latest_finalized = vote.source
 
-        # Persist the updated justifications map back into flattened lists.
+        # Persist the updated justifications map back into flattened SSZ lists.
         final_state = self.with_justifications(justifications)
 
-        # Return the state with updated checkpoints and justified bits.
+        # Return the state with updated checkpoints and justified bitfield.
         return final_state.model_copy(
             update={
                 "latest_justified": latest_justified,
