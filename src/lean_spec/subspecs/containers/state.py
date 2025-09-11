@@ -60,7 +60,7 @@ class State(StrictBaseModel, Container):
     @classmethod
     def generate_genesis(cls, genesis_time: Uint64, num_validators: Uint64) -> "State":
         """
-        Construct the genesis State for the chain.
+        Construct the genesis `State` for the chain.
 
         This factory creates a minimal, self-consistent starting state.
         - It encodes the chain configuration (time and validator count).
@@ -76,18 +76,13 @@ class State(StrictBaseModel, Container):
         Returns:
             A new State positioned at slot 0 with empty history and checkpoints.
         """
-        # Build an empty block body for genesis.
-        #
-        # This body has no attestations and serves only to derive body_root.
-        empty_body = BlockBody(attestations=[])  # type: ignore
-
         # Create the zeroed header that anchors the chain at genesis.
         genesis_header = BlockHeader(
             slot=Slot(0),
             proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
-            body_root=hash_tree_root(empty_body),
+            body_root=hash_tree_root(BlockBody(attestations=[])),  # type: ignore
         )
 
         # Assemble and return the full genesis state.
@@ -412,6 +407,7 @@ class State(StrictBaseModel, Container):
         updates["justified_slots"] = self.justified_slots.__class__(new_justified_slots)
 
         # Construct the new latest block header.
+        #
         # Leave state_root empty; it will be filled on the next process_slot call.
         updates["latest_block_header"] = BlockHeader(
             slot=block.slot,
