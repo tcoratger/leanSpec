@@ -51,10 +51,9 @@ class State(Container):
     justifications_roots: SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
     """Roots of justified blocks."""
 
-    justifications_validators: SSZList[  # type: ignore
-        Boolean,
+    justifications_validators: Bitlist[
         DEVNET_CONFIG.historical_roots_limit.as_int()
-        * DEVNET_CONFIG.historical_roots_limit.as_int(),
+        * DEVNET_CONFIG.historical_roots_limit.as_int()  # type: ignore
     ]
     """A bitlist of validators who participated in justifications."""
 
