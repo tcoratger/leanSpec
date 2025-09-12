@@ -5,16 +5,16 @@ from __future__ import annotations
 import io
 from typing import IO, Any, Dict, List, Tuple, Type, cast
 
-from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
+from lean_spec.types.base import StrictBaseModel
 from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 
 from .ssz_base import SSZType
 from .uint import Uint32
 
 
-class Container(BaseModel, SSZType):
+class Container(StrictBaseModel, SSZType):
     """
     A strict SSZ Container type: an ordered, heterogeneous collection of fields.
 
@@ -27,11 +27,6 @@ class Container(BaseModel, SSZType):
             proposer_index: Uint64
             parent_root: Bytes32
     """
-
-    # Configure all container subclasses to be strict and immutable by default.
-    model_config = ConfigDict(strict=True, frozen=True)
-
-    # --- SSZType Implementation ---
 
     @classmethod
     def is_fixed_size(cls) -> bool:
@@ -145,7 +140,7 @@ class Container(BaseModel, SSZType):
         Returns:
             Self: A new instance of the container with the deserialized data.
         """
-        # --- Phase 1: Read fixed data and gather variable field offsets ---
+        # Phase 1: Read fixed data and gather variable field offsets
         deserialized_fields: Dict[str, Any] = {}
         variable_field_info: List[Tuple[str, Type[SSZType], int]] = []
 
@@ -173,7 +168,7 @@ class Container(BaseModel, SSZType):
                 variable_field_info.append((field_name, field_type, offset))
                 fixed_data_end += OFFSET_BYTE_LENGTH
 
-        # --- Phase 2: Read variable data using the collected offsets ---
+        # Phase 2: Read variable data using the collected offsets
         if variable_field_info:
             # Add the total scope as the final offset boundary.
             offsets = [info[2] for info in variable_field_info] + [scope]
