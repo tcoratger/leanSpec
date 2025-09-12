@@ -1,11 +1,11 @@
 """Checkpoint Container."""
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, StrictBaseModel
+from lean_spec.types import Bytes32
 from lean_spec.types.container import Container
 
 
-class Checkpoint(StrictBaseModel, Container):
+class Checkpoint(Container):
     """Represents a checkpoint in the chain's history."""
 
     root: Bytes32

@@ -1,7 +1,7 @@
 """Block Containers."""
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, List, StrictBaseModel, Uint64
+from lean_spec.types import Bytes32, List, Uint64
 from lean_spec.types.container import Container
 
 from ..chain import config
@@ -19,7 +19,7 @@ class BlockBody(Container):
     """
 
 
-class BlockHeader(StrictBaseModel, Container):
+class BlockHeader(Container):
     """The header of a block, containing metadata."""
 
     slot: Slot
@@ -38,7 +38,7 @@ class BlockHeader(StrictBaseModel, Container):
     """The root of the block's body."""
 
 
-class Block(StrictBaseModel, Container):
+class Block(Container):
     """Represents a single block in the chain."""
 
     slot: Slot
@@ -57,7 +57,7 @@ class Block(StrictBaseModel, Container):
     """The block's payload."""
 
 
-class SignedBlock(StrictBaseModel, Container):
+class SignedBlock(Container):
     """A container for a block and the proposer's signature."""
 
     message: Block

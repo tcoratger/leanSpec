@@ -8,7 +8,7 @@ from lean_spec.subspecs.chain import DEVNET_CONFIG
 from lean_spec.subspecs.chain import config as chainconfig
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Boolean, Bytes32, Container, StrictBaseModel, Uint64, ValidatorIndex
+from lean_spec.types import Boolean, Bytes32, Container, Uint64, ValidatorIndex
 from lean_spec.types import List as SSZList
 
 from .block import Block, BlockBody, BlockHeader, SignedBlock
@@ -18,7 +18,7 @@ from .slot import Slot
 from .vote import SignedVote, Vote
 
 
-class State(StrictBaseModel, Container):
+class State(Container):
     """The main consensus state object."""
 
     # Configuration
@@ -82,7 +82,7 @@ class State(StrictBaseModel, Container):
             proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
-            body_root=hash_tree_root(BlockBody(attestations=[])),  # type: ignore
+            body_root=hash_tree_root(BlockBody(attestations=[])),
         )
 
         # Assemble and return the full genesis state.
@@ -95,10 +95,10 @@ class State(StrictBaseModel, Container):
             latest_block_header=genesis_header,
             latest_justified=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
             latest_finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
-            historical_block_hashes=[],  # type: ignore
-            justified_slots=[],  # type: ignore
-            justifications_roots=[],  # type: ignore
-            justifications_validators=[],  # type: ignore
+            historical_block_hashes=[],
+            justified_slots=[],
+            justifications_roots=[],
+            justifications_validators=[],
         )
 
     def is_proposer(self, validator_index: ValidatorIndex) -> bool:

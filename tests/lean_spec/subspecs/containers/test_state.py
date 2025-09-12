@@ -83,7 +83,7 @@ def _create_block(
         A signed block wrapper containing the constructed block.
     """
     # Create a block body with the provided votes or an empty list.
-    body = BlockBody(attestations=votes or [])  # type: ignore
+    body = BlockBody(attestations=votes or [])
     # Construct the inner block message with correct parent_root linkage.
     block_message = Block(
         slot=Slot(slot),
@@ -183,10 +183,10 @@ def base_state(
         latest_block_header=sample_block_header,
         latest_justified=sample_checkpoint,
         latest_finalized=sample_checkpoint,
-        historical_block_hashes=[],  # type: ignore
-        justified_slots=[],  # type: ignore
-        justifications_roots=[],  # type: ignore
-        justifications_validators=[],  # type: ignore
+        historical_block_hashes=[],
+        justified_slots=[],
+        justifications_roots=[],
+        justifications_validators=[],
     )
 
 
@@ -214,10 +214,10 @@ def test_is_proposer(
             latest_block_header=sample_block_header,
             latest_justified=sample_checkpoint,
             latest_finalized=sample_checkpoint,
-            historical_block_hashes=[],  # type: ignore
-            justified_slots=[],  # type: ignore
-            justifications_roots=[],  # type: ignore
-            justifications_validators=[],  # type: ignore
+            historical_block_hashes=[],
+            justified_slots=[],
+            justifications_roots=[],
+            justifications_validators=[],
         )
 
     # At slot 0, validator 0 should be the proposer (0 % 10 == 0)
@@ -364,10 +364,10 @@ def test_with_justifications_empty(
         latest_block_header=sample_block_header,
         latest_justified=sample_checkpoint,
         latest_finalized=sample_checkpoint,
-        historical_block_hashes=[],  # type: ignore
-        justified_slots=[],  # type: ignore
-        justifications_roots=[Bytes32(b"\x01" * 32)],  # type: ignore
-        justifications_validators=[Boolean(True)] * DEVNET_CONFIG.validator_registry_limit.as_int(),  # type: ignore
+        historical_block_hashes=[],
+        justified_slots=[],
+        justifications_roots=[Bytes32(b"\x01" * 32)],
+        justifications_validators=[Boolean(True)] * DEVNET_CONFIG.validator_registry_limit.as_int(),
     )
 
     # Apply an empty justifications map to get a new state snapshot.
@@ -512,7 +512,7 @@ def test_generate_genesis(sample_config: Config) -> None:
     # Slot should start at 0.
     assert state.slot == Slot(0)
     # Body root must commit to an empty body at genesis.
-    assert state.latest_block_header.body_root == hash_tree_root(BlockBody(attestations=[]))  # type: ignore
+    assert state.latest_block_header.body_root == hash_tree_root(BlockBody(attestations=[]))
     # History and justifications must be empty initially.
     assert not state.historical_block_hashes
     assert not state.justified_slots
@@ -642,7 +642,7 @@ def test_process_block_header_invalid(
         proposer_index=ValidatorIndex(bad_proposer),
         parent_root=bad_parent_root or parent_root,
         state_root=Bytes32.zero(),
-        body=BlockBody(attestations=[]),  # type: ignore
+        body=BlockBody(attestations=[]),
     )
 
     # Expect an AssertionError with the given message for each case.
