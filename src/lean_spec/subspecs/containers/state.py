@@ -10,6 +10,7 @@ from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Boolean, Bytes32, Container, Uint64, ValidatorIndex
 from lean_spec.types import List as SSZList
+from lean_spec.types.bitfields import Bitlist
 
 from .block import Block, BlockBody, BlockHeader, SignedBlock
 from .checkpoint import Checkpoint
@@ -43,7 +44,7 @@ class State(Container):
     historical_block_hashes: SSZList[Bytes32, DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
     """A list of historical block root hashes."""
 
-    justified_slots: SSZList[Boolean, DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
+    justified_slots: Bitlist[DEVNET_CONFIG.historical_roots_limit.as_int()]  # type: ignore
     """A bitfield indicating which historical slots were justified."""
 
     # Justification tracking (flattened for SSZ compatibility)
