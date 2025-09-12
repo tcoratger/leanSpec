@@ -78,10 +78,10 @@ def test_class_getitem_rejects_bad_options() -> None:
 
 def test_constructor_success() -> None:
     u = u_fn(None, Uint16, Uint32)
-    assert u(selector=0, value=None).selector() == 0
-    assert u(selector=1, value=Uint16(0xBEEF)).value() == Uint16(0xBEEF)
+    assert u(selector=0, value=None).selector == 0
+    assert u(selector=1, value=Uint16(0xBEEF)).value == Uint16(0xBEEF)
     # coercion from plain int works
-    assert u(selector=2, value=0xAABBCCDD).value() == Uint32(0xAABBCCDD)
+    assert u(selector=2, value=0xAABBCCDD).value == Uint32(0xAABBCCDD)
 
 
 def test_constructor_errors() -> None:
@@ -103,17 +103,17 @@ def test_pydantic_validation_ok() -> None:
     inst = u(selector=1, value=Uint16(0xAA55))
     m = cast(Any, model(v=inst))
     assert isinstance(m.v, u)
-    assert m.v.value() == Uint16(0xAA55)
+    assert m.v.value == Uint16(0xAA55)
 
     # Mapping form: selector + value (coerced)
     m2 = cast(Any, model(v={"selector": 2, "value": 0xDEADBEEF}))
     assert isinstance(m2.v, u)
-    assert m2.v.selector() == 2
-    assert m2.v.value() == Uint32(0xDEADBEEF)
+    assert m2.v.selector == 2
+    assert m2.v.value == Uint32(0xDEADBEEF)
 
     # None arm
     m3 = cast(Any, model(v={"selector": 0, "value": None}))
-    assert m3.v.value() is None
+    assert m3.v.value is None
 
 
 def test_pydantic_validation_errors() -> None:
@@ -167,8 +167,8 @@ def test_union_serialize_matches_reference(
 
     # decode_bytes / deserialize
     decoded = u_type.decode_bytes(bytes.fromhex(expected_hex))
-    assert decoded.selector() == selector
-    assert decoded.value() == value
+    assert decoded.selector == selector
+    assert decoded.value == value
 
 
 def test_union_with_nested_composites_roundtrip() -> None:
@@ -182,8 +182,8 @@ def test_union_with_nested_composites_roundtrip() -> None:
     # round-trip
     encoded = inst.encode_bytes()
     dec = u.decode_bytes(encoded)
-    assert dec.selector() == 2
-    assert dec.value() == vp
+    assert dec.selector == 2
+    assert dec.value == vp
 
     # selector = 0 (Vector[Uint8,3])
     v = vv(Uint8, 3)([9, 8, 7])
@@ -238,9 +238,9 @@ def test_selected_type_sanity() -> None:
     u0 = u(selector=0, value=None)
     u1 = u(selector=1, value=Uint16(5))
     u2 = u(selector=2, value=Uint32(6))
-    assert u0.selected_type() is None
-    assert u1.selected_type() is Uint16
-    assert u2.selected_type() is Uint32
+    assert u0.selected_type is None
+    assert u1.selected_type is Uint16
+    assert u2.selected_type is Uint32
 
 
 def test_equality_and_hashing() -> None:

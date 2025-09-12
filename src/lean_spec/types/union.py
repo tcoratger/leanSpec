@@ -1,16 +1,13 @@
 """
-Union Type Specification.
+SSZ Union Type - Tagged sum type with selector byte + optional value.
 
-A strict SSZ Union type: a tagged sum type encoded as:
+Encoding: [selector: uint8][value: SSZ(selected_type)]
+- Selector: 1 byte indicating which option is selected (0-based)
+- Value: SSZ-encoded value (omitted for None option at index 0)
+- Max 128 options, only index 0 may be None
+- Always variable-size for SSZ purposes
 
-    selector: uint8  (1 byte)
-    value:    SSZ(value_type)  (0 or more bytes depending on selected option)
-
-Notes:
-- Only option index 0 may be None (the "null" option). If selected, the value
-  is omitted and the encoding is just the selector byte.
-- A Union is always variable-size overall because its total length depends on
-  which option is selected (even if some options are fixed-size individually).
+Usage: Union[None, Uint16, Uint32] creates specialized type
 """
 
 from __future__ import annotations
@@ -37,252 +34,337 @@ _UNION_CACHE: Dict[
     Type["Union"],
 ] = {}
 """
-Cache for dynamically created specialized Union types:
-key = (base-class, options-tuple-identity)
+Global cache for specialized Union types to avoid recreating the same types
+
+Key: (base Union class, tuple of option types)
+Value: The specialized Union class
 """
 
 
 class Union(SSZType):
     """
-    A strict SSZ Union type.
+    SSZ Union type holding one value from a predefined set of types.
 
-    Create specialized types with `Union[Opt0, Opt1, ..., OptN]`, where each
-    OptK is an SSZ type, and only Opt0 may be None (the "null" option).
+    Create specialized types: Union[None, Uint16, Uint32]
+    Create instances: MyUnion(selector=1, value=Uint16(42))
+    Access data: instance.selector, instance.selected_type, instance.value
 
-    Example:
-        MyUnion = Union[None, Uint16, List[Uint8, 32]]
-        x = MyUnion(selector=1, value=Uint16(42))
-        y = MyUnion(selector=0, value=None)   # the "None" arm
+    Constraints:
+    - Max 128 options, only index 0 may be None
+    - All non-None options must implement SSZType protocol
+    - Values auto-coerced to selected type when possible
 
-    Instances are constructed with explicit selector + value for clarity and
-    strictness.
+    Attributes:
+        OPTIONS: Tuple of possible types for this specialized Union.
     """
 
+    # Class variable holding the possible types for this specialized Union
+    # This gets set automatically when you create a Union type like Union[A, B, C]
     OPTIONS: ClassVar[Tuple[Type[SSZType] | None, ...]]
-    """The list of options for this specialized Union type."""
 
     def __class_getitem__(
         cls, options: Tuple[Type[SSZType] | None, ...] | Type[SSZType] | None
     ) -> Type["Union"]:
         """
-        Create a specific Union type with the given options.
+        Create specialized Union type with given options.
 
-        Usage:
-            Union[None, Uint16, Vector[Uint8, 3]]
-            Union[Uint32]  # single option, no None arm
+        Called when using Union[A, B, C] syntax. Creates and caches new
+        specialized Union class.
+
+        Args:
+            options: Single type or tuple of types. Only index 0 may be None.
+
+        Returns:
+            Specialized Union class for the given option types.
+
+        Raises:
+            TypeError: Invalid options (wrong count, None not at index 0,
+                      non-types, or missing SSZType protocol methods).
         """
-        # Normalize single-element syntax (Python passes a non-tuple in that case).
+        # Normalize input - Python passes single types as non-tuples
+        #
+        # Convert Union[Uint16] -> Union[(Uint16,)] for consistent processing
         if not isinstance(options, tuple):
             options = (options,)
 
-        # Basic arity checks.
+        # Validate option count constraints
+        #
+        # Must have at least one option to be meaningful
         if len(options) < 1:
             raise TypeError("Union expects at least one option")
+        # SSZ selector is uint8, so max 256 options, but we limit to 128 for safety
         if len(options) > 128:
             raise TypeError(f"Union expects at most 128 options, got {len(options)}")
 
-        # Validate option types: only index 0 may be None.
-        # Use duck-typing for SSZ types (List/Vector specializations may not
-        # literally subclass SSZType but implement the protocol).
+        # Validate each option type and enforce None-only-at-index-0 rule
         norm_opts: list[Type[SSZType] | None] = list(options)
         for i, opt in enumerate(norm_opts):
+            # Handle None option - only allowed at index 0 (the "null" variant)
             if opt is None:
                 if i != 0:
                     raise TypeError("Only option 0 may be None")
-                continue
+                continue  # Skip further validation for None
+
+            # Ensure option is actually a type/class, not an instance
             if not isinstance(opt, type):
-                raise TypeError(f"Option at index {i} must be a type (or None at index 0)")
-            # Minimal SSZType protocol used at runtime
-            required_methods = (
-                "serialize",
-                "deserialize",
-                "encode_bytes",
-                "decode_bytes",
-                "is_fixed_size",
-            )
-            missing = [m for m in required_methods if not hasattr(opt, m)]
-            if missing:
+                raise TypeError(f"Option {i} must be a type")
+
+            # Check that the type implements the SSZType protocol
+            #
+            # We use duck typing - check for required methods rather than inheritance
+            required = ("serialize", "deserialize", "encode_bytes", "decode_bytes", "is_fixed_size")
+            if missing := [m for m in required if not hasattr(opt, m)]:
                 raise TypeError(
-                    "Option at index "
-                    f"{i} must be an SSZType-like type implementing: "
-                    f"{', '.join(required_methods)}"
+                    f"Option at index {i} must be an SSZType-like type implementing: "
+                    f"{', '.join(missing)}"
                 )
 
-        # If there is a None option, require at least one additional option.
+        # Additional validation - None-only unions are not useful
+        #
+        # If first option is None, require at least one non-None option
         if norm_opts[0] is None and len(norm_opts) < 2:
             raise TypeError("Union with None at option 0 must have at least one non-None option")
 
+        # Check cache to avoid recreating identical Union types
+        #
+        # Key combines the base class and the exact tuple of option types
         key = (cls, tuple(norm_opts))
         if key in _UNION_CACHE:
-            return _UNION_CACHE[key]
+            return _UNION_CACHE[key]  # Return existing specialized type
 
-        # Build the specialized class.
-        label = ", ".join(opt.__name__ if opt is not None else "None" for opt in norm_opts)
-        type_name = f"{cls.__name__}[{label}]"
+        # Create new specialized Union class dynamically
+        #
+        # Generate a readable name showing the options: "Union[Uint16, Uint32]"
+        label = ", ".join(getattr(opt, "__name__", "None") for opt in norm_opts)
+
+        # Create new class inheriting from the base Union class
+        # The OPTIONS attribute holds the tuple of possible types
         new_type = type(
-            type_name,
-            (cls,),
-            {
-                "OPTIONS": tuple(norm_opts),
-                "__doc__": (
-                    "A Union over options: "
-                    f"{label}.\n\n"
-                    "Select with selector=index and provide value matching the "
-                    "selected option.\n"
-                    "If selector==0 and option 0 is None, value must be None."
-                ),
-            },
+            f"{cls.__name__}[{label}]",  # Class name for debugging
+            (cls,),  # Base classes
+            {"OPTIONS": tuple(norm_opts)},  # Class attributes
         )
+
+        # Cache the new type and return it
         _UNION_CACHE[key] = new_type
         return new_type
 
     def __init__(self, *, selector: int, value: Any) -> None:
         """
-        Construct a Union value by explicitly specifying the selected arm.
+        Create Union instance with explicit selector and value.
 
         Args:
-            selector: The index of the selected option (0-based).
-            value:    The value for that option, or None if option 0 is the
-                      None arm.
+            selector: 0-based index of selected option (0 to len(OPTIONS)-1).
+            value: Value for selected option (None if selector=0 and OPTIONS[0] is None).
+                  Values are auto-coerced to target type when possible.
 
         Raises:
-            TypeError / ValueError for invalid selector or mismatched value type.
+            ValueError: Invalid selector (not int or out of range).
+            TypeError: Value/selector mismatch (None value for non-None option, etc).
         """
-        # Validate selector in range.
-        if not isinstance(selector, int) or selector < 0 or selector >= len(self.OPTIONS):
-            raise ValueError(
-                "Invalid selector "
-                f"{selector} for {type(self).__name__} "
-                f"with {len(self.OPTIONS)} options"
-            )
+        # Validate the selector is a valid index
+        #
+        # Must be an integer and within the bounds of the OPTIONS tuple
+        if not isinstance(selector, int) or not 0 <= selector < len(self.OPTIONS):
+            raise ValueError(f"Invalid selector {selector} for {len(self.OPTIONS)} options")
 
-        # Enforce the typing rule for the chosen arm.
-        opt_t = self.OPTIONS[selector]
+        # Handle the special None option case
+        opt_t = self.OPTIONS[selector]  # Get the type for the selected option
         if opt_t is None:
+            # If None option is selected, value must also be None
             if value is not None:
                 raise TypeError("Selected option is None, therefore value must be None")
+            # Store the None selector and value directly
             self._selector = selector
             self._value = None
             return
 
-        # Coerce the provided value into the selected SSZ type if needed.
-        if isinstance(value, opt_t):
-            coerced = value
-        else:
-            coerced = cast(Any, opt_t)(value)
+        # Handle non-None options - coerce value to the target type
         self._selector = selector
-        self._value = coerced
+        # If value is already the correct type, use it as-is
+        # Otherwise, try to coerce it by calling the type constructor
+        # This allows Union(selector=1, value=42) to work for Uint16 options
+        self._value = value if isinstance(value, opt_t) else cast(Any, opt_t)(value)
 
     @classmethod
     def options(cls) -> Tuple[Type[SSZType] | None, ...]:
-        """Return the options for this specialized Union type."""
+        """
+        Get tuple of possible types for this Union.
+
+        Returns:
+            Tuple of types where position corresponds to selector index.
+        """
         return cls.OPTIONS
 
+    @property
     def selector(self) -> int:
-        """Return the selected option index."""
+        """
+        The 0-based index of the currently selected option.
+
+        Returns:
+            Selector index (0 to len(OPTIONS)-1).
+        """
         return self._selector
 
+    @property
     def selected_type(self) -> Type[SSZType] | None:
-        """Return the SSZ type of the selected option (or None for the null arm)."""
-        return self.OPTIONS[self.selector()]
+        """
+        The type of the currently selected option.
 
+        Returns:
+            Type class of selected option, or None for null option.
+        """
+        return self.OPTIONS[self.selector]
+
+    @property
     def value(self) -> Any:
-        """Return the current value (or None if the null arm is selected)."""
+        """
+        The value currently stored in this Union.
+
+        Returns:
+            Stored value (None for null option, SSZType instance otherwise).
+        """
         return self._value
 
     @classmethod
     def is_fixed_size(cls) -> bool:
         """
-        A Union is considered variable-size overall.
+        Indicate whether this Union type has a fixed size.
 
-        Even if some (or all) arms are individually fixed-size, the total length
-        depends on which arm is selected.
+        Union types are always considered variable-size in SSZ because
+        the total serialized length depends on which option is selected,
+        even if some individual options are fixed-size.
+
+        Returns:
+            Always False - unions are variable-size by definition.
         """
         return False
 
     def serialize(self, stream: IO[bytes]) -> int:
         """
-        Serialize as: 1 byte selector, followed by the selected arm's SSZ
-        encoding (if any).
+        Serialize this Union to a byte stream.
+
+        Writes the Union in SSZ format: one selector byte followed by
+        the SSZ serialization of the value (if not None option).
+
+        Args:
+            stream: A writable byte stream to write the serialized data to.
 
         Returns:
-            Total number of bytes written.
+            The total number of bytes written to the stream.
         """
-        # Write selector.
-        sel = self.selector()
-        stream.write(sel.to_bytes(length=1, byteorder="little"))
-        total = 1
+        # Write the selector byte (which option is selected)
+        stream.write(self.selector.to_bytes(length=1, byteorder="little"))
 
-        # Write value if not None-arm.
-        opt_t = self.selected_type()
-        if opt_t is None:
-            return total
+        # If None option is selected, we're done (no value to write)
+        if self.selected_type is None:
+            return 1
 
-        val = cast(SSZType, self.value())
-        total += val.serialize(stream)
-        return total
+        # Write the value using its SSZ serialization and add to byte count
+        return 1 + cast(SSZType, self.value).serialize(stream)
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
-        """
-        Deserialize from a stream with the provided scope (total bytes available).
+        r"""
+        Deserialize a Union from a byte stream.
 
-        Layout:
-            [ selector:1 ][ value-bytes: (scope-1) ]
+        Reads the selector byte, then deserializes the value based on
+        the selected option type.
 
-        For the None arm (option 0 == None), scope must be exactly 1.
-        For any other arm, the remaining scope-1 bytes are passed to that arm's
-        .deserialize(stream, remaining_scope).
+        Args:
+            stream: A readable byte stream containing the serialized Union data.
+            scope: The maximum number of bytes that can be read from the stream
+                  for this Union (used for bounds checking).
+
+        Returns:
+            A new Union instance with the deserialized data.
+
+        Raises:
+            ValueError: If scope is too small, selector is invalid, or None
+                       option has unexpected payload bytes.
+            IOError: If stream ends prematurely or selected option needs more
+                    bytes than available.
+
         """
+        # Validate we have enough bytes for at least the selector
+        #
+        # Every Union needs at least 1 byte for the selector
         if scope < 1:
-            raise ValueError("Scope too small: cannot read Union selector")
+            raise ValueError("Scope too small for Union selector")
 
-        # Read selector byte.
+        # Read the selector byte from the stream
         sel_bytes = stream.read(1)
+        # Ensure we actually got the byte (stream might be truncated)
         if len(sel_bytes) != 1:
-            raise IOError("Stream ended prematurely while decoding Union selector")
+            raise IOError("Stream ended reading Union selector")
 
+        # Convert selector byte to integer and validate it
+        #
+        # Union selector is stored as little-endian uint8
         selector = int.from_bytes(sel_bytes, "little")
-        if selector < 0 or selector >= len(cls.OPTIONS):
-            raise ValueError(
-                "Selected index "
-                f"{selector} is out of range for {cls.__name__} "
-                f"with {len(cls.OPTIONS)} options"
-            )
+        # Selector must be a valid index into our OPTIONS tuple
+        if not 0 <= selector < len(cls.OPTIONS):
+            raise ValueError(f"Selector {selector} out of range for {len(cls.OPTIONS)} options")
 
-        remaining = scope - 1
+        # Determine the selected option type and remaining bytes
+        #
+        # Get the type for this selector
         opt_t = cls.OPTIONS[selector]
+        # Bytes left after reading selector
+        remaining = scope - 1
 
+        # Handle None option (no value payload expected)
         if opt_t is None:
-            # None-arm: must have no payload.
+            # None option should have no additional bytes
             if remaining != 0:
                 raise ValueError("Invalid encoding: None arm must have no payload bytes")
             return cls(selector=selector, value=None)
 
-        # If the selected arm is fixed-size, ensure we have enough bytes.
-        if opt_t.is_fixed_size():
-            # Most fixed-size SSZ types expose get_byte_length()
-            expected = getattr(opt_t, "get_byte_length", None)
-            if callable(expected):
-                need = expected()
-                if remaining < need:
-                    raise IOError(
-                        f"Insufficient scope for {opt_t.__name__}: need {need}, got {remaining}"
-                    )
+        # Validate fixed-size constraints for non-None options
+        #
+        # If the selected type is fixed-size, ensure we have enough bytes
+        if opt_t.is_fixed_size() and hasattr(opt_t, "get_byte_length"):
+            # How many bytes this type needs
+            need = opt_t.get_byte_length()
+            if remaining < need:
+                raise IOError(f"Need {need} bytes, got {remaining}")
 
-        # Non-None arm: delegate to the selected type with the remaining scope.
-        val = opt_t.deserialize(stream, remaining)
-        return cls(selector=selector, value=val)
+        # Deserialize the value using the selected type's deserializer
+        #
+        # Let the selected type handle parsing its own format from the remaining bytes
+        return cls(selector=selector, value=opt_t.deserialize(stream, remaining))
 
     def encode_bytes(self) -> bytes:
-        """Serialize to bytes [selector || value-encoding]."""
+        r"""
+        Encode this Union to a bytes object.
+
+        Convenience method that serializes the Union to an in-memory buffer
+        and returns the resulting bytes.
+
+        Returns:
+            The SSZ-encoded bytes representation of this Union.
+        """
         with io.BytesIO() as s:
             self.serialize(s)
             return s.getvalue()
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
-        """Parse from bytes [selector || value-encoding]."""
+        r"""
+        Decode a Union from a bytes object.
+
+        Convenience method that deserializes a Union from raw bytes.
+
+        Args:
+            data: The SSZ-encoded bytes to decode.
+
+        Returns:
+            A new Union instance decoded from the bytes.
+
+        Raises:
+            ValueError: If the data is invalid or corrupted.
+            IOError: If the data is truncated.
+        """
         with io.BytesIO(data) as s:
             return cls.deserialize(s, len(data))
 
@@ -291,48 +373,57 @@ class Union(SSZType):
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> CoreSchema:
         """
-        Pydantic validation:
-        - Accept an instance of this specialized Union (pass-through).
-        - Or accept a dict like {'selector': int, 'value': <obj>} and build an
-          instance. The 'value' is validated/constructed using the selected
-          option's schema.
-        - Serialize to a dict {'selector': int, 'value': <obj>} (value None for
-          the None arm).
+        Generate Pydantic core schema for Union validation and serialization.
+
+        This method enables Pydantic integration, allowing Unions to be used
+        in Pydantic models with automatic validation and serialization.
+
+        The schema accepts:
+        1. Existing Union instances (pass-through)
+        2. Dictionaries with 'selector' and 'value' keys
+
+        And serializes Unions to dictionaries with 'selector' and 'value' keys.
+
+        Args:
+            source_type: The source type being processed (usually this Union class).
+            handler: Pydantic's schema generation handler.
+
+        Returns:
+            A Pydantic CoreSchema that can validate and serialize Union instances.
         """
 
         def from_mapping(v: Any) -> "Union":
+            """Convert input to Union instance for Pydantic validation."""
+            # If already a Union instance, pass it through unchanged
             if isinstance(v, cls):
                 return v
-            if not isinstance(v, dict):
-                # Use ValueError so Pydantic wraps into ValidationError
-                raise ValueError(f"Expected {cls.__name__} or dict, got {type(v).__name__}")
-            if "selector" not in v or "value" not in v:
-                raise ValueError("Expected dict with 'selector' and 'value' keys")
-            sel = v["selector"]
-            if not isinstance(sel, int):
-                raise ValueError("selector must be int")
-            if sel < 0 or sel >= len(cls.OPTIONS):
-                raise ValueError(f"selector {sel} out of range for {cls.__name__}")
 
+            # Must be a dict with both required keys
+            if not isinstance(v, dict) or not {"selector", "value"} <= v.keys():
+                raise ValueError(f"Expected {cls.__name__} or dict with 'selector', 'value'")
+
+            # Validate selector is valid integer index
+            sel = v["selector"]
+            if not isinstance(sel, int) or not 0 <= sel < len(cls.OPTIONS):
+                raise ValueError(f"Invalid selector {sel}")
+
+            # Handle None option separately
             opt_t = cls.OPTIONS[sel]
             if opt_t is None:
                 if v["value"] is not None:
-                    # ValueError -> Pydantic ValidationError
-                    raise ValueError("value must be None for None arm (selector 0)")
+                    raise ValueError("None option requires None value")
                 return cls(selector=sel, value=None)
 
-            # Construct the inner value using the selected SSZ type.
-            parsed = cast(Any, opt_t)(v["value"])
-            return cls(selector=sel, value=parsed)
+            # For non-None options, coerce the value to the target type
+            return cls(selector=sel, value=cast(Any, opt_t)(v["value"]))
 
-        # Serializer to a simple mapping.
         def to_obj(u: "Union") -> dict[str, Any]:
-            sel = u.selector()
-            val_t = u.selected_type()
-            if val_t is None:
-                return {"selector": sel, "value": None}
-            val = cast(SSZType, u.value())
-            return {"selector": sel, "value": val}
+            """Convert Union instance to dict for Pydantic serialization."""
+            return {
+                "selector": u.selector,  # Always include the selector
+                # Include the actual value for serialization
+                "value": None if u.selected_type is None else cast(SSZType, u.value),
+            }
 
         return core_schema.union_schema(
             [
@@ -344,33 +435,44 @@ class Union(SSZType):
 
     def __eq__(self, other: object) -> bool:
         """
-        Structural equality for Union instances.
+        Check structural equality between Union instances.
 
-        Two Unions are equal if:
-            - they are of the exact same specialized Union type, and
-            - they have the same selector, and
-            - their contained values are equal.
+        Two Unions are equal if they are the same specialized type,
+        have the same selector, and their values are equal.
 
         Args:
-            other: The object to compare against.
+            other: The object to compare with.
 
         Returns:
-            True if both are equivalent Unions, False otherwise.
+            True if the Unions are structurally equal, False otherwise.
         """
-        if not isinstance(other, type(self)):
-            return False
-        return (self.selector() == other.selector()) and (self.value() == other.value())
+        return (
+            isinstance(other, type(self))
+            and self.selector == other.selector
+            and self.value == other.value
+        )
 
     def __hash__(self) -> int:
         """
-        Hash based on the specialized Union type, selector, and value.
+        Compute hash value for use in sets and dictionaries.
 
-        Ensures Unions can be used reliably as dictionary keys or in sets.
-        Two Unions that compare equal will also have the same hash.
+        The hash is based on the Union's type, selector, and value,
+        ensuring that equal Unions have equal hashes.
+
+        Returns:
+            An integer hash value.
         """
-        return hash((type(self), self.selector(), self.value()))
+        return hash((type(self), self.selector, self.value))
 
     def __repr__(self) -> str:
-        """Return a readable representation showing the selector and value."""
-        tname = type(self).__name__
-        return f"{tname}(selector={self.selector()}, value={self.value()!r})"
+        """
+        Return a readable string representation of this Union.
+
+        The representation shows the Union type name, selector, and value,
+        making it easy to understand the Union's state during debugging.
+
+        Returns:
+            A string representation in the format:
+            "UnionTypeName(selector=N, value=repr(value))"
+        """
+        return f"{type(self).__name__}(selector={self.selector}, value={self.value!r})"
