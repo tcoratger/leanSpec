@@ -152,7 +152,7 @@ def _htr_container(value: Container) -> Bytes32:
 
 @hash_tree_root.register
 def _htr_union(value: Union) -> Bytes32:
-    sel = value.selector()
-    if value.selected_type() is None:
+    sel = value.selector
+    if value.selected_type is None:
         return Merkle.mix_in_selector(Bytes32.zero(), 0)
-    return Merkle.mix_in_selector(hash_tree_root(value.value()), sel)
+    return Merkle.mix_in_selector(hash_tree_root(value.value), sel)
