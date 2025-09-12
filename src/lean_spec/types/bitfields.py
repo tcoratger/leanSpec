@@ -40,9 +40,12 @@ from typing_extensions import List, Self
 from .boolean import Boolean
 from .ssz_base import SSZType
 
-# Cache for specialized Bitvector classes: key = (base class, length)
 _BITVECTOR_CACHE: Dict[Tuple[Type[Any], int], Type["Bitvector"]] = {}
-"""Module-level cache of dynamically generated Bitvector[N] subclasses."""
+"""
+Module-level cache of dynamically generated Bitvector[N] subclasses.
+
+Cache for specialized Bitvector classes: key = (base class, length).
+"""
 
 
 class BitvectorType(abc.ABCMeta):
@@ -282,9 +285,12 @@ class Bitvector(tuple[Boolean, ...], SSZType, metaclass=BitvectorType):
         return f"{type(self).__name__}({list(self)})"
 
 
-# Cache for specialized Bitlist classes: key = (base class, limit)
 _BITLIST_CACHE: Dict[Tuple[Type[Any], int], Type["Bitlist"]] = {}
-"""Module-level cache of dynamically generated Bitlist[N] subclasses."""
+"""
+Module-level cache of dynamically generated Bitlist[N] subclasses.
+
+Cache for specialized Bitlist classes: key = (base class, limit).
+"""
 
 
 class BitlistType(abc.ABCMeta):
