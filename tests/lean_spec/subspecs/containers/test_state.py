@@ -367,7 +367,7 @@ def test_with_justifications_empty(
         historical_block_hashes=[],
         justified_slots=[],
         justifications_roots=[Bytes32(b"\x01" * 32)],
-        justifications_validators=[Boolean(True)] * DEVNET_CONFIG.validator_registry_limit.as_int(),
+        justifications_validators=[True] * DEVNET_CONFIG.validator_registry_limit.as_int(),
     )
 
     # Apply an empty justifications map to get a new state snapshot.
@@ -708,7 +708,7 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
     # The target (slot 4) should now be justified.
     assert new_state.latest_justified == checkpoint4
     # The justified bit for slot 4 must be set.
-    assert bool(cast(Boolean, new_state.justified_slots[4])) is True
+    assert bool(new_state.justified_slots[4]) is True
     # Since no other justifiable slot exists between 0 and 4, genesis is finalized.
     assert new_state.latest_finalized == genesis_checkpoint
     # The per-root vote tracker for the justified target has been cleared.

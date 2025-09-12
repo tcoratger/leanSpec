@@ -1,7 +1,26 @@
-"""Bitvector and Bitlist Type Specifications."""
+"""Bitvector and Bitlist type specifications.
+
+This module provides two SSZ (SimpleSerialize) container families:
+
+- Bitvector[N]: fixed-length, immutable sequence of booleans.
+- Bitlist[N]: variable-length, mutable sequence of booleans with max capacity N.
+
+Both families support SSZ byte encoding/decoding:
+- Bitvector packs bits little-endian within each byte (bit 0 -> LSB).
+- Bitlist packs bits the same way and appends a single delimiter bit set to 1
+  immediately after the last data bit (may create a new byte).
+
+Factory types are specialized via the subscription syntax:
+- Bitvector[128] produces a concrete subclass with LENGTH = 128.
+- Bitlist[2048] produces a concrete subclass with LIMIT = 2048.
+
+Specializations are cached to ensure stable identity:
+Bitvector[128] is Bitvector[128].
+"""
 
 from __future__ import annotations
 
+import abc
 from typing import (
     IO,
     Any,
@@ -21,124 +40,150 @@ from typing_extensions import List, Self
 from .boolean import Boolean
 from .ssz_base import SSZType
 
-_BITVECTOR_CACHE: Dict[Tuple[Type[Any], int], Type[Bitvector]] = {}
-"""A cache to store and reuse dynamically generated Bitvector types."""
+_BITVECTOR_CACHE: Dict[Tuple[Type[Any], int], Type["Bitvector"]] = {}
+"""
+Module-level cache of dynamically generated Bitvector[N] subclasses.
+
+Cache for specialized Bitvector classes: key = (base class, length).
+"""
 
 
-class Bitvector(tuple[Boolean, ...], SSZType):
-    """A strict Bitvector type: a fixed-length, immutable sequence of booleans."""
+class BitvectorType(abc.ABCMeta):
+    """Metaclass that builds and caches Bitvector[N] specializations.
 
-    LENGTH: ClassVar[int]
+    Provides the `Bitvector[N]` subscription syntax by implementing __getitem__.
+    Ensures each specialization is created once and reused.
     """
-    The exact number of booleans in the vector.
 
-    This will be populated in the dynamically created subclass.
-    """
+    def __getitem__(cls, length: int) -> Type["Bitvector"]:
+        """Return a fixed-length Bitvector specialization.
 
-    def __class_getitem__(cls, length: int) -> Type[Bitvector]:  # type: ignore[override]
-        """
-        Create a specific, fixed-length Bitvector type.
-
-        Args:
-            length (int): The exact number of booleans for this vector type.
+        Parameters
+        ----------
+        length
+            Exact number of bits (booleans). Must be a positive integer.
 
         Raises:
-            TypeError: If the length is not a positive integer.
+        ------
+        TypeError
+            If length is not a positive integer.
 
         Returns:
-            Type[Bitvector]: A new, specialized Bitvector class.
+        -------
+        Type[Bitvector]
+            A subclass with LENGTH set to `length`.
         """
-        # Parameter validation: ensure length is a positive integer.
+        # Validate the parameter early.
         if not isinstance(length, int) or length <= 0:
             raise TypeError(f"Bitvector length must be a positive integer, not {length!r}.")
 
-        # Use a cache to avoid recreating the same type.
         cache_key = (cls, length)
+        # Reuse existing specialization if available.
         if cache_key in _BITVECTOR_CACHE:
             return _BITVECTOR_CACHE[cache_key]
 
-        # Dynamically create a new type with the specified length.
-        #
-        # This allows for `isinstance(my_vec, Bitvector[128])` checks.
+        # Create a new subclass named like "Bitvector[128]".
         type_name = f"{cls.__name__}[{length}]"
         new_type = type(
             type_name,
             (cls,),
             {
-                "LENGTH": length,
+                "LENGTH": length,  # attach the fixed length
                 "__doc__": f"A fixed-length vector of {length} booleans.",
             },
         )
 
-        # Store the new type in the cache for future use.
+        # Cache and return.
         _BITVECTOR_CACHE[cache_key] = new_type
         return new_type
 
-    def __new__(cls, values: Iterable[bool | int]) -> Self:
-        """
-        Create and validate a new Bitvector instance.
 
-        Args:
-            values (Iterable[bool | int]): An iterable of booleans or 0/1 integers.
+class Bitvector(tuple[Boolean, ...], SSZType, metaclass=BitvectorType):
+    """Fixed-length, immutable sequence of booleans with SSZ support.
+
+    Instances are tuples of Boolean values of exact length LENGTH.
+    Use Bitvector[N] to construct a concrete class with LENGTH = N.
+    """
+
+    LENGTH: ClassVar[int]
+    """Number of booleans in the vector. Set on the specialized subclass."""
+
+    def __new__(cls, values: Iterable[bool | int]) -> Self:
+        """Create and validate an instance.
+
+        Parameters
+        ----------
+        values
+            Iterable of booleans or 0/1 integers. Length must equal LENGTH.
 
         Raises:
-            TypeError: If the class is not specialized (e.g., `Bitvector` instead of `Bitvector[N]`)
-            ValueError: If the number of items in `values` does not match the required length
+        ------
+        TypeError
+            If called on the unspecialized base class.
+        ValueError
+            If the number of items does not match LENGTH.
 
         Returns:
-            Self: A new, validated instance of the Bitvector.
+        -------
+        Self
+            A validated Bitvector instance.
         """
-        # Ensure this is a specialized class (e.g., `Bitvector[128]`) before instantiation.
+        # Only specialized subclasses have LENGTH.
         if not hasattr(cls, "LENGTH"):
             raise TypeError(
                 "Cannot instantiate raw Bitvector; specify a length, e.g., `Bitvector[128]`."
             )
 
-        # Convert all input values to our strict Boolean type for consistency.
+        # Normalize to Boolean and freeze as a tuple.
         bool_values = tuple(Boolean(v) for v in values)
 
-        # Enforce the fixed-length constraint.
+        # Enforce exact length.
         if len(bool_values) != cls.LENGTH:
             raise ValueError(
                 f"{cls.__name__} requires exactly {cls.LENGTH} items, "
                 f"but {len(bool_values)} were provided."
             )
 
-        # Create the immutable tuple instance.
         return super().__new__(cls, bool_values)
 
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> CoreSchema:
-        """Hook into Pydantic's validation system for strict, fixed-length validation."""
-        # This method is called on specialized types, so `cls.LENGTH` is available.
+        """Define Pydantic v2 validation and serialization.
+
+        Validation:
+        - Accept an existing Bitvector instance (is_instance_schema).
+        - Or accept a tuple of strict booleans of exact LENGTH, then coerce to Bitvector.
+
+        Serialization:
+        - Emit a plain tuple of built-in bool values.
+        """
         if not hasattr(cls, "LENGTH"):
             raise TypeError(
                 "Cannot use raw Bitvector in Pydantic; specify a length, e.g., `Bitvector[128]`."
             )
 
-        # Pydantic schema for a single boolean element.
+        # Strict boolean items (no implicit coercions by Pydantic).
         bool_schema = core_schema.bool_schema(strict=True)
 
-        # Pydantic schema for a tuple of booleans with an exact length.
+        # Validate a tuple with exact LENGTH.
         tuple_validator = core_schema.tuple_variable_schema(
             items_schema=bool_schema,
             min_length=cls.LENGTH,
             max_length=cls.LENGTH,
         )
 
-        # Validator function that takes the validated tuple and constructs our class.
+        # Convert validated tuple into a Bitvector instance.
         from_tuple_validator = core_schema.no_info_plain_validator_function(cls)
 
+        # Union: already a Bitvector OR tuple -> Bitvector.
         return core_schema.union_schema(
             [
-                # Case 1: The value is already the correct custom Bitvector type.
                 core_schema.is_instance_schema(cls),
-                # Case 2: The value is a tuple/list that needs to be validated and wrapped.
                 core_schema.chain_schema([tuple_validator, from_tuple_validator]),
             ],
-            # For serialization (e.g., to JSON), convert the instance to a plain tuple of bools.
+            # Serialize as a tuple of plain bools.
             serialization=core_schema.plain_serializer_function_ser_schema(
                 lambda v: tuple(bool(x) for x in v)
             ),
@@ -146,25 +191,44 @@ class Bitvector(tuple[Boolean, ...], SSZType):
 
     @classmethod
     def is_fixed_size(cls) -> bool:
-        """Return whether the type is fixed-size."""
+        """Return True. Bitvector is a fixed-size SSZ type."""
         return True
 
     @classmethod
     def get_byte_length(cls) -> int:
-        """Return the byte length of the type."""
+        """Return the SSZ byte length.
+
+        Computes ceil(LENGTH / 8) using integer arithmetic.
+        """
         if not hasattr(cls, "LENGTH"):
             raise TypeError("Cannot get length of raw Bitvector type.")
         return (cls.LENGTH + 7) // 8
 
     def serialize(self, stream: IO[bytes]) -> int:
-        """Serialize the bitvector to a binary stream."""
+        """Write SSZ bytes to a binary stream.
+
+        Returns the number of bytes written.
+        """
         encoded_data = self.encode_bytes()
         stream.write(encoded_data)
         return len(encoded_data)
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
-        """Deserialize a bitvector from a binary stream."""
+        """Read SSZ bytes from a stream and return an instance.
+
+        Parameters
+        ----------
+        scope
+            Number of bytes to read. Must equal get_byte_length().
+
+        Raises:
+        ------
+        ValueError
+            If scope does not match the expected byte length.
+        IOError
+            If the stream ends prematurely.
+        """
         byte_length = cls.get_byte_length()
         if scope != byte_length:
             raise ValueError(
@@ -176,12 +240,13 @@ class Bitvector(tuple[Boolean, ...], SSZType):
         return cls.decode_bytes(data)
 
     def encode_bytes(self) -> bytes:
-        """Serializes the Bitvector into a byte string according to SSZ spec."""
-        # Calculate the number of bytes required to hold all bits.
+        """Encode to SSZ bytes.
+
+        Packs bits little-endian within each byte:
+        bit i goes to byte i // 8 at bit position (i % 8).
+        """
         byte_len = (self.LENGTH + 7) // 8
-        # Create a mutable byte array to hold the result.
         byte_array = bytearray(byte_len)
-        # Iterate through each bit and set the corresponding bit in the byte array.
         for i, bit in enumerate(self):
             if bit:
                 byte_index = i // 8
@@ -191,13 +256,14 @@ class Bitvector(tuple[Boolean, ...], SSZType):
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
-        """Deserializes a byte string into a Bitvector instance."""
-        # Ensure this is a specialized class before decoding.
+        """Decode from SSZ bytes.
+
+        Expects exactly ceil(LENGTH / 8) bytes. No delimiter bit for Bitvector.
+        """
         if not hasattr(cls, "LENGTH"):
             raise TypeError(
                 "Cannot decode to raw Bitvector; specify a length, e.g., `Bitvector[4]`."
             )
-        # Check that the input data has the correct number of bytes.
         expected_byte_len = (cls.LENGTH + 7) // 8
         if len(data) != expected_byte_len:
             raise ValueError(
@@ -205,136 +271,157 @@ class Bitvector(tuple[Boolean, ...], SSZType):
                 f"expected {expected_byte_len}, got {len(data)}"
             )
 
-        # Unpack the bits from the byte data.
+        # Reconstruct booleans from packed bits (little-endian per byte).
         bits: List[bool] = []
         for i in range(cls.LENGTH):
             byte_index = i // 8
             bit_index_in_byte = i % 8
-            # Check if the i-th bit is set in the byte array.
             bit = (data[byte_index] >> bit_index_in_byte) & 1
             bits.append(bool(bit))
-        # Instantiate the class with the decoded bits.
         return cls(bits)
 
     def __repr__(self) -> str:
-        """Return the official string representation of the object."""
+        """Return a concise, informative representation."""
         return f"{type(self).__name__}({list(self)})"
 
 
-_BITLIST_CACHE: Dict[Tuple[Type[Any], int], Type[Bitlist]] = {}
-"""A cache to store and reuse dynamically generated Bitlist types."""
+_BITLIST_CACHE: Dict[Tuple[Type[Any], int], Type["Bitlist"]] = {}
+"""
+Module-level cache of dynamically generated Bitlist[N] subclasses.
+
+Cache for specialized Bitlist classes: key = (base class, limit).
+"""
 
 
-class Bitlist(list[Boolean], SSZType):
-    """
-    A strict Bitlist type: a variable-length, mutable sequence of booleans
-    with a maximum capacity.
-    """
+class BitlistType(abc.ABCMeta):
+    """Metaclass that builds and caches Bitlist[N] specializations.
 
-    LIMIT: ClassVar[int]
-    """
-    The maximum number of booleans this list can hold.
-
-    This will be populated in the dynamically created subclass.
+    Provides the `Bitlist[N]` subscription syntax by implementing __getitem__.
+    Ensures each specialization is created once and reused.
     """
 
-    def __class_getitem__(cls, limit: int) -> Type[Bitlist]:  # type: ignore[override]
-        """
-        Create a specific, limited Bitlist type.
+    def __getitem__(cls, limit: int) -> Type["Bitlist"]:
+        """Return a bounded-capacity Bitlist specialization.
 
-        Args:
-            limit (int): The maximum number of booleans for this list type.
+        Parameters
+        ----------
+        limit
+            Maximum number of booleans allowed. Must be a positive integer.
 
         Raises:
-            TypeError: If the limit is not a positive integer.
+        ------
+        TypeError
+            If limit is not a positive integer.
 
         Returns:
-            Type[Bitlist]: A new, specialized Bitlist class.
+        -------
+        Type[Bitlist]
+            A subclass with LIMIT set to `limit`.
         """
-        # Parameter validation: ensure limit is a positive integer.
+        # Validate the parameter early.
         if not isinstance(limit, int) or limit <= 0:
             raise TypeError(f"Bitlist limit must be a positive integer, not {limit!r}.")
 
-        # Use a cache to avoid recreating the same type.
         cache_key = (cls, limit)
+        # Reuse existing specialization if available.
         if cache_key in _BITLIST_CACHE:
             return _BITLIST_CACHE[cache_key]
 
-        # Dynamically create a new type with the specified limit.
+        # Create a new subclass named like "Bitlist[2048]".
         type_name = f"{cls.__name__}[{limit}]"
         new_type = type(
             type_name,
             (cls,),
             {
-                "LIMIT": limit,
+                "LIMIT": limit,  # attach the capacity limit
                 "__doc__": f"A variable-length list of booleans with a limit of {limit} items.",
             },
         )
 
-        # Store the new type in the cache.
+        # Cache and return.
         _BITLIST_CACHE[cache_key] = new_type
         return new_type
 
-    def __init__(self, values: Iterable[bool | int] = ()) -> None:
-        """
-        Create and validate a new Bitlist instance.
 
-        Args:
-            values (Iterable[bool | int]): An iterable of booleans or 0/1 integers.
+class Bitlist(list[Boolean], SSZType, metaclass=BitlistType):
+    """Variable-length, mutable sequence of booleans with SSZ support.
+
+    Instances are Python lists of Boolean values with length ≤ LIMIT.
+    Use Bitlist[N] to construct a concrete class with LIMIT = N.
+    """
+
+    LIMIT: ClassVar[int]
+    """Maximum number of booleans allowed. Set on the specialized subclass."""
+
+    def __init__(self, values: Iterable[bool | int] = ()) -> None:
+        """Create and validate an instance.
+
+        Parameters
+        ----------
+        values
+            Iterable of booleans or 0/1 integers. Size must be ≤ LIMIT.
 
         Raises:
-            TypeError: If the class is not specialized (e.g., `Bitlist` instead of `Bitlist[N]`).
-            ValueError: If the number of items in `values` exceeds the list's limit.
+        ------
+        TypeError
+            If called on the unspecialized base class.
+        ValueError
+            If the number of items exceeds LIMIT.
         """
-        # Ensure this is a specialized class before instantiation.
         if not hasattr(self, "LIMIT"):
             raise TypeError(
                 "Cannot instantiate raw Bitlist; specify a limit, e.g., `Bitlist[2048]`."
             )
 
-        # Convert all input values to our strict Boolean type.
+        # Normalize to Boolean.
         bool_values = [Boolean(v) for v in values]
 
-        # Enforce the length limit constraint.
+        # Enforce capacity.
         if len(bool_values) > self.LIMIT:
             raise ValueError(
                 f"{type(self).__name__} has a limit of {self.LIMIT} items, "
                 f"but {len(bool_values)} were provided."
             )
 
-        # Initialize the mutable list.
         super().__init__(bool_values)
 
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> CoreSchema:
-        """Hook into Pydantic's validation system for strict, max-length validation."""
+        """Define Pydantic v2 validation and serialization.
+
+        Validation:
+        - Accept an existing Bitlist instance (is_instance_schema).
+        - Or accept a list of strict booleans with length ≤ LIMIT, then coerce to Bitlist.
+
+        Serialization:
+        - Emit a plain list of built-in bool values.
+        """
         if not hasattr(cls, "LIMIT"):
             raise TypeError(
                 "Cannot use raw Bitlist in Pydantic; specify a limit, e.g., `Bitlist[2048]`."
             )
 
-        # Pydantic schema for a single boolean element.
+        # Strict boolean items.
         bool_schema = core_schema.bool_schema(strict=True)
 
-        # Pydantic schema for a list of booleans with a maximum length.
+        # Validate a list up to LIMIT elements.
         list_validator = core_schema.list_schema(
             items_schema=bool_schema,
             max_length=cls.LIMIT,
         )
 
-        # Validator function that constructs our class from the validated list.
+        # Convert validated list into a Bitlist instance.
         from_list_validator = core_schema.no_info_plain_validator_function(cls)
 
+        # Union: already a Bitlist OR list -> Bitlist.
         return core_schema.union_schema(
             [
-                # Case 1: The value is already the correct custom Bitlist type.
                 core_schema.is_instance_schema(cls),
-                # Case 2: The value is a list that needs to be validated and wrapped.
                 core_schema.chain_schema([list_validator, from_list_validator]),
             ],
-            # For serialization, convert the instance to a plain list of bools.
+            # Serialize as a list of plain bools.
             serialization=core_schema.plain_serializer_function_ser_schema(
                 lambda v: [bool(x) for x in v]
             ),
@@ -342,51 +429,77 @@ class Bitlist(list[Boolean], SSZType):
 
     @classmethod
     def is_fixed_size(cls) -> bool:
-        """Return whether the type is fixed-size."""
+        """Return False. Bitlist is a variable-size SSZ type."""
         return False
 
     @classmethod
     def get_byte_length(cls) -> int:
-        """Raise TypeError, as the type is variable-size."""
+        """Bitlist is variable-size; length is not known upfront.
+
+        Raises:
+        ------
+        TypeError
+            Always, to signal that size is variable.
+        """
         raise TypeError(f"Type {cls.__name__} is not fixed-size")
 
     def serialize(self, stream: IO[bytes]) -> int:
-        """Serialize the bitlist to a binary stream."""
+        """Write SSZ bytes to a binary stream.
+
+        Returns the number of bytes written.
+        """
         encoded_data = self.encode_bytes()
         stream.write(encoded_data)
         return len(encoded_data)
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
-        """Deserialize a bitlist from a binary stream."""
+        """Read SSZ bytes from a stream and return an instance.
+
+        Parameters
+        ----------
+        scope
+            Number of bytes to read. Determined externally (offset/length).
+
+        Raises:
+        ------
+        IOError
+            If the stream ends prematurely.
+        """
         data = stream.read(scope)
         if len(data) != scope:
             raise IOError(f"Stream ended prematurely while decoding {cls.__name__}")
         return cls.decode_bytes(data)
 
     def encode_bytes(self) -> bytes:
-        """Serializes the Bitlist into a byte string with a trailing delimiter bit."""
-        # Get the number of bits in the list.
+        """Encode to SSZ bytes with a trailing delimiter bit.
+
+        Data bits are packed little-endian within each byte.
+        Then a single delimiter bit set to 1 is placed immediately after
+        the last data bit. If the last data bit ends a byte (num_bits % 8 == 0),
+        the delimiter is a new byte 0b00000001 appended at the end.
+        """
         num_bits = len(self)
         if num_bits == 0:
+            # Empty list: just the delimiter byte.
             return b"\x01"
 
         byte_len = (num_bits + 7) // 8
         byte_array = bytearray(byte_len)
 
-        # Pack the bits into the byte array.
+        # Pack data bits.
         for i, bit in enumerate(self):
             if bit:
                 byte_index = i // 8
                 bit_index_in_byte = i % 8
                 byte_array[byte_index] |= 1 << bit_index_in_byte
 
-        # Add the mandatory delimiter bit.
+        # Place delimiter bit (1) immediately after the last data bit.
         if num_bits % 8 == 0:
-            # If the data perfectly fills the last byte, append a new byte for the delimiter.
+            # Delimiter starts a new byte.
             return bytes(byte_array) + b"\x01"
         else:
-            # Otherwise, set the bit after the last data bit in the existing last byte.
+            # Delimiter lives in the last byte at position num_bits % 8.
             delimiter_byte_index = num_bits // 8
             delimiter_bit_index = num_bits % 8
             byte_array[delimiter_byte_index] |= 1 << delimiter_bit_index
@@ -394,31 +507,39 @@ class Bitlist(list[Boolean], SSZType):
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
-        """Deserializes a byte string with a delimiter bit into a Bitlist instance."""
-        # Ensure this is a specialized class before decoding.
+        """Decode from SSZ bytes with a delimiter bit.
+
+        Rules:
+        - Data cannot be empty.
+        - The last byte must be nonzero (must contain the delimiter bit).
+        - The delimiter is the highest set bit (most significant 1) in the last byte.
+          Its zero-based position gives the offset within the last byte.
+        - Total data bits = (len(data) - 1) * 8 + delimiter_pos.
+        - Total data bits must be ≤ LIMIT.
+        """
         if not hasattr(cls, "LIMIT"):
             raise TypeError("Cannot decode to raw Bitlist; specify a limit, e.g., `Bitlist[4]`.")
-        # The encoded data must not be empty (it must at least contain the delimiter).
         if not data:
             raise ValueError("Invalid Bitlist encoding: data cannot be empty.")
 
-        # The length in bits is determined by finding the position of the delimiter.
+        # Base count: all full bytes before the last contribute 8 bits each.
         num_bits = (len(data) - 1) * 8
         last_byte = data[-1]
 
-        # The last byte must not be zero, as it must contain the delimiter.
+        # Last byte must carry at least the delimiter bit.
         if last_byte == 0:
             raise ValueError("Invalid Bitlist encoding: last byte cannot be zero.")
 
-        # The delimiter is the most significant bit. Its position tells us the length.
+        # Position of the delimiter is the index of the highest set bit.
+        # bit_length() - 1 yields the zero-based position.
         delimiter_pos = last_byte.bit_length() - 1
         num_bits += delimiter_pos
 
-        # The decoded length cannot exceed the type's limit.
+        # Enforce capacity.
         if num_bits > cls.LIMIT:
             raise ValueError(f"Decoded bitlist length {num_bits} exceeds limit of {cls.LIMIT}")
 
-        # Unpack the bits from the byte data, up to the calculated length.
+        # Reconstruct data bits (exclude the delimiter itself).
         bits: List[bool] = []
         for i in range(num_bits):
             byte_index = i // 8
@@ -429,40 +550,46 @@ class Bitlist(list[Boolean], SSZType):
         return cls(bits)
 
     def _check_capacity(self, added_count: int) -> None:
-        """Internal helper to check if adding items would exceed the limit."""
+        """Validate that adding `added_count` items will not exceed LIMIT.
+
+        Raises:
+        ------
+        ValueError
+            If the operation would exceed LIMIT.
+        """
         if len(self) + added_count > self.LIMIT:
             raise ValueError(
                 f"Operation exceeds {type(self).__name__} limit of {self.LIMIT} items."
             )
 
     def append(self, value: bool | int) -> None:
-        """Append a boolean to the end of the list, checking the limit."""
+        """Append one boolean, enforcing LIMIT."""
         self._check_capacity(1)
         super().append(Boolean(value))
 
     def extend(self, values: Iterable[bool | int]) -> None:
-        """Extend the list with an iterable of booleans, checking the limit."""
+        """Extend with an iterable of booleans, enforcing LIMIT."""
         bool_values = [Boolean(v) for v in values]
         self._check_capacity(len(bool_values))
         super().extend(bool_values)
 
     def insert(self, index: SupportsIndex, value: bool | int) -> None:
-        """Insert a boolean at an index, checking the limit."""
+        """Insert one boolean at a position, enforcing LIMIT."""
         self._check_capacity(1)
         super().insert(index, Boolean(value))
 
     @overload
     def __setitem__(self, index: SupportsIndex, value: bool | int) -> None: ...
-
     @overload
     def __setitem__(self, s: slice, values: Iterable[bool | int]) -> None: ...
 
     def __setitem__(self, key: SupportsIndex | slice, value: Any) -> None:
-        """Set an item or slice, checking the limit for slice assignments."""
+        """Assign an item or slice, enforcing LIMIT for slice growth.
+
+        For slice assignment, LIMIT is checked against the net change in length.
+        """
         if isinstance(key, slice):
             bool_values = [Boolean(v) for v in value]
-            # When replacing a slice, the change in length is the number of new
-            # items minus the number of items being removed.
             slice_len = len(self[key])
             change_in_len = len(bool_values) - slice_len
             self._check_capacity(change_in_len)
@@ -471,17 +598,17 @@ class Bitlist(list[Boolean], SSZType):
             super().__setitem__(key, Boolean(value))
 
     def __add__(self, other: list[Boolean]) -> Bitlist:  # type: ignore[override]
-        """Concatenate with another list, checking the limit."""
+        """Return a new Bitlist equal to self + other, enforcing LIMIT."""
         bool_values = [Boolean(v) for v in other]
         self._check_capacity(len(bool_values))
         new_list = list(self) + bool_values
         return type(self)(new_list)
 
     def __iadd__(self, other: Iterable[bool | int]) -> Self:  # type: ignore[override]
-        """In-place concatenation (+=), checking the limit."""
+        """Extend in place with `other`, enforcing LIMIT."""
         self.extend(other)
         return self
 
     def __repr__(self) -> str:
-        """Return the official string representation of the object."""
+        """Return a concise, informative representation."""
         return f"{type(self).__name__}({super().__repr__()})"
