@@ -7,6 +7,11 @@ The Store tracks all information required for the LMD GHOST forkchoice algorithm
 import copy
 from typing import Dict, cast
 
+from lean_spec.subspecs.chain.config import (
+    INTERVALS_PER_SLOT,
+    SECONDS_PER_INTERVAL,
+    SECONDS_PER_SLOT,
+)
 from lean_spec.subspecs.containers import (
     Block,
     Checkpoint,
@@ -19,7 +24,6 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 from lean_spec.types.container import Container
 
-from .constants import INTERVALS_PER_SLOT, SECONDS_PER_INTERVAL, SECONDS_PER_SLOT
 from .helpers import get_fork_choice_head, get_latest_justified, get_vote_target
 
 
