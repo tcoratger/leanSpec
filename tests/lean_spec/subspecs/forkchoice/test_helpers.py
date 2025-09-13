@@ -4,7 +4,7 @@ from typing import Dict
 
 import pytest
 
-from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint
+from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice.helpers import (
     get_fork_choice_head,
@@ -99,8 +99,6 @@ def test_get_latest_justified_empty() -> None:
 
 def test_get_latest_justified() -> None:
     """Test get_latest_justified with states."""
-    from lean_spec.subspecs.containers import State
-
     checkpoint1 = Checkpoint(root=Bytes32(b"test1" + b"\x00" * 27), slot=Slot(10))
     checkpoint2 = Checkpoint(root=Bytes32(b"test2" + b"\x00" * 27), slot=Slot(20))
 

@@ -3,9 +3,18 @@
 import pytest
 from typing_extensions import Dict
 
-from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, Config, SignedVote, Vote
+from lean_spec.subspecs.containers import (
+    Block,
+    BlockBody,
+    Checkpoint,
+    Config,
+    SignedVote,
+    State,
+    Vote,
+)
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
+from lean_spec.subspecs.forkchoice.constants import ZERO_HASH
 from lean_spec.subspecs.forkchoice.helpers import (
     get_fork_choice_head,
     get_latest_justified,
@@ -469,15 +478,11 @@ class TestEdgeCasesAdvanced:
         blocks = {genesis_hash: genesis}
 
         # Use ZERO_HASH as root - should default to earliest block
-        from lean_spec.subspecs.forkchoice.constants import ZERO_HASH
-
         head = get_fork_choice_head(blocks, ZERO_HASH, {})
         assert head == genesis_hash
 
     def test_get_latest_justified_with_ties(self) -> None:
         """Test get_latest_justified when multiple states have same slot."""
-        from lean_spec.subspecs.containers import State
-
         checkpoint_same_slot = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(10))
 
         class MockState:

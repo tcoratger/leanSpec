@@ -16,7 +16,11 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.forkchoice.helpers import get_fork_choice_head, get_latest_justified
+from lean_spec.subspecs.forkchoice.helpers import (
+    get_fork_choice_head,
+    get_latest_justified,
+    get_vote_target,
+)
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
@@ -278,8 +282,6 @@ class TestVoteTargetSelection:
 
         # Recent finalization
         finalized = Checkpoint(root=genesis_hash, slot=Slot(0))
-
-        from lean_spec.subspecs.forkchoice.helpers import get_vote_target
 
         target = get_vote_target(
             head=block_1_hash,
