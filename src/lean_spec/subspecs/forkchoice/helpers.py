@@ -83,6 +83,7 @@ def get_latest_justified(states: Dict[Bytes32, "State"]) -> Optional[Checkpoint]
     # Find state with maximum justified slot
     latest_state = max(states.values(), key=lambda s: s.latest_justified.slot)
 
+    # Return latest justified checkpoint from that state
     return latest_state.latest_justified
 
 
