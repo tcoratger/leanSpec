@@ -1,0 +1,123 @@
+"""
+Core forkchoice algorithms.
+
+Pure functions implementing the LMD GHOST forkchoice rule and related utilities.
+"""
+
+from typing import Dict, Optional
+
+from lean_spec.subspecs.containers import Block, Checkpoint, State
+from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.types import Bytes32, ValidatorIndex
+
+from .constants import ZERO_HASH
+
+
+def get_fork_choice_head(
+    blocks: Dict[Bytes32, Block],
+    root: Bytes32,
+    latest_votes: Dict[ValidatorIndex, Checkpoint],
+    min_score: int = 0,
+) -> Bytes32:
+    """
+    Use LMD GHOST to find the head block from a given root.
+
+    Args:
+        blocks: All known blocks indexed by hash.
+        root: Starting point root (usually latest justified).
+        latest_votes: Current votes by validator index.
+        min_score: Minimum vote count for block inclusion.
+
+    Returns:
+        Hash of the chosen head block.
+    """
+    # Start at genesis if root is zero hash
+    if root == ZERO_HASH:
+        root = min(blocks.keys(), key=lambda block_hash: blocks[block_hash].slot)
+
+    # If no votes, return the starting root immediately
+    if not latest_votes:
+        return root
+
+    # Count votes for each block (votes for descendants count for ancestors)
+    vote_weights: Dict[Bytes32, int] = {}
+
+    for vote in latest_votes.values():
+        if vote.root in blocks:
+            # Walk up from vote target, incrementing ancestor weights
+            block_hash = vote.root
+            while blocks[block_hash].slot > blocks[root].slot:
+                vote_weights[block_hash] = vote_weights.get(block_hash, 0) + 1
+                block_hash = blocks[block_hash].parent_root
+
+    # Build children mapping for blocks above min score
+    children_map: Dict[Bytes32, list[Bytes32]] = {}
+    for block_hash, block in blocks.items():
+        if block.parent_root and vote_weights.get(block_hash, 0) >= min_score:
+            children_map.setdefault(block.parent_root, []).append(block_hash)
+
+    # Walk down tree, choosing child with most votes (tiebreak by slot, then hash)
+    current = root
+    while True:
+        children = children_map.get(current, [])
+        if not children:
+            return current
+
+        # Choose best child: most votes, then highest slot, then highest hash
+        current = max(children, key=lambda x: (vote_weights.get(x, 0), blocks[x].slot, x))
+
+
+def get_latest_justified(states: Dict[Bytes32, "State"]) -> Optional[Checkpoint]:
+    """
+    Find the justified checkpoint with the highest slot.
+
+    Args:
+        states: All known states indexed by hash.
+
+    Returns:
+        Latest justified checkpoint, or None if no states.
+    """
+    if not states:
+        return None
+
+    # Find state with maximum justified slot
+    latest_state = max(states.values(), key=lambda s: s.latest_justified.slot)
+
+    return latest_state.latest_justified
+
+
+def get_vote_target(
+    head: Bytes32,
+    safe_target: Bytes32,
+    latest_finalized: Checkpoint,
+    blocks: Dict[Bytes32, Block],
+) -> Checkpoint:
+    """
+    Calculate target checkpoint for validator votes.
+
+    Determines appropriate attestation target based on head, safe target,
+    and finalization constraints.
+
+    Args:
+        head: Current head block root.
+        safe_target: Current safe target block root.
+        latest_finalized: Latest finalized checkpoint.
+        blocks: All known blocks.
+
+    Returns:
+        Target checkpoint for voting.
+    """
+    # Start from current head
+    target_block_root = head
+
+    # Walk back up to 3 steps if safe target is newer
+    for _ in range(3):
+        if blocks[target_block_root].slot > blocks[safe_target].slot:
+            target_block_root = blocks[target_block_root].parent_root
+
+    # Ensure target is in justifiable slot range
+    while not blocks[target_block_root].slot.is_justifiable_after(latest_finalized.slot):
+        target_block_root = blocks[target_block_root].parent_root
+
+    target_block = blocks[target_block_root]
+    return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)
