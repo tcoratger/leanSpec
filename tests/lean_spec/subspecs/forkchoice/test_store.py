@@ -167,13 +167,13 @@ def test_store_process_attestation(sample_store: Store) -> None:
 
 def test_store_advance_time(sample_store: Store) -> None:
     """Test Store.advance_time() method."""
-    initial_time = sample_store.time.as_int()
-    target_time = sample_store.config.genesis_time.as_int() + 200  # Much later time
+    initial_time = sample_store.time
+    target_time = sample_store.config.genesis_time + Uint64(200)  # Much later time
 
     sample_store.advance_time(target_time, has_proposal=True)
 
     # Time should advance
-    assert sample_store.time.as_int() > initial_time
+    assert sample_store.time > initial_time
 
 
 def test_store_accept_new_votes(sample_store: Store) -> None:

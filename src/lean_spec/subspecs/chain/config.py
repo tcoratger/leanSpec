@@ -12,7 +12,7 @@ from lean_spec.types import BasisPoint, Uint64
 
 # --- Time Parameters ---
 
-INTERVALS_PER_SLOT = 4
+INTERVALS_PER_SLOT = Uint64(4)
 """Number of intervals per slot for forkchoice processing."""
 
 SLOT_DURATION_MS: Final = Uint64(4000)

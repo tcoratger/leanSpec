@@ -93,7 +93,7 @@ class Store(Container):
         anchor_slot = anchor_block.slot
 
         return cls(
-            time=Uint64(anchor_slot.as_int() * INTERVALS_PER_SLOT),
+            time=Uint64(anchor_slot * INTERVALS_PER_SLOT),
             config=state.config,
             head=anchor_root,
             safe_target=anchor_root,
@@ -133,8 +133,8 @@ class Store(Container):
         assert target_block.slot == vote.target.slot, "Target checkpoint slot mismatch"
 
         # Validate attestation is not too far in the future
-        current_slot = Slot(self.time.as_int() // SECONDS_PER_INTERVAL)
-        assert vote.slot <= Slot(current_slot.as_int() + 1), "Attestation too far in future"
+        current_slot = Slot(self.time // SECONDS_PER_INTERVAL)
+        assert vote.slot <= Slot(current_slot + Slot(1)), "Attestation too far in future"
 
     def process_attestation(self, signed_vote: "SignedVote", is_from_block: bool = False) -> None:
         """
@@ -170,7 +170,7 @@ class Store(Container):
             # Network gossip attestation processing
 
             # Ensure forkchoice is current before processing gossip
-            time_slots = Slot(self.time.as_int() // SECONDS_PER_INTERVAL)
+            time_slots = Slot(self.time // SECONDS_PER_INTERVAL)
             assert vote.slot <= time_slots, "Attestation from future slot"
 
             # Update new votes if this is latest from validator
@@ -198,9 +198,7 @@ class Store(Container):
         assert parent_state is not None, "Parent state not found - sync parent chain first"
 
         # Apply state transition to get post-block state
-        # TODO: Implement actual state transition function
-        # For now, use parent state as placeholder
-        state = copy.deepcopy(parent_state)
+        state = copy.deepcopy(parent_state).process_block(block)
 
         # Add block and state to store
         self.blocks[block_hash] = block
@@ -231,7 +229,7 @@ class Store(Container):
         if new_head in self.states:
             object.__setattr__(self, "latest_finalized", self.states[new_head].latest_finalized)
 
-    def advance_time(self, time: int, has_proposal: bool) -> None:
+    def advance_time(self, time: Uint64, has_proposal: bool) -> None:
         """
         Advance forkchoice store time to given timestamp.
 
@@ -243,12 +241,12 @@ class Store(Container):
             has_proposal: Whether node has proposal for current slot.
         """
         # Calculate target time in intervals
-        tick_interval_time = (time - self.config.genesis_time.as_int()) // SECONDS_PER_INTERVAL
+        tick_interval_time = (time - self.config.genesis_time) // SECONDS_PER_INTERVAL
 
         # Tick forward one interval at a time
-        while self.time.as_int() < tick_interval_time:
+        while self.time < tick_interval_time:
             # Check if proposal should be signaled for next interval
-            should_signal_proposal = has_proposal and (self.time.as_int() + 1) == tick_interval_time
+            should_signal_proposal = has_proposal and (self.time + Uint64(1)) == tick_interval_time
 
             # Advance by one interval with appropriate signaling
             self.tick_interval(should_signal_proposal)
@@ -267,7 +265,7 @@ class Store(Container):
             has_proposal: Whether a proposal exists for this interval.
         """
         object.__setattr__(self, "time", Uint64(self.time.as_int() + 1))
-        current_interval = self.time.as_int() % INTERVALS_PER_SLOT
+        current_interval = self.time.as_int() % INTERVALS_PER_SLOT.as_int()
 
         if current_interval == 0:
             # Start of slot - process votes if proposal exists
@@ -316,7 +314,7 @@ class Store(Container):
         )
         object.__setattr__(self, "safe_target", safe_target)
 
-    def get_proposal_head(self, slot: int) -> Bytes32:
+    def get_proposal_head(self, slot: Slot) -> Bytes32:
         """
         Get the head for block proposal at given slot.
 
@@ -328,7 +326,7 @@ class Store(Container):
         Returns:
             Root of block to build upon.
         """
-        slot_time = self.config.genesis_time.as_int() + slot * SECONDS_PER_SLOT
+        slot_time = self.config.genesis_time + slot * SECONDS_PER_SLOT
 
         # Tick store to current time (no-op if already current)
         self.advance_time(slot_time, True)

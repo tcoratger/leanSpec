@@ -68,13 +68,13 @@ class TestStoreLifecycle:
     def test_store_time_advancement(self, genesis_state: State, genesis_block: Block) -> None:
         """Test time advancement with interval ticking."""
         store = Store.create_forkchoice_store(genesis_state, genesis_block)
-        initial_time = store.time.as_int()
+        initial_time = store.time
 
         # Advance by several intervals
-        target_time = store.config.genesis_time.as_int() + 100
+        target_time = store.config.genesis_time + Uint64(100)
         store.advance_time(target_time, has_proposal=False)
 
-        assert store.time.as_int() > initial_time
+        assert store.time > initial_time
 
     def test_store_accept_new_votes(self, genesis_state: State, genesis_block: Block) -> None:
         """Test accepting new votes and updating forkchoice."""
@@ -445,7 +445,7 @@ class TestAttestationProcessing:
         signed_vote = SignedVote(data=vote, signature=Bytes32(b"signature" + b"\x00" * 23))
 
         # Convert Uint64 to int before adding, then advance time.
-        target_time = store_with_blocks.config.genesis_time.as_int() + 100
+        target_time = store_with_blocks.config.genesis_time + Uint64(100)
         store_with_blocks.advance_time(target_time, False)
 
         # Process as network attestation

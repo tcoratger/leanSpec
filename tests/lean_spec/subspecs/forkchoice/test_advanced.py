@@ -271,7 +271,7 @@ class TestStoreAdvanced:
     def test_store_get_proposal_head(self, simple_store: Store) -> None:
         """Test getting proposal head for a slot."""
         # Get proposal head for slot 0
-        head = simple_store.get_proposal_head(0)
+        head = simple_store.get_proposal_head(Slot(0))
 
         # Should return current head
         assert head == simple_store.head
