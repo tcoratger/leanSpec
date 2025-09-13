@@ -19,7 +19,6 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.forkchoice.helpers import (
     get_fork_choice_head,
     get_latest_justified,
-    get_vote_target,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
@@ -283,12 +282,20 @@ class TestVoteTargetSelection:
         # Recent finalization
         finalized = Checkpoint(root=genesis_hash, slot=Slot(0))
 
-        target = get_vote_target(
+        # Create a Store instance to call get_vote_target
+        config = Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+        store = Store(
+            time=Uint64(100),
+            config=config,
             head=block_1_hash,
             safe_target=block_1_hash,
+            latest_justified=finalized,
             latest_finalized=finalized,
             blocks=blocks,
+            states={},
         )
+
+        target = store.get_vote_target()
 
         # Should target the head block since finalization is recent
         assert target.root == block_1_hash

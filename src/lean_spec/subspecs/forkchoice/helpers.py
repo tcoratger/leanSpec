@@ -7,7 +7,6 @@ Pure functions implementing the LMD GHOST forkchoice rule and related utilities.
 from typing import Dict, Optional
 
 from lean_spec.subspecs.containers import Block, Checkpoint, State
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, ValidatorIndex
 
 from .constants import ZERO_HASH
@@ -85,40 +84,3 @@ def get_latest_justified(states: Dict[Bytes32, "State"]) -> Optional[Checkpoint]
 
     # Return latest justified checkpoint from that state
     return latest_state.latest_justified
-
-
-def get_vote_target(
-    head: Bytes32,
-    safe_target: Bytes32,
-    latest_finalized: Checkpoint,
-    blocks: Dict[Bytes32, Block],
-) -> Checkpoint:
-    """
-    Calculate target checkpoint for validator votes.
-
-    Determines appropriate attestation target based on head, safe target,
-    and finalization constraints.
-
-    Args:
-        head: Current head block root.
-        safe_target: Current safe target block root.
-        latest_finalized: Latest finalized checkpoint.
-        blocks: All known blocks.
-
-    Returns:
-        Target checkpoint for voting.
-    """
-    # Start from current head
-    target_block_root = head
-
-    # Walk back up to 3 steps if safe target is newer
-    for _ in range(3):
-        if blocks[target_block_root].slot > blocks[safe_target].slot:
-            target_block_root = blocks[target_block_root].parent_root
-
-    # Ensure target is in justifiable slot range
-    while not blocks[target_block_root].slot.is_justifiable_after(latest_finalized.slot):
-        target_block_root = blocks[target_block_root].parent_root
-
-    target_block = blocks[target_block_root]
-    return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)

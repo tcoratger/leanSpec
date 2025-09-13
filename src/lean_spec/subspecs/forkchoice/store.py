@@ -24,7 +24,7 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 from lean_spec.types.container import Container
 
-from .helpers import get_fork_choice_head, get_latest_justified, get_vote_target
+from .helpers import get_fork_choice_head, get_latest_justified
 
 
 class Store(Container):
@@ -346,4 +346,19 @@ class Store(Container):
         Returns:
             Target checkpoint for voting.
         """
-        return get_vote_target(self.head, self.safe_target, self.latest_finalized, self.blocks)
+        # Start from current head
+        target_block_root = self.head
+
+        # Walk back up to 3 steps if safe target is newer
+        for _ in range(3):
+            if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
+                target_block_root = self.blocks[target_block_root].parent_root
+
+        # Ensure target is in justifiable slot range
+        while not self.blocks[target_block_root].slot.is_justifiable_after(
+            self.latest_finalized.slot
+        ):
+            target_block_root = self.blocks[target_block_root].parent_root
+
+        target_block = self.blocks[target_block_root]
+        return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)

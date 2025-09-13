@@ -6,10 +6,10 @@ import pytest
 
 from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.forkchoice.helpers import (
     get_fork_choice_head,
     get_latest_justified,
-    get_vote_target,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, ValidatorIndex
@@ -119,7 +119,7 @@ def test_get_latest_justified() -> None:
 
 
 def test_get_vote_target(sample_blocks: Dict[Bytes32, Block]) -> None:
-    """Test get_vote_target function."""
+    """Test get_vote_target method on Store."""
     # Reuse the valid linked blocks from the fixture
     genesis_hash = list(sample_blocks.keys())[0]
     head_hash = list(sample_blocks.keys())[2]  # block_b as head
@@ -127,12 +127,23 @@ def test_get_vote_target(sample_blocks: Dict[Bytes32, Block]) -> None:
 
     finalized = Checkpoint(root=genesis_hash, slot=Slot(0))
 
-    target = get_vote_target(
+    # Create a Store instance to test the get_vote_target method
+    from lean_spec.subspecs.containers import Config
+    from lean_spec.types import Uint64
+
+    config = Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+    store = Store(
+        time=Uint64(100),
+        config=config,
         head=head_hash,
         safe_target=head_hash,  # Assume safe_target is the same as head
+        latest_justified=finalized,
         latest_finalized=finalized,
         blocks=sample_blocks,
+        states={},  # Empty states dict for this test
     )
+
+    target = store.get_vote_target()
 
     # Target should be the head block since head_slot - finalized_slot is > 3
     # and head_slot is justifiable.

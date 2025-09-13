@@ -18,7 +18,6 @@ from lean_spec.subspecs.forkchoice.constants import ZERO_HASH
 from lean_spec.subspecs.forkchoice.helpers import (
     get_fork_choice_head,
     get_latest_justified,
-    get_vote_target,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
@@ -224,7 +223,7 @@ class TestStoreAdvanced:
 
     def test_store_tick_interval_actions(self, simple_store: Store) -> None:
         """Test different interval actions during tick."""
-        # FIX: Advance time to 3 using the object's method instead of direct assignment.
+        # Advance time to 3 using the object's method instead of direct assignment.
         for _ in range(3):
             simple_store.tick_interval(has_proposal=False)
 
@@ -328,7 +327,20 @@ class TestVoteTargetAdvanced:
         # Current head is at slot 9
         head_hash = next(h for h, b in blocks.items() if b.slot == Slot(9))
 
-        target = get_vote_target(head_hash, head_hash, finalized, blocks)
+        # Create a Store instance to call get_vote_target
+        config = Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+        store = Store(
+            time=Uint64(100),
+            config=config,
+            head=head_hash,
+            safe_target=head_hash,
+            latest_justified=finalized,
+            latest_finalized=finalized,
+            blocks=blocks,
+            states={},
+        )
+
+        target = store.get_vote_target()
 
         # Should return a valid checkpoint
         assert isinstance(target, Checkpoint)
@@ -374,8 +386,20 @@ class TestVoteTargetAdvanced:
         # Finalized at genesis
         finalized = Checkpoint(root=genesis_hash, slot=Slot(0))
 
-        # Head is at block_2, but safe target is at block_1
-        target = get_vote_target(block_2_hash, block_1_hash, finalized, blocks)
+        # Create a Store instance with head at block_2 and safe target at block_1
+        config = Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+        store = Store(
+            time=Uint64(100),
+            config=config,
+            head=block_2_hash,
+            safe_target=block_1_hash,  # Different from head
+            latest_justified=finalized,
+            latest_finalized=finalized,
+            blocks=blocks,
+            states={},
+        )
+
+        target = store.get_vote_target()
 
         # Should walk back towards safe target
         assert target.root in blocks
