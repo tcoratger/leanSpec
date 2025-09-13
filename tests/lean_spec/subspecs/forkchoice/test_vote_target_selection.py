@@ -29,7 +29,7 @@ class TestVoteTargetCalculation:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -122,7 +122,7 @@ class TestVoteTargetCalculation:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -176,7 +176,7 @@ class TestVoteTargetCalculation:
         """Test that vote target respects justifiable slot constraints."""
         # Create a long chain to test slot justification
         blocks = {}
-        prev_hash = Bytes32(b"\x00" * 32)
+        prev_hash = Bytes32.zero()
 
         # Create blocks from slot 0 to 20
         for i in range(21):
@@ -229,7 +229,7 @@ class TestVoteTargetCalculation:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -279,7 +279,7 @@ class TestSafeTargetComputation:
         genesis_block = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -310,7 +310,7 @@ class TestSafeTargetComputation:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -385,7 +385,7 @@ class TestEdgeCases:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )

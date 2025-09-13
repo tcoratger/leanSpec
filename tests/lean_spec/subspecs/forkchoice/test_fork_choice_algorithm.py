@@ -23,7 +23,7 @@ def sample_blocks() -> Dict[Bytes32, Block]:
     genesis = Block(
         slot=Slot(0),
         proposer_index=Uint64(0),
-        parent_root=Bytes32(b"\x00" * 32),
+        parent_root=Bytes32.zero(),
         state_root=Bytes32(b"genesis" + b"\x00" * 25),
         body=BlockBody(attestations=[]),
     )
@@ -93,7 +93,7 @@ class TestLMDGHOSTAlgorithm:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -171,7 +171,7 @@ class TestLMDGHOSTAlgorithm:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -222,7 +222,7 @@ class TestLMDGHOSTAlgorithm:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -267,7 +267,7 @@ class TestLMDGHOSTAlgorithm:
     def test_fork_choice_deep_chain(self) -> None:
         """Test fork choice algorithm with a deeper chain."""
         blocks = {}
-        prev_hash = Bytes32(b"\x00" * 32)
+        prev_hash = Bytes32.zero()
 
         # Create a 10-block chain
         for i in range(10):
@@ -302,7 +302,7 @@ class TestLMDGHOSTAlgorithm:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -362,7 +362,7 @@ class TestLMDGHOSTAlgorithm:
         genesis = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -409,7 +409,7 @@ class TestStoreBasedForkChoice:
         genesis_block = Block(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )

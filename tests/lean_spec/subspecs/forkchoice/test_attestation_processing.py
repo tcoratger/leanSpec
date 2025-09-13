@@ -46,7 +46,7 @@ class TestAttestationValidation:
         source_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -73,7 +73,7 @@ class TestAttestationValidation:
             target=Checkpoint(root=target_hash, slot=Slot(2)),
             source=Checkpoint(root=source_hash, slot=Slot(1)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Should validate without error
         sample_store.validate_attestation(signed_vote)
@@ -84,7 +84,7 @@ class TestAttestationValidation:
         source_block = Block(
             slot=Slot(2),  # Later than target
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -93,7 +93,7 @@ class TestAttestationValidation:
         target_block = Block(
             slot=Slot(1),  # Earlier than source
             proposer_index=Uint64(2),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"target" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -111,7 +111,7 @@ class TestAttestationValidation:
             source=Checkpoint(root=source_hash, slot=Slot(2)),
             target=Checkpoint(root=target_hash, slot=Slot(1)),  # Invalid: target < source
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Should raise assertion error
         with pytest.raises(AssertionError, match="Source slot must not exceed target slot"):
@@ -130,7 +130,7 @@ class TestAttestationValidation:
             source=Checkpoint(root=source_hash, slot=Slot(1)),
             target=Checkpoint(root=target_hash, slot=Slot(2)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Should raise assertion error for missing blocks
         with pytest.raises(AssertionError, match="Unknown source block"):
@@ -142,7 +142,7 @@ class TestAttestationValidation:
         source_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -169,7 +169,7 @@ class TestAttestationValidation:
             source=Checkpoint(root=source_hash, slot=Slot(0)),  # Wrong slot (should be 1)
             target=Checkpoint(root=target_hash, slot=Slot(2)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Should raise assertion error
         with pytest.raises(AssertionError, match="Source checkpoint slot mismatch"):
@@ -181,7 +181,7 @@ class TestAttestationValidation:
         source_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -208,7 +208,7 @@ class TestAttestationValidation:
             source=Checkpoint(root=source_hash, slot=Slot(1)),
             target=Checkpoint(root=target_hash, slot=Slot(1000)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Should raise assertion error
         with pytest.raises(AssertionError, match="Attestation too far in future"):
@@ -224,7 +224,7 @@ class TestAttestationProcessing:
         source_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -251,7 +251,7 @@ class TestAttestationProcessing:
             source=Checkpoint(root=source_hash, slot=Slot(1)),
             target=Checkpoint(root=target_hash, slot=Slot(2)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Process as network attestation
         sample_store.process_attestation(signed_vote, is_from_block=False)
@@ -266,7 +266,7 @@ class TestAttestationProcessing:
         source_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -293,7 +293,7 @@ class TestAttestationProcessing:
             source=Checkpoint(root=source_hash, slot=Slot(1)),
             target=Checkpoint(root=target_hash, slot=Slot(2)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Process as block attestation
         sample_store.process_attestation(signed_vote, is_from_block=True)
@@ -308,7 +308,7 @@ class TestAttestationProcessing:
         target_block_1 = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"target1" + b"\x00" * 25),
             body=BlockBody(attestations=[]),
         )
@@ -337,7 +337,7 @@ class TestAttestationProcessing:
             source=Checkpoint(root=target_hash_1, slot=Slot(1)),
             target=Checkpoint(root=target_hash_1, slot=Slot(1)),
         )
-        signed_vote_1 = SignedVote(data=vote_1, signature=Bytes32(b"\x00" * 32))
+        signed_vote_1 = SignedVote(data=vote_1, signature=Bytes32.zero())
         sample_store.process_attestation(signed_vote_1, is_from_block=False)
 
         # Process second (newer) attestation
@@ -348,7 +348,7 @@ class TestAttestationProcessing:
             source=Checkpoint(root=target_hash_1, slot=Slot(1)),
             target=Checkpoint(root=target_hash_2, slot=Slot(2)),
         )
-        signed_vote_2 = SignedVote(data=vote_2, signature=Bytes32(b"\x00" * 32))
+        signed_vote_2 = SignedVote(data=vote_2, signature=Bytes32.zero())
         sample_store.process_attestation(signed_vote_2, is_from_block=False)
 
         # Should have the newer vote
@@ -361,7 +361,7 @@ class TestAttestationProcessing:
         source_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"source" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -390,7 +390,7 @@ class TestAttestationProcessing:
             source=Checkpoint(root=source_hash, slot=Slot(1)),
             target=Checkpoint(root=target_hash, slot=Slot(2)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
         sample_store.process_attestation(signed_vote, is_from_block=False)
 
         # Should be in new votes
@@ -414,7 +414,7 @@ class TestBlockProcessing:
         parent_block = Block(
             slot=Slot(1),
             proposer_index=Uint64(1),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"parent" + b"\x00" * 26),
             body=BlockBody(attestations=[]),
         )
@@ -431,7 +431,7 @@ class TestBlockProcessing:
             source=Checkpoint(root=parent_hash, slot=Slot(1)),
             target=Checkpoint(root=parent_hash, slot=Slot(1)),
         )
-        signed_vote = SignedVote(data=vote, signature=Bytes32(b"\x00" * 32))
+        signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
         # Test processing the block attestation
         sample_store.process_attestation(signed_vote, is_from_block=True)

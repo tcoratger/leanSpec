@@ -20,7 +20,7 @@ def sample_blocks() -> Dict[Bytes32, Block]:
     genesis = Block(
         slot=Slot(0),
         proposer_index=Uint64(0),
-        parent_root=Bytes32(b"\x00" * 32),
+        parent_root=Bytes32.zero(),
         state_root=Bytes32(b"genesis" + b"\x00" * 25),
         body=BlockBody(attestations=[]),
     )

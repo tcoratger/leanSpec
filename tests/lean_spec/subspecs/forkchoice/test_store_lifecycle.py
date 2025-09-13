@@ -101,7 +101,7 @@ class TestStoreCreation:
         block_header = BlockHeader(
             slot=Slot(0),
             proposer_index=Uint64(0),
-            parent_root=Bytes32(b"\x00" * 32),
+            parent_root=Bytes32.zero(),
             state_root=Bytes32(b"state" + b"\x00" * 27),
             body_root=Bytes32(b"body" + b"\x00" * 28),
         )
