@@ -369,110 +369,106 @@ class Store(Container):
         """
         Produce a new block for the given slot and validator.
 
-        This method implements the block production algorithm according to the
-        lean protocol specification. It constructs a block that includes all
-        valid attestations available in the store and ensures proper state
-        transition.
-
-        The algorithm:
-        1. Get the proposal head (parent block) for the new block
-        2. Get the parent state from the proposal head
-        3. Iteratively add valid attestations from the store
-        4. Compute the new state after applying all attestations
-        5. Set the block's state root and return the complete block
+        Algorithm Overview:
+        1. Validate proposer authorization for the target slot
+        2. Get the current chain head as the parent block
+        3. Iteratively build attestation set:
+           - Create candidate block with current attestations
+           - Apply state transition (slot advancement + block processing)
+           - Find new valid attestations matching post-state requirements
+           - Continue until no new attestations can be added
+        4. Finalize block with computed state root and store it
 
         Args:
-            slot: The slot for which to produce the block.
-            validator_index: The validator index producing the block.
+            slot: Target slot number for block production
+            validator_index: Index of validator authorized to propose this block
 
         Returns:
-            A fully constructed Block ready for signing and broadcast.
+            Complete block with maximal attestation set and valid state root
 
         Raises:
-            AssertionError: If the validator is not the proposer for the slot.
+            AssertionError: If validator lacks proposer authorization for slot
         """
-        # Verify validator is authorized proposer for this slot
-        assert is_proposer(validator_index, slot, self.config.num_validators), (
-            f"Validator {validator_index} is not the proposer for slot {slot}"
-        )
+        # Validate proposer authorization for this slot
+        if not is_proposer(validator_index, slot, self.config.num_validators):
+            msg = f"Validator {validator_index} is not the proposer for slot {slot}"
+            raise AssertionError(msg)
 
-        # Get the head block to build upon
+        # Get parent block and state to build upon
         head_root = self.get_proposal_head(slot)
         head_state = self.states[head_root]
 
-        # Start with empty attestation list
-        votes_to_add: list[SignedVote] = []
+        # Initialize empty attestation set for iterative collection
+        attestations: list[SignedVote] = []
 
-        # Iteratively collect all valid attestations from the store
-        # This follows the algorithm from docs/client/validator.md
+        # Iteratively collect valid attestations using fixed-point algorithm
+        #
+        # Continue until no new attestations can be added to the block
         while True:
             # Create candidate block with current attestation set
             candidate_block = Block(
                 slot=slot,
                 proposer_index=validator_index,
                 parent_root=head_root,
-                state_root=Bytes32.zero(),  # Will be updated after state computation
-                body=BlockBody(attestations=votes_to_add),
+                state_root=Bytes32.zero(),  # Temporary; updated after state computation
+                body=BlockBody(attestations=attestations),
             )
 
             # Apply state transition to get the post-block state
             # First advance state to target slot, then process the block
-            advanced_state = copy.deepcopy(head_state).process_slots(slot)
+            advanced_state = head_state.process_slots(slot)
             post_state = advanced_state.process_block(candidate_block)
 
-            # Find new valid attestations that can be included
-            # Only include attestations that:
-            # 1. Have source matching the post-state's latest justified
-            # 2. Are not already in the block
-            new_votes_to_add = []
+            # Find new valid attestations matching post-state justification
+            new_attestations: list[SignedVote] = []
             for validator_id, checkpoint in self.latest_known_votes.items():
-                # Create SignedVote for this validator's latest vote
+                # Skip if target block is unknown in our store
+                if checkpoint.root not in self.blocks:
+                    continue
+
+                # Create attestation with post-state's latest justified as source
                 vote = Vote(
                     validator_id=validator_id,
                     slot=checkpoint.slot,
-                    head=checkpoint,  # Use checkpoint as head
+                    head=checkpoint,
                     target=checkpoint,
                     source=post_state.latest_justified,
                 )
-                signed_vote = SignedVote(
-                    data=vote,
-                    signature=Bytes32.zero(),  # Placeholder signature
-                )
+                signed_vote = SignedVote(data=vote, signature=Bytes32.zero())
 
-                # Check if this vote should be included
-                if checkpoint.root in self.blocks and signed_vote not in votes_to_add:
-                    new_votes_to_add.append(signed_vote)
+                # Include if not already in attestation set
+                if signed_vote not in attestations:
+                    new_attestations.append(signed_vote)
 
-            # If no new valid votes found, we're done
-            if not new_votes_to_add:
+            # Fixed point reached: no new attestations found
+            if not new_attestations:
                 break
 
-            # Add new votes and continue iteration
-            votes_to_add.extend(new_votes_to_add)
+            # Add new attestations and continue iteration
+            attestations.extend(new_attestations)
 
-        # Create the final block with all collected attestations
-        # Need to recompute final state with all attestations
-        final_advanced_state = copy.deepcopy(head_state).process_slots(slot)
+        # Create final block with all collected attestations
+        final_state = head_state.process_slots(slot)
         final_block = Block(
             slot=slot,
             proposer_index=validator_index,
             parent_root=head_root,
-            state_root=Bytes32.zero(),  # Will be set after state computation
-            body=BlockBody(attestations=votes_to_add),
+            state_root=Bytes32.zero(),  # Will be updated with computed hash
+            body=BlockBody(attestations=attestations),
         )
-        final_post_state = final_advanced_state.process_block(final_block)
 
-        # Update the block with correct state root
-        final_block = final_block.model_copy(
+        # Apply state transition to get final post-state and compute state root
+        final_post_state = final_state.process_block(final_block)
+        finalized_block = final_block.model_copy(
             update={"state_root": hash_tree_root(final_post_state)}
         )
 
-        # Store the new block and its state in the forkchoice store
-        final_block_hash = hash_tree_root(final_block)
-        self.blocks[final_block_hash] = final_block
-        self.states[final_block_hash] = final_post_state
+        # Store block and state in forkchoice store
+        block_hash = hash_tree_root(finalized_block)
+        self.blocks[block_hash] = finalized_block
+        self.states[block_hash] = final_post_state
 
-        return final_block
+        return finalized_block
 
     def produce_attestation_vote(self, slot: Slot, validator_index: ValidatorIndex) -> Vote:
         """
@@ -504,6 +500,7 @@ class Store(Container):
         )
 
         # Calculate the target checkpoint for this vote
+        #
         # This uses the store's current forkchoice state to determine
         # the appropriate attestation target
         target_checkpoint = self.get_vote_target()

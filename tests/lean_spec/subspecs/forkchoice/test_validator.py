@@ -8,7 +8,6 @@ from lean_spec.subspecs.containers import (
     BlockHeader,
     Checkpoint,
     Config,
-    SignedVote,
     State,
     Vote,
 )
