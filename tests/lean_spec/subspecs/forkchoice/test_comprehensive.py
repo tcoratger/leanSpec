@@ -55,7 +55,7 @@ class TestStoreLifecycle:
 
     def test_store_initialization(self, genesis_state: State, genesis_block: Block) -> None:
         """Test store initialization from genesis state and block."""
-        store = Store.create_forkchoice_store(genesis_state, genesis_block)
+        store = Store.get_forkchoice_store(genesis_state, genesis_block)
 
         assert store.config == genesis_state.config
         assert store.latest_justified == genesis_state.latest_justified
@@ -67,7 +67,7 @@ class TestStoreLifecycle:
 
     def test_store_time_advancement(self, genesis_state: State, genesis_block: Block) -> None:
         """Test time advancement with interval ticking."""
-        store = Store.create_forkchoice_store(genesis_state, genesis_block)
+        store = Store.get_forkchoice_store(genesis_state, genesis_block)
         initial_time = store.time
 
         # Advance by several intervals
@@ -78,7 +78,7 @@ class TestStoreLifecycle:
 
     def test_store_accept_new_votes(self, genesis_state: State, genesis_block: Block) -> None:
         """Test accepting new votes and updating forkchoice."""
-        store = Store.create_forkchoice_store(genesis_state, genesis_block)
+        store = Store.get_forkchoice_store(genesis_state, genesis_block)
 
         # Add some new votes
         checkpoint = Checkpoint(root=hash_tree_root(genesis_block), slot=Slot(0))
@@ -241,7 +241,7 @@ class TestVoteTargetSelection:
         )
         genesis_block_hash = hash_tree_root(genesis_block)
 
-        store = Store.create_forkchoice_store(genesis_state, genesis_block)
+        store = Store.get_forkchoice_store(genesis_state, genesis_block)
 
         # Add votes for safe target computation
         target_checkpoint = Checkpoint(root=genesis_block_hash, slot=Slot(0))
@@ -380,7 +380,7 @@ class TestAttestationProcessing:
             body=BlockBody(attestations=[]),
         )
 
-        store = Store.create_forkchoice_store(genesis_state, genesis_block)
+        store = Store.get_forkchoice_store(genesis_state, genesis_block)
 
         # Add more blocks for testing
         block_1 = Block(
@@ -533,7 +533,7 @@ class TestEdgeCases:
             body=BlockBody(attestations=[]),
         )
 
-        store = Store.create_forkchoice_store(genesis_state, genesis_block)
+        store = Store.get_forkchoice_store(genesis_state, genesis_block)
 
         # Add blocks at different slots
         block_1 = Block(

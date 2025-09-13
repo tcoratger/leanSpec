@@ -66,7 +66,7 @@ class Store(Container):
     """Latest votes by validator that are pending processing."""
 
     @classmethod
-    def create_forkchoice_store(cls, state: State, anchor_block: Block) -> "Store":
+    def get_forkchoice_store(cls, state: State, anchor_block: Block) -> "Store":
         """
         Initialize forkchoice store from an anchor state and block.
 
@@ -158,7 +158,7 @@ class Store(Container):
 
             # Update known votes if this is the latest from validator
             latest_known = self.latest_known_votes.get(validator_id)
-            if latest_known is None or latest_known.slot < vote.target.slot:
+            if latest_known is None or latest_known.slot < vote.slot:
                 self.latest_known_votes[validator_id] = vote.target
 
             # Remove from new votes if this supersedes it
@@ -170,7 +170,7 @@ class Store(Container):
             # Network gossip attestation processing
 
             # Ensure forkchoice is current before processing gossip
-            time_slots = Slot(self.time // SECONDS_PER_INTERVAL)
+            time_slots = self.time // SECONDS_PER_INTERVAL
             assert vote.slot <= time_slots, "Attestation from future slot"
 
             # Update new votes if this is latest from validator
@@ -264,17 +264,17 @@ class Store(Container):
         Args:
             has_proposal: Whether a proposal exists for this interval.
         """
-        object.__setattr__(self, "time", Uint64(self.time.as_int() + 1))
-        current_interval = self.time.as_int() % INTERVALS_PER_SLOT.as_int()
+        object.__setattr__(self, "time", self.time + Uint64(1))
+        current_interval = self.time % INTERVALS_PER_SLOT
 
-        if current_interval == 0:
+        if current_interval == Uint64(0):
             # Start of slot - process votes if proposal exists
             if has_proposal:
                 self.accept_new_votes()
-        elif current_interval == 1:
+        elif current_interval == Uint64(1):
             # Validator voting interval - no action
             pass
-        elif current_interval == 2:
+        elif current_interval == Uint64(2):
             # Update safe target for next votes
             self.update_safe_target()
         else:
