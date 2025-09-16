@@ -53,7 +53,9 @@ class GossipsubParameters(StrictBaseModel):
     """The number of history windows to gossip about."""
 
     seen_ttl_secs: int = (
-        DEVNET_CONFIG.second_per_slot * DEVNET_CONFIG.justification_lookback_slots * 2
+        DEVNET_CONFIG.second_per_slot.as_int()
+        * DEVNET_CONFIG.justification_lookback_slots.as_int()
+        * 2
     )
     """
     The expiry time in seconds for the cache of seen message IDs.
