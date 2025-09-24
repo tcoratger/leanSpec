@@ -54,16 +54,12 @@ class BaseBitvector(SSZModel):
         if not isinstance(v, (list, tuple)):
             v = tuple(v)
 
-        # Convert each bit to Boolean
-        typed_values = tuple(Boolean(item) if not isinstance(item, Boolean) else item for item in v)
-
-        if len(typed_values) != cls.LENGTH:
+        if len(v) != cls.LENGTH:
             raise ValueError(
-                f"{cls.__name__} requires exactly {cls.LENGTH} bits, "
-                f"but {len(typed_values)} were provided."
+                f"{cls.__name__} requires exactly {cls.LENGTH} bits, but {len(v)} were provided."
             )
 
-        return typed_values
+        return tuple(Boolean(item) for item in v)
 
     @classmethod
     def is_fixed_size(cls) -> bool:
@@ -104,9 +100,7 @@ class BaseBitvector(SSZModel):
         byte_array = bytearray(byte_len)
         for i, bit in enumerate(self.data):
             if bit:
-                byte_index = i // 8
-                bit_index_in_byte = i % 8
-                byte_array[byte_index] |= 1 << bit_index_in_byte
+                byte_array[i // 8] |= 1 << (i % 8)
         return bytes(byte_array)
 
     @classmethod
@@ -120,8 +114,8 @@ class BaseBitvector(SSZModel):
         if len(data) != expected_len:
             raise ValueError(f"{cls.__name__} expected {expected_len} bytes, got {len(data)}")
 
-        bits_generator = (Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(cls.LENGTH))
-        return cls(data=tuple(bits_generator))
+        bits = tuple(Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(cls.LENGTH))
+        return cls(data=bits)
 
 
 class BaseBitlist(SSZModel):
@@ -158,18 +152,10 @@ class BaseBitlist(SSZModel):
                 f"{cls.__name__} cannot contain more than {cls.LIMIT} bits, got {len(elements)}"
             )
 
-        # Convert and validate each bit
-        typed_values = []
-        for i, element in enumerate(elements):
-            if isinstance(element, Boolean):
-                typed_values.append(element)
-            else:
-                try:
-                    typed_values.append(Boolean(element))
-                except Exception as e:
-                    raise ValueError(f"Bit {i} cannot be converted to Boolean: {e}") from e
-
-        return tuple(typed_values)
+        try:
+            return tuple(Boolean(element) for element in elements)
+        except Exception as e:
+            raise ValueError(f"Cannot convert elements to Boolean: {e}") from e
 
     def __getitem__(self, key: int | slice) -> Boolean | tuple[Boolean, ...]:
         """Get a bit by index or slice."""
@@ -219,9 +205,7 @@ class BaseBitlist(SSZModel):
         # Pack data bits.
         for i, bit in enumerate(self.data):
             if bit:
-                byte_index = i // 8
-                bit_index_in_byte = i % 8
-                byte_array[byte_index] |= 1 << bit_index_in_byte
+                byte_array[i // 8] |= 1 << (i % 8)
 
         # Place delimiter bit (1) immediately after the last data bit.
         if num_bits % 8 == 0:
@@ -229,9 +213,7 @@ class BaseBitlist(SSZModel):
             return bytes(byte_array) + b"\x01"
         else:
             # Delimiter lives in the last byte at position num_bits % 8.
-            delimiter_byte_index = num_bits // 8
-            delimiter_bit_index = num_bits % 8
-            byte_array[delimiter_byte_index] |= 1 << delimiter_bit_index
+            byte_array[num_bits // 8] |= 1 << (num_bits % 8)
             return bytes(byte_array)
 
     @classmethod
@@ -250,11 +232,9 @@ class BaseBitlist(SSZModel):
         for byte_idx in range(len(data) - 1, -1, -1):
             byte_val = data[byte_idx]
             if byte_val != 0:
-                # Find the rightmost 1 bit in this byte.
-                for bit_idx in range(7, -1, -1):
-                    if (byte_val >> bit_idx) & 1:
-                        delimiter_pos = byte_idx * 8 + bit_idx
-                        break
+                # Find the highest set bit in this byte using bit_length
+                bit_idx = byte_val.bit_length() - 1
+                delimiter_pos = byte_idx * 8 + bit_idx
                 break
 
         if delimiter_pos is None:
@@ -267,14 +247,5 @@ class BaseBitlist(SSZModel):
                 f"{cls.__name__} decoded length {num_data_bits} exceeds limit {cls.LIMIT}"
             )
 
-        bits = []
-        for i in range(num_data_bits):
-            byte_index = i // 8
-            bit_index_in_byte = i % 8
-            if byte_index < len(data):
-                bit_value = bool((data[byte_index] >> bit_index_in_byte) & 1)
-            else:
-                bit_value = False
-            bits.append(bit_value)
-
+        bits = [bool((data[i // 8] >> (i % 8)) & 1) for i in range(num_data_bits)]
         return cls(data=bits)
