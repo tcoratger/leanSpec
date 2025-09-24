@@ -34,9 +34,8 @@ def _coerce_to_bytes(value: Any) -> bytes:
     if isinstance(value, (bytes, bytearray)):
         return bytes(value)
     if isinstance(value, str):
-        s = value[2:] if value.startswith("0x") else value
         # bytes.fromhex handles empty string and validates hex characters
-        return bytes.fromhex(s)
+        return bytes.fromhex(value.removeprefix("0x"))
     if isinstance(value, Iterable):
         # bytes(bytearray(iterable)) enforces each element is an int in 0..255
         return bytes(bytearray(value))
@@ -185,9 +184,7 @@ class BaseBytes(bytes, SSZType):
 
     def hex(self, sep: str | bytes | None = None, bytes_per_sep: SupportsIndex = 1) -> str:
         """Return the hexadecimal string representation of the underlying bytes."""
-        if sep is None:
-            return bytes(self).hex()
-        return bytes(self).hex(sep, bytes_per_sep)
+        return bytes(self).hex() if sep is None else bytes(self).hex(sep, bytes_per_sep)
 
 
 class Bytes1(BaseBytes):
@@ -288,11 +285,11 @@ class BaseByteList(SSZModel):
         """
         if scope < 0:
             raise ValueError("Invalid scope for ByteList: negative")
+        if scope > cls.LIMIT:
+            raise ValueError(f"ByteList[{cls.LIMIT}] scope {scope} exceeds limit")
         data = stream.read(scope)
         if len(data) != scope:
             raise IOError("Stream ended prematurely while decoding ByteList")
-        if len(data) > cls.LIMIT:
-            raise ValueError(f"ByteList[{cls.LIMIT}] decoded length {len(data)} exceeds limit")
         return cls(data=data)
 
     def encode_bytes(self) -> bytes:
@@ -316,8 +313,6 @@ class BaseByteList(SSZModel):
 
     def __add__(self, other: Any) -> bytes:
         """Return the concatenation of the byte list and the argument."""
-        if isinstance(other, (bytes, bytearray)):
-            return self.data + bytes(other)
         return self.data + bytes(other)
 
     def __radd__(self, other: Any) -> bytes:

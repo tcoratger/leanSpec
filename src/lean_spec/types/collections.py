@@ -84,10 +84,7 @@ class SSZVector(SSZModel):
         """Serialize the vector to a binary stream."""
         # If elements are fixed-size, serialize them back-to-back.
         if self.is_fixed_size():
-            total_bytes_written = 0
-            for element in self.data:
-                total_bytes_written += element.serialize(stream)
-            return total_bytes_written
+            return sum(element.serialize(stream) for element in self.data)
         # If elements are variable-size, serialize their offsets, then their data.
         else:
             # Use a temporary in-memory stream to hold the serialized variable data.
@@ -230,10 +227,7 @@ class SSZList(SSZModel):
         # Lists are always variable-size, so we serialize offsets + data
         if self.ELEMENT_TYPE.is_fixed_size():
             # Fixed-size elements: serialize them back-to-back
-            total_bytes_written = 0
-            for element in self.data:
-                total_bytes_written += element.serialize(stream)
-            return total_bytes_written
+            return sum(element.serialize(stream) for element in self.data)
         else:
             # Variable-size elements: serialize offsets, then data
             variable_data_stream = io.BytesIO()
@@ -268,10 +262,10 @@ class SSZList(SSZModel):
             return cls(data=elements)
         else:
             # Variable-size elements: read offsets first, then data
-            if scope < OFFSET_BYTE_LENGTH:
+            if scope == 0:
                 # Empty list case
-                if scope == 0:
-                    return cls(data=[])
+                return cls(data=[])
+            if scope < OFFSET_BYTE_LENGTH:
                 raise ValueError(f"Invalid scope for variable-size list: {scope}")
 
             # Read the first offset to determine the number of elements.

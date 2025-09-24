@@ -34,14 +34,12 @@ def _get_ssz_field_type(annotation: Any) -> Type[SSZType]:
         TypeError: If the annotation is not a valid SSZType class.
     """
     # Check if it's a class and is a subclass of SSZType
-    if inspect.isclass(annotation) and issubclass(annotation, SSZType):
-        return annotation
-
-    # If we get here, the annotation is not a valid SSZType
-    raise TypeError(
-        f"Field annotation {annotation} is not a valid SSZType class. "
-        f"Container fields must be concrete SSZType subclasses."
-    )
+    if not (inspect.isclass(annotation) and issubclass(annotation, SSZType)):
+        raise TypeError(
+            f"Field annotation {annotation} is not a valid SSZType class. "
+            f"Container fields must be concrete SSZType subclasses."
+        )
+    return annotation
 
 
 class Container(SSZModel):
@@ -134,7 +132,7 @@ class Container(SSZModel):
         variable_data = []
 
         # Process each field in definition order
-        for field_name, _field_info in type(self).model_fields.items():
+        for field_name in type(self).model_fields:
             # Get the field value and its type
             value = getattr(self, field_name)
             # Use the actual runtime type of the value, which should be an SSZType
@@ -160,7 +158,7 @@ class Container(SSZModel):
             if part:  # Fixed-size field data
                 stream.write(part)
             else:  # Variable-size field offset
-                Uint32(offset).serialize(stream)
+                stream.write(Uint32(offset).encode_bytes())
                 offset += len(variable_data[var_index])
                 var_index += 1
 

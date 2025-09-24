@@ -37,11 +37,10 @@ class Boolean(int, SSZType):
         if not isinstance(value, int):
             raise TypeError(f"Expected bool or int, got {type(value).__name__}")
 
-        int_value = int(value)
-        if int_value not in (0, 1):
-            raise ValueError(f"Boolean value must be 0 or 1, not {int_value}")
+        if value not in (0, 1):
+            raise ValueError(f"Boolean value must be 0 or 1, not {value}")
 
-        return super().__new__(cls, int_value)
+        return super().__new__(cls, value)
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -142,7 +141,7 @@ class Boolean(int, SSZType):
         """Handle the bitwise AND operator (`&`) strictly."""
         if not isinstance(other, type(self)):
             self._raise_type_error(other, "&")
-        return type(self)(super().__and__(other))
+        return type(self)(int(self) & int(other))
 
     def __rand__(self, other: Any) -> Self:
         """Handle the reverse bitwise AND operator (`&`) strictly."""
@@ -152,7 +151,7 @@ class Boolean(int, SSZType):
         """Handle the bitwise OR operator (`|`) strictly."""
         if not isinstance(other, type(self)):
             self._raise_type_error(other, "|")
-        return type(self)(super().__or__(other))
+        return type(self)(int(self) | int(other))
 
     def __ror__(self, other: Any) -> Self:
         """Handle the reverse bitwise OR operator (`|`) strictly."""
@@ -162,7 +161,7 @@ class Boolean(int, SSZType):
         """Handle the bitwise XOR operator (`^`) strictly."""
         if not isinstance(other, type(self)):
             self._raise_type_error(other, "^")
-        return type(self)(super().__xor__(other))
+        return type(self)(int(self) ^ int(other))
 
     def __rxor__(self, other: Any) -> Self:
         """Handle the reverse bitwise XOR operator (`^`) strictly."""
@@ -176,9 +175,7 @@ class Boolean(int, SSZType):
 
         It returns `False` for all other types.
         """
-        if isinstance(other, int):
-            return int(self) == int(other)
-        return False
+        return isinstance(other, int) and int(self) == int(other)
 
     def __ne__(self, other: object) -> bool:
         """
