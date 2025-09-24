@@ -13,12 +13,12 @@ from math import ceil
 from typing import Final, Type
 
 from lean_spec.subspecs.ssz.constants import BYTES_PER_CHUNK
-from lean_spec.types.bitfields import Bitlist, Bitvector
+from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean
-from lean_spec.types.byte_arrays import ByteListBase, Bytes32, ByteVectorBase
+from lean_spec.types.byte_arrays import BaseByteList, BaseBytes, Bytes32
 from lean_spec.types.collections import (
-    List,
-    Vector,
+    SSZList,
+    SSZVector,
 )
 from lean_spec.types.container import Container
 from lean_spec.types.uint import BaseUint
@@ -79,12 +79,12 @@ def _htr_memoryview(value: memoryview) -> Bytes32:
 
 
 @hash_tree_root.register
-def _htr_bytevector(value: ByteVectorBase) -> Bytes32:
+def _htr_bytevector(value: BaseBytes) -> Bytes32:
     return Merkle.merkleize(Packer.pack_bytes(value.encode_bytes()))
 
 
 @hash_tree_root.register
-def _htr_bytelist(value: ByteListBase) -> Bytes32:
+def _htr_bytelist(value: BaseByteList) -> Bytes32:
     data = value.encode_bytes()
     limit_chunks = ceil(type(value).LIMIT / BYTES_PER_CHUNK)
     root = Merkle.merkleize(Packer.pack_bytes(data), limit=limit_chunks)
@@ -92,23 +92,23 @@ def _htr_bytelist(value: ByteListBase) -> Bytes32:
 
 
 @hash_tree_root.register
-def _htr_bitvector(value: Bitvector) -> Bytes32:
+def _htr_bitvector_base(value: BaseBitvector) -> Bytes32:
     nbits = type(value).LENGTH
     limit = (nbits + 255) // 256
-    chunks = Packer.pack_bits(tuple(bool(b) for b in value))
+    chunks = Packer.pack_bits(tuple(bool(b) for b in value.data))
     return Merkle.merkleize(chunks, limit=limit)
 
 
 @hash_tree_root.register
-def _htr_bitlist(value: Bitlist) -> Bytes32:
+def _htr_bitlist_base(value: BaseBitlist) -> Bytes32:
     limit = (type(value).LIMIT + 255) // 256
-    chunks = Packer.pack_bits(tuple(bool(b) for b in value))
+    chunks = Packer.pack_bits(tuple(bool(b) for b in value.data))
     root = Merkle.merkleize(chunks, limit=limit)
-    return Merkle.mix_in_length(root, len(value))
+    return Merkle.mix_in_length(root, len(value.data))
 
 
 @hash_tree_root.register
-def _htr_vector(value: Vector) -> Bytes32:
+def _htr_vector(value: SSZVector) -> Bytes32:
     elem_t: Type[object] = type(value).ELEMENT_TYPE
     length: int = type(value).LENGTH
 
@@ -125,7 +125,7 @@ def _htr_vector(value: Vector) -> Bytes32:
 
 
 @hash_tree_root.register
-def _htr_list(value: List) -> Bytes32:
+def _htr_list(value: SSZList) -> Bytes32:
     elem_t: Type[object] = type(value).ELEMENT_TYPE
     limit: int = type(value).LIMIT
 

@@ -1,17 +1,16 @@
-"""Block Containers."""
+"""Block Containers for the Lean Ethereum consensus specification."""
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, List, Uint64
+from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.container import Container
 
-from ..chain import config
-from .vote import SignedVote
+from .types import Attestations
 
 
 class BlockBody(Container):
     """The body of a block, containing payload data."""
 
-    attestations: List[SignedVote, config.VALIDATOR_REGISTRY_LIMIT.as_int()]  # type: ignore
+    attestations: Attestations
     """
     A list of votes included in the block.
 
@@ -32,14 +31,14 @@ class BlockHeader(Container):
     """The root of the parent block."""
 
     state_root: Bytes32
-    """The root of the state after processing the block."""
+    """The root of the state after applying transactions in this block."""
 
     body_root: Bytes32
-    """The root of the block's body."""
+    """The root of the block body."""
 
 
 class Block(Container):
-    """Represents a single block in the chain."""
+    """A complete block including header and body."""
 
     slot: Slot
     """The slot in which the block was proposed."""
@@ -61,11 +60,10 @@ class SignedBlock(Container):
     """A container for a block and the proposer's signature."""
 
     message: Block
-    """The block data that was signed."""
+    """The block being signed."""
 
     signature: Bytes32
     """
     The proposer's signature of the block message.
-
     Note: Bytes32 is a placeholder; the actual signature is much larger.
     """

@@ -11,7 +11,14 @@ from lean_spec.subspecs.containers import (
     State,
     Vote,
 )
+from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import (
+    HistoricalBlockHashes,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
+)
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
@@ -45,10 +52,10 @@ def sample_state(config: Config) -> State:
         latest_block_header=block_header,
         latest_justified=temp_finalized,
         latest_finalized=temp_finalized,
-        historical_block_hashes=[],
-        justified_slots=[],
-        justifications_roots=[],
-        justifications_validators=[],
+        historical_block_hashes=HistoricalBlockHashes(data=[]),
+        justified_slots=JustifiedSlots(data=[]),
+        justifications_roots=JustificationRoots(data=[]),
+        justifications_validators=JustificationValidators(data=[]),
     )
 
 
@@ -61,7 +68,7 @@ def sample_store(config: Config, sample_state: State) -> Store:
         proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(sample_state),
-        body=BlockBody(attestations=[]),
+        body=BlockBody(attestations=Attestations(data=[])),
     )
     genesis_hash = hash_tree_root(genesis_block)
 
@@ -400,7 +407,7 @@ class TestValidatorIntegration:
         config = Config(genesis_time=Uint64(1000), num_validators=Uint64(3))
 
         # Create minimal genesis block first
-        genesis_body = BlockBody(attestations=[])
+        genesis_body = BlockBody(attestations=Attestations(data=[]))
 
         # Create minimal state with temporary header
         checkpoint = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
@@ -416,10 +423,10 @@ class TestValidatorIntegration:
             ),
             latest_justified=checkpoint,
             latest_finalized=checkpoint,
-            historical_block_hashes=[],
-            justified_slots=[],
-            justifications_roots=[],
-            justifications_validators=[],
+            historical_block_hashes=HistoricalBlockHashes(data=[]),
+            justified_slots=JustifiedSlots(data=[]),
+            justifications_roots=JustificationRoots(data=[]),
+            justifications_validators=JustificationValidators(data=[]),
         )
 
         # Compute consistent state root

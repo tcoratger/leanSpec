@@ -14,7 +14,14 @@ from lean_spec.subspecs.containers import (
     SignedBlock,
     State,
 )
+from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import (
+    HistoricalBlockHashes,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
+)
 from lean_spec.subspecs.containers.vote import SignedVote, Vote
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Boolean, Bytes32, Uint64, ValidatorIndex
@@ -83,7 +90,7 @@ def _create_block(
         A signed block wrapper containing the constructed block.
     """
     # Create a block body with the provided votes or an empty list.
-    body = BlockBody(attestations=votes or [])
+    body = BlockBody(attestations=Attestations(data=votes or []))
     # Construct the inner block message with correct parent_root linkage.
     block_message = Block(
         slot=Slot(slot),
@@ -183,10 +190,10 @@ def base_state(
         latest_block_header=sample_block_header,
         latest_justified=sample_checkpoint,
         latest_finalized=sample_checkpoint,
-        historical_block_hashes=[],
-        justified_slots=[],
-        justifications_roots=[],
-        justifications_validators=[],
+        historical_block_hashes=HistoricalBlockHashes(data=[]),
+        justified_slots=JustifiedSlots(data=[]),
+        justifications_roots=JustificationRoots(data=[]),
+        justifications_validators=JustificationValidators(data=[]),
     )
 
 
@@ -230,8 +237,8 @@ def test_get_justifications_single_root(base_state: State) -> None:
     # Bake the synthetic justification data into a derived state.
     state_with_data = base_state.model_copy(
         update={
-            "justifications_roots": [root1],
-            "justifications_validators": votes1,
+            "justifications_roots": JustificationRoots(data=[root1]),
+            "justifications_validators": JustificationValidators(data=votes1),
         }
     )
 
@@ -274,8 +281,8 @@ def test_get_justifications_multiple_roots(base_state: State) -> None:
     # Create a state that encodes the three roots and the concatenated votes.
     state_with_data = base_state.model_copy(
         update={
-            "justifications_roots": [root1, root2, root3],
-            "justifications_validators": votes1 + votes2 + votes3,
+            "justifications_roots": JustificationRoots(data=[root1, root2, root3]),
+            "justifications_validators": JustificationValidators(data=votes1 + votes2 + votes3),
         }
     )
 
@@ -311,10 +318,12 @@ def test_with_justifications_empty(
         latest_block_header=sample_block_header,
         latest_justified=sample_checkpoint,
         latest_finalized=sample_checkpoint,
-        historical_block_hashes=[],
-        justified_slots=[],
-        justifications_roots=[Bytes32(b"\x01" * 32)],
-        justifications_validators=[True] * DEVNET_CONFIG.validator_registry_limit.as_int(),
+        historical_block_hashes=HistoricalBlockHashes(data=[]),
+        justified_slots=JustifiedSlots(data=[]),
+        justifications_roots=JustificationRoots(data=[Bytes32(b"\x01" * 32)]),
+        justifications_validators=JustificationValidators(
+            data=[Boolean(True)] * DEVNET_CONFIG.validator_registry_limit.as_int()
+        ),
     )
 
     # Apply an empty justifications map to get a new state snapshot.
@@ -355,9 +364,9 @@ def test_with_justifications_deterministic_order(base_state: State) -> None:
     new_state = base_state.with_justifications(justifications)
 
     # The stored roots should be [root1, root2].
-    assert new_state.justifications_roots == [root1, root2]
+    assert list(new_state.justifications_roots) == [root1, root2]
     # The flattened validators list should follow the same order.
-    assert new_state.justifications_validators == votes1 + votes2
+    assert list(new_state.justifications_validators) == votes1 + votes2
     # Original state remains empty.
     assert not base_state.justifications_roots
 
@@ -459,7 +468,8 @@ def test_generate_genesis(sample_config: Config) -> None:
     # Slot should start at 0.
     assert state.slot == Slot(0)
     # Body root must commit to an empty body at genesis.
-    assert state.latest_block_header.body_root == hash_tree_root(BlockBody(attestations=[]))
+    expected_body = BlockBody(attestations=Attestations(data=[]))
+    assert state.latest_block_header.body_root == hash_tree_root(expected_body)
     # History and justifications must be empty initially.
     assert not state.historical_block_hashes
     assert not state.justified_slots
@@ -543,9 +553,9 @@ def test_process_block_header_valid(genesis_state: State) -> None:
     assert new_state.latest_finalized.root == genesis_header_root
     assert new_state.latest_justified.root == genesis_header_root
     # History should include the parent's root at index 0.
-    assert new_state.historical_block_hashes == [genesis_header_root]
+    assert list(new_state.historical_block_hashes) == [genesis_header_root]
     # Slot 0 should be marked justified.
-    assert new_state.justified_slots == [Boolean(True)]
+    assert list(new_state.justified_slots) == [Boolean(True)]
     # Latest header now reflects the processed block's header content.
     assert new_state.latest_block_header.slot == block.slot
     assert new_state.latest_block_header.parent_root == block.parent_root
@@ -589,7 +599,7 @@ def test_process_block_header_invalid(
         proposer_index=ValidatorIndex(bad_proposer),
         parent_root=bad_parent_root or parent_root,
         state_root=Bytes32.zero(),
-        body=BlockBody(attestations=[]),
+        body=BlockBody(attestations=Attestations(data=[])),
     )
 
     # Expect an AssertionError with the given message for each case.
@@ -626,7 +636,7 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
 
     # Define source (genesis) and target (slot 4) checkpoints for voting.
     genesis_checkpoint = Checkpoint(
-        root=cast(Bytes32, state.historical_block_hashes[0]),  # Canonical root for slot 0
+        root=state.historical_block_hashes[0],  # Canonical root for slot 0
         slot=Slot(0),
     )
     checkpoint4 = Checkpoint(

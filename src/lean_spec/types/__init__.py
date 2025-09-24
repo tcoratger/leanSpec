@@ -4,7 +4,7 @@ from .base import StrictBaseModel
 from .basispt import BasisPoint
 from .boolean import Boolean
 from .byte_arrays import Bytes32
-from .collections import List, Vector
+from .collections import SSZList, SSZVector
 from .container import Container
 from .uint import Uint64
 from .validator import ValidatorIndex, is_proposer
@@ -16,8 +16,8 @@ __all__ = [
     "StrictBaseModel",
     "ValidatorIndex",
     "is_proposer",
-    "List",
-    "Vector",
+    "SSZList",
+    "SSZVector",
     "Boolean",
     "Container",
 ]

@@ -5,7 +5,7 @@ The Store tracks all information required for the LMD GHOST forkchoice algorithm
 """
 
 import copy
-from typing import Dict, cast
+from typing import Dict
 
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
@@ -21,6 +21,7 @@ from lean_spec.subspecs.containers import (
     State,
     Vote,
 )
+from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex, is_proposer
@@ -120,8 +121,8 @@ class Store(Container):
         vote = signed_vote.data
 
         # Validate vote targets exist in store
-        assert vote.source.root in self.blocks, f"Unknown source block: {vote.source.root}"
-        assert vote.target.root in self.blocks, f"Unknown target block: {vote.target.root}"
+        assert vote.source.root in self.blocks, f"Unknown source block: {vote.source.root.hex()}"
+        assert vote.target.root in self.blocks, f"Unknown target block: {vote.target.root.hex()}"
 
         # Validate slot relationships
         source_block = self.blocks[vote.source.root]
@@ -207,8 +208,7 @@ class Store(Container):
         self.states[block_hash] = state
 
         # Process block's attestations as on-chain votes
-        for signed_vote_untyped in block.body.attestations:
-            signed_vote = cast(SignedVote, signed_vote_untyped)
+        for signed_vote in block.body.attestations:
             self.process_attestation(signed_vote, is_from_block=True)
 
         # Update forkchoice head
@@ -411,7 +411,7 @@ class Store(Container):
                 proposer_index=validator_index,
                 parent_root=head_root,
                 state_root=Bytes32.zero(),  # Temporary; updated after state computation
-                body=BlockBody(attestations=attestations),
+                body=BlockBody(attestations=Attestations(data=attestations)),
             )
 
             # Apply state transition to get the post-block state
@@ -454,7 +454,7 @@ class Store(Container):
             proposer_index=validator_index,
             parent_root=head_root,
             state_root=Bytes32.zero(),  # Will be updated with computed hash
-            body=BlockBody(attestations=attestations),
+            body=BlockBody(attestations=Attestations(data=attestations)),
         )
 
         # Apply state transition to get final post-state and compute state root
