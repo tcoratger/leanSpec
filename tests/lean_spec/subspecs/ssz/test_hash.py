@@ -24,7 +24,7 @@ from lean_spec.types.uint import (
     Uint128,
     Uint256,
 )
-from lean_spec.types.union import Union
+from lean_spec.types.union import SSZUnion
 
 
 # Concrete SSZList classes for tests

@@ -22,7 +22,7 @@ from lean_spec.types.collections import (
 )
 from lean_spec.types.container import Container
 from lean_spec.types.uint import BaseUint
-from lean_spec.types.union import Union
+from lean_spec.types.union import SSZUnion
 
 from .merkleization import Merkle
 from .pack import Packer
@@ -151,7 +151,7 @@ def _htr_container(value: Container) -> Bytes32:
 
 
 @hash_tree_root.register
-def _htr_union(value: Union) -> Bytes32:
+def _htr_union(value: SSZUnion) -> Bytes32:
     sel = value.selector
     if value.selected_type is None:
         return Merkle.mix_in_selector(Bytes32.zero(), 0)

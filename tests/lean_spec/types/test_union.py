@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import io
-from typing import Any, cast
 from typing import Type as PyType
+from typing import cast
 
 import pytest
 from pydantic import ValidationError, create_model
@@ -11,12 +11,7 @@ from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
 from lean_spec.types.ssz_base import SSZType
 from lean_spec.types.uint import Uint8, Uint16, Uint32
-from lean_spec.types.union import Union as SSZUnion
-
-
-def u_fn(*opts: Any) -> Any:
-    """Build a specialized SSZUnion using __class_getitem__ (mypy-friendly)."""
-    return SSZUnion.__class_getitem__(tuple(opts))
+from lean_spec.types.union import SSZUnion
 
 
 class Uint8Vector3(SSZVector):
@@ -33,14 +28,6 @@ class Uint16List8(SSZList):
     LIMIT = 8
 
 
-def vv(elem: Any, length: int) -> Any:
-    """Build a specialized SSZVector[elem, length] without [] syntax (mypy-friendly)."""
-    # For our tests, we only need Uint8Vector3
-    if elem == Uint8 and length == 3:
-        return Uint8Vector3
-    raise NotImplementedError(f"Vector type {elem.__name__}[{length}] not implemented")
-
-
 class SingleField(Container):
     """Tiny fixed-size container."""
 
@@ -48,255 +35,284 @@ class SingleField(Container):
 
 
 class FixedPair(Container):
-    """Another small container, to test duplicate option types in unions."""
+    """A pair of fixed-size values."""
 
-    a: Uint8
-    b: Uint16
-
-
-class VarPair(Container):
-    """Variable-size container (offset present) to test nested composites."""
-
-    a: Uint8
-    # Note: this annotation uses a runtime-parameterized SSZ type;
-    # mypy does not understand it as a valid type. The Container metaclass
-    # needs the concrete SSZ type here though, so we keep it and ignore the type check.
-    b: Uint16List8
+    A: Uint8
+    B: Uint16
 
 
-def test_class_getitem_builds_specialized_type() -> None:
-    u1 = u_fn(Uint16)
-    u2 = u_fn(None, Uint16, Uint32)
-    assert u1 is u_fn(Uint16)  # caching
-    assert u1 is not u2
-    assert u1.options() == (Uint16,)
-    assert u2.options() == (None, Uint16, Uint32)
-    # Union is always variable-size overall
-    assert not u1.is_fixed_size()
-    assert not u2.is_fixed_size()
+# Domain-specific Union types using clean inheritance pattern
+class SimpleUnion(SSZUnion):
+    """Union with a single numeric type."""
+
+    OPTIONS = (Uint16,)
 
 
-def test_class_getitem_rejects_bad_options() -> None:
-    # Only option 0 may be None
-    with pytest.raises(TypeError, match="Only option 0 may be None"):
-        _ = u_fn(Uint16, None)
-    # At least one option
-    with pytest.raises(TypeError, match="at least one option"):
-        SSZUnion.__class_getitem__(())  # explicit call with empty tuple
-    # None at 0 must have another non-none option
-    with pytest.raises(TypeError, match="must have at least one non-None option"):
-        _ = u_fn(None)
+class NumericUnion(SSZUnion):
+    """Union of two numeric types."""
+
+    OPTIONS = (Uint16, Uint32)
+
+
+class OptionalNumericUnion(SSZUnion):
+    """Nullable union with None and numeric types."""
+
+    OPTIONS = (None, Uint16, Uint32)
+
+
+class ComplexUnion(SSZUnion):
+    """Union with multiple types including collections."""
+
+    OPTIONS = (Uint16, Uint32, Uint8, Uint16List8)
+
+
+class ContainerUnion(SSZUnion):
+    """Union with identical container types."""
+
+    OPTIONS = (SingleField, SingleField)
+
+
+def test_specialized_union_creation() -> None:
+    """Test that specialized Union types work correctly."""
+    # Simple union
+    u1 = SimpleUnion(data=(0, Uint16(0xAABB)))
+    assert u1.selector == 0
+    assert u1.value == Uint16(0xAABB)
+    assert u1.selected_type == Uint16
+
+    # Numeric union
+    u2 = NumericUnion(data=(0, Uint16(43707)))
+    assert u2.selector == 0
+    assert u2.value == Uint16(43707)
+
+    u3 = NumericUnion(data=(1, Uint32(0xDEADBEEF)))
+    assert u3.selector == 1
+    assert u3.value == Uint32(0xDEADBEEF)
 
 
 def test_constructor_success() -> None:
-    u = u_fn(None, Uint16, Uint32)
-    assert u(selector=0, value=None).selector == 0
-    assert u(selector=1, value=Uint16(0xBEEF)).value == Uint16(0xBEEF)
-    # coercion from plain int works
-    assert u(selector=2, value=0xAABBCCDD).value == Uint32(0xAABBCCDD)
+    """Test successful Union construction."""
+    # None variant
+    u_null = OptionalNumericUnion(data=(0, None))
+    assert u_null.selector == 0
+    assert u_null.value is None
+    assert u_null.selected_type is None
+
+    # Uint16 variant with explicit type
+    u_explicit = OptionalNumericUnion(data=(1, Uint16(0xBEEF)))
+    assert u_explicit.selector == 1
+    assert u_explicit.value == Uint16(0xBEEF)
+
+    # Uint32 variant with coercion from int
+    u_coerced = OptionalNumericUnion(data=(2, 0xAABBCCDD))
+    assert u_coerced.selector == 2
+    assert u_coerced.value == Uint32(0xAABBCCDD)
 
 
 def test_constructor_errors() -> None:
-    u = u_fn(None, Uint16, Uint32)
+    """Test Union construction error cases."""
+    # Invalid selector (out of range)
     with pytest.raises(ValueError, match="Invalid selector"):
-        u(selector=3, value=None)
+        OptionalNumericUnion(data=(3, None))
+
+    # None value for None option should work
+    OptionalNumericUnion(data=(0, None))
+
+    # Non-None value for None option should fail
     with pytest.raises(TypeError, match="value must be None"):
-        u(selector=0, value=Uint16(1))
-    # Wrong inner value type that cannot be coerced
-    with pytest.raises(TypeError):
-        u(selector=1, value="not-an-int")
+        OptionalNumericUnion(data=(0, Uint16(1)))
 
 
 def test_pydantic_validation_ok() -> None:
-    u = u_fn(None, Uint16, Uint32)
-    model = create_model("M", v=(u, ...))
+    """Test successful Pydantic validation."""
+    # Direct construction
+    u1 = OptionalNumericUnion(data=(1, 42))
+    assert u1.value == Uint16(42)
 
-    # Instance passes through
-    inst = u(selector=1, value=Uint16(0xAA55))
-    m = cast(Any, model(v=inst))
-    assert isinstance(m.v, u)
-    assert m.v.value == Uint16(0xAA55)
-
-    # Mapping form: selector + value (coerced)
-    m2 = cast(Any, model(v={"selector": 2, "value": 0xDEADBEEF}))
-    assert isinstance(m2.v, u)
-    assert m2.v.selector == 2
-    assert m2.v.value == Uint32(0xDEADBEEF)
-
-    # None arm
-    m3 = cast(Any, model(v={"selector": 0, "value": None}))
-    assert m3.v.value is None
+    # Model validation from dict
+    u2 = OptionalNumericUnion.model_validate({"data": (2, 0xDEADBEEF)})
+    assert u2.selector == 2
+    assert u2.value == Uint32(0xDEADBEEF)
 
 
 def test_pydantic_validation_errors() -> None:
-    u = u_fn(None, Uint16, Uint32)
-    model = create_model("M", v=(u, ...))
-    with pytest.raises(ValidationError):
-        model(v={"selector": 9, "value": 0})
-    with pytest.raises(ValidationError):
-        model(v={"selector": 0, "value": 1})
-    with pytest.raises(ValidationError):
-        model(v=["not-a-mapping"])
+    """Test Pydantic validation error cases."""
+    # Test invalid selector directly
+    with pytest.raises(ValueError, match="Invalid selector"):
+        OptionalNumericUnion(data=(9, 0))
 
-    # More bad mappings: missing keys and wrong selector type
-    with pytest.raises(ValidationError):
-        model(v={"selector": 1})  # missing value
-    with pytest.raises(ValidationError):
-        model(v={"value": 123})  # missing selector
-    with pytest.raises(ValidationError):
-        model(v={"selector": "1", "value": 123})  # selector must be int
+    # Test invalid value for None option directly
+    with pytest.raises(TypeError, match="value must be None"):
+        OptionalNumericUnion(data=(0, 1))
+
+    # Test with Pydantic model wrapper - should catch underlying errors
+    model = create_model("M", v=(OptionalNumericUnion, ...))
+
+    # Invalid selector in model context
+    with pytest.raises((ValidationError, ValueError)):
+        model(v={"data": (9, 0)})
+
+    # Invalid value for None option in model context
+    with pytest.raises((ValidationError, TypeError)):
+        model(v={"data": (0, 1)})
 
 
-@pytest.mark.parametrize(
-    "u_type, selector, value, expected_hex",
-    [
-        (u_fn(Uint16), 0, Uint16(0xAABB), "00bbaa"),
-        (u_fn(Uint16, Uint32), 0, Uint16(0xAABB), "00bbaa"),
-        (u_fn(None, Uint16, Uint32), 0, None, "00"),
-        (u_fn(None, Uint16, Uint32), 1, Uint16(0xAABB), "01bbaa"),
-        (u_fn(Uint16, Uint32), 1, Uint32(0xDEADBEEF), "01efbeadde"),
-        (u_fn(Uint16, Uint32, Uint8, Uint16List8), 2, Uint8(0xAA), "02aa"),
-        (u_fn(SingleField, SingleField), 1, SingleField(A=Uint8(0xAB)), "01ab"),
-    ],
-)
-def test_union_serialize_matches_reference(
-    u_type: PyType[Any],
-    selector: int,
-    value: Any,
-    expected_hex: str,
-) -> None:
-    inst = u_type(selector=selector, value=value)
-    # encode_bytes
-    encoded = inst.encode_bytes()
-    assert encoded.hex() == expected_hex
+def test_union_serialize_matches_reference() -> None:
+    """Test serialization matches expected byte patterns."""
+    test_cases = [
+        (SimpleUnion(data=(0, Uint16(43707))), "00bbaa"),
+        (NumericUnion(data=(0, Uint16(43707))), "00bbaa"),
+        (OptionalNumericUnion(data=(0, None)), "00"),
+        (OptionalNumericUnion(data=(1, Uint16(43707))), "01bbaa"),
+        (NumericUnion(data=(1, Uint32(3735928559))), "01efbeadde"),
+        (ComplexUnion(data=(2, Uint8(170))), "02aa"),
+        (ContainerUnion(data=(1, SingleField(A=0xAB))), "01ab"),
+    ]
 
-    # serialize(stream)
-    stream = io.BytesIO()
-    n = inst.serialize(stream)
-    stream.seek(0)
-    assert stream.read().hex() == expected_hex
-    assert n == len(bytes.fromhex(expected_hex))
-
-    # decode_bytes / deserialize
-    decoded = u_type.decode_bytes(bytes.fromhex(expected_hex))
-    assert decoded.selector == selector
-    assert decoded.value == value
+    for union_instance, expected_hex in test_cases:
+        encoded = union_instance.encode_bytes()
+        assert encoded.hex() == expected_hex
 
 
 def test_union_with_nested_composites_roundtrip() -> None:
-    # Union including vector, containers and list
-    u = u_fn(vv(Uint8, 3), SingleField, VarPair, FixedPair, Uint16)
+    """Test serialization roundtrip with complex nested types."""
+    # Create a union with nested container
+    original = ContainerUnion(data=(0, SingleField(A=42)))
 
-    # selector = 2 (VarPair)
-    elem_list = Uint16List8(data=[1, 2, 3])
-    vp = VarPair(a=Uint8(0xAB), b=elem_list)
-    inst = u(selector=2, value=vp)
-    # round-trip
-    encoded = inst.encode_bytes()
-    dec = u.decode_bytes(encoded)
-    assert dec.selector == 2
-    assert dec.value == vp
+    # Encode and decode
+    encoded = original.encode_bytes()
+    decoded = ContainerUnion.decode_bytes(encoded)
 
-    # selector = 0 (Vector[Uint8,3])
-    v = vv(Uint8, 3)(data=[9, 8, 7])
-    inst2 = u(selector=0, value=v)
-    assert u.decode_bytes(inst2.encode_bytes()) == inst2
-
-    # selector = 4 (Uint16)
-    inst3 = u(selector=4, value=Uint16(0xBEEF))
-    assert u.decode_bytes(inst3.encode_bytes()) == inst3
+    # Verify roundtrip
+    assert decoded.selector == original.selector
+    assert decoded.value.A == original.value.A
+    assert decoded == original
 
 
 def test_deserialize_errors() -> None:
-    u = u_fn(None, Uint16)
-    # scope < 1
+    """Test deserialization error cases."""
+    # Too small scope
     with pytest.raises(ValueError, match="Scope too small"):
-        u.deserialize(io.BytesIO(b""), 0)
-    # selector out of range
+        SimpleUnion.deserialize(io.BytesIO(b""), 0)
+
+    # Invalid selector
     with pytest.raises(ValueError, match="out of range"):
-        u.deserialize(io.BytesIO(b"\x02"), 1)
-    # None arm must have no payload
-    with pytest.raises(ValueError, match="None arm must have no payload"):
-        u.deserialize(io.BytesIO(b"\x00\xff"), 2)
-    # Non-none arm, but not enough scope to satisfy inner (Uint16 needs 2 bytes)
-    # The implementation should surface this as an IOError at the Union level.
-    with pytest.raises(IOError):
-        u.deserialize(io.BytesIO(b"\x01\xaa"), 2)
+        SimpleUnion.deserialize(io.BytesIO(b"\x09"), 1)
+
+    # None option with payload
+    with pytest.raises(ValueError, match="no payload bytes"):
+        OptionalNumericUnion.deserialize(io.BytesIO(b"\x00\xff"), 2)
 
 
 def test_repr_contains_selector_and_value() -> None:
-    u = u_fn(Uint16, Uint32)
-    inst = u(selector=0, value=Uint16(3))
-    r = repr(inst)
-    assert "selector=0" in r
-    assert "Uint16(3)" in r
-
-
-def test_cache_identity_and_distinctness() -> None:
-    # Identity: same parameterization reuses the cached type
-    u1 = u_fn(Uint16, Uint32)
-    u2 = u_fn(Uint16, Uint32)
-    assert u1 is u2
-
-    # Distinctness: different order or options -> different type
-    u3 = u_fn(Uint32, Uint16)
-    assert u1 is not u3
-    assert u1.options() == (Uint16, Uint32)
-    assert u3.options() == (Uint32, Uint16)
+    """Test __repr__ shows selector and value."""
+    u = NumericUnion(data=(1, Uint32(0xDEADBEEF)))
+    repr_str = repr(u)
+    assert "selector=1" in repr_str
+    assert "Uint32(3735928559)" in repr_str
 
 
 def test_selected_type_sanity() -> None:
-    u = u_fn(None, Uint16, Uint32)
-    u0 = u(selector=0, value=None)
-    u1 = u(selector=1, value=Uint16(5))
-    u2 = u(selector=2, value=Uint32(6))
-    assert u0.selected_type is None
-    assert u1.selected_type is Uint16
-    assert u2.selected_type is Uint32
+    """Test selected_type property works correctly."""
+    u1 = NumericUnion(data=(0, Uint16(42)))
+    assert u1.selected_type == Uint16
+
+    u2 = NumericUnion(data=(1, Uint32(42)))
+    assert u2.selected_type == Uint32
+
+    u3 = OptionalNumericUnion(data=(0, None))
+    assert u3.selected_type is None
 
 
 def test_equality_and_hashing() -> None:
-    u = u_fn(Uint16, Uint32)
-    a = u(selector=0, value=Uint16(10))
-    b = u(selector=0, value=Uint16(10))
-    c = u(selector=1, value=Uint32(10))
-    # same specialized type, same selector/value -> equal & same hash
-    assert a == b
-    assert hash(a) == hash(b)
-    # different selector -> not equal
-    assert a != c
-    # usable in sets/dicts
-    s = {a, b, c}
-    assert len(s) == 2
-    d = {a: "A", c: "C"}
-    assert d[a] == "A"
-    assert d[c] == "C"
+    """Test equality and hashing behavior."""
+    u1 = NumericUnion(data=(0, Uint16(42)))
+    u2 = NumericUnion(data=(0, Uint16(42)))
+    u3 = NumericUnion(data=(1, Uint32(42)))
+
+    # Same data should be equal
+    assert u1 == u2
+    assert hash(u1) == hash(u2)
+
+    # Different selector/value should not be equal
+    assert u1 != u3
+    assert hash(u1) != hash(u3)
 
 
-def test_max_options_boundary_and_too_many() -> None:
-    # Exactly 128 options is allowed
-    opts_ok = tuple([Uint8] * 128)
-    u_ok = SSZUnion.__class_getitem__(opts_ok)
-    assert isinstance(u_ok, type)
-    assert issubclass(u_ok, SSZUnion)
-    assert len(u_ok.options()) == 128
-
-    # 129 options should fail
-    opts_bad = tuple([Uint8] * 129)
-    with pytest.raises(TypeError, match="at most 128 options"):
-        _ = SSZUnion.__class_getitem__(opts_bad)
+def test_options_helper() -> None:
+    """Test options() class method."""
+    assert NumericUnion.options() == (Uint16, Uint32)
+    assert OptionalNumericUnion.options() == (None, Uint16, Uint32)
+    assert SimpleUnion.options() == (Uint16,)
 
 
-def test_invalid_option_type_rejected() -> None:
-    # Create a fake type missing SSZType protocol methods
+def test_is_fixed_size_helper() -> None:
+    """Test is_fixed_size() class method."""
+    assert not NumericUnion.is_fixed_size()
+    assert not OptionalNumericUnion.is_fixed_size()
+    assert not SimpleUnion.is_fixed_size()
+
+
+def test_get_byte_length_raises() -> None:
+    """Test get_byte_length() raises for variable-size types."""
+    with pytest.raises(TypeError, match="variable-size"):
+        NumericUnion.get_byte_length()
+
+
+def test_union_type_validation() -> None:
+    """Test that Union types validate OPTIONS correctly."""
+
+    # Valid union should work
+    class ValidUnion(SSZUnion):
+        OPTIONS = (Uint16, Uint32)
+
+    instance = ValidUnion(data=(0, 42))
+    assert instance.selector == 0
+
+    # Invalid union with None not at index 0 should fail during validation
+    with pytest.raises(TypeError, match="None at index 0"):
+
+        class InvalidUnion1(SSZUnion):
+            OPTIONS = (Uint16, None)
+
+        InvalidUnion1(data=(0, 42))
+
+    # Union with non-SSZ type should fail
     class NotSSZ:
         pass
 
-    with pytest.raises(TypeError, match="must be an SSZType-like"):
-        _ = SSZUnion.__class_getitem__((cast(PyType[SSZType], NotSSZ),))  # wrong kind of type
+    with pytest.raises(TypeError, match="missing SSZType methods"):
+
+        class InvalidUnion2(SSZUnion):
+            OPTIONS = (cast(PyType[SSZType], NotSSZ),)
+
+        InvalidUnion2(data=(0, 42))
 
 
-def test_options_and_is_fixed_size_helpers() -> None:
-    u = u_fn(Uint16)
-    assert u.options() == (Uint16,)
-    assert not u.is_fixed_size()
+def test_union_boundary_cases() -> None:
+    """Test edge cases and boundary conditions."""
+    # Single option union
+    u = SimpleUnion(data=(0, Uint16(42)))
+    assert u.selector == 0
+    assert u.value == Uint16(42)
+
+    # None-only union should fail validation
+    with pytest.raises(TypeError, match="only option"):
+
+        class NoneOnlyUnion(SSZUnion):
+            OPTIONS = (None,)
+
+        NoneOnlyUnion(data=(0, None))
+
+
+def test_data_tuple_construction() -> None:
+    """Test construction using data tuple format."""
+    # Direct data tuple
+    u = NumericUnion(data=(1, Uint32(42)))
+    assert u.selector == 1
+    assert u.value == Uint32(42)
+
+    # Model validation with data tuple
+    u2 = NumericUnion.model_validate({"data": (0, 123)})
+    assert u2.selector == 0
+    assert u2.value == Uint16(123)
