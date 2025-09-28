@@ -105,87 +105,64 @@ class SSZUnion(SSZModel):
     @classmethod
     def _validate_union_data(cls, v: Any) -> Tuple[int, Any]:
         """Validate and convert union data to (selector, value) tuple."""
-        # Ensure OPTIONS is defined
+        # Check required class attributes
         if not hasattr(cls, "OPTIONS") or not isinstance(cls.OPTIONS, tuple):
             raise TypeError(f"{cls.__name__} must define OPTIONS as a tuple of SSZ types")
 
         options = cls.OPTIONS
         options_count = len(options)
 
-        # Validate options count
+        # Validate OPTIONS constraints
         if options_count == 0:
             raise TypeError(f"{cls.__name__} OPTIONS cannot be empty")
         if options_count > MAX_UNION_OPTIONS:
             raise TypeError(
                 f"{cls.__name__} has {options_count} options, but maximum is {MAX_UNION_OPTIONS}"
             )
-
-        # Validate None placement (only at index 0)
-        for i, opt in enumerate(options):
-            if opt is None and i != 0:
-                raise TypeError(f"{cls.__name__} can only have None at index 0, found at index {i}")
-            elif opt is not None:
-                # Validate SSZType protocol
-                if not isinstance(opt, type):
-                    raise TypeError(f"{cls.__name__} option {i} must be a type, got {type(opt)}")
-
-                required_methods = (
-                    "serialize",
-                    "deserialize",
-                    "encode_bytes",
-                    "decode_bytes",
-                    "is_fixed_size",
-                )
-                missing = [m for m in required_methods if not hasattr(opt, m)]
-                if missing:
-                    raise TypeError(
-                        f"{cls.__name__} option {i} ({opt.__name__}) "
-                        f"missing SSZType methods: {missing}"
-                    )
-
-        # Prevent None-only unions
         if options[0] is None and options_count == 1:
             raise TypeError(f"{cls.__name__} cannot have None as the only option")
 
-        # Convert input to (selector, value) tuple
-        if isinstance(v, tuple) and len(v) == 2:
-            selector, value = v
-        else:
+        # Validate None placement (only at index 0) and types
+        for i, opt in enumerate(options):
+            if opt is None and i != 0:
+                raise TypeError(f"{cls.__name__} can only have None at index 0, found at index {i}")
+            elif opt is not None and not isinstance(opt, type):
+                raise TypeError(f"{cls.__name__} option {i} must be a type, got {type(opt)}")
+
+        # Normalize input to (selector, value) tuple
+        if not isinstance(v, tuple) or len(v) != 2:
             raise ValueError(
                 f"{cls.__name__} data must be a (selector, value) tuple, got {type(v)}"
             )
+
+        selector, value = v
 
         # Validate selector
         if not isinstance(selector, int):
             raise ValueError(f"Selector must be int, got {type(selector)}")
         if not 0 <= selector < options_count:
-            # Match legacy error message format
             raise ValueError(f"Invalid selector {selector} for {options_count} options")
 
-        # Validate value for selected option
+        # Validate and coerce value for selected option
         selected_type = options[selector]
 
         if selected_type is None:
             # None option - value must be None
             if value is not None:
-                # Match legacy error message format
                 raise TypeError("Selected option is None, therefore value must be None")
             return (selector, None)
 
         # Non-None option - validate and coerce value
         if isinstance(value, selected_type):
-            # Already correct type
-            validated_value = value
-        else:
-            # Attempt coercion
-            try:
-                validated_value = cast(Any, selected_type)(value)
-            except Exception as e:
-                raise TypeError(
-                    f"Cannot coerce {type(value).__name__} to {selected_type.__name__}: {e}"
-                ) from e
+            return (selector, value)
 
-        return (selector, validated_value)
+        try:
+            coerced_value = cast(Any, selected_type)(value)
+            return (selector, coerced_value)
+        except Exception as e:
+            raise TypeError(
+                f"Cannot coerce {type(value).__name__} to {selected_type.__name__}: {e}"
+            ) from e
 
     @property
     def selector(self) -> int:
@@ -193,14 +170,14 @@ class SSZUnion(SSZModel):
         return self.data[0]
 
     @property
-    def selected_type(self) -> Type[SSZType] | None:
-        """The type class of the currently selected option."""
-        return self.OPTIONS[self.selector]
-
-    @property
     def value(self) -> Any:
         """The value currently stored in this Union."""
         return self.data[1]
+
+    @property
+    def selected_type(self) -> Type[SSZType] | None:
+        """The type class of the currently selected option."""
+        return self.OPTIONS[self.selector]
 
     @classmethod
     def options(cls) -> Tuple[Type[SSZType] | None, ...]:
@@ -219,18 +196,11 @@ class SSZUnion(SSZModel):
 
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize this Union to a byte stream in SSZ format."""
-        # Write selector byte
-        selector_bytes = self.selector.to_bytes(SELECTOR_BYTE_SIZE, byteorder="little")
-        stream.write(selector_bytes)
-        bytes_written = SELECTOR_BYTE_SIZE
-
-        # For None option, only selector byte is written
-        if self.selected_type is None:
-            return bytes_written
-
-        # For non-None options, serialize the value
-        value_bytes_written = cast(SSZType, self.value).serialize(stream)
-        return bytes_written + value_bytes_written
+        # Write selector byte and return early for None
+        stream.write(self.selector.to_bytes(SELECTOR_BYTE_SIZE, byteorder="little"))
+        return SELECTOR_BYTE_SIZE + (
+            cast(SSZType, self.value).serialize(stream) if self.selected_type is not None else 0
+        )
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
@@ -281,8 +251,7 @@ class SSZUnion(SSZModel):
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
         """Decode a Union from bytes."""
-        with io.BytesIO(data) as stream:
-            return cls.deserialize(stream, len(data))
+        return cls.deserialize(io.BytesIO(data), len(data))
 
     def __repr__(self) -> str:
         """Return a readable string representation of this Union."""

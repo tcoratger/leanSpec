@@ -277,11 +277,11 @@ def test_union_type_validation() -> None:
 
         InvalidUnion1(data=(0, 42))
 
-    # Union with non-SSZ type should fail
+    # Union with non-SSZ type should fail when trying to use it
     class NotSSZ:
         pass
 
-    with pytest.raises(TypeError, match="missing SSZType methods"):
+    with pytest.raises(TypeError, match="takes no arguments"):
 
         class InvalidUnion2(SSZUnion):
             OPTIONS = (cast(PyType[SSZType], NotSSZ),)
