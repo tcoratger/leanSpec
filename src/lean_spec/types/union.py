@@ -105,12 +105,11 @@ class SSZUnion(SSZModel):
     @classmethod
     def _validate_union_data(cls, v: Any) -> Tuple[int, Any]:
         """Validate and convert union data to (selector, value) tuple."""
-        # Check required class attributes
+        # Check required class attributes and get options
         if not hasattr(cls, "OPTIONS") or not isinstance(cls.OPTIONS, tuple):
             raise TypeError(f"{cls.__name__} must define OPTIONS as a tuple of SSZ types")
 
-        options = cls.OPTIONS
-        options_count = len(options)
+        options, options_count = cls.OPTIONS, len(cls.OPTIONS)
 
         # Validate OPTIONS constraints
         if options_count == 0:
@@ -129,36 +128,28 @@ class SSZUnion(SSZModel):
             elif opt is not None and not isinstance(opt, type):
                 raise TypeError(f"{cls.__name__} option {i} must be a type, got {type(opt)}")
 
-        # Normalize input to (selector, value) tuple
+        # Normalize input and validate selector
         if not isinstance(v, tuple) or len(v) != 2:
             raise ValueError(
                 f"{cls.__name__} data must be a (selector, value) tuple, got {type(v)}"
             )
 
         selector, value = v
-
-        # Validate selector
-        if not isinstance(selector, int):
-            raise ValueError(f"Selector must be int, got {type(selector)}")
-        if not 0 <= selector < options_count:
+        if not isinstance(selector, int) or not 0 <= selector < options_count:
             raise ValueError(f"Invalid selector {selector} for {options_count} options")
 
-        # Validate and coerce value for selected option
-        selected_type = options[selector]
-
-        if selected_type is None:
-            # None option - value must be None
+        # Handle None option
+        if (selected_type := options[selector]) is None:
             if value is not None:
                 raise TypeError("Selected option is None, therefore value must be None")
             return (selector, None)
 
-        # Non-None option - validate and coerce value
+        # Handle non-None option
         if isinstance(value, selected_type):
             return (selector, value)
 
         try:
-            coerced_value = cast(Any, selected_type)(value)
-            return (selector, coerced_value)
+            return (selector, cast(Any, selected_type)(value))
         except Exception as e:
             raise TypeError(
                 f"Cannot coerce {type(value).__name__} to {selected_type.__name__}: {e}"
