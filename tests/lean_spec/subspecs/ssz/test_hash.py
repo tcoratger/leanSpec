@@ -579,92 +579,22 @@ class ByteList2048(BaseByteList):
     LIMIT = 2048
 
 
-class UnionUint16(SSZType):
+class UnionUint16(SSZUnion):
     """A union type that can hold Uint16."""
 
     OPTIONS = (Uint16,)
 
-    def __init__(self, selector: int, value: Any):
-        # This is a simplified implementation for testing
-        self.selector = selector
-        self.value = value
 
-    @classmethod
-    def is_fixed_size(cls) -> bool:
-        """Union is variable-size."""
-        return False
-
-    @classmethod
-    def get_byte_length(cls) -> int:
-        """Union is variable-size, so this raises a TypeError."""
-        raise TypeError(f"{cls.__name__} is variable-size")
-
-    def serialize(self, stream: Any) -> int:
-        """Simplified serialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-    @classmethod
-    def deserialize(cls, stream: Any, scope: int) -> Any:
-        """Simplified deserialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-
-class UnionNoneUint16Uint32(SSZType):
+class UnionNoneUint16Uint32(SSZUnion):
     """A union type that can hold None, Uint16, or Uint32."""
 
     OPTIONS = (None, Uint16, Uint32)
 
-    def __init__(self, selector: int, value: Any):
-        self.selector = selector
-        self.value = value
 
-    @classmethod
-    def is_fixed_size(cls) -> bool:
-        """Union is variable-size."""
-        return False
-
-    @classmethod
-    def get_byte_length(cls) -> int:
-        """Union is variable-size, so this raises a TypeError."""
-        raise TypeError(f"{cls.__name__} is variable-size")
-
-    def serialize(self, stream: Any) -> int:
-        """Simplified serialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-    @classmethod
-    def deserialize(cls, stream: Any, scope: int) -> Any:
-        """Simplified deserialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-
-class UnionUint16Uint32(SSZType):
+class UnionUint16Uint32(SSZUnion):
     """A union type that can hold Uint16 or Uint32."""
 
     OPTIONS = (Uint16, Uint32)
-
-    def __init__(self, selector: int, value: Any):
-        self.selector = selector
-        self.value = value
-
-    @classmethod
-    def is_fixed_size(cls) -> bool:
-        """Union is variable-size."""
-        return False
-
-    @classmethod
-    def get_byte_length(cls) -> int:
-        """Union is variable-size, so this raises a TypeError."""
-        raise TypeError(f"{cls.__name__} is variable-size")
-
-    def serialize(self, stream: Any) -> int:
-        """Simplified serialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-    @classmethod
-    def deserialize(cls, stream: Any, scope: int) -> Any:
-        """Simplified deserialize for testing."""
-        raise NotImplementedError("Not implemented for test")
 
 
 # Define SSZ Container types for testing.
@@ -843,7 +773,6 @@ def test_hash_tree_root_container_complex() -> None:
     assert hash_tree_root(v).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_single_type() -> None:
     """
     Tests the hash tree root of a Union object.
@@ -851,14 +780,13 @@ def test_hash_tree_root_union_single_type() -> None:
     # Define a Union type with one possible member.
     union = UnionUint16
     # Instantiate the union, selecting the first type (selector=0).
-    u = union(selector=0, value=Uint16(0xAABB))
+    u = union(data=(0, Uint16(0xAABB)))
     # The root is hash(root(value), chunk(selector)).
     # For selector 0, this is hashed with a zero chunk.
     expected = h(chunk("bbaa"), chunk(""))
     assert hash_tree_root(u).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_with_none_arm() -> None:
     """
     Tests a Union where the selected type is `None`.
@@ -866,14 +794,13 @@ def test_hash_tree_root_union_with_none_arm() -> None:
     # Define a Union type that includes None.
     union = UnionNoneUint16Uint32
     # Instantiate with the None type (selector=0).
-    u = union(selector=0, value=None)
+    u = union(data=(0, None))
     # For a `None` value, the value root is a zero chunk.
     # This is hashed with the selector (0), which is also a zero chunk.
     expected = h(chunk(""), chunk(""))
     assert hash_tree_root(u).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_other_arm() -> None:
     """
     Tests a Union where a non-zero selector is used.
@@ -881,13 +808,12 @@ def test_hash_tree_root_union_other_arm() -> None:
     # Define the Union type.
     union = UnionNoneUint16Uint32
     # Instantiate with the second type (selector=1).
-    u = union(selector=1, value=Uint16(0xAABB))
+    u = union(data=(1, Uint16(0xAABB)))
     # The root is hash(root(value), chunk(selector=1)).
     expected = h(chunk("bbaa"), chunk("01"))
     assert hash_tree_root(u).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_multi_other_arm() -> None:
     """
     Tests a Union with multiple non-None types.
@@ -895,7 +821,7 @@ def test_hash_tree_root_union_multi_other_arm() -> None:
     # Define a union of two integer types.
     union = UnionUint16Uint32
     # Instantiate with the second type (selector=1), which is Uint32.
-    u = union(selector=1, value=Uint32(0xDEADBEEF))
+    u = union(data=(1, Uint32(0xDEADBEEF)))
     # The root is hash(root(value), chunk(selector=1)).
     expected = h(chunk("efbeadde"), chunk("01"))
     assert hash_tree_root(u).hex() == expected
