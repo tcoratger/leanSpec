@@ -780,7 +780,7 @@ def test_hash_tree_root_union_single_type() -> None:
     # Define a Union type with one possible member.
     union = UnionUint16
     # Instantiate the union, selecting the first type (selector=0).
-    u = union(data=(0, Uint16(0xAABB)))
+    u = union(selector=0, value=Uint16(0xAABB))
     # The root is hash(root(value), chunk(selector)).
     # For selector 0, this is hashed with a zero chunk.
     expected = h(chunk("bbaa"), chunk(""))
@@ -794,7 +794,7 @@ def test_hash_tree_root_union_with_none_arm() -> None:
     # Define a Union type that includes None.
     union = UnionNoneUint16Uint32
     # Instantiate with the None type (selector=0).
-    u = union(data=(0, None))
+    u = union(selector=0, value=None)
     # For a `None` value, the value root is a zero chunk.
     # This is hashed with the selector (0), which is also a zero chunk.
     expected = h(chunk(""), chunk(""))
@@ -808,7 +808,7 @@ def test_hash_tree_root_union_other_arm() -> None:
     # Define the Union type.
     union = UnionNoneUint16Uint32
     # Instantiate with the second type (selector=1).
-    u = union(data=(1, Uint16(0xAABB)))
+    u = union(selector=1, value=Uint16(0xAABB))
     # The root is hash(root(value), chunk(selector=1)).
     expected = h(chunk("bbaa"), chunk("01"))
     assert hash_tree_root(u).hex() == expected
@@ -821,7 +821,7 @@ def test_hash_tree_root_union_multi_other_arm() -> None:
     # Define a union of two integer types.
     union = UnionUint16Uint32
     # Instantiate with the second type (selector=1), which is Uint32.
-    u = union(data=(1, Uint32(0xDEADBEEF)))
+    u = union(selector=1, value=Uint32(0xDEADBEEF))
     # The root is hash(root(value), chunk(selector=1)).
     expected = h(chunk("efbeadde"), chunk("01"))
     assert hash_tree_root(u).hex() == expected

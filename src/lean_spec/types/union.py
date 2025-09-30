@@ -13,7 +13,7 @@ from typing import (
     cast,
 )
 
-from pydantic import Field, field_validator
+from pydantic import model_validator
 from typing_extensions import Self
 
 from .ssz_base import SSZModel, SSZType
@@ -56,16 +56,13 @@ class SSZUnion(SSZModel):
     # Direct instantiation
     instance = MyUnion(selector=1, value=Uint32(42))
 
-    # Using data tuple (internal format)
-    instance = MyUnion(data=(1, Uint32(42)))
-
     # Pydantic-style creation
     instance = MyUnion.model_validate({"selector": 1, "value": 42})
     ```
 
     ## Data Access
 
-    Access union data through properties:
+    Access union data through direct fields:
 
     ```python
     assert instance.selector == 1
@@ -94,17 +91,16 @@ class SSZUnion(SSZModel):
         - selector=2 -> Uint32 values
     """
 
-    data: Tuple[int, Any] = Field(default_factory=lambda: (0, None))
-    """The union data stored as (selector, value) tuple.
+    selector: int
+    """The 0-based index of the currently selected option."""
 
-    This is the internal storage format. Use selector/value properties
-    or the constructor parameters for external access.
-    """
+    value: Any
+    """The value currently stored in this Union."""
 
-    @field_validator("data", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _validate_union_data(cls, v: Any) -> Tuple[int, Any]:
-        """Validate and convert union data to (selector, value) tuple."""
+    def _validate_union_data(cls, data: Any) -> dict[str, Any]:
+        """Validate selector and value together."""
         # Check required class attributes and get options
         if not hasattr(cls, "OPTIONS") or not isinstance(cls.OPTIONS, tuple):
             raise TypeError(f"{cls.__name__} must define OPTIONS as a tuple of SSZ types")
@@ -128,13 +124,11 @@ class SSZUnion(SSZModel):
             elif opt is not None and not isinstance(opt, type):
                 raise TypeError(f"{cls.__name__} option {i} must be a type, got {type(opt)}")
 
-        # Normalize input and validate selector
-        if not isinstance(v, tuple) or len(v) != 2:
-            raise ValueError(
-                f"{cls.__name__} data must be a (selector, value) tuple, got {type(v)}"
-            )
+        # Extract selector and value from input
+        selector = data.get("selector")
+        value = data.get("value")
 
-        selector, value = v
+        # Validate selector
         if not isinstance(selector, int) or not 0 <= selector < options_count:
             raise ValueError(f"Invalid selector {selector} for {options_count} options")
 
@@ -142,28 +136,19 @@ class SSZUnion(SSZModel):
         if (selected_type := options[selector]) is None:
             if value is not None:
                 raise TypeError("Selected option is None, therefore value must be None")
-            return (selector, None)
+            return {"selector": selector, "value": None}
 
-        # Handle non-None option
+        # Handle non-None option - coerce value if needed
         if isinstance(value, selected_type):
-            return (selector, value)
+            return {"selector": selector, "value": value}
 
         try:
-            return (selector, cast(Any, selected_type)(value))
+            coerced_value = cast(Any, selected_type)(value)
+            return {"selector": selector, "value": coerced_value}
         except Exception as e:
             raise TypeError(
                 f"Cannot coerce {type(value).__name__} to {selected_type.__name__}: {e}"
             ) from e
-
-    @property
-    def selector(self) -> int:
-        """The 0-based index of the currently selected option."""
-        return self.data[0]
-
-    @property
-    def value(self) -> Any:
-        """The value currently stored in this Union."""
-        return self.data[1]
 
     @property
     def selected_type(self) -> Type[SSZType] | None:
@@ -218,7 +203,7 @@ class SSZUnion(SSZModel):
         if selected_type is None:
             if remaining_bytes != 0:
                 raise ValueError("Invalid encoding: None arm must have no payload bytes")
-            return cls(data=(selector, None))
+            return cls(selector=selector, value=None)
 
         # Handle non-None option
         if selected_type.is_fixed_size() and hasattr(selected_type, "get_byte_length"):
@@ -229,7 +214,7 @@ class SSZUnion(SSZModel):
         # Deserialize value
         try:
             value = selected_type.deserialize(stream, remaining_bytes)
-            return cls(data=(selector, value))
+            return cls(selector=selector, value=value)
         except Exception as e:
             raise IOError(f"Failed to deserialize {selected_type.__name__}: {e}") from e
 
