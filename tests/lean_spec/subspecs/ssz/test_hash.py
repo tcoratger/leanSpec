@@ -24,7 +24,7 @@ from lean_spec.types.uint import (
     Uint128,
     Uint256,
 )
-from lean_spec.types.union import Union
+from lean_spec.types.union import SSZUnion
 
 
 # Concrete SSZList classes for tests
@@ -579,92 +579,22 @@ class ByteList2048(BaseByteList):
     LIMIT = 2048
 
 
-class UnionUint16(SSZType):
+class UnionUint16(SSZUnion):
     """A union type that can hold Uint16."""
 
     OPTIONS = (Uint16,)
 
-    def __init__(self, selector: int, value: Any):
-        # This is a simplified implementation for testing
-        self.selector = selector
-        self.value = value
 
-    @classmethod
-    def is_fixed_size(cls) -> bool:
-        """Union is variable-size."""
-        return False
-
-    @classmethod
-    def get_byte_length(cls) -> int:
-        """Union is variable-size, so this raises a TypeError."""
-        raise TypeError(f"{cls.__name__} is variable-size")
-
-    def serialize(self, stream: Any) -> int:
-        """Simplified serialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-    @classmethod
-    def deserialize(cls, stream: Any, scope: int) -> Any:
-        """Simplified deserialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-
-class UnionNoneUint16Uint32(SSZType):
+class UnionNoneUint16Uint32(SSZUnion):
     """A union type that can hold None, Uint16, or Uint32."""
 
     OPTIONS = (None, Uint16, Uint32)
 
-    def __init__(self, selector: int, value: Any):
-        self.selector = selector
-        self.value = value
 
-    @classmethod
-    def is_fixed_size(cls) -> bool:
-        """Union is variable-size."""
-        return False
-
-    @classmethod
-    def get_byte_length(cls) -> int:
-        """Union is variable-size, so this raises a TypeError."""
-        raise TypeError(f"{cls.__name__} is variable-size")
-
-    def serialize(self, stream: Any) -> int:
-        """Simplified serialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-    @classmethod
-    def deserialize(cls, stream: Any, scope: int) -> Any:
-        """Simplified deserialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-
-class UnionUint16Uint32(SSZType):
+class UnionUint16Uint32(SSZUnion):
     """A union type that can hold Uint16 or Uint32."""
 
     OPTIONS = (Uint16, Uint32)
-
-    def __init__(self, selector: int, value: Any):
-        self.selector = selector
-        self.value = value
-
-    @classmethod
-    def is_fixed_size(cls) -> bool:
-        """Union is variable-size."""
-        return False
-
-    @classmethod
-    def get_byte_length(cls) -> int:
-        """Union is variable-size, so this raises a TypeError."""
-        raise TypeError(f"{cls.__name__} is variable-size")
-
-    def serialize(self, stream: Any) -> int:
-        """Simplified serialize for testing."""
-        raise NotImplementedError("Not implemented for test")
-
-    @classmethod
-    def deserialize(cls, stream: Any, scope: int) -> Any:
-        """Simplified deserialize for testing."""
-        raise NotImplementedError("Not implemented for test")
 
 
 # Define SSZ Container types for testing.
@@ -843,7 +773,6 @@ def test_hash_tree_root_container_complex() -> None:
     assert hash_tree_root(v).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_single_type() -> None:
     """
     Tests the hash tree root of a Union object.
@@ -858,7 +787,6 @@ def test_hash_tree_root_union_single_type() -> None:
     assert hash_tree_root(u).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_with_none_arm() -> None:
     """
     Tests a Union where the selected type is `None`.
@@ -873,7 +801,6 @@ def test_hash_tree_root_union_with_none_arm() -> None:
     assert hash_tree_root(u).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_other_arm() -> None:
     """
     Tests a Union where a non-zero selector is used.
@@ -887,7 +814,6 @@ def test_hash_tree_root_union_other_arm() -> None:
     assert hash_tree_root(u).hex() == expected
 
 
-@pytest.mark.skip(reason="Union implementation needs update for new type system")
 def test_hash_tree_root_union_multi_other_arm() -> None:
     """
     Tests a Union with multiple non-None types.
