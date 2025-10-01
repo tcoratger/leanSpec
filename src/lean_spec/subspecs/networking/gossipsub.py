@@ -148,11 +148,6 @@ class GossipsubMessage:
             A 20-byte raw bytes digest.
         """
         # Concatenate all components: domain + topic_len + topic + data
-        data_to_hash = (
-            domain
-            + len(self.topic).to_bytes(8, "little")
-            + self.topic
-            + message_data
-        )
+        data_to_hash = domain + len(self.topic).to_bytes(8, "little") + self.topic + message_data
         # Compute SHA256 and take the first 20 bytes
         return hashlib.sha256(data_to_hash).digest()[:20]
