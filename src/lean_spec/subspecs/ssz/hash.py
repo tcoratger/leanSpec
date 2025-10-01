@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from functools import singledispatch
 from math import ceil
-from typing import Final, Type
 
 from lean_spec.subspecs.ssz.constants import BYTES_PER_CHUNK
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
@@ -74,8 +73,7 @@ def _htr_bytearray(value: bytearray) -> Bytes32:
 
 @hash_tree_root.register
 def _htr_memoryview(value: memoryview) -> Bytes32:
-    data: Final[bytes] = value.tobytes()
-    return Merkle.merkleize(Packer.pack_bytes(data))
+    return Merkle.merkleize(Packer.pack_bytes(value.tobytes()))
 
 
 @hash_tree_root.register
@@ -86,73 +84,82 @@ def _htr_bytevector(value: BaseBytes) -> Bytes32:
 @hash_tree_root.register
 def _htr_bytelist(value: BaseByteList) -> Bytes32:
     data = value.encode_bytes()
+    # Compute limit in chunks and merkleize the packed bytes
     limit_chunks = ceil(type(value).LIMIT / BYTES_PER_CHUNK)
-    root = Merkle.merkleize(Packer.pack_bytes(data), limit=limit_chunks)
-    return Merkle.mix_in_length(root, len(data))
+    # Mix in the length of the data
+    return Merkle.mix_in_length(
+        Merkle.merkleize(Packer.pack_bytes(data), limit=limit_chunks), len(data)
+    )
 
 
 @hash_tree_root.register
 def _htr_bitvector_base(value: BaseBitvector) -> Bytes32:
-    nbits = type(value).LENGTH
-    limit = (nbits + 255) // 256
-    chunks = Packer.pack_bits(tuple(bool(b) for b in value.data))
-    return Merkle.merkleize(chunks, limit=limit)
+    # Compute limit in chunks: (nbits + 255) // 256
+    limit = (type(value).LENGTH + 255) // 256
+    # Pack bits and merkleize with the computed limit
+    return Merkle.merkleize(Packer.pack_bits(tuple(bool(b) for b in value.data)), limit=limit)
 
 
 @hash_tree_root.register
 def _htr_bitlist_base(value: BaseBitlist) -> Bytes32:
+    # Compute limit in chunks: (LIMIT + 255) // 256
     limit = (type(value).LIMIT + 255) // 256
-    chunks = Packer.pack_bits(tuple(bool(b) for b in value.data))
-    root = Merkle.merkleize(chunks, limit=limit)
-    return Merkle.mix_in_length(root, len(value.data))
+    # Pack bits, merkleize, and mix in the length
+    return Merkle.mix_in_length(
+        Merkle.merkleize(Packer.pack_bits(tuple(bool(b) for b in value.data)), limit=limit),
+        len(value.data),
+    )
 
 
 @hash_tree_root.register
 def _htr_vector(value: SSZVector) -> Bytes32:
-    elem_t: Type[object] = type(value).ELEMENT_TYPE
-    length: int = type(value).LENGTH
+    elem_t, length = type(value).ELEMENT_TYPE, type(value).LENGTH
 
-    # BASIC elements (uint/boolean): pack serialized bytes
     if issubclass(elem_t, (BaseUint, Boolean)):
+        # BASIC elements: pack serialized bytes
         elem_size = elem_t.get_byte_length() if issubclass(elem_t, BaseUint) else 1
-        concat = b"".join(e.encode_bytes() for e in value)
-        limit_chunks = (length * elem_size + (BYTES_PER_CHUNK - 1)) // BYTES_PER_CHUNK
-        return Merkle.merkleize(Packer.pack_bytes(concat), limit=limit_chunks)
+        # Compute limit in chunks: ceil((length * elem_size) / BYTES_PER_CHUNK)
+        limit_chunks = (length * elem_size + BYTES_PER_CHUNK - 1) // BYTES_PER_CHUNK
+        return Merkle.merkleize(
+            Packer.pack_bytes(b"".join(e.encode_bytes() for e in value)),
+            limit=limit_chunks,
+        )
 
     # COMPOSITE elements: merkleize child roots with limit = length
-    leaves = [hash_tree_root(e) for e in value]
-    return Merkle.merkleize(leaves, limit=length)
+    return Merkle.merkleize([hash_tree_root(e) for e in value], limit=length)
 
 
 @hash_tree_root.register
 def _htr_list(value: SSZList) -> Bytes32:
-    elem_t: Type[object] = type(value).ELEMENT_TYPE
-    limit: int = type(value).LIMIT
+    elem_t, limit = type(value).ELEMENT_TYPE, type(value).LIMIT
 
-    # BASIC elements
     if issubclass(elem_t, (BaseUint, Boolean)):
+        # BASIC elements: pack serialized bytes
         elem_size = elem_t.get_byte_length() if issubclass(elem_t, BaseUint) else 1
-        concat = b"".join(e.encode_bytes() for e in value)
-        limit_chunks = (limit * elem_size + (BYTES_PER_CHUNK - 1)) // BYTES_PER_CHUNK
-        root = Merkle.merkleize(Packer.pack_bytes(concat), limit=limit_chunks)
-        return Merkle.mix_in_length(root, len(value))
+        # Compute limit in chunks: ceil((limit * elem_size) / BYTES_PER_CHUNK)
+        limit_chunks = (limit * elem_size + BYTES_PER_CHUNK - 1) // BYTES_PER_CHUNK
+        root = Merkle.merkleize(
+            Packer.pack_bytes(b"".join(e.encode_bytes() for e in value)),
+            limit=limit_chunks,
+        )
+    else:
+        # COMPOSITE elements: merkleize child roots
+        root = Merkle.merkleize([hash_tree_root(e) for e in value], limit=limit)
 
-    # COMPOSITE elements
-    leaves = [hash_tree_root(e) for e in value]
-    root = Merkle.merkleize(leaves, limit=limit)
+    # Mix in the length for both cases
     return Merkle.mix_in_length(root, len(value))
 
 
 @hash_tree_root.register
 def _htr_container(value: Container) -> Bytes32:
-    # Preserve declared field order from the Pydantic model.
-    leaves = [hash_tree_root(getattr(value, fname)) for fname in type(value).model_fields.keys()]
-    return Merkle.merkleize(leaves)
+    # Preserve declared field order from the Pydantic model
+    return Merkle.merkleize(
+        [hash_tree_root(getattr(value, fname)) for fname in type(value).model_fields.keys()]
+    )
 
 
 @hash_tree_root.register
 def _htr_union(value: SSZUnion) -> Bytes32:
-    sel = value.selector
     if value.selected_type is None:
         return Merkle.mix_in_selector(Bytes32.zero(), 0)
-    return Merkle.mix_in_selector(hash_tree_root(value.value), sel)
+    return Merkle.mix_in_selector(hash_tree_root(value.value), value.selector)
