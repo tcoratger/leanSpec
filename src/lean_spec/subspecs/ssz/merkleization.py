@@ -28,14 +28,14 @@ class Merkle:
         """
         n = len(chunks)
         if n == 0:
-            # If a limit is provided, the tree width is determined by that limit,
-            # and the root must be the zero-subtree root of that width.
-            if limit is not None:
-                width = get_power_of_two_ceil(limit)
-                return Merkle._zero_tree_root(width)
-            return ZERO_HASH
+            # If a limit is provided, return the zero-subtree root of that width
+            return (
+                Merkle._zero_tree_root(get_power_of_two_ceil(limit))
+                if limit is not None
+                else ZERO_HASH
+            )
 
-        # Determine the width of the bottom layer after padding/limiting.
+        # Determine the width of the bottom layer after padding/limiting
         if limit is None:
             width = get_power_of_two_ceil(n)
         else:
@@ -43,21 +43,20 @@ class Merkle:
                 raise ValueError("merkleize: input exceeds limit")
             width = get_power_of_two_ceil(limit)
 
-        # Width of 1: the single chunk is the root.
+        # Width of 1: the single chunk is the root
         if width == 1:
             return chunks[0]
 
-        # Start with the leaf layer: provided chunks + ZERO padding.
+        # Start with the leaf layer: provided chunks + ZERO padding
         level: List[Bytes32] = list(chunks) + [ZERO_HASH] * (width - n)
 
-        # Reduce bottom-up: pairwise hash until a single root remains.
+        # Reduce bottom-up: pairwise hash until a single root remains
         while len(level) > 1:
-            nxt: List[Bytes32] = []
             it = iter(level)
-            for a in it:
-                b = next(it, ZERO_HASH)  # Safe: even-length implied by padding
-                nxt.append(hash_nodes(a, b))
-            level = nxt
+            # Pair up elements: hash each (a, b) pair
+            level = [
+                hash_nodes(a, next(it, ZERO_HASH)) for a in it
+            ]  # Safe: even-length implied by padding
         return level[0]
 
     @staticmethod
@@ -71,17 +70,17 @@ class Merkle:
         if len(chunks) == 0:
             return ZERO_HASH
 
-        # Right branch: fixed-width merkleization of the first `num_leaves` chunks.
+        # Right branch: fixed-width merkleization of the first `num_leaves` chunks
         right = Merkle.merkleize(chunks[:num_leaves], num_leaves)
 
-        # Left branch: recursively collapse everything beyond `num_leaves`.
+        # Left branch: recursively collapse everything beyond `num_leaves`
         left = (
             Merkle.merkleize_progressive(chunks[num_leaves:], num_leaves * 4)
             if len(chunks) > num_leaves
             else ZERO_HASH
         )
 
-        # Combine branches.
+        # Combine branches
         return hash_nodes(left, right)
 
     @staticmethod
@@ -89,17 +88,16 @@ class Merkle:
         """Mix the length (as uint256 little-endian) into a Merkle root."""
         if length < 0:
             raise ValueError("length must be non-negative")
-        # The "mix" is `hash(root + length_uint256_le)`.
-        le = length.to_bytes(32, "little")
-        return hash_nodes(root, Bytes32(le))
+        # The "mix" is `hash(root + length_uint256_le)`
+        return hash_nodes(root, Bytes32(length.to_bytes(32, "little")))
 
     @staticmethod
     def mix_in_selector(root: Bytes32, selector: int) -> Bytes32:
         """Mix the union selector (as uint256 little-endian) into a Merkle root."""
         if selector < 0:
             raise ValueError("selector must be non-negative")
-        le = selector.to_bytes(32, "little")
-        return hash_nodes(root, Bytes32(le))
+        # The "mix" is `hash(root + selector_uint256_le)`
+        return hash_nodes(root, Bytes32(selector.to_bytes(32, "little")))
 
     @staticmethod
     def _zero_tree_root(width_pow2: int) -> Bytes32:
@@ -110,9 +108,8 @@ class Merkle:
         """
         if width_pow2 <= 1:
             return ZERO_HASH
-        h = ZERO_HASH
-        w = width_pow2
+        # Build tree from bottom up: hash ZERO_HASH with itself repeatedly
+        h, w = ZERO_HASH, width_pow2
         while w > 1:
-            h = hash_nodes(h, h)
-            w //= 2
+            h, w = hash_nodes(h, h), w // 2
         return h

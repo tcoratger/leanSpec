@@ -64,10 +64,10 @@ class Packer:
         list[Bytes32]
             Concatenated and right-padded chunks ready for Merkleization.
         """
-        # Concatenate the serialized representations of individual basic values.
-        joined = b"".join(serialized_basic_values)
-        # Right-pad, then partition into 32-byte slices.
-        return Packer._partition_chunks(Packer._right_pad_to_chunk(joined))
+        # Concatenate, right-pad, then partition into 32-byte slices
+        return Packer._partition_chunks(
+            Packer._right_pad_to_chunk(b"".join(serialized_basic_values))
+        )
 
     @staticmethod
     def pack_bytes(data: bytes) -> List[Bytes32]:
