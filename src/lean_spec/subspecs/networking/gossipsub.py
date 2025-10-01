@@ -110,30 +110,31 @@ class GossipsubMessage:
         if self._id is not None:
             return self._id
 
-        domain: bytes
-        data_for_hash: bytes
-
+        # Determine domain and data based on snappy decompression
         if self._snappy_decompress:
             try:
                 # Try to decompress the data with snappy
                 decompressed_data = self._snappy_decompress(self.raw_data)
                 # Valid snappy decompression - use valid domain
-                domain = MESSAGE_DOMAIN_VALID_SNAPPY
-                data_for_hash = decompressed_data
+                domain, data_for_hash = (
+                    MESSAGE_DOMAIN_VALID_SNAPPY,
+                    decompressed_data,
+                )
             except Exception:
                 # Invalid snappy decompression - use invalid domain
-                domain = MESSAGE_DOMAIN_INVALID_SNAPPY
-                data_for_hash = self.raw_data
+                domain, data_for_hash = (
+                    MESSAGE_DOMAIN_INVALID_SNAPPY,
+                    self.raw_data,
+                )
         else:
             # No decompressor provided - use invalid domain
-            domain = MESSAGE_DOMAIN_INVALID_SNAPPY
-            data_for_hash = self.raw_data
+            domain, data_for_hash = (
+                MESSAGE_DOMAIN_INVALID_SNAPPY,
+                self.raw_data,
+            )
 
-        # The internal computation returns the raw bytes...
-        computed_id_bytes = self._compute_raw_id(domain, data_for_hash)
-
-        # We then cast to our strict NewType before caching and returning.
-        self._id = MessageId(computed_id_bytes)
+        # Compute the raw ID bytes and cast to our strict type before caching
+        self._id = MessageId(self._compute_raw_id(domain, data_for_hash))
         return self._id
 
     def _compute_raw_id(self, domain: bytes, message_data: bytes) -> bytes:
@@ -147,12 +148,7 @@ class GossipsubMessage:
         Returns:
             A 20-byte raw bytes digest.
         """
-        # Encode the topic length as little-endian bytes
-        topic_len_bytes = len(self.topic).to_bytes(8, "little")
-
-        # Concatenate all components for hashing
-        data_to_hash = domain + topic_len_bytes + self.topic + message_data
-
+        # Concatenate all components: domain + topic_len + topic + data
+        data_to_hash = domain + len(self.topic).to_bytes(8, "little") + self.topic + message_data
         # Compute SHA256 and take the first 20 bytes
-        digest = hashlib.sha256(data_to_hash).digest()
-        return digest[:20]
+        return hashlib.sha256(data_to_hash).digest()[:20]
