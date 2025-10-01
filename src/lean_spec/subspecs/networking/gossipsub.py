@@ -94,7 +94,8 @@ class GossipsubMessage:
         self.topic: bytes = topic
         self.raw_data: bytes = data
         self._snappy_decompress = snappy_decompress
-        self._id: Optional[MessageId] = None  # Cache for the computed ID
+        # Cache for the computed ID
+        self._id: Optional[MessageId] = None
 
     @property
     def id(self) -> MessageId:
