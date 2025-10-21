@@ -123,6 +123,7 @@ class Store(Container):
         # Validate vote targets exist in store
         assert vote.source.root in self.blocks, f"Unknown source block: {vote.source.root.hex()}"
         assert vote.target.root in self.blocks, f"Unknown target block: {vote.target.root.hex()}"
+        assert vote.head.root in self.blocks, f"Unknown head block: {vote.head.root.hex()}"
 
         # Validate slot relationships
         source_block = self.blocks[vote.source.root]
@@ -136,7 +137,7 @@ class Store(Container):
         assert target_block.slot == vote.target.slot, "Target checkpoint slot mismatch"
 
         # Validate attestation is not too far in the future
-        current_slot = Slot(self.time // SECONDS_PER_INTERVAL)
+        current_slot = Slot(self.time // INTERVALS_PER_SLOT)
         assert vote.slot <= Slot(current_slot + Slot(1)), "Attestation too far in future"
 
     def process_attestation(self, signed_vote: "SignedVote", is_from_block: bool = False) -> None:
@@ -173,7 +174,7 @@ class Store(Container):
             # Network gossip attestation processing
 
             # Ensure forkchoice is current before processing gossip
-            time_slots = self.time // SECONDS_PER_INTERVAL
+            time_slots = self.time // INTERVALS_PER_SLOT
             assert vote.slot <= time_slots, "Attestation from future slot"
 
             # Update new votes if this is latest from validator
