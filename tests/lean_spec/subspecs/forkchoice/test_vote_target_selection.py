@@ -14,6 +14,8 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
+from .conftest import build_signed_attestation
+
 
 @pytest.fixture
 def config() -> Config:
@@ -173,7 +175,10 @@ class TestVoteTargetCalculation:
         # Should walk back towards safe target
         assert target.root in blocks
 
-    def test_vote_target_justifiable_slot_constraint(self, config: Config) -> None:
+    def test_vote_target_justifiable_slot_constraint(
+        self,
+        config: Config,
+    ) -> None:
         """Test that vote target respects justifiable slot constraints."""
         # Create a long chain to test slot justification
         blocks = {}
@@ -335,8 +340,14 @@ class TestSafeTargetComputation:
 
         # Add some new votes
         new_votes = {
-            ValidatorIndex(0): Checkpoint(root=block_1_hash, slot=Slot(1)),
-            ValidatorIndex(1): Checkpoint(root=block_1_hash, slot=Slot(1)),
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=block_1_hash, slot=Slot(1)),
+            ),
+            ValidatorIndex(1): build_signed_attestation(
+                ValidatorIndex(1),
+                Checkpoint(root=block_1_hash, slot=Slot(1)),
+            ),
         }
 
         store = Store(
@@ -364,7 +375,7 @@ class TestEdgeCases:
 
     def test_vote_target_empty_blocks(self, config: Config) -> None:
         """Test vote target with minimal block set."""
-        checkpoint = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
+        checkpoint = Checkpoint.default()
 
         store = Store(
             time=Uint64(100),

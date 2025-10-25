@@ -4,10 +4,18 @@ from typing import Type
 
 import pytest
 
-from lean_spec.subspecs.containers import BlockBody, Checkpoint, State
+from lean_spec.subspecs.containers import (
+    Attestation,
+    AttestationData,
+    BlockBody,
+    Checkpoint,
+    SignedAttestation,
+    State,
+)
 from lean_spec.subspecs.containers.block import Attestations, BlockHeader
 from lean_spec.subspecs.containers.config import Config
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
@@ -15,11 +23,11 @@ from lean_spec.subspecs.containers.state.types import (
     JustifiedSlots,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Bytes4000, Uint64, ValidatorIndex
 
 
 class MockState(State):
-    """A mock State for testing that only requires specifying latest_justified."""
+    """Mock state that exposes configurable ``latest_justified``."""
 
     def __init__(self, latest_justified: Checkpoint) -> None:
         """Initialize a mock state with minimal defaults."""
@@ -42,12 +50,37 @@ class MockState(State):
             slot=Slot(0),
             latest_block_header=genesis_header,
             latest_justified=latest_justified,
-            latest_finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
+            latest_finalized=Checkpoint.default(),
             historical_block_hashes=HistoricalBlockHashes(data=[]),
             justified_slots=JustifiedSlots(data=[]),
+            validators=Validators(data=[]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         )
+
+
+def build_signed_attestation(
+    validator: ValidatorIndex,
+    target: Checkpoint,
+    source: Checkpoint | None = None,
+) -> SignedAttestation:
+    """Construct a SignedValidatorAttestation pointing to ``target``."""
+
+    source_checkpoint = source or Checkpoint.default()
+    attestation_data = AttestationData(
+        slot=target.slot,
+        head=target,
+        target=target,
+        source=source_checkpoint,
+    )
+    message = Attestation(
+        validator_id=validator,
+        data=attestation_data,
+    )
+    return SignedAttestation(
+        message=message,
+        signature=Bytes4000.zero(),
+    )
 
 
 @pytest.fixture

@@ -14,6 +14,8 @@ from lean_spec.subspecs.forkchoice.helpers import (
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
+from .conftest import build_signed_attestation
+
 if TYPE_CHECKING:
     from .conftest import MockState
 
@@ -64,7 +66,12 @@ class TestForkChoiceHeadFunction:
         target_hash = list(sample_blocks.keys())[2]  # block_b
 
         # Create votes pointing to target
-        votes = {ValidatorIndex(0): Checkpoint(root=target_hash, slot=Slot(2))}
+        votes = {
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=target_hash, slot=Slot(2)),
+            )
+        }
 
         head = get_fork_choice_head(
             blocks=sample_blocks, root=root_hash, latest_votes=votes, min_score=0
@@ -88,7 +95,12 @@ class TestForkChoiceHeadFunction:
         target_hash = list(sample_blocks.keys())[2]  # block_b
 
         # Single vote, but require min_score of 2
-        votes = {ValidatorIndex(0): Checkpoint(root=target_hash, slot=Slot(2))}
+        votes = {
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=target_hash, slot=Slot(2)),
+            )
+        }
 
         head = get_fork_choice_head(
             blocks=sample_blocks, root=root_hash, latest_votes=votes, min_score=2
@@ -104,9 +116,18 @@ class TestForkChoiceHeadFunction:
 
         # Multiple votes for same target
         votes = {
-            ValidatorIndex(0): Checkpoint(root=target_hash, slot=Slot(2)),
-            ValidatorIndex(1): Checkpoint(root=target_hash, slot=Slot(2)),
-            ValidatorIndex(2): Checkpoint(root=target_hash, slot=Slot(2)),
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=target_hash, slot=Slot(2)),
+            ),
+            ValidatorIndex(1): build_signed_attestation(
+                ValidatorIndex(1),
+                Checkpoint(root=target_hash, slot=Slot(2)),
+            ),
+            ValidatorIndex(2): build_signed_attestation(
+                ValidatorIndex(2),
+                Checkpoint(root=target_hash, slot=Slot(2)),
+            ),
         }
 
         head = get_fork_choice_head(
@@ -136,9 +157,10 @@ class TestLatestJustifiedFunction:
         assert result == checkpoint
 
     def test_get_latest_justified_multiple_states(
-        self, mock_state_factory: Type["MockState"]
+        self,
+        mock_state_factory: Type["MockState"],
     ) -> None:
-        """Test get_latest_justified with states having different justified slots."""
+        """Test get_latest_justified when states have different slots."""
         checkpoint1 = Checkpoint(root=Bytes32(b"test1" + b"\x00" * 27), slot=Slot(10))
         checkpoint2 = Checkpoint(
             root=Bytes32(b"test2" + b"\x00" * 27), slot=Slot(20)
@@ -153,7 +175,7 @@ class TestLatestJustifiedFunction:
         assert result == checkpoint2  # Should return the one with higher slot
 
     def test_get_latest_justified_tie_breaking(self, mock_state_factory: Type["MockState"]) -> None:
-        """Test get_latest_justified when multiple states have same justified slot."""
+        """Test get_latest_justified when slots tie."""
         checkpoint1 = Checkpoint(root=Bytes32(b"test1" + b"\x00" * 27), slot=Slot(10))
         checkpoint2 = Checkpoint(root=Bytes32(b"test2" + b"\x00" * 27), slot=Slot(10))
 

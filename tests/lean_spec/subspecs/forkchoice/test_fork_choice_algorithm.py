@@ -17,6 +17,8 @@ from lean_spec.subspecs.forkchoice.helpers import get_fork_choice_head
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
+from .conftest import build_signed_attestation
+
 
 @pytest.fixture
 def sample_blocks() -> Dict[Bytes32, Block]:
@@ -76,7 +78,12 @@ class TestLMDGHOSTAlgorithm:
         root_hash = list(sample_blocks.keys())[0]
         target_hash = list(sample_blocks.keys())[2]  # block_b
 
-        votes = {ValidatorIndex(0): Checkpoint(root=target_hash, slot=Slot(2))}
+        votes = {
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=target_hash, slot=Slot(2)),
+            )
+        }
 
         head = get_fork_choice_head(
             blocks=sample_blocks,
@@ -148,10 +155,17 @@ class TestLMDGHOSTAlgorithm:
 
         # More votes for fork 2 (C->D)
         votes = {
-            ValidatorIndex(0): Checkpoint(root=block_d_hash, slot=Slot(2)),
-            ValidatorIndex(1): Checkpoint(root=block_d_hash, slot=Slot(2)),
-            ValidatorIndex(2): Checkpoint(
-                root=block_b_hash, slot=Slot(2)
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=block_d_hash, slot=Slot(2)),
+            ),
+            ValidatorIndex(1): build_signed_attestation(
+                ValidatorIndex(1),
+                Checkpoint(root=block_d_hash, slot=Slot(2)),
+            ),
+            ValidatorIndex(2): build_signed_attestation(
+                ValidatorIndex(2),
+                Checkpoint(root=block_b_hash, slot=Slot(2)),
             ),  # Single vote for fork 1
         }
 
@@ -204,8 +218,14 @@ class TestLMDGHOSTAlgorithm:
 
         # Equal votes for both forks
         votes = {
-            ValidatorIndex(0): Checkpoint(root=block_a_hash, slot=Slot(1)),
-            ValidatorIndex(1): Checkpoint(root=block_b_hash, slot=Slot(1)),
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=block_a_hash, slot=Slot(1)),
+            ),
+            ValidatorIndex(1): build_signed_attestation(
+                ValidatorIndex(1),
+                Checkpoint(root=block_b_hash, slot=Slot(1)),
+            ),
         }
 
         head = get_fork_choice_head(
@@ -285,7 +305,12 @@ class TestLMDGHOSTAlgorithm:
 
         # Vote for the head block
         head_hash = prev_hash
-        votes = {ValidatorIndex(0): Checkpoint(root=head_hash, slot=Slot(9))}
+        votes = {
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=head_hash, slot=Slot(9)),
+            )
+        }
 
         # Should find the head
         result = get_fork_choice_head(
@@ -345,7 +370,10 @@ class TestLMDGHOSTAlgorithm:
 
         # Vote for ancestor should still find the head
         votes = {
-            ValidatorIndex(0): Checkpoint(root=block_a_hash, slot=Slot(1)),
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=block_a_hash, slot=Slot(1)),
+            ),
         }
 
         head = get_fork_choice_head(
@@ -384,7 +412,12 @@ class TestLMDGHOSTAlgorithm:
         }
 
         # Single vote shouldn't meet min_score of 2
-        votes = {ValidatorIndex(0): Checkpoint(root=block_a_hash, slot=Slot(1))}
+        votes = {
+            ValidatorIndex(0): build_signed_attestation(
+                ValidatorIndex(0),
+                Checkpoint(root=block_a_hash, slot=Slot(1)),
+            )
+        }
 
         head = get_fork_choice_head(
             blocks=blocks,

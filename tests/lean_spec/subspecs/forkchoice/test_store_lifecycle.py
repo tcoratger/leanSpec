@@ -17,10 +17,13 @@ from lean_spec.subspecs.containers.state import (
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
+    Validators,
 )
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+
+from .conftest import build_signed_attestation
 
 
 @pytest.fixture
@@ -75,6 +78,15 @@ class TestStoreCreation:
         )
         block_hash = hash_tree_root(block)
 
+        signed_known = build_signed_attestation(
+            ValidatorIndex(0),
+            checkpoint,
+        )
+        signed_new = build_signed_attestation(
+            ValidatorIndex(1),
+            checkpoint,
+        )
+
         store = Store(
             time=Uint64(200),
             config=config,
@@ -84,8 +96,8 @@ class TestStoreCreation:
             latest_finalized=checkpoint,
             blocks={block_hash: block},
             states={},
-            latest_known_votes={ValidatorIndex(0): checkpoint},
-            latest_new_votes={ValidatorIndex(1): checkpoint},
+            latest_known_votes={ValidatorIndex(0): signed_known},
+            latest_new_votes={ValidatorIndex(1): signed_new},
         )
 
         assert store.time == Uint64(200)
@@ -121,6 +133,7 @@ class TestStoreCreation:
             latest_finalized=checkpoint,
             historical_block_hashes=HistoricalBlockHashes(data=[]),
             justified_slots=JustifiedSlots(data=[]),
+            validators=Validators(data=[]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         )

@@ -13,17 +13,17 @@ from lean_spec.types import (
     is_proposer,
 )
 
-from ..block import Block, BlockBody, BlockHeader, SignedBlock
+from ..block import Block, BlockBody, BlockHeader
 from ..block.types import Attestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
-from ..vote import Vote
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
+    Validators,
 )
 
 
@@ -54,6 +54,9 @@ class State(Container):
 
     justified_slots: JustifiedSlots
     """A bitfield indicating which historical slots were justified."""
+
+    validators: Validators
+    """Registry of validators tracked by the state."""
 
     # Justification tracking (flattened for SSZ compatibility)
     justifications_roots: JustificationRoots
@@ -99,10 +102,11 @@ class State(Container):
             config=genesis_config,
             slot=Slot(0),
             latest_block_header=genesis_header,
-            latest_justified=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
-            latest_finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
+            latest_justified=Checkpoint.default(),
+            latest_finalized=Checkpoint.default(),
             historical_block_hashes=HistoricalBlockHashes(data=[]),
             justified_slots=JustifiedSlots(data=[]),
+            validators=Validators(data=[]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         )
@@ -429,8 +433,8 @@ class State(Container):
         latest_finalized = self.latest_finalized
 
         # Process each attestation in the block.
-        for signed_vote in attestations:
-            vote: Vote = signed_vote.data
+        for attestation in attestations:
+            vote = attestation.data
             source = vote.source
             target = vote.target
 
@@ -484,9 +488,9 @@ class State(Container):
             }
         )
 
-    def state_transition(self, signed_block: SignedBlock, valid_signatures: bool = True) -> "State":
+    def state_transition(self, block: Block, valid_signatures: bool = True) -> "State":
         """
-        Apply the complete state transition function for a signed block.
+        Apply the complete state transition function for a block.
 
         This method represents the full state transition function:
         1. Validate signatures if required
@@ -496,8 +500,8 @@ class State(Container):
 
         Parameters
         ----------
-        signed_block : SignedBlock
-            The signed block to apply to the state.
+        block : Block
+            The block to apply to the state.
         valid_signatures : bool, optional
             Whether to validate block signatures. Defaults to True.
 
@@ -514,8 +518,6 @@ class State(Container):
         # Validate signatures if required
         if not valid_signatures:
             raise AssertionError("Block signatures must be valid")
-
-        block = signed_block.message
 
         # First, process any intermediate slots.
         state = self.process_slots(block.slot)
