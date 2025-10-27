@@ -5,7 +5,6 @@ import pytest
 from lean_spec.subspecs.containers import (
     Block,
     BlockBody,
-    BlockHeader,
     Checkpoint,
     Config,
     State,
@@ -13,13 +12,7 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import (
-    HistoricalBlockHashes,
-    JustificationRoots,
-    JustificationValidators,
-    JustifiedSlots,
-    Validators,
-)
+from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
@@ -46,31 +39,12 @@ def sample_store(sample_config: Config) -> Store:
     )
     genesis_hash = hash_tree_root(genesis_block)
 
-    # Create genesis block header
-    genesis_header = BlockHeader(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=Bytes32(b"state" + b"\x00" * 27),
-        body_root=hash_tree_root(genesis_block.body),
-    )
-
     checkpoint = Checkpoint(root=genesis_hash, slot=Slot(0))
 
-    # Create validators list with 10 validators for testing
+    # Create genesis state with 10 validators for testing
     validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(10)])
-
-    # Create a state for the genesis block
-    state = State(
-        config=sample_config,
-        slot=Slot(0),
-        latest_block_header=genesis_header,
-        latest_justified=checkpoint,
-        latest_finalized=checkpoint,
-        historical_block_hashes=HistoricalBlockHashes(data=[]),
-        justified_slots=JustifiedSlots(data=[]),
-        justifications_roots=JustificationRoots(data=[]),
-        justifications_validators=JustificationValidators(data=[]),
+    state = State.generate_genesis(
+        genesis_time=sample_config.genesis_time,
         validators=validators,
     )
 

@@ -5,7 +5,6 @@ import pytest
 from lean_spec.subspecs.containers import (
     Block,
     BlockBody,
-    BlockHeader,
     Checkpoint,
     Config,
     State,
@@ -13,13 +12,7 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import (
-    HistoricalBlockHashes,
-    JustificationRoots,
-    JustificationValidators,
-    JustifiedSlots,
-    Validators,
-)
+from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
@@ -305,23 +298,8 @@ class TestSafeTargetComputation:
 
         # Create genesis state with validators
         validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(100)])
-        genesis_header = BlockHeader(
-            slot=Slot(0),
-            proposer_index=Uint64(0),
-            parent_root=Bytes32.zero(),
-            state_root=Bytes32(b"genesis" + b"\x00" * 25),
-            body_root=hash_tree_root(genesis_block.body),
-        )
-        genesis_state = State(
-            config=config,
-            slot=Slot(0),
-            latest_block_header=genesis_header,
-            latest_justified=checkpoint,
-            latest_finalized=checkpoint,
-            historical_block_hashes=HistoricalBlockHashes(data=[]),
-            justified_slots=JustifiedSlots(data=[]),
-            justifications_roots=JustificationRoots(data=[]),
-            justifications_validators=JustificationValidators(data=[]),
+        genesis_state = State.generate_genesis(
+            genesis_time=config.genesis_time,
             validators=validators,
         )
 
@@ -372,46 +350,12 @@ class TestSafeTargetComputation:
 
         # Create states with validators
         validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(100)])
-        genesis_header = BlockHeader(
-            slot=Slot(0),
-            proposer_index=Uint64(0),
-            parent_root=Bytes32.zero(),
-            state_root=Bytes32(b"genesis" + b"\x00" * 25),
-            body_root=hash_tree_root(genesis.body),
-        )
-        genesis_state = State(
-            config=config,
-            slot=Slot(0),
-            latest_block_header=genesis_header,
-            latest_justified=checkpoint,
-            latest_finalized=checkpoint,
-            historical_block_hashes=HistoricalBlockHashes(data=[]),
-            justified_slots=JustifiedSlots(data=[]),
-            justifications_roots=JustificationRoots(data=[]),
-            justifications_validators=JustificationValidators(data=[]),
+        genesis_state = State.generate_genesis(
+            genesis_time=config.genesis_time,
             validators=validators,
         )
-
-        # Create state for block_1
-        block_1_header = BlockHeader(
-            slot=Slot(1),
-            proposer_index=Uint64(1),
-            parent_root=genesis_hash,
-            state_root=Bytes32(b"block1" + b"\x00" * 26),
-            body_root=hash_tree_root(block_1.body),
-        )
-        block_1_state = State(
-            config=config,
-            slot=Slot(1),
-            latest_block_header=block_1_header,
-            latest_justified=checkpoint,
-            latest_finalized=checkpoint,
-            historical_block_hashes=HistoricalBlockHashes(data=[]),
-            justified_slots=JustifiedSlots(data=[]),
-            justifications_roots=JustificationRoots(data=[]),
-            justifications_validators=JustificationValidators(data=[]),
-            validators=validators,
-        )
+        # Create state for block_1 (copy genesis state and update slot)
+        block_1_state = genesis_state.model_copy(update={"slot": Slot(1)})
 
         # Add some new votes
         new_votes = {
