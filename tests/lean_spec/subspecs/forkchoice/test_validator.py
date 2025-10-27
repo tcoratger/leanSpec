@@ -12,6 +12,7 @@ from lean_spec.subspecs.containers import (
     Config,
     SignedAttestation,
     State,
+    Validator,
 )
 from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
@@ -24,14 +25,14 @@ from lean_spec.subspecs.containers.state import (
 )
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Bytes4000, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Bytes4000, Bytes52, Uint64, ValidatorIndex
 from lean_spec.types.validator import is_proposer
 
 
 @pytest.fixture
 def config() -> Config:
     """Sample configuration for validator testing."""
-    return Config(genesis_time=Uint64(1000), num_validators=Uint64(10))
+    return Config(genesis_time=Uint64(1000))
 
 
 @pytest.fixture
@@ -49,6 +50,9 @@ def sample_state(config: Config) -> State:
     # Use a placeholder for genesis - will be updated in store fixture
     temp_finalized = Checkpoint(root=Bytes32(b"genesis" + b"\x00" * 25), slot=Slot(0))
 
+    # Create validators list with 10 validators for testing
+    validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(10)])
+
     return State(
         config=config,
         slot=Slot(0),
@@ -59,7 +63,7 @@ def sample_state(config: Config) -> State:
         justified_slots=JustifiedSlots(data=[]),
         justifications_roots=JustificationRoots(data=[]),
         justifications_validators=JustificationValidators(data=[]),
-        validators=Validators(data=[]),
+        validators=validators,
     )
 
 
@@ -473,10 +477,13 @@ class TestValidatorIntegration:
 
     def test_validator_operations_empty_store(self) -> None:
         """Test validator operations with minimal store state."""
-        config = Config(genesis_time=Uint64(1000), num_validators=Uint64(3))
+        config = Config(genesis_time=Uint64(1000))
 
         # Create minimal genesis block first
         genesis_body = BlockBody(attestations=Attestations(data=[]))
+
+        # Create validators list with 3 validators
+        validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(3)])
 
         # Create minimal state with temporary header
         checkpoint = Checkpoint.default()
@@ -496,7 +503,7 @@ class TestValidatorIntegration:
             justified_slots=JustifiedSlots(data=[]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
-            validators=Validators(data=[]),
+            validators=validators,
         )
 
         # Compute consistent state root
@@ -567,7 +574,7 @@ class TestValidatorErrorHandling:
 
     def test_produce_block_missing_parent_state(self) -> None:
         """Test error when parent state is missing."""
-        config = Config(genesis_time=Uint64(1000), num_validators=Uint64(5))
+        config = Config(genesis_time=Uint64(1000))
         checkpoint = Checkpoint(root=Bytes32(b"missing" + b"\x00" * 25), slot=Slot(0))
 
         # Create store with missing parent state
@@ -594,8 +601,13 @@ class TestValidatorErrorHandling:
         large_validator = ValidatorIndex(1000000)
         large_slot = Slot(1000000)
 
+        # Get the state to determine number of validators
+        genesis_hash = sample_store.head
+        state = sample_store.states[genesis_hash]
+        num_validators = Uint64(state.validators.count)
+
         # is_proposer should work (though likely return False)
-        result = is_proposer(large_validator, large_slot, sample_store.config.num_validators)
+        result = is_proposer(large_validator, large_slot, num_validators)
         assert isinstance(result, bool)
 
         # produce_attestation_vote should work for any validator

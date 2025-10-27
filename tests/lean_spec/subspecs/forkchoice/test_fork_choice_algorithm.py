@@ -436,7 +436,7 @@ class TestStoreBasedForkChoice:
     @pytest.fixture
     def config(self) -> Config:
         """Sample configuration."""
-        return Config(genesis_time=Uint64(1000), num_validators=Uint64(100))
+        return Config(genesis_time=Uint64(1000))
 
     def test_store_fork_choice_no_votes(self, config: Config) -> None:
         """Test Store.get_proposal_head with no votes."""

@@ -5,14 +5,24 @@ import pytest
 from lean_spec.subspecs.containers import (
     Block,
     BlockBody,
+    BlockHeader,
     Checkpoint,
     Config,
+    State,
+    Validator,
 )
 from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import (
+    HistoricalBlockHashes,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
+    Validators,
+)
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
 
 from .conftest import build_signed_attestation
 
@@ -20,21 +30,59 @@ from .conftest import build_signed_attestation
 @pytest.fixture
 def sample_config() -> Config:
     """Sample configuration for testing."""
-    return Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+    return Config(genesis_time=Uint64(1000))
 
 
 @pytest.fixture
 def sample_store(sample_config: Config) -> Store:
     """Create a sample forkchoice store."""
-    checkpoint = Checkpoint(root=Bytes32(b"test_root" + b"\x00" * 23), slot=Slot(0))
+    # Create a genesis block with empty body
+    genesis_block = Block(
+        slot=Slot(0),
+        proposer_index=ValidatorIndex(0),
+        parent_root=Bytes32.zero(),
+        state_root=Bytes32(b"state" + b"\x00" * 27),
+        body=BlockBody(attestations=Attestations(data=[])),
+    )
+    genesis_hash = hash_tree_root(genesis_block)
+
+    # Create genesis block header
+    genesis_header = BlockHeader(
+        slot=Slot(0),
+        proposer_index=ValidatorIndex(0),
+        parent_root=Bytes32.zero(),
+        state_root=Bytes32(b"state" + b"\x00" * 27),
+        body_root=hash_tree_root(genesis_block.body),
+    )
+
+    checkpoint = Checkpoint(root=genesis_hash, slot=Slot(0))
+
+    # Create validators list with 10 validators for testing
+    validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(10)])
+
+    # Create a state for the genesis block
+    state = State(
+        config=sample_config,
+        slot=Slot(0),
+        latest_block_header=genesis_header,
+        latest_justified=checkpoint,
+        latest_finalized=checkpoint,
+        historical_block_hashes=HistoricalBlockHashes(data=[]),
+        justified_slots=JustifiedSlots(data=[]),
+        justifications_roots=JustificationRoots(data=[]),
+        justifications_validators=JustificationValidators(data=[]),
+        validators=validators,
+    )
 
     return Store(
         time=Uint64(100),
         config=sample_config,
-        head=Bytes32(b"head_root" + b"\x00" * 23),
-        safe_target=Bytes32(b"safe_root" + b"\x00" * 23),
+        head=genesis_hash,
+        safe_target=genesis_hash,
         latest_justified=checkpoint,
         latest_finalized=checkpoint,
+        blocks={genesis_hash: genesis_block},
+        states={genesis_hash: state},
     )
 
 

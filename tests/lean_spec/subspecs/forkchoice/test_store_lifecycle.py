@@ -29,7 +29,7 @@ from .conftest import build_signed_attestation
 @pytest.fixture
 def sample_config() -> Config:
     """Sample configuration for testing."""
-    return Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+    return Config(genesis_time=Uint64(1000))
 
 
 @pytest.fixture
@@ -57,7 +57,6 @@ class TestStoreCreation:
     def test_store_creation_basic(self, sample_store: Store) -> None:
         """Test basic Store creation with required fields."""
         assert sample_store.time == Uint64(100)
-        assert sample_store.config.num_validators == Uint64(100)
         assert sample_store.head == Bytes32(b"head_root" + b"\x00" * 23)
         assert sample_store.safe_target == Bytes32(b"safe_root" + b"\x00" * 23)
         assert isinstance(sample_store.latest_justified, Checkpoint)
@@ -65,7 +64,7 @@ class TestStoreCreation:
 
     def test_store_initialization_with_data(self) -> None:
         """Test Store initialization with blocks and states."""
-        config = Config(num_validators=Uint64(10), genesis_time=Uint64(2000))
+        config = Config(genesis_time=Uint64(2000))
         checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(5))
 
         # Sample block
@@ -112,7 +111,7 @@ class TestStoreCreation:
     def test_store_factory_method(self) -> None:
         """Test Store.get_forkchoice_store factory method."""
 
-        config = Config(num_validators=Uint64(10), genesis_time=Uint64(1000))
+        config = Config(genesis_time=Uint64(1000))
         checkpoint = Checkpoint(root=Bytes32(b"genesis" + b"\x00" * 25), slot=Slot(0))
 
         # Create block header for testing
@@ -166,7 +165,7 @@ class TestStoreDefaultValues:
 
     def test_store_empty_collections_by_default(self) -> None:
         """Test that Store initializes empty collections by default."""
-        config = Config(num_validators=Uint64(5), genesis_time=Uint64(500))
+        config = Config(genesis_time=Uint64(500))
         checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(0))
 
         store = Store(
@@ -201,7 +200,7 @@ class TestStoreValidation:
 
     def test_store_validation_required_fields(self) -> None:
         """Test that Store validates required fields."""
-        config = Config(num_validators=Uint64(5), genesis_time=Uint64(500))
+        config = Config(genesis_time=Uint64(500))
         checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(0))
 
         # Should create successfully with all required fields
@@ -223,7 +222,7 @@ class TestStoreValidation:
 
     def test_store_type_validation(self) -> None:
         """Test Store validates field types."""
-        config = Config(num_validators=Uint64(5), genesis_time=Uint64(500))
+        config = Config(genesis_time=Uint64(500))
         checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(0))
 
         # Test with wrong type for time - should work due to Pydantic coercion

@@ -41,3 +41,8 @@ class Validators(SSZList):
 
     ELEMENT_TYPE = Validator
     LIMIT = DEVNET_CONFIG.validator_registry_limit.as_int()
+
+    @property
+    def count(self) -> int:
+        """Return the number of validators in the registry."""
+        return len(self.data)

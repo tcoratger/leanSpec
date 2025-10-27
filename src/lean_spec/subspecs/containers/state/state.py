@@ -66,7 +66,7 @@ class State(Container):
     """A bitlist of validators who participated in justifications."""
 
     @classmethod
-    def generate_genesis(cls, genesis_time: Uint64, num_validators: Uint64) -> "State":
+    def generate_genesis(cls, genesis_time: Uint64, validators: Validators) -> "State":
         """
         Generate a genesis state with empty history and proper initial values.
 
@@ -74,8 +74,8 @@ class State(Container):
         ----------
         genesis_time : Uint64
             The genesis timestamp.
-        num_validators : Uint64
-            The number of validators in the genesis state.
+        validators : Validators
+            The list of validators in the genesis state.
 
         Returns:
         -------
@@ -84,7 +84,6 @@ class State(Container):
         """
         # Configure the genesis state.
         genesis_config = Config(
-            num_validators=num_validators,
             genesis_time=genesis_time,
         )
 
@@ -106,7 +105,7 @@ class State(Container):
             latest_finalized=Checkpoint.default(),
             historical_block_hashes=HistoricalBlockHashes(data=[]),
             justified_slots=JustifiedSlots(data=[]),
-            validators=Validators(data=[]),
+            validators=validators,
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         )
@@ -129,7 +128,7 @@ class State(Container):
         return is_proposer(
             validator_index=validator_index,
             slot=self.slot,
-            num_validators=self.config.num_validators,
+            num_validators=Uint64(self.validators.count),
         )
 
     def get_justifications(self) -> Dict[Bytes32, List[Boolean]]:
@@ -152,7 +151,7 @@ class State(Container):
             return justifications
 
         # Compute the length of each validator vote slice.
-        validator_count = self.config.num_validators.as_int()
+        validator_count = self.validators.count
 
         # Extract vote slices for each justified root.
         flat_votes = list(self.justifications_validators)
@@ -195,7 +194,7 @@ class State(Container):
         for root in sorted(justifications.keys()):
             votes = justifications[root]
             # Validate that the vote list has the expected length.
-            expected_len = self.config.num_validators.as_int()
+            expected_len = self.validators.count
             if len(votes) != expected_len:
                 raise AssertionError(f"Vote list for root {root.hex()} has incorrect length")
 

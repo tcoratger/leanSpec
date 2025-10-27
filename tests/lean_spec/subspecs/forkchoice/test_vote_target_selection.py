@@ -5,14 +5,24 @@ import pytest
 from lean_spec.subspecs.containers import (
     Block,
     BlockBody,
+    BlockHeader,
     Checkpoint,
     Config,
+    State,
+    Validator,
 )
 from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import (
+    HistoricalBlockHashes,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
+    Validators,
+)
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
 
 from .conftest import build_signed_attestation
 
@@ -20,7 +30,7 @@ from .conftest import build_signed_attestation
 @pytest.fixture
 def config() -> Config:
     """Sample configuration."""
-    return Config(genesis_time=Uint64(1000), num_validators=Uint64(100))
+    return Config(genesis_time=Uint64(1000))
 
 
 class TestVoteTargetCalculation:
@@ -293,6 +303,28 @@ class TestSafeTargetComputation:
 
         checkpoint = Checkpoint(root=genesis_block_hash, slot=Slot(0))
 
+        # Create genesis state with validators
+        validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(100)])
+        genesis_header = BlockHeader(
+            slot=Slot(0),
+            proposer_index=Uint64(0),
+            parent_root=Bytes32.zero(),
+            state_root=Bytes32(b"genesis" + b"\x00" * 25),
+            body_root=hash_tree_root(genesis_block.body),
+        )
+        genesis_state = State(
+            config=config,
+            slot=Slot(0),
+            latest_block_header=genesis_header,
+            latest_justified=checkpoint,
+            latest_finalized=checkpoint,
+            historical_block_hashes=HistoricalBlockHashes(data=[]),
+            justified_slots=JustifiedSlots(data=[]),
+            justifications_roots=JustificationRoots(data=[]),
+            justifications_validators=JustificationValidators(data=[]),
+            validators=validators,
+        )
+
         store = Store(
             time=Uint64(100),
             config=config,
@@ -301,7 +333,7 @@ class TestSafeTargetComputation:
             latest_justified=checkpoint,
             latest_finalized=checkpoint,
             blocks={genesis_block_hash: genesis_block},
-            states={},
+            states={genesis_block_hash: genesis_state},
         )
 
         # Update safe target (this tests the method exists and runs)
@@ -338,6 +370,49 @@ class TestSafeTargetComputation:
 
         checkpoint = Checkpoint(root=genesis_hash, slot=Slot(0))
 
+        # Create states with validators
+        validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(100)])
+        genesis_header = BlockHeader(
+            slot=Slot(0),
+            proposer_index=Uint64(0),
+            parent_root=Bytes32.zero(),
+            state_root=Bytes32(b"genesis" + b"\x00" * 25),
+            body_root=hash_tree_root(genesis.body),
+        )
+        genesis_state = State(
+            config=config,
+            slot=Slot(0),
+            latest_block_header=genesis_header,
+            latest_justified=checkpoint,
+            latest_finalized=checkpoint,
+            historical_block_hashes=HistoricalBlockHashes(data=[]),
+            justified_slots=JustifiedSlots(data=[]),
+            justifications_roots=JustificationRoots(data=[]),
+            justifications_validators=JustificationValidators(data=[]),
+            validators=validators,
+        )
+
+        # Create state for block_1
+        block_1_header = BlockHeader(
+            slot=Slot(1),
+            proposer_index=Uint64(1),
+            parent_root=genesis_hash,
+            state_root=Bytes32(b"block1" + b"\x00" * 26),
+            body_root=hash_tree_root(block_1.body),
+        )
+        block_1_state = State(
+            config=config,
+            slot=Slot(1),
+            latest_block_header=block_1_header,
+            latest_justified=checkpoint,
+            latest_finalized=checkpoint,
+            historical_block_hashes=HistoricalBlockHashes(data=[]),
+            justified_slots=JustifiedSlots(data=[]),
+            justifications_roots=JustificationRoots(data=[]),
+            justifications_validators=JustificationValidators(data=[]),
+            validators=validators,
+        )
+
         # Add some new votes
         new_votes = {
             ValidatorIndex(0): build_signed_attestation(
@@ -358,7 +433,7 @@ class TestSafeTargetComputation:
             latest_justified=checkpoint,
             latest_finalized=checkpoint,
             blocks=blocks,
-            states={},
+            states={genesis_hash: genesis_state, block_1_hash: block_1_state},
             latest_new_votes=new_votes,
         )
 

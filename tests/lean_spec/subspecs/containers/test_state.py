@@ -15,6 +15,7 @@ from lean_spec.subspecs.containers import (
     Config,
     SignedAttestation,
     State,
+    Validator,
 )
 from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
@@ -26,7 +27,7 @@ from lean_spec.subspecs.containers.state import (
     Validators,
 )
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Boolean, Bytes32, Bytes4000, Uint64, ValidatorIndex
+from lean_spec.types import Boolean, Bytes32, Bytes4000, Bytes52, Uint64, ValidatorIndex
 
 
 @pytest.fixture
@@ -37,11 +38,10 @@ def sample_config() -> Config:
     Returns
     -------
     Config
-        A configuration with 4096 validators and genesis_time set to 0.
+        A configuration with genesis_time set to 0.
     """
     # Create and return a simple configuration used across tests.
     return Config(
-        num_validators=DEVNET_CONFIG.validator_registry_limit,
         genesis_time=Uint64(0),
     )
 
@@ -54,7 +54,7 @@ def genesis_state(sample_config: Config) -> State:
     Parameters
     ----------
     sample_config : Config
-        The configuration fixture with validator count and genesis time.
+        The configuration fixture with genesis time.
 
     Returns
     -------
@@ -62,9 +62,12 @@ def genesis_state(sample_config: Config) -> State:
         A fresh genesis state produced by the class factory.
     """
     # Call the canonical genesis factory with the sample configuration values.
+    # Create validators list with 4096 validators
+    num_validators = DEVNET_CONFIG.validator_registry_limit.as_int()
+    validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(num_validators)])
     return State.generate_genesis(
         genesis_time=sample_config.genesis_time,
-        num_validators=sample_config.num_validators,
+        validators=validators,
     )
 
 
@@ -205,7 +208,7 @@ def base_state(
     Parameters
     ----------
     sample_config : Config
-        Test configuration with 10 validators.
+        Test configuration.
     sample_block_header : BlockHeader
         Zeroed header used as latest_block_header.
     sample_checkpoint : Checkpoint
@@ -217,6 +220,9 @@ def base_state(
         A State with empty history and justification lists.
     """
     # Build a State with the provided fixtures and no history/justifications.
+    # Create validators list with registry limit validators
+    num_validators = DEVNET_CONFIG.validator_registry_limit.as_int()
+    validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(num_validators)])
     return State(
         config=sample_config,
         slot=Slot(0),
@@ -227,7 +233,7 @@ def base_state(
         justified_slots=JustifiedSlots(data=[]),
         justifications_roots=JustificationRoots(data=[]),
         justifications_validators=JustificationValidators(data=[]),
-        validators=Validators(data=[]),
+        validators=validators,
     )
 
 
@@ -264,7 +270,7 @@ def test_get_justifications_single_root(base_state: State) -> None:
     root1 = Bytes32(b"\x01" * 32)
 
     # Prepare a vote bitlist with required length; flip two positions to True.
-    votes1 = [Boolean(False)] * base_state.config.num_validators.as_int()
+    votes1 = [Boolean(False)] * base_state.validators.count
     votes1[2] = Boolean(True)  # Validator 2 voted
     votes1[5] = Boolean(True)  # Validator 5 voted
 
@@ -300,7 +306,7 @@ def test_get_justifications_multiple_roots(base_state: State) -> None:
     root3 = Bytes32(b"\x03" * 32)
 
     # Validator count for each vote slice.
-    count = base_state.config.num_validators.as_int()
+    count = base_state.validators.count
 
     # Build per-root vote slices.
     votes1 = [Boolean(False)] * count
@@ -346,6 +352,9 @@ def test_with_justifications_empty(
     - Ensure original state is unchanged.
     """
     # Build a state populated with a single root and a full votes bitlist.
+    # Create validators list with registry limit validators
+    num_validators = DEVNET_CONFIG.validator_registry_limit.as_int()
+    validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(num_validators)])
     initial_state = State(
         config=sample_config,
         slot=Slot(0),
@@ -356,9 +365,9 @@ def test_with_justifications_empty(
         justified_slots=JustifiedSlots(data=[]),
         justifications_roots=JustificationRoots(data=[Bytes32(b"\x01" * 32)]),
         justifications_validators=JustificationValidators(
-            data=[Boolean(True)] * sample_config.num_validators.as_int()
+            data=[Boolean(True)] * num_validators
         ),
-        validators=Validators(data=[]),
+        validators=validators,
     )
 
     # Apply an empty justifications map to get a new state snapshot.
@@ -388,7 +397,7 @@ def test_with_justifications_deterministic_order(base_state: State) -> None:
     root2 = Bytes32(b"\x02" * 32)
 
     # Build two vote slices of proper length.
-    count = base_state.config.num_validators.as_int()
+    count = base_state.validators.count
     votes1 = [Boolean(False)] * count
     votes2 = [Boolean(True)] * count
     # Intentionally supply the dict in unsorted key order.
@@ -418,7 +427,7 @@ def test_with_justifications_invalid_length(base_state: State) -> None:
     root1 = Bytes32(b"\x01" * 32)
 
     # Construct an invalid votes bitlist: one short of required length.
-    invalid_votes = [Boolean(True)] * (base_state.config.num_validators - Uint64(1)).as_int()
+    invalid_votes = [Boolean(True)] * (base_state.validators.count - 1)
     justifications = {root1: invalid_votes}
 
     # The method asserts on incorrect lengths.
@@ -492,9 +501,12 @@ def test_generate_genesis(sample_config: Config) -> None:
     - Ensure historical/justification lists start empty.
     """
     # Produce a genesis state from the sample config.
+    # Create validators list with registry limit validators
+    num_validators = DEVNET_CONFIG.validator_registry_limit.as_int()
+    validators = Validators(data=[Validator(pubkey=Bytes52.zero()) for _ in range(num_validators)])
     state = State.generate_genesis(
         genesis_time=sample_config.genesis_time,
-        num_validators=sample_config.num_validators,
+        validators=validators,
     )
 
     # Config in state should match the input.
