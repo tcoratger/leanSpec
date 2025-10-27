@@ -506,20 +506,8 @@ class Store(Container):
                 if data.source != post_state.latest_justified:
                     continue
 
-                # Create attestation with post-state's latest justified as source
-                attestation_data = AttestationData(
-                    slot=data.slot,
-                    head=data.head,
-                    target=data.target,
-                    source=post_state.latest_justified,
-                )
-                candidate_attestation = Attestation(
-                    validator_id=signed_attestation.message.validator_id,
-                    data=attestation_data,
-                )
-
-                if candidate_attestation not in attestations:
-                    new_attestations.append(candidate_attestation)
+                if signed_attestation.message not in attestations:
+                    new_attestations.append(signed_attestation.message)
                     new_signatures.append(signed_attestation.signature)
 
             # Fixed point reached: no new attestations found
