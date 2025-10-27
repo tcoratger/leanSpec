@@ -27,7 +27,7 @@ from lean_spec.subspecs.containers.state import (
     Validators,
 )
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Boolean, Bytes32, Bytes4000, Bytes52, Uint64, ValidatorIndex
+from lean_spec.types import Boolean, Bytes32, Bytes52, Bytes4000, Uint64, ValidatorIndex
 
 
 @pytest.fixture
@@ -364,9 +364,7 @@ def test_with_justifications_empty(
         historical_block_hashes=HistoricalBlockHashes(data=[]),
         justified_slots=JustifiedSlots(data=[]),
         justifications_roots=JustificationRoots(data=[Bytes32(b"\x01" * 32)]),
-        justifications_validators=JustificationValidators(
-            data=[Boolean(True)] * num_validators
-        ),
+        justifications_validators=JustificationValidators(data=[Boolean(True)] * num_validators),
         validators=validators,
     )
 
