@@ -365,8 +365,12 @@ class Store(Container):
 
         Computes target that has sufficient (2/3+ majority) vote support.
         """
+        # Get validator count from head state
+        head_state = self.states[self.head]
+        num_validators = head_state.validators.count
+
         # Calculate 2/3 majority threshold (ceiling division)
-        min_target_score = -(-self.config.num_validators * 2 // 3)
+        min_target_score = -(-num_validators * 2 // 3)
 
         # Find head with minimum vote threshold
         safe_target = get_fork_choice_head(
@@ -457,14 +461,15 @@ class Store(Container):
         Raises:
             AssertionError: If validator lacks proposer authorization for slot
         """
-        # Validate proposer authorization for this slot
-        if not is_proposer(validator_index, slot, self.config.num_validators):
-            msg = f"Validator {validator_index} is not the proposer for slot {slot}"
-            raise AssertionError(msg)
-
         # Get parent block and state to build upon
         head_root = self.get_proposal_head(slot)
         head_state = self.states[head_root]
+
+        # Validate proposer authorization for this slot
+        num_validators = Uint64(head_state.validators.count)
+        if not is_proposer(validator_index, slot, num_validators):
+            msg = f"Validator {validator_index} is not the proposer for slot {slot}"
+            raise AssertionError(msg)
 
         # Initialize empty attestation set for iterative collection
         attestations: list[Attestation] = []

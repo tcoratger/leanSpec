@@ -21,7 +21,7 @@ from lean_spec.types import Bytes32, Bytes4000, Uint64, ValidatorIndex
 @pytest.fixture
 def sample_config() -> Config:
     """Sample configuration for testing."""
-    return Config(num_validators=Uint64(100), genesis_time=Uint64(1000))
+    return Config(genesis_time=Uint64(1000))
 
 
 @pytest.fixture

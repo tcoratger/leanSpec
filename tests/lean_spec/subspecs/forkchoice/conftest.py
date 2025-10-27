@@ -33,7 +33,6 @@ class MockState(State):
         """Initialize a mock state with minimal defaults."""
         # Create minimal defaults for all required fields
         genesis_config = Config(
-            num_validators=Uint64(4),
             genesis_time=Uint64(0),
         )
 
