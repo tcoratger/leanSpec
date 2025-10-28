@@ -89,8 +89,15 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-branch",
+    # Exclude fixture generation tests from regular test runs
+    # These are only run via the 'fill' command
+    "--ignore=tests/consensus",
+    "--ignore=tests/execution",
 ]
-markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "valid_until: marks tests as valid until a specific fork version",
+]
 
 [tool.coverage.run]
 source = ["src"]
@@ -99,6 +106,15 @@ branch = true
 [tool.mdformat]
 number = true
 wrap = 80
+
+[tool.uv]
+required-version = ">=0.7.0"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+lean-ethereum-testing = { workspace = true }
 
 [dependency-groups]
 dev = [
