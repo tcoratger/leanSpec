@@ -2,10 +2,8 @@
 
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel
-
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, CamelModel, Uint64
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.containers import SignedAttestation
@@ -85,7 +83,7 @@ class AttestationCheck(BaseModel):
                     )
 
 
-class StoreChecks(BaseModel):
+class StoreChecks(CamelModel):
     """
     Store state checks for fork choice tests.
 

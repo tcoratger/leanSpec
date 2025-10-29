@@ -2,11 +2,7 @@
 
 from typing import Type
 
-from framework.base_types import CamelModel
-
 from . import forks
-from .block_spec import BlockSpec
-from .genesis import generate_pre_state
 from .test_fixtures import (
     BaseConsensusFixture,
     ForkChoiceTest,
@@ -16,11 +12,13 @@ from .test_types import (
     AttestationCheck,
     AttestationStep,
     BaseForkChoiceStep,
+    BlockSpec,
     BlockStep,
     ForkChoiceStep,
     StateExpectation,
     StoreChecks,
     TickStep,
+    generate_pre_state,
 )
 
 StateTransitionTestFiller = Type[StateTransitionTest]
@@ -32,7 +30,6 @@ __all__ = [
     "forks",
     "generate_pre_state",
     # Base types
-    "CamelModel",
     # Fixture classes
     "BaseConsensusFixture",
     "StateTransitionTest",
