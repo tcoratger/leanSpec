@@ -53,6 +53,12 @@ class StoreChecks(BaseModel):
     safe_target: Bytes32 | None = None
     """Expected safe target root."""
 
+    known_attestation_count: int | None = None
+    """Expected number of attestations in latest_known_attestations."""
+
+    new_attestation_count: int | None = None
+    """Expected number of attestations in latest_new_attestations."""
+
     def validate_against_store(self, store: "Store", step_index: int) -> None:
         """
         Validate these checks against actual Store state.
@@ -138,4 +144,20 @@ class StoreChecks(BaseModel):
                     raise AssertionError(
                         f"Step {step_index}: safe_target = 0x{actual_root.hex()}, "
                         f"expected 0x{expected_value.hex()}"
+                    )
+
+            elif field_name == "known_attestation_count":
+                actual = len(store.latest_known_attestations)
+                if actual != expected_value:
+                    raise AssertionError(
+                        f"Step {step_index}: known attestation count = {actual}, "
+                        f"expected {expected_value}"
+                    )
+
+            elif field_name == "new_attestation_count":
+                actual = len(store.latest_new_attestations)
+                if actual != expected_value:
+                    raise AssertionError(
+                        f"Step {step_index}: new attestation count = {actual}, "
+                        f"expected {expected_value}"
                     )
