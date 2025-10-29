@@ -12,26 +12,27 @@ The Attestation Pipeline
 Attestations flow through two dictionaries, both keyed by validator index:
 
 **Stage 1: latest_new_attestations**
-    New attestations enter here immediately after block processing.
-    Holds the current slot's proposer attestation.
+    - New attestations enter here immediately after block processing.
+    - Holds the current slot's proposer attestation.
 
 **Stage 2: latest_known_attestations**
-    Accepted attestations that contribute to fork choice weights.
-    Updated by the interval tick system between slots.
+    - Accepted attestations that contribute to fork choice weights.
+    - Updated by the interval tick system between slots.
 
 Key Behaviors
 -------------
 **Migration**: Between blocks, attestations move from new → known via interval ticks.
 
 **Superseding**:
-    Newer attestation from the same validator replaces older one.
-    Only the most recent attestation per validator is retained.
+    - Newer attestation from the same validator replaces older one.
+    - Only the most recent attestation per validator is retained.
 
 **Accumulation**: Attestations from different validators coexist across both dictionaries.
 """
 
 import pytest
 from consensus_testing import (
+    AttestationCheck,
     AttestationStep,
     BlockSpec,
     BlockStep,
@@ -59,11 +60,10 @@ def test_proposer_attestation_appears_in_latest_new(
 
     Scenario
     --------
-    Process one block at slot 1.
+    Process one block at slot 1 (proposer: validator 1).
 
     Expected:
-        - new attestations = 1,
-        - known attestations = 0
+        - validator 1's attestation has correct slot and checkpoint slots
 
     Why This Matters
     ----------------
@@ -79,7 +79,16 @@ def test_proposer_attestation_appears_in_latest_new(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    new_attestation_count=1,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            head_slot=Slot(1),
+                            source_slot=Slot(0),  # Genesis
+                            target_slot=Slot(1),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
         ],
@@ -97,8 +106,8 @@ def test_attestation_superseding_same_validator(
     Process blocks at slots 1 and 5 (same proposer: validator 1).
 
     Expected:
-        - After slot 1: new attestations = 1,
-        - After slot 5: new attestations = 1 (still 1, not 2!)
+        - After slot 1: validator 1 attests to slot 1
+        - After slot 5: validator 1 attests to slot 5 (supersedes slot 1)
 
     Why This Matters
     ----------------
@@ -116,14 +125,32 @@ def test_attestation_superseding_same_validator(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    new_attestation_count=1,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            head_slot=Slot(1),
+                            source_slot=Slot(0),
+                            target_slot=Slot(1),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    new_attestation_count=1,  # Still 1 (superseded, not accumulated)
+                    attestation_checks=[
+                        # Validator 1's newer attestation (superseded the old one)
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),
+                            head_slot=Slot(5),
+                            target_slot=Slot(5),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
         ],
@@ -138,11 +165,13 @@ def test_attestations_move_to_known_between_blocks(
 
     Scenario
     --------
-    Process blocks at slots 1 and 2 (different proposers).
+    Process blocks at slots 1 and 2 (different proposers: validators 1 and 2).
 
     Expected:
         - After slot 1: new attestations = 1, known attestations = 0
         - After slot 2: new attestations = 1, known attestations = 1
+        - Validator 1's attestation moved to known with correct checkpoints
+        - Validator 2's attestation in new with correct checkpoints
 
     Why This Matters
     ----------------
@@ -162,16 +191,42 @@ def test_attestations_move_to_known_between_blocks(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    new_attestation_count=1,
-                    known_attestation_count=0,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            head_slot=Slot(1),
+                            source_slot=Slot(0),
+                            target_slot=Slot(1),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    new_attestation_count=1,  # Current block's proposer
-                    known_attestation_count=1,  # Previous block's proposer (moved)
+                    attestation_checks=[
+                        # Validator 1's attestation migrated to known
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            head_slot=Slot(1),
+                            source_slot=Slot(0),
+                            target_slot=Slot(1),
+                            in_latest_new=False,  # Now in known!
+                        ),
+                        # Validator 2's new attestation
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            head_slot=Slot(2),
+                            source_slot=Slot(1),
+                            target_slot=Slot(2),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
         ],
@@ -203,7 +258,6 @@ def test_attestation_accumulation_full_validator_set(
     - known: all previous proposers
 
     The total (new + known) equals the number of unique validators who proposed.
-    This confirms correct tracking with no duplicates or losses.
     """
     fork_choice_test(
         steps=[
@@ -211,32 +265,87 @@ def test_attestation_accumulation_full_validator_set(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    new_attestation_count=1,
-                    known_attestation_count=0,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            target_slot=Slot(1),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    new_attestation_count=1,
-                    known_attestation_count=1,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,  # Moved to known
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            target_slot=Slot(2),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    new_attestation_count=1,
-                    known_attestation_count=2,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(3),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(4)),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    new_attestation_count=1,
-                    known_attestation_count=3,  # Total: 1+3=4 validators
+                    attestation_checks=[
+                        # All 4 validators now have attestations
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            attestation_slot=Slot(4),
+                            target_slot=Slot(4),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
         ],
@@ -255,12 +364,10 @@ def test_slot_gaps_with_attestation_superseding(
     Proposers: validators 1, 3, 1, 3 (same validators repeat).
 
     Expected:
-        - After slot 1:  new attestations = 1, known attestations = 0
-        - After slot 3:  new attestations = 1, known attestations = 1
-        - After slot 5:  new attestations = 1, known attestations = 2
-        (validator 1 supersedes own older attestation)
-        - After slot 7:  new attestations = 1, known attestations = 2
-        (validator 3 supersedes own older attestation)
+        - After slot 1:  Validator 1 attests
+        - After slot 3:  Validator 3 attests, validator 1 moved to known
+        - After slot 5:  Validator 1 attests again (supersedes old), validator 3 in known
+        - After slot 7:  Validator 3 attests again (supersedes old), validator 1 in known
 
     Why This Matters
     ----------------
@@ -280,32 +387,71 @@ def test_slot_gaps_with_attestation_superseding(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    new_attestation_count=1,  # Validator 1
-                    known_attestation_count=0,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            target_slot=Slot(1),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    new_attestation_count=1,  # Validator 3
-                    known_attestation_count=1,  # Validator 1 (moved)
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,  # Moved to known
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(3),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    new_attestation_count=1,  # Validator 1 (newer)
-                    known_attestation_count=2,  # Validators 1 (old), 3
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),  # Newer attestation superseded slot 1
+                            target_slot=Slot(5),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(7)),
                 checks=StoreChecks(
                     head_slot=Slot(7),
-                    new_attestation_count=1,  # Validator 3 (newer)
-                    known_attestation_count=2,  # Validators 1 (newer), 3 (old)
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),  # Latest from validator 1
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(7),  # Newer attestation superseded slot 3
+                            target_slot=Slot(7),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
         ],
@@ -330,10 +476,9 @@ def test_extended_chain_attestation_superseding_pattern(
         Total stays at 4, composition changes.
 
     Expected:
-        - After slot 4:  new attestations = 1, known attestations = 3
-        - After slot 5:  new attestations = 1, known attestations = 4
-        - After slot 8:  new attestations = 1, known attestations = 4
-        (still 4, different composition)
+        - After slot 4:  All 4 validators have attestations (v0 in new, v1-v3 in known)
+        - After slot 5:  Validator 1 supersedes their slot 1 attestation
+        - After slot 8:  All validators have their latest attestations from slots 5-8
 
     Why This Matters
     ----------------
@@ -351,64 +496,198 @@ def test_extended_chain_attestation_superseding_pattern(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    new_attestation_count=1,
-                    known_attestation_count=0,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    new_attestation_count=1,
-                    known_attestation_count=1,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    new_attestation_count=1,
-                    known_attestation_count=2,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(4)),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    new_attestation_count=1,
-                    known_attestation_count=3,
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(1),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            attestation_slot=Slot(4),
+                            in_latest_new=True,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    new_attestation_count=1,  # Validator 1 (newer)
-                    known_attestation_count=4,  # v0, v1(old), v2, v3
+                    attestation_checks=[
+                        # Validator 1's newer attestation supersedes slot 1
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),
+                            in_latest_new=True,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            attestation_slot=Slot(4),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(2),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            in_latest_new=False,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(6)),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    new_attestation_count=1,  # Validator 2 (newer)
-                    known_attestation_count=4,  # v0, v1(new), v2(old), v3
+                    attestation_checks=[
+                        # Validator 2's newer attestation supersedes slot 2
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(6),
+                            in_latest_new=True,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            attestation_slot=Slot(4),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(3),
+                            in_latest_new=False,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(7)),
                 checks=StoreChecks(
                     head_slot=Slot(7),
-                    new_attestation_count=1,  # Validator 3 (newer)
-                    known_attestation_count=4,  # v0, v1(new), v2(new), v3(old)
+                    attestation_checks=[
+                        # Validator 3's newer attestation supersedes slot 3
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(7),
+                            in_latest_new=True,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            attestation_slot=Slot(4),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(6),
+                            in_latest_new=False,
+                        ),
+                    ],
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(8)),
                 checks=StoreChecks(
                     head_slot=Slot(8),
-                    new_attestation_count=1,  # Validator 0 (newer)
-                    known_attestation_count=4,  # v0(old), v1(new), v2(new), v3(new)
+                    attestation_checks=[
+                        # Validator 0's newer attestation supersedes slot 4
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            attestation_slot=Slot(8),
+                            in_latest_new=True,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            attestation_slot=Slot(5),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            attestation_slot=Slot(6),
+                            in_latest_new=False,
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            attestation_slot=Slot(7),
+                            in_latest_new=False,
+                        ),
+                    ],
                 ),
             ),
         ],

@@ -5,10 +5,79 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
 if TYPE_CHECKING:
+    from lean_spec.subspecs.containers import SignedAttestation
     from lean_spec.subspecs.forkchoice.store import Store
+
+
+class AttestationCheck(BaseModel):
+    """
+    Validation checks for a specific validator's attestation.
+
+    All fields optional - only check fields explicitly set.
+    Used to validate attestation content beyond just counting.
+    """
+
+    validator: ValidatorIndex
+    """Which validator's attestation to check."""
+
+    attestation_slot: Slot | None = None
+    """Expected attestation data slot."""
+
+    head_slot: Slot | None = None
+    """Expected head checkpoint slot."""
+
+    source_slot: Slot | None = None
+    """Expected source checkpoint slot."""
+
+    target_slot: Slot | None = None
+    """Expected target checkpoint slot."""
+
+    in_latest_new: bool | None = None
+    """Expected to be in latest_new_attestations (if True) or latest_known (if False)."""
+
+    def validate_attestation(
+        self, attestation: "SignedAttestation", location: str, step_index: int
+    ) -> None:
+        """Validate attestation properties."""
+        fields_to_check = self.model_fields_set - {"validator", "in_latest_new"}
+
+        for field_name in fields_to_check:
+            expected = getattr(self, field_name)
+
+            if field_name == "attestation_slot":
+                actual = attestation.message.data.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"attestation slot = {actual}, expected {expected}"
+                    )
+
+            elif field_name == "head_slot":
+                actual = attestation.message.data.head.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"head slot = {actual}, expected {expected}"
+                    )
+
+            elif field_name == "source_slot":
+                actual = attestation.message.data.source.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"source slot = {actual}, expected {expected}"
+                    )
+
+            elif field_name == "target_slot":
+                actual = attestation.message.data.target.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"target slot = {actual}, expected {expected}"
+                    )
 
 
 class StoreChecks(BaseModel):
@@ -53,11 +122,8 @@ class StoreChecks(BaseModel):
     safe_target: Bytes32 | None = None
     """Expected safe target root."""
 
-    known_attestation_count: int | None = None
-    """Expected number of attestations in latest_known_attestations."""
-
-    new_attestation_count: int | None = None
-    """Expected number of attestations in latest_new_attestations."""
+    attestation_checks: list[AttestationCheck] | None = None
+    """Optional list of attestation content checks for specific validators."""
 
     def validate_against_store(self, store: "Store", step_index: int) -> None:
         """
@@ -146,18 +212,40 @@ class StoreChecks(BaseModel):
                         f"expected 0x{expected_value.hex()}"
                     )
 
-            elif field_name == "known_attestation_count":
-                actual = len(store.latest_known_attestations)
-                if actual != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: known attestation count = {actual}, "
-                        f"expected {expected_value}"
-                    )
+            elif field_name == "attestation_checks":
+                # Validate specific attestation contents
+                for check in expected_value:
+                    validator_idx = check.validator
 
-            elif field_name == "new_attestation_count":
-                actual = len(store.latest_new_attestations)
-                if actual != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: new attestation count = {actual}, "
-                        f"expected {expected_value}"
-                    )
+                    # Determine where to look for the attestation
+                    if check.in_latest_new is True:
+                        if validator_idx not in store.latest_new_attestations:
+                            raise AssertionError(
+                                f"Step {step_index}: validator {validator_idx} not found "
+                                f"in latest_new_attestations"
+                            )
+                        attestation = store.latest_new_attestations[validator_idx]
+                        check.validate_attestation(attestation, "in latest_new", step_index)
+
+                    elif check.in_latest_new is False:
+                        if validator_idx not in store.latest_known_attestations:
+                            raise AssertionError(
+                                f"Step {step_index}: validator {validator_idx} not found "
+                                f"in latest_known_attestations"
+                            )
+                        attestation = store.latest_known_attestations[validator_idx]
+                        check.validate_attestation(attestation, "in latest_known", step_index)
+
+                    else:
+                        # Check both dictionaries if location not specified
+                        if validator_idx in store.latest_new_attestations:
+                            attestation = store.latest_new_attestations[validator_idx]
+                            check.validate_attestation(attestation, "in latest_new", step_index)
+                        elif validator_idx in store.latest_known_attestations:
+                            attestation = store.latest_known_attestations[validator_idx]
+                            check.validate_attestation(attestation, "in latest_known", step_index)
+                        else:
+                            raise AssertionError(
+                                f"Step {step_index}: validator {validator_idx} not found "
+                                f"in any attestation dictionary"
+                            )

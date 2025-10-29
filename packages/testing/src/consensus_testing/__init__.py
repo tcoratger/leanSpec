@@ -13,6 +13,7 @@ from .test_fixtures import (
     StateTransitionTest,
 )
 from .test_types import (
+    AttestationCheck,
     AttestationStep,
     BaseForkChoiceStep,
     BlockStep,
@@ -44,6 +45,7 @@ __all__ = [
     "ForkChoiceStep",
     "StateExpectation",
     "StoreChecks",
+    "AttestationCheck",
     # Type aliases for test function signatures
     "StateTransitionTestFiller",
     "ForkChoiceTestFiller",

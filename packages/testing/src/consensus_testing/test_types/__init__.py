@@ -8,11 +8,12 @@ from .step_types import (
     ForkChoiceStep,
     TickStep,
 )
-from .store_checks import StoreChecks
+from .store_checks import AttestationCheck, StoreChecks
 
 __all__ = [
     "StateExpectation",
     "StoreChecks",
+    "AttestationCheck",
     "BaseForkChoiceStep",
     "TickStep",
     "BlockStep",
