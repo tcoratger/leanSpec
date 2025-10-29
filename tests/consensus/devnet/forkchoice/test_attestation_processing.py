@@ -86,7 +86,7 @@ def test_proposer_attestation_appears_in_latest_new(
                             head_slot=Slot(1),
                             source_slot=Slot(0),  # Genesis
                             target_slot=Slot(1),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -132,7 +132,7 @@ def test_attestation_superseding_same_validator(
                             head_slot=Slot(1),
                             source_slot=Slot(0),
                             target_slot=Slot(1),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -148,7 +148,7 @@ def test_attestation_superseding_same_validator(
                             attestation_slot=Slot(5),
                             head_slot=Slot(5),
                             target_slot=Slot(5),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -198,7 +198,7 @@ def test_attestations_move_to_known_between_blocks(
                             head_slot=Slot(1),
                             source_slot=Slot(0),
                             target_slot=Slot(1),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -215,7 +215,7 @@ def test_attestations_move_to_known_between_blocks(
                             head_slot=Slot(1),
                             source_slot=Slot(0),
                             target_slot=Slot(1),
-                            in_latest_new=False,  # Now in known!
+                            location="known",  # Now in known!
                         ),
                         # Validator 2's new attestation
                         AttestationCheck(
@@ -224,7 +224,7 @@ def test_attestations_move_to_known_between_blocks(
                             head_slot=Slot(2),
                             source_slot=Slot(1),
                             target_slot=Slot(2),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -270,7 +270,7 @@ def test_attestation_accumulation_full_validator_set(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
                             target_slot=Slot(1),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -283,13 +283,13 @@ def test_attestation_accumulation_full_validator_set(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,  # Moved to known
+                            location="known",  # Moved to known
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
                             target_slot=Slot(2),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -302,18 +302,18 @@ def test_attestation_accumulation_full_validator_set(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
                             target_slot=Slot(3),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -327,23 +327,23 @@ def test_attestation_accumulation_full_validator_set(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(0),
                             attestation_slot=Slot(4),
                             target_slot=Slot(4),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -392,7 +392,7 @@ def test_slot_gaps_with_attestation_superseding(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
                             target_slot=Slot(1),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -405,13 +405,13 @@ def test_slot_gaps_with_attestation_superseding(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,  # Moved to known
+                            location="known",  # Moved to known
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
                             target_slot=Slot(3),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -424,13 +424,13 @@ def test_slot_gaps_with_attestation_superseding(
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(5),  # Newer attestation superseded slot 1
                             target_slot=Slot(5),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -443,13 +443,13 @@ def test_slot_gaps_with_attestation_superseding(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(5),  # Latest from validator 1
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(7),  # Newer attestation superseded slot 3
                             target_slot=Slot(7),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -500,7 +500,7 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -513,12 +513,12 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -531,17 +531,17 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -554,22 +554,22 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(1),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(0),
                             attestation_slot=Slot(4),
-                            in_latest_new=True,
+                            location="new",
                         ),
                     ],
                 ),
@@ -583,22 +583,22 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(5),
-                            in_latest_new=True,
+                            location="new",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(0),
                             attestation_slot=Slot(4),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(2),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
-                            in_latest_new=False,
+                            location="known",
                         ),
                     ],
                 ),
@@ -612,22 +612,22 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(6),
-                            in_latest_new=True,
+                            location="new",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(0),
                             attestation_slot=Slot(4),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(5),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(3),
-                            in_latest_new=False,
+                            location="known",
                         ),
                     ],
                 ),
@@ -641,22 +641,22 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(7),
-                            in_latest_new=True,
+                            location="new",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(0),
                             attestation_slot=Slot(4),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(5),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(6),
-                            in_latest_new=False,
+                            location="known",
                         ),
                     ],
                 ),
@@ -670,22 +670,22 @@ def test_extended_chain_attestation_superseding_pattern(
                         AttestationCheck(
                             validator=ValidatorIndex(0),
                             attestation_slot=Slot(8),
-                            in_latest_new=True,
+                            location="new",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(1),
                             attestation_slot=Slot(5),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(2),
                             attestation_slot=Slot(6),
-                            in_latest_new=False,
+                            location="known",
                         ),
                         AttestationCheck(
                             validator=ValidatorIndex(3),
                             attestation_slot=Slot(7),
-                            in_latest_new=False,
+                            location="known",
                         ),
                     ],
                 ),

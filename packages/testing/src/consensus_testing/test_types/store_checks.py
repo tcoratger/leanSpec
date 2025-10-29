@@ -1,6 +1,6 @@
 """Store checks model for selective validation in fork choice tests."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
@@ -35,14 +35,19 @@ class AttestationCheck(BaseModel):
     target_slot: Slot | None = None
     """Expected target checkpoint slot."""
 
-    in_latest_new: bool | None = None
-    """Expected to be in latest_new_attestations (if True) or latest_known (if False)."""
+    location: Literal["new", "known"] | None = None
+    """
+    Expected attestation location:
+        - "new" for `latest_new_attestations`,
+        - "known" for `latest_known_attestations`,
+        - `None` to check both.
+    """
 
     def validate_attestation(
         self, attestation: "SignedAttestation", location: str, step_index: int
     ) -> None:
         """Validate attestation properties."""
-        fields_to_check = self.model_fields_set - {"validator", "in_latest_new"}
+        fields_to_check = self.model_fields_set - {"validator", "location"}
 
         for field_name in fields_to_check:
             expected = getattr(self, field_name)
@@ -218,7 +223,7 @@ class StoreChecks(BaseModel):
                     validator_idx = check.validator
 
                     # Determine where to look for the attestation
-                    if check.in_latest_new is True:
+                    if check.location == "new":
                         if validator_idx not in store.latest_new_attestations:
                             raise AssertionError(
                                 f"Step {step_index}: validator {validator_idx} not found "
@@ -227,7 +232,7 @@ class StoreChecks(BaseModel):
                         attestation = store.latest_new_attestations[validator_idx]
                         check.validate_attestation(attestation, "in latest_new", step_index)
 
-                    elif check.in_latest_new is False:
+                    elif check.location == "known":
                         if validator_idx not in store.latest_known_attestations:
                             raise AssertionError(
                                 f"Step {step_index}: validator {validator_idx} not found "
