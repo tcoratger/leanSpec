@@ -3,14 +3,14 @@
 from typing import TYPE_CHECKING, Literal
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, CamelModel, Uint64
+from lean_spec.types import Bytes32, CamelModel, Uint64, ValidatorIndex
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.containers import SignedAttestation
     from lean_spec.subspecs.forkchoice.store import Store
 
 
-class AttestationCheck(BaseModel):
+class AttestationCheck(CamelModel):
     """
     Validation checks for a specific validator's attestation.
 
