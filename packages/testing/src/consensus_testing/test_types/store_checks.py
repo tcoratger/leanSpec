@@ -33,12 +33,11 @@ class AttestationCheck(CamelModel):
     target_slot: Slot | None = None
     """Expected target checkpoint slot."""
 
-    location: Literal["new", "known"] | None = None
+    location: Literal["new", "known"]
     """
     Expected attestation location:
-        - "new" for `latest_new_attestations`,
-        - "known" for `latest_known_attestations`,
-        - `None` to check both.
+        - "new" for `latest_new_attestations`
+        - "known" for `latest_known_attestations`
     """
 
     def validate_attestation(
@@ -220,7 +219,7 @@ class StoreChecks(CamelModel):
                 for check in expected_value:
                     validator_idx = check.validator
 
-                    # Determine where to look for the attestation
+                    # Check attestation location
                     if check.location == "new":
                         if validator_idx not in store.latest_new_attestations:
                             raise AssertionError(
@@ -230,7 +229,7 @@ class StoreChecks(CamelModel):
                         attestation = store.latest_new_attestations[validator_idx]
                         check.validate_attestation(attestation, "in latest_new", step_index)
 
-                    elif check.location == "known":
+                    else:  # check.location == "known"
                         if validator_idx not in store.latest_known_attestations:
                             raise AssertionError(
                                 f"Step {step_index}: validator {validator_idx} not found "
@@ -238,17 +237,3 @@ class StoreChecks(CamelModel):
                             )
                         attestation = store.latest_known_attestations[validator_idx]
                         check.validate_attestation(attestation, "in latest_known", step_index)
-
-                    else:
-                        # Check both dictionaries if location not specified
-                        if validator_idx in store.latest_new_attestations:
-                            attestation = store.latest_new_attestations[validator_idx]
-                            check.validate_attestation(attestation, "in latest_new", step_index)
-                        elif validator_idx in store.latest_known_attestations:
-                            attestation = store.latest_known_attestations[validator_idx]
-                            check.validate_attestation(attestation, "in latest_known", step_index)
-                        else:
-                            raise AssertionError(
-                                f"Step {step_index}: validator {validator_idx} not found "
-                                f"in any attestation dictionary"
-                            )
