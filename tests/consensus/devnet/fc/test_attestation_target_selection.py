@@ -303,37 +303,54 @@ def test_attestation_target_justifiable_constraint(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target advances gradually while maintaining justifiability.
+    Attestation target advances while respecting justifiability rules.
 
     Scenario
     --------
     Build a 10-slot chain and observe how the attestation target advances
-    over time while remaining justifiable relative to the finalized checkpoint.
+    over time while remaining justifiable relative to genesis (finalized at slot 0).
 
-    Expected Behavior:
-        - Slots 1-3: Target stays at genesis (slot 0)
-          Conservative start before sufficient attestation weight accumulates
+    Justifiability Rules (see Slot.is_justifiable_after)
+    -----------------------------------------------------
+    A slot is justifiable at distance delta from finalization if:
+    1. delta ≤ 5 (first 5 slots always justifiable)
+    2. delta is a perfect square (1, 4, 9, 16, 25, ...)
+    3. delta is a pronic number (2, 6, 12, 20, 30, ...)
 
-        - Slots 4-9: Target advances gradually (lags ~3 slots behind head)
-          As validators attest and weights accumulate, target moves forward
+    Expected Target Advancement:
+        - Slots 1-3: Target = slot 0 (genesis)
+          Uses Rule 1: distance ≤ 5
 
-        - Slot 10: Target caps at slot 6
-          Advancement slows as the algorithm balances safety and progress
+        - Slot 4: Target = slot 1
+          Uses Rule 2: distance 1 is a perfect square
+
+        - Slot 5: Target = slot 2
+          Uses Rule 3: distance 2 is pronic (1×2)
+
+        - Slot 6: Target = slot 3
+          Uses Rule 1: distance 3 ≤ 5
+
+        - Slot 7: Target = slot 4
+          Uses Rule 2: distance 4 is a perfect square (2^2)
+
+        - Slot 8: Target = slot 5
+          Uses Rule 1: distance 5 ≤ 5
+
+        - Slot 9: Target = slot 6
+          Uses Rule 3: distance 6 is pronic (2×3)
+
+        - Slot 10: Target = slot 6
+          Target can't advance: distance 7 fails all rules
 
     Why This Matters
     ----------------
-    The "justifiable" constraint ensures validators can only attest to checkpoints
-    that can eventually be justified through the fork choice algorithm, given the
-    current finalized checkpoint.
+    The justifiability rules prevent long-range attacks by restricting which
+    checkpoints validators can attest to. The mathematical pattern (perfect squares
+    and pronic numbers) creates increasingly sparse justifiable slots as the chain
+    grows beyond finalization, providing security guarantees.
 
-    This prevents long-range attacks where validators might attest to checkpoints
-    that would create irreconcilable forks in the chain's history.
-
-    The test demonstrates that throughout a growing chain, the algorithm:
-    - Starts conservatively at the finalized checkpoint
-    - Advances only when sufficient attestation support exists
-    - Never selects a target that violates justifiability constraints
-    - Maintains a stable lag behind the head for safety
+    The test verifies that the target selection algorithm respects these rules
+    and never selects a non-justifiable target.
     """
     fork_choice_test(
         steps=[
