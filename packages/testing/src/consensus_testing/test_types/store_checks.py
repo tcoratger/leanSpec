@@ -1,12 +1,85 @@
 """Store checks model for selective validation in fork choice tests."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, CamelModel, Uint64
+from lean_spec.types import Bytes32, CamelModel, Uint64, ValidatorIndex
 
 if TYPE_CHECKING:
+    from lean_spec.subspecs.containers import SignedAttestation
     from lean_spec.subspecs.forkchoice.store import Store
+
+
+class AttestationCheck(CamelModel):
+    """
+    Validation checks for a specific validator's attestation.
+
+    All fields optional - only check fields explicitly set.
+    Used to validate attestation content beyond just counting.
+    """
+
+    validator: ValidatorIndex
+    """Which validator's attestation to check."""
+
+    attestation_slot: Slot | None = None
+    """Expected attestation data slot."""
+
+    head_slot: Slot | None = None
+    """Expected head checkpoint slot."""
+
+    source_slot: Slot | None = None
+    """Expected source checkpoint slot."""
+
+    target_slot: Slot | None = None
+    """Expected target checkpoint slot."""
+
+    location: Literal["new", "known"]
+    """
+    Expected attestation location:
+        - "new" for `latest_new_attestations`
+        - "known" for `latest_known_attestations`
+    """
+
+    def validate_attestation(
+        self, attestation: "SignedAttestation", location: str, step_index: int
+    ) -> None:
+        """Validate attestation properties."""
+        fields_to_check = self.model_fields_set - {"validator", "location"}
+
+        for field_name in fields_to_check:
+            expected = getattr(self, field_name)
+
+            if field_name == "attestation_slot":
+                actual = attestation.message.data.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"attestation slot = {actual}, expected {expected}"
+                    )
+
+            elif field_name == "head_slot":
+                actual = attestation.message.data.head.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"head slot = {actual}, expected {expected}"
+                    )
+
+            elif field_name == "source_slot":
+                actual = attestation.message.data.source.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"source slot = {actual}, expected {expected}"
+                    )
+
+            elif field_name == "target_slot":
+                actual = attestation.message.data.target.slot
+                if actual != expected:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {self.validator} {location} "
+                        f"target slot = {actual}, expected {expected}"
+                    )
 
 
 class StoreChecks(CamelModel):
@@ -50,6 +123,9 @@ class StoreChecks(CamelModel):
 
     safe_target: Bytes32 | None = None
     """Expected safe target root."""
+
+    attestation_checks: list[AttestationCheck] | None = None
+    """Optional list of attestation content checks for specific validators."""
 
     def validate_against_store(self, store: "Store", step_index: int) -> None:
         """
@@ -137,3 +213,27 @@ class StoreChecks(CamelModel):
                         f"Step {step_index}: safe_target = 0x{actual_root.hex()}, "
                         f"expected 0x{expected_value.hex()}"
                     )
+
+            elif field_name == "attestation_checks":
+                # Validate specific attestation contents
+                for check in expected_value:
+                    validator_idx = check.validator
+
+                    # Check attestation location
+                    if check.location == "new":
+                        if validator_idx not in store.latest_new_attestations:
+                            raise AssertionError(
+                                f"Step {step_index}: validator {validator_idx} not found "
+                                f"in latest_new_attestations"
+                            )
+                        attestation = store.latest_new_attestations[validator_idx]
+                        check.validate_attestation(attestation, "in latest_new", step_index)
+
+                    else:  # check.location == "known"
+                        if validator_idx not in store.latest_known_attestations:
+                            raise AssertionError(
+                                f"Step {step_index}: validator {validator_idx} not found "
+                                f"in latest_known_attestations"
+                            )
+                        attestation = store.latest_known_attestations[validator_idx]
+                        check.validate_attestation(attestation, "in latest_known", step_index)
