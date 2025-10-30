@@ -124,6 +124,15 @@ class StoreChecks(CamelModel):
     safe_target: Bytes32 | None = None
     """Expected safe target root."""
 
+    attestation_target_slot: Slot | None = None
+    """
+    Expected attestation target checkpoint slot.
+
+    Validates the complete checkpoint (both slot and root):
+    - The checkpoint slot matches the expected value
+    - The checkpoint root references an actual block at that slot
+    """
+
     attestation_checks: list[AttestationCheck] | None = None
     """Optional list of attestation content checks for specific validators."""
 
@@ -212,6 +221,38 @@ class StoreChecks(CamelModel):
                     raise AssertionError(
                         f"Step {step_index}: safe_target = 0x{actual_root.hex()}, "
                         f"expected 0x{expected_value.hex()}"
+                    )
+
+            elif field_name == "attestation_target_slot":
+                # Get attestation target and check slot
+                target = store.get_attestation_target()
+                actual_slot = target.slot
+                if actual_slot != expected_value:
+                    raise AssertionError(
+                        f"Step {step_index}: attestation_target.slot = {actual_slot}, "
+                        f"expected {expected_value}"
+                    )
+
+                # ALSO validate the root matches a block at this slot
+                #
+                # This ensures we're validating the complete checkpoint (root + slot)
+                block_found = False
+                for root, block in store.blocks.items():
+                    if block.slot == expected_value and root == target.root:
+                        block_found = True
+                        break
+
+                if not block_found:
+                    available = [
+                        f"0x{r.hex()[:16]}..."
+                        for r, b in store.blocks.items()
+                        if b.slot == expected_value
+                    ]
+                    raise AssertionError(
+                        f"Step {step_index}: attestation_target.root = "
+                        f"0x{target.root.hex()[:16]}... does not match any "
+                        f"block at slot {expected_value}. "
+                        f"Available blocks: {available}"
                     )
 
             elif field_name == "attestation_checks":

@@ -37,12 +37,20 @@ class Slot(Uint64):
         delta = (self - finalized_slot).as_int()
 
         return (
-            # Rule 1: The first few slots immediately following finalization are always justifiable.
-            delta <= 5
-            # Rule 2: Slots at perfect square distances are justifiable (e.g., sqrt(9) % 1 == 0).
-            or (delta**0.5) % 1 == 0
-            # Rule 3: Slots at pronic distances (x^2 + x) are justifiable.
+            # Rule 1: The first 5 slots after finalization are always justifiable.
             #
-            # This is true if sqrt(delta + 0.25) has a fractional part of exactly 0.5.
+            # Examples: delta = 0, 1, 2, 3, 4, 5
+            delta <= 5
+            # Rule 2: Slots at perfect square distances are justifiable.
+            #
+            # Examples: delta = 1, 4, 9, 16, 25, 36, 49, 64, ...
+            # Check: sqrt(delta) is a whole number (no fractional part)
+            or (delta**0.5) % 1 == 0
+            # Rule 3: Slots at pronic number distances are justifiable.
+            #
+            # Pronic numbers have the form n(n+1): 2, 6, 12, 20, 30, 42, 56, ...
+            # Mathematical insight: For pronic delta = n(n+1), we have:
+            #   delta + 0.25 = n^2 + n + 0.25 = (n + 0.5)^2
+            #   Therefore sqrt(delta + 0.25) = n + 0.5
             or ((delta + 0.25) ** 0.5) % 1 == 0.5
         )
