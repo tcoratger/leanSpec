@@ -52,3 +52,31 @@ class BlockSpec(CamelModel):
     If None, framework creates empty body for state transition tests,
     or collects attestations for fork choice tests.
     """
+
+    label: str | None = None
+    """
+    Optional label to tag this block for later reference.
+
+    Allows creating forks by building blocks on labeled ancestors:
+    ```python
+    BlockSpec(slot=Slot(1), label="fork_a")  # Tag this block
+    BlockSpec(slot=Slot(2), parent_label="fork_a")  # Build on it
+    ```
+
+    Labels must be unique within a test.
+    """
+
+    parent_label: str | None = None
+    """
+    Optional label referencing a previously created block as parent.
+
+    Enables explicit fork creation:
+    ```python
+    BlockSpec(slot=Slot(1), label="common")
+    BlockSpec(slot=Slot(2), parent_label="common", label="fork_a")
+    BlockSpec(slot=Slot(2), parent_label="common", label="fork_b")
+    ```
+
+    If None, parent is determined by the current canonical head.
+    If specified, parent_root is computed from the labeled block.
+    """
