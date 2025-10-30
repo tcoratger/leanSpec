@@ -9,6 +9,7 @@ from lean_spec.subspecs.containers import (
     AttestationData,
     BlockBody,
     Checkpoint,
+    Signature,
     SignedAttestation,
     State,
 )
@@ -23,7 +24,7 @@ from lean_spec.subspecs.containers.state.types import (
     JustifiedSlots,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Bytes4000, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
 
 class MockState(State):
@@ -78,7 +79,7 @@ def build_signed_attestation(
     )
     return SignedAttestation(
         message=message,
-        signature=Bytes4000.zero(),
+        signature=Signature.zero(),
     )
 
 

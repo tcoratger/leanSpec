@@ -13,6 +13,7 @@ from lean_spec.subspecs.containers import (
     BlockHeader,
     Checkpoint,
     Config,
+    Signature,
     SignedAttestation,
     State,
     Validator,
@@ -27,7 +28,7 @@ from lean_spec.subspecs.containers.state import (
     Validators,
 )
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Boolean, Bytes32, Bytes52, Bytes4000, Uint64, ValidatorIndex
+from lean_spec.types import Boolean, Bytes32, Bytes52, Uint64, ValidatorIndex
 
 
 @pytest.fixture
@@ -158,7 +159,7 @@ def _build_signed_attestation(
     )
     return SignedAttestation(
         message=message,
-        signature=Bytes4000.zero(),
+        signature=Signature.zero(),
     )
 
 
