@@ -7,6 +7,7 @@ from lean_spec.types import Bytes32, CamelModel, Uint64, ValidatorIndex
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.containers import SignedAttestation
+    from lean_spec.subspecs.containers.block.block import Block
     from lean_spec.subspecs.forkchoice.store import Store
 
 
@@ -109,6 +110,18 @@ class StoreChecks(CamelModel):
     head_root: Bytes32 | None = None
     """Expected head block root."""
 
+    head_root_label: str | None = None
+    """
+    Expected head block root by label reference.
+
+    Alternative to head_root that uses the block label system.
+    The framework will resolve this label to the actual block root
+    and validate the head matches.
+
+    Example:
+        StoreChecks(head_root_label="fork_a")  # Validates head is fork_a block
+    """
+
     latest_justified_slot: Slot | None = None
     """Expected latest justified checkpoint slot."""
 
@@ -136,7 +149,9 @@ class StoreChecks(CamelModel):
     attestation_checks: list[AttestationCheck] | None = None
     """Optional list of attestation content checks for specific validators."""
 
-    def validate_against_store(self, store: "Store", step_index: int) -> None:
+    def validate_against_store(
+        self, store: "Store", step_index: int, block_registry: dict[str, "Block"] | None = None
+    ) -> None:
         """
         Validate these checks against actual Store state.
 
@@ -149,6 +164,8 @@ class StoreChecks(CamelModel):
             The fork choice store to validate against.
         step_index : int
             Index of the step being validated (for error messages).
+        block_registry : dict[str, Block] | None
+            Optional registry of labeled blocks for resolving head_root_label.
 
         Raises:
         ------
@@ -181,6 +198,35 @@ class StoreChecks(CamelModel):
                     raise AssertionError(
                         f"Step {step_index}: head.root = 0x{actual_root.hex()}, "
                         f"expected 0x{expected_value.hex()}"
+                    )
+
+            elif field_name == "head_root_label":
+                # Resolve label to root
+                if block_registry is None:
+                    raise ValueError(
+                        f"Step {step_index}: head_root_label='{expected_value}' specified "
+                        f"but block_registry not provided to validate_against_store()"
+                    )
+
+                if expected_value not in block_registry:
+                    available = list(block_registry.keys())
+                    raise ValueError(
+                        f"Step {step_index}: head_root_label='{expected_value}' not found "
+                        f"in block registry. Available labels: {available}"
+                    )
+
+                # Import hash_tree_root locally to avoid circular import
+                from lean_spec.subspecs.ssz import hash_tree_root
+
+                expected_block = block_registry[expected_value]
+                expected_root = hash_tree_root(expected_block)
+                actual_root = store.head
+
+                if actual_root != expected_root:
+                    raise AssertionError(
+                        f"Step {step_index}: head.root = 0x{actual_root.hex()}, "
+                        f"expected 0x{expected_root.hex()} "
+                        f"(label '{expected_value}')"
                     )
 
             elif field_name == "latest_justified_slot":

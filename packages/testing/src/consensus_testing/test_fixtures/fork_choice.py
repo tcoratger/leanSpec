@@ -172,7 +172,9 @@ class ForkChoiceTest(BaseConsensusFixture):
 
                 # Validate checks if provided
                 if step.checks is not None:
-                    step.checks.validate_against_store(store, step_index=i)
+                    step.checks.validate_against_store(
+                        store, step_index=i, block_registry=self._block_registry
+                    )
 
             except Exception as e:
                 if step.valid:

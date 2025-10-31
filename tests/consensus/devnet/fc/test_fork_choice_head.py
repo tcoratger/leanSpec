@@ -54,7 +54,7 @@ from lean_spec.subspecs.containers.slot import Slot
 pytestmark = pytest.mark.valid_until("Devnet")
 
 
-def test_head_slot_advances_through_deep_chain(
+def test_head_advances_through_deep_chain(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
@@ -81,17 +81,28 @@ def test_head_slot_advances_through_deep_chain(
 
     A 20-block chain is a modest test of this scalability.
     """
-    fork_choice_test(
-        steps=[
-            BlockStep(
-                block=BlockSpec(slot=Slot(i)),
-                checks=StoreChecks(
-                    head_slot=Slot(i),
-                ),
+    steps = []
+    for i in range(1, 21):
+        # Add label to last block so we can verify root
+        if i == 20:
+            steps.append(
+                BlockStep(
+                    block=BlockSpec(slot=Slot(i), label="block_20"),
+                    checks=StoreChecks(
+                        head_slot=Slot(i),
+                        head_root_label="block_20",
+                    ),
+                )
             )
-            for i in range(1, 21)
-        ],
-    )
+        else:
+            steps.append(
+                BlockStep(
+                    block=BlockSpec(slot=Slot(i)),
+                    checks=StoreChecks(head_slot=Slot(i)),
+                )
+            )
+
+    fork_choice_test(steps=steps)
 
 
 def test_head_with_gaps_in_slots(
@@ -234,7 +245,7 @@ def test_head_with_two_competing_forks(
             # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
-                checks=StoreChecks(head_slot=Slot(1)),
+                checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
             # Fork A at slot 2
             BlockStep(
@@ -243,7 +254,7 @@ def test_head_with_two_competing_forks(
                     parent_label="common",
                     label="fork_a",
                 ),
-                checks=StoreChecks(head_slot=Slot(2)),  # Becomes head
+                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
             # Competing fork B at slot 2
             BlockStep(
@@ -253,7 +264,8 @@ def test_head_with_two_competing_forks(
                     label="fork_b",
                 ),
                 # Head determined by tie-breaker (lexicographic root order)
-                checks=StoreChecks(head_slot=Slot(2)),
+                # The tie is broken by comparing block roots lexicographically
+                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
         ],
     )
@@ -292,7 +304,7 @@ def test_head_switches_to_heavier_fork(
             # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
-                checks=StoreChecks(head_slot=Slot(1)),
+                checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
             # Fork A at slot 2
             BlockStep(
@@ -301,7 +313,7 @@ def test_head_switches_to_heavier_fork(
                     parent_label="common",
                     label="fork_a",
                 ),
-                checks=StoreChecks(head_slot=Slot(2)),
+                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
             # Competing fork B at slot 2
             BlockStep(
@@ -310,15 +322,16 @@ def test_head_switches_to_heavier_fork(
                     parent_label="common",
                     label="fork_b",
                 ),
-                checks=StoreChecks(head_slot=Slot(2)),  # Still fork A
+                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
             # Extend fork B - gives it more weight
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
                     parent_label="fork_b",  # Build on fork B
+                    label="fork_b_3",
                 ),
-                checks=StoreChecks(head_slot=Slot(3)),  # Head switches to fork B!
+                checks=StoreChecks(head_slot=Slot(3), head_root_label="fork_b_3"),
             ),
         ],
     )
@@ -356,37 +369,37 @@ def test_head_with_deep_fork_split(
             # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
-                checks=StoreChecks(head_slot=Slot(1)),
+                checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
             # Fork A: slots 2, 3, 4
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_a_2"),
-                checks=StoreChecks(head_slot=Slot(2)),
+                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a_2"),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3), parent_label="fork_a_2", label="fork_a_3"),
-                checks=StoreChecks(head_slot=Slot(3)),
+                checks=StoreChecks(head_slot=Slot(3), head_root_label="fork_a_3"),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(4), parent_label="fork_a_3"),
-                checks=StoreChecks(head_slot=Slot(4)),
+                block=BlockSpec(slot=Slot(4), parent_label="fork_a_3", label="fork_a_4"),
+                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
             # Fork B: slots 2, 3, 4, 5 (longer)
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_b_2"),
-                checks=StoreChecks(head_slot=Slot(4)),  # Still fork A
+                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3), parent_label="fork_b_2", label="fork_b_3"),
-                checks=StoreChecks(head_slot=Slot(4)),  # Still fork A
+                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(4), parent_label="fork_b_3", label="fork_b_4"),
-                checks=StoreChecks(head_slot=Slot(4)),  # Tied at depth
+                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(5), parent_label="fork_b_4"),
-                checks=StoreChecks(head_slot=Slot(5)),  # Fork B wins with extra block!
+                block=BlockSpec(slot=Slot(5), parent_label="fork_b_4", label="fork_b_5"),
+                checks=StoreChecks(head_slot=Slot(5), head_root_label="fork_b_5"),
             ),
         ],
     )
