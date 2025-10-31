@@ -54,7 +54,7 @@ from lean_spec.subspecs.containers.slot import Slot
 pytestmark = pytest.mark.valid_until("Devnet")
 
 
-def test_head_advances_through_deep_chain(
+def test_head_slot_advances_through_deep_chain(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
