@@ -478,10 +478,6 @@ class Store(Container):
         Returns:
             New Store with updated head, latest_justified, and latest_finalized.
 
-        Example:
-            >>> # Immutable update pattern
-            >>> store = store.update_head()
-            >>> # Old store instance unchanged, new instance returned
         """
         # Compute latest justified checkpoint from all known states
         #
@@ -708,10 +704,6 @@ class Store(Container):
 
         Returns:
             Tuple of (new Store with updated time, head root for building).
-
-        Example:
-            >>> store, parent_root = store.get_proposal_head(Slot(10))
-            >>> # Build new block with parent_root as parent
         """
         # Calculate time corresponding to this slot
         slot_time = self.config.genesis_time + slot * SECONDS_PER_SLOT
@@ -754,18 +746,6 @@ class Store(Container):
 
         Returns:
             Target checkpoint for attestation.
-
-        Example:
-            >>> target = store.get_attestation_target()
-            >>> attestation = Attestation(
-            ...     validator_id=validator_id,
-            ...     data=AttestationData(
-            ...         target=target,
-            ...         source=store.latest_justified,
-            ...         head=current_head,
-            ...         slot=current_slot,
-            ...     ),
-            ... )
         """
         # Start from current head
         target_block_root = self.head
