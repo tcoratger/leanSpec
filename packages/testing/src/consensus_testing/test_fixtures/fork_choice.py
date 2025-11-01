@@ -121,6 +121,12 @@ class ForkChoiceTest(BaseConsensusFixture):
             anchor_block=self.anchor_block,
         )
 
+        # Block registry for label-based fork creation
+        self._block_registry: dict[str, Block] = {}
+
+        # Register genesis/anchor block with implicit label
+        self._block_registry["genesis"] = self.anchor_block
+
         # Process each step
         for i, step in enumerate(self.steps):
             try:
@@ -130,11 +136,22 @@ class ForkChoiceTest(BaseConsensusFixture):
 
                 elif isinstance(step, BlockStep):
                     # Build SignedBlockWithAttestation from BlockSpec
-                    signed_block = self._build_block_from_spec(step.block, store)
+                    signed_block = self._build_block_from_spec(
+                        step.block, store, self._block_registry
+                    )
 
                     # Store the filled Block for serialization
                     block = signed_block.message.block
                     step._filled_block = block
+
+                    # Register block if it has a label
+                    if step.block.label is not None:
+                        if step.block.label in self._block_registry:
+                            raise ValueError(
+                                f"Step {i}: duplicate label '{step.block.label}' - "
+                                f"labels must be unique within a test"
+                            )
+                        self._block_registry[step.block.label] = block
 
                     # Automatically advance time to block's slot before processing
                     # Compute the time corresponding to the block's slot
@@ -155,7 +172,9 @@ class ForkChoiceTest(BaseConsensusFixture):
 
                 # Validate checks if provided
                 if step.checks is not None:
-                    step.checks.validate_against_store(store, step_index=i)
+                    step.checks.validate_against_store(
+                        store, step_index=i, block_registry=self._block_registry
+                    )
 
             except Exception as e:
                 if step.valid:
@@ -175,7 +194,12 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Return self (fixture is already complete)
         return self
 
-    def _build_block_from_spec(self, spec: BlockSpec, store: Store) -> SignedBlockWithAttestation:
+    def _build_block_from_spec(
+        self,
+        spec: BlockSpec,
+        store: Store,
+        block_registry: dict[str, Block],
+    ) -> SignedBlockWithAttestation:
         """
         Build a full SignedBlockWithAttestation from a lightweight BlockSpec.
 
@@ -194,6 +218,8 @@ class ForkChoiceTest(BaseConsensusFixture):
             The lightweight block specification.
         store : Store
             The fork choice store (used to get head state and latest justified).
+        block_registry : dict[str, Block]
+            Registry of labeled blocks for fork creation.
 
         Returns:
         -------
@@ -207,12 +233,31 @@ class ForkChoiceTest(BaseConsensusFixture):
         else:
             proposer_index = spec.proposer_index
 
-        # Get the current head state from the store
-        head_state = store.states[store.head]
+        # Resolve parent block if parent_label is specified
+        if spec.parent_label is not None:
+            if spec.parent_label not in block_registry:
+                raise ValueError(
+                    f"parent_label '{spec.parent_label}' not found - "
+                    f"available labels: {list(block_registry.keys())}"
+                )
+            parent_block = block_registry[spec.parent_label]
+            parent_root = hash_tree_root(parent_block)
 
-        # Dry-run to build block with correct state root
-        temp_state = head_state.process_slots(spec.slot)
-        parent_root = hash_tree_root(temp_state.latest_block_header)
+            # Get state at the parent block
+            if parent_root not in store.states:
+                raise ValueError(
+                    f"parent_label '{spec.parent_label}' (root=0x{parent_root.hex()[:16]}...) "
+                    f"has no state in store - cannot build on this fork"
+                )
+            parent_state = store.states[parent_root]
+
+            # Advance state to the new block's slot
+            temp_state = parent_state.process_slots(spec.slot)
+        else:
+            # Default: build on current head
+            head_state = store.states[store.head]
+            temp_state = head_state.process_slots(spec.slot)
+            parent_root = hash_tree_root(temp_state.latest_block_header)
 
         # Build body (empty for now, attestations can be added later if needed)
         body = BlockBody(attestations=Attestations(data=[]))
