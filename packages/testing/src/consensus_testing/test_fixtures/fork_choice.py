@@ -127,12 +127,12 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Register genesis/anchor block with implicit label
         self._block_registry["genesis"] = self.anchor_block
 
-        # Process each step
+        # Process each step (immutable pattern: store = store.method())
         for i, step in enumerate(self.steps):
             try:
                 if isinstance(step, TickStep):
-                    # Advance time
-                    store.advance_time(Uint64(step.time), has_proposal=False)
+                    # Advance time (immutable)
+                    store = store.advance_time(Uint64(step.time), has_proposal=False)
 
                 elif isinstance(step, BlockStep):
                     # Build SignedBlockWithAttestation from BlockSpec
@@ -153,19 +153,16 @@ class ForkChoiceTest(BaseConsensusFixture):
                             )
                         self._block_registry[step.block.label] = block
 
-                    # Automatically advance time to block's slot before processing
-                    # Compute the time corresponding to the block's slot
+                    # Automatically advance time to block's slot before processing (immutable)
                     block_time = store.config.genesis_time + block.slot * Uint64(SECONDS_PER_SLOT)
+                    store = store.advance_time(block_time, has_proposal=True)
 
-                    # Use spec's advance_time method to handle time progression
-                    store.advance_time(block_time, has_proposal=True)
-
-                    # Process the block (which calls state_transition internally)
-                    store.process_block(signed_block)
+                    # Process the block (immutable)
+                    store = store.process_block(signed_block)
 
                 elif isinstance(step, AttestationStep):
-                    # Process attestation from gossip (not from block)
-                    store.process_attestation(step.attestation, is_from_block=False)
+                    # Process attestation from gossip (immutable)
+                    store = store.process_attestation(step.attestation, is_from_block=False)
 
                 else:
                     raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")

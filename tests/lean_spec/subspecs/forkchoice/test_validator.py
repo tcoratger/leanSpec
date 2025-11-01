@@ -147,7 +147,7 @@ class TestBlockProduction:
         slot = Slot(1)
         validator_idx = ValidatorIndex(1)  # Proposer for slot 1
 
-        block, _signatures = sample_store.produce_block_with_signatures(slot, validator_idx)
+        store, block, _signatures = sample_store.produce_block_with_signatures(slot, validator_idx)
         # Verify block structure
         assert block.slot == slot
         assert block.proposer_index == validator_idx
@@ -157,8 +157,8 @@ class TestBlockProduction:
 
         # Verify block was added to store
         block_hash = hash_tree_root(block)
-        assert block_hash in sample_store.blocks
-        assert block_hash in sample_store.states
+        assert block_hash in store.blocks
+        assert block_hash in store.states
 
     def test_produce_block_unauthorized_proposer(self, sample_store: Store) -> None:
         """Test block production fails for unauthorized proposer."""
@@ -191,7 +191,7 @@ class TestBlockProduction:
         slot = Slot(2)
         validator_idx = ValidatorIndex(2)  # Proposer for slot 2
 
-        block, _signatures = sample_store.produce_block_with_signatures(
+        store, block, _signatures = sample_store.produce_block_with_signatures(
             slot,
             validator_idx,
         )
@@ -207,7 +207,7 @@ class TestBlockProduction:
     def test_produce_block_sequential_slots(self, sample_store: Store) -> None:
         """Test producing blocks in sequential slots."""
         # Produce block for slot 1
-        block1, _signatures1 = sample_store.produce_block_with_signatures(
+        sample_store, block1, _signatures1 = sample_store.produce_block_with_signatures(
             Slot(1),
             ValidatorIndex(1),
         )
@@ -224,7 +224,7 @@ class TestBlockProduction:
         # So block2 should build on genesis, not block1
 
         # Produce block for slot 2 (will build on genesis due to forkchoice)
-        block2, _signatures2 = sample_store.produce_block_with_signatures(
+        sample_store, block2, _signatures2 = sample_store.produce_block_with_signatures(
             Slot(2),
             ValidatorIndex(2),
         )
@@ -251,7 +251,7 @@ class TestBlockProduction:
         # Ensure no attestations in store
         sample_store.latest_known_attestations.clear()
 
-        block, _signatures = sample_store.produce_block_with_signatures(
+        store, block, _signatures = sample_store.produce_block_with_signatures(
             slot,
             validator_idx,
         )
@@ -277,14 +277,14 @@ class TestBlockProduction:
             target=sample_store.get_attestation_target(),
         )
 
-        block, _signatures = sample_store.produce_block_with_signatures(
+        store, block, _signatures = sample_store.produce_block_with_signatures(
             slot,
             validator_idx,
         )
         block_hash = hash_tree_root(block)
 
         # Verify the stored state matches the block's state root
-        stored_state = sample_store.states[block_hash]
+        stored_state = store.states[block_hash]
         assert hash_tree_root(stored_state) == block.state_root
 
 
@@ -316,7 +316,7 @@ class TestAttestationProduction:
         attestation = sample_store.produce_attestation(slot, validator_idx)
 
         # Head checkpoint should reference the current proposal head
-        expected_head_root = sample_store.get_proposal_head(slot)
+        _, expected_head_root = sample_store.get_proposal_head(slot)
         assert attestation.data.head.root == expected_head_root
 
         # Head slot should match the block's slot
@@ -401,7 +401,7 @@ class TestValidatorIntegration:
         sample_store.produce_block_with_signatures(proposer_slot, proposer_idx)
 
         # Update store state after block production
-        sample_store.update_head()
+        sample_store = sample_store.update_head()
 
         # Other validator creates attestation for slot 2
         attestor_slot = Slot(2)
@@ -418,7 +418,7 @@ class TestValidatorIntegration:
     def test_multiple_validators_coordination(self, sample_store: Store) -> None:
         """Test multiple validators producing blocks and attestations."""
         # Validator 1 produces block for slot 1
-        block1, _signatures1 = sample_store.produce_block_with_signatures(
+        sample_store, block1, _signatures1 = sample_store.produce_block_with_signatures(
             Slot(1),
             ValidatorIndex(1),
         )
@@ -441,7 +441,7 @@ class TestValidatorIntegration:
         # Validator 2 produces next block for slot 2
         # After processing block1, head should be block1 (fork choice walks the tree)
         # So block2 will build on block1
-        block2, _signatures2 = sample_store.produce_block_with_signatures(
+        sample_store, block2, _signatures2 = sample_store.produce_block_with_signatures(
             Slot(2),
             ValidatorIndex(2),
         )
@@ -475,7 +475,7 @@ class TestValidatorIntegration:
         slot = Slot(9)  # This validator's slot
 
         # Should be able to produce block
-        block, _signatures = sample_store.produce_block_with_signatures(
+        store, block, _signatures = sample_store.produce_block_with_signatures(
             slot,
             max_validator,
         )
@@ -559,7 +559,7 @@ class TestValidatorIntegration:
         )
 
         # Should be able to produce block and attestation
-        block, _signatures = store.produce_block_with_signatures(
+        store, block, _signatures = store.produce_block_with_signatures(
             Slot(1),
             ValidatorIndex(1),
         )
