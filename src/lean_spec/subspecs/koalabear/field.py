@@ -19,6 +19,9 @@ P: int = 2**31 - 2**24 + 1
 P_BITS: int = 31
 """The number of bits in the prime P."""
 
+P_BYTES: int = (P_BITS + 7) // 8
+"""The size of a KoalaBear field element in bytes."""
+
 TWO_ADICITY: int = 24
 """
 The largest integer n such that 2^n divides (P - 1).
@@ -131,3 +134,103 @@ class Fp(StrictBaseModel):
         if not (0 <= bits <= TWO_ADICITY):
             raise ValueError(f"bits must be between 0 and {TWO_ADICITY}")
         return cls(value=TWO_ADIC_GENERATORS[bits])
+
+    def __bytes__(self) -> bytes:
+        """
+        Serialize the field element using Python's bytes protocol.
+
+        This enables `bytes(fp)` to work naturally with field elements.
+
+        Returns:
+            4-byte little-endian representation of the field element.
+
+        Example:
+            >>> fp = Fp(value=42)
+            >>> data = bytes(fp)
+            >>> len(data) == 4
+            True
+        """
+        return self.value.to_bytes(P_BYTES, byteorder="little")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        """
+        Deserialize a field element from bytes.
+
+        This is the inverse of `__bytes__()` and follows Python's standard
+        deserialization pattern.
+
+        Args:
+            data: 4-byte little-endian representation of a field element.
+
+        Returns:
+            Deserialized field element.
+
+        Raises:
+            ValueError: If data has incorrect length or represents an invalid field value.
+
+        Example:
+            >>> fp = Fp(value=42)
+            >>> recovered = Fp.from_bytes(bytes(fp))
+            >>> recovered == fp
+            True
+        """
+        if len(data) != P_BYTES:
+            raise ValueError(f"Expected {P_BYTES} bytes, got {len(data)}")
+
+        value = int.from_bytes(data, byteorder="little")
+
+        if value >= P:
+            raise ValueError(f"Value {value} (0x{value:08x}) exceeds field modulus {P} (0x{P:08x})")
+
+        return cls(value=value)
+
+    @classmethod
+    def serialize_list(cls, elements: list[Self]) -> bytes:
+        """
+        Serialize a list of field elements to bytes.
+
+        This is a convenience method for serializing multiple field elements
+        at once, useful for container serialization.
+
+        Args:
+            elements: List of field elements to serialize.
+
+        Returns:
+            Concatenated bytes of all field elements.
+
+        Example:
+            >>> elements = [Fp(value=1), Fp(value=2), Fp(value=3)]
+            >>> data = Fp.serialize_list(elements)
+            >>> len(data) == 3 * P_BYTES
+            True
+        """
+        return b"".join(bytes(elem) for elem in elements)
+
+    @classmethod
+    def deserialize_list(cls, data: bytes, count: int) -> list[Self]:
+        """
+        Deserialize a fixed number of field elements from bytes.
+
+        Args:
+            data: Raw bytes to deserialize.
+            count: Expected number of field elements.
+
+        Returns:
+            List of deserialized field elements.
+
+        Raises:
+            ValueError: If data length doesn't match expected count.
+
+        Example:
+            >>> elements = [Fp(value=1), Fp(value=2), Fp(value=3)]
+            >>> data = Fp.serialize_list(elements)
+            >>> recovered = Fp.deserialize_list(data, 3)
+            >>> recovered == elements
+            True
+        """
+        expected_len = count * P_BYTES
+        if len(data) != expected_len:
+            raise ValueError(f"Expected {expected_len} bytes for {count} elements, got {len(data)}")
+
+        return [cls.from_bytes(data[i : i + P_BYTES]) for i in range(0, len(data), P_BYTES)]

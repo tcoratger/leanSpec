@@ -13,7 +13,7 @@ from typing_extensions import Final
 
 from lean_spec.types import StrictBaseModel
 
-from ..koalabear import Fp
+from ..koalabear import P_BYTES, Fp
 
 
 class XmssConfig(StrictBaseModel):
@@ -87,6 +87,22 @@ class XmssConfig(StrictBaseModel):
     def POS_OUTPUT_LEN_FE(self) -> int:  # noqa: N802
         """Total output length for the message hash."""
         return self.POS_OUTPUT_LEN_PER_INV_FE * self.POS_INVOCATIONS
+
+    @property
+    def PUBLIC_KEY_LEN_BYTES(self) -> int:  # noqa: N802
+        """The size of the public key in bytes."""
+        return self.HASH_LEN_FE * P_BYTES + self.PARAMETER_LEN * P_BYTES
+
+    @property
+    def SIGNATURE_LEN_BYTES(self) -> int:  # noqa: N802
+        """The size of the signature in bytes."""
+        # - path siblings: LOG_LIFETIME siblings × HASH_LEN_FE elements
+        # - rho: RAND_LEN_FE elements
+        # - hashes: DIMENSION hashes × HASH_LEN_FE elements per hash
+        path_size = self.LOG_LIFETIME * self.HASH_LEN_FE * P_BYTES
+        rho_size = self.RAND_LEN_FE * P_BYTES
+        hashes_size = self.DIMENSION * self.HASH_LEN_FE * P_BYTES
+        return path_size + rho_size + hashes_size
 
 
 PROD_CONFIG: Final = XmssConfig(
