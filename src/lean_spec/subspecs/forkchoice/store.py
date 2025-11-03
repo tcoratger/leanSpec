@@ -361,7 +361,7 @@ class Store(Container):
         # and only influences fork choice after interval 3 acceptance
         return self.on_attestation(signed_proposer_attestation, is_from_block=False)
 
-    def process_block(self, signed_block_with_attestation: SignedBlockWithAttestation) -> "Store":
+    def on_block(self, signed_block_with_attestation: SignedBlockWithAttestation) -> "Store":
         """
         Process a new block and update the forkchoice state.
 
@@ -839,7 +839,7 @@ class Store(Container):
             # Apply state transition to get the post-block state
             # First advance state to target slot, then process the block
             advanced_state = head_state.process_slots(slot)
-            post_state = advanced_state.process_block(candidate_block)
+            post_state = advanced_state.on_block(candidate_block)
 
             # Find new valid attestations matching post-state justification
             new_attestations: list[Attestation] = []
@@ -880,7 +880,7 @@ class Store(Container):
         )
 
         # Apply state transition to get final post-state and compute state root
-        final_post_state = final_state.process_block(final_block)
+        final_post_state = final_state.on_block(final_block)
         finalized_block = final_block.model_copy(
             update={"state_root": hash_tree_root(final_post_state)}
         )

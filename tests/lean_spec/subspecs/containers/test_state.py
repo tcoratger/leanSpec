@@ -669,12 +669,12 @@ def test_process_attestations_justification_and_finalization(genesis_state: Stat
     state_at_slot_1 = state.process_slots(Slot(1))
     # Create and process the block at slot 1.
     block1 = _create_block(1, state_at_slot_1.latest_block_header)
-    state = state_at_slot_1.process_block(block1)
+    state = state_at_slot_1.on_block(block1)
 
     # Move to slot 4 and produce/process a block.
     state_at_slot_4 = state.process_slots(Slot(4))
     block4 = _create_block(4, state_at_slot_4.latest_block_header)
-    state = state_at_slot_4.process_block(block4)
+    state = state_at_slot_4.on_block(block4)
 
     # Advance to slot 5 so the header at slot 4 caches its state root.
     state = state.process_slots(Slot(5))
@@ -722,7 +722,7 @@ def test_state_transition_full(genesis_state: State) -> None:
     -----
     - Start at genesis.
     - Build a valid block for slot 1.
-    - Compute expected post-state by calling process_block manually.
+    - Compute expected post-state by calling on_block manually.
     - Set the block's state_root to the expected hash.
     - Run state_transition with valid signatures.
     - Assert resulting state equals the expected post-state.
@@ -737,7 +737,7 @@ def test_state_transition_full(genesis_state: State) -> None:
     block = _create_block(1, state_at_slot_1.latest_block_header)
 
     # Manually compute the post-state result of processing this block.
-    expected_state = state_at_slot_1.process_block(block)
+    expected_state = state_at_slot_1.on_block(block)
     # Embed the correct state root into the header to simulate a valid block.
     block_with_correct_root = block.model_copy(
         update={"state_root": hash_tree_root(expected_state)}
