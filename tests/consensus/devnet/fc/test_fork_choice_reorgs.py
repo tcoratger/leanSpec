@@ -21,8 +21,7 @@ Reorg Depth
 -----------
 The **depth** of a reorg is the number of blocks that become non-canonical:
 - **Shallow reorg**: 1-2 blocks deep
-- **Medium reorg**: 3-5 blocks deep
-- **Deep reorg**: 6+ blocks deep
+- **Deep reorg**: 3+ blocks deep
 
 In healthy networks, reorgs are typically shallow. Deep reorgs can indicate:
 - Network partitions or latency issues
