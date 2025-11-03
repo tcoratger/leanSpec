@@ -230,7 +230,7 @@ class StateTransitionTest(BaseConsensusFixture):
                 state_root=Bytes32.zero(),
                 body=body,
             )
-            post_state = temp_state.on_block(temp_block)
+            post_state = temp_state.process_block(temp_block)
             state_root = hash_tree_root(post_state)
 
         # Create final block with all fields

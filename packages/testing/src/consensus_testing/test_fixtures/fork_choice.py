@@ -269,7 +269,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         )
 
         # Process to get correct state root
-        post_state = temp_state.on_block(temp_block)
+        post_state = temp_state.process_block(temp_block)
         correct_state_root = hash_tree_root(post_state)
 
         # Create final block

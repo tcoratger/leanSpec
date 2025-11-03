@@ -389,7 +389,7 @@ class State(Container):
         # Return the state with all header updates applied.
         return self.model_copy(update=updates)
 
-    def on_block(self, block: Block) -> "State":
+    def process_block(self, block: Block) -> "State":
         """
         Apply full block processing including header and body.
 
@@ -528,7 +528,7 @@ class State(Container):
         state = self.process_slots(block.slot)
 
         # Process the block itself.
-        new_state = state.on_block(block)
+        new_state = state.process_block(block)
 
         # Validate that the block's state root matches the computed state
         computed_state_root = hash_tree_root(new_state)

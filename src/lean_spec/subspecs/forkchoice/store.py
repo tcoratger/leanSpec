@@ -839,7 +839,7 @@ class Store(Container):
             # Apply state transition to get the post-block state
             # First advance state to target slot, then process the block
             advanced_state = head_state.process_slots(slot)
-            post_state = advanced_state.on_block(candidate_block)
+            post_state = advanced_state.process_block(candidate_block)
 
             # Find new valid attestations matching post-state justification
             new_attestations: list[Attestation] = []
@@ -880,7 +880,7 @@ class Store(Container):
         )
 
         # Apply state transition to get final post-state and compute state root
-        final_post_state = final_state.on_block(final_block)
+        final_post_state = final_state.process_block(final_block)
         finalized_block = final_block.model_copy(
             update={"state_root": hash_tree_root(final_post_state)}
         )
