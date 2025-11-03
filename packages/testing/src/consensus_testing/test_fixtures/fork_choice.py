@@ -158,11 +158,11 @@ class ForkChoiceTest(BaseConsensusFixture):
                     store = store.advance_time(block_time, has_proposal=True)
 
                     # Process the block (immutable)
-                    store = store.process_block(signed_block)
+                    store = store.on_block(signed_block)
 
                 elif isinstance(step, AttestationStep):
                     # Process attestation from gossip (immutable)
-                    store = store.process_attestation(step.attestation, is_from_block=False)
+                    store = store.on_attestation(step.attestation, is_from_block=False)
 
                 else:
                     raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")

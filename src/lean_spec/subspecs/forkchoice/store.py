@@ -171,14 +171,12 @@ class Store(Container):
         current_slot = Slot(self.time // INTERVALS_PER_SLOT)
         assert data.slot <= Slot(current_slot + Slot(1)), "Attestation too far in future"
 
-    def process_attestation(
+    def on_attestation(
         self,
         signed_attestation: SignedAttestation,
         is_from_block: bool = False,
     ) -> "Store":
         """
-        Process new attestation (signed validator attestation).
-
         Handles attestations from blocks or network gossip, updating attestation tracking
         according to timing and precedence rules.
 
@@ -207,7 +205,7 @@ class Store(Container):
         **Accumulation**: Attestations from different validators coexist across both dictionaries.
 
         Args:
-            signed_attestation: Attestation to process.
+            signed_attestation: Attestation from block or network.
             is_from_block: True if attestation came from block, False if from network.
 
         Returns:
@@ -266,7 +264,7 @@ class Store(Container):
     def _validate_block_signatures(self, block: Block, signatures: BlockSignatures) -> bool:
         """
         Validate block signatures.
-
+        
         Temporary stub for aggregated signature validation.
 
         Args:
@@ -313,7 +311,7 @@ class Store(Container):
             )
 
             # Process as on-chain attestation (immediately becomes "known")
-            store = store.process_attestation(signed_attestation, is_from_block=True)
+            store = store.on_attestation(signed_attestation, is_from_block=True)
 
         return store
 
@@ -358,7 +356,7 @@ class Store(Container):
             message=proposer_attestation,
             signature=proposer_signature,
         )
-
+        
         # Process as gossip (not from block) so it enters "new" attestations
         # and only influences fork choice after interval 3 acceptance
         return self.process_attestation(signed_proposer_attestation, is_from_block=False)
