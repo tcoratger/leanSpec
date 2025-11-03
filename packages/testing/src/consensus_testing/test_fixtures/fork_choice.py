@@ -158,7 +158,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                     store = store.advance_time(block_time, has_proposal=True)
 
                     # Process the block (immutable)
-                    store = store.on_block(signed_block)
+                    store = store.process_block(signed_block)
 
                 elif isinstance(step, AttestationStep):
                     # Process attestation from gossip (immutable)

@@ -264,7 +264,7 @@ class Store(Container):
     def _validate_block_signatures(self, block: Block, signatures: BlockSignatures) -> bool:
         """
         Validate block signatures.
-        
+
         Temporary stub for aggregated signature validation.
 
         Args:
@@ -356,10 +356,10 @@ class Store(Container):
             message=proposer_attestation,
             signature=proposer_signature,
         )
-        
+
         # Process as gossip (not from block) so it enters "new" attestations
         # and only influences fork choice after interval 3 acceptance
-        return self.process_attestation(signed_proposer_attestation, is_from_block=False)
+        return self.on_attestation(signed_proposer_attestation, is_from_block=False)
 
     def process_block(self, signed_block_with_attestation: SignedBlockWithAttestation) -> "Store":
         """
