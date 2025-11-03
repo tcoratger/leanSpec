@@ -68,7 +68,7 @@ class TestTimeAdvancement:
         initial_time = sample_store.time
         target_time = sample_store.config.genesis_time + Uint64(200)  # Much later time
 
-        sample_store.advance_time(target_time, has_proposal=True)
+        sample_store = sample_store.advance_time(target_time, has_proposal=True)
 
         # Time should advance
         assert sample_store.time > initial_time
@@ -78,7 +78,7 @@ class TestTimeAdvancement:
         initial_time = sample_store.time
         target_time = sample_store.config.genesis_time + Uint64(100)
 
-        sample_store.advance_time(target_time, has_proposal=False)
+        sample_store = sample_store.advance_time(target_time, has_proposal=False)
 
         # Time should still advance
         assert sample_store.time >= initial_time
@@ -89,7 +89,7 @@ class TestTimeAdvancement:
         current_target = sample_store.config.genesis_time + initial_time
 
         # Try to advance to current time (should be no-op)
-        sample_store.advance_time(current_target, has_proposal=True)
+        sample_store = sample_store.advance_time(current_target, has_proposal=True)
 
         # Should not change significantly
         assert abs(sample_store.time.as_int() - initial_time.as_int()) <= 10  # small tolerance
@@ -99,7 +99,7 @@ class TestTimeAdvancement:
         initial_time = sample_store.time
         target_time = sample_store.config.genesis_time + initial_time + Uint64(1)
 
-        sample_store.advance_time(target_time, has_proposal=False)
+        sample_store = sample_store.advance_time(target_time, has_proposal=False)
 
         # Should advance by small amount
         assert sample_store.time >= initial_time
@@ -113,7 +113,7 @@ class TestIntervalTicking:
         initial_time = sample_store.time
 
         # Tick one interval forward
-        sample_store.tick_interval(has_proposal=False)
+        sample_store = sample_store.tick_interval(has_proposal=False)
 
         # Time should advance by one interval
         assert sample_store.time == initial_time + Uint64(1)
@@ -122,7 +122,7 @@ class TestIntervalTicking:
         """Test interval ticking with proposal."""
         initial_time = sample_store.time
 
-        sample_store.tick_interval(has_proposal=True)
+        sample_store = sample_store.tick_interval(has_proposal=True)
 
         # Time should advance
         assert sample_store.time == initial_time + Uint64(1)
@@ -133,7 +133,7 @@ class TestIntervalTicking:
 
         # Tick multiple intervals
         for i in range(5):
-            sample_store.tick_interval(has_proposal=(i % 2 == 0))
+            sample_store = sample_store.tick_interval(has_proposal=(i % 2 == 0))
 
         # Should have advanced by 5 intervals
         assert sample_store.time == initial_time + Uint64(5)
@@ -156,7 +156,7 @@ class TestIntervalTicking:
         # Tick through a complete slot cycle
         for interval in range(INTERVALS_PER_SLOT.as_int()):
             has_proposal = interval == 0  # Proposal only in first interval
-            sample_store.tick_interval(has_proposal=has_proposal)
+            sample_store = sample_store.tick_interval(has_proposal=has_proposal)
 
             current_interval = sample_store.time % INTERVALS_PER_SLOT
             expected_interval = Uint64((interval + 1) % INTERVALS_PER_SLOT.as_int())
@@ -243,7 +243,7 @@ class TestAttestationProcessingTiming:
         initial_known_attestations = len(sample_store.latest_known_attestations)
 
         # Accept new attestations
-        sample_store.accept_new_attestations()
+        sample_store = sample_store.accept_new_attestations()
 
         # New attestations should move to known attestations
         assert len(sample_store.latest_new_attestations) == 0
@@ -270,7 +270,7 @@ class TestAttestationProcessingTiming:
             )
 
         # Accept all new attestations
-        sample_store.accept_new_attestations()
+        sample_store = sample_store.accept_new_attestations()
 
         # All should move to known attestations
         assert len(sample_store.latest_new_attestations) == 0
@@ -286,7 +286,7 @@ class TestAttestationProcessingTiming:
         initial_known_attestations = len(sample_store.latest_known_attestations)
 
         # Accept attestations when there are no new attestations
-        sample_store.accept_new_attestations()
+        sample_store = sample_store.accept_new_attestations()
 
         # Should be no-op
         assert len(sample_store.latest_new_attestations) == 0
@@ -307,16 +307,17 @@ class TestProposalHeadTiming:
             body=BlockBody(attestations=Attestations(data=[])),
         )
         genesis_hash = hash_tree_root(genesis_block)
-        sample_store.blocks[genesis_hash] = genesis_block
 
-        # Set store head to genesis
-        object.__setattr__(sample_store, "head", genesis_hash)
+        # Use immutable update to add block
+        new_blocks = dict(sample_store.blocks)
+        new_blocks[genesis_hash] = genesis_block
+        sample_store = sample_store.model_copy(update={"blocks": new_blocks, "head": genesis_hash})
 
         # Get proposal head for slot 0
-        head = sample_store.get_proposal_head(Slot(0))
+        store, head = sample_store.get_proposal_head(Slot(0))
 
-        # Should return current head
-        assert head == sample_store.head
+        # Should return the store's head
+        assert head == store.head
 
     def test_get_proposal_head_advances_time(self, sample_store: Store) -> None:
         """Test that get_proposal_head advances store time appropriately."""
@@ -324,28 +325,32 @@ class TestProposalHeadTiming:
 
         # Get proposal head for a future slot
         future_slot = Slot(5)
-        sample_store.get_proposal_head(future_slot)
+        store, _ = sample_store.get_proposal_head(future_slot)
 
         # Time may have advanced (depending on slot timing)
         # This is mainly testing that the call doesn't fail
-        assert sample_store.time >= initial_time
+        assert store.time >= initial_time
 
     def test_get_proposal_head_processes_attestations(self, sample_store: Store) -> None:
         """Test that get_proposal_head processes pending attestations."""
-        # Add some new attestations
+        # Add some new attestations (immutable update)
         checkpoint = Checkpoint(root=Bytes32(b"attestation" + b"\x00" * 21), slot=Slot(1))
-        sample_store.latest_new_attestations[ValidatorIndex(10)] = build_signed_attestation(
+        new_new_attestations = dict(sample_store.latest_new_attestations)
+        new_new_attestations[ValidatorIndex(10)] = build_signed_attestation(
             ValidatorIndex(10),
             checkpoint,
         )
+        sample_store = sample_store.model_copy(
+            update={"latest_new_attestations": new_new_attestations}
+        )
 
         # Get proposal head should process attestations
-        sample_store.get_proposal_head(Slot(1))
+        store, _ = sample_store.get_proposal_head(Slot(1))
 
         # Attestations should have been processed (moved to known attestations)
-        assert ValidatorIndex(10) not in sample_store.latest_new_attestations
-        assert ValidatorIndex(10) in sample_store.latest_known_attestations
-        stored = sample_store.latest_known_attestations[ValidatorIndex(10)]
+        assert ValidatorIndex(10) not in store.latest_new_attestations
+        assert ValidatorIndex(10) in store.latest_known_attestations
+        stored = store.latest_known_attestations[ValidatorIndex(10)]
         assert stored.message.data.target == checkpoint
 
 

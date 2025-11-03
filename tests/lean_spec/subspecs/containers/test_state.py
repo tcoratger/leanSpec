@@ -722,7 +722,7 @@ def test_state_transition_full(genesis_state: State) -> None:
     -----
     - Start at genesis.
     - Build a valid block for slot 1.
-    - Compute expected post-state by calling process_block manually.
+    - Compute expected post-state by calling on_block manually.
     - Set the block's state_root to the expected hash.
     - Run state_transition with valid signatures.
     - Assert resulting state equals the expected post-state.
