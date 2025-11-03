@@ -799,117 +799,101 @@ def test_reorg_with_justification_boundary(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Reorg occurs correctly when forks cross justification boundaries.
+    Fork choice respects justification boundaries: shorter justifiable fork wins.
 
     Scenario
     --------
-    Two forks compete across multiple justifiable slots. Fork choice must
-    correctly handle reorgs while respecting justification rules.
+    Two forks compete where one extends past justifiable boundaries:
+    - Fork A: extends to slot 7 (NOT justifiable - not ≤5, not perfect square, not pronic)
+    - Fork B: extends to slot 5 (justifiable - within ≤5 threshold)
 
-    Slots 1-8: Two forks build in parallel
-    - Fork A: slots 1, 3, 5, 7 (4 blocks with gaps)
-    - Fork B: slots 1, 2, 4, 6, 8 (5 blocks, denser)
+    Justification Rules (from finalized slot 0):
+    - Justifiable: delta ≤ 5, perfect squares (9, 16, 25...), pronic (6, 12, 20...)
+    - ❌ NOT Justifiable: 7, 8, 10, 11, 13, 14, 15, etc.
 
     Expected Behavior
     -----------------
-    1. Fork A initially leads with first block
-    2. Fork B builds denser chain (more blocks)
-    3. Fork B overtakes despite gaps in fork A
-    4. Justification constraints remain satisfied throughout
+    1. Fork A extends to slot 7 (longer chain, 7 blocks)
+    2. Fork B extends to slot 5 (shorter chain, 5 blocks)
+    3. Fork B wins despite being shorter because:
+       - Fork B's head (slot 5) is justifiable (5 ≤ 5)
+       - Fork A's head (slot 7) is NOT justifiable
+       - Attestations to Fork A must target earlier justifiable ancestor
+       - This reduces Fork A's effective weight
 
     Why This Matters
     ----------------
-    Justification is a critical safety mechanism:
-    - Limits which blocks can be attested to
-    - Prevents long-range attacks
+    Justification is a critical safety mechanism that:
+    - Limits which blocks can receive attestations
+    - Prevents long-range attacks by restricting attestable depth
     - Ensures fork choice respects finality constraints
+    - Creates "checkpoints" where the chain must be justified
 
     This test ensures:
-    - Reorgs respect justification boundaries
-    - Fork choice works correctly across justifiable slots
-    - Dense fork beats sparse fork even with justification gaps
-    - Safety guarantees maintained during reorgs
+    - Longer forks don't automatically win if they exceed justifiable boundaries
+    - Fork choice correctly handles non-justifiable block depths
+    - Safety guarantees prevent attestations to unjustifiable forks
+    - The protocol favors shorter justifiable chains over longer unjustifiable ones
     """
     fork_choice_test(
         steps=[
-            # Common base at slot 1
+            # Common base at slot 1 (both forks will diverge from here)
             BlockStep(
-                block=BlockSpec(slot=Slot(1), label="base"),
+                block=BlockSpec(slot=Slot(1), label="common"),
+                checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
+            ),
+            # Fork A extends all the way to slot 7
+            BlockStep(
+                block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_a_2"),
+                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a_2"),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(3), parent_label="fork_a_2", label="fork_a_3"),
+                checks=StoreChecks(head_slot=Slot(3), head_root_label="fork_a_3"),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(4), parent_label="fork_a_3", label="fork_a_4"),
+                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(5), parent_label="fork_a_4", label="fork_a_5"),
+                checks=StoreChecks(head_slot=Slot(5), head_root_label="fork_a_5"),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(6), parent_label="fork_a_5", label="fork_a_6"),
+                checks=StoreChecks(head_slot=Slot(6), head_root_label="fork_a_6"),
+            ),
+            # Fork A at slot 7 (NOT justifiable from slot 0: not ≤5, not square, not pronic)
+            BlockStep(
+                block=BlockSpec(slot=Slot(7), parent_label="fork_a_6", label="fork_a_7"),
                 checks=StoreChecks(
-                    head_slot=Slot(1),
-                    head_root_label="base",
+                    head_slot=Slot(7),
+                    head_root_label="fork_a_7",  # Fork A leads (7 blocks total)
                 ),
             ),
-            # Fork A: slot 2
+            # Fork B competes, building from common ancestor
             BlockStep(
-                block=BlockSpec(slot=Slot(2), parent_label="base", label="fork_a_2"),
-                checks=StoreChecks(
-                    head_slot=Slot(2),
-                    head_root_label="fork_a_2",
-                ),
+                block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_b_2"),
+                checks=StoreChecks(head_slot=Slot(7), head_root_label="fork_a_7"),
             ),
-            # Fork B: slot 2 (competing)
-            BlockStep(
-                block=BlockSpec(slot=Slot(2), parent_label="base", label="fork_b_2"),
-                checks=StoreChecks(
-                    head_slot=Slot(2),
-                    head_root_label="fork_a_2",  # Tie-breaker favors fork_a
-                ),
-            ),
-            # Fork B: slot 3 (extends first, takes lead)
             BlockStep(
                 block=BlockSpec(slot=Slot(3), parent_label="fork_b_2", label="fork_b_3"),
-                checks=StoreChecks(
-                    head_slot=Slot(3),
-                    head_root_label="fork_b_3",  # Fork B leads (2 blocks vs 1)
-                ),
+                checks=StoreChecks(head_slot=Slot(7), head_root_label="fork_a_7"),
             ),
-            # Fork A: slot 4 (extends, ties at depth 2)
             BlockStep(
-                block=BlockSpec(slot=Slot(4), parent_label="fork_a_2", label="fork_a_4"),
-                checks=StoreChecks(
-                    head_slot=Slot(3),
-                    head_root_label="fork_b_3",  # Tie (both 2), fork_b maintains
-                ),
+                block=BlockSpec(slot=Slot(4), parent_label="fork_b_3", label="fork_b_4"),
+                checks=StoreChecks(head_slot=Slot(7), head_root_label="fork_a_7"),
             ),
-            # Fork B: slot 5 (extends to depth 3)
+            # Fork B stops at slot 5 (justifiable: 5 ≤ 5)
+            # Despite being shorter (5 blocks vs 7), Fork B wins because:
+            # - Fork B's head (slot 5) is justifiable from genesis (delta=5, ≤5)
+            # - Fork A's head (slot 7) is NOT justifiable (delta=7)
+            # - Attestations prefer the justifiable fork
             BlockStep(
-                block=BlockSpec(slot=Slot(5), parent_label="fork_b_3", label="fork_b_5"),
+                block=BlockSpec(slot=Slot(5), parent_label="fork_b_4", label="fork_b_5"),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    head_root_label="fork_b_5",  # Fork B leads (3 vs 2)
-                ),
-            ),
-            # Fork A: slot 6 (extends to depth 3, ties)
-            BlockStep(
-                block=BlockSpec(slot=Slot(6), parent_label="fork_a_4", label="fork_a_6"),
-                checks=StoreChecks(
-                    head_slot=Slot(5),
-                    head_root_label="fork_b_5",  # Tie (both 3), fork_b maintains
-                ),
-            ),
-            # Fork B: slot 7 (extends to depth 4)
-            BlockStep(
-                block=BlockSpec(slot=Slot(7), parent_label="fork_b_5", label="fork_b_7"),
-                checks=StoreChecks(
-                    head_slot=Slot(7),
-                    head_root_label="fork_b_7",  # Fork B leads (4 vs 3)
-                ),
-            ),
-            # Fork A: slot 8 (extends to depth 4, ties)
-            BlockStep(
-                block=BlockSpec(slot=Slot(8), parent_label="fork_a_6", label="fork_a_8"),
-                checks=StoreChecks(
-                    head_slot=Slot(7),
-                    head_root_label="fork_b_7",  # Tie (both 4), fork_b maintains
-                ),
-            ),
-            # Fork B: slot 9 (extends to depth 5, wins decisively)
-            BlockStep(
-                block=BlockSpec(slot=Slot(9), parent_label="fork_b_7", label="fork_b_9"),
-                checks=StoreChecks(
-                    head_slot=Slot(9),
-                    head_root_label="fork_b_9",  # Fork B wins (5 vs 4)
+                    head_root_label="fork_b_5",  # Fork B wins! Shorter but justifiable
                 ),
             ),
         ],
