@@ -890,12 +890,12 @@ class Store(Container):
 
         # Store block and state immutably
         block_hash = hash_tree_root(finalized_block)
-        new_blocks = dict(store.blocks)
-        new_blocks[block_hash] = finalized_block
-        new_states = dict(store.states)
-        new_states[block_hash] = final_post_state
-
-        store = store.model_copy(update={"blocks": new_blocks, "states": new_states})
+        store = store.model_copy(
+            update={
+                "blocks": {**store.blocks, block_hash: finalized_block}, 
+                "states": {**store.states, block_hash: final_post_state},
+            }
+        )
 
         return store, finalized_block, signatures
 
