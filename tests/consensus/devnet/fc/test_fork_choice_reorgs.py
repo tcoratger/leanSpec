@@ -76,8 +76,8 @@ def test_simple_one_block_reorg(
 
     Expected Behavior
     -----------------
-    1. After fork_a_2: head = fork_a_2 (first seen wins tie)
-    2. After fork_b_2: head = fork_a_2 (tie, fork_a maintains head)
+    1. After fork_a_2: head = fork_a_2 (first fork created)
+    2. After fork_b_2: head = fork_a_2 (equal weight, head remains unchanged)
     3. After fork_b_3: head = fork_b_3 (fork B heavier due to extension)
 
     Reorg Details:
@@ -117,7 +117,7 @@ def test_simple_one_block_reorg(
                     head_root_label="fork_a_2",
                 ),
             ),
-            # Fork B at slot 2 (competing fork, tie-breaker keeps fork_a as head)
+            # Fork B at slot 2 (competing fork, equal weight to fork_a)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -126,7 +126,7 @@ def test_simple_one_block_reorg(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    head_root_label="fork_a_2",  # No reorg yet (tie)
+                    head_root_label="fork_a_2",  # Equal weight, head unchanged
                 ),
             ),
             # Extend fork B → triggers reorg to fork B
