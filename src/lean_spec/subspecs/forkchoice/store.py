@@ -543,14 +543,11 @@ class Store(Container):
         Returns:
             New Store with migrated attestations and updated head.
         """
-        # Move all new attestations to known attestations
-        new_known = dict(self.latest_known_attestations)
-        new_known.update(self.latest_new_attestations)
-
         # Create store with migrated attestations
         store = self.model_copy(
             update={
-                "latest_known_attestations": new_known,
+                "latest_known_attestations": self.latest_known_attestations
+                | self.latest_new_attestations,
                 "latest_new_attestations": {},
             }
         )
@@ -892,7 +889,7 @@ class Store(Container):
         block_hash = hash_tree_root(finalized_block)
         store = store.model_copy(
             update={
-                "blocks": {**store.blocks, block_hash: finalized_block}, 
+                "blocks": {**store.blocks, block_hash: finalized_block},
                 "states": {**store.states, block_hash: final_post_state},
             }
         )
