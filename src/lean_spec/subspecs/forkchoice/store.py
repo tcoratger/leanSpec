@@ -429,12 +429,12 @@ class Store(Container):
         post_state = copy.deepcopy(parent_state).state_transition(block, valid_signatures)
 
         # Create new store with block and state
-        new_blocks = dict(self.blocks)
-        new_blocks[block_root] = block
-        new_states = dict(self.states)
-        new_states[block_root] = post_state
-
-        store = self.model_copy(update={"blocks": new_blocks, "states": new_states})
+        store = self.model_copy(
+            update={
+                "blocks": self.blocks | {block_root: block},
+                "states": self.states | {block_root: post_state},
+            }
+        )
 
         # Process attestations immutably (chain method calls)
         store = store._process_block_body_attestations(block, signatures)
