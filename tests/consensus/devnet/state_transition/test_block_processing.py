@@ -10,7 +10,7 @@ incorporating new transactions, attestations, and consensus decisions into the c
 
 What is Block Processing?
 --------------------------
-Block processing validates and integrates a proposed block into the beacon state:
+Block processing validates and integrates a proposed block into the chain's state:
 
 1. **Header Validation**: Verify block structure, proposer, parent linkage
 2. **State Transition**: Execute block operations on current state
