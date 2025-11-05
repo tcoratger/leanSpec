@@ -225,7 +225,7 @@ def test_block_with_invalid_proposer(
         blocks=[
             BlockSpec(
                 slot=Slot(1),
-                proposer_index=ValidatorIndex(5),  # Wrong proposer
+                proposer_index=ValidatorIndex(3),  # Wrong proposer
             ),
         ],
         post=None,  # Expect failure
