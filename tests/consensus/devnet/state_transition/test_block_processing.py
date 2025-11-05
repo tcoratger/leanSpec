@@ -83,7 +83,12 @@ def test_process_first_block_after_genesis(
         blocks=[
             BlockSpec(slot=Slot(1)),
         ],
-        post=StateExpectation(slot=Slot(1)),
+        post=StateExpectation(
+            slot=Slot(1),
+            latest_block_header_slot=Slot(1),
+            latest_block_header_state_root=Bytes32(b"\x00" * 32),
+            historical_block_hashes_count=1,
+        ),
     )
 
 
@@ -157,7 +162,12 @@ def test_blocks_with_gaps(
             BlockSpec(slot=Slot(4), parent_label="block_1", label="block_4"),
             BlockSpec(slot=Slot(8), parent_label="block_4", label="block_8"),
         ],
-        post=StateExpectation(slot=Slot(8)),
+        post=StateExpectation(
+            slot=Slot(8),
+            latest_block_header_slot=Slot(8),
+            latest_block_header_state_root=Bytes32(b"\x00" * 32),
+            historical_block_hashes_count=8,
+        ),
     )
 
 
