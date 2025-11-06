@@ -1,46 +1,4 @@
-"""
-Attestation Target Selection and Safe Target Computation
-========================================================
-
-Overview
---------
-Tests the attestation target selection algorithm.
-The target determines which checkpoint validators should attest to,
-balancing between head advancement and safety guarantees.
-
-Validation Approach
--------------------
-These tests validate **complete checkpoints** (both slot and root).
-
-When specifying the attestation target slot, validation automatically checks:
-1. The checkpoint slot matches the expected value
-2. The checkpoint root references an actual block at that slot
-
-Attestation Target Algorithm
-----------------------------
-The attestation target algorithm determines which checkpoint (root + slot) validators
-should attest to. This algorithm:
-
-1. **Starts at Head**: Begin with the current head block
-2. **Walks Toward Safe**: Move backward toward the safe target
-3. **Respects Finalization**: Must be justifiable after the finalized checkpoint
-4. **Balances Safety**: Optimizes between rapid head advancement and safety
-
-Key Concepts
-------------
-
-**Attestation Target**:
-    - The checkpoint that validators should attest to in their next attestation.
-    - Computed dynamically based on head, safe_target, and finalization status.
-
-**Safe Target**:
-    - A checkpoint with sufficient attestation support to be considered "safe".
-    - Updated based on latest attestation weights and supermajority threshold.
-
-**Justifiable Slot**:
-    - A slot that can be justified after the finalized checkpoint.
-    - The target must be justifiable relative to the finalized slot.
-"""
+"""Attestation Target Selection and Safe Target Computation"""
 
 import pytest
 from consensus_testing import (
