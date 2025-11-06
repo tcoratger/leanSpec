@@ -16,6 +16,7 @@ from typing import Dict
 
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
+    JUSTIFICATION_LOOKBACK_SLOTS,
     SECONDS_PER_INTERVAL,
     SECONDS_PER_SLOT,
 )
@@ -725,7 +726,8 @@ class Store(Container):
         ensuring the target is in a justifiable slot range:
 
         1. **Start at Head**: Begin with the current head block
-        2. **Walk Toward Safe**: Move backward (up to 3 steps) if safe target is newer
+        2. **Walk Toward Safe**: Move backward (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
+           if safe target is newer
         3. **Ensure Justifiable**: Continue walking back until slot is justifiable
         4. **Return Checkpoint**: Create checkpoint from selected block
 
@@ -745,11 +747,11 @@ class Store(Container):
         # Start from current head
         target_block_root = self.head
 
-        # Walk back toward safe target (up to 3 steps)
+        # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
         #
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
-        for _ in range(3):
+        for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
                 target_block_root = self.blocks[target_block_root].parent_root
 
