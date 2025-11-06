@@ -39,7 +39,6 @@ from lean_spec.types import (
     Bytes32,
     Uint64,
     ValidatorIndex,
-    is_proposer,
 )
 from lean_spec.types.container import Container
 
@@ -816,7 +815,7 @@ class Store(Container):
 
         # Validate proposer authorization for this slot
         num_validators = Uint64(head_state.validators.count)
-        assert is_proposer(validator_index, slot, num_validators), (
+        assert validator_index.is_proposer(slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )
 

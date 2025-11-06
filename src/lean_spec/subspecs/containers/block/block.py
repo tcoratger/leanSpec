@@ -10,7 +10,7 @@ can propose.
 """
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, ValidatorIndex
 from lean_spec.types.container import Container
 
 from ..attestation import Attestation
@@ -48,7 +48,7 @@ class BlockHeader(Container):
     slot: Slot
     """The slot in which the block was proposed."""
 
-    proposer_index: Uint64
+    proposer_index: ValidatorIndex
     """The index of the validator that proposed the block."""
 
     parent_root: Bytes32
@@ -67,7 +67,7 @@ class Block(Container):
     slot: Slot
     """The slot in which the block was proposed."""
 
-    proposer_index: Uint64
+    proposer_index: ValidatorIndex
     """The index of the validator that proposed the block."""
 
     parent_root: Bytes32

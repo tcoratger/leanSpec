@@ -16,7 +16,6 @@ from lean_spec.types import (
     Container,
     Uint64,
     ValidatorIndex,
-    is_proposer,
 )
 
 from ..block import Block, BlockBody, BlockHeader
@@ -114,27 +113,6 @@ class State(Container):
             validators=validators,
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
-        )
-
-    def is_proposer(self, validator_index: ValidatorIndex) -> bool:
-        """
-        Check if a validator is the proposer for the current slot.
-
-        Parameters
-        ----------
-        validator_index : ValidatorIndex
-            The index of the validator to check.
-
-        Returns:
-        -------
-        bool
-            True if the validator is the proposer for the current slot.
-        """
-        # Forward to the global proposer function with state context.
-        return is_proposer(
-            validator_index=validator_index,
-            slot=self.slot,
-            num_validators=Uint64(self.validators.count),
         )
 
     def get_justifications(self) -> Dict[Bytes32, List[Boolean]]:
@@ -331,7 +309,9 @@ class State(Container):
         assert block.slot > self.latest_block_header.slot, "Block is older than latest header"
 
         # The proposer must be the expected validator for this slot.
-        assert self.is_proposer(block.proposer_index), "Incorrect block proposer"
+        assert block.proposer_index.is_proposer(self.slot, Uint64(self.validators.count)), (
+            "Incorrect block proposer"
+        )
 
         # The declared parent must match the hash of the latest block header.
         assert block.parent_root == hash_tree_root(self.latest_block_header), (

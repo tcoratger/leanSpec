@@ -2,7 +2,7 @@
 
 import pytest
 
-from lean_spec.types import Uint64, ValidatorIndex, is_proposer
+from lean_spec.types import Uint64, ValidatorIndex
 
 
 class TestIsProposer:
@@ -18,16 +18,16 @@ class TestIsProposer:
         num_validators = Uint64(10)
 
         # At slot 0, validator 0 should be the proposer (0 % 10 == 0)
-        assert is_proposer(ValidatorIndex(0), Uint64(0), num_validators) is True
-        assert is_proposer(ValidatorIndex(1), Uint64(0), num_validators) is False
+        assert ValidatorIndex(0).is_proposer(Uint64(0), num_validators) is True
+        assert ValidatorIndex(1).is_proposer(Uint64(0), num_validators) is False
 
         # At slot 7, validator 7 should be the proposer (7 % 10 == 7)
-        assert is_proposer(ValidatorIndex(7), Uint64(7), num_validators) is True
-        assert is_proposer(ValidatorIndex(8), Uint64(7), num_validators) is False
+        assert ValidatorIndex(7).is_proposer(Uint64(7), num_validators) is True
+        assert ValidatorIndex(8).is_proposer(Uint64(7), num_validators) is False
 
         # At slot 9, validator 9 should be the proposer (9 % 10 == 9)
-        assert is_proposer(ValidatorIndex(9), Uint64(9), num_validators) is True
-        assert is_proposer(ValidatorIndex(0), Uint64(9), num_validators) is False
+        assert ValidatorIndex(9).is_proposer(Uint64(9), num_validators) is True
+        assert ValidatorIndex(0).is_proposer(Uint64(9), num_validators) is False
 
     def test_is_proposer_wraparound(self) -> None:
         """
@@ -39,16 +39,16 @@ class TestIsProposer:
         num_validators = Uint64(10)
 
         # At slot 10, wrap-around selects validator 0 (10 % 10 == 0)
-        assert is_proposer(ValidatorIndex(0), Uint64(10), num_validators) is True
-        assert is_proposer(ValidatorIndex(1), Uint64(10), num_validators) is False
+        assert ValidatorIndex(0).is_proposer(Uint64(10), num_validators) is True
+        assert ValidatorIndex(1).is_proposer(Uint64(10), num_validators) is False
 
         # At slot 23, wrap-around selects validator 3 (23 % 10 == 3)
-        assert is_proposer(ValidatorIndex(3), Uint64(23), num_validators) is True
-        assert is_proposer(ValidatorIndex(2), Uint64(23), num_validators) is False
+        assert ValidatorIndex(3).is_proposer(Uint64(23), num_validators) is True
+        assert ValidatorIndex(2).is_proposer(Uint64(23), num_validators) is False
 
         # At slot 100, wrap-around selects validator 0 (100 % 10 == 0)
-        assert is_proposer(ValidatorIndex(0), Uint64(100), num_validators) is True
-        assert is_proposer(ValidatorIndex(5), Uint64(100), num_validators) is False
+        assert ValidatorIndex(0).is_proposer(Uint64(100), num_validators) is True
+        assert ValidatorIndex(5).is_proposer(Uint64(100), num_validators) is False
 
     def test_is_proposer_large_numbers(self) -> None:
         """
@@ -59,14 +59,14 @@ class TestIsProposer:
         num_validators = Uint64(1000)
 
         # Test with large slot numbers
-        assert is_proposer(ValidatorIndex(555), Uint64(555), num_validators) is True
-        assert is_proposer(ValidatorIndex(556), Uint64(555), num_validators) is False
+        assert ValidatorIndex(555).is_proposer(Uint64(555), num_validators) is True
+        assert ValidatorIndex(556).is_proposer(Uint64(555), num_validators) is False
 
         # Test wrap-around with large numbers
         slot = Uint64(12345)
         expected_proposer = ValidatorIndex(slot % num_validators)  # 345
-        assert is_proposer(expected_proposer, slot, num_validators) is True
-        assert is_proposer(ValidatorIndex(0), slot, num_validators) is False
+        assert expected_proposer.is_proposer(slot, num_validators) is True
+        assert ValidatorIndex(0).is_proposer(slot, num_validators) is False
 
     def test_is_proposer_single_validator(self) -> None:
         """
@@ -77,9 +77,9 @@ class TestIsProposer:
         num_validators = Uint64(1)
 
         # With only one validator, they should always be the proposer
-        assert is_proposer(ValidatorIndex(0), Uint64(0), num_validators) is True
-        assert is_proposer(ValidatorIndex(0), Uint64(1), num_validators) is True
-        assert is_proposer(ValidatorIndex(0), Uint64(100), num_validators) is True
+        assert ValidatorIndex(0).is_proposer(Uint64(0), num_validators) is True
+        assert ValidatorIndex(0).is_proposer(Uint64(1), num_validators) is True
+        assert ValidatorIndex(0).is_proposer(Uint64(100), num_validators) is True
 
     def test_is_proposer_edge_cases(self) -> None:
         """
@@ -91,14 +91,14 @@ class TestIsProposer:
         num_validators = Uint64(3)
 
         # Test all validators in a 3-validator system
-        assert is_proposer(ValidatorIndex(0), Uint64(0), num_validators) is True
-        assert is_proposer(ValidatorIndex(1), Uint64(1), num_validators) is True
-        assert is_proposer(ValidatorIndex(2), Uint64(2), num_validators) is True
+        assert ValidatorIndex(0).is_proposer(Uint64(0), num_validators) is True
+        assert ValidatorIndex(1).is_proposer(Uint64(1), num_validators) is True
+        assert ValidatorIndex(2).is_proposer(Uint64(2), num_validators) is True
 
         # Test wrap-around in small system
-        assert is_proposer(ValidatorIndex(0), Uint64(3), num_validators) is True
-        assert is_proposer(ValidatorIndex(1), Uint64(4), num_validators) is True
-        assert is_proposer(ValidatorIndex(2), Uint64(5), num_validators) is True
+        assert ValidatorIndex(0).is_proposer(Uint64(3), num_validators) is True
+        assert ValidatorIndex(1).is_proposer(Uint64(4), num_validators) is True
+        assert ValidatorIndex(2).is_proposer(Uint64(5), num_validators) is True
 
     def test_is_proposer_validation(self) -> None:
         """
@@ -116,7 +116,7 @@ class TestIsProposer:
             for validator_idx in range(5):
                 validator = ValidatorIndex(validator_idx)
                 expected_result = validator == expected_proposer
-                actual_result = is_proposer(validator, slot, num_validators)
+                actual_result = validator.is_proposer(slot, num_validators)
 
                 assert actual_result == expected_result, (
                     f"Slot {slot_num}: validator {validator_idx} should "
@@ -135,11 +135,11 @@ class TestIsProposer:
         validator = ValidatorIndex(3)
         slot = Uint64(10)  # 10 % 7 = 3
 
-        assert is_proposer(validator, slot, num_validators) is True
+        assert validator.is_proposer(slot, num_validators) is True
 
         # Test with different validator
         other_validator = ValidatorIndex(4)
-        assert is_proposer(other_validator, slot, num_validators) is False
+        assert other_validator.is_proposer(slot, num_validators) is False
 
     @pytest.mark.parametrize("num_validators", [1, 2, 5, 10, 100, 1000])
     def test_is_proposer_parametrized(self, num_validators: int) -> None:
@@ -156,9 +156,9 @@ class TestIsProposer:
             expected_proposer = ValidatorIndex(slot_num % num_validators)
 
             # The expected proposer should return True
-            assert is_proposer(expected_proposer, slot, validators) is True
+            assert expected_proposer.is_proposer(slot, validators) is True
 
             # A different validator should return False
             if num_validators > 1:
                 other_validator = ValidatorIndex((slot_num + 1) % num_validators)
-                assert is_proposer(other_validator, slot, validators) is False
+                assert other_validator.is_proposer(slot, validators) is False

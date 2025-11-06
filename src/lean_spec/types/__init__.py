@@ -7,7 +7,7 @@ from .byte_arrays import Bytes32, Bytes52, Bytes3100
 from .collections import SSZList, SSZVector
 from .container import Container
 from .uint import Uint64
-from .validator import ValidatorIndex, is_proposer
+from .validator import ValidatorIndex
 
 __all__ = [
     "Uint64",
@@ -18,7 +18,6 @@ __all__ = [
     "CamelModel",
     "StrictBaseModel",
     "ValidatorIndex",
-    "is_proposer",
     "SSZList",
     "SSZVector",
     "Boolean",

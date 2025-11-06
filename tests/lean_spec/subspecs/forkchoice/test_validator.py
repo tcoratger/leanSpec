@@ -27,7 +27,6 @@ from lean_spec.subspecs.containers.state import (
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
-from lean_spec.types.validator import is_proposer
 
 
 @pytest.fixture
@@ -617,7 +616,7 @@ class TestValidatorErrorHandling:
         num_validators = Uint64(state.validators.count)
 
         # is_proposer should work (though likely return False)
-        result = is_proposer(large_validator, large_slot, num_validators)
+        result = large_validator.is_proposer(large_slot, num_validators)
         assert isinstance(result, bool)
 
         # produce_attestation should work for any validator
