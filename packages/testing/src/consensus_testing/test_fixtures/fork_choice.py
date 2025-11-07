@@ -183,19 +183,23 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Use shared key manager if it has sufficient capacity, otherwise create a new one
         # This optimizes performance by reusing keys across tests when possible
         shared_key_manager = _get_shared_key_manager()
-        if self.max_slot <= shared_key_manager.max_slot:
-            key_manager = shared_key_manager
-        else:
-            # Test needs more slots than shared manager supports, create dedicated one
-            key_manager = XmssKeyManager(max_slot=self.max_slot)
+        key_manager = (
+            shared_key_manager
+            if self.max_slot <= shared_key_manager.max_slot
+            else XmssKeyManager(max_slot=self.max_slot)
+        )
 
         # Update validator pubkeys to match key_manager's generated keys
-        updated_validators = []
-        for i, validator in enumerate(self.anchor_state.validators):
-            key_pair = key_manager[ValidatorIndex(i)]
-            pubkey_bytes = key_pair.public.to_bytes(DEFAULT_SIGNATURE_SCHEME.config)
-            updated_validator = validator.model_copy(update={"pubkey": pubkey_bytes})
-            updated_validators.append(updated_validator)
+        updated_validators = [
+            validator.model_copy(
+                update={
+                    "pubkey": key_manager[ValidatorIndex(i)].public.to_bytes(
+                        DEFAULT_SIGNATURE_SCHEME.config
+                    )
+                }
+            )
+            for i, validator in enumerate(self.anchor_state.validators)
+        ]
 
         self.anchor_state = self.anchor_state.model_copy(
             update={"validators": Validators(data=updated_validators)}
@@ -211,10 +215,8 @@ class ForkChoiceTest(BaseConsensusFixture):
         )
 
         # Block registry for label-based fork creation
-        self._block_registry: dict[str, Block] = {}
-
         # Register genesis/anchor block with implicit label
-        self._block_registry["genesis"] = self.anchor_block
+        self._block_registry: dict[str, Block] = {"genesis": self.anchor_block}
 
         # Process each step (immutable pattern: store = store.method())
         for i, step in enumerate(self.steps):
