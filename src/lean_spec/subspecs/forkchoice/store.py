@@ -340,9 +340,9 @@ class Store(Container):
             # - The attestation has not been tampered with
             # - The signature was created at the correct epoch (slot)
             assert signature.verify(
-                pubkey=validator.get_pubkey(),
-                epoch=attestation.data.slot.as_int(),
-                message=bytes(hash_tree_root(attestation)),
+                validator.get_pubkey(),
+                attestation.data.slot.as_int(),
+                bytes(hash_tree_root(attestation)),
             ), "Attestation signature verification failed"
 
         return True
