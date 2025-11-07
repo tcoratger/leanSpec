@@ -53,7 +53,7 @@ def test_apply_is_sensitive_to_inputs() -> None:
 
     # Generate a baseline output with a set of initial inputs.
     key1 = b"\x11" * PRF_KEY_LENGTH
-    epoch1 = 10
+    epoch1 = Uint64(10)
     chain_index1 = Uint64(20)
     baseline_output = prf.apply(key1, epoch1, chain_index1)
     assert len(baseline_output) == config.HASH_LEN_FE
@@ -64,7 +64,7 @@ def test_apply_is_sensitive_to_inputs() -> None:
     assert baseline_output != output_key_changed
 
     # Test sensitivity to the epoch.
-    epoch2 = 11
+    epoch2 = Uint64(11)
     output_epoch_changed = prf.apply(key1, epoch2, chain_index1)
     assert baseline_output != output_epoch_changed
 

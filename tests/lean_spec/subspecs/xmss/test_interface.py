@@ -8,6 +8,7 @@ from lean_spec.subspecs.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
 )
+from lean_spec.types import Uint64
 
 
 def _test_correctness_roundtrip(
@@ -25,12 +26,12 @@ def _test_correctness_roundtrip(
     # KEY GENERATION
     #
     # Generate a new key pair for the specified active range.
-    pk, sk = scheme.key_gen(activation_epoch, num_active_epochs)
+    pk, sk = scheme.key_gen(Uint64(activation_epoch), Uint64(num_active_epochs))
 
     # SIGN & VERIFY
     #
     # Pick a sample epoch within the active range to test signing.
-    test_epoch = activation_epoch + num_active_epochs // 2
+    test_epoch = Uint64(activation_epoch + num_active_epochs // 2)
     message = b"\x42" * scheme.config.MESSAGE_LENGTH
 
     # Sign the message at the chosen epoch.
@@ -51,7 +52,7 @@ def _test_correctness_roundtrip(
 
     # Verification must fail if the epoch is incorrect.
     if num_active_epochs > 1:
-        wrong_epoch = test_epoch + 1
+        wrong_epoch = Uint64(int(test_epoch) + 1)
         is_invalid_epoch = scheme.verify(pk, wrong_epoch, message, signature)
         assert not is_invalid_epoch, "Verification succeeded for an incorrect epoch"
 

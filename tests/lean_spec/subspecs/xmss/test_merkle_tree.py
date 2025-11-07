@@ -10,6 +10,7 @@ from lean_spec.subspecs.xmss.merkle_tree import (
 from lean_spec.subspecs.xmss.tweak_hash import (
     TreeTweak,
 )
+from lean_spec.types import Uint64
 
 
 def _run_commit_open_verify_roundtrip(
@@ -51,12 +52,12 @@ def _run_commit_open_verify_roundtrip(
     ]
 
     # COMMIT: Build the Merkle tree from the leaf hashes.
-    tree = merkle_tree.build(depth, start_index, parameter, leaf_hashes)
+    tree = merkle_tree.build(depth, Uint64(start_index), parameter, leaf_hashes)
     root = merkle_tree.root(tree)
 
     # OPEN & VERIFY: For each leaf, generate and verify its path.
     for i, leaf_parts in enumerate(leaves):
-        position = start_index + i
+        position = Uint64(start_index + i)
         opening = merkle_tree.path(tree, position)
         is_valid = merkle_tree.verify_path(parameter, root, position, leaf_parts, opening)
         assert is_valid, f"Verification failed for leaf at position {position}"

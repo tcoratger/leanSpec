@@ -79,7 +79,9 @@ class XmssKeyManager:
         # Generate the key pair using the default XMSS scheme.
         #
         # The seed is set to 0 for deterministic test keys.
-        pk, sk = DEFAULT_SIGNATURE_SCHEME.key_gen(0, num_active_epochs)
+        from lean_spec.types import Uint64
+
+        pk, sk = DEFAULT_SIGNATURE_SCHEME.key_gen(Uint64(0), Uint64(num_active_epochs))
 
         # Store as a cohesive unit and return.
         key_pair = KeyPair(public=pk, secret=sk)
@@ -120,7 +122,8 @@ class XmssKeyManager:
         # Map the attestation slot to an XMSS epoch.
         #
         # Each slot gets its own epoch to avoid key reuse.
-        epoch = int(attestation.data.slot)
+        # attestation.data.slot is already a Slot (which extends Uint64)
+        epoch = attestation.data.slot
 
         # Generate the XMSS signature using the validator's secret key.
         xmss_sig = DEFAULT_SIGNATURE_SCHEME.sign(key_pair.secret, epoch, message)

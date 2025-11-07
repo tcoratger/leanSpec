@@ -36,6 +36,7 @@ from lean_spec.subspecs.xmss.poseidon import (
     TEST_POSEIDON,
     PoseidonXmss,
 )
+from lean_spec.types import Uint64
 
 from ..koalabear import Fp, P
 from .constants import (
@@ -76,7 +77,7 @@ class MessageHasher:
         # Decompose the integer into a list of field elements (base-P).
         return int_to_base_p(acc, self.config.MSG_LEN_FE)
 
-    def encode_epoch(self, epoch: int) -> List[Fp]:
+    def encode_epoch(self, epoch: Uint64) -> List[Fp]:
         """
         Encodes the epoch and a domain separator prefix into field elements.
 
@@ -85,7 +86,7 @@ class MessageHasher:
         hash input in a structured, domain-separated way.
         """
         # Combine the epoch and the message hash prefix into a single integer.
-        acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE.value
+        acc = (int(epoch) << 8) | TWEAK_PREFIX_MESSAGE.value
 
         # Decompose the integer into its base-P representation.
         return int_to_base_p(acc, self.config.TWEAK_LEN_FE)
@@ -134,7 +135,7 @@ class MessageHasher:
     def apply(
         self,
         parameter: Parameter,
-        epoch: int,
+        epoch: Uint64,
         rho: Randomness,
         message: bytes,
     ) -> List[int]:

@@ -11,7 +11,7 @@ We also provide a test instantiation for testing purposes.
 
 from typing_extensions import Final
 
-from lean_spec.types import StrictBaseModel
+from lean_spec.types import StrictBaseModel, Uint64
 
 from ..koalabear import P_BYTES, Fp
 
@@ -27,13 +27,13 @@ class XmssConfig(StrictBaseModel):
     """The base-2 logarithm of the scheme's maximum lifetime."""
 
     @property
-    def LIFETIME(self) -> int:  # noqa: N802
+    def LIFETIME(self) -> Uint64:  # noqa: N802
         """
         The maximum number of epochs supported by this configuration.
 
         An individual key pair can be active for a smaller sub-range.
         """
-        return 1 << self.LOG_LIFETIME
+        return Uint64(1 << self.LOG_LIFETIME)
 
     DIMENSION: int
     """The total number of hash chains, `v`."""
