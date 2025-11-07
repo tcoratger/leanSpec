@@ -192,8 +192,8 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Update validator pubkeys to match key_manager's generated keys
         updated_validators = []
         for i, validator in enumerate(self.anchor_state.validators):
-            pubkey, _ = key_manager.create_and_store_key_pair(ValidatorIndex(i))
-            pubkey_bytes = pubkey.to_bytes(DEFAULT_SIGNATURE_SCHEME.config)
+            key_pair = key_manager[ValidatorIndex(i)]
+            pubkey_bytes = key_pair.public.to_bytes(DEFAULT_SIGNATURE_SCHEME.config)
             updated_validator = validator.model_copy(update={"pubkey": pubkey_bytes})
             updated_validators.append(updated_validator)
 
