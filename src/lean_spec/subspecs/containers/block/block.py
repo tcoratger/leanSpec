@@ -116,7 +116,7 @@ class SignedBlockWithAttestation(Container):
 
     def verify_signatures(self, parent_state: "State") -> bool:
         """
-        Cryptographically verify all XMSS signatures in this signed block.
+        Verify all XMSS signatures in this signed block.
 
         This function ensures that every attestation included in the block
         (both on-chain attestations from the block body and the proposer's
