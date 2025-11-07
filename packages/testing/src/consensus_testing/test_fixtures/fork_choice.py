@@ -215,7 +215,6 @@ class ForkChoiceTest(BaseConsensusFixture):
         )
 
         # Block registry for label-based fork creation
-        #
         # Register genesis/anchor block with implicit label
         self._block_registry: dict[str, Block] = {"genesis": self.anchor_block}
 
