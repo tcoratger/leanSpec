@@ -122,7 +122,6 @@ class XmssKeyManager:
         # Map the attestation slot to an XMSS epoch.
         #
         # Each slot gets its own epoch to avoid key reuse.
-        # attestation.data.slot is already a Slot (which extends Uint64)
         epoch = attestation.data.slot
 
         # Generate the XMSS signature using the validator's secret key.
