@@ -1,10 +1,14 @@
 """Fork choice test fixture format."""
 
+from __future__ import annotations
+
+from functools import lru_cache
 from typing import ClassVar, List
 
 from pydantic import model_validator
 
 from lean_spec.subspecs.chain.config import SECONDS_PER_SLOT
+from lean_spec.subspecs.containers import Signature
 from lean_spec.subspecs.containers.attestation import (
     Attestation,
     AttestationData,
@@ -18,12 +22,15 @@ from lean_spec.subspecs.containers.block.block import (
 )
 from lean_spec.subspecs.containers.block.types import Attestations, BlockSignatures
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
-from lean_spec.subspecs.containers.signature import Signature
+from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz import hash_tree_root
+from lean_spec.subspecs.xmss.interface import DEFAULT_SIGNATURE_SCHEME
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
+from ..keys import XmssKeyManager
 from ..test_types import (
     AttestationStep,
     BlockSpec,
@@ -33,6 +40,21 @@ from ..test_types import (
     TickStep,
 )
 from .base import BaseConsensusFixture
+
+
+@lru_cache(maxsize=1)
+def _get_shared_key_manager() -> XmssKeyManager:
+    """
+    Get or create the shared XMSS key manager for reusing keys across tests.
+
+    Uses functools.lru_cache to create a singleton instance that's shared
+    across all test fixture generations within a session. This optimizes
+    performance by reusing keys when possible.
+
+    Returns:
+        Shared XmssKeyManager instance with max_slot=10.
+    """
+    return XmssKeyManager(max_slot=Slot(10))
 
 
 class ForkChoiceTest(BaseConsensusFixture):
@@ -81,8 +103,17 @@ class ForkChoiceTest(BaseConsensusFixture):
     Events are processed in order, with store state carrying forward.
     """
 
+    max_slot: Slot | None = None
+    """
+    Maximum slot for which XMSS keys should be valid.
+
+    If not provided, will be auto-calculated from the steps. This determines
+    how many slots worth of XMSS signatures can be generated. Keys must be
+    valid up to the highest slot used in any block or attestation.
+    """
+
     @model_validator(mode="after")
-    def set_anchor_block_default(self) -> "ForkChoiceTest":
+    def set_anchor_block_default(self) -> ForkChoiceTest:
         """
         Auto-generate anchor_block from anchor_state if not provided.
 
@@ -103,7 +134,29 @@ class ForkChoiceTest(BaseConsensusFixture):
             )
         return self
 
-    def make_fixture(self) -> "ForkChoiceTest":
+    @model_validator(mode="after")
+    def set_max_slot_default(self) -> ForkChoiceTest:
+        """
+        Auto-calculate max_slot from steps if not provided.
+
+        Scans all steps to find the highest slot value used in blocks or
+        attestations. This ensures XMSS keys are generated with sufficient
+        capacity for the entire test.
+        """
+        if self.max_slot is None:
+            max_slot_value = 0
+
+            for step in self.steps:
+                if isinstance(step, BlockStep):
+                    max_slot_value = max(max_slot_value, int(step.block.slot))
+                elif isinstance(step, AttestationStep):
+                    max_slot_value = max(max_slot_value, int(step.attestation.message.data.slot))
+
+            self.max_slot = Slot(max_slot_value)
+
+        return self
+
+    def make_fixture(self) -> ForkChoiceTest:
         """
         Generate the fixture by running the spec's Store.
 
@@ -125,6 +178,31 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Ensure anchor_state and anchor_block are set
         assert self.anchor_state is not None, "anchor_state must be set before make_fixture"
         assert self.anchor_block is not None, "anchor_block must be set before make_fixture"
+        assert self.max_slot is not None, "max_slot must be set before make_fixture"
+
+        # Use shared key manager if it has sufficient capacity, otherwise create a new one
+        # This optimizes performance by reusing keys across tests when possible
+        shared_key_manager = _get_shared_key_manager()
+        if self.max_slot <= shared_key_manager.max_slot:
+            key_manager = shared_key_manager
+        else:
+            # Test needs more slots than shared manager supports, create dedicated one
+            key_manager = XmssKeyManager(max_slot=self.max_slot)
+
+        # Update validator pubkeys to match key_manager's generated keys
+        updated_validators = []
+        for i, validator in enumerate(self.anchor_state.validators):
+            pubkey, _ = key_manager.create_and_store_key_pair(ValidatorIndex(i))
+            pubkey_bytes = pubkey.to_bytes(DEFAULT_SIGNATURE_SCHEME.config)
+            updated_validator = validator.model_copy(update={"pubkey": pubkey_bytes})
+            updated_validators.append(updated_validator)
+
+        self.anchor_state = self.anchor_state.model_copy(
+            update={"validators": Validators(data=updated_validators)}
+        )
+        self.anchor_block = self.anchor_block.model_copy(
+            update={"state_root": hash_tree_root(self.anchor_state)}
+        )
 
         # Initialize Store from anchor
         store = Store.get_forkchoice_store(
@@ -148,7 +226,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 elif isinstance(step, BlockStep):
                     # Build SignedBlockWithAttestation from BlockSpec
                     signed_block = self._build_block_from_spec(
-                        step.block, store, self._block_registry
+                        step.block, store, self._block_registry, key_manager
                     )
 
                     # Store the filled Block for serialization
@@ -207,6 +285,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         spec: BlockSpec,
         store: Store,
         block_registry: dict[str, Block],
+        key_manager: XmssKeyManager,
     ) -> SignedBlockWithAttestation:
         """
         Build a full SignedBlockWithAttestation from a lightweight BlockSpec.
@@ -324,10 +403,13 @@ class ForkChoiceTest(BaseConsensusFixture):
             ),
         )
 
-        # Finally create the signed block with attestation
-        # Signatures are indexed as: [attestation_0, attestation_1, ..., proposer_attestation]
-        # TODO: replace Signature.zero() with the actual proposer signature
-        signature_list = attestation_signatures + [Signature.zero()]
+        # Sign all attestations and the proposer attestation
+        signature_list = []
+        for attestation in final_block.body.attestations:
+            signature_list.append(key_manager.sign_attestation(attestation))
+        proposer_attestation_signature = key_manager.sign_attestation(proposer_attestation)
+        signature_list.append(proposer_attestation_signature)
+
         return SignedBlockWithAttestation(
             message=BlockWithAttestation(
                 block=final_block,
