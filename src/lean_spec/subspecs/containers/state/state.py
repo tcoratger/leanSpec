@@ -149,30 +149,21 @@ class State(Container):
         Dict[Bytes32, List[Boolean]]
             A mapping from justified block root to the list of validator votes.
         """
-        # Initialize an empty result.
-        justifications: Dict[Bytes32, List[Boolean]] = {}
-
-        # If there are no justified roots, return immediately.
+        # No justified roots means no justifications to reconstruct.
         if not self.justifications_roots:
-            return justifications
+            return {}
 
-        # Compute the length of each validator vote slice.
+        # Each root has exactly validator_count votes in the flat encoding.
         validator_count = self.validators.count
 
-        # Extract vote slices for each justified root.
+        # Extract the flattened validator votes.
         flat_votes = list(self.justifications_validators)
-        for i, root in enumerate(self.justifications_roots):
-            # Ensure root is Bytes32 type
-            root = Bytes32(root) if not isinstance(root, Bytes32) else root
-            # Calculate the slice boundaries for this root.
-            start_index = i * validator_count
-            end_index = start_index + validator_count
 
-            # Extract the vote slice and associate it with the root.
-            vote_slice = flat_votes[start_index:end_index]
-            justifications[root] = vote_slice
-
-        return justifications
+        # Reconstruct the map: each root gets its corresponding vote slice.
+        return {
+            root: flat_votes[i * validator_count : (i + 1) * validator_count]
+            for i, root in enumerate(self.justifications_roots)
+        }
 
     def with_justifications(
         self,
