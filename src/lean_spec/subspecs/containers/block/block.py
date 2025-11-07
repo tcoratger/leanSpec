@@ -9,12 +9,18 @@ Each block has a proposer who created it. The slot determines which validator
 can propose.
 """
 
+from typing import TYPE_CHECKING
+
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.container import Container
 
 from ..attestation import Attestation
 from .types import Attestations, BlockSignatures
+
+if TYPE_CHECKING:
+    from ..state import State
 
 
 class BlockBody(Container):
@@ -107,3 +113,72 @@ class SignedBlockWithAttestation(Container):
     Eventually this field will be replaced by a SNARK (which represents the
     aggregation of all signatures).
     """
+
+    def verify_signatures(self, parent_state: "State") -> bool:
+        """
+        Cryptographically verify all XMSS signatures in this signed block.
+
+        This function ensures that every attestation included in the block
+        (both on-chain attestations from the block body and the proposer's
+        own attestation) is properly signed by the claimed validator using
+        their registered XMSS public key.
+
+        Args:
+            parent_state: The state at the parent block, used to retrieve
+                validator public keys and verify signatures.
+
+        Returns:
+            True if all signatures are cryptographically valid.
+
+        Raises:
+            AssertionError: If signature verification fails, including:
+                - Signature count mismatch
+                - Validator index out of range
+                - XMSS signature verification failure
+        """
+        # Unpack the signed block components
+        block = self.message.block
+        signatures = self.signature
+
+        # Combine all attestations that need verification
+        #
+        # This creates a single list containing both:
+        # 1. Block body attestations (from other validators)
+        # 2. Proposer attestation (from the block producer)
+        all_attestations = list(block.body.attestations) + [self.message.proposer_attestation]
+
+        # Verify signature count matches attestation count
+        #
+        # Each attestation must have exactly one corresponding signature.
+        #
+        # The ordering must be preserved:
+        # 1. Block body attestations,
+        # 2. The proposer attestation.
+        assert len(signatures) == len(all_attestations), (
+            "Number of signatures does not match number of attestations"
+        )
+
+        validators = parent_state.validators
+
+        # Verify each attestation signature
+        for attestation, signature in zip(all_attestations, signatures, strict=True):
+            # Identify the validator who created this attestation
+            validator_id = attestation.validator_id.as_int()
+
+            # Ensure validator exists in the active set
+            assert validator_id < len(validators), "Validator index out of range"
+            validator = validators[validator_id]
+
+            # Verify the XMSS signature
+            #
+            # This cryptographically proves that:
+            # - The validator possesses the secret key for their public key
+            # - The attestation has not been tampered with
+            # - The signature was created at the correct epoch (slot)
+            assert signature.verify(
+                validator.get_pubkey(),
+                attestation.data.slot.as_int(),
+                bytes(hash_tree_root(attestation)),
+            ), "Attestation signature verification failed"
+
+        return True

@@ -262,91 +262,6 @@ class Store(Container):
             }
         )
 
-    def _validate_block_signatures(
-        self,
-        signed_block_with_attestation: SignedBlockWithAttestation,
-    ) -> bool:
-        """
-        Verify all XMSS signatures in a signed block.
-
-        This method ensures that every attestation included in the block
-        (both on-chain attestations from the block body and the proposer's
-        own attestation) is properly signed by the claimed validator using
-        their registered XMSS public key.
-
-        Args:
-            signed_block_with_attestation: Complete signed block containing:
-                - Block body with included attestations
-                - Proposer's attestation for this block
-                - XMSS signatures for all attestations (ordered)
-
-        Returns:
-            True if all signatures are cryptographically valid.
-
-        Raises:
-            AssertionError: If signature verification fails, including:
-                - Signature count mismatch
-                - Parent state not found in store
-                - Validator index out of range
-                - XMSS signature verification failure
-        """
-        # Unpack the signed block components
-        message = signed_block_with_attestation.message
-        block = message.block
-        signatures = signed_block_with_attestation.signature
-
-        # Combine all attestations that need verification
-        #
-        # This creates a single list containing both:
-        # 1. Block body attestations (from other validators)
-        # 2. Proposer attestation (from the block producer)
-        all_attestations = list(block.body.attestations) + [message.proposer_attestation]
-
-        # Verify signature count matches attestation count
-        #
-        # Each attestation must have exactly one corresponding signature.
-        #
-        # The ordering must be preserved:
-        # 1. Block body attestations,
-        # 2. The proposer attestation.
-        assert len(signatures) == len(all_attestations), (
-            "Number of signatures does not match number of attestations"
-        )
-
-        # Retrieve parent state to access validator public keys
-        #
-        # We use the parent state because:
-        # - Validator set is determined at the parent block
-        # - Public keys must be registered before signing
-        # - State root is committed in the block header
-        parent_state = self.states.get(block.parent_root)
-        assert parent_state is not None, "Parent state not found"
-
-        validators = parent_state.validators
-
-        # Verify each attestation signature
-        for attestation, signature in zip(all_attestations, signatures, strict=True):
-            # Identify the validator who created this attestation
-            validator_id = attestation.validator_id.as_int()
-
-            # Ensure validator exists in the active set
-            assert validator_id < len(validators), "Validator index out of range"
-            validator = validators[validator_id]
-
-            # Verify the XMSS signature
-            #
-            # This cryptographically proves that:
-            # - The validator possesses the secret key for their public key
-            # - The attestation has not been tampered with
-            # - The signature was created at the correct epoch (slot)
-            assert signature.verify(
-                validator.get_pubkey(),
-                attestation.data.slot.as_int(),
-                bytes(hash_tree_root(attestation)),
-            ), "Attestation signature verification failed"
-
-        return True
-
     def _process_block_body_attestations(
         self, block: Block, signatures: BlockSignatures
     ) -> "Store":
@@ -490,8 +405,8 @@ class Store(Container):
             f"Sync parent chain before processing block at slot {block.slot}."
         )
 
-        # Validate cryptographic signatures
-        valid_signatures = self._validate_block_signatures(signed_block_with_attestation)
+        # Validate cryptographic signatures using pure helper function
+        valid_signatures = signed_block_with_attestation.verify_signatures(parent_state)
 
         # Execute state transition function to compute post-block state
         post_state = copy.deepcopy(parent_state).state_transition(block, valid_signatures)
