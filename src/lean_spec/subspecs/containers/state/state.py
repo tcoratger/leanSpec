@@ -209,15 +209,11 @@ class State(Container):
             # Extend the flattened list with the votes for this root.
             votes_list.extend(votes)
 
-        # Create immutable SSZList instances
-        new_roots = JustificationRoots(data=roots_list)
-        flat_votes = JustificationValidators(data=votes_list)
-
         # Return a new state object with the updated fields.
         return self.model_copy(
             update={
-                "justifications_roots": new_roots,
-                "justifications_validators": flat_votes,
+                "justifications_roots": JustificationRoots(data=roots_list),
+                "justifications_validators": JustificationValidators(data=votes_list),
             }
         )
 
@@ -234,23 +230,23 @@ class State(Container):
         State
             A new state with latest_block_header.state_root set if needed.
         """
+        # If the latest block header already has a state root, no action is needed.
+        if self.latest_block_header.state_root != Bytes32.zero():
+            return self
+
         # If the latest block header has no state root, fill it now.
         #
         # This occurs on the first slot after a block.
-        if self.latest_block_header.state_root == Bytes32.zero():
-            # Compute the root of the current (pre-block) state.
-            previous_state_root = hash_tree_root(self)
-
-            # Copy the header and set its state_root to the computed value.
-            new_header = self.latest_block_header.model_copy(
-                update={"state_root": previous_state_root}
-            )
-
-            # Return a new state with the updated header in place.
-            return self.model_copy(update={"latest_block_header": new_header})
-
-        # Nothing to do for this slot. Return the state unchanged.
-        return self
+        # - We compute the root of the current (pre-block) state.
+        # - We copy the header and set its state_root to the computed value.
+        # - We return a new state with the updated header in place.
+        return self.model_copy(
+            update={
+                "latest_block_header": self.latest_block_header.model_copy(
+                    update={"state_root": hash_tree_root(self)}
+                )
+            }
+        )
 
     def process_slots(self, target_slot: Slot) -> "State":
         """
