@@ -405,7 +405,7 @@ class Store(Container):
             f"Sync parent chain before processing block at slot {block.slot}."
         )
 
-        # Validate cryptographic signatures using pure helper function
+        # Validate cryptographic signatures
         valid_signatures = signed_block_with_attestation.verify_signatures(parent_state)
 
         # Execute state transition function to compute post-block state
