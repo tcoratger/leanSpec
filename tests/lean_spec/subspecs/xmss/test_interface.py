@@ -114,7 +114,6 @@ def test_advance_preparation() -> None:
     """Tests that advance_preparation correctly slides the window."""
     scheme = TEST_SIGNATURE_SCHEME
     # Use full lifetime (16 epochs) to ensure room to advance
-    # With LOG_LIFETIME=4: 16 epochs total, 4 per tree, need 3+ trees
     pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
 
     # Get initial prepared interval
@@ -169,7 +168,7 @@ def test_deterministic_signing() -> None:
     # Use full lifetime
     pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
 
-    # Use epoch within prepared interval [0, 8)
+    # Use epoch within prepared interval
     epoch = Uint64(4)
     message = b"\x42" * scheme.config.MESSAGE_LENGTH
 

@@ -11,13 +11,22 @@ from lean_spec.types import ValidatorIndex
 
 
 class KeyPair(NamedTuple):
-    """A validator’s XMSS key pair."""
+    """A validator's XMSS key pair."""
 
     public: PublicKey
-    """The validator’s public key (used for verification)."""
+    """The validator's public key (used for verification)."""
 
     secret: SecretKey
-    """The validator’s secret key (used for signing)."""
+    """The validator's secret key (used for signing)."""
+
+
+
+_KEY_CACHE: dict[tuple[int, int], KeyPair] = {}
+"""
+Cache keys across tests to avoid regenerating them for the same validator/lifetime combo.
+
+Key: (validator_index, num_active_epochs) -> KeyPair
+"""
 
 
 class XmssKeyManager:
@@ -76,6 +85,13 @@ class XmssKeyManager:
         # - We include slot 0 (genesis) in the count
         num_active_epochs = self.max_slot.as_int() + 1
 
+        # Check global cache first (keys are reused across tests)
+        cache_key = (int(validator_index), num_active_epochs)
+        if cache_key in _KEY_CACHE:
+            key_pair = _KEY_CACHE[cache_key]
+            self._key_pairs[validator_index] = key_pair
+            return key_pair
+
         # Generate the key pair using the default XMSS scheme.
         #
         # The seed is set to 0 for deterministic test keys.
@@ -85,6 +101,7 @@ class XmssKeyManager:
 
         # Store as a cohesive unit and return.
         key_pair = KeyPair(public=pk, secret=sk)
+        _KEY_CACHE[cache_key] = key_pair  # Cache globally for reuse across tests
         self._key_pairs[validator_index] = key_pair
         return key_pair
 
