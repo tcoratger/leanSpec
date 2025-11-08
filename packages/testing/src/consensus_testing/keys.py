@@ -6,7 +6,9 @@ from lean_spec.subspecs.containers import Attestation, Signature
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.containers import PublicKey, SecretKey
-from lean_spec.subspecs.xmss.interface import DEFAULT_SIGNATURE_SCHEME
+from lean_spec.subspecs.xmss.interface import (
+    TEST_SIGNATURE_SCHEME as DEFAULT_SIGNATURE_SCHEME,
+)
 from lean_spec.types import ValidatorIndex
 
 
@@ -18,7 +20,6 @@ class KeyPair(NamedTuple):
 
     secret: SecretKey
     """The validator's secret key (used for signing)."""
-
 
 
 _KEY_CACHE: dict[tuple[int, int], KeyPair] = {}
@@ -107,7 +108,7 @@ class XmssKeyManager:
 
     def sign_attestation(self, attestation: Attestation) -> Signature:
         """
-        Sign an attestation with the validator’s XMSS key.
+        Sign an attestation with the validator's XMSS key.
 
         Parameters
         ----------
@@ -130,22 +131,49 @@ class XmssKeyManager:
 
         # Lazy key retrieval: creates keys if first time seeing this validator.
         key_pair = self[validator_id]
-
-        # Compute the message digest from the attestation's SSZ tree root.
-        #
-        # This produces a cryptographic hash of the entire attestation structure.
-        message = bytes(hash_tree_root(attestation))
+        sk = key_pair.secret  # Get the current secret key
 
         # Map the attestation slot to an XMSS epoch.
         #
         # Each slot gets its own epoch to avoid key reuse.
         epoch = attestation.data.slot
 
-        # Generate the XMSS signature using the validator's secret key.
-        xmss_sig = DEFAULT_SIGNATURE_SCHEME.sign(key_pair.secret, epoch, message)
+        # Advance the key's prepared window until it covers the target epoch.
+        #
+        # We use the scheme that the key was generated with.
+        scheme = DEFAULT_SIGNATURE_SCHEME
+
+        # Loop until the epoch is inside the prepared interval
+        prepared_interval = scheme.get_prepared_interval(sk)
+        while int(epoch) not in prepared_interval:
+            # Check if we're advancing past the key's total lifetime
+            activation_interval = scheme.get_activation_interval(sk)
+            if prepared_interval.stop >= activation_interval.stop:
+                raise ValueError(
+                    f"Cannot sign for epoch {epoch}: "
+                    f"it is beyond the key's max lifetime {activation_interval.stop}"
+                )
+
+            # Advance the key and get the new key object
+            sk = scheme.advance_preparation(sk)
+
+            # Update the prepared interval for the next loop check
+            prepared_interval = scheme.get_prepared_interval(sk)
+
+        # Update the cached key pair with the new, advanced secret key.
+        # This ensures the *next* call to sign() uses the advanced state.
+        self._key_pairs[validator_id] = KeyPair(public=key_pair.public, secret=sk)
+
+        # Compute the message digest from the attestation's SSZ tree root.
+        #
+        # This produces a cryptographic hash of the entire attestation structure.
+        message = bytes(hash_tree_root(attestation))
+
+        # Generate the XMSS signature using the validator's (now prepared) secret key.
+        xmss_sig = scheme.sign(sk, epoch, message)
 
         # Convert the signature to the wire format (byte array).
-        signature_bytes = xmss_sig.to_bytes(DEFAULT_SIGNATURE_SCHEME.config)
+        signature_bytes = xmss_sig.to_bytes(scheme.config)
 
         # Ensure the signature meets the consensus spec length (3100 bytes).
         #

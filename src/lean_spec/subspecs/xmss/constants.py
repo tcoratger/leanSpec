@@ -126,7 +126,7 @@ PROD_CONFIG: Final = XmssConfig(
 
 TEST_CONFIG: Final = XmssConfig(
     MESSAGE_LENGTH=32,
-    LOG_LIFETIME=4,
+    LOG_LIFETIME=8,
     DIMENSION=4,
     BASE=4,
     FINAL_LAYER=6,
