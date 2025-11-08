@@ -80,7 +80,8 @@ def test_signature_scheme_correctness(activation_epoch: int, num_active_epochs: 
 def test_get_activation_interval() -> None:
     """Tests that get_activation_interval returns the correct range."""
     scheme = TEST_SIGNATURE_SCHEME
-    pk, sk = scheme.key_gen(Uint64(10), Uint64(100))
+    # Use 8 epochs (half of LIFETIME=16)
+    pk, sk = scheme.key_gen(Uint64(4), Uint64(8))
 
     interval = scheme.get_activation_interval(sk)
 
@@ -88,14 +89,15 @@ def test_get_activation_interval() -> None:
     assert isinstance(interval, range)
 
     # Verify it covers the activation interval (may be expanded)
-    assert interval.start <= 10
-    assert interval.stop >= 110
+    assert interval.start <= 4
+    assert interval.stop >= 12
 
 
 def test_get_prepared_interval() -> None:
     """Tests that get_prepared_interval returns the correct range."""
     scheme = TEST_SIGNATURE_SCHEME
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(100))
+    # Use full lifetime
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
 
     interval = scheme.get_prepared_interval(sk)
 
@@ -111,15 +113,17 @@ def test_get_prepared_interval() -> None:
 def test_advance_preparation() -> None:
     """Tests that advance_preparation correctly slides the window."""
     scheme = TEST_SIGNATURE_SCHEME
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(100))
+    # Use full lifetime (16 epochs) to ensure room to advance
+    # With LOG_LIFETIME=4: 16 epochs total, 4 per tree, need 3+ trees
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
 
     # Get initial prepared interval
     initial_interval = scheme.get_prepared_interval(sk)
     initial_left_index = sk.left_bottom_tree_index
     assert initial_left_index is not None
 
-    # Advance preparation
-    scheme.advance_preparation(sk)
+    # Advance preparation (returns new SecretKey since models are immutable)
+    sk = scheme.advance_preparation(sk)
 
     # Get new prepared interval
     new_interval = scheme.get_prepared_interval(sk)
@@ -138,14 +142,16 @@ def test_advance_preparation() -> None:
 def test_sign_requires_prepared_interval() -> None:
     """Tests that sign raises an error if epoch is outside prepared interval."""
     scheme = TEST_SIGNATURE_SCHEME
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(100))
+    # Use full lifetime to have room for testing
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
 
     # Get the prepared interval
     prepared_interval = scheme.get_prepared_interval(sk)
 
     # Try to sign outside the prepared interval (but inside activation interval)
     activation_interval = scheme.get_activation_interval(sk)
-    outside_epoch = Uint64(prepared_interval.stop + 100)
+    # Pick an epoch just beyond the prepared interval
+    outside_epoch = Uint64(prepared_interval.stop)
 
     # Verify it's inside activation but outside prepared
     assert int(outside_epoch) in activation_interval
@@ -160,9 +166,11 @@ def test_sign_requires_prepared_interval() -> None:
 def test_deterministic_signing() -> None:
     """Tests that signing the same message with the same key produces the same signature."""
     scheme = TEST_SIGNATURE_SCHEME
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(100))
+    # Use full lifetime
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
 
-    epoch = Uint64(10)
+    # Use epoch within prepared interval [0, 8)
+    epoch = Uint64(4)
     message = b"\x42" * scheme.config.MESSAGE_LENGTH
 
     # Sign twice

@@ -506,7 +506,7 @@ class GeneralizedXmssScheme:
         end = start + (2 * leafs_per_bottom_tree)
         return range(start, end)
 
-    def advance_preparation(self, sk: SecretKey) -> None:
+    def advance_preparation(self, sk: SecretKey) -> SecretKey:
         """
         Advances the prepared interval by computing the next bottom tree.
 
@@ -523,7 +523,10 @@ class GeneralizedXmssScheme:
         right half of the prepared interval, to ensure the next epoch range is ready.
 
         Args:
-            sk: The secret key to advance. This object is modified in place.
+            sk: The secret key to advance.
+
+        Returns:
+            A new SecretKey with the advanced preparation window.
 
         Raises:
             ValueError: If the secret key is missing top-bottom tree structures
@@ -544,7 +547,7 @@ class GeneralizedXmssScheme:
         activation_interval = self.get_activation_interval(sk)
         if next_prepared_end_epoch > activation_interval.stop:
             # Nothing to do - we're already at the end of the activation interval
-            return
+            return sk
 
         # Compute the next bottom tree (the one after the current right tree)
         new_right_tree_index = sk.left_bottom_tree_index + 2
@@ -558,12 +561,14 @@ class GeneralizedXmssScheme:
             parameter=sk.parameter,
         )
 
-        # Slide the window:
-        # - current right becomes new left,
-        # - new tree becomes new right
-        sk.left_bottom_tree = sk.right_bottom_tree
-        sk.right_bottom_tree = new_right_bottom_tree
-        sk.left_bottom_tree_index += 1
+        # Return a new SecretKey with the advanced window
+        return sk.model_copy(
+            update={
+                "left_bottom_tree": sk.right_bottom_tree,
+                "right_bottom_tree": new_right_bottom_tree,
+                "left_bottom_tree_index": sk.left_bottom_tree_index + 1,
+            }
+        )
 
 
 PROD_SIGNATURE_SCHEME = GeneralizedXmssScheme(
