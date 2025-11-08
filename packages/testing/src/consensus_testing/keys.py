@@ -125,17 +125,29 @@ class XmssKeyManager:
         # Map the attestation slot to an XMSS epoch.
         #
         # Each slot gets its own epoch to avoid key reuse.
-        epoch = attestation.data.slot
+        #
+        # For TEST_CONFIG with limited LIFETIME, we use modulo to wrap epochs.
+        slot_number = int(attestation.data.slot)
+        lifetime = int(DEFAULT_SIGNATURE_SCHEME.config.LIFETIME)
+        epoch_number = slot_number % lifetime
+
+        from lean_spec.types import Uint64
+
+        epoch = Uint64(epoch_number)
 
         # Advance the prepared window if needed
         #
         # XMSS uses a sliding window approach for efficiency. If the requested epoch
         # is outside the current prepared interval, we need to slide the window forward.
         secret_key = key_pair.secret
-        while int(epoch) not in DEFAULT_SIGNATURE_SCHEME.get_prepared_interval(secret_key):
-            secret_key = DEFAULT_SIGNATURE_SCHEME.advance_preparation(secret_key)
-            # Update the cached key pair with the new secret key
-            self._key_pairs[validator_id] = KeyPair(public=key_pair.public, secret=secret_key)
+        activation_interval = DEFAULT_SIGNATURE_SCHEME.get_activation_interval(secret_key)
+
+        # Only advance if epoch is within activation interval
+        if epoch_number in activation_interval:
+            while epoch_number not in DEFAULT_SIGNATURE_SCHEME.get_prepared_interval(secret_key):
+                secret_key = DEFAULT_SIGNATURE_SCHEME.advance_preparation(secret_key)
+                # Update the cached key pair with the new secret key
+                self._key_pairs[validator_id] = KeyPair(public=key_pair.public, secret=secret_key)
 
         # Generate the XMSS signature using the validator's secret key.
         xmss_sig = DEFAULT_SIGNATURE_SCHEME.sign(secret_key, epoch, message)
