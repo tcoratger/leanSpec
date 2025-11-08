@@ -31,7 +31,7 @@ from typing import List, Union
 
 from pydantic import Field
 
-from lean_spec.types import StrictBaseModel
+from lean_spec.types import StrictBaseModel, Uint64
 
 from ..koalabear import Fp
 from .constants import (
@@ -61,7 +61,7 @@ class TreeTweak(StrictBaseModel):
     level: int = Field(
         ge=0, description="The level (height) in the Merkle tree, where 0 is the leaf level."
     )
-    index: int = Field(ge=0, description="The node's index (from the left) within that level.")
+    index: Uint64 = Field(description="The node's index (from the left) within that level.")
 
 
 class ChainTweak(StrictBaseModel):
@@ -72,7 +72,7 @@ class ChainTweak(StrictBaseModel):
     chain is distinct across all epochs.
     """
 
-    epoch: int = Field(ge=0, description="The signature epoch.")
+    epoch: Uint64 = Field(description="The signature epoch.")
     chain_index: int = Field(
         ge=0, description="The index of the hash chain (from 0 to DIMENSION-1)."
     )
@@ -121,11 +121,11 @@ class TweakHasher:
         # A hardcoded prefix is included for domain separation between tweak types.
         if isinstance(tweak, TreeTweak):
             # Packing scheme: (level << 40) | (index << 8) | PREFIX
-            acc = (tweak.level << 40) | (tweak.index << 8) | TWEAK_PREFIX_TREE.value
+            acc = (tweak.level << 40) | (int(tweak.index) << 8) | TWEAK_PREFIX_TREE.value
         else:
             # Packing scheme: (epoch << 24) | (chain_index << 16) | (step << 8) | PREFIX
             acc = (
-                (tweak.epoch << 24)
+                (int(tweak.epoch) << 24)
                 | (tweak.chain_index << 16)
                 | (tweak.step << 8)
                 | TWEAK_PREFIX_CHAIN.value
@@ -211,7 +211,7 @@ class TweakHasher:
     def hash_chain(
         self,
         parameter: Parameter,
-        epoch: int,
+        epoch: Uint64,
         chain_index: int,
         start_step: int,
         num_steps: int,

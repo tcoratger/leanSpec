@@ -81,7 +81,7 @@ class Prf:
         """
         return os.urandom(PRF_KEY_LENGTH)
 
-    def apply(self, key: PRFKey, epoch: int, chain_index: Uint64) -> List[Fp]:
+    def apply(self, key: PRFKey, epoch: Uint64, chain_index: Uint64) -> List[Fp]:
         """
         Applies the PRF to derive the secret starting value for a single hash chain.
 
@@ -113,7 +113,7 @@ class Prf:
         # - Epoch: A 4-byte integer ensuring every epoch derives a different set of secrets.
         # - Chain Index: An 8-byte integer ensuring each parallel hash chain gets a unique secret.
         input_data = (
-            PRF_DOMAIN_SEP + key + epoch.to_bytes(4, "big") + chain_index.to_bytes(8, "big")
+            PRF_DOMAIN_SEP + key + int(epoch).to_bytes(4, "big") + chain_index.to_bytes(8, "big")
         )
 
         # Determine the total number of bytes to extract from the SHAKE output.

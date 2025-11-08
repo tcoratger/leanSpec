@@ -8,6 +8,8 @@ top of the message hash output.
 
 from typing import List, Optional
 
+from lean_spec.types import Uint64
+
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
 from .containers import Parameter, Randomness
 from .message_hash import (
@@ -31,7 +33,7 @@ class TargetSumEncoder:
         self.message_hasher = message_hasher
 
     def encode(
-        self, parameter: Parameter, message: bytes, rho: Randomness, epoch: int
+        self, parameter: Parameter, message: bytes, rho: Randomness, epoch: Uint64
     ) -> Optional[List[int]]:
         """
         Encodes a message into a codeword if it meets the target sum criteria.

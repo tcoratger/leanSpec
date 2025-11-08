@@ -58,7 +58,9 @@ class GeneralizedXmssScheme:
         self.encoder = encoder
         self.rand = rand
 
-    def key_gen(self, activation_epoch: int, num_active_epochs: int) -> Tuple[PublicKey, SecretKey]:
+    def key_gen(
+        self, activation_epoch: Uint64, num_active_epochs: Uint64
+    ) -> Tuple[PublicKey, SecretKey]:
         """
         Generates a new cryptographic key pair for a specified range of epochs.
 
@@ -109,8 +111,9 @@ class GeneralizedXmssScheme:
         prf_key = self.prf.key_gen()
 
         # Iterate through each epoch to generate its corresponding Merkle leaf.
+        # Note: range() requires int, so we convert only for the loop
         leaf_hashes: List[HashDigest] = []
-        for epoch in range(activation_epoch, activation_epoch + num_active_epochs):
+        for epoch in range(int(activation_epoch), int(activation_epoch + num_active_epochs)):
             # For each epoch, compute the one-time public key, which consists
             # of the public endpoints of `DIMENSION` independent hash chains.
             chain_ends: List[HashDigest] = []
@@ -118,13 +121,13 @@ class GeneralizedXmssScheme:
                 # Derive the secret start of the chain from the master PRF key.
                 #
                 # This ensures each chain is unique and cryptographically secure.
-                start_digest = self.prf.apply(prf_key, epoch, Uint64(chain_index))
+                start_digest = self.prf.apply(prf_key, Uint64(epoch), Uint64(chain_index))
 
                 # Compute the public end of the chain by applying the hash function
                 # `BASE - 1` times. This is the public part of the one-time key.
                 end_digest = self.hasher.hash_chain(
                     parameter=parameter,
-                    epoch=epoch,
+                    epoch=Uint64(epoch),
                     chain_index=chain_index,
                     start_step=0,
                     num_steps=config.BASE - 1,
@@ -155,7 +158,7 @@ class GeneralizedXmssScheme:
         )
         return pk, sk
 
-    def sign(self, sk: SecretKey, epoch: int, message: bytes) -> Signature:
+    def sign(self, sk: SecretKey, epoch: Uint64, message: bytes) -> Signature:
         """
         Produces a digital signature for a given message at a specific epoch.
 
@@ -201,8 +204,11 @@ class GeneralizedXmssScheme:
         config = self.config
 
         # Verify that the secret key is currently active for the requested signing epoch.
-        active_range = range(sk.activation_epoch, sk.activation_epoch + sk.num_active_epochs)
-        if epoch not in active_range:
+        # Note: range() requires int, so we convert only for the range check
+        activation_int = int(sk.activation_epoch)
+        num_epochs_int = int(sk.num_active_epochs)
+        active_range = range(activation_int, activation_int + num_epochs_int)
+        if int(epoch) not in active_range:
             raise ValueError("Key is not active for the specified epoch.")
 
         # Find a valid message encoding.
@@ -259,7 +265,7 @@ class GeneralizedXmssScheme:
         # - The randomness `rho` needed for verification.
         return Signature(path=path, rho=rho, hashes=ots_hashes)
 
-    def verify(self, pk: PublicKey, epoch: int, message: bytes, sig: Signature) -> bool:
+    def verify(self, pk: PublicKey, epoch: Uint64, message: bytes, sig: Signature) -> bool:
         r"""
         Verifies a digital signature against a public key, message, and epoch.
 

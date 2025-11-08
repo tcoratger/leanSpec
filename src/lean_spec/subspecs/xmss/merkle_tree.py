@@ -32,6 +32,8 @@ from __future__ import annotations
 
 from typing import List
 
+from lean_spec.types import Uint64
+
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
@@ -102,7 +104,7 @@ class MerkleTree:
     def build(
         self,
         depth: int,
-        start_index: int,
+        start_index: Uint64,
         parameter: Parameter,
         leaf_hashes: List[HashDigest],
     ) -> HashTree:
@@ -138,12 +140,12 @@ class MerkleTree:
             The fully constructed `HashTree` object containing all computed layers.
         """
         # Check there is enough space for the leafs in the tree.
-        if start_index + len(leaf_hashes) > 2**depth:
+        if int(start_index) + len(leaf_hashes) > 2**depth:
             raise ValueError("Not enough space for leafs in the tree.")
 
         # Start with the leaf hashes and apply the initial padding.
         layers: List[HashTreeLayer] = []
-        current_layer = self._get_padded_layer(leaf_hashes, start_index)
+        current_layer = self._get_padded_layer(leaf_hashes, int(start_index))
         layers.append(current_layer)
 
         # Iterate from the leaf layer (level 0) up to the root.
@@ -185,7 +187,7 @@ class MerkleTree:
         # The root is the single node in the final layer.
         return tree.layers[-1].nodes[0]
 
-    def path(self, tree: HashTree, position: int) -> HashTreeOpening:
+    def path(self, tree: HashTree, position: Uint64) -> HashTreeOpening:
         """
         Computes the authentication path for a leaf.
 
@@ -211,14 +213,14 @@ class MerkleTree:
             raise ValueError("Cannot generate path for empty tree.")
 
         # Check that the position is within the tree's range.
-        if position < tree.layers[0].start_index:
+        if int(position) < tree.layers[0].start_index:
             raise ValueError("Position (before start) is invalid.")
 
-        if position >= tree.layers[0].start_index + len(tree.layers[0].nodes):
+        if int(position) >= tree.layers[0].start_index + len(tree.layers[0].nodes):
             raise ValueError("Position (after end) is invalid.")
 
         co_path: List[HashDigest] = []
-        current_position = position
+        current_position = int(position)
 
         # Iterate from the leaf layer (level 0) up to the layer below the root.
         for level in range(tree.depth):
@@ -238,7 +240,7 @@ class MerkleTree:
         self,
         parameter: Parameter,
         root: HashDigest,
-        position: int,
+        position: Uint64,
         leaf_parts: List[HashDigest],
         opening: HashTreeOpening,
     ) -> bool:
@@ -286,17 +288,17 @@ class MerkleTree:
         if len(opening.siblings) > 32:
             raise ValueError("Tree depth must be at most 32.")
         # Check that the position and path length match.
-        if position >= num_leafs:
+        if int(position) >= num_leafs:
             raise ValueError("Position and path length do not match.")
 
         # The first step is to hash the constituent parts of the leaf to get
         # the actual node at layer 0 of the tree.
-        leaf_tweak = TreeTweak(level=0, index=position)
+        leaf_tweak = TreeTweak(level=0, index=int(position))
         current_node = self.hasher.apply(parameter, leaf_tweak, leaf_parts)
 
         # Iterate up the tree, hashing the current node with its sibling from
         # the path at each level.
-        current_position = position
+        current_position = int(position)
         for level, sibling_node in enumerate(opening.siblings):
             # Determine if the current node is a left or right child.
             if current_position % 2 == 0:
