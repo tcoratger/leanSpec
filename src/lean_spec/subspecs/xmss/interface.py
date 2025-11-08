@@ -17,13 +17,12 @@ from lean_spec.subspecs.xmss.target_sum import (
 )
 from lean_spec.types.uint import Uint64
 
-from ..koalabear import Fp
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
     XmssConfig,
 )
-from .containers import HashDigest, HashSubTree, PublicKey, SecretKey, Signature
+from .containers import HashDigest, PublicKey, SecretKey, Signature
 from .merkle_tree import (
     PROD_MERKLE_TREE,
     TEST_MERKLE_TREE,
@@ -33,176 +32,15 @@ from .prf import PROD_PRF, TEST_PRF, Prf
 from .tweak_hash import (
     PROD_TWEAK_HASHER,
     TEST_TWEAK_HASHER,
-    TreeTweak,
     TweakHasher,
 )
-from .utils import PROD_RAND, TEST_RAND, Rand
-
-
-def _expand_activation_time(
-    log_lifetime: int, desired_activation_epoch: int, desired_num_active_epochs: int
-) -> tuple[int, int]:
-    """
-    Expands and aligns the activation time to top-bottom tree boundaries.
-
-    For efficient top-bottom tree traversal, activation intervals must be aligned to
-    `sqrt(LIFETIME)` boundaries. This function takes the user's desired activation
-    interval and expands it to meet the following requirements:
-
-    1.  **Start alignment**: Start epoch is rounded down to a multiple of `sqrt(LIFETIME)`
-    2.  **End alignment**: End epoch is rounded up to a multiple of `sqrt(LIFETIME)`
-    3.  **Minimum duration**: At least `2 * sqrt(LIFETIME)` epochs (two bottom trees)
-    4.  **Lifetime bounds**: Clamped to `[0, LIFETIME)`
-
-    ### Algorithm
-
-    Let `C = 2^(LOG_LIFETIME/2) = sqrt(LIFETIME)`
-
-    1.  Align start downward: `start = desired_start & c_mask` where `c_mask = ~(C - 1)`
-    2.  Round end upward: `end = (desired_end + C - 1) & c_mask`
-    3.  Enforce minimum: `if end - start < 2*C: end = start + 2*C`
-    4.  Clamp to bounds: Adjust if end exceeds `C^2 = LIFETIME`
-
-    ### Example
-
-    For `LOG_LIFETIME = 32` (LIFETIME = 2^32, C = 2^16 = 65536):
-    - Request: epochs [10000, 80000) → 70000 epochs
-    - Aligned: epochs [0, 131072) → 131072 epochs = 2 bottom trees
-
-    Args:
-        log_lifetime: The logarithm (base 2) of the total lifetime.
-        desired_activation_epoch: The user's requested first epoch.
-        desired_num_active_epochs: The user's requested number of epochs.
-
-    Returns:
-        A tuple `(start_bottom_tree_index, end_bottom_tree_index)` where:
-        - `start_bottom_tree_index`: Index of the first bottom tree (0, 1, 2, ...)
-        - `end_bottom_tree_index`: Index past the last bottom tree (exclusive)
-        - Actual epochs: `[start_index * C, end_index * C)`
-    """
-    # Calculate sqrt(LIFETIME) and the alignment mask.
-    c = 1 << (log_lifetime // 2)  # C = 2^(LOG_LIFETIME/2)
-    c_mask = ~(c - 1)  # Mask for rounding to multiples of C
-
-    # Calculate the desired end epoch.
-    desired_end_epoch = desired_activation_epoch + desired_num_active_epochs
-
-    # Step 1: Align start downward to a multiple of C.
-    start = desired_activation_epoch & c_mask
-
-    # Step 2: Round end upward to a multiple of C.
-    end = (desired_end_epoch + c - 1) & c_mask
-
-    # Step 3: Enforce minimum duration of 2*C.
-    if end - start < 2 * c:
-        end = start + 2 * c
-
-    # Step 4: Clamp to lifetime bounds [0, C^2).
-    lifetime = c * c  # LIFETIME = C^2 = 2^LOG_LIFETIME
-    if end > lifetime:
-        # If the expanded interval exceeds the lifetime, try to fit it at the end.
-        duration = end - start
-
-        if duration > lifetime:
-            # The expanded interval is larger than the entire lifetime.
-            # Use the entire lifetime.
-            start = 0
-            end = lifetime
-        else:
-            # Shift the interval to end at the lifetime boundary.
-            end = lifetime
-            start = (lifetime - duration) & c_mask  # Keep alignment
-
-    # Convert to bottom tree indices.
-    # Bottom tree i covers epochs [i*C, (i+1)*C).
-    start_bottom_tree_index = start // c
-    end_bottom_tree_index = end // c
-
-    return (start_bottom_tree_index, end_bottom_tree_index)
-
-
-def _bottom_tree_from_prf_key(
-    prf: Prf,
-    hasher: TweakHasher,
-    merkle_tree: MerkleTree,
-    config: XmssConfig,
-    prf_key: bytes,
-    bottom_tree_index: int,
-    parameter: List[Fp],
-) -> HashSubTree:
-    """
-    Generates a single bottom tree on-demand from the PRF key.
-
-    This is a key component of the top-bottom tree approach: instead of storing all
-    one-time secret keys, we regenerate them on-demand using the PRF. This enables
-    O(sqrt(LIFETIME)) memory usage.
-
-    ### Algorithm
-
-    1.  **Determine epoch range**: Bottom tree `i` covers epochs
-        `[i * sqrt(LIFETIME), (i+1) * sqrt(LIFETIME))`
-
-    2.  **Generate leaves**: For each epoch in parallel:
-        - For each chain (0 to DIMENSION-1):
-          - Derive secret start: `PRF(prf_key, epoch, chain_index)`
-          - Compute public end: hash chain for `BASE - 1` steps
-        - Hash all chain ends to get the leaf
-
-    3.  **Build bottom tree**: Construct the bottom tree from the leaves
-
-    Args:
-        prf: The PRF instance for key derivation.
-        hasher: The tweakable hash instance.
-        merkle_tree: The Merkle tree instance for tree construction.
-        config: The XMSS configuration.
-        prf_key: The master PRF secret key.
-        bottom_tree_index: The index of the bottom tree to generate (0, 1, 2, ...).
-        parameter: The public parameter `P` for the hash function.
-
-    Returns:
-        A `HashSubTree` representing the requested bottom tree.
-    """
-    # Calculate the number of leaves per bottom tree: sqrt(LIFETIME).
-    leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
-
-    # Determine the epoch range for this bottom tree.
-    start_epoch = bottom_tree_index * leafs_per_bottom_tree
-    end_epoch = start_epoch + leafs_per_bottom_tree
-
-    # Generate leaf hashes for all epochs in this bottom tree.
-    leaf_hashes: List[HashDigest] = []
-
-    for epoch in range(start_epoch, end_epoch):
-        # For each epoch, compute the one-time public key (chain endpoints).
-        chain_ends: List[HashDigest] = []
-
-        for chain_index in range(config.DIMENSION):
-            # Derive the secret start of the chain from the PRF key.
-            start_digest = prf.apply(prf_key, Uint64(epoch), Uint64(chain_index))
-
-            # Compute the public end by hashing BASE - 1 times.
-            end_digest = hasher.hash_chain(
-                parameter=parameter,
-                epoch=Uint64(epoch),
-                chain_index=chain_index,
-                start_step=0,
-                num_steps=config.BASE - 1,
-                start_digest=start_digest,
-            )
-            chain_ends.append(end_digest)
-
-        # Hash the chain ends to get the leaf for this epoch.
-        leaf_tweak = TreeTweak(level=0, index=epoch)
-        leaf_hash = hasher.apply(parameter, leaf_tweak, chain_ends)
-        leaf_hashes.append(leaf_hash)
-
-    # Build the bottom tree from the leaf hashes.
-    return merkle_tree.new_bottom_tree(
-        depth=config.LOG_LIFETIME,
-        bottom_tree_index=bottom_tree_index,
-        parameter=parameter,
-        leaves=leaf_hashes,
-    )
+from .utils import (
+    PROD_RAND,
+    TEST_RAND,
+    Rand,
+    bottom_tree_from_prf_key,
+    expand_activation_time,
+)
 
 
 class GeneralizedXmssScheme:
@@ -297,7 +135,7 @@ class GeneralizedXmssScheme:
         prf_key = self.prf.key_gen()
 
         # Step 1: Expand and align activation time to sqrt(LIFETIME) boundaries.
-        start_bottom_tree_index, end_bottom_tree_index = _expand_activation_time(
+        start_bottom_tree_index, end_bottom_tree_index = expand_activation_time(
             config.LOG_LIFETIME, int(activation_epoch), int(num_active_epochs)
         )
 
@@ -309,7 +147,7 @@ class GeneralizedXmssScheme:
         actual_num_active_epochs = num_bottom_trees * leafs_per_bottom_tree
 
         # Step 2: Generate the first two bottom trees (kept in memory).
-        left_bottom_tree = _bottom_tree_from_prf_key(
+        left_bottom_tree = bottom_tree_from_prf_key(
             self.prf,
             self.hasher,
             self.merkle_tree,
@@ -318,7 +156,7 @@ class GeneralizedXmssScheme:
             start_bottom_tree_index,
             parameter,
         )
-        right_bottom_tree = _bottom_tree_from_prf_key(
+        right_bottom_tree = bottom_tree_from_prf_key(
             self.prf,
             self.hasher,
             self.merkle_tree,
@@ -336,7 +174,7 @@ class GeneralizedXmssScheme:
 
         # Step 3: Generate remaining bottom trees (only their roots).
         for i in range(start_bottom_tree_index + 2, end_bottom_tree_index):
-            tree = _bottom_tree_from_prf_key(
+            tree = bottom_tree_from_prf_key(
                 self.prf,
                 self.hasher,
                 self.merkle_tree,
@@ -377,7 +215,8 @@ class GeneralizedXmssScheme:
         """
         Produces a digital signature for a given message at a specific epoch.
 
-        This is a **randomized** algorithm.
+        This is a **deterministic** algorithm. Calling `sign` twice with the same
+        (sk, epoch, message) triple produces the same signature.
 
         **CRITICAL SECURITY WARNING**: A secret key for a given epoch must **NEVER** be used
         to sign two different messages. Doing so would reveal parts of the secret key
@@ -390,7 +229,8 @@ class GeneralizedXmssScheme:
             requires the message hash to be encoded into a `codeword` whose digits
             sum to a predefined target. A direct hash of the message is unlikely to
             satisfy this. Therefore, the algorithm repeatedly hashes the message
-            combined with fresh randomness (`rho`) until a valid `codeword` is found.
+            combined with deterministic randomness (`rho`) derived from the PRF
+            until a valid `codeword` is found.
 
         2.  **One-Time Signature**: The `codeword` dictates how the one-time signature is
             formed. For each digit `x_i` in the codeword, the signer reveals an intermediate
@@ -426,14 +266,32 @@ class GeneralizedXmssScheme:
         if int(epoch) not in active_range:
             raise ValueError("Key is not active for the specified epoch.")
 
+        # Verify that the epoch is within the prepared interval (covered by loaded bottom trees).
+        #
+        # With top-bottom tree traversal, only epochs within the prepared interval can be
+        # signed without computing additional bottom trees.
+        #
+        # If the epoch is outside this range, call `advance_preparation()`
+        # to slide the window forward.
+        prepared_interval = self.get_prepared_interval(sk)
+        if int(epoch) not in prepared_interval:
+            raise ValueError(
+                f"Epoch {epoch} is outside the prepared interval "
+                f"[{prepared_interval.start}, {prepared_interval.stop}). "
+                f"Call advance_preparation() to slide the window forward."
+            )
+
         # Find a valid message encoding.
         #
         # This loop repeatedly tries different randomness `rho` until the encoder
         # produces a valid codeword (i.e., one that meets the target sum constraint).
-        for _ in range(config.MAX_TRIES):
-            # Sample fresh randomness `rho`.
-            rho = self.rand.rho()
-            # Attempt to encode the message with the new `rho`.
+        #
+        # The randomness is deterministically derived from the PRF to ensure
+        # that signing is reproducible for the same (sk, epoch, message).
+        for attempts in range(config.MAX_TRIES):
+            # Derive deterministic randomness `rho` from PRF using the attempt counter.
+            rho = self.prf.get_randomness(sk.prf_key, epoch, message, Uint64(attempts))
+            # Attempt to encode the message with the deterministic `rho`.
             codeword = self.encoder.encode(sk.parameter, message, rho, epoch)
             # If encoding is successful, we've found our `rho` and `codeword`.
             #
@@ -595,6 +453,111 @@ class GeneralizedXmssScheme:
             leaf_parts=chain_ends,
             opening=sig.path,
         )
+
+    def get_activation_interval(self, sk: SecretKey) -> range:
+        """
+        Returns the epoch range for which this secret key is active.
+
+        The activation interval is `[activation_epoch, activation_epoch + num_active_epochs)`.
+        A signature can only be created for an epoch within this range.
+
+        Args:
+            sk: The secret key to query.
+
+        Returns:
+            A Python range object representing the valid epoch range.
+        """
+        start = int(sk.activation_epoch)
+        end = start + int(sk.num_active_epochs)
+        return range(start, end)
+
+    def get_prepared_interval(self, sk: SecretKey) -> range:
+        """
+        Returns the epoch range currently prepared (covered by loaded bottom trees).
+
+        With top-bottom tree traversal, a secret key maintains a sliding window of
+        two consecutive bottom trees. This method returns the range of epochs that
+        can be signed with the currently loaded trees, without needing to compute
+        additional bottom trees.
+
+        The prepared interval is:
+        `[left_bottom_tree_index * sqrt(LIFETIME), (left_bottom_tree_index + 2) * sqrt(LIFETIME))`
+
+        Args:
+            sk: The secret key to query.
+
+        Returns:
+            A Python range object representing the prepared epoch range.
+
+        Raises:
+            ValueError: If the secret key is missing top-bottom tree structures.
+        """
+        if sk.left_bottom_tree_index is None:
+            raise ValueError("Secret key missing top-bottom tree structures")
+
+        leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
+        start = sk.left_bottom_tree_index * leafs_per_bottom_tree
+        end = start + (2 * leafs_per_bottom_tree)
+        return range(start, end)
+
+    def advance_preparation(self, sk: SecretKey) -> None:
+        """
+        Advances the prepared interval by computing the next bottom tree.
+
+        This method implements the "sliding window" strategy for top-bottom tree
+        traversal. It:
+        1. Computes a new bottom tree for the next interval
+        2. Shifts the current right tree to become the new left tree
+        3. The newly computed tree becomes the new right tree
+        4. Increments `left_bottom_tree_index`
+
+        After this operation, the prepared interval moves forward by `sqrt(LIFETIME)` epochs.
+
+        **When to call**: Call this method after signing with an epoch that is in the
+        right half of the prepared interval, to ensure the next epoch range is ready.
+
+        Args:
+            sk: The secret key to advance. This object is modified in place.
+
+        Raises:
+            ValueError: If the secret key is missing top-bottom tree structures
+            or if advancing would exceed the activation interval.
+        """
+        if sk.left_bottom_tree_index is None:
+            raise ValueError("Secret key missing top-bottom tree structures")
+
+        if sk.left_bottom_tree is None or sk.right_bottom_tree is None:
+            raise ValueError("Secret key missing bottom tree data")
+
+        leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
+
+        # Check if advancing would exceed the activation interval
+        next_prepared_end_epoch = (
+            sk.left_bottom_tree_index * leafs_per_bottom_tree + 3 * leafs_per_bottom_tree
+        )
+        activation_interval = self.get_activation_interval(sk)
+        if next_prepared_end_epoch > activation_interval.stop:
+            # Nothing to do - we're already at the end of the activation interval
+            return
+
+        # Compute the next bottom tree (the one after the current right tree)
+        new_right_tree_index = sk.left_bottom_tree_index + 2
+        new_right_bottom_tree = bottom_tree_from_prf_key(
+            prf=self.prf,
+            hasher=self.hasher,
+            merkle_tree=self.merkle_tree,
+            config=self.config,
+            prf_key=sk.prf_key,
+            bottom_tree_index=new_right_tree_index,
+            parameter=sk.parameter,
+        )
+
+        # Slide the window:
+        # - current right becomes new left,
+        # - new tree becomes new right
+        sk.left_bottom_tree = sk.right_bottom_tree
+        sk.right_bottom_tree = new_right_bottom_tree
+        sk.left_bottom_tree_index += 1
 
 
 PROD_SIGNATURE_SCHEME = GeneralizedXmssScheme(

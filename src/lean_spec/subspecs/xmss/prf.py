@@ -51,6 +51,23 @@ This prevents any potential conflicts if the same underlying hash function
 (SHAKE128) were used for other purposes in the system.
 """
 
+PRF_DOMAIN_SEP_DOMAIN_ELEMENT: bytes = bytes([0x00])
+"""
+A 1-byte domain separator for deriving domain elements (used in `apply`).
+
+This distinguishes the PRF calls for generating hash chain starting points
+from the PRF calls for generating randomness during signing.
+"""
+
+PRF_DOMAIN_SEP_RANDOMNESS: bytes = bytes([0x01])
+"""
+A 1-byte domain separator for deriving randomness (used in `get_randomness`).
+
+This distinguishes the PRF calls for generating signing randomness from the
+PRF calls for generating domain elements, preventing any potential collisions
+between the two use cases.
+"""
+
 PRF_BYTES_PER_FE: int = 8
 """
 The number of bytes of SHAKE128 output used to generate one field element.
@@ -89,10 +106,12 @@ class Prf:
 
         The function constructs a unique input for the underlying SHAKE128 function
         by concatenating several components:
-        `SHAKE128(DOMAIN_SEP || key || epoch || chain_index)`
+        `SHAKE128(DOMAIN_SEP || 0x00 || key || epoch || chain_index)`
 
-        The arbitrary-length output of SHAKE128 is then processed to produce a
-        list of field elements, which serves as the secret starting digest for one chain.
+        The 0x00 byte distinguishes this use case (deriving domain elements) from
+        randomness generation (which uses 0x01). The arbitrary-length output of
+        SHAKE128 is then processed to produce a list of field elements, which
+        serves as the secret starting digest for one chain.
 
         Args:
             key: The secret master PRF key.
@@ -109,11 +128,16 @@ class Prf:
         # Construct the unique input for the PRF by concatenating its components:
         #
         # - Domain Separation: Uniquely tag the PRF for this specific use case.
+        # - Domain Element Tag: 0x00 byte to distinguish from randomness generation.
         # - Key Input: The master secret key.
         # - Epoch: A 4-byte integer ensuring every epoch derives a different set of secrets.
         # - Chain Index: An 8-byte integer ensuring each parallel hash chain gets a unique secret.
         input_data = (
-            PRF_DOMAIN_SEP + key + int(epoch).to_bytes(4, "big") + chain_index.to_bytes(8, "big")
+            PRF_DOMAIN_SEP
+            + PRF_DOMAIN_SEP_DOMAIN_ELEMENT
+            + key
+            + int(epoch).to_bytes(4, "big")
+            + chain_index.to_bytes(8, "big")
         )
 
         # Determine the total number of bytes to extract from the SHAKE output.
@@ -136,6 +160,71 @@ class Prf:
                 )
             )
             for i in range(config.HASH_LEN_FE)
+        ]
+
+    def get_randomness(
+        self, key: PRFKey, epoch: Uint64, message: bytes, counter: Uint64
+    ) -> List[Fp]:
+        """
+        Derives pseudorandom field elements for use in deterministic signing.
+
+        This method is used to generate deterministic randomness for the Information
+        Encoding step during signing. By deriving randomness from the PRF key, epoch,
+        message, and attempt counter, we ensure that signing is deterministic: calling
+        `sign` twice with the same (sk, epoch, message) triple produces the same signature.
+
+        This provides additional hardening against implementation errors where sign might
+        be called multiple times with the same epoch. However, calling sign with the same
+        epoch but *different* messages still compromises security.
+
+        ### Construction
+
+        Similar to `apply`, but includes the message and a counter in the input:
+        `SHAKE128(DOMAIN_SEP || 0x01 || key || epoch || message || counter)`
+
+        The 0x01 byte distinguishes this use case (generating randomness) from
+        domain element derivation (which uses 0x00).
+
+        Args:
+            key: The secret master PRF key.
+            epoch: The epoch number for this signature.
+            message: The message being signed (MESSAGE_LENGTH bytes).
+            counter: The attempt number (used when retrying encoding).
+
+        Returns:
+            A list of field elements to use as randomness for encoding (i.e., `rho`).
+        """
+        config = self.config
+
+        # Validate message length
+        if len(message) != config.MESSAGE_LENGTH:
+            raise ValueError(
+                f"Message must be exactly {config.MESSAGE_LENGTH} bytes, got {len(message)}"
+            )
+
+        # Construct input: DOMAIN_SEP || 0x01 || key || epoch || message || counter
+        input_data = (
+            PRF_DOMAIN_SEP
+            + PRF_DOMAIN_SEP_RANDOMNESS
+            + key
+            + int(epoch).to_bytes(4, "big")
+            + message
+            + int(counter).to_bytes(8, "big")
+        )
+
+        # Extract enough bytes for RAND_LEN_FE field elements
+        num_bytes_to_read = PRF_BYTES_PER_FE * config.RAND_LEN_FE
+        prf_output_bytes = hashlib.shake_128(input_data).digest(num_bytes_to_read)
+
+        # Convert to field elements
+        return [
+            Fp(
+                value=int.from_bytes(
+                    prf_output_bytes[i * PRF_BYTES_PER_FE : (i + 1) * PRF_BYTES_PER_FE],
+                    "big",
+                )
+            )
+            for i in range(config.RAND_LEN_FE)
         ]
 
 
