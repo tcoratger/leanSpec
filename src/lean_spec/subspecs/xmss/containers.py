@@ -12,6 +12,7 @@ from .constants import PRF_KEY_LENGTH
 
 if TYPE_CHECKING:
     from .constants import XmssConfig
+    from .subtree import HashSubTree
 
 PRFKey = Annotated[bytes, Field(min_length=PRF_KEY_LENGTH, max_length=PRF_KEY_LENGTH)]
 """
@@ -125,65 +126,6 @@ class HashTree(StrictBaseModel):
     """
     A list of `HashTreeLayer` objects, from the leaf hashes
     (layer 0) up to the layer just below the root.
-    """
-
-
-class HashSubTree(StrictBaseModel):
-    """
-    Represents a subtree of a sparse Merkle tree.
-
-    This is the building block for the top-bottom tree traversal approach,
-    which splits a large Merkle tree into:
-    - **One top tree**: Contains the root and the top `LOG_LIFETIME/2` layers
-    - **Multiple bottom trees**: Each contains `sqrt(LIFETIME)` leaves
-
-    A subtree can represent either a complete tree (from layer 0) or a partial tree
-    starting from a higher layer (like a top tree starting from layer `LOG_LIFETIME/2`).
-
-    The layers are stored from `lowest_layer` up to the root, with padding applied
-    to ensure even alignment for efficient parent computation.
-
-    Memory Efficiency
-    -----------------
-    For a key with lifetime 2^32:
-    - Traditional approach: O(2^32) = requires hundreds of GiB
-    - Top-bottom approach: O(sqrt(2^32)) = O(2^16) ≈ 6-8 MB
-
-    The secret key maintains:
-    - The full top tree (sparse, only active roots)
-    - Two consecutive bottom trees (sliding window)
-    """
-
-    depth: int
-    """
-    The total depth of the full tree (e.g., 32 for a 2^32 leaf space).
-
-    This represents the depth of the complete Merkle tree, not just this subtree.
-    A subtree starting from layer `k` will have `depth - k` layers stored.
-    """
-
-    lowest_layer: int
-    """
-    The lowest layer included in this subtree.
-
-    - For bottom trees: `lowest_layer = 0` (includes leaves)
-    - For top trees: `lowest_layer = LOG_LIFETIME/2` (starts from middle)
-
-    Example: For LOG_LIFETIME=32, top tree has lowest_layer=16, containing
-    layers 16 through 32 (the root).
-    """
-
-    layers: List[HashTreeLayer]
-    """
-    The layers of this subtree, from `lowest_layer` to the root.
-
-    - `layers[0]` corresponds to layer `lowest_layer` in the full tree
-    - `layers[-1]` corresponds to the highest layer in this subtree
-    - For bottom trees: the last layer contains a single root
-    - For top trees: the last layer contains the global root
-
-    Each layer maintains the padding invariant: start index is even,
-    end index is odd (except for single-node layers).
     """
 
 
@@ -488,3 +430,11 @@ class SecretKey(StrictBaseModel):
     Together with `left_bottom_tree`, this provides a prepared interval of
     exactly `2 * sqrt(LIFETIME)` consecutive epochs.
     """
+
+
+# Import HashSubTree at the end to avoid circular import issues
+# (subtree.py imports from containers.py, so we import after all types are defined)
+from .subtree import HashSubTree  # noqa: E402, F811
+
+# Re-export for backward compatibility
+__all__ = ["HashSubTree"]

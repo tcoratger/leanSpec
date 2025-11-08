@@ -168,8 +168,8 @@ class GeneralizedXmssScheme:
 
         # Collect roots for building the top tree.
         bottom_tree_roots: List[HashDigest] = [
-            self.merkle_tree.subtree_root(left_bottom_tree),
-            self.merkle_tree.subtree_root(right_bottom_tree),
+            left_bottom_tree.root(),
+            right_bottom_tree.root(),
         ]
 
         # Step 3: Generate remaining bottom trees (only their roots).
@@ -183,11 +183,15 @@ class GeneralizedXmssScheme:
                 i,
                 parameter,
             )
-            root = self.merkle_tree.subtree_root(tree)
+            root = tree.root()
             bottom_tree_roots.append(root)
 
         # Step 4: Build the top tree from bottom tree roots.
-        top_tree = self.merkle_tree.new_top_tree(
+        from .subtree import HashSubTree
+
+        top_tree = HashSubTree.new_top_tree(
+            hasher=self.hasher,
+            rand=self.rand,
             depth=config.LOG_LIFETIME,
             start_bottom_tree_index=start_bottom_tree_index,
             parameter=parameter,
@@ -195,7 +199,7 @@ class GeneralizedXmssScheme:
         )
 
         # Extract the global root.
-        root = self.merkle_tree.subtree_root(top_tree)
+        root = top_tree.root()
 
         # Assemble and return the keys.
         pk = PublicKey(root=root, parameter=parameter)
@@ -360,7 +364,9 @@ class GeneralizedXmssScheme:
             )
 
         # Generate the combined authentication path
-        path = self.merkle_tree.combined_path(sk.top_tree, bottom_tree, epoch)
+        from .subtree import combined_path
+
+        path = combined_path(sk.top_tree, bottom_tree, epoch)
 
         # Assemble and return the final signature, which contains:
         # - The OTS,

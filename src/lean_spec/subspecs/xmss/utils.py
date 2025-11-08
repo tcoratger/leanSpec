@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING, List
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .containers import HashDigest, HashSubTree, Parameter, Randomness
+from .containers import HashDigest, Parameter, Randomness
 
 if TYPE_CHECKING:
     from .merkle_tree import MerkleTree
     from .prf import Prf
+    from .subtree import HashSubTree
     from .tweak_hash import TweakHasher
 
 
@@ -158,7 +159,7 @@ def bottom_tree_from_prf_key(
     prf_key: bytes,
     bottom_tree_index: int,
     parameter: List[Fp],
-) -> HashSubTree:
+) -> "HashSubTree":
     """
     Generates a single bottom tree on-demand from the PRF key.
 
@@ -228,7 +229,11 @@ def bottom_tree_from_prf_key(
         leaf_hashes.append(leaf_hash)
 
     # Build the bottom tree from the leaf hashes.
-    return merkle_tree.new_bottom_tree(
+    from .subtree import HashSubTree
+
+    return HashSubTree.new_bottom_tree(
+        hasher=hasher,
+        rand=merkle_tree.rand,
         depth=config.LOG_LIFETIME,
         bottom_tree_index=bottom_tree_index,
         parameter=parameter,
