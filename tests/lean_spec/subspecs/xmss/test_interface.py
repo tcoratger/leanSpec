@@ -113,8 +113,9 @@ def test_get_prepared_interval() -> None:
 def test_advance_preparation() -> None:
     """Tests that advance_preparation correctly slides the window."""
     scheme = TEST_SIGNATURE_SCHEME
-    # Use full lifetime (16 epochs) to ensure room to advance
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
+    # Request 3 bottom trees' worth of epochs to ensure room to advance
+    leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(3 * leafs_per_bottom_tree))
 
     # Get initial prepared interval
     initial_interval = scheme.get_prepared_interval(sk)
@@ -141,8 +142,9 @@ def test_advance_preparation() -> None:
 def test_sign_requires_prepared_interval() -> None:
     """Tests that sign raises an error if epoch is outside prepared interval."""
     scheme = TEST_SIGNATURE_SCHEME
-    # Use full lifetime to have room for testing
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
+    # Request 3 bottom trees' worth of epochs to have room for testing
+    leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(3 * leafs_per_bottom_tree))
 
     # Get the prepared interval
     prepared_interval = scheme.get_prepared_interval(sk)
