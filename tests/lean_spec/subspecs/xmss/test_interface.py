@@ -61,11 +61,11 @@ def _test_correctness_roundtrip(
     "activation_epoch, num_active_epochs",
     [
         pytest.param(
-            10, 4, id="Standard case with a short, active lifetime", marks=pytest.mark.slow
+            4, 4, id="Standard case with a short, active lifetime", marks=pytest.mark.slow
         ),
         pytest.param(0, 8, id="Lifetime starting at epoch 0", marks=pytest.mark.slow),
         pytest.param(7, 5, id="Lifetime starting at an odd-numbered epoch", marks=pytest.mark.slow),
-        pytest.param(20, 1, id="Lifetime with only a single active epoch"),
+        pytest.param(12, 1, id="Lifetime with only a single active epoch"),
     ],
 )
 def test_signature_scheme_correctness(activation_epoch: int, num_active_epochs: int) -> None:
