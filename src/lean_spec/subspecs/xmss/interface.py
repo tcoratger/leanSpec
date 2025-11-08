@@ -17,12 +17,13 @@ from lean_spec.subspecs.xmss.target_sum import (
 )
 from lean_spec.types.uint import Uint64
 
+from ..koalabear import Fp
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
     XmssConfig,
 )
-from .containers import HashDigest, PublicKey, SecretKey, Signature
+from .containers import HashDigest, HashSubTree, PublicKey, SecretKey, Signature
 from .merkle_tree import (
     PROD_MERKLE_TREE,
     TEST_MERKLE_TREE,
@@ -36,6 +37,172 @@ from .tweak_hash import (
     TweakHasher,
 )
 from .utils import PROD_RAND, TEST_RAND, Rand
+
+
+def _expand_activation_time(
+    log_lifetime: int, desired_activation_epoch: int, desired_num_active_epochs: int
+) -> tuple[int, int]:
+    """
+    Expands and aligns the activation time to top-bottom tree boundaries.
+
+    For efficient top-bottom tree traversal, activation intervals must be aligned to
+    `sqrt(LIFETIME)` boundaries. This function takes the user's desired activation
+    interval and expands it to meet the following requirements:
+
+    1.  **Start alignment**: Start epoch is rounded down to a multiple of `sqrt(LIFETIME)`
+    2.  **End alignment**: End epoch is rounded up to a multiple of `sqrt(LIFETIME)`
+    3.  **Minimum duration**: At least `2 * sqrt(LIFETIME)` epochs (two bottom trees)
+    4.  **Lifetime bounds**: Clamped to `[0, LIFETIME)`
+
+    ### Algorithm
+
+    Let `C = 2^(LOG_LIFETIME/2) = sqrt(LIFETIME)`
+
+    1.  Align start downward: `start = desired_start & c_mask` where `c_mask = ~(C - 1)`
+    2.  Round end upward: `end = (desired_end + C - 1) & c_mask`
+    3.  Enforce minimum: `if end - start < 2*C: end = start + 2*C`
+    4.  Clamp to bounds: Adjust if end exceeds `C^2 = LIFETIME`
+
+    ### Example
+
+    For `LOG_LIFETIME = 32` (LIFETIME = 2^32, C = 2^16 = 65536):
+    - Request: epochs [10000, 80000) → 70000 epochs
+    - Aligned: epochs [0, 131072) → 131072 epochs = 2 bottom trees
+
+    Args:
+        log_lifetime: The logarithm (base 2) of the total lifetime.
+        desired_activation_epoch: The user's requested first epoch.
+        desired_num_active_epochs: The user's requested number of epochs.
+
+    Returns:
+        A tuple `(start_bottom_tree_index, end_bottom_tree_index)` where:
+        - `start_bottom_tree_index`: Index of the first bottom tree (0, 1, 2, ...)
+        - `end_bottom_tree_index`: Index past the last bottom tree (exclusive)
+        - Actual epochs: `[start_index * C, end_index * C)`
+    """
+    # Calculate sqrt(LIFETIME) and the alignment mask.
+    c = 1 << (log_lifetime // 2)  # C = 2^(LOG_LIFETIME/2)
+    c_mask = ~(c - 1)  # Mask for rounding to multiples of C
+
+    # Calculate the desired end epoch.
+    desired_end_epoch = desired_activation_epoch + desired_num_active_epochs
+
+    # Step 1: Align start downward to a multiple of C.
+    start = desired_activation_epoch & c_mask
+
+    # Step 2: Round end upward to a multiple of C.
+    end = (desired_end_epoch + c - 1) & c_mask
+
+    # Step 3: Enforce minimum duration of 2*C.
+    if end - start < 2 * c:
+        end = start + 2 * c
+
+    # Step 4: Clamp to lifetime bounds [0, C^2).
+    lifetime = c * c  # LIFETIME = C^2 = 2^LOG_LIFETIME
+    if end > lifetime:
+        # If the expanded interval exceeds the lifetime, try to fit it at the end.
+        duration = end - start
+
+        if duration > lifetime:
+            # The expanded interval is larger than the entire lifetime.
+            # Use the entire lifetime.
+            start = 0
+            end = lifetime
+        else:
+            # Shift the interval to end at the lifetime boundary.
+            end = lifetime
+            start = (lifetime - duration) & c_mask  # Keep alignment
+
+    # Convert to bottom tree indices.
+    # Bottom tree i covers epochs [i*C, (i+1)*C).
+    start_bottom_tree_index = start // c
+    end_bottom_tree_index = end // c
+
+    return (start_bottom_tree_index, end_bottom_tree_index)
+
+
+def _bottom_tree_from_prf_key(
+    prf: Prf,
+    hasher: TweakHasher,
+    merkle_tree: MerkleTree,
+    config: XmssConfig,
+    prf_key: bytes,
+    bottom_tree_index: int,
+    parameter: List[Fp],
+) -> HashSubTree:
+    """
+    Generates a single bottom tree on-demand from the PRF key.
+
+    This is a key component of the top-bottom tree approach: instead of storing all
+    one-time secret keys, we regenerate them on-demand using the PRF. This enables
+    O(sqrt(LIFETIME)) memory usage.
+
+    ### Algorithm
+
+    1.  **Determine epoch range**: Bottom tree `i` covers epochs
+        `[i * sqrt(LIFETIME), (i+1) * sqrt(LIFETIME))`
+
+    2.  **Generate leaves**: For each epoch in parallel:
+        - For each chain (0 to DIMENSION-1):
+          - Derive secret start: `PRF(prf_key, epoch, chain_index)`
+          - Compute public end: hash chain for `BASE - 1` steps
+        - Hash all chain ends to get the leaf
+
+    3.  **Build bottom tree**: Construct the bottom tree from the leaves
+
+    Args:
+        prf: The PRF instance for key derivation.
+        hasher: The tweakable hash instance.
+        merkle_tree: The Merkle tree instance for tree construction.
+        config: The XMSS configuration.
+        prf_key: The master PRF secret key.
+        bottom_tree_index: The index of the bottom tree to generate (0, 1, 2, ...).
+        parameter: The public parameter `P` for the hash function.
+
+    Returns:
+        A `HashSubTree` representing the requested bottom tree.
+    """
+    # Calculate the number of leaves per bottom tree: sqrt(LIFETIME).
+    leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
+
+    # Determine the epoch range for this bottom tree.
+    start_epoch = bottom_tree_index * leafs_per_bottom_tree
+    end_epoch = start_epoch + leafs_per_bottom_tree
+
+    # Generate leaf hashes for all epochs in this bottom tree.
+    leaf_hashes: List[HashDigest] = []
+
+    for epoch in range(start_epoch, end_epoch):
+        # For each epoch, compute the one-time public key (chain endpoints).
+        chain_ends: List[HashDigest] = []
+
+        for chain_index in range(config.DIMENSION):
+            # Derive the secret start of the chain from the PRF key.
+            start_digest = prf.apply(prf_key, Uint64(epoch), Uint64(chain_index))
+
+            # Compute the public end by hashing BASE - 1 times.
+            end_digest = hasher.hash_chain(
+                parameter=parameter,
+                epoch=Uint64(epoch),
+                chain_index=chain_index,
+                start_step=0,
+                num_steps=config.BASE - 1,
+                start_digest=start_digest,
+            )
+            chain_ends.append(end_digest)
+
+        # Hash the chain ends to get the leaf for this epoch.
+        leaf_tweak = TreeTweak(level=0, index=epoch)
+        leaf_hash = hasher.apply(parameter, leaf_tweak, chain_ends)
+        leaf_hashes.append(leaf_hash)
+
+    # Build the bottom tree from the leaf hashes.
+    return merkle_tree.new_bottom_tree(
+        depth=config.LOG_LIFETIME,
+        bottom_tree_index=bottom_tree_index,
+        parameter=parameter,
+        leaves=leaf_hashes,
+    )
 
 
 class GeneralizedXmssScheme:
@@ -64,33 +231,52 @@ class GeneralizedXmssScheme:
         """
         Generates a new cryptographic key pair for a specified range of epochs.
 
-        This is a **randomized** algorithm that establishes a signer's identity.
-        The generated secret key is stateful and tied to the progression of epochs.
+        This is a **randomized** algorithm that establishes a signer's identity using
+        the memory-efficient Top-Bottom Tree Traversal approach.
 
         ### Key Generation Algorithm
 
-        1.  **Master Secrets**: A master secret (the PRF key) and a public hash
-            parameter (`P`) are randomly generated. The PRF key allows for the
-            deterministic derivation of one-time secrets for each epoch.
+        1.  **Expand Activation Time**: Align the requested activation interval to
+            `sqrt(LIFETIME)` boundaries to enable efficient tree partitioning.
+            This ensures the interval starts at a multiple of `sqrt(LIFETIME)` and
+            has a minimum duration of `2 * sqrt(LIFETIME)` epochs.
 
-        2.  **Hash Chains**: For each epoch in the key's active lifetime, the algorithm
-            derives the secret starting points for all `DIMENSION` hash chains using the PRF.
-            It then computes the public endpoint of each chain by hashing it `BASE - 1` times.
+        2.  **Generate Master Secrets**: Generate PRF key and public parameter `P`.
+            The PRF key allows deterministic on-demand regeneration of one-time keys.
 
-        3.  **One-Time Public Keys**: The collection of all chain endpoints for a given
-            epoch constitutes that epoch's one-time public key.
+        3.  **Generate First Two Bottom Trees**: Create the first two bottom trees
+            (covering the initial `2 * sqrt(LIFETIME)` epochs) and keep them in memory.
+            Each bottom tree covers `sqrt(LIFETIME)` consecutive epochs.
 
-        4.  **Merkle Tree Construction**: Each one-time public key is hashed to form a
-            single Merkle leaf. A Merkle tree is then constructed over all the leaves
-            for the active epochs. The root of this tree serves as the single, compact
-            public commitment for the entire key lifetime.
+        4.  **Generate Remaining Bottom Tree Roots**: For all other bottom trees in
+            the range, generate only their roots (not the full trees). This saves
+            memory since we only need the first two trees for the prepared window.
+
+        5.  **Build Top Tree**: Construct the top tree from all bottom tree roots.
+            The top tree's lowest layer contains the bottom tree roots, and it is
+            built upward to the global Merkle root.
+
+        ### Memory Efficiency
+
+        Traditional approach: O(LIFETIME) memory
+        Top-Bottom approach: O(sqrt(LIFETIME)) memory
+
+        For LOG_LIFETIME=32 (2^32 epochs):
+        - Traditional: ~hundreds of GiB
+        - Top-Bottom: ~6-8 MB
 
         Args:
             activation_epoch: The starting epoch for which this key is valid.
+                             Will be aligned downward to `sqrt(LIFETIME)` boundary.
             num_active_epochs: The number of consecutive epochs the key can be used for.
+                              Will be rounded up to at least `2 * sqrt(LIFETIME)`.
 
         Returns:
             A tuple containing the `PublicKey` and `SecretKey`.
+
+        Note:
+            The actual activation epoch and num_active_epochs in the returned SecretKey
+            may be larger than requested due to alignment requirements.
 
         For the formal specification of this process, please refer to:
         - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
@@ -110,51 +296,80 @@ class GeneralizedXmssScheme:
         parameter = self.rand.parameter()
         prf_key = self.prf.key_gen()
 
-        # Iterate through each epoch to generate its corresponding Merkle leaf.
-        # Note: range() requires int, so we convert only for the loop
-        leaf_hashes: List[HashDigest] = []
-        for epoch in range(int(activation_epoch), int(activation_epoch + num_active_epochs)):
-            # For each epoch, compute the one-time public key, which consists
-            # of the public endpoints of `DIMENSION` independent hash chains.
-            chain_ends: List[HashDigest] = []
-            for chain_index in range(config.DIMENSION):
-                # Derive the secret start of the chain from the master PRF key.
-                #
-                # This ensures each chain is unique and cryptographically secure.
-                start_digest = self.prf.apply(prf_key, Uint64(epoch), Uint64(chain_index))
+        # Step 1: Expand and align activation time to sqrt(LIFETIME) boundaries.
+        start_bottom_tree_index, end_bottom_tree_index = _expand_activation_time(
+            config.LOG_LIFETIME, int(activation_epoch), int(num_active_epochs)
+        )
 
-                # Compute the public end of the chain by applying the hash function
-                # `BASE - 1` times. This is the public part of the one-time key.
-                end_digest = self.hasher.hash_chain(
-                    parameter=parameter,
-                    epoch=Uint64(epoch),
-                    chain_index=chain_index,
-                    start_step=0,
-                    num_steps=config.BASE - 1,
-                    start_digest=start_digest,
-                )
-                chain_ends.append(end_digest)
+        num_bottom_trees = end_bottom_tree_index - start_bottom_tree_index
+        leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
 
-            # The Merkle leaf for this epoch is the hash of its one-time public key.
-            #
-            # A unique tweak is used to domain-separate this hash from other hashes in the scheme.
-            leaf_tweak = TreeTweak(level=0, index=epoch)
-            leaf_hash = self.hasher.apply(parameter, leaf_tweak, chain_ends)
-            leaf_hashes.append(leaf_hash)
+        # Calculate the actual (expanded) activation epoch and count.
+        actual_activation_epoch = start_bottom_tree_index * leafs_per_bottom_tree
+        actual_num_active_epochs = num_bottom_trees * leafs_per_bottom_tree
 
-        # Build the Merkle tree over the list of all generated leaf hashes.
-        tree = self.merkle_tree.build(config.LOG_LIFETIME, activation_epoch, parameter, leaf_hashes)
-        # The root of the tree is the primary component of the public key.
-        root = self.merkle_tree.root(tree)
+        # Step 2: Generate the first two bottom trees (kept in memory).
+        left_bottom_tree = _bottom_tree_from_prf_key(
+            self.prf,
+            self.hasher,
+            self.merkle_tree,
+            config,
+            prf_key,
+            start_bottom_tree_index,
+            parameter,
+        )
+        right_bottom_tree = _bottom_tree_from_prf_key(
+            self.prf,
+            self.hasher,
+            self.merkle_tree,
+            config,
+            prf_key,
+            start_bottom_tree_index + 1,
+            parameter,
+        )
 
-        # Assemble and return the public and secret keys.
+        # Collect roots for building the top tree.
+        bottom_tree_roots: List[HashDigest] = [
+            self.merkle_tree.subtree_root(left_bottom_tree),
+            self.merkle_tree.subtree_root(right_bottom_tree),
+        ]
+
+        # Step 3: Generate remaining bottom trees (only their roots).
+        for i in range(start_bottom_tree_index + 2, end_bottom_tree_index):
+            tree = _bottom_tree_from_prf_key(
+                self.prf,
+                self.hasher,
+                self.merkle_tree,
+                config,
+                prf_key,
+                i,
+                parameter,
+            )
+            root = self.merkle_tree.subtree_root(tree)
+            bottom_tree_roots.append(root)
+
+        # Step 4: Build the top tree from bottom tree roots.
+        top_tree = self.merkle_tree.new_top_tree(
+            depth=config.LOG_LIFETIME,
+            start_bottom_tree_index=start_bottom_tree_index,
+            parameter=parameter,
+            bottom_tree_roots=bottom_tree_roots,
+        )
+
+        # Extract the global root.
+        root = self.merkle_tree.subtree_root(top_tree)
+
+        # Assemble and return the keys.
         pk = PublicKey(root=root, parameter=parameter)
         sk = SecretKey(
             prf_key=prf_key,
-            tree=tree,
             parameter=parameter,
-            activation_epoch=activation_epoch,
-            num_active_epochs=num_active_epochs,
+            activation_epoch=actual_activation_epoch,
+            num_active_epochs=actual_num_active_epochs,
+            top_tree=top_tree,
+            left_bottom_tree_index=start_bottom_tree_index,
+            left_bottom_tree=left_bottom_tree,
+            right_bottom_tree=right_bottom_tree,
         )
         return pk, sk
 
@@ -257,7 +472,37 @@ class GeneralizedXmssScheme:
             ots_hashes.append(ots_digest)
 
         # Retrieve the Merkle authentication path for the current epoch's leaf.
-        path = self.merkle_tree.path(sk.tree, epoch)
+        # With top-bottom tree traversal, we use combined_path to merge paths from
+        # the bottom tree and top tree.
+
+        # Ensure we have the required top-bottom tree structures.
+        if sk.top_tree is None or sk.left_bottom_tree_index is None:
+            raise ValueError(
+                "Secret key is missing top-bottom tree structures. "
+                "This may be a legacy key format that is no longer supported."
+            )
+
+        # Determine which bottom tree contains this epoch.
+        leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
+        boundary = (sk.left_bottom_tree_index + 1) * leafs_per_bottom_tree
+
+        if int(epoch) < boundary:
+            # Use left bottom tree
+            bottom_tree = sk.left_bottom_tree
+        else:
+            # Use right bottom tree
+            bottom_tree = sk.right_bottom_tree
+
+        # Ensure bottom tree exists
+        if bottom_tree is None:
+            raise ValueError(
+                f"Epoch {epoch} requires bottom tree but it is not available. "
+                f"Prepared interval may have been exceeded. Call advance_preparation() "
+                f"to slide the window forward."
+            )
+
+        # Generate the combined authentication path
+        path = self.merkle_tree.combined_path(sk.top_tree, bottom_tree, epoch)
 
         # Assemble and return the final signature, which contains:
         # - The OTS,
