@@ -218,6 +218,10 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Register genesis/anchor block with implicit label
         self._block_registry: dict[str, Block] = {"genesis": self.anchor_block}
 
+        # Track which validators have proposed blocks at each slot
+        # This prevents the same validator from proposing competing forks
+        slot_proposers: dict[Slot, set[ValidatorIndex]] = {}
+
         # Process each step (immutable pattern: store = store.method())
         for i, step in enumerate(self.steps):
             try:
@@ -234,6 +238,23 @@ class ForkChoiceTest(BaseConsensusFixture):
                     # Store the filled Block for serialization
                     block = signed_block.message.block
                     step._filled_block = block
+
+                    # Validate that the same validator doesn't propose competing blocks
+                    # at the same slot
+                    if block.slot not in slot_proposers:
+                        slot_proposers[block.slot] = set()
+
+                    if block.proposer_index in slot_proposers[block.slot]:
+                        raise ValueError(
+                            f"Step {i}: Validator {block.proposer_index} is proposing multiple "
+                            f"blocks at slot {block.slot}. This creates competing forks from "
+                            f"the same validator, which is invalid.\n"
+                            f"Solution: Either add more validators to the test or explicitly "
+                            f"assign different proposer_index values to competing blocks at "
+                            f"the same slot."
+                        )
+
+                    slot_proposers[block.slot].add(block.proposer_index)
 
                     # Register block if it has a label
                     if step.block.label is not None:
