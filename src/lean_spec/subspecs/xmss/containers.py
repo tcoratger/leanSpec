@@ -430,11 +430,3 @@ class SecretKey(StrictBaseModel):
     Together with `left_bottom_tree`, this provides a prepared interval of
     exactly `2 * sqrt(LIFETIME)` consecutive epochs.
     """
-
-
-# Import HashSubTree at the end to avoid circular import issues
-# (subtree.py imports from containers.py, so we import after all types are defined)
-from .subtree import HashSubTree  # noqa: E402, F811
-
-# Re-export for backward compatibility
-__all__ = ["HashSubTree"]

@@ -101,13 +101,13 @@ class GeneralizedXmssScheme:
 
         For LOG_LIFETIME=32 (2^32 epochs):
         - Traditional: ~hundreds of GiB
-        - Top-Bottom: ~6-8 MB
+        - Top-Bottom: much more reasonable
 
         Args:
             activation_epoch: The starting epoch for which this key is valid.
-                             Will be aligned downward to `sqrt(LIFETIME)` boundary.
+            - Will be aligned downward to `sqrt(LIFETIME)` boundary.
             num_active_epochs: The number of consecutive epochs the key can be used for.
-                              Will be rounded up to at least `2 * sqrt(LIFETIME)`.
+            - Will be rounded up to at least `2 * sqrt(LIFETIME)`.
 
         Returns:
             A tuple containing the `PublicKey` and `SecretKey`.
@@ -275,8 +275,7 @@ class GeneralizedXmssScheme:
         # With top-bottom tree traversal, only epochs within the prepared interval can be
         # signed without computing additional bottom trees.
         #
-        # If the epoch is outside this range, call `advance_preparation()`
-        # to slide the window forward.
+        # If the epoch is outside this range, we need to slide the window forward.
         prepared_interval = self.get_prepared_interval(sk)
         if int(epoch) not in prepared_interval:
             raise ValueError(

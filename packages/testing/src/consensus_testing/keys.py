@@ -131,7 +131,8 @@ class XmssKeyManager:
 
         # Lazy key retrieval: creates keys if first time seeing this validator.
         key_pair = self[validator_id]
-        sk = key_pair.secret  # Get the current secret key
+        # Get the current secret key
+        sk = key_pair.secret
 
         # Map the attestation slot to an XMSS epoch.
         #
