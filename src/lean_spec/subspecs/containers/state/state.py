@@ -336,7 +336,7 @@ class State(Container):
             if is_genesis_parent
             else self.latest_justified
         )
-        new_finalized = (
+        new_latest_finalized = (
             self.latest_finalized.model_copy(update={"root": parent_root})
             if is_genesis_parent
             else self.latest_finalized
