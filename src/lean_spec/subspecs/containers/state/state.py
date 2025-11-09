@@ -373,8 +373,8 @@ class State(Container):
         # Return the state with all header updates applied in one go.
         return self.model_copy(
             update={
-                "latest_justified": new_justified,
-                "latest_finalized": new_finalized,
+                "latest_justified": new_latest_justified,
+                "latest_finalized": new_latest_finalized,
                 "historical_block_hashes": self.historical_block_hashes.__class__(
                     data=new_historical_hashes_data
                 ),
