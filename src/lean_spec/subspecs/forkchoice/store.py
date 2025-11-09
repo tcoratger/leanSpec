@@ -262,42 +262,6 @@ class Store(Container):
             }
         )
 
-    def _process_block_body_attestations(
-        self, block: Block, signatures: BlockSignatures
-    ) -> "Store":
-        """
-        Process on-chain attestations from block body.
-
-        These are historical attestations from other validators that the proposer
-        chose to include. They are processed as on-chain (`is_from_block=True`)
-        and immediately added to known attestations.
-
-        Args:
-            block: The block containing attestations.
-            signatures: Signature list matching block attestations.
-
-        Returns:
-            New Store with attestations processed.
-
-        Note:
-            Future implementation may use aggregated signatures where a single
-            signature covers multiple attestations.
-        """
-        store = self
-        for index, attestation in enumerate(block.body.attestations):
-            # Extract signature at same index as attestation
-            signature = signatures[index]
-
-            signed_attestation = SignedAttestation(
-                message=attestation,
-                signature=signature,
-            )
-
-            # Process as on-chain attestation (immediately becomes "known")
-            store = store.on_attestation(signed_attestation, is_from_block=True)
-
-        return store
-
     def _process_proposer_attestation(
         self,
         proposer_attestation: Attestation,
@@ -419,8 +383,8 @@ class Store(Container):
             }
         )
 
-        # Process attestations immutably (chain method calls)
-        store = store._process_block_body_attestations(block, signatures)
+        # Process block body attestations
+        store = signed_block_with_attestation.process_block_body_attestations(store)
 
         # Update forkchoice head based on new block and attestations
         #
