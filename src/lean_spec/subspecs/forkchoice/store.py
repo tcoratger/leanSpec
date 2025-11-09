@@ -384,9 +384,12 @@ class Store(Container):
         )
 
         # Process block body attestations
+        #
         # Iterate over attestations and their corresponding signatures.
         for attestation, signature in zip(
-            block.message.block.body.attestations, block.signature, strict=False
+            signed_block_with_attestation.message.block.body.attestations,
+            signed_block_with_attestation.signature,
+            strict=False,
         ):
             # Process as on-chain attestation (immediately becomes "known")
             store = store.on_attestation(

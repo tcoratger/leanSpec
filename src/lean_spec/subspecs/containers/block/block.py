@@ -16,11 +16,10 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.container import Container
 
-from ..attestation import Attestation, SignedAttestation
+from ..attestation import Attestation
 from .types import Attestations, BlockSignatures
 
 if TYPE_CHECKING:
-    from ...forkchoice.store import Store
     from ..state import State
 
 
@@ -183,36 +182,3 @@ class SignedBlockWithAttestation(Container):
             ), "Attestation signature verification failed"
 
         return True
-
-    def process_block_body_attestations(self, store: "Store") -> "Store":
-        """
-        Process on-chain attestations from block body.
-
-        These are historical attestations from other validators that the proposer
-        chose to include. They are processed as on-chain (`is_from_block=True`)
-        and immediately added to known attestations.
-
-        Args:
-            store: Fork choice store to update with attestations.
-
-        Returns:
-            New Store with attestations processed.
-
-        Note:
-            Future implementation may use aggregated signatures where a single
-            signature covers multiple attestations.
-        """
-        # Iterate over attestations and their corresponding signatures.
-        for attestation, signature in zip(
-            self.message.block.body.attestations, self.signature, strict=False
-        ):
-            # Process as on-chain attestation (immediately becomes "known")
-            store = store.on_attestation(
-                signed_attestation=SignedAttestation(
-                    message=attestation,
-                    signature=signature,
-                ),
-                is_from_block=True,
-            )
-
-        return store
