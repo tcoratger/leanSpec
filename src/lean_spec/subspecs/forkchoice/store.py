@@ -32,7 +32,7 @@ from lean_spec.subspecs.containers import (
     SignedBlockWithAttestation,
     State,
 )
-from lean_spec.subspecs.containers.block import Attestations, BlockSignatures
+from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import (
@@ -262,52 +262,6 @@ class Store(Container):
             }
         )
 
-    def _process_proposer_attestation(
-        self,
-        proposer_attestation: Attestation,
-        signatures: BlockSignatures,
-        block: Block,
-    ) -> "Store":
-        """
-        Process the proposer's attestation for their own block.
-
-        The proposer attestation is handled specially to prevent circular weight:
-
-        Timing
-        ------
-        - Cast during interval 1 (after block proposal in interval 0)
-        - Processed as gossip (`is_from_block=False`) to avoid circular weight
-        - Becomes "known" only in interval 3, after fork choice update
-        - Will be included in a future block by another proposer
-
-        Why This Matters
-        -----------------
-        The proposer should not gain unfair fork choice advantage by attesting
-        to their own block before it competes with alternatives. This separation
-        ensures the proposer's attestation doesn't create circular weight.
-
-        Args:
-            proposer_attestation: The proposer's attestation message.
-            signatures: Signature list from the signed block.
-            block: The block being processed (for index calculation).
-
-        Returns:
-            New Store with proposer attestation processed as gossip.
-        """
-        # Proposer signature is at the end of signature list
-        # (after all block body attestation signatures)
-        proposer_signature_index = len(block.body.attestations)
-        proposer_signature = signatures[proposer_signature_index]
-
-        signed_proposer_attestation = SignedAttestation(
-            message=proposer_attestation,
-            signature=proposer_signature,
-        )
-
-        # Process as gossip (not from block) so it enters "new" attestations
-        # and only influences fork choice after interval 3 acceptance
-        return self.on_attestation(signed_proposer_attestation, is_from_block=False)
-
     def on_block(self, signed_block_with_attestation: SignedBlockWithAttestation) -> "Store":
         """
         Process a new block and update the forkchoice state.
@@ -413,7 +367,13 @@ class Store(Container):
         # 1. NOT affect this block's fork choice position (processed as "new")
         # 2. Be available for inclusion in future blocks
         # 3. Influence fork choice only after interval 3 (end of slot)
-        store = store._process_proposer_attestation(proposer_attestation, signatures, block)
+        store = self.on_attestation(
+            signed_attestation=SignedAttestation(
+                message=proposer_attestation,
+                signature=signatures[len(block.body.attestations)],
+            ),
+            is_from_block=False,
+        )
 
         return store
 
