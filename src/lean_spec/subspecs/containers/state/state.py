@@ -331,7 +331,7 @@ class State(Container):
 
         # Special case: first block after genesis.
         is_genesis_parent = parent_header.slot == Slot(0)
-        new_justified = (
+        new_latest_justified = (
             self.latest_justified.model_copy(update={"root": parent_root})
             if is_genesis_parent
             else self.latest_justified
