@@ -6,7 +6,7 @@ recent blocks, and validator attestations. State also records which blocks are
 justified and finalized.
 """
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -311,61 +311,56 @@ class State(Container):
         AssertionError
             If any header check fails.
         """
+        # Validation
+        parent_header = self.latest_block_header
+        parent_root = hash_tree_root(parent_header)
+
         # The block must be for the current slot.
         assert block.slot == self.slot, "Block slot mismatch"
 
         # The block must be newer than the current latest header.
-        assert block.slot > self.latest_block_header.slot, "Block is older than latest header"
+        assert block.slot > parent_header.slot, "Block is older than latest header"
 
         # The proposer must be the expected validator for this slot.
         assert self.is_proposer(block.proposer_index), "Incorrect block proposer"
 
         # The declared parent must match the hash of the latest block header.
-        assert block.parent_root == hash_tree_root(self.latest_block_header), (
-            "Block parent root mismatch"
-        )
+        assert block.parent_root == parent_root, "Block parent root mismatch"
 
-        # Build a dictionary of field updates to apply in one copy operation.
-        updates: Dict[str, Any] = {}
-
-        # Cache the parent root locally for repeated use.
-        parent_root = block.parent_root
+        # State Updates
 
         # Special case: first block after genesis.
-        #
-        # Mark genesis as both justified and finalized.
-        if self.latest_block_header.slot == Slot(0):
-            updates["latest_justified"] = self.latest_justified.model_copy(
-                update={"root": parent_root}
-            )
-            updates["latest_finalized"] = self.latest_finalized.model_copy(
-                update={"root": parent_root}
-            )
-
-        # Create mutable copies to work with to avoid modifying the original object.
-        new_historical_hashes = list(self.historical_block_hashes)
-        new_historical_hashes.append(parent_root)
-
-        new_justified_slots = list(self.justified_slots)
-        new_justified_slots.append(Boolean(self.latest_block_header.slot == Slot(0)))
+        is_genesis_parent = parent_header.slot == Slot(0)
+        new_justified = (
+            self.latest_justified.model_copy(update={"root": parent_root})
+            if is_genesis_parent
+            else self.latest_justified
+        )
+        new_finalized = (
+            self.latest_finalized.model_copy(update={"root": parent_root})
+            if is_genesis_parent
+            else self.latest_finalized
+        )
 
         # If there were empty slots between parent and this block, fill them.
-        num_empty_slots = (block.slot - self.latest_block_header.slot - Slot(1)).as_int()
-        if num_empty_slots > 0:
-            new_historical_hashes.extend([ZERO_HASH] * num_empty_slots)
-            new_justified_slots.extend([Boolean(False)] * num_empty_slots)
+        num_empty_slots = (block.slot - parent_header.slot - Slot(1)).as_int()
 
-        # Record updated history arrays, ensuring they are cast back to the
-        # correct domain-specific type.
-        updates["historical_block_hashes"] = self.historical_block_hashes.__class__(
-            data=new_historical_hashes
+        # Build new historical hashes list
+        new_historical_hashes_data = (
+            list(self.historical_block_hashes) + [parent_root] + ([ZERO_HASH] * num_empty_slots)
         )
-        updates["justified_slots"] = self.justified_slots.__class__(data=new_justified_slots)
+
+        # Build new justified slots list
+        new_justified_slots_data = (
+            list(self.justified_slots)
+            + [Boolean(is_genesis_parent)]
+            + ([Boolean(False)] * num_empty_slots)
+        )
 
         # Construct the new latest block header.
         #
         # Leave state_root empty; it will be filled on the next process_slot call.
-        updates["latest_block_header"] = BlockHeader(
+        new_header = BlockHeader(
             slot=block.slot,
             proposer_index=block.proposer_index,
             parent_root=block.parent_root,
@@ -373,8 +368,20 @@ class State(Container):
             state_root=Bytes32.zero(),
         )
 
-        # Return the state with all header updates applied.
-        return self.model_copy(update=updates)
+        # Final Immutable Copy
+        #
+        # Return the state with all header updates applied in one go.
+        return self.model_copy(
+            update={
+                "latest_justified": new_justified,
+                "latest_finalized": new_finalized,
+                "historical_block_hashes": self.historical_block_hashes.__class__(
+                    data=new_historical_hashes_data
+                ),
+                "justified_slots": self.justified_slots.__class__(data=new_justified_slots_data),
+                "latest_block_header": new_header,
+            }
+        )
 
     def process_block(self, block: Block) -> "State":
         """
