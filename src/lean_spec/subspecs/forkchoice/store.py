@@ -384,7 +384,18 @@ class Store(Container):
         )
 
         # Process block body attestations
-        store = signed_block_with_attestation.process_block_body_attestations(store)
+        # Iterate over attestations and their corresponding signatures.
+        for attestation, signature in zip(
+            block.message.block.body.attestations, block.signature, strict=False
+        ):
+            # Process as on-chain attestation (immediately becomes "known")
+            store = store.on_attestation(
+                signed_attestation=SignedAttestation(
+                    message=attestation,
+                    signature=signature,
+                ),
+                is_from_block=True,
+            )
 
         # Update forkchoice head based on new block and attestations
         #
