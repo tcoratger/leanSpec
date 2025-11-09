@@ -367,7 +367,7 @@ class Store(Container):
         # 1. NOT affect this block's fork choice position (processed as "new")
         # 2. Be available for inclusion in future blocks
         # 3. Influence fork choice only after interval 3 (end of slot)
-        store = self.on_attestation(
+        store = store.on_attestation(
             signed_attestation=SignedAttestation(
                 message=proposer_attestation,
                 signature=signatures[len(block.body.attestations)],
