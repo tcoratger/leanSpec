@@ -12,6 +12,7 @@ from .constants import PRF_KEY_LENGTH
 
 if TYPE_CHECKING:
     from .constants import XmssConfig
+    from .subtree import HashSubTree
 
 PRFKey = Annotated[bytes, Field(min_length=PRF_KEY_LENGTH, max_length=PRF_KEY_LENGTH)]
 """
@@ -112,10 +113,11 @@ class HashTreeLayer(StrictBaseModel):
 
 class HashTree(StrictBaseModel):
     """
-    The pre-computed, stored portion of the sparse Merkle tree.
+    A simple representation of a sparse Merkle tree.
 
-    This structure is part of the `SecretKey` and contains all the necessary nodes
-    to generate an authentication path for any signature within the key's active lifetime.
+    This structure contains the necessary nodes to generate an authentication path
+    for any signature within a key's active lifetime. For production use with
+    long lifetimes, prefer `HashSubTree` with the top-bottom tree approach.
     """
 
     depth: int
@@ -370,11 +372,61 @@ class SecretKey(StrictBaseModel):
 
     prf_key: PRFKey
     """The master secret key used to derive all one-time secrets."""
-    tree: HashTree
-    """The pre-computed sparse Merkle tree needed to generate authentication paths."""
+
     parameter: Parameter
     """The public parameter `P`, stored for convenience during signing."""
+
     activation_epoch: int
-    """The first epoch for which this secret key is valid."""
+    """
+    The first epoch for which this secret key is valid.
+
+    Note: With top-bottom trees, this is aligned to a multiple of `sqrt(LIFETIME)`
+    to ensure efficient tree partitioning.
+    """
+
     num_active_epochs: int
-    """The number of consecutive epochs this key can be used for."""
+    """
+    The number of consecutive epochs this key can be used for.
+
+    Note: With top-bottom trees, this is rounded up to be a multiple of
+    `sqrt(LIFETIME)`, with a minimum of `2 * sqrt(LIFETIME)`.
+    """
+
+    top_tree: HashSubTree | None = None
+    """
+    The top tree containing the root and top `LOG_LIFETIME/2` layers.
+
+    This tree is always kept in memory and contains the roots of all bottom trees
+    in its lowest layer. Its root is the public key's Merkle root.
+    """
+
+    left_bottom_tree_index: int | None = None
+    """
+    The index of the left bottom tree in the sliding window.
+
+    Bottom trees are numbered 0, 1, 2, ... where tree `i` covers epochs
+    `[i * sqrt(LIFETIME), (i+1) * sqrt(LIFETIME))`.
+
+    The prepared interval is:
+    [left_bottom_tree_index * sqrt(LIFETIME), (left_bottom_tree_index + 2) * sqrt(LIFETIME))
+
+    """
+
+    left_bottom_tree: HashSubTree | None = None
+    """
+    The left bottom tree in the sliding window.
+
+    This covers epochs:
+    [left_bottom_tree_index * sqrt(LIFETIME), (left_bottom_tree_index + 1) * sqrt(LIFETIME))
+    """
+
+    right_bottom_tree: HashSubTree | None = None
+    """
+    The right bottom tree in the sliding window.
+
+    This covers epochs:
+    [(left_bottom_tree_index + 1) * sqrt(LIFETIME), (left_bottom_tree_index + 2) * sqrt(LIFETIME))
+
+    Together with `left_bottom_tree`, this provides a prepared interval of
+    exactly `2 * sqrt(LIFETIME)` consecutive epochs.
+    """
