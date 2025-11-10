@@ -3,7 +3,7 @@
 from lean_spec.types import Bytes52, Container
 
 from ..xmss.containers import PublicKey
-from ..xmss.interface import PROD_SIGNATURE_SCHEME, GeneralizedXmssScheme
+from ..xmss.interface import TEST_SIGNATURE_SCHEME, GeneralizedXmssScheme
 
 
 class Validator(Container):
@@ -12,7 +12,7 @@ class Validator(Container):
     pubkey: Bytes52
     """XMSS one-time signature public key."""
 
-    def get_pubkey(self, scheme: GeneralizedXmssScheme = PROD_SIGNATURE_SCHEME) -> PublicKey:
+    def get_pubkey(self, scheme: GeneralizedXmssScheme = TEST_SIGNATURE_SCHEME) -> PublicKey:
         """
         Get the XMSS public key from this validator.
 

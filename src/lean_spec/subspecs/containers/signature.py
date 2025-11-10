@@ -6,7 +6,7 @@ from lean_spec.types import Bytes3100, Uint64
 
 from ..xmss.containers import PublicKey
 from ..xmss.containers import Signature as XmssSignature
-from ..xmss.interface import PROD_SIGNATURE_SCHEME, GeneralizedXmssScheme
+from ..xmss.interface import TEST_SIGNATURE_SCHEME, GeneralizedXmssScheme
 
 
 class Signature(Bytes3100):
@@ -17,7 +17,7 @@ class Signature(Bytes3100):
         public_key: PublicKey,
         epoch: Uint64,
         message: bytes,
-        scheme: GeneralizedXmssScheme = PROD_SIGNATURE_SCHEME,
+        scheme: GeneralizedXmssScheme = TEST_SIGNATURE_SCHEME,
     ) -> bool:
         """
         Verify the signature using XMSS verification algorithm.
