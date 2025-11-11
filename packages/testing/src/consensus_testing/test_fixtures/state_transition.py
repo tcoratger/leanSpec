@@ -127,7 +127,6 @@ class StateTransitionTest(BaseConsensusFixture):
 
         # Initialize filled_blocks list that will be populated as we process blocks
         filled_blocks: list[Block] = []
-
         try:
             state = self.pre
 
@@ -230,6 +229,13 @@ class StateTransitionTest(BaseConsensusFixture):
                 state_root=Bytes32.zero(),
                 body=body,
             )
+            # If we are expecting an exception,
+            #  then return the temp_block without running process_block.
+            #  This is because process_block will reject the block and
+            # the generated vector will have missing data.
+            if self.expect_exception is not None:
+                return temp_block
+
             post_state = temp_state.process_block(temp_block)
             state_root = hash_tree_root(post_state)
 
