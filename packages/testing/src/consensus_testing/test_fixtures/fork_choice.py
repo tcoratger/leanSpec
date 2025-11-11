@@ -246,12 +246,8 @@ class ForkChoiceTest(BaseConsensusFixture):
 
                     if block.proposer_index in slot_proposers[block.slot]:
                         raise ValueError(
-                            f"Step {i}: Validator {block.proposer_index} is proposing multiple "
-                            f"blocks at slot {block.slot}. This creates competing forks from "
-                            f"the same validator, which is invalid.\n"
-                            f"Solution: Either add more validators to the test or explicitly "
-                            f"assign different proposer_index values to competing blocks at "
-                            f"the same slot."
+                            f"Step {i}: Validator {block.proposer_index} is equivocating "
+                            f"at slot {block.slot}."
                         )
 
                     slot_proposers[block.slot].add(block.proposer_index)
