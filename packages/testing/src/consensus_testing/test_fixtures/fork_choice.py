@@ -239,11 +239,11 @@ class ForkChoiceTest(BaseConsensusFixture):
                     block = signed_block.message.block
                     step._filled_block = block
 
-                    # Validate that the same validator doesn't propose competing blocks
-                    # at the same slot
                     if block.slot not in slot_proposers:
                         slot_proposers[block.slot] = set()
 
+                    # Validate that the same validator doesn't propose competing blocks
+                    # at the same slot
                     if block.proposer_index in slot_proposers[block.slot]:
                         raise ValueError(
                             f"Step {i}: Validator {block.proposer_index} is equivocating "
