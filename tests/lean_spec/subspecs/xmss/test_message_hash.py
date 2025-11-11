@@ -11,6 +11,7 @@ from lean_spec.subspecs.xmss.message_hash import (
     TEST_MESSAGE_HASHER,
 )
 from lean_spec.subspecs.xmss.utils import TEST_RAND, int_to_base_p
+from lean_spec.types import Uint64
 
 
 def test_encode_message() -> None:
@@ -43,14 +44,14 @@ def test_encode_epoch() -> None:
     for epoch in test_epochs:
         acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE.value
         expected = int_to_base_p(acc, config.TWEAK_LEN_FE)
-        assert hasher.encode_epoch(epoch) == expected
+        assert hasher.encode_epoch(Uint64(epoch)) == expected
 
     # Test for injectivity. It is highly unlikely for a collision to occur
     # with a few random samples if the encoding is injective.
     num_trials = 1000
     seen_encodings: set[tuple[Fp, ...]] = set()
     for i in range(num_trials):
-        encoding = tuple(hasher.encode_epoch(i))
+        encoding = tuple(hasher.encode_epoch(Uint64(i)))
         assert encoding not in seen_encodings
         seen_encodings.add(encoding)
 
@@ -66,7 +67,7 @@ def test_apply_output_is_in_correct_hypercube_part() -> None:
 
     # Setup with random inputs.
     parameter = rand.parameter()
-    epoch = 313
+    epoch = Uint64(313)
     randomness = rand.rho()
     message = b"\xaa" * config.MESSAGE_LENGTH
 

@@ -6,7 +6,15 @@ from typing import List
 import pytest
 
 from lean_spec.subspecs.koalabear.field import Fp, P
-from lean_spec.subspecs.xmss.utils import int_to_base_p
+from lean_spec.subspecs.xmss.constants import TEST_CONFIG
+from lean_spec.subspecs.xmss.merkle_tree import TEST_MERKLE_TREE
+from lean_spec.subspecs.xmss.prf import TEST_PRF
+from lean_spec.subspecs.xmss.tweak_hash import TEST_TWEAK_HASHER
+from lean_spec.subspecs.xmss.utils import (
+    bottom_tree_from_prf_key,
+    expand_activation_time,
+    int_to_base_p,
+)
 
 
 @pytest.mark.parametrize(
@@ -48,3 +56,150 @@ def test_int_to_base_p_roundtrip() -> None:
     assert original_value == reconstructed_value
     # Also assert that the original and decomposed limbs match.
     assert original_limbs == decomposed_limbs
+
+
+@pytest.mark.parametrize(
+    "log_lifetime, desired_activation, desired_num, expected_start_tree, expected_end_tree",
+    [
+        # Test case 1: Request falls on boundary, minimum duration
+        (8, 0, 16, 0, 2),  # C = 16, requested [0, 16), aligned [0, 32) = 2 trees
+        # Test case 2: Request needs rounding
+        (8, 10, 5, 0, 2),  # C = 16, requested [10, 15), aligned [0, 32) = 2 trees
+        # Test case 3: Larger request
+        (8, 0, 100, 0, 7),  # C = 16, requested [0, 100), aligned [0, 112) = 7 trees
+        # Test case 4: Request that exceeds lifetime
+        (4, 0, 300, 0, 4),  # C = 4, LIFETIME = 16, clamped to [0, 16) = 4 trees
+        # Test case 5: Request in middle
+        (8, 32, 16, 2, 4),  # C = 16, requested [32, 48), aligned [32, 48) = 2 trees
+    ],
+)
+def test_expand_activation_time(
+    log_lifetime: int,
+    desired_activation: int,
+    desired_num: int,
+    expected_start_tree: int,
+    expected_end_tree: int,
+) -> None:
+    """Tests that expand_activation_time correctly aligns and expands activation intervals."""
+    start_tree, end_tree = expand_activation_time(log_lifetime, desired_activation, desired_num)
+    assert start_tree == expected_start_tree
+    assert end_tree == expected_end_tree
+
+    # Verify minimum duration constraint (at least 2 bottom trees)
+    assert end_tree - start_tree >= 2
+
+    # Verify alignment
+    c = 1 << (log_lifetime // 2)
+    actual_start_epoch = start_tree * c
+    actual_end_epoch = end_tree * c
+    assert actual_start_epoch % c == 0
+    assert actual_end_epoch % c == 0
+
+    # Verify it covers the desired range (if the desired range fits within lifetime)
+    lifetime = c * c
+    desired_end_epoch = desired_activation + desired_num
+    if desired_end_epoch <= lifetime:
+        assert actual_start_epoch <= desired_activation
+        assert actual_end_epoch >= desired_end_epoch
+    else:
+        # If desired range exceeds lifetime, verify it's clamped to lifetime bounds
+        assert actual_start_epoch >= 0
+        assert actual_end_epoch <= lifetime
+
+
+def test_bottom_tree_from_prf_key() -> None:
+    """Tests that bottom_tree_from_prf_key generates a valid bottom tree."""
+    config = TEST_CONFIG
+
+    # Generate a PRF key
+    prf_key = TEST_PRF.key_gen()
+
+    # Generate a random parameter
+    parameter = [Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+
+    # Generate bottom tree 0
+    bottom_tree = bottom_tree_from_prf_key(
+        prf=TEST_PRF,
+        hasher=TEST_TWEAK_HASHER,
+        merkle_tree=TEST_MERKLE_TREE,
+        config=config,
+        prf_key=prf_key,
+        bottom_tree_index=0,
+        parameter=parameter,
+    )
+
+    # Verify structure
+    assert bottom_tree.depth == config.LOG_LIFETIME
+    assert bottom_tree.lowest_layer == 0
+    assert len(bottom_tree.layers) > 0
+
+    # Verify the root layer has exactly one node
+    root_layer = bottom_tree.layers[-1]
+    assert len(root_layer.nodes) == 1
+
+    # Verify the leaf layer covers the right range
+    leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
+    leaf_layer = bottom_tree.layers[0]
+    assert len(leaf_layer.nodes) == leafs_per_bottom_tree
+
+
+def test_bottom_tree_from_prf_key_deterministic() -> None:
+    """Tests that bottom_tree_from_prf_key is deterministic."""
+    config = TEST_CONFIG
+    prf_key = TEST_PRF.key_gen()
+    parameter = [Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+
+    # Generate the same bottom tree twice
+    tree1 = bottom_tree_from_prf_key(
+        prf=TEST_PRF,
+        hasher=TEST_TWEAK_HASHER,
+        merkle_tree=TEST_MERKLE_TREE,
+        config=config,
+        prf_key=prf_key,
+        bottom_tree_index=0,
+        parameter=parameter,
+    )
+
+    tree2 = bottom_tree_from_prf_key(
+        prf=TEST_PRF,
+        hasher=TEST_TWEAK_HASHER,
+        merkle_tree=TEST_MERKLE_TREE,
+        config=config,
+        prf_key=prf_key,
+        bottom_tree_index=0,
+        parameter=parameter,
+    )
+
+    # Verify the roots are identical
+    assert tree1.layers[-1].nodes[0] == tree2.layers[-1].nodes[0]
+
+
+def test_bottom_tree_from_prf_key_different_indices() -> None:
+    """Tests that different bottom tree indices produce different trees."""
+    config = TEST_CONFIG
+    prf_key = TEST_PRF.key_gen()
+    parameter = [Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+
+    # Generate two different bottom trees
+    tree0 = bottom_tree_from_prf_key(
+        prf=TEST_PRF,
+        hasher=TEST_TWEAK_HASHER,
+        merkle_tree=TEST_MERKLE_TREE,
+        config=config,
+        prf_key=prf_key,
+        bottom_tree_index=0,
+        parameter=parameter,
+    )
+
+    tree1 = bottom_tree_from_prf_key(
+        prf=TEST_PRF,
+        hasher=TEST_TWEAK_HASHER,
+        merkle_tree=TEST_MERKLE_TREE,
+        config=config,
+        prf_key=prf_key,
+        bottom_tree_index=1,
+        parameter=parameter,
+    )
+
+    # Verify the roots are different
+    assert tree0.layers[-1].nodes[0] != tree1.layers[-1].nodes[0]

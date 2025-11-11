@@ -8,6 +8,7 @@ from lean_spec.subspecs.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
 )
+from lean_spec.types import Uint64
 
 
 def _test_correctness_roundtrip(
@@ -25,12 +26,12 @@ def _test_correctness_roundtrip(
     # KEY GENERATION
     #
     # Generate a new key pair for the specified active range.
-    pk, sk = scheme.key_gen(activation_epoch, num_active_epochs)
+    pk, sk = scheme.key_gen(Uint64(activation_epoch), Uint64(num_active_epochs))
 
     # SIGN & VERIFY
     #
     # Pick a sample epoch within the active range to test signing.
-    test_epoch = activation_epoch + num_active_epochs // 2
+    test_epoch = Uint64(activation_epoch + num_active_epochs // 2)
     message = b"\x42" * scheme.config.MESSAGE_LENGTH
 
     # Sign the message at the chosen epoch.
@@ -51,7 +52,7 @@ def _test_correctness_roundtrip(
 
     # Verification must fail if the epoch is incorrect.
     if num_active_epochs > 1:
-        wrong_epoch = test_epoch + 1
+        wrong_epoch = Uint64(int(test_epoch) + 1)
         is_invalid_epoch = scheme.verify(pk, wrong_epoch, message, signature)
         assert not is_invalid_epoch, "Verification succeeded for an incorrect epoch"
 
@@ -60,11 +61,11 @@ def _test_correctness_roundtrip(
     "activation_epoch, num_active_epochs",
     [
         pytest.param(
-            10, 4, id="Standard case with a short, active lifetime", marks=pytest.mark.slow
+            4, 4, id="Standard case with a short, active lifetime", marks=pytest.mark.slow
         ),
         pytest.param(0, 8, id="Lifetime starting at epoch 0", marks=pytest.mark.slow),
         pytest.param(7, 5, id="Lifetime starting at an odd-numbered epoch", marks=pytest.mark.slow),
-        pytest.param(20, 1, id="Lifetime with only a single active epoch"),
+        pytest.param(12, 1, id="Lifetime with only a single active epoch"),
     ],
 )
 def test_signature_scheme_correctness(activation_epoch: int, num_active_epochs: int) -> None:
@@ -74,3 +75,110 @@ def test_signature_scheme_correctness(activation_epoch: int, num_active_epochs: 
         activation_epoch=activation_epoch,
         num_active_epochs=num_active_epochs,
     )
+
+
+def test_get_activation_interval() -> None:
+    """Tests that get_activation_interval returns the correct range."""
+    scheme = TEST_SIGNATURE_SCHEME
+    # Use 8 epochs (half of LIFETIME=16)
+    pk, sk = scheme.key_gen(Uint64(4), Uint64(8))
+
+    interval = scheme.get_activation_interval(sk)
+
+    # Verify it's a range
+    assert isinstance(interval, range)
+
+    # Verify it covers the activation interval (may be expanded)
+    assert interval.start <= 4
+    assert interval.stop >= 12
+
+
+def test_get_prepared_interval() -> None:
+    """Tests that get_prepared_interval returns the correct range."""
+    scheme = TEST_SIGNATURE_SCHEME
+    # Use full lifetime
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
+
+    interval = scheme.get_prepared_interval(sk)
+
+    # Verify it's a range
+    assert isinstance(interval, range)
+
+    # Verify it has at least 2 * sqrt(LIFETIME) epochs
+    leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)
+    min_prepared = 2 * leafs_per_bottom_tree
+    assert len(interval) >= min_prepared
+
+
+def test_advance_preparation() -> None:
+    """Tests that advance_preparation correctly slides the window."""
+    scheme = TEST_SIGNATURE_SCHEME
+    # Request 3 bottom trees' worth of epochs to ensure room to advance
+    leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(3 * leafs_per_bottom_tree))
+
+    # Get initial prepared interval
+    initial_interval = scheme.get_prepared_interval(sk)
+    initial_left_index = sk.left_bottom_tree_index
+    assert initial_left_index is not None
+
+    # Advance preparation (returns new SecretKey since models are immutable)
+    sk = scheme.advance_preparation(sk)
+
+    # Get new prepared interval
+    new_interval = scheme.get_prepared_interval(sk)
+    new_left_index = sk.left_bottom_tree_index
+    assert new_left_index is not None
+
+    # Verify the left index incremented
+    assert new_left_index == initial_left_index + 1
+
+    # Verify the prepared interval shifted forward
+    leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)
+    assert new_interval.start == initial_interval.start + leafs_per_bottom_tree
+    assert new_interval.stop == initial_interval.stop + leafs_per_bottom_tree
+
+
+def test_sign_requires_prepared_interval() -> None:
+    """Tests that sign raises an error if epoch is outside prepared interval."""
+    scheme = TEST_SIGNATURE_SCHEME
+    # Request 3 bottom trees' worth of epochs to have room for testing
+    leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(3 * leafs_per_bottom_tree))
+
+    # Get the prepared interval
+    prepared_interval = scheme.get_prepared_interval(sk)
+
+    # Try to sign outside the prepared interval (but inside activation interval)
+    activation_interval = scheme.get_activation_interval(sk)
+    # Pick an epoch just beyond the prepared interval
+    outside_epoch = Uint64(prepared_interval.stop)
+
+    # Verify it's inside activation but outside prepared
+    assert int(outside_epoch) in activation_interval
+    assert int(outside_epoch) not in prepared_interval
+
+    # Signing should fail
+    message = b"\x42" * scheme.config.MESSAGE_LENGTH
+    with pytest.raises(ValueError, match="outside the prepared interval"):
+        scheme.sign(sk, outside_epoch, message)
+
+
+def test_deterministic_signing() -> None:
+    """Tests that signing the same message with the same key produces the same signature."""
+    scheme = TEST_SIGNATURE_SCHEME
+    # Use full lifetime
+    pk, sk = scheme.key_gen(Uint64(0), Uint64(16))
+
+    # Use epoch within prepared interval
+    epoch = Uint64(4)
+    message = b"\x42" * scheme.config.MESSAGE_LENGTH
+
+    # Sign twice
+    sig1 = scheme.sign(sk, epoch, message)
+    sig2 = scheme.sign(sk, epoch, message)
+
+    # Signatures should be identical (deterministic)
+    assert sig1.rho == sig2.rho
+    assert sig1.hashes == sig2.hashes
+    assert sig1.path.siblings == sig2.path.siblings

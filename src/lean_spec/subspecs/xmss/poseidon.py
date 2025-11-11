@@ -199,7 +199,7 @@ class PoseidonXmss:
 
 
 # An instance configured for production-level parameters.
-PROD_POSEIDON = PoseidonXmss(PARAMS_16, PARAMS_24)
+PROD_POSEIDON: PoseidonXmss = PoseidonXmss(PARAMS_16, PARAMS_24)
 
 # A lightweight instance for test environments.
-TEST_POSEIDON = PoseidonXmss(PARAMS_16, PARAMS_24)
+TEST_POSEIDON: PoseidonXmss = PoseidonXmss(PARAMS_16, PARAMS_24)

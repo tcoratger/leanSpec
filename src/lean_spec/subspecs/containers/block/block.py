@@ -177,7 +177,7 @@ class SignedBlockWithAttestation(Container):
             # - The signature was created at the correct epoch (slot)
             assert signature.verify(
                 validator.get_pubkey(),
-                attestation.data.slot.as_int(),
+                attestation.data.slot,
                 bytes(hash_tree_root(attestation)),
             ), "Attestation signature verification failed"
 
