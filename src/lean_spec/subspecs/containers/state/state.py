@@ -242,33 +242,37 @@ class State(Container):
         while state.slot < target_slot:
             # Per-Slot Housekeeping & Slot Increment
             #
-            # For each empty slot:
+            # This single statement performs two tasks for each empty slot
+            # in a single, immutable update:
             #
             # 1. State Root Caching (Conditional):
-            #    - It checks if the latest block header has an empty state root.
-            #    This is true only for the *first* empty slot immediately following a block.
+            #    It checks if the latest block header has an empty state root.
+            #    This is true only for the *first* empty slot immediately
+            #    following a block.
             #
             #    - If it is empty, we must cache the pre-block state root
             #    (the hash of the state *before* this slot increment) into that
-            #    header. We create a new header object for this update.
+            #    header. We do this by:
+            #    a) Computing the root of the current (pre-block) state.
+            #    b) Creating a *new* header object with this computed state root
+            #       to be included in the update.
+            #
+            #    - If the state root is *not* empty, it means we are in a
+            #    sequence of empty slots, and we simply use the existing header.
             #
             # 2. Slot Increment:
-            #    After handling the header, it always increments the slot number by one.
-
-            new_header = state.latest_block_header
-            new_slot = Slot(state.slot + Slot(1))
-
-            # If the header's state root is empty (i.e., this is the first
-            # slot after a block), compute the hash of the *current* state
-            # and cache it in a new header object.
-            if new_header.state_root == Bytes32.zero():
-                new_header = new_header.model_copy(update={"state_root": hash_tree_root(state)})
-
-            # Create the new state with the incremented slot and the (potentially updated) header.
+            #    It always increments the slot number by one.
+            #
             state = state.model_copy(
                 update={
-                    "latest_block_header": new_header,
-                    "slot": new_slot,
+                    "latest_block_header": (
+                        state.latest_block_header.model_copy(
+                            update={"state_root": hash_tree_root(state)}
+                        )
+                        if state.latest_block_header.state_root == Bytes32.zero()
+                        else state.latest_block_header
+                    ),
+                    "slot": Slot(state.slot + Slot(1)),
                 }
             )
 
