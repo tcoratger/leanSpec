@@ -398,22 +398,27 @@ class Store(Container):
             New Store with updated head, latest_justified, and latest_finalized.
 
         """
-        # Compute latest justified checkpoint from all known states
+        # Find the Latest Justified Checkpoint
         #
-        # Scans every state in the store to find the checkpoint with the
-        # highest slot that has achieved justification.
+        # We must first determine the anchor point for our fork choice algorithm.
+        # This anchor is the justified checkpoint (a block root and slot) with the
+        # highest slot number known across *all* known states.
+        #
+        # We find this by:
+        # a) Scanning all known states.
+        # b) Finding the state that contains the justified checkpoint with the
+        #    highest slot number.
+        # c) Extracting that specific checkpoint object to use as our anchor.
+        #
+        # If there are no states to scan (e.g., at initialization), the
+        # operation would fail. In this case, we fall back to using the
+        # store's currently recorded justified checkpoint, preserving the
+        # last known good anchor.
         latest_justified = (
             max(self.states.values(), key=lambda s: s.latest_justified.slot).latest_justified
             if self.states
-            else None
+            else self.latest_justified
         )
-
-        # Preserve current justified checkpoint if no newer one found
-        #
-        # This handles the case where no states have updated justification.
-        # Maintains the previous justified checkpoint rather than losing it.
-        if latest_justified is None:
-            latest_justified = self.latest_justified
 
         # Run LMD-GHOST fork choice algorithm
         #
