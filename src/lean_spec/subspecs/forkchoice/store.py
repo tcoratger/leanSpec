@@ -43,7 +43,7 @@ from lean_spec.types import (
 )
 from lean_spec.types.container import Container
 
-from .helpers import get_fork_choice_head, get_latest_justified
+from .helpers import get_fork_choice_head
 
 
 class Store(Container):
@@ -402,7 +402,11 @@ class Store(Container):
         #
         # Scans every state in the store to find the checkpoint with the
         # highest slot that has achieved justification.
-        latest_justified = get_latest_justified(self.states)
+        latest_justified = (
+            max(self.states.values(), key=lambda s: s.latest_justified.slot).latest_justified
+            if self.states
+            else None
+        )
 
         # Preserve current justified checkpoint if no newer one found
         #
