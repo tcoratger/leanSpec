@@ -182,6 +182,10 @@ class StateTransitionTest(BaseConsensusFixture):
         Returns both the block and the cached post-state (if computed) to avoid
         redundant state transitions.
 
+        TODO: If the spec implements a State.produce_block() method in the future,
+        we should use that instead of manually computing fields here. Until then,
+        this manual approach is necessary.
+
         Parameters
         ----------
         spec : BlockSpec
