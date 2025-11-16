@@ -6,6 +6,8 @@ recent blocks, and validator attestations. State also records which blocks are
 justified and finalized.
 """
 
+from typing_extensions import Dict, List
+
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import (
@@ -112,27 +114,6 @@ class State(Container):
             validators=validators,
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
-        )
-
-    def is_proposer(self, validator_index: ValidatorIndex) -> bool:
-        """
-        Check if a validator is the proposer for the current slot.
-
-        Parameters
-        ----------
-        validator_index : ValidatorIndex
-            The index of the validator to check.
-
-        Returns:
-        -------
-        bool
-            True if the validator is the proposer for the current slot.
-        """
-        # Forward to the global proposer function with state context.
-        return is_proposer(
-            validator_index=validator_index,
-            slot=self.slot,
-            num_validators=Uint64(self.validators.count),
         )
 
     def get_justifications(self) -> Dict[Bytes32, List[Boolean]]:
