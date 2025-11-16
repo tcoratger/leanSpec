@@ -6,8 +6,6 @@ recent blocks, and validator attestations. State also records which blocks are
 justified and finalized.
 """
 
-from typing import Dict, List
-
 from lean_spec.subspecs.ssz.constants import ZERO_HASH
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import (
@@ -322,7 +320,11 @@ class State(Container):
         assert block.slot > parent_header.slot, "Block is older than latest header"
 
         # The proposer must be the expected validator for this slot.
-        assert self.is_proposer(block.proposer_index), "Incorrect block proposer"
+        assert is_proposer(
+            validator_index=block.proposer_index,
+            slot=self.slot,
+            num_validators=Uint64(self.validators.count),
+        ), "Incorrect block proposer"
 
         # The declared parent must match the hash of the latest block header.
         assert block.parent_root == parent_root, "Block parent root mismatch"
