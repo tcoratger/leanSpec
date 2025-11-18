@@ -235,20 +235,11 @@ class Fp(StrictBaseModel):
 
         return [cls.from_bytes(data[i : i + P_BYTES]) for i in range(0, len(data), P_BYTES)]
 
-    # =================================================================
-    # Bincode Serialization Methods
-    #
-    # These methods implement Rust's bincode serialization format.
-    # IMPORTANT: Rust's MontyField31 serializes the internal Montgomery
-    # representation, NOT the canonical form. Python's Fp stores values
-    # in canonical form, so we serialize the canonical value directly.
-    # =================================================================
-
     def to_bincode_bytes(self) -> bytes:
         """
         Serialize this Fp to bincode format using varint encoding.
 
-        Note: This serializes the canonical form value. Rust's MontyField31
+        Note: This serializes the canonical form value. Plonky3 `MontyField31`
         serializes the internal Montgomery representation, so when
         interoperating with Rust, ensure you're comparing the same forms.
 
