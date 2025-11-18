@@ -141,7 +141,10 @@ class Store(Container):
         """
         Validate incoming attestation before processing.
 
-        Performs basic validation checks on attestation structure and timing.
+        Ensures the vote respects the basic laws of time and topology:
+            1. The blocks voted for must exist in our store.
+            2. A vote cannot span backwards in time (source > target).
+            3. A vote cannot be for a future slot.
 
         Args:
             signed_attestation: Attestation to validate.
@@ -149,28 +152,35 @@ class Store(Container):
         Raises:
             AssertionError: If attestation fails validation.
         """
-        attestation = signed_attestation.message
-        data = attestation.data
+        data = signed_attestation.message.data
 
-        # Validate attestation targets exist in store
+        # Availability Check
+        #
+        # We cannot count a vote if we haven't seen the blocks involved.
         assert data.source.root in self.blocks, f"Unknown source block: {data.source.root.hex()}"
         assert data.target.root in self.blocks, f"Unknown target block: {data.target.root.hex()}"
         assert data.head.root in self.blocks, f"Unknown head block: {data.head.root.hex()}"
 
-        # Validate slot relationships
+        # Topology Check
+        #
+        # History is linear and monotonic. Source must be an ancestor of Target.
         source_block = self.blocks[data.source.root]
         target_block = self.blocks[data.target.root]
 
         assert source_block.slot <= target_block.slot, "Source slot must not exceed target"
-        assert data.source.slot <= data.target.slot, "Source checkpoint slot must not exceed target"
 
+        # Consistency Check
+        #
         # Validate checkpoint slots match block slots
         assert source_block.slot == data.source.slot, "Source checkpoint slot mismatch"
         assert target_block.slot == data.target.slot, "Target checkpoint slot mismatch"
 
+        # Time Check
+        #
         # Validate attestation is not too far in the future
+        # We allow a small margin for clock disparity (1 slot), but no further.
         current_slot = Slot(self.time // SECONDS_PER_SLOT)
-        assert data.slot <= Slot(current_slot + Slot(1)), "Attestation too far in future"
+        assert data.slot <= current_slot + Slot(1), "Attestation too far in future"
 
     def on_attestation(
         self,
