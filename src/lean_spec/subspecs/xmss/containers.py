@@ -85,12 +85,6 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> L
     ]
 
 
-# Helper functions removed - now using Fp class methods:
-# - Fp.to_bincode_bytes() for single element serialization
-# - Fp.from_bincode_bytes() for single element deserialization
-# - Fp.serialize_fixed_array_bincode() for fixed array serialization
-
-
 def _deserialize_fp_fixed_array_bincode(
     data: bytes, offset: int, count: int
 ) -> Tuple[List[Fp], int]:
