@@ -234,3 +234,90 @@ class Fp(StrictBaseModel):
             raise ValueError(f"Expected {expected_len} bytes for {count} elements, got {len(data)}")
 
         return [cls.from_bytes(data[i : i + P_BYTES]) for i in range(0, len(data), P_BYTES)]
+
+    # =================================================================
+    # Bincode Serialization Methods
+    #
+    # These methods implement Rust's bincode serialization format.
+    # IMPORTANT: Rust's MontyField31 serializes the internal Montgomery
+    # representation, NOT the canonical form. Python's Fp stores values
+    # in canonical form, so we serialize the canonical value directly.
+    # =================================================================
+
+    def to_bincode_bytes(self) -> bytes:
+        """
+        Serialize this Fp to bincode format using varint encoding.
+
+        Note: This serializes the canonical form value. Rust's MontyField31
+        serializes the internal Montgomery representation, so when
+        interoperating with Rust, ensure you're comparing the same forms.
+
+        Returns:
+            Bincode-encoded bytes of this field element.
+
+        Example:
+            >>> fp = Fp(value=42)
+            >>> data = fp.to_bincode_bytes()
+            >>> recovered, _ = Fp.from_bincode_bytes(data)
+            >>> recovered == fp
+            True
+        """
+        from lean_spec.subspecs.xmss import bincode
+
+        return bincode.encode_varint_u64(self.value)
+
+    @classmethod
+    def from_bincode_bytes(cls, data: bytes, offset: int = 0) -> tuple[Self, int]:
+        """
+        Deserialize an Fp from bincode format.
+
+        Args:
+            data: Raw bytes to deserialize.
+            offset: Starting position in the byte array (default: 0).
+
+        Returns:
+            Tuple of (deserialized field element, bytes consumed).
+
+        Raises:
+            ValueError: If deserialization fails or value is invalid.
+
+        Example:
+            >>> fp = Fp(value=42)
+            >>> data = fp.to_bincode_bytes()
+            >>> recovered, consumed = Fp.from_bincode_bytes(data)
+            >>> recovered == fp and consumed == len(data)
+            True
+        """
+        from lean_spec.subspecs.xmss import bincode
+
+        val, consumed = bincode.decode_varint_u64(data, offset)
+        return cls(value=val), consumed
+
+    @staticmethod
+    def serialize_fixed_array_bincode(elements: list["Fp"]) -> bytes:
+        """
+        Serialize a fixed-size array of Fp elements in bincode format.
+
+        Note: In Rust, fixed-size arrays [F; N] do NOT have a length prefix
+        in bincode serialization. Each element is varint-encoded sequentially.
+
+        Args:
+            elements: List of field elements to serialize.
+
+        Returns:
+            Concatenated bincode bytes of all elements.
+
+        Example:
+            >>> elements = [Fp(value=1), Fp(value=2), Fp(value=3)]
+            >>> data = Fp.serialize_fixed_array_bincode(elements)
+            >>> # Deserialize manually
+            >>> offset = 0
+            >>> recovered = []
+            >>> for _ in range(len(elements)):
+            ...     fp, consumed = Fp.from_bincode_bytes(data, offset)
+            ...     recovered.append(fp)
+            ...     offset += consumed
+            >>> recovered == elements
+            True
+        """
+        return b"".join(fp.to_bincode_bytes() for fp in elements)
