@@ -260,14 +260,6 @@ class PublicKey(StrictBaseModel):
 
         This method produces bytes compatible with Rust's bincode serialization format.
 
-        The format matches the Rust struct:
-        ```rust
-        struct GeneralizedXMSSPublicKey<TH> {
-            root: TH::Domain,        // [F; HASH_LEN] - fixed array, varint-encoded Fp
-            parameter: TH::Parameter, // [F; PARAMETER_LEN] - fixed array, varint-encoded Fp
-        }
-        ```
-
         Args:
             config: The XMSS configuration for validation.
 
