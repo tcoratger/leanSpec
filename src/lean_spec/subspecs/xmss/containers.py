@@ -85,23 +85,6 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> L
     ]
 
 
-def _deserialize_fp_fixed_array_bincode(
-    data: bytes, offset: int, count: int
-) -> Tuple[List[Fp], int]:
-    """
-    Deserialize a fixed-size array [F; N] for bincode.
-
-    Each field element is varint-encoded.
-    """
-    elements = []
-    current_offset = offset
-    for _ in range(count):
-        fp, consumed = Fp.from_bincode_bytes(data, current_offset)
-        elements.append(fp)
-        current_offset += consumed
-    return elements, current_offset - offset
-
-
 class HashTreeOpening(StrictBaseModel):
     """
     A Merkle authentication path.
@@ -293,13 +276,11 @@ class PublicKey(StrictBaseModel):
         offset = 0
 
         # 1. root: [F; HASH_LEN] - fixed array with varint-encoded Fp
-        root, consumed = _deserialize_fp_fixed_array_bincode(data, offset, config.HASH_LEN_FE)
+        root, consumed = Fp.deserialize_fixed_array_bincode(data, offset, config.HASH_LEN_FE)
         offset += consumed
 
         # 2. parameter: [F; PARAMETER_LEN] - fixed array with varint-encoded Fp
-        parameter, consumed = _deserialize_fp_fixed_array_bincode(
-            data, offset, config.PARAMETER_LEN
-        )
+        parameter, consumed = Fp.deserialize_fixed_array_bincode(data, offset, config.PARAMETER_LEN)
         offset += consumed
 
         if offset != len(data):
@@ -517,7 +498,7 @@ class Signature(StrictBaseModel):
 
         # Helper to deserialize [F; HASH_LEN] with varint-encoded Fp
         def deserialize_digest_fixed(data: bytes, offset: int) -> Tuple[List[Fp], int]:
-            return _deserialize_fp_fixed_array_bincode(data, offset, config.HASH_LEN_FE)
+            return Fp.deserialize_fixed_array_bincode(data, offset, config.HASH_LEN_FE)
 
         # 1. Deserialize path.siblings: Vec<[F; HASH_LEN]>
         siblings, siblings_consumed = bincode.deserialize_vec(
@@ -532,7 +513,7 @@ class Signature(StrictBaseModel):
             )
 
         # 2. Deserialize rho: [F; RAND_LEN] (fixed-size array with varint Fp, no length prefix)
-        rho, consumed = _deserialize_fp_fixed_array_bincode(data, offset, config.RAND_LEN_FE)
+        rho, consumed = Fp.deserialize_fixed_array_bincode(data, offset, config.RAND_LEN_FE)
         offset += consumed
 
         # 3. Deserialize hashes: Vec<[F; HASH_LEN]>

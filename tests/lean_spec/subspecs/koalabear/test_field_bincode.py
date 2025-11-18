@@ -123,6 +123,83 @@ def test_fp_fixed_array_empty() -> None:
     assert serialized == b""
 
 
+def test_fp_fixed_array_deserialization() -> None:
+    """Test deserialization of fixed-size arrays of Fp elements."""
+    elements = [
+        Fp(value=0),
+        Fp(value=1),
+        Fp(value=250),
+        Fp(value=251),
+        Fp(value=65536),
+    ]
+
+    # Serialize first
+    serialized = Fp.serialize_fixed_array_bincode(elements)
+
+    # Deserialize using the new method
+    recovered, consumed = Fp.deserialize_fixed_array_bincode(serialized, 0, len(elements))
+
+    assert recovered == elements
+    assert consumed == len(serialized), "Should consume all bytes"
+
+
+def test_fp_fixed_array_deserialization_with_offset() -> None:
+    """Test deserialization with offset into byte array."""
+    # Create multiple arrays back-to-back
+    array1 = [Fp(value=1), Fp(value=2)]
+    array2 = [Fp(value=100), Fp(value=200), Fp(value=300)]
+    array3 = [Fp(value=65536)]
+
+    data = (
+        Fp.serialize_fixed_array_bincode(array1)
+        + Fp.serialize_fixed_array_bincode(array2)
+        + Fp.serialize_fixed_array_bincode(array3)
+    )
+
+    # Deserialize each array
+    recovered1, consumed1 = Fp.deserialize_fixed_array_bincode(data, 0, len(array1))
+    assert recovered1 == array1
+
+    recovered2, consumed2 = Fp.deserialize_fixed_array_bincode(data, consumed1, len(array2))
+    assert recovered2 == array2
+
+    recovered3, consumed3 = Fp.deserialize_fixed_array_bincode(
+        data, consumed1 + consumed2, len(array3)
+    )
+    assert recovered3 == array3
+
+    # Verify we consumed all bytes
+    assert consumed1 + consumed2 + consumed3 == len(data)
+
+
+def test_fp_fixed_array_roundtrip() -> None:
+    """Test that fixed arrays roundtrip correctly."""
+    elements = [
+        Fp(value=0),
+        Fp(value=42),
+        Fp(value=250),
+        Fp(value=251),
+        Fp(value=1000),
+        Fp(value=65536),
+        Fp(value=2130706432),  # P - 1
+    ]
+
+    serialized = Fp.serialize_fixed_array_bincode(elements)
+    recovered, consumed = Fp.deserialize_fixed_array_bincode(serialized, 0, len(elements))
+
+    assert recovered == elements
+    assert consumed == len(serialized)
+
+
+def test_fp_fixed_array_empty_deserialization() -> None:
+    """Test that empty arrays deserialize correctly."""
+    data = b""
+    recovered, consumed = Fp.deserialize_fixed_array_bincode(data, 0, 0)
+
+    assert recovered == []
+    assert consumed == 0
+
+
 def test_fp_bincode_with_offset() -> None:
     """Test deserialization with offset into byte array."""
     # Create a byte array with multiple encoded values

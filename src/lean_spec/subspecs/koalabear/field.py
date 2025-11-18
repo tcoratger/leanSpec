@@ -312,3 +312,38 @@ class Fp(StrictBaseModel):
             True
         """
         return b"".join(fp.to_bincode_bytes() for fp in elements)
+
+    @staticmethod
+    def deserialize_fixed_array_bincode(
+        data: bytes, offset: int, count: int
+    ) -> tuple[list["Fp"], int]:
+        """
+        Deserialize a fixed-size array [F; N] from bincode format.
+
+        Each field element is varint-encoded sequentially without a length prefix.
+
+        Args:
+            data: Raw bytes to deserialize.
+            offset: Starting position in the byte array.
+            count: Number of field elements to deserialize.
+
+        Returns:
+            Tuple of (list of deserialized field elements, bytes consumed).
+
+        Raises:
+            ValueError: If deserialization fails.
+
+        Example:
+            >>> elements = [Fp(value=1), Fp(value=2), Fp(value=3)]
+            >>> data = Fp.serialize_fixed_array_bincode(elements)
+            >>> recovered, consumed = Fp.deserialize_fixed_array_bincode(data, 0, 3)
+            >>> recovered == elements and consumed == len(data)
+            True
+        """
+        elements = []
+        current_offset = offset
+        for _ in range(count):
+            fp, consumed = Fp.from_bincode_bytes(data, current_offset)
+            elements.append(fp)
+            current_offset += consumed
+        return elements, current_offset - offset
