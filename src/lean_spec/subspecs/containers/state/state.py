@@ -258,12 +258,12 @@ class State(Container):
 
         # Build new historical hashes list
         new_historical_hashes_data = (
-            list(self.historical_block_hashes) + [parent_root] + ([ZERO_HASH] * num_empty_slots)
+            self.historical_block_hashes + [parent_root] + ([ZERO_HASH] * num_empty_slots)
         )
 
         # Build new justified slots list
         new_justified_slots_data = (
-            list(self.justified_slots)
+            self.justified_slots
             + [Boolean(is_genesis_parent)]
             + ([Boolean(False)] * num_empty_slots)
         )
@@ -355,11 +355,9 @@ class State(Container):
         #   - each segment corresponds to one block root,
         #   - each segment has length equal to the number of validators,
         #   - and the ordering of block roots is preserved.
-        flat_justifications = list(self.justifications_validators)
-
         justifications = (
             {
-                root: flat_justifications[
+                root: self.justifications_validators[
                     i * self.validators.count : (i + 1) * self.validators.count
                 ]
                 for i, root in enumerate(self.justifications_roots)
@@ -371,7 +369,7 @@ class State(Container):
         # Track state changes to be applied at the end
         latest_justified = self.latest_justified
         latest_finalized = self.latest_finalized
-        justified_slots = list(self.justified_slots)
+        justified_slots = self.justified_slots
 
         # Process each attestation in the block.
         for attestation in attestations:
