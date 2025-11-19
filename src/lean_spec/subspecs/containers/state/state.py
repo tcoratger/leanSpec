@@ -469,7 +469,7 @@ class State(Container):
             update={
                 "justifications_roots": justifications_roots,
                 "justifications_validators": justifications_validators,
-                "justified_slots": justified_slots,
+                "justified_slots": self.justified_slots.__class__(data=justified_slots),
                 "latest_justified": latest_justified,
                 "latest_finalized": latest_finalized,
             }
