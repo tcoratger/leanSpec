@@ -9,43 +9,6 @@ from lean_spec.subspecs.containers.state.types import (
 from lean_spec.types import Boolean, Bytes32
 
 
-def get_justifications_map(
-    justifications_roots: JustificationRoots,
-    justifications_validators: JustificationValidators,
-    validator_count: int,
-) -> Dict[Bytes32, List[Boolean]]:
-    """
-    Reconstruct the justifications map from the state's flat data structures.
-
-    Parameters
-    ----------
-    justifications_roots : JustificationRoots
-        The block roots in alphabetical order.
-    justifications_validators : JustificationValidators
-        The list of validator justifications for each block root concatenated in the same order
-        as the list of block roots.
-    validator_count : int
-        The number of validators in the state.
-
-    Returns:
-    -------
-    Dict[Bytes32, List[Boolean]]
-        A mapping from a block root to the list of validator justifications for that root.
-    """
-    # No justified roots means no justifications to reconstruct.
-    if not justifications_roots:
-        return {}
-
-    # Extract the flattened validator justifications.
-    flat_justifications = list(justifications_validators)
-
-    # Reconstruct the map: each root gets its corresponding justification slice.
-    return {
-        root: flat_justifications[i * validator_count : (i + 1) * validator_count]
-        for i, root in enumerate(justifications_roots)
-    }
-
-
 def flatten_justifications_map(
     justifications_map: Dict[Bytes32, List[Boolean]], validator_count: int
 ) -> tuple[JustificationRoots, JustificationValidators]:
