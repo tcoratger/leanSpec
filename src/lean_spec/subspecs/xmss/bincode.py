@@ -1,7 +1,10 @@
 """
 Bincode-compatible serialization helpers for XMSS.
 
-See: https://docs.rs/bincode/latest/bincode/index.html
+This module implements the specific VarInt (Variable Integer) encoding used by
+Rust's `bincode` crate with `bincode::config::standard()`.
+
+See: https://docs.rs/bincode/latest/bincode/config/index.html
 """
 
 from typing import Callable, List, Tuple, TypeVar
@@ -41,11 +44,11 @@ def encode_varint_u64(value: int) -> bytes:
     """
     # Sanity checks for valid u64 range
     if value < 0:
-        raise ValueError(f"VarInt cannot be negative: {value}")
+        raise ValueError(f"Cannot encode negative value as varint: {value}")
     if value >= (1 << 64):
-        raise ValueError(f"Value too large for u64: {value}")
+        raise ValueError(f"Value too large for u64 varint: {value}")
 
-    # Case 1: Fits in a single byte (0-250)
+    # Case 1: Fits in a single byte
     if value < MARKER_U16:
         return value.to_bytes(1, "little")
 
@@ -69,21 +72,21 @@ def encode_varint_u64(value: int) -> bytes:
 
 def decode_varint_u64(data: bytes, offset: int = 0) -> Tuple[int, int]:
     """
-    Decode a bincode varint from bytes.
+    Decode a Bincode VarInt from a byte buffer.
 
     Args:
-        data: The bytes to decode from.
-        offset: Starting position in data.
+        data: The raw bytes.
+        offset: Where to start reading.
 
     Returns:
-        A tuple of (decoded_value, bytes_consumed).
+        (decoded_value, bytes_consumed)
 
     Raises:
-        ValueError: If data is too short or invalid.
+        ValueError: If data is too short or marker is invalid.
     """
     # Ensure we have at least one byte to read the marker/value
     if offset >= len(data):
-        raise ValueError("Unexpected EOF: Not enough data to read VarInt marker")
+        raise ValueError("Not enough data to decode varint")
 
     # Read the first byte (the marker or the immediate value)
     marker = data[offset]
@@ -92,31 +95,32 @@ def decode_varint_u64(data: bytes, offset: int = 0) -> Tuple[int, int]:
     if marker < MARKER_U16:
         return marker, 1
 
-    # Case 2: The byte is a marker indicating subsequent size
+    # Process Markers
     #
-    # We determine the payload size based on the marker value.
-    if marker == MARKER_U16:
-        size = 2
-    elif marker == MARKER_U32:
-        size = 4
-    elif marker == MARKER_U64:
-        size = 8
+    # We check for the specific marker byte, ensure enough data exists for the payload,
+    # and then decode the Little Endian integer.
+
+    if marker == MARKER_U16:  # 0xfb
+        if offset + 3 > len(data):
+            raise ValueError("Not enough data for u16 varint")
+        value = int.from_bytes(data[offset + 1 : offset + 3], "little")
+        return value, 3
+
+    elif marker == MARKER_U32:  # 0xfc
+        if offset + 5 > len(data):
+            raise ValueError("Not enough data for u32 varint")
+        value = int.from_bytes(data[offset + 1 : offset + 5], "little")
+        return value, 5
+
+    elif marker == MARKER_U64:  # 0xfd
+        if offset + 9 > len(data):
+            raise ValueError("Not enough data for u64 varint")
+        value = int.from_bytes(data[offset + 1 : offset + 9], "little")
+        return value, 9
+
     else:
         # Markers 254/255 are reserved/unused in standard bincode
-        raise ValueError(f"Invalid VarInt marker: {marker}")
-
-    # Ensure we have enough bytes remaining for the payload
-    payload_end = offset + 1 + size
-    if payload_end > len(data):
-        raise ValueError(f"Unexpected EOF: Need {size} bytes for VarInt payload")
-
-    # Read the integer payload (Little Endian)
-    #
-    # We slice [offset+1 : payload_end] to skip the marker byte
-    value = int.from_bytes(data[offset + 1 : payload_end], "little")
-
-    # Return the value and total bytes consumed (1 marker + size)
-    return value, 1 + size
+        raise ValueError(f"Invalid varint marker: {marker}")
 
 
 def serialize_vec(items: List[T], item_serializer: Callable[[T], bytes]) -> bytes:
@@ -159,9 +163,6 @@ def deserialize_vec(
 
     Returns:
         (list_of_items, total_bytes_consumed)
-
-    Raises:
-        ValueError: If data is invalid.
     """
     # Read the vector length (how many items follow)
     count, consumed = decode_varint_u64(data, offset)
