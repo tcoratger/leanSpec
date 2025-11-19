@@ -209,7 +209,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         )
 
         # Initialize Store from anchor
-        store = Store.get_forkchoice_store(
+        store = Store.from_state_and_block(
             state=self.anchor_state,
             anchor_block=self.anchor_block,
         )
