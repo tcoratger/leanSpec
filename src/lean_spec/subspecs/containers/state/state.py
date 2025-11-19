@@ -22,7 +22,7 @@ from ..block.types import Attestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
-from .helpers import flatten_justifications_map, get_justifications_map
+from .helpers import flatten_justifications_map
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
@@ -337,12 +337,35 @@ class State(Container):
         State
             A new state with updated justification/finalization.
         """
-        # Get justifications, justified slots and historical block hashes are already up to
-        # date as per the processing in process_block_header
-        justifications = get_justifications_map(
-            justifications_roots=self.justifications_roots,
-            justifications_validators=self.justifications_validators,
-            validator_count=self.validators.count,
+        # NOTE:
+        # The state already contains three pieces of data:
+        #   1. A list of block roots that have received justification votes.
+        #   2. A long sequence of boolean entries representing all validator votes,
+        #      flattened into a single list.
+        #   3. The total number of validators.
+        #
+        # The flattened vote list is organized so that votes from all validators for
+        # each block root appear together, and those groups are simply placed back-to-back.
+        #
+        # To work with attestations, we must rebuild the intuitive structure:
+        #   “for each block root, here is the list of validator votes for it”.
+        #
+        # Reconstructing this is done by cutting the long vote list into consecutive
+        # segments, where:
+        #   - each segment corresponds to one block root,
+        #   - each segment has length equal to the number of validators,
+        #   - and the ordering of block roots is preserved.
+        flat_justifications = list(self.justifications_validators)
+
+        justifications = (
+            {
+                root: flat_justifications[
+                    i * self.validators.count : (i + 1) * self.validators.count
+                ]
+                for i, root in enumerate(self.justifications_roots)
+            }
+            if self.justifications_roots
+            else {}
         )
 
         # Track state changes to be applied at the end
