@@ -4,6 +4,7 @@ from typing import Self
 
 from pydantic import Field, field_validator
 
+from lean_spec.subspecs.xmss import bincode
 from lean_spec.types import StrictBaseModel
 
 # =================================================================
@@ -253,8 +254,6 @@ class Fp(StrictBaseModel):
             >>> recovered == fp
             True
         """
-        from lean_spec.subspecs.xmss import bincode
-
         return bincode.encode_varint_u64(self.value)
 
     @classmethod
@@ -279,8 +278,6 @@ class Fp(StrictBaseModel):
             >>> recovered == fp and consumed == len(data)
             True
         """
-        from lean_spec.subspecs.xmss import bincode
-
         val, consumed = bincode.decode_varint_u64(data, offset)
         return cls(value=val), consumed
 
