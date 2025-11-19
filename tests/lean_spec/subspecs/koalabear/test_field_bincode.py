@@ -1,14 +1,4 @@
-"""
-Bincode serialization tests for Fp field elements.
-
-These tests verify that Python's Fp serialization is compatible with Rust's
-bincode serialization format. Test data is generated from Rust tests in leanSig.
-
-Key findings:
-- Rust's MontyField31 serializes the internal Montgomery representation
-- Python's Fp stores values in canonical form
-- Python serializes canonical values directly with bincode varint encoding
-"""
+"""Bincode serialization tests for Fp field elements."""
 
 import pytest
 

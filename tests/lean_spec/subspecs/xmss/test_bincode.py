@@ -1,13 +1,4 @@
-"""Tests for bincode serialization compatibility with Rust.
-
-These tests verify that the Python bincode implementation produces
-exactly the same output as Rust's bincode crate (version 2.0.1) with
-standard configuration.
-
-Reference Rust tests in leanSig/src/lib.rs:
-- test_bincode_varint_encoding
-- test_field_element_varint_encoding
-"""
+"""Tests for bincode serialization compatibility with Rust."""
 
 from typing import Any
 

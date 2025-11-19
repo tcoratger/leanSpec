@@ -432,8 +432,6 @@ class Signature(StrictBaseModel):
         Raises:
             ValueError: If any component has incorrect length.
         """
-        from . import bincode
-
         # Validate (same as to_bytes)
         if len(self.path.siblings) != config.LOG_LIFETIME:
             raise ValueError(
