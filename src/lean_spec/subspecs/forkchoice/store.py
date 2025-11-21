@@ -140,7 +140,7 @@ class Store(Container):
     """
 
     @classmethod
-    def from_state_and_block(cls, state: State, anchor_block: Block) -> "Store":
+    def get_forkchoice_store(cls, state: State, anchor_block: Block) -> "Store":
         """
         Initialize forkchoice store from an anchor state and block.
 
