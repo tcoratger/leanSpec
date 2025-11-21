@@ -22,7 +22,6 @@ from ..block.types import Attestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
-from .helpers import flatten_justifications_map
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
@@ -441,9 +440,28 @@ class State(Container):
                 ):
                     latest_finalized = source
 
-        # Flatten and set updated justifications back to the state
-        justifications_roots, justifications_validators = flatten_justifications_map(
-            justifications, self.validators.count
+        # Converting the justification map into SSZ form
+        #
+        # The justification data has been maintained as a convenient map from
+        # block roots to lists of validator votes. Before storing it in the
+        # consensus state, it must be transformed into the strict SSZ layout.
+        #
+        # This requires two steps:
+        #
+        #   1. Order all block roots deterministically.
+        #      This ensures every node produces the same state representation.
+        #
+        #   2. Produce a single list of votes by taking, in that order,
+        #      the complete vote list for each block root and placing them
+        #      back-to-back without nesting.
+        #
+        # The result is a list of ordered roots and one flat sequence of votes,
+        # matching the exact structure expected by SSZ.
+        sorted_roots = sorted(justifications.keys())
+
+        justifications_roots = JustificationRoots(data=sorted_roots)
+        justifications_validators = JustificationValidators(
+            data=[vote for root in sorted_roots for vote in justifications[root]]
         )
 
         # Return the updated state.
