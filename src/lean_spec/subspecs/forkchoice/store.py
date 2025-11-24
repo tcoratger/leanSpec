@@ -22,7 +22,6 @@ from lean_spec.subspecs.chain.config import (
 )
 from lean_spec.subspecs.containers import (
     Attestation,
-    AttestationData,
     Block,
     BlockBody,
     Checkpoint,
@@ -785,17 +784,11 @@ class Store(Container):
         target_block_root = self.head
 
         # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
-        #
-        # This ensures the target doesn't advance too far ahead of safe target,
-        # providing a balance between liveness and safety.
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
                 target_block_root = self.blocks[target_block_root].parent_root
 
         # Ensure target is in justifiable slot range
-        #
-        # Walk back until we find a slot that satisfies justifiability rules
-        # relative to the latest finalized checkpoint.
         while not self.blocks[target_block_root].slot.is_justifiable_after(
             self.latest_finalized.slot
         ):
@@ -934,56 +927,3 @@ class Store(Container):
         )
 
         return store, finalized_block, signatures
-
-    def produce_attestation(
-        self,
-        slot: Slot,
-        validator_index: ValidatorIndex,
-    ) -> Attestation:
-        """
-        Produce an attestation for the given slot and validator.
-
-        This method constructs an Attestation object according to the lean protocol
-        specification for attestation. The attestation represents the
-        validator's view of the chain state and their choice for the
-        next justified checkpoint.
-
-        The algorithm:
-        1. Get the current head
-        2. Calculate the appropriate attestation target using current forkchoice state
-        3. Use the store's latest justified checkpoint as the attestation source
-        4. Construct and return the complete Attestation object
-
-        Args:
-            slot: The slot for which to produce the attestation.
-            validator_index: The validator index producing the attestation.
-
-        Returns:
-            A fully constructed Attestation object ready for signing and broadcast.
-        """
-        # Get the head block the validator sees for this slot
-        head_checkpoint = Checkpoint(
-            root=self.head,
-            slot=self.blocks[self.head].slot,
-        )
-
-        # Calculate the target checkpoint for this attestation
-        #
-        # This uses the store's current forkchoice state to determine
-        # the appropriate attestation target, balancing between head
-        # advancement and safety guarantees.
-        target_checkpoint = self.get_attestation_target()
-
-        # Construct attestation data
-        attestation_data = AttestationData(
-            slot=slot,
-            head=head_checkpoint,
-            target=target_checkpoint,
-            source=self.latest_justified,
-        )
-
-        # Create the attestation using current forkchoice state
-        return Attestation(
-            validator_id=validator_index,
-            data=attestation_data,
-        )
