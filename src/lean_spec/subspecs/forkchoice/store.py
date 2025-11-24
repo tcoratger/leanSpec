@@ -784,11 +784,17 @@ class Store(Container):
         target_block_root = self.head
 
         # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
+        #
+        # This ensures the target doesn't advance too far ahead of safe target,
+        # providing a balance between liveness and safety.
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
                 target_block_root = self.blocks[target_block_root].parent_root
 
         # Ensure target is in justifiable slot range
+        #
+        # Walk back until we find a slot that satisfies justifiability rules
+        # relative to the latest finalized checkpoint.
         while not self.blocks[target_block_root].slot.is_justifiable_after(
             self.latest_finalized.slot
         ):
