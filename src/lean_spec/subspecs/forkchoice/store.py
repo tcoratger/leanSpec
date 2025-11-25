@@ -12,6 +12,7 @@ __all__ = [
 ]
 
 import copy
+from collections import defaultdict
 from typing import Dict
 
 from lean_spec.subspecs.chain.config import (
@@ -491,15 +492,23 @@ class Store(Container):
         min_score: int = 0,
     ) -> Bytes32:
         """
-        Internal implementation of LMD GHOST fork choice algorithm.
+        Walk the block tree according to the LMD GHOST rule.
 
-        Navigates the block tree from `start_root` by choosing the heaviest child
-        at each fork, based on the provided `attestations`.
+        The walk starts from a chosen root.
+        At each fork, the child subtree with the highest weight is taken.
+        The process stops when a leaf is reached.
+        That leaf is the chosen head.
 
-        This is the core fork choice logic. It walks down the tree from a given
-        starting point (typically the latest justified checkpoint), choosing at
-        each fork the child with the most attestation weight. When there is a tie,
-        it breaks it lexicographically by hash.
+        Weights are derived from votes as follows:
+        - Each validator contributes its full weight to its most recent head vote.
+        - The weight of that vote also flows to every ancestor of the voted block.
+        - The weight of a subtree is the sum of all such contributions inside it.
+
+        An optional threshold can be applied:
+        - If a threshold is set, children below this threshold are ignored.
+
+        When two branches have equal weight, the one with the lexicographically
+        larger hash is chosen to break ties.
 
         Args:
             start_root: Starting point root (usually latest justified).
@@ -509,43 +518,64 @@ class Store(Container):
         Returns:
             Hash of the chosen head block.
         """
-        # Start at genesis if root is zero hash
+        # If the starting point is not defined, choose the earliest known block.
+        #
+        # This ensures that the walk always has an anchor.
         if start_root == ZERO_HASH:
             start_root = min(
                 self.blocks.keys(), key=lambda block_hash: self.blocks[block_hash].slot
             )
 
-        # Count attestations for each block (attestations for descendants count for ancestors)
-        attestation_weights: Dict[Bytes32, int] = {}
-
-        for attestation in attestations.values():
-            head = attestation.message.data.head
-            if head.root in self.blocks:
-                # Walk up from attestation target, incrementing ancestor weights
-                block_hash = head.root
-                while self.blocks[block_hash].slot > self.blocks[start_root].slot:
-                    attestation_weights[block_hash] = attestation_weights.get(block_hash, 0) + 1
-                    block_hash = self.blocks[block_hash].parent_root
-
-        # Build children mapping for ALL blocks (not just those above min_score)
+        # Remember the slot of the anchor once and reuse it during the walk.
         #
-        # This ensures fork choice works even when there are no attestations
-        children_map: Dict[Bytes32, list[Bytes32]] = {}
-        for block_hash, block in self.blocks.items():
-            if block.parent_root:
-                # Only include blocks that have enough attestations OR when min_score is 0
-                if min_score == 0 or attestation_weights.get(block_hash, 0) >= min_score:
-                    children_map.setdefault(block.parent_root, []).append(block_hash)
+        # This avoids repeated lookups inside the inner loop.
+        start_slot = self.blocks[start_root].slot
 
-        # Walk down tree, choosing child with most attestations (tiebreak by lexicographic hash)
-        current = start_root
-        while True:
-            children = children_map.get(current, [])
-            if not children:
-                return current
+        # Prepare a table that will collect voting weight for each block.
+        #
+        # Each entry starts conceptually at zero and then accumulates contributions.
+        weights: Dict[Bytes32, int] = defaultdict(int)
 
+        # For every vote, follow the chosen head upward through its ancestors.
+        #
+        # Each visited block accumulates one unit of weight from that validator.
+        for attestation in attestations.values():
+            curr = attestation.message.data.head.root
+
+            # Climb towards the anchor while staying inside the known tree.
+            #
+            # This naturally handles partial views and ongoing sync.
+            while curr in self.blocks and self.blocks[curr].slot > start_slot:
+                weights[curr] += 1
+                curr = self.blocks[curr].parent_root
+
+        # Build the adjacency tree (parent -> children).
+        #
+        # We use a defaultdict to avoid checking if keys exist.
+        children_map: Dict[Bytes32, list[Bytes32]] = defaultdict(list)
+
+        for root, block in self.blocks.items():
+            # 1. Structural check: skip blocks without parents (e.g., purely genesis/orphans)
+            if not block.parent_root:
+                continue
+
+            # 2. Heuristic check: prune branches early if they lack sufficient weight
+            if min_score > 0 and weights[root] < min_score:
+                continue
+
+            children_map[block.parent_root].append(root)
+
+        # Now perform the greedy walk.
+        #
+        # At each step, pick the child with the highest weight among the candidates.
+        head = start_root
+
+        # Descend the tree, choosing the heaviest branch at every fork.
+        while children := children_map.get(head):
             # Choose best child: most attestations, then lexicographically highest hash
-            current = max(children, key=lambda x: (attestation_weights.get(x, 0), x))
+            head = max(children, key=lambda x: (weights[x], x))
+
+        return head
 
     def update_head(self) -> "Store":
         """
