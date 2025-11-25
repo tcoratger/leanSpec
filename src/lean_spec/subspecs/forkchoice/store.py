@@ -545,7 +545,7 @@ class Store(Container):
             # Climb towards the anchor while staying inside the known tree.
             #
             # This naturally handles partial views and ongoing sync.
-            while current_root in self.blocks and self.blocks[curr].slot > start_slot:
+            while current_root in self.blocks and self.blocks[current_root].slot > start_slot:
                 weights[current_root] += 1
                 current_root = self.blocks[current_root].parent_root
 
