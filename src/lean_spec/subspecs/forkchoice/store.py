@@ -540,14 +540,14 @@ class Store(Container):
         #
         # Each visited block accumulates one unit of weight from that validator.
         for attestation in attestations.values():
-            curr = attestation.message.data.head.root
+            current_root = attestation.message.data.head.root
 
             # Climb towards the anchor while staying inside the known tree.
             #
             # This naturally handles partial views and ongoing sync.
-            while curr in self.blocks and self.blocks[curr].slot > start_slot:
-                weights[curr] += 1
-                curr = self.blocks[curr].parent_root
+            while current_root in self.blocks and self.blocks[curr].slot > start_slot:
+                weights[current_root] += 1
+                current_root = self.blocks[current_root].parent_root
 
         # Build the adjacency tree (parent -> children).
         #
