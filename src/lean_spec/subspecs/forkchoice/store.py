@@ -791,6 +791,8 @@ class Store(Container):
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
                 target_block_root = self.blocks[target_block_root].parent_root
+            else:
+                break
 
         # Ensure target is in justifiable slot range
         #
