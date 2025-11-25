@@ -22,6 +22,7 @@ from lean_spec.subspecs.chain.config import (
 )
 from lean_spec.subspecs.containers import (
     Attestation,
+    AttestationData,
     Block,
     BlockBody,
     Checkpoint,
@@ -803,6 +804,43 @@ class Store(Container):
         # Create checkpoint from selected target block
         target_block = self.blocks[target_block_root]
         return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)
+
+    def produce_attestation_data(self, slot: Slot) -> AttestationData:
+        """
+        Produce attestation data for the given slot.
+
+        This method constructs an AttestationData object according to the lean protocol
+        specification. The attestation data represents the chain state view including
+        head, target, and source checkpoints.
+
+        The algorithm:
+        1. Get the current head block
+        2. Calculate the appropriate attestation target using current forkchoice state
+        3. Use the store's latest justified checkpoint as the attestation source
+        4. Construct and return the complete AttestationData object
+
+        Args:
+            slot: The slot for which to produce the attestation data.
+
+        Returns:
+            A fully constructed AttestationData object.
+        """
+        # Get the head block the validator sees for this slot
+        head_checkpoint = Checkpoint(
+            root=self.head,
+            slot=self.blocks[self.head].slot,
+        )
+
+        # Calculate the target checkpoint for this attestation
+        target_checkpoint = self.get_attestation_target()
+
+        # Construct attestation data
+        return AttestationData(
+            slot=slot,
+            head=head_checkpoint,
+            target=target_checkpoint,
+            source=self.latest_justified,
+        )
 
     def produce_block_with_signatures(
         self,

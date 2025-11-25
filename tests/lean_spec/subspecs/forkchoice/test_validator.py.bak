@@ -297,8 +297,7 @@ class TestAttestationProduction:
         validator_idx = ValidatorIndex(5)
 
         validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, slot)
 
         # Verify attestation structure
         assert attestation.validator_id == validator_idx
@@ -316,8 +315,7 @@ class TestAttestationProduction:
         validator_idx = ValidatorIndex(8)
 
         validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, slot)
 
         # Head checkpoint should reference the current proposal head
         _, expected_head_root = sample_store.get_proposal_head(slot)
@@ -333,8 +331,7 @@ class TestAttestationProduction:
         validator_idx = ValidatorIndex(9)
 
         validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, slot)
 
         # Target should match the store's attestation target calculation
         expected_target = sample_store.get_attestation_target()
@@ -349,8 +346,7 @@ class TestAttestationProduction:
         attestations = []
         for validator_idx in range(5):
             validator = Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(validator_idx))
-            attestation_data = sample_store.produce_attestation_data(slot)
-            attestation = validator.produce_attestation(attestation_data)
+            attestation = validator.produce_attestation(sample_store, slot)
             attestations.append(attestation)
 
             # Each attestation should have correct validator ID
@@ -373,10 +369,8 @@ class TestAttestationProduction:
         validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
 
         # Produce attestations for sequential slots
-        attestation_data1 = sample_store.produce_attestation_data(Slot(1))
-        attestation1 = validator.produce_attestation(attestation_data1)
-        attestation_data2 = sample_store.produce_attestation_data(Slot(2))
-        attestation2 = validator.produce_attestation(attestation_data2)
+        attestation1 = validator.produce_attestation(sample_store, Slot(1))
+        attestation2 = validator.produce_attestation(sample_store, Slot(2))
 
         # Attestations should be for different slots
         assert attestation1.data.slot == Slot(1)
@@ -392,8 +386,7 @@ class TestAttestationProduction:
         validator_idx = ValidatorIndex(2)
 
         validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, slot)
 
         # Source must be the latest justified checkpoint from store
         assert attestation.data.source.root == sample_store.latest_justified.root
@@ -420,8 +413,7 @@ class TestValidatorIntegration:
         attestor_slot = Slot(2)
         attestor_idx = ValidatorIndex(7)
         validator = Validator(pubkey=Bytes52.zero(), index=attestor_idx)
-        attestation_data = sample_store.produce_attestation_data(attestor_slot)
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, attestor_slot)
 
         # Attestation should reference the new block as head (if it became head)
         assert attestation.validator_id == attestor_idx
@@ -444,8 +436,7 @@ class TestValidatorIntegration:
         attestations = []
         for i in range(2, 6):
             validator = Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i))
-            attestation_data = sample_store.produce_attestation_data(Slot(2))
-            attestation = validator.produce_attestation(attestation_data)
+            attestation = validator.produce_attestation(sample_store, Slot(2))
             attestations.append(attestation)
 
         # All attestations should be consistent
@@ -500,8 +491,7 @@ class TestValidatorIntegration:
 
         # Should be able to produce attestation
         validator = Validator(pubkey=Bytes52.zero(), index=max_validator)
-        attestation_data = sample_store.produce_attestation_data(Slot(10))
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, Slot(10))
         assert attestation.validator_id == max_validator
 
     def test_validator_operations_empty_store(self) -> None:
@@ -583,8 +573,7 @@ class TestValidatorIntegration:
             ValidatorIndex(1),
         )
         validator = Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(2))
-        attestation_data = store.produce_attestation_data(Slot(1))
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(store, Slot(1))
 
         assert isinstance(block, Block)
         assert isinstance(attestation, Attestation)
@@ -643,6 +632,5 @@ class TestValidatorErrorHandling:
 
         # produce_attestation should work for any validator
         validator = Validator(pubkey=Bytes52.zero(), index=large_validator)
-        attestation_data = sample_store.produce_attestation_data(Slot(1))
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = validator.produce_attestation(sample_store, Slot(1))
         assert attestation.validator_id == large_validator
