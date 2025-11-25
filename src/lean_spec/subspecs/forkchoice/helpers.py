@@ -10,9 +10,7 @@ from lean_spec.subspecs.containers import (
     Block,
     SignedAttestation,
 )
-from lean_spec.types import Bytes32, ValidatorIndex
-
-from .constants import ZERO_HASH
+from lean_spec.types import ZERO_HASH, Bytes32, ValidatorIndex
 
 
 def get_fork_choice_head(
