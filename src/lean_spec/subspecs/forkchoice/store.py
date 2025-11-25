@@ -36,14 +36,13 @@ from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import (
+    ZERO_HASH,
     Bytes32,
     Uint64,
     ValidatorIndex,
     is_proposer,
 )
 from lean_spec.types.container import Container
-
-from .helpers import get_fork_choice_head
 
 
 class Store(Container):
@@ -485,6 +484,69 @@ class Store(Container):
 
         return store
 
+    def _compute_lmd_ghost_head(
+        self,
+        start_root: Bytes32,
+        attestations: Dict[ValidatorIndex, SignedAttestation],
+        min_score: int = 0,
+    ) -> Bytes32:
+        """
+        Internal implementation of LMD GHOST fork choice algorithm.
+
+        Navigates the block tree from `start_root` by choosing the heaviest child
+        at each fork, based on the provided `attestations`.
+
+        This is the core fork choice logic. It walks down the tree from a given
+        starting point (typically the latest justified checkpoint), choosing at
+        each fork the child with the most attestation weight. When there is a tie,
+        it breaks it lexicographically by hash.
+
+        Args:
+            start_root: Starting point root (usually latest justified).
+            attestations: Attestations to consider for fork choice weights.
+            min_score: Minimum attestation count for block inclusion.
+
+        Returns:
+            Hash of the chosen head block.
+        """
+        # Start at genesis if root is zero hash
+        if start_root == ZERO_HASH:
+            start_root = min(
+                self.blocks.keys(), key=lambda block_hash: self.blocks[block_hash].slot
+            )
+
+        # Count attestations for each block (attestations for descendants count for ancestors)
+        attestation_weights: Dict[Bytes32, int] = {}
+
+        for attestation in attestations.values():
+            head = attestation.message.data.head
+            if head.root in self.blocks:
+                # Walk up from attestation target, incrementing ancestor weights
+                block_hash = head.root
+                while self.blocks[block_hash].slot > self.blocks[start_root].slot:
+                    attestation_weights[block_hash] = attestation_weights.get(block_hash, 0) + 1
+                    block_hash = self.blocks[block_hash].parent_root
+
+        # Build children mapping for ALL blocks (not just those above min_score)
+        #
+        # This ensures fork choice works even when there are no attestations
+        children_map: Dict[Bytes32, list[Bytes32]] = {}
+        for block_hash, block in self.blocks.items():
+            if block.parent_root:
+                # Only include blocks that have enough attestations OR when min_score is 0
+                if min_score == 0 or attestation_weights.get(block_hash, 0) >= min_score:
+                    children_map.setdefault(block.parent_root, []).append(block_hash)
+
+        # Walk down tree, choosing child with most attestations (tiebreak by lexicographic hash)
+        current = start_root
+        while True:
+            children = children_map.get(current, [])
+            if not children:
+                return current
+
+            # Choose best child: most attestations, then lexicographically highest hash
+            current = max(children, key=lambda x: (attestation_weights.get(x, 0), x))
+
     def update_head(self) -> "Store":
         """
         Compute updated store with new canonical head.
@@ -532,10 +594,9 @@ class Store(Container):
         #
         # Selects canonical head by walking the tree from the justified root,
         # choosing the heaviest child at each fork based on attestation weights.
-        new_head = get_fork_choice_head(
-            self.blocks,
-            latest_justified.root,
-            self.latest_known_attestations,
+        new_head = self._compute_lmd_ghost_head(
+            start_root=latest_justified.root,
+            attestations=self.latest_known_attestations,
         )
 
         # Extract finalized checkpoint from head state
@@ -619,10 +680,9 @@ class Store(Container):
         min_target_score = -(-num_validators * 2 // 3)
 
         # Find head with minimum attestation threshold
-        safe_target = get_fork_choice_head(
-            self.blocks,
-            self.latest_justified.root,
-            self.latest_new_attestations,
+        safe_target = self._compute_lmd_ghost_head(
+            start_root=self.latest_justified.root,
+            attestations=self.latest_new_attestations,
             min_score=min_target_score,
         )
 
