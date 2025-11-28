@@ -55,6 +55,7 @@ from .tweak_hash import (
     TreeTweak,
     TweakHasher,
 )
+from .utils import get_padded_layer
 
 
 class MerkleTree(StrictBaseModel):
@@ -80,43 +81,6 @@ class MerkleTree(StrictBaseModel):
                     f"got {type(getattr(self, field)).__name__}"
                 )
         return self
-
-    def _get_padded_layer(self, nodes: List[HashDigest], start_index: Uint64) -> HashTreeLayer:
-        """
-        Pads a layer of nodes with random hashes to simplify tree construction.
-
-        This helper enforces a crucial invariant: every active layer must start at an
-        even index and end at an odd index. This guarantees that every node within
-        the layer can be neatly paired with a sibling (a left child with a right
-        child), which dramatically simplifies the parent generation logic by
-        removing the need to handle edge cases.
-
-        Args:
-            nodes: The list of active nodes for the current layer.
-            start_index: The starting index of the first node in `nodes`.
-
-        Returns:
-            A new `HashTreeLayer` with the necessary padding applied.
-        """
-        nodes_with_padding: List[HashDigest] = []
-        end_index = start_index + Uint64(len(nodes)) - Uint64(1)
-
-        # Prepend random padding if the layer starts at an odd index.
-        if start_index % Uint64(2) == Uint64(1):
-            nodes_with_padding.append(self.rand.domain())
-
-        # The actual start index of the padded layer is always the even
-        # number at or immediately before the original start_index.
-        actual_start_index = start_index - (start_index % Uint64(2))
-
-        # Add the actual node content.
-        nodes_with_padding.extend(nodes)
-
-        # Append random padding if the layer ends at an even index.
-        if end_index % Uint64(2) == Uint64(0):
-            nodes_with_padding.append(self.rand.domain())
-
-        return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
 
     def build(
         self,
@@ -162,7 +126,7 @@ class MerkleTree(StrictBaseModel):
 
         # Start with the leaf hashes and apply the initial padding.
         layers: List[HashTreeLayer] = []
-        current_layer = self._get_padded_layer(leaf_hashes, start_index)
+        current_layer = get_padded_layer(self.rand, leaf_hashes, start_index)
         layers.append(current_layer)
 
         # Iterate from the leaf layer (level 0) up to the root.
@@ -188,7 +152,7 @@ class MerkleTree(StrictBaseModel):
 
             # Pad the new list of parents to prepare for the next iteration.
             new_start_index = current_layer.start_index // Uint64(2)
-            current_layer = self._get_padded_layer(parents, new_start_index)
+            current_layer = get_padded_layer(self.rand, parents, new_start_index)
             layers.append(current_layer)
 
         # Return the completed tree containing all computed layers.
