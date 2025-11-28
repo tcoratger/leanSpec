@@ -123,7 +123,7 @@ class HashSubTree(StrictBaseModel):
         rand: Rand,
         lowest_layer: int,
         depth: int,
-        start_index: int,
+        start_index: Uint64,
         parameter: Parameter,
         lowest_layer_nodes: List[HashDigest],
     ) -> HashSubTree:
@@ -166,7 +166,7 @@ class HashSubTree(StrictBaseModel):
         # Validate that we have enough space in the tree for these nodes.
         # At layer `lowest_layer`, there are 2^(depth - lowest_layer) possible positions.
         max_index_at_layer = 1 << (depth - lowest_layer)
-        if start_index + len(lowest_layer_nodes) > max_index_at_layer:
+        if start_index + Uint64(len(lowest_layer_nodes)) > Uint64(max_index_at_layer):
             raise ValueError(
                 f"Not enough space at layer {lowest_layer}: "
                 f"start_index={start_index}, nodes={len(lowest_layer_nodes)}, "
@@ -175,7 +175,7 @@ class HashSubTree(StrictBaseModel):
 
         # Start with the lowest layer nodes and apply initial padding.
         layers: List[HashTreeLayer] = []
-        current_layer = _get_padded_layer(rand, lowest_layer_nodes, Uint64(start_index))
+        current_layer = _get_padded_layer(rand, lowest_layer_nodes, start_index)
         layers.append(current_layer)
 
         # Build the tree layer by layer from lowest_layer up to the root.
@@ -213,7 +213,7 @@ class HashSubTree(StrictBaseModel):
         hasher: TweakHasher,
         rand: Rand,
         depth: int,
-        start_bottom_tree_index: int,
+        start_bottom_tree_index: Uint64,
         parameter: Parameter,
         bottom_tree_roots: List[HashDigest],
     ) -> HashSubTree:
@@ -275,7 +275,7 @@ class HashSubTree(StrictBaseModel):
         hasher: TweakHasher,
         rand: Rand,
         depth: int,
-        bottom_tree_index: int,
+        bottom_tree_index: Uint64,
         parameter: Parameter,
         leaves: List[HashDigest],
     ) -> HashSubTree:
@@ -329,7 +329,7 @@ class HashSubTree(StrictBaseModel):
             )
 
         # Calculate the starting index for this bottom tree's leaves.
-        start_index = bottom_tree_index * leafs_per_bottom_tree
+        start_index = bottom_tree_index * Uint64(leafs_per_bottom_tree)
 
         # Build a full subtree from layer 0 using the leaves.
         full_tree = cls.new(
@@ -353,14 +353,14 @@ class HashSubTree(StrictBaseModel):
 
         # The root is at position (start_index >> (depth // 2)) = bottom_tree_index
         # within the middle layer. We need to find it in the stored nodes.
-        root_position_in_layer = Uint64(bottom_tree_index) - middle_layer.start_index
+        root_position_in_layer = bottom_tree_index - middle_layer.start_index
         root = middle_layer.nodes[int(root_position_in_layer)]
 
         # Truncate layers to keep only 0 through depth/2 - 1.
         truncated_layers = full_tree.layers[: (depth // 2)]
 
         # Add a final layer containing just the root.
-        truncated_layers.append(HashTreeLayer(start_index=Uint64(bottom_tree_index), nodes=[root]))
+        truncated_layers.append(HashTreeLayer(start_index=bottom_tree_index, nodes=[root]))
 
         return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
 
