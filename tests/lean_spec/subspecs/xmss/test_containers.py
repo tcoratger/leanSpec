@@ -144,12 +144,7 @@ class TestSignature:
         data = sig.to_bytes(TEST_CONFIG)
         assert len(data) == TEST_CONFIG.SIGNATURE_LEN_BYTES
 
-        # Note: With SSZ types (HashDigestVector, HashDigestList), many invalid
-        # configurations are now impossible to construct because Pydantic validates
-        # at construction time. This is a feature, not a bug - type safety is enforced
-        # at the construction level rather than at serialization time.
-
-        # We can still test path length validation (wrong number of siblings)
+        # Test path length validation (wrong number of siblings)
         invalid_siblings = [
             HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE) for _ in range(5)
         ]
