@@ -153,11 +153,7 @@ class SSZVector(SSZModel):
         return len(self.data)
 
     def __getitem__(self, index: int) -> SSZType:
-        """Access an element by index.
-
-        With __len__ and __getitem__ defined, Python automatically makes
-        the vector iterable, so you can use it in for loops and enumerate().
-        """
+        """Access an element by index."""
         return self.data[index]
 
 
@@ -347,9 +343,5 @@ class SSZList(SSZModel):
         return len(self.data)
 
     def __getitem__(self, index: int) -> SSZType:
-        """Access an element by index.
-
-        With __len__ and __getitem__ defined, Python automatically makes
-        the list iterable, so you can use it in for loops and enumerate().
-        """
+        """Access an element by index."""
         return self.data[index]
