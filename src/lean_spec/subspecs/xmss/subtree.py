@@ -19,9 +19,7 @@ if TYPE_CHECKING:
     from .tweak_hash import TweakHasher
 
 
-def _get_padded_layer(
-    rand: Rand, nodes: List[HashDigest], start_index: Uint64 | int
-) -> HashTreeLayer:
+def _get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: Uint64) -> HashTreeLayer:
     """
     Pads a layer of nodes with random hashes to simplify tree construction.
 
@@ -39,19 +37,16 @@ def _get_padded_layer(
     Returns:
         A new `HashTreeLayer` with the necessary padding applied.
     """
-    # Convert to Uint64 if needed for consistent arithmetic
-    start_index_u64 = Uint64(start_index) if isinstance(start_index, int) else start_index
-
     nodes_with_padding: List[HashDigest] = []
-    end_index = start_index_u64 + Uint64(len(nodes)) - Uint64(1)
+    end_index = start_index + Uint64(len(nodes)) - Uint64(1)
 
     # Prepend random padding if the layer starts at an odd index.
-    if start_index_u64 % Uint64(2) == Uint64(1):
+    if start_index % Uint64(2) == Uint64(1):
         nodes_with_padding.append(rand.domain())
 
     # The actual start index of the padded layer is always the even
     # number at or immediately before the original start_index.
-    actual_start_index = start_index_u64 - (start_index_u64 % Uint64(2))
+    actual_start_index = start_index - (start_index % Uint64(2))
 
     # Add the actual node content.
     nodes_with_padding.extend(nodes)
@@ -180,7 +175,7 @@ class HashSubTree(StrictBaseModel):
 
         # Start with the lowest layer nodes and apply initial padding.
         layers: List[HashTreeLayer] = []
-        current_layer = _get_padded_layer(rand, lowest_layer_nodes, start_index)
+        current_layer = _get_padded_layer(rand, lowest_layer_nodes, Uint64(start_index))
         layers.append(current_layer)
 
         # Build the tree layer by layer from lowest_layer up to the root.
