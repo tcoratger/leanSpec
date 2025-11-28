@@ -111,24 +111,6 @@ class HashTreeLayer(StrictBaseModel):
     """A list of the actual hash digests stored for this layer."""
 
 
-class HashTree(StrictBaseModel):
-    """
-    A simple representation of a sparse Merkle tree.
-
-    This structure contains the necessary nodes to generate an authentication path
-    for any signature within a key's active lifetime. For production use with
-    long lifetimes, prefer `HashSubTree` with the top-bottom tree approach.
-    """
-
-    depth: Uint64
-    """The total depth of the tree (e.g., 32 for a 2^32 leaf space)."""
-    layers: List[HashTreeLayer]
-    """
-    A list of `HashTreeLayer` objects, from the leaf hashes
-    (layer 0) up to the layer just below the root.
-    """
-
-
 class PublicKey(StrictBaseModel):
     """
     The public-facing component of a key pair.

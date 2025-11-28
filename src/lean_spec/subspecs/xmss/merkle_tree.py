@@ -43,12 +43,12 @@ from .constants import (
 )
 from .containers import (
     HashDigest,
-    HashTree,
     HashTreeLayer,
     HashTreeOpening,
     Parameter,
 )
 from .rand import PROD_RAND, TEST_RAND, Rand
+from .subtree import HashSubTree
 from .tweak_hash import (
     PROD_TWEAK_HASHER,
     TEST_TWEAK_HASHER,
@@ -124,7 +124,7 @@ class MerkleTree(StrictBaseModel):
         start_index: Uint64,
         parameter: Parameter,
         leaf_hashes: List[HashDigest],
-    ) -> HashTree:
+    ) -> HashSubTree:
         """
         Builds a new sparse Merkle tree from a contiguous range of leaf hashes.
 
@@ -154,7 +154,7 @@ class MerkleTree(StrictBaseModel):
             leaf_hashes: The list of pre-hashed leaf nodes.
 
         Returns:
-            The fully constructed `HashTree` object containing all computed layers.
+            The fully constructed `HashSubTree` object containing all computed layers.
         """
         # Check there is enough space for the leafs in the tree.
         if int(start_index) + len(leaf_hashes) > 2**depth:
@@ -192,19 +192,20 @@ class MerkleTree(StrictBaseModel):
             layers.append(current_layer)
 
         # Return the completed tree containing all computed layers.
-        return HashTree(depth=Uint64(depth), layers=layers)
+        # A full tree is represented as a HashSubTree with lowest_layer=0
+        return HashSubTree(depth=Uint64(depth), lowest_layer=Uint64(0), layers=layers)
 
-    def root(self, tree: HashTree) -> HashDigest:
+    def root(self, tree: HashSubTree) -> HashDigest:
         """
         Extracts the root digest from a constructed Merkle tree.
 
-        The root is the single node in the final, highest layer of the `HashTree`
+        The root is the single node in the final, highest layer of the `HashSubTree`
         and serves as the primary component of the master public key.
         """
         # The root is the single node in the final layer.
         return tree.layers[-1].nodes[0]
 
-    def path(self, tree: HashTree, position: Uint64) -> HashTreeOpening:
+    def path(self, tree: HashSubTree, position: Uint64) -> HashTreeOpening:
         """
         Computes the authentication path for a leaf.
 
@@ -219,7 +220,7 @@ class MerkleTree(StrictBaseModel):
         next level.
 
         Args:
-            tree: The `HashTree` from which to extract the path.
+            tree: The `HashSubTree` from which to extract the path.
             position: The absolute index of the leaf whose path is needed.
 
         Returns:
