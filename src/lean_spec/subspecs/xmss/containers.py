@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, List
+from typing import TYPE_CHECKING, Annotated, List, cast
 
 from pydantic import Field
 
@@ -179,7 +179,7 @@ class PublicKey(StrictBaseModel):
     All field elements are serialized in little-endian byte order.
     """
 
-    root: List[Fp]
+    root: HashDigestVector
     """The Merkle root, which commits to all one-time keys for the key's lifetime."""
     parameter: Parameter
     """The public parameter `P` that personalizes the hash function."""
@@ -196,7 +196,9 @@ class PublicKey(StrictBaseModel):
             >>> isinstance(data, bytes)
             True
         """
-        return Fp.serialize_list(self.root) + Fp.serialize_list(self.parameter)
+        return Fp.serialize_list(cast(List[Fp], list(self.root.data))) + Fp.serialize_list(
+            self.parameter
+        )
 
     def to_bytes(self, config: XmssConfig) -> bytes:
         """
@@ -262,7 +264,7 @@ class PublicKey(StrictBaseModel):
         root = Fp.deserialize_list(data[:root_len], config.HASH_LEN_FE)
         parameter = Fp.deserialize_list(data[root_len:], config.PARAMETER_LEN)
 
-        return cls(root=root, parameter=parameter)
+        return cls(root=HashDigestVector(data=root), parameter=parameter)
 
 
 class Signature(StrictBaseModel):

@@ -189,7 +189,7 @@ class HashSubTree(StrictBaseModel):
         depth: int,
         start_bottom_tree_index: Uint64,
         parameter: Parameter,
-        bottom_tree_roots: List[List[Fp]],
+        bottom_tree_roots: List[HashDigestVector],
     ) -> HashSubTree:
         """
         Constructs a top tree from the roots of bottom trees.
@@ -232,6 +232,9 @@ class HashSubTree(StrictBaseModel):
         # The top tree starts at the middle layer.
         lowest_layer = depth // 2
 
+        # Convert HashDigestVector roots to List[Fp] for building
+        roots_as_lists = [cast(List[Fp], list(root.data)) for root in bottom_tree_roots]
+
         # Build the top tree using the bottom tree roots as the lowest layer.
         return cls.new(
             hasher=hasher,
@@ -240,7 +243,7 @@ class HashSubTree(StrictBaseModel):
             depth=depth,
             start_index=start_bottom_tree_index,
             parameter=parameter,
-            lowest_layer_nodes=bottom_tree_roots,
+            lowest_layer_nodes=roots_as_lists,
         )
 
     @classmethod
@@ -344,7 +347,7 @@ class HashSubTree(StrictBaseModel):
 
         return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
 
-    def root(self) -> List[Fp]:
+    def root(self) -> HashDigestVector:
         """
         Extracts the root digest from this subtree.
 
@@ -366,9 +369,7 @@ class HashSubTree(StrictBaseModel):
 
         # The root is the only node in the highest layer for proper subtrees.
         # For top trees and bottom trees, the highest layer should have exactly one node.
-        root_node = cast(HashDigestVector, highest_layer.nodes.data[0])
-        root_data = cast("Tuple[Fp, ...]", root_node.data)
-        return list(root_data)
+        return cast(HashDigestVector, highest_layer.nodes[0])
 
     def path(self, position: Uint64) -> HashTreeOpening:
         """
@@ -400,7 +401,8 @@ class HashSubTree(StrictBaseModel):
         if position >= lowest_layer.start_index + Uint64(len(lowest_layer.nodes)):
             raise ValueError("Position is beyond the subtree's range.")
 
-        co_path: List[List[Fp]] = []
+        # Build the co-path directly with SSZ types
+        siblings = HashDigestList(data=[])
         current_position = position
 
         # Iterate through layers from lowest to highest, EXCLUDING the final root layer.
@@ -412,23 +414,20 @@ class HashSubTree(StrictBaseModel):
             sibling_index = sibling_position - layer.start_index
 
             # Ensure the sibling exists in this layer
-            if sibling_index < Uint64(0) or sibling_index >= Uint64(len(layer.nodes.data)):
+            if sibling_index < Uint64(0) or sibling_index >= Uint64(len(layer.nodes)):
                 raise ValueError(
                     f"Sibling index {sibling_index} out of bounds for layer "
-                    f"with {len(layer.nodes.data)} nodes"
+                    f"with {len(layer.nodes)} nodes"
                 )
 
-            # Add the sibling's hash to the co-path.
-            sibling_node = cast(HashDigestVector, layer.nodes.data[int(sibling_index)])
-            sibling_data = cast("Tuple[Fp, ...]", sibling_node.data)
-            co_path.append(list(sibling_data))
+            # Access the sibling directly from the SSZ list and add to path
+            siblings = siblings + [layer.nodes[int(sibling_index)]]
 
             # Move to the parent's position for the next iteration.
             current_position = current_position // Uint64(2)
 
-        # Wrap in SSZ types
-        ssz_siblings = [HashDigestVector(data=sibling) for sibling in co_path]
-        return HashTreeOpening(siblings=HashDigestList(data=ssz_siblings))
+        # Return the opening with SSZ-typed siblings
+        return HashTreeOpening(siblings=siblings)
 
 
 def combined_path(

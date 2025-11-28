@@ -20,7 +20,7 @@ class TestPublicKey:
 
     def test_bytes_protocol(self) -> None:
         """Test that PublicKey implements Python's bytes protocol."""
-        root = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=i + 100) for i in range(TEST_CONFIG.PARAMETER_LEN)]
         pk = PublicKey(root=root, parameter=parameter)
 
@@ -31,7 +31,7 @@ class TestPublicKey:
 
     def test_to_bytes_with_validation(self) -> None:
         """Test that to_bytes validates field lengths."""
-        root = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=i) for i in range(TEST_CONFIG.PARAMETER_LEN)]
         pk = PublicKey(root=root, parameter=parameter)
 
@@ -39,10 +39,9 @@ class TestPublicKey:
         data = pk.to_bytes(TEST_CONFIG)
         assert len(data) == TEST_CONFIG.PUBLIC_KEY_LEN_BYTES
 
-        # Invalid root length
-        invalid_pk = PublicKey(root=[Fp(value=0)] * 5, parameter=parameter)
-        with pytest.raises(ValueError, match="Invalid root length"):
-            invalid_pk.to_bytes(TEST_CONFIG)
+        # Invalid root length - HashDigestVector validates length at construction
+        with pytest.raises(ValueError, match="requires exactly"):
+            HashDigestVector(data=[Fp(value=0)] * 5)
 
         # Invalid parameter length
         invalid_pk = PublicKey(root=root, parameter=[Fp(value=0)] * 3)
@@ -51,7 +50,7 @@ class TestPublicKey:
 
     def test_roundtrip_test_config(self) -> None:
         """Test serialization round-trip with TEST_CONFIG."""
-        root = [Fp(value=i * 10) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        root = HashDigestVector(data=[Fp(value=i * 10) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=i * 20) for i in range(TEST_CONFIG.PARAMETER_LEN)]
         original = PublicKey(root=root, parameter=parameter)
 
@@ -65,7 +64,7 @@ class TestPublicKey:
 
     def test_roundtrip_prod_config(self) -> None:
         """Test serialization round-trip with PROD_CONFIG."""
-        root = [Fp(value=i) for i in range(PROD_CONFIG.HASH_LEN_FE)]
+        root = HashDigestVector(data=[Fp(value=i) for i in range(PROD_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=i + 1000) for i in range(PROD_CONFIG.PARAMETER_LEN)]
         original = PublicKey(root=root, parameter=parameter)
 
@@ -86,14 +85,16 @@ class TestPublicKey:
 
     def test_serialization_format(self) -> None:
         """Test that serialization follows the documented format: root || parameter."""
-        root = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=i + 100) for i in range(TEST_CONFIG.PARAMETER_LEN)]
         pk = PublicKey(root=root, parameter=parameter)
 
         data = bytes(pk)
 
         # Check that root comes first
-        root_data = Fp.serialize_list(root)
+        from typing import List, cast
+
+        root_data = Fp.serialize_list(cast(List[Fp], list(root.data)))
         parameter_data = Fp.serialize_list(parameter)
 
         assert data == root_data + parameter_data
@@ -253,7 +254,7 @@ class TestSerializationProperties:
 
     def test_public_key_deterministic(self) -> None:
         """Test that serialization is deterministic."""
-        root = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=i) for i in range(TEST_CONFIG.PARAMETER_LEN)]
         pk = PublicKey(root=root, parameter=parameter)
 
@@ -288,8 +289,8 @@ class TestSerializationProperties:
 
     def test_different_values_produce_different_bytes(self) -> None:
         """Test that different values produce different serializations."""
-        root1 = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)]
-        root2 = [Fp(value=i + 1) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        root1 = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
+        root2 = HashDigestVector(data=[Fp(value=i + 1) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         parameter = [Fp(value=0)] * TEST_CONFIG.PARAMETER_LEN
 
         pk1 = PublicKey(root=root1, parameter=parameter)
