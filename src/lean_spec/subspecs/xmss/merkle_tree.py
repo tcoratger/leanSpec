@@ -168,7 +168,7 @@ class MerkleTree(StrictBaseModel):
         # A full tree is represented as a HashSubTree with lowest_layer=0
         return HashSubTree(depth=Uint64(depth), lowest_layer=Uint64(0), layers=layers)
 
-    def root(self, tree: HashSubTree) -> List[Fp]:
+    def root(self, tree: HashSubTree) -> HashDigestVector:
         """
         Extracts the root digest from a constructed Merkle tree.
 
@@ -176,9 +176,7 @@ class MerkleTree(StrictBaseModel):
         and serves as the primary component of the master public key.
         """
         # The root is the single node in the final layer.
-        root_node = cast(HashDigestVector, tree.layers[-1].nodes.data[0])
-        root_data = cast("Tuple[Fp, ...]", root_node.data)
-        return list(root_data)
+        return cast(HashDigestVector, tree.layers[-1].nodes[0])
 
     def path(self, tree: HashSubTree, position: Uint64) -> HashTreeOpening:
         """
@@ -236,7 +234,7 @@ class MerkleTree(StrictBaseModel):
     def verify_path(
         self,
         parameter: Parameter,
-        root: List[Fp],
+        root: HashDigestVector,
         position: Uint64,
         leaf_parts: List[List[Fp]],
         opening: HashTreeOpening,
@@ -316,7 +314,7 @@ class MerkleTree(StrictBaseModel):
 
         # After iterating through the entire path, the final computed node
         # should be the root of the tree.
-        return current_node == root
+        return current_node == list(root.data)
 
 
 PROD_MERKLE_TREE = MerkleTree(config=PROD_CONFIG, hasher=PROD_TWEAK_HASHER, rand=PROD_RAND)

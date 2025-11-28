@@ -191,7 +191,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
 
         # Collect roots for building the top tree.
-        bottom_tree_roots: List[List[Fp]] = [
+        bottom_tree_roots: List[HashDigestVector] = [
             left_bottom_tree.root(),
             right_bottom_tree.root(),
         ]
