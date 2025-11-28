@@ -7,11 +7,19 @@ implementing the memory-efficient top-bottom tree traversal approach.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Iterator, List, Tuple, cast
 
 from lean_spec.types import StrictBaseModel, Uint64
 
-from .containers import HashDigest, HashTreeLayer, HashTreeOpening, Parameter
+from ..koalabear import Fp
+from .containers import (
+    HashDigest,
+    HashDigestVector,
+    HashTreeLayer,
+    HashTreeOpening,
+    NodeList,
+    Parameter,
+)
 from .tweak_hash import TreeTweak
 from .utils import get_padded_layer
 
@@ -146,19 +154,24 @@ class HashSubTree(StrictBaseModel):
 
             # Group current layer's nodes into pairs of (left, right) siblings.
             # The padding guarantees this works perfectly without orphan nodes.
-            for i, children in enumerate(
+            children_iter = cast(
+                Iterator[Tuple[HashDigestVector, HashDigestVector]],
                 zip(
-                    current_layer.nodes[0::2],
-                    current_layer.nodes[1::2],
+                    current_layer.nodes.data[0::2],
+                    current_layer.nodes.data[1::2],
                     strict=False,
-                )
-            ):
+                ),
+            )
+            for i, children in enumerate(children_iter):
                 # Calculate the position of the parent node in the next level up.
                 parent_index = (current_layer.start_index // Uint64(2)) + Uint64(i)
                 # Create the tweak for hashing these two children.
                 tweak = TreeTweak(level=level + 1, index=parent_index)
                 # Hash the left and right children to get their parent.
-                parent_node = hasher.apply(parameter, tweak, list(children))
+                # Convert HashDigestVector to List[Fp] for hashing
+                left_data = cast("Tuple[Fp, ...]", children[0].data)
+                right_data = cast("Tuple[Fp, ...]", children[1].data)
+                parent_node = hasher.apply(parameter, tweak, [list(left_data), list(right_data)])
                 parents.append(parent_node)
 
             # Pad the new list of parents to prepare for the next iteration.
@@ -316,13 +329,19 @@ class HashSubTree(StrictBaseModel):
         # The root is at position (start_index >> (depth // 2)) = bottom_tree_index
         # within the middle layer. We need to find it in the stored nodes.
         root_position_in_layer = bottom_tree_index - middle_layer.start_index
-        root = middle_layer.nodes[int(root_position_in_layer)]
+        root_node = cast(HashDigestVector, middle_layer.nodes.data[int(root_position_in_layer)])
+        root_data = cast("Tuple[Fp, ...]", root_node.data)
+        root = list(root_data)
 
         # Truncate layers to keep only 0 through depth/2 - 1.
         truncated_layers = full_tree.layers[: (depth // 2)]
 
         # Add a final layer containing just the root.
-        truncated_layers.append(HashTreeLayer(start_index=bottom_tree_index, nodes=[root]))
+        root_vector = HashDigestVector(data=root)
+        root_layer = HashTreeLayer(
+            start_index=bottom_tree_index, nodes=NodeList(data=[root_vector])
+        )
+        truncated_layers.append(root_layer)
 
         return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
 
@@ -343,12 +362,14 @@ class HashSubTree(StrictBaseModel):
             raise ValueError("Cannot get root of empty subtree.")
 
         highest_layer = self.layers[-1]
-        if len(highest_layer.nodes) == 0:
+        if len(highest_layer.nodes.data) == 0:
             raise ValueError("Highest layer of subtree is empty.")
 
         # The root is the only node in the highest layer for proper subtrees.
         # For top trees and bottom trees, the highest layer should have exactly one node.
-        return highest_layer.nodes[0]
+        root_node = cast(HashDigestVector, highest_layer.nodes.data[0])
+        root_data = cast("Tuple[Fp, ...]", root_node.data)
+        return list(root_data)
 
     def path(self, position: Uint64) -> HashTreeOpening:
         """
@@ -392,14 +413,16 @@ class HashSubTree(StrictBaseModel):
             sibling_index = sibling_position - layer.start_index
 
             # Ensure the sibling exists in this layer
-            if sibling_index < Uint64(0) or sibling_index >= Uint64(len(layer.nodes)):
+            if sibling_index < Uint64(0) or sibling_index >= Uint64(len(layer.nodes.data)):
                 raise ValueError(
                     f"Sibling index {sibling_index} out of bounds for layer "
-                    f"with {len(layer.nodes)} nodes"
+                    f"with {len(layer.nodes.data)} nodes"
                 )
 
             # Add the sibling's hash to the co-path.
-            co_path.append(layer.nodes[int(sibling_index)])
+            sibling_node = cast(HashDigestVector, layer.nodes.data[int(sibling_index)])
+            sibling_data = cast("Tuple[Fp, ...]", sibling_node.data)
+            co_path.append(list(sibling_data))
 
             # Move to the parent's position for the next iteration.
             current_position = current_position // Uint64(2)

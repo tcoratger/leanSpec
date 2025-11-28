@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, Annotated, List
 from pydantic import Field
 
 from ...types import StrictBaseModel, Uint64
+from ...types.collections import SSZList, SSZVector
 from ..koalabear import P_BYTES, Fp
-from .constants import PRF_KEY_LENGTH
+from .constants import PRF_KEY_LENGTH, PROD_CONFIG
 
 if TYPE_CHECKING:
     from .constants import XmssConfig
@@ -23,14 +24,71 @@ which all one-time signing keys are deterministically derived.
 """
 
 
+HASH_DIGEST_LENGTH = PROD_CONFIG.HASH_LEN_FE
+"""
+The fixed length of a hash digest in field elements.
+
+Derived from `PROD_CONFIG.HASH_LEN_FE`. This corresponds to the output length
+of the Poseidon2 hash function used in the XMSS scheme.
+"""
+
+# Calculate the maximum number of nodes in a sparse Merkle tree layer:
+# - A bottom tree has at most 2^(LOG_LIFETIME/2) leaves
+# - With padding, we may add up to 2 additional nodes
+# - To be generous and future-proof, we use 2^(LOG_LIFETIME/2 + 1)
+NODE_LIST_LIMIT = 1 << (PROD_CONFIG.LOG_LIFETIME // 2 + 1)
+"""
+The maximum number of nodes that can be stored in a sparse Merkle tree layer.
+
+Calculated as `2^(LOG_LIFETIME/2 + 1)` from PROD_CONFIG to accommodate:
+- Bottom trees with up to `2^(LOG_LIFETIME/2)` nodes
+- Padding overhead (up to 2 additional nodes)
+- Future-proofing with 2x margin
+"""
+
+
+class HashDigestVector(SSZVector):
+    """
+    A single hash digest represented as a fixed-size vector of field elements.
+
+    This is the SSZ-compliant representation of a Poseidon2 hash output.
+    In SSZ notation: `Vector[Fp, HASH_DIGEST_LENGTH]`
+
+    The fixed size enables efficient serialization when used in collections,
+    as SSZ can pack these back-to-back without per-element offsets.
+    """
+
+    ELEMENT_TYPE = Fp
+    LENGTH = HASH_DIGEST_LENGTH
+
+
+# Type alias for backward compatibility
 HashDigest = List[Fp]
 """
-A type alias representing a hash digest.
+Legacy type alias representing a hash digest as a plain list.
 
-In this scheme, a digest is the output of the Poseidon2 hash function. It is a
-fixed-length list of field elements (`Fp`) and serves as the fundamental
-building block for all cryptographic structures (e.g., a node in a Merkle tree).
+New code should prefer `HashDigestVector` for SSZ serialization.
+This alias is maintained for compatibility with existing code.
 """
+
+
+class NodeList(SSZList):
+    """
+    Variable-length list of hash digests representing nodes in a Merkle tree layer.
+
+    In SSZ notation: `List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]`
+
+    The limit is calculated from PROD_CONFIG to provide ample space for sparse
+    Merkle tree layers, accommodating even the largest possible bottom tree with
+    padding overhead.
+
+    Corresponds to `Vec<TH::Domain>` in the Rust implementation's `HashTreeLayer`
+    structure.
+    """
+
+    ELEMENT_TYPE = HashDigestVector
+    LIMIT = NODE_LIST_LIMIT
+
 
 Parameter = List[Fp]
 """
@@ -107,8 +165,8 @@ class HashTreeLayer(StrictBaseModel):
 
     start_index: Uint64
     """The starting index of the first node in this layer."""
-    nodes: List[HashDigest]
-    """A list of the actual hash digests stored for this layer."""
+    nodes: NodeList
+    """SSZ-compliant list of hash digests stored for this layer."""
 
 
 class PublicKey(StrictBaseModel):

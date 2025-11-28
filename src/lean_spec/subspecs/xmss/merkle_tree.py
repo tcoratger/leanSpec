@@ -30,12 +30,13 @@ This implementation includes two important features tailored for this use case:
 
 from __future__ import annotations
 
-from typing import List
+from typing import Iterator, List, Tuple, cast
 
 from pydantic import model_validator
 
 from lean_spec.types import StrictBaseModel, Uint64
 
+from ..koalabear import Fp
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
@@ -43,6 +44,7 @@ from .constants import (
 )
 from .containers import (
     HashDigest,
+    HashDigestVector,
     HashTreeLayer,
     HashTreeOpening,
     Parameter,
@@ -135,19 +137,26 @@ class MerkleTree(StrictBaseModel):
             # Group the current layer's nodes into pairs of (left, right) siblings.
             #
             # The padding guarantees this works perfectly without leaving orphan nodes.
-            for i, children in enumerate(
+            children_iter = cast(
+                Iterator[Tuple[HashDigestVector, HashDigestVector]],
                 zip(
-                    current_layer.nodes[0::2],
-                    current_layer.nodes[1::2],
+                    current_layer.nodes.data[0::2],
+                    current_layer.nodes.data[1::2],
                     strict=False,
-                )
-            ):
+                ),
+            )
+            for i, children in enumerate(children_iter):
                 # Calculate the position of the parent node in the next level up.
                 parent_index = (current_layer.start_index // Uint64(2)) + Uint64(i)
                 # Create the tweak for hashing these two children.
                 tweak = TreeTweak(level=level + 1, index=parent_index)
                 # Hash the left and right children to get their parent.
-                parent_node = self.hasher.apply(parameter, tweak, list(children))
+                # Convert HashDigestVector to List[Fp] for hashing
+                left_data = cast("Tuple[Fp, ...]", children[0].data)
+                right_data = cast("Tuple[Fp, ...]", children[1].data)
+                parent_node = self.hasher.apply(
+                    parameter, tweak, [list(left_data), list(right_data)]
+                )
                 parents.append(parent_node)
 
             # Pad the new list of parents to prepare for the next iteration.
@@ -167,7 +176,9 @@ class MerkleTree(StrictBaseModel):
         and serves as the primary component of the master public key.
         """
         # The root is the single node in the final layer.
-        return tree.layers[-1].nodes[0]
+        root_node = cast(HashDigestVector, tree.layers[-1].nodes.data[0])
+        root_data = cast("Tuple[Fp, ...]", root_node.data)
+        return list(root_data)
 
     def path(self, tree: HashSubTree, position: Uint64) -> HashTreeOpening:
         """
@@ -212,7 +223,9 @@ class MerkleTree(StrictBaseModel):
             layer = tree.layers[level]
             sibling_index_in_vec = sibling_position - layer.start_index
             # Add the sibling's hash to the co-path.
-            co_path.append(layer.nodes[int(sibling_index_in_vec)])
+            sibling_node = cast(HashDigestVector, layer.nodes.data[int(sibling_index_in_vec)])
+            sibling_data = cast("Tuple[Fp, ...]", sibling_node.data)
+            co_path.append(list(sibling_data))
             # Move up to the parent's position for the next iteration.
             current_position = current_position // Uint64(2)
 

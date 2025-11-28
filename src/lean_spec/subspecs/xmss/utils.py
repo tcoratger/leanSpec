@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, List
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .constants import XmssConfig
-from .containers import HashDigest, HashTreeLayer
+from .containers import HashDigest, HashDigestVector, HashTreeLayer, NodeList
 from .rand import Rand
 
 if TYPE_CHECKING:
@@ -51,7 +51,10 @@ def get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: Uint64) -
     if end_index % Uint64(2) == Uint64(0):
         nodes_with_padding.append(rand.domain())
 
-    return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
+    # Convert to SSZ-friendly types: each digest becomes a HashDigestVector,
+    # and the list becomes a NodeList.
+    ssz_nodes = [HashDigestVector(data=node) for node in nodes_with_padding]
+    return HashTreeLayer(start_index=actual_start_index, nodes=NodeList(data=ssz_nodes))
 
 
 def int_to_base_p(value: int, num_limbs: int) -> List[Fp]:
