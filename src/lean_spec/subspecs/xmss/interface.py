@@ -359,13 +359,6 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # With top-bottom tree traversal, we use combined_path to merge paths from
         # the bottom tree and top tree.
 
-        # Ensure we have the required top-bottom tree structures.
-        if sk.top_tree is None:
-            raise ValueError(
-                "Secret key is missing top-bottom tree structures. "
-                "This may be a legacy key format that is no longer supported."
-            )
-
         # Determine which bottom tree contains this epoch.
         leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
         boundary = (sk.left_bottom_tree_index + Uint64(1)) * Uint64(leafs_per_bottom_tree)
@@ -548,12 +541,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
             A new SecretKey with the advanced preparation window.
 
         Raises:
-            ValueError: If the secret key is missing top-bottom tree structures
-            or if advancing would exceed the activation interval.
+            ValueError: If advancing would exceed the activation interval.
         """
-        if sk.left_bottom_tree is None or sk.right_bottom_tree is None:
-            raise ValueError("Secret key missing bottom tree data")
-
         leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
 
         # Check if advancing would exceed the activation interval

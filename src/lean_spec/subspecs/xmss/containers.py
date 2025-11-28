@@ -374,7 +374,7 @@ class SecretKey(StrictBaseModel):
     `sqrt(LIFETIME)`, with a minimum of `2 * sqrt(LIFETIME)`.
     """
 
-    top_tree: HashSubTree | None = None
+    top_tree: HashSubTree
     """
     The top tree containing the root and top `LOG_LIFETIME/2` layers.
 
@@ -394,7 +394,7 @@ class SecretKey(StrictBaseModel):
 
     """
 
-    left_bottom_tree: HashSubTree | None = None
+    left_bottom_tree: HashSubTree
     """
     The left bottom tree in the sliding window.
 
@@ -402,7 +402,7 @@ class SecretKey(StrictBaseModel):
     [left_bottom_tree_index * sqrt(LIFETIME), (left_bottom_tree_index + 1) * sqrt(LIFETIME))
     """
 
-    right_bottom_tree: HashSubTree | None = None
+    right_bottom_tree: HashSubTree
     """
     The right bottom tree in the sliding window.
 
