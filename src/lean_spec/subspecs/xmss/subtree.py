@@ -13,11 +13,10 @@ from lean_spec.types import StrictBaseModel, Uint64
 
 from ..koalabear import Fp
 from .containers import (
-    HashDigest,
+    HashDigestList,
     HashDigestVector,
     HashTreeLayer,
     HashTreeOpening,
-    NodeList,
     Parameter,
 )
 from .tweak_hash import TreeTweak
@@ -95,7 +94,7 @@ class HashSubTree(StrictBaseModel):
         depth: int,
         start_index: Uint64,
         parameter: Parameter,
-        lowest_layer_nodes: List[HashDigest],
+        lowest_layer_nodes: List[List[Fp]],
     ) -> HashSubTree:
         """
         Builds a new sparse Merkle subtree starting from a specified layer.
@@ -150,7 +149,7 @@ class HashSubTree(StrictBaseModel):
 
         # Build the tree layer by layer from lowest_layer up to the root.
         for level in range(lowest_layer, depth):
-            parents: List[HashDigest] = []
+            parents: List[List[Fp]] = []
 
             # Group current layer's nodes into pairs of (left, right) siblings.
             # The padding guarantees this works perfectly without orphan nodes.
@@ -190,7 +189,7 @@ class HashSubTree(StrictBaseModel):
         depth: int,
         start_bottom_tree_index: Uint64,
         parameter: Parameter,
-        bottom_tree_roots: List[HashDigest],
+        bottom_tree_roots: List[List[Fp]],
     ) -> HashSubTree:
         """
         Constructs a top tree from the roots of bottom trees.
@@ -252,7 +251,7 @@ class HashSubTree(StrictBaseModel):
         depth: int,
         bottom_tree_index: Uint64,
         parameter: Parameter,
-        leaves: List[HashDigest],
+        leaves: List[List[Fp]],
     ) -> HashSubTree:
         """
         Constructs a single bottom tree from leaf hashes.
@@ -339,13 +338,13 @@ class HashSubTree(StrictBaseModel):
         # Add a final layer containing just the root.
         root_vector = HashDigestVector(data=root)
         root_layer = HashTreeLayer(
-            start_index=bottom_tree_index, nodes=NodeList(data=[root_vector])
+            start_index=bottom_tree_index, nodes=HashDigestList(data=[root_vector])
         )
         truncated_layers.append(root_layer)
 
         return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
 
-    def root(self) -> HashDigest:
+    def root(self) -> List[Fp]:
         """
         Extracts the root digest from this subtree.
 
@@ -401,7 +400,7 @@ class HashSubTree(StrictBaseModel):
         if position >= lowest_layer.start_index + Uint64(len(lowest_layer.nodes)):
             raise ValueError("Position is beyond the subtree's range.")
 
-        co_path: List[HashDigest] = []
+        co_path: List[List[Fp]] = []
         current_position = position
 
         # Iterate through layers from lowest to highest, EXCLUDING the final root layer.
@@ -427,7 +426,9 @@ class HashSubTree(StrictBaseModel):
             # Move to the parent's position for the next iteration.
             current_position = current_position // Uint64(2)
 
-        return HashTreeOpening(siblings=co_path)
+        # Wrap in SSZ types
+        ssz_siblings = [HashDigestVector(data=sibling) for sibling in co_path]
+        return HashTreeOpening(siblings=HashDigestList(data=ssz_siblings))
 
 
 def combined_path(
@@ -516,6 +517,7 @@ def combined_path(
 
     # Concatenate the two paths: bottom siblings first, then top siblings.
     # This creates a complete path from leaf to global root.
-    combined_siblings = bottom_path.siblings + top_path.siblings
+    # Since siblings are now HashDigestList, we need to concatenate their data.
+    combined_siblings_data = list(bottom_path.siblings.data) + list(top_path.siblings.data)
 
-    return HashTreeOpening(siblings=combined_siblings)
+    return HashTreeOpening(siblings=HashDigestList(data=combined_siblings_data))

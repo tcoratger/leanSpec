@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, List
+from typing import TYPE_CHECKING, Annotated, List, Tuple
 
 from pydantic import Field
 
@@ -62,28 +62,13 @@ class HashDigestVector(SSZVector):
     LENGTH = HASH_DIGEST_LENGTH
 
 
-# Type alias for backward compatibility
-HashDigest = List[Fp]
-"""
-Legacy type alias representing a hash digest as a plain list.
-
-New code should prefer `HashDigestVector` for SSZ serialization.
-This alias is maintained for compatibility with existing code.
-"""
-
-
-class NodeList(SSZList):
+class HashDigestList(SSZList):
     """
-    Variable-length list of hash digests representing nodes in a Merkle tree layer.
+    Variable-length list of hash digests.
 
     In SSZ notation: `List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]`
 
-    The limit is calculated from PROD_CONFIG to provide ample space for sparse
-    Merkle tree layers, accommodating even the largest possible bottom tree with
-    padding overhead.
-
-    Corresponds to `Vec<TH::Domain>` in the Rust implementation's `HashTreeLayer`
-    structure.
+    This type is used to represent collections of hash digests in the XMSS scheme.
     """
 
     ELEMENT_TYPE = HashDigestVector
@@ -109,16 +94,26 @@ the final signature for the verifier to reproduce the same hash.
 """
 
 
-def _serialize_digests(digests: List[HashDigest]) -> bytes:
+def _serialize_digests(digests: HashDigestList) -> bytes:
     """
     Serialize a list of hash digests.
 
-    Each digest is a list of field elements.
+    Args:
+        digests: SSZ-compliant list of hash digests.
+
+    Returns:
+        Concatenated serialized field elements.
     """
-    return b"".join(Fp.serialize_list(digest) for digest in digests)
+    from typing import cast as typing_cast
+
+    digest_vectors = typing_cast("List[HashDigestVector]", digests.data)
+    return b"".join(
+        Fp.serialize_list(list(typing_cast("Tuple[Fp, ...]", digest.data)))
+        for digest in digest_vectors
+    )
 
 
-def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> List[HashDigest]:
+def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> HashDigestList:
     """
     Deserialize multiple hash digests from bytes.
 
@@ -128,7 +123,7 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> L
         elements_per_digest: Field elements per digest.
 
     Returns:
-        List of hash digests.
+        SSZ-compliant list of hash digests.
 
     Raises:
         ValueError: If data length doesn't match expectations.
@@ -136,10 +131,15 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> L
     total_elements = count * elements_per_digest
     all_elements = Fp.deserialize_list(data, total_elements)
 
-    return [
+    # Convert to list of lists first
+    digests = [
         all_elements[i : i + elements_per_digest]
         for i in range(0, len(all_elements), elements_per_digest)
     ]
+
+    # Wrap in SSZ types
+    ssz_digests = [HashDigestVector(data=digest) for digest in digests]
+    return HashDigestList(data=ssz_digests)
 
 
 class HashTreeOpening(StrictBaseModel):
@@ -151,8 +151,8 @@ class HashTreeOpening(StrictBaseModel):
     path from the leaf to the top of the tree.
     """
 
-    siblings: List[HashDigest]
-    """List of sibling hashes, from bottom to top."""
+    siblings: HashDigestList
+    """SSZ-compliant list of sibling hashes, from bottom to top."""
 
 
 class HashTreeLayer(StrictBaseModel):
@@ -165,7 +165,7 @@ class HashTreeLayer(StrictBaseModel):
 
     start_index: Uint64
     """The starting index of the first node in this layer."""
-    nodes: NodeList
+    nodes: HashDigestList
     """SSZ-compliant list of hash digests stored for this layer."""
 
 
@@ -285,7 +285,7 @@ class Signature(StrictBaseModel):
     """The authentication path proving the one-time key's inclusion in the Merkle tree."""
     rho: Randomness
     """The randomness used to successfully encode the message."""
-    hashes: List[HashDigest]
+    hashes: HashDigestList
     """The one-time signature itself: a list of intermediate Winternitz chain hashes."""
 
     def __bytes__(self) -> bytes:
@@ -320,11 +320,14 @@ class Signature(StrictBaseModel):
                 f"got {len(self.path.siblings)}"
             )
 
-        for i, sibling in enumerate(self.path.siblings):
-            if len(sibling) != config.HASH_LEN_FE:
+        from typing import cast as typing_cast
+
+        sibling_vectors = typing_cast("List[HashDigestVector]", self.path.siblings.data)
+        for i, sibling_vector in enumerate(sibling_vectors):
+            if len(sibling_vector.data) != config.HASH_LEN_FE:
                 raise ValueError(
                     f"Invalid sibling {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(sibling)}"
+                    f"got {len(sibling_vector.data)}"
                 )
 
         # Validate randomness
@@ -339,11 +342,12 @@ class Signature(StrictBaseModel):
                 f"Invalid hashes length: expected {config.DIMENSION} hashes, got {len(self.hashes)}"
             )
 
-        for i, hash_digest in enumerate(self.hashes):
-            if len(hash_digest) != config.HASH_LEN_FE:
+        hash_vectors = typing_cast("List[HashDigestVector]", self.hashes.data)
+        for i, hash_vector in enumerate(hash_vectors):
+            if len(hash_vector.data) != config.HASH_LEN_FE:
                 raise ValueError(
                     f"Invalid hash {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(hash_digest)}"
+                    f"got {len(hash_vector.data)}"
                 )
 
         return bytes(self)

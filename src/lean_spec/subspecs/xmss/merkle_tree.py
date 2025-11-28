@@ -43,7 +43,7 @@ from .constants import (
     XmssConfig,
 )
 from .containers import (
-    HashDigest,
+    HashDigestList,
     HashDigestVector,
     HashTreeLayer,
     HashTreeOpening,
@@ -89,7 +89,7 @@ class MerkleTree(StrictBaseModel):
         depth: int,
         start_index: Uint64,
         parameter: Parameter,
-        leaf_hashes: List[HashDigest],
+        leaf_hashes: List[List[Fp]],
     ) -> HashSubTree:
         """
         Builds a new sparse Merkle tree from a contiguous range of leaf hashes.
@@ -133,7 +133,7 @@ class MerkleTree(StrictBaseModel):
 
         # Iterate from the leaf layer (level 0) up to the root.
         for level in range(depth):
-            parents: List[HashDigest] = []
+            parents: List[List[Fp]] = []
             # Group the current layer's nodes into pairs of (left, right) siblings.
             #
             # The padding guarantees this works perfectly without leaving orphan nodes.
@@ -168,7 +168,7 @@ class MerkleTree(StrictBaseModel):
         # A full tree is represented as a HashSubTree with lowest_layer=0
         return HashSubTree(depth=Uint64(depth), lowest_layer=Uint64(0), layers=layers)
 
-    def root(self, tree: HashSubTree) -> HashDigest:
+    def root(self, tree: HashSubTree) -> List[Fp]:
         """
         Extracts the root digest from a constructed Merkle tree.
 
@@ -212,7 +212,7 @@ class MerkleTree(StrictBaseModel):
         if position >= tree.layers[0].start_index + Uint64(len(tree.layers[0].nodes)):
             raise ValueError("Position (after end) is invalid.")
 
-        co_path: List[HashDigest] = []
+        co_path: List[List[Fp]] = []
         current_position = position
 
         # Iterate from the leaf layer (level 0) up to the layer below the root.
@@ -229,14 +229,16 @@ class MerkleTree(StrictBaseModel):
             # Move up to the parent's position for the next iteration.
             current_position = current_position // Uint64(2)
 
-        return HashTreeOpening(siblings=co_path)
+        # Wrap in SSZ types
+        ssz_siblings = [HashDigestVector(data=sibling) for sibling in co_path]
+        return HashTreeOpening(siblings=HashDigestList(data=ssz_siblings))
 
     def verify_path(
         self,
         parameter: Parameter,
-        root: HashDigest,
+        root: List[Fp],
         position: Uint64,
-        leaf_parts: List[HashDigest],
+        leaf_parts: List[List[Fp]],
         opening: HashTreeOpening,
     ) -> bool:
         """
@@ -294,8 +296,13 @@ class MerkleTree(StrictBaseModel):
         # Iterate up the tree, hashing the current node with its sibling from
         # the path at each level.
         current_position = int(position)
-        for level, sibling_node in enumerate(opening.siblings):
+        sibling_vectors = cast("List[HashDigestVector]", opening.siblings.data)
+        for level, sibling_vector in enumerate(sibling_vectors):
+            # Convert HashDigestVector to List[Fp]
+            sibling_data = cast("Tuple[Fp, ...]", sibling_vector.data)
+            sibling_node: List[Fp] = list(sibling_data)
             # Determine if the current node is a left or right child.
+            children: List[List[Fp]]
             if current_position % 2 == 0:
                 # Current node is a left child; sibling is on the right.
                 children = [current_node, sibling_node]

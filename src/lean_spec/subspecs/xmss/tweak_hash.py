@@ -41,7 +41,7 @@ from .constants import (
     TWEAK_PREFIX_TREE,
     XmssConfig,
 )
-from .containers import HashDigest, Parameter
+from .containers import Parameter
 from .poseidon import (
     PROD_POSEIDON,
     TEST_POSEIDON,
@@ -150,8 +150,8 @@ class TweakHasher(StrictBaseModel):
         self,
         parameter: Parameter,
         tweak: Union[TreeTweak, ChainTweak],
-        message_parts: List[HashDigest],
-    ) -> HashDigest:
+        message_parts: List[List[Fp]],
+    ) -> List[Fp]:
         """
         Applies the tweakable Poseidon2 hash function to a message.
 
@@ -227,8 +227,8 @@ class TweakHasher(StrictBaseModel):
         chain_index: int,
         start_step: int,
         num_steps: int,
-        start_digest: HashDigest,
-    ) -> HashDigest:
+        start_digest: List[Fp],
+    ) -> List[Fp]:
         """
         Performs repeated hashing to traverse a WOTS+ hash chain.
 

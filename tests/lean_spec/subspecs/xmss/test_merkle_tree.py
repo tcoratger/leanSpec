@@ -2,7 +2,7 @@
 
 import pytest
 
-from lean_spec.subspecs.xmss.containers import HashDigest
+from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.merkle_tree import (
     PROD_MERKLE_TREE,
     MerkleTree,
@@ -37,12 +37,12 @@ def _run_commit_open_verify_roundtrip(
     """
     # SETUP: Generate a random parameter and the raw leaf data.
     parameter = merkle_tree.rand.parameter()
-    leaves: list[list[HashDigest]] = [
+    leaves: list[list[list[Fp]]] = [
         [merkle_tree.rand.domain() for _ in range(leaf_parts_len)] for _ in range(num_leaves)
     ]
 
     # HASH LEAVES: Compute the layer 0 nodes by hashing the leaf parts.
-    leaf_hashes: list[HashDigest] = [
+    leaf_hashes: list[list[Fp]] = [
         merkle_tree.hasher.apply(
             parameter,
             TreeTweak(level=0, index=start_index + i),

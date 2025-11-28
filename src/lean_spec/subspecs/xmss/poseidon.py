@@ -35,7 +35,6 @@ from ..poseidon2.permutation import (
     Poseidon2Params,
     permute,
 )
-from .containers import HashDigest
 from .utils import int_to_base_p
 
 
@@ -60,7 +59,7 @@ class PoseidonXmss(StrictBaseModel):
                 )
         return self
 
-    def compress(self, input_vec: List[Fp], width: int, output_len: int) -> HashDigest:
+    def compress(self, input_vec: List[Fp], width: int, output_len: int) -> List[Fp]:
         """
         Implements the Poseidon2 hash in **compression mode**.
 
@@ -144,7 +143,7 @@ class PoseidonXmss(StrictBaseModel):
         capacity_value: List[Fp],
         output_len: int,
         width: int,
-    ) -> HashDigest:
+    ) -> List[Fp]:
         """
         Implements the Poseidon2 hash using the **sponge construction**.
 
@@ -204,7 +203,7 @@ class PoseidonXmss(StrictBaseModel):
             state = permute(state, params)
 
         # Squeeze the output until enough elements have been generated.
-        output: HashDigest = []
+        output: List[Fp] = []
         while len(output) < output_len:
             # Extract the rate part of the state as output.
             output.extend(state[:rate])
