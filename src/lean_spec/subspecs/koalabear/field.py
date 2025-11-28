@@ -1,10 +1,8 @@
 """Core definition of the KoalaBear prime field Fp."""
 
-from typing import Self
+from typing import IO, Self
 
-from pydantic import Field, field_validator
-
-from lean_spec.types import StrictBaseModel
+from lean_spec.types import SSZType
 
 # =================================================================
 # Field Constants
@@ -72,16 +70,61 @@ the multiplicative subgroup of order 2^n.
 # =================================================================
 
 
-class Fp(StrictBaseModel):
-    """An element in the KoalaBear prime field F_p."""
+class Fp(SSZType):
+    """
+    An element in the KoalaBear prime field F_p.
 
-    value: int = Field(ge=0, lt=P, description="Field element value in the range [0, P)")
+    This is an SSZ-serializable type.
 
-    @field_validator("value", mode="before")
+    Each field element is represented as a 4-byte little-endian unsigned integer.
+    """
+
+    def __init__(self, value: int) -> None:
+        """
+        Create a field element.
+
+        Args:
+            value: The value to wrap. Must be in the range [0, P).
+
+            Negative values will be normalized to the range [0, P).
+
+        Raises:
+            TypeError: If value is not an integer.
+        """
+        if not isinstance(value, int):
+            raise TypeError(f"Field value must be an integer, got {type(value).__name__}")
+
+        # Normalize to [0, P) - handles negative values correctly
+        self.value: int = value % P
+
     @classmethod
-    def reduce_modulo_p(cls, v: int) -> int:
-        """Reduces an integer input modulo P before validation."""
-        return v % P
+    def is_fixed_size(cls) -> bool:
+        """Fp elements are fixed-size (4 bytes)."""
+        return True
+
+    @classmethod
+    def get_byte_length(cls) -> int:
+        """Get the byte length of an Fp element."""
+        return P_BYTES
+
+    def serialize(self, stream: IO[bytes]) -> int:
+        """Serialize the field element to a binary stream."""
+        data = self.value.to_bytes(P_BYTES, byteorder="little")
+        stream.write(data)
+        return len(data)
+
+    @classmethod
+    def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
+        """Deserialize a field element from a binary stream."""
+        if scope != P_BYTES:
+            raise ValueError(f"Expected {P_BYTES} bytes for Fp, got {scope}")
+        data = stream.read(P_BYTES)
+        if len(data) != P_BYTES:
+            raise ValueError(f"Expected {P_BYTES} bytes for Fp, got {len(data)}")
+        value = int.from_bytes(data, byteorder="little")
+        if value >= P:
+            raise ValueError(f"Value {value} exceeds field modulus {P}")
+        return cls(value=value)
 
     def __add__(self, other: Self) -> Self:
         """Field addition."""
@@ -135,6 +178,20 @@ class Fp(StrictBaseModel):
             raise ValueError(f"bits must be between 0 and {TWO_ADICITY}")
         return cls(value=TWO_ADIC_GENERATORS[bits])
 
+    def __eq__(self, other: object) -> bool:
+        """Check equality of two field elements."""
+        if not isinstance(other, Fp):
+            return False
+        return self.value == other.value
+
+    def __hash__(self) -> int:
+        """Compute hash of the field element."""
+        return hash(self.value)
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return f"Fp(value={self.value})"
+
     def __bytes__(self) -> bytes:
         """
         Serialize the field element using Python's bytes protocol.
@@ -150,7 +207,7 @@ class Fp(StrictBaseModel):
             >>> len(data) == 4
             True
         """
-        return self.value.to_bytes(P_BYTES, byteorder="little")
+        return self.encode_bytes()
 
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
@@ -175,15 +232,7 @@ class Fp(StrictBaseModel):
             >>> recovered == fp
             True
         """
-        if len(data) != P_BYTES:
-            raise ValueError(f"Expected {P_BYTES} bytes, got {len(data)}")
-
-        value = int.from_bytes(data, byteorder="little")
-
-        if value >= P:
-            raise ValueError(f"Value {value} (0x{value:08x}) exceeds field modulus {P} (0x{P:08x})")
-
-        return cls(value=value)
+        return cls.decode_bytes(data)
 
     @classmethod
     def serialize_list(cls, elements: list[Self]) -> bytes:

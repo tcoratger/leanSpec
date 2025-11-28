@@ -6,6 +6,7 @@ from .boolean import Boolean
 from .byte_arrays import ZERO_HASH, Bytes32, Bytes52, Bytes3116
 from .collections import SSZList, SSZVector
 from .container import Container
+from .ssz_base import SSZType
 from .uint import Uint64
 from .validator import ValidatorIndex, is_proposer
 
@@ -22,6 +23,7 @@ __all__ = [
     "is_proposer",
     "SSZList",
     "SSZVector",
+    "SSZType",
     "Boolean",
     "Container",
 ]
