@@ -15,6 +15,7 @@ from lean_spec.subspecs.xmss.utils import (
     expand_activation_time,
     int_to_base_p,
 )
+from lean_spec.types import Uint64
 
 
 @pytest.mark.parametrize(
@@ -129,8 +130,8 @@ def test_bottom_tree_from_prf_key() -> None:
     )
 
     # Verify structure
-    assert bottom_tree.depth == config.LOG_LIFETIME
-    assert bottom_tree.lowest_layer == 0
+    assert bottom_tree.depth == Uint64(config.LOG_LIFETIME)
+    assert bottom_tree.lowest_layer == Uint64(0)
     assert len(bottom_tree.layers) > 0
 
     # Verify the root layer has exactly one node

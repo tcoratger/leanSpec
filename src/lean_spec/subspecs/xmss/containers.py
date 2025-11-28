@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated, List
 
 from pydantic import Field
 
-from ...types import StrictBaseModel
+from ...types import StrictBaseModel, Uint64
 from ..koalabear import P_BYTES, Fp
 from .constants import PRF_KEY_LENGTH
 
@@ -105,7 +105,7 @@ class HashTreeLayer(StrictBaseModel):
     for the active range of leaves, not the entire conceptual layer.
     """
 
-    start_index: int
+    start_index: Uint64
     """The starting index of the first node in this layer."""
     nodes: List[HashDigest]
     """A list of the actual hash digests stored for this layer."""
@@ -120,7 +120,7 @@ class HashTree(StrictBaseModel):
     long lifetimes, prefer `HashSubTree` with the top-bottom tree approach.
     """
 
-    depth: int
+    depth: Uint64
     """The total depth of the tree (e.g., 32 for a 2^32 leaf space)."""
     layers: List[HashTreeLayer]
     """

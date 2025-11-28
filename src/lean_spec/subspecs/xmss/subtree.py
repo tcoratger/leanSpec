@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from .tweak_hash import TweakHasher
 
 
-def _get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: int) -> HashTreeLayer:
+def _get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: Uint64) -> HashTreeLayer:
     """
     Pads a layer of nodes with random hashes to simplify tree construction.
 
@@ -38,21 +38,21 @@ def _get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: int) -> 
         A new `HashTreeLayer` with the necessary padding applied.
     """
     nodes_with_padding: List[HashDigest] = []
-    end_index = start_index + len(nodes) - 1
+    end_index = start_index + Uint64(len(nodes)) - Uint64(1)
 
     # Prepend random padding if the layer starts at an odd index.
-    if start_index % 2 == 1:
+    if start_index % Uint64(2) == Uint64(1):
         nodes_with_padding.append(rand.domain())
 
     # The actual start index of the padded layer is always the even
     # number at or immediately before the original start_index.
-    actual_start_index = start_index - (start_index % 2)
+    actual_start_index = start_index - (start_index % Uint64(2))
 
     # Add the actual node content.
     nodes_with_padding.extend(nodes)
 
     # Append random padding if the layer ends at an even index.
-    if end_index % 2 == 0:
+    if end_index % Uint64(2) == Uint64(0):
         nodes_with_padding.append(rand.domain())
 
     return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
@@ -84,7 +84,7 @@ class HashSubTree(StrictBaseModel):
     - Two consecutive bottom trees (sliding window)
     """
 
-    depth: int
+    depth: Uint64
     """
     The total depth of the full tree (e.g., 32 for a 2^32 leaf space).
 
@@ -92,7 +92,7 @@ class HashSubTree(StrictBaseModel):
     A subtree starting from layer `k` will have `depth - k` layers stored.
     """
 
-    lowest_layer: int
+    lowest_layer: Uint64
     """
     The lowest layer included in this subtree.
 
@@ -175,7 +175,7 @@ class HashSubTree(StrictBaseModel):
 
         # Start with the lowest layer nodes and apply initial padding.
         layers: List[HashTreeLayer] = []
-        current_layer = _get_padded_layer(rand, lowest_layer_nodes, start_index)
+        current_layer = _get_padded_layer(rand, lowest_layer_nodes, Uint64(start_index))
         layers.append(current_layer)
 
         # Build the tree layer by layer from lowest_layer up to the root.
@@ -192,7 +192,7 @@ class HashSubTree(StrictBaseModel):
                 )
             ):
                 # Calculate the position of the parent node in the next level up.
-                parent_index = (current_layer.start_index // 2) + i
+                parent_index = (current_layer.start_index // Uint64(2)) + Uint64(i)
                 # Create the tweak for hashing these two children.
                 tweak = TreeTweak(level=level + 1, index=parent_index)
                 # Hash the left and right children to get their parent.
@@ -200,12 +200,12 @@ class HashSubTree(StrictBaseModel):
                 parents.append(parent_node)
 
             # Pad the new list of parents to prepare for the next iteration.
-            new_start_index = current_layer.start_index // 2
+            new_start_index = current_layer.start_index // Uint64(2)
             current_layer = _get_padded_layer(rand, parents, new_start_index)
             layers.append(current_layer)
 
         # Return the completed subtree.
-        return cls(depth=depth, lowest_layer=lowest_layer, layers=layers)
+        return cls(depth=Uint64(depth), lowest_layer=Uint64(lowest_layer), layers=layers)
 
     @classmethod
     def new_top_tree(
@@ -353,16 +353,16 @@ class HashSubTree(StrictBaseModel):
 
         # The root is at position (start_index >> (depth // 2)) = bottom_tree_index
         # within the middle layer. We need to find it in the stored nodes.
-        root_position_in_layer = bottom_tree_index - middle_layer.start_index
-        root = middle_layer.nodes[root_position_in_layer]
+        root_position_in_layer = Uint64(bottom_tree_index) - middle_layer.start_index
+        root = middle_layer.nodes[int(root_position_in_layer)]
 
         # Truncate layers to keep only 0 through depth/2 - 1.
         truncated_layers = full_tree.layers[: (depth // 2)]
 
         # Add a final layer containing just the root.
-        truncated_layers.append(HashTreeLayer(start_index=bottom_tree_index, nodes=[root]))
+        truncated_layers.append(HashTreeLayer(start_index=Uint64(bottom_tree_index), nodes=[root]))
 
-        return cls(depth=depth, lowest_layer=0, layers=truncated_layers)
+        return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
 
     def root(self) -> HashDigest:
         """
@@ -412,35 +412,35 @@ class HashSubTree(StrictBaseModel):
             raise ValueError("Cannot generate path for empty subtree.")
 
         lowest_layer = self.layers[0]
-        if int(position) < lowest_layer.start_index:
+        if position < lowest_layer.start_index:
             raise ValueError("Position is before the subtree's start index.")
 
-        if int(position) >= lowest_layer.start_index + len(lowest_layer.nodes):
+        if position >= lowest_layer.start_index + Uint64(len(lowest_layer.nodes)):
             raise ValueError("Position is beyond the subtree's range.")
 
         co_path: List[HashDigest] = []
-        current_position = int(position)
+        current_position = position
 
         # Iterate through layers from lowest to highest, EXCLUDING the final root layer.
         # The root layer doesn't contribute a sibling to the authentication path.
         # self.layers[:-1] gives all layers except the last (root) layer.
         for layer in self.layers[:-1]:
             # Determine the sibling's position by flipping the last bit.
-            sibling_position = current_position ^ 1
+            sibling_position = current_position ^ Uint64(1)
             sibling_index = sibling_position - layer.start_index
 
             # Ensure the sibling exists in this layer
-            if sibling_index < 0 or sibling_index >= len(layer.nodes):
+            if sibling_index < Uint64(0) or sibling_index >= Uint64(len(layer.nodes)):
                 raise ValueError(
                     f"Sibling index {sibling_index} out of bounds for layer "
                     f"with {len(layer.nodes)} nodes"
                 )
 
             # Add the sibling's hash to the co-path.
-            co_path.append(layer.nodes[sibling_index])
+            co_path.append(layer.nodes[int(sibling_index)])
 
             # Move to the parent's position for the next iteration.
-            current_position //= 2
+            current_position = current_position // Uint64(2)
 
         return HashTreeOpening(siblings=co_path)
 
@@ -496,23 +496,23 @@ def combined_path(
     depth = top_tree.depth
 
     # Validate even depth (required for top-bottom split).
-    if depth % 2 != 0:
+    if depth % Uint64(2) != Uint64(0):
         raise ValueError(
             f"Top-bottom tree traversal requires even depth, got {depth}. "
             f"Cannot split tree into equal top and bottom halves."
         )
 
     # Calculate parameters for bottom trees.
-    leafs_per_bottom_tree = 1 << (depth // 2)
+    leafs_per_bottom_tree = 1 << int(depth // Uint64(2))
 
     # Determine which bottom tree this position belongs to.
     #
     # Bottom tree index = floor(position / sqrt(LIFETIME))
-    bottom_tree_index = int(position) // leafs_per_bottom_tree
+    bottom_tree_index = position // Uint64(leafs_per_bottom_tree)
 
     # Verify that the provided bottom_tree actually corresponds to this position.
     # The bottom tree's lowest layer starts at bottom_tree_index * leafs_per_bottom_tree.
-    expected_start = bottom_tree_index * leafs_per_bottom_tree
+    expected_start = bottom_tree_index * Uint64(leafs_per_bottom_tree)
     actual_start = bottom_tree.layers[0].start_index
 
     if actual_start != expected_start:
