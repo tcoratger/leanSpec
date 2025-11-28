@@ -376,7 +376,7 @@ class SecretKey(StrictBaseModel):
     parameter: Parameter
     """The public parameter `P`, stored for convenience during signing."""
 
-    activation_epoch: int
+    activation_epoch: Uint64
     """
     The first epoch for which this secret key is valid.
 
@@ -384,7 +384,7 @@ class SecretKey(StrictBaseModel):
     to ensure efficient tree partitioning.
     """
 
-    num_active_epochs: int
+    num_active_epochs: Uint64
     """
     The number of consecutive epochs this key can be used for.
 

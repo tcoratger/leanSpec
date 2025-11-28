@@ -229,8 +229,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         sk = SecretKey(
             prf_key=prf_key,
             parameter=parameter,
-            activation_epoch=actual_activation_epoch,
-            num_active_epochs=actual_num_active_epochs,
+            activation_epoch=Uint64(actual_activation_epoch),
+            num_active_epochs=Uint64(actual_num_active_epochs),
             top_tree=top_tree,
             left_bottom_tree_index=start_bottom_tree_index,
             left_bottom_tree=left_bottom_tree,
