@@ -7,7 +7,6 @@ It exposes the core data structures and the main interface functions.
 
 from .constants import PROD_CONFIG, TEST_CONFIG
 from .containers import (
-    HashTree,
     HashTreeOpening,
     PublicKey,
     SecretKey,
@@ -21,7 +20,6 @@ __all__ = [
     "Signature",
     "SecretKey",
     "HashTreeOpening",
-    "HashTree",
     "PROD_CONFIG",
     "TEST_CONFIG",
 ]
