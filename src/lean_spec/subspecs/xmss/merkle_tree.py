@@ -116,7 +116,7 @@ class MerkleTree(StrictBaseModel):
         if end_index % 2 == 0:
             nodes_with_padding.append(self.rand.domain())
 
-        return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
+        return HashTreeLayer(start_index=Uint64(actual_start_index), nodes=nodes_with_padding)
 
     def build(
         self,
@@ -192,7 +192,7 @@ class MerkleTree(StrictBaseModel):
             layers.append(current_layer)
 
         # Return the completed tree containing all computed layers.
-        return HashTree(depth=depth, layers=layers)
+        return HashTree(depth=Uint64(depth), layers=layers)
 
     def root(self, tree: HashTree) -> HashDigest:
         """

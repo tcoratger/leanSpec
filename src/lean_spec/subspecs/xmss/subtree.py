@@ -55,7 +55,7 @@ def _get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: int) -> 
     if end_index % 2 == 0:
         nodes_with_padding.append(rand.domain())
 
-    return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
+    return HashTreeLayer(start_index=Uint64(actual_start_index), nodes=nodes_with_padding)
 
 
 class HashSubTree(StrictBaseModel):
@@ -84,7 +84,7 @@ class HashSubTree(StrictBaseModel):
     - Two consecutive bottom trees (sliding window)
     """
 
-    depth: int
+    depth: Uint64
     """
     The total depth of the full tree (e.g., 32 for a 2^32 leaf space).
 
@@ -92,7 +92,7 @@ class HashSubTree(StrictBaseModel):
     A subtree starting from layer `k` will have `depth - k` layers stored.
     """
 
-    lowest_layer: int
+    lowest_layer: Uint64
     """
     The lowest layer included in this subtree.
 
@@ -121,7 +121,7 @@ class HashSubTree(StrictBaseModel):
         cls,
         hasher: TweakHasher,
         rand: Rand,
-        lowest_layer: int,
+        lowest_layer: Uint64,
         depth: int,
         start_index: int,
         parameter: Parameter,
@@ -205,7 +205,7 @@ class HashSubTree(StrictBaseModel):
             layers.append(current_layer)
 
         # Return the completed subtree.
-        return cls(depth=depth, lowest_layer=lowest_layer, layers=layers)
+        return cls(depth=Uint64(depth), lowest_layer=Uint64(lowest_layer), layers=layers)
 
     @classmethod
     def new_top_tree(
@@ -262,7 +262,7 @@ class HashSubTree(StrictBaseModel):
         return cls.new(
             hasher=hasher,
             rand=rand,
-            lowest_layer=lowest_layer,
+            lowest_layer=Uint64(lowest_layer),
             depth=depth,
             start_index=start_bottom_tree_index,
             parameter=parameter,
@@ -335,7 +335,7 @@ class HashSubTree(StrictBaseModel):
         full_tree = cls.new(
             hasher=hasher,
             rand=rand,
-            lowest_layer=0,
+            lowest_layer=Uint64(0),
             depth=depth,
             start_index=start_index,
             parameter=parameter,
@@ -360,9 +360,9 @@ class HashSubTree(StrictBaseModel):
         truncated_layers = full_tree.layers[: (depth // 2)]
 
         # Add a final layer containing just the root.
-        truncated_layers.append(HashTreeLayer(start_index=bottom_tree_index, nodes=[root]))
+        truncated_layers.append(HashTreeLayer(start_index=Uint64(bottom_tree_index), nodes=[root]))
 
-        return cls(depth=depth, lowest_layer=0, layers=truncated_layers)
+        return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
 
     def root(self) -> HashDigest:
         """
