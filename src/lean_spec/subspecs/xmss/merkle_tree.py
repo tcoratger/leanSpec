@@ -296,13 +296,10 @@ class MerkleTree(StrictBaseModel):
         # Iterate up the tree, hashing the current node with its sibling from
         # the path at each level.
         current_position = int(position)
-        sibling_vectors = cast("List[HashDigestVector]", opening.siblings.data)
-        for level, sibling_vector in enumerate(sibling_vectors):
+        for level, sibling_vector in enumerate(opening.siblings):
             # Convert HashDigestVector to List[Fp]
-            sibling_data = cast("Tuple[Fp, ...]", sibling_vector.data)
-            sibling_node: List[Fp] = list(sibling_data)
+            sibling_node = list(sibling_vector.data)
             # Determine if the current node is a left or right child.
-            children: List[List[Fp]]
             if current_position % 2 == 0:
                 # Current node is a left child; sibling is on the right.
                 children = [current_node, sibling_node]

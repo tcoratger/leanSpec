@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, List, Tuple
+from typing import TYPE_CHECKING, Annotated, List
 
 from pydantic import Field
 
@@ -104,13 +104,7 @@ def _serialize_digests(digests: HashDigestList) -> bytes:
     Returns:
         Concatenated serialized field elements.
     """
-    from typing import cast as typing_cast
-
-    digest_vectors = typing_cast("List[HashDigestVector]", digests.data)
-    return b"".join(
-        Fp.serialize_list(list(typing_cast("Tuple[Fp, ...]", digest.data)))
-        for digest in digest_vectors
-    )
+    return b"".join(Fp.serialize_list(list(digest.data)) for digest in digests)
 
 
 def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> HashDigestList:
@@ -320,14 +314,11 @@ class Signature(StrictBaseModel):
                 f"got {len(self.path.siblings)}"
             )
 
-        from typing import cast as typing_cast
-
-        sibling_vectors = typing_cast("List[HashDigestVector]", self.path.siblings.data)
-        for i, sibling_vector in enumerate(sibling_vectors):
-            if len(sibling_vector.data) != config.HASH_LEN_FE:
+        for i, sibling_vector in enumerate(self.path.siblings):
+            if len(sibling_vector) != config.HASH_LEN_FE:
                 raise ValueError(
                     f"Invalid sibling {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(sibling_vector.data)}"
+                    f"got {len(sibling_vector)}"
                 )
 
         # Validate randomness
@@ -342,12 +333,11 @@ class Signature(StrictBaseModel):
                 f"Invalid hashes length: expected {config.DIMENSION} hashes, got {len(self.hashes)}"
             )
 
-        hash_vectors = typing_cast("List[HashDigestVector]", self.hashes.data)
-        for i, hash_vector in enumerate(hash_vectors):
-            if len(hash_vector.data) != config.HASH_LEN_FE:
+        for i, hash_vector in enumerate(self.hashes):
+            if len(hash_vector) != config.HASH_LEN_FE:
                 raise ValueError(
                     f"Invalid hash {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(hash_vector.data)}"
+                    f"got {len(hash_vector)}"
                 )
 
         return bytes(self)

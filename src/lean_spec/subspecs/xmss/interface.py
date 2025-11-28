@@ -8,7 +8,7 @@ This constitutes the public API of the signature scheme.
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Tuple, cast
 
 from pydantic import model_validator
 
@@ -450,14 +450,11 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # Reconstruct the one-time public key (the list of chain endpoints).
         chain_ends: List[List[Fp]] = []
-        from typing import cast
-
-        hash_vectors = cast("List[HashDigestVector]", sig.hashes.data)
         for chain_index, xi in enumerate(codeword):
             # The signature provides `start_digest`, which is the hash value after `xi` steps.
             # Extract from SSZ type: HashDigestList -> HashDigestVector -> List[Fp]
-            hash_data = cast("Tuple[Fp, ...]", hash_vectors[chain_index].data)
-            start_digest: List[Fp] = list(hash_data)
+            hash_vector = cast(HashDigestVector, sig.hashes[chain_index])
+            start_digest = cast(List[Fp], list(hash_vector.data))
             # We must perform the remaining `BASE - 1 - xi` hashing steps
             # to compute the public endpoint of the chain.
             num_steps_remaining = config.BASE - 1 - xi
