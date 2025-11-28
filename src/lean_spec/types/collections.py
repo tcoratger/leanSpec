@@ -148,6 +148,14 @@ class SSZVector(SSZModel):
         with io.BytesIO(data) as stream:
             return cls.deserialize(stream, len(data))
 
+    def __len__(self) -> int:
+        """Return the number of elements in the vector."""
+        return len(self.data)
+
+    def __getitem__(self, index: int) -> SSZType:
+        """Access an element by index."""
+        return self.data[index]
+
 
 class SSZList(SSZModel):
     """
@@ -329,3 +337,11 @@ class SSZList(SSZModel):
         """Deserializes a byte string into an SSZList instance."""
         with io.BytesIO(data) as stream:
             return cls.deserialize(stream, len(data))
+
+    def __len__(self) -> int:
+        """Return the number of elements in the list."""
+        return len(self.data)
+
+    def __getitem__(self, index: int) -> SSZType:
+        """Access an element by index."""
+        return self.data[index]

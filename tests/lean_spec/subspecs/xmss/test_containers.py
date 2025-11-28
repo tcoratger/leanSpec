@@ -6,7 +6,13 @@ import pytest
 
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG, TEST_CONFIG
-from lean_spec.subspecs.xmss.containers import HashTreeOpening, PublicKey, Signature
+from lean_spec.subspecs.xmss.containers import (
+    HashDigestList,
+    HashDigestVector,
+    HashTreeOpening,
+    PublicKey,
+    Signature,
+)
 
 
 class TestPublicKey:
@@ -100,16 +106,19 @@ class TestSignature:
 
     def test_bytes_protocol(self) -> None:
         """Test that Signature implements Python's bytes protocol."""
-        path = HashTreeOpening(
-            siblings=[[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)]]
-            * TEST_CONFIG.LOG_LIFETIME
-        )
+        # Create SSZ-compliant siblings
+        siblings_data = [
+            HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
+            for _ in range(TEST_CONFIG.LOG_LIFETIME)
+        ]
+        path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
         rho = [Fp(value=i) for i in range(TEST_CONFIG.RAND_LEN_FE)]
-        hashes = [
-            [Fp(value=i + j) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        # Create SSZ-compliant hashes
+        hashes_data = [
+            HashDigestVector(data=[Fp(value=i + j) for i in range(TEST_CONFIG.HASH_LEN_FE)])
             for j in range(TEST_CONFIG.DIMENSION)
         ]
-        sig = Signature(path=path, rho=rho, hashes=hashes)
+        sig = Signature(path=path, rho=rho, hashes=HashDigestList(data=hashes_data))
 
         # Test __bytes__()
         data = bytes(sig)
@@ -119,61 +128,59 @@ class TestSignature:
     def test_to_bytes_with_validation(self) -> None:
         """Test that to_bytes validates all field lengths."""
         # Create valid signature
-        path = HashTreeOpening(
-            siblings=[[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE] * TEST_CONFIG.LOG_LIFETIME
-        )
+        siblings_data = [
+            HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE)
+            for _ in range(TEST_CONFIG.LOG_LIFETIME)
+        ]
+        path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
         rho = [Fp(value=0)] * TEST_CONFIG.RAND_LEN_FE
-        hashes = [[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE] * TEST_CONFIG.DIMENSION
-        sig = Signature(path=path, rho=rho, hashes=hashes)
+        hashes_data = [
+            HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE)
+            for _ in range(TEST_CONFIG.DIMENSION)
+        ]
+        sig = Signature(path=path, rho=rho, hashes=HashDigestList(data=hashes_data))
 
         # Valid serialization
         data = sig.to_bytes(TEST_CONFIG)
         assert len(data) == TEST_CONFIG.SIGNATURE_LEN_BYTES
 
-        # Invalid path length (wrong number of siblings)
-        invalid_path = HashTreeOpening(siblings=[[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE] * 5)
-        invalid_sig = Signature(path=invalid_path, rho=rho, hashes=hashes)
+        # Test path length validation (wrong number of siblings)
+        invalid_siblings = [
+            HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE) for _ in range(5)
+        ]
+        invalid_path = HashTreeOpening(siblings=HashDigestList(data=invalid_siblings))
+        invalid_sig = Signature(path=invalid_path, rho=rho, hashes=HashDigestList(data=hashes_data))
         with pytest.raises(ValueError, match="Invalid path length"):
             invalid_sig.to_bytes(TEST_CONFIG)
 
-        # Invalid sibling length
-        invalid_path = HashTreeOpening(siblings=[[Fp(value=0)] * 5] * TEST_CONFIG.LOG_LIFETIME)
-        invalid_sig = Signature(path=invalid_path, rho=rho, hashes=hashes)
-        with pytest.raises(ValueError, match="Invalid sibling .* length"):
-            invalid_sig.to_bytes(TEST_CONFIG)
-
         # Invalid rho length
-        invalid_sig = Signature(path=path, rho=[Fp(value=0)] * 3, hashes=hashes)
+        invalid_sig = Signature(
+            path=path, rho=[Fp(value=0)] * 3, hashes=HashDigestList(data=hashes_data)
+        )
         with pytest.raises(ValueError, match="Invalid rho length"):
             invalid_sig.to_bytes(TEST_CONFIG)
 
         # Invalid hashes count
-        invalid_sig = Signature(
-            path=path, rho=rho, hashes=[[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE] * 5
-        )
+        invalid_hashes = [
+            HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE) for _ in range(5)
+        ]
+        invalid_sig = Signature(path=path, rho=rho, hashes=HashDigestList(data=invalid_hashes))
         with pytest.raises(ValueError, match="Invalid hashes length"):
-            invalid_sig.to_bytes(TEST_CONFIG)
-
-        # Invalid hash digest length
-        invalid_hashes = [[Fp(value=0)] * 5] * TEST_CONFIG.DIMENSION
-        invalid_sig = Signature(path=path, rho=rho, hashes=invalid_hashes)
-        with pytest.raises(ValueError, match="Invalid hash .* length"):
             invalid_sig.to_bytes(TEST_CONFIG)
 
     def test_roundtrip_test_config(self) -> None:
         """Test serialization round-trip with TEST_CONFIG."""
-        path = HashTreeOpening(
-            siblings=[
-                [Fp(value=i * j) for i in range(TEST_CONFIG.HASH_LEN_FE)]
-                for j in range(TEST_CONFIG.LOG_LIFETIME)
-            ]
-        )
+        siblings_data = [
+            HashDigestVector(data=[Fp(value=i * j) for i in range(TEST_CONFIG.HASH_LEN_FE)])
+            for j in range(TEST_CONFIG.LOG_LIFETIME)
+        ]
+        path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
         rho = [Fp(value=i * 10) for i in range(TEST_CONFIG.RAND_LEN_FE)]
-        hashes = [
-            [Fp(value=i + j * 100) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        hashes_data = [
+            HashDigestVector(data=[Fp(value=i + j * 100) for i in range(TEST_CONFIG.HASH_LEN_FE)])
             for j in range(TEST_CONFIG.DIMENSION)
         ]
-        original = Signature(path=path, rho=rho, hashes=hashes)
+        original = Signature(path=path, rho=rho, hashes=HashDigestList(data=hashes_data))
 
         # Serialize and deserialize
         data = original.to_bytes(TEST_CONFIG)
@@ -186,17 +193,17 @@ class TestSignature:
 
     def test_roundtrip_prod_config(self) -> None:
         """Test serialization round-trip with PROD_CONFIG."""
-        path = HashTreeOpening(
-            siblings=[
-                [Fp(value=i)] * PROD_CONFIG.HASH_LEN_FE for i in range(PROD_CONFIG.LOG_LIFETIME)
-            ]
-        )
+        siblings_data = [
+            HashDigestVector(data=[Fp(value=i)] * PROD_CONFIG.HASH_LEN_FE)
+            for i in range(PROD_CONFIG.LOG_LIFETIME)
+        ]
+        path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
         rho = [Fp(value=i) for i in range(PROD_CONFIG.RAND_LEN_FE)]
-        hashes = [
-            [Fp(value=i + j) for i in range(PROD_CONFIG.HASH_LEN_FE)]
+        hashes_data = [
+            HashDigestVector(data=[Fp(value=i + j) for i in range(PROD_CONFIG.HASH_LEN_FE)])
             for j in range(PROD_CONFIG.DIMENSION)
         ]
-        original = Signature(path=path, rho=rho, hashes=hashes)
+        original = Signature(path=path, rho=rho, hashes=HashDigestList(data=hashes_data))
 
         data = original.to_bytes(PROD_CONFIG)
         recovered = Signature.from_bytes(data, PROD_CONFIG)
@@ -215,17 +222,17 @@ class TestSignature:
 
     def test_serialization_format(self) -> None:
         """Test that serialization follows format: path || rho || hashes."""
-        path = HashTreeOpening(
-            siblings=[
-                [Fp(value=i)] * TEST_CONFIG.HASH_LEN_FE for i in range(TEST_CONFIG.LOG_LIFETIME)
-            ]
-        )
+        siblings_data = [
+            HashDigestVector(data=[Fp(value=i)] * TEST_CONFIG.HASH_LEN_FE)
+            for i in range(TEST_CONFIG.LOG_LIFETIME)
+        ]
+        path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
         rho = [Fp(value=i + 100) for i in range(TEST_CONFIG.RAND_LEN_FE)]
-        hashes = [
-            [Fp(value=i + j + 200) for i in range(TEST_CONFIG.HASH_LEN_FE)]
+        hashes_data = [
+            HashDigestVector(data=[Fp(value=i + j + 200) for i in range(TEST_CONFIG.HASH_LEN_FE)])
             for j in range(TEST_CONFIG.DIMENSION)
         ]
-        sig = Signature(path=path, rho=rho, hashes=hashes)
+        sig = Signature(path=path, rho=rho, hashes=HashDigestList(data=hashes_data))
 
         data = bytes(sig)
 
@@ -260,12 +267,17 @@ class TestSerializationProperties:
 
     def test_signature_deterministic(self) -> None:
         """Test that serialization is deterministic."""
-        path = HashTreeOpening(
-            siblings=[[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE] * TEST_CONFIG.LOG_LIFETIME
-        )
+        siblings_data = [
+            HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE)
+            for _ in range(TEST_CONFIG.LOG_LIFETIME)
+        ]
+        path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
         rho = [Fp(value=0)] * TEST_CONFIG.RAND_LEN_FE
-        hashes = [[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE] * TEST_CONFIG.DIMENSION
-        sig = Signature(path=path, rho=rho, hashes=hashes)
+        hashes_data = [
+            HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE)
+            for _ in range(TEST_CONFIG.DIMENSION)
+        ]
+        sig = Signature(path=path, rho=rho, hashes=HashDigestList(data=hashes_data))
 
         data1 = sig.to_bytes(TEST_CONFIG)
         data2 = sig.to_bytes(TEST_CONFIG)

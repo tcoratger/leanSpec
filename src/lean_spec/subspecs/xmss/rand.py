@@ -9,7 +9,7 @@ from lean_spec.types import StrictBaseModel
 
 from ..koalabear import Fp, P
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .containers import HashDigest, Parameter, Randomness
+from .containers import Parameter, Randomness
 
 
 class Rand(StrictBaseModel):
@@ -34,7 +34,7 @@ class Rand(StrictBaseModel):
         """Generates a random public parameter."""
         return self.field_elements(self.config.PARAMETER_LEN)
 
-    def domain(self) -> HashDigest:
+    def domain(self) -> List[Fp]:
         """Generates a random hash digest."""
         return self.field_elements(self.config.HASH_LEN_FE)
 

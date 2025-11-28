@@ -9,7 +9,7 @@ Each block has a proposer who created it. The slot determines which validator
 can propose.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -17,6 +17,7 @@ from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.container import Container
 
 from ..attestation import Attestation
+from ..validator import Validator
 from .types import Attestations, BlockSignatures
 
 if TYPE_CHECKING:
@@ -167,7 +168,7 @@ class SignedBlockWithAttestation(Container):
 
             # Ensure validator exists in the active set
             assert validator_id < len(validators), "Validator index out of range"
-            validator = validators[validator_id]
+            validator = cast(Validator, validators[validator_id])
 
             # Verify the XMSS signature
             #

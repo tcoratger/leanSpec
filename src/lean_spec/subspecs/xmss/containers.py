@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, Annotated, List
 from pydantic import Field
 
 from ...types import StrictBaseModel, Uint64
+from ...types.collections import SSZList, SSZVector
 from ..koalabear import P_BYTES, Fp
-from .constants import PRF_KEY_LENGTH
+from .constants import PRF_KEY_LENGTH, PROD_CONFIG
 
 if TYPE_CHECKING:
     from .constants import XmssConfig
@@ -23,14 +24,56 @@ which all one-time signing keys are deterministically derived.
 """
 
 
-HashDigest = List[Fp]
+HASH_DIGEST_LENGTH = PROD_CONFIG.HASH_LEN_FE
 """
-A type alias representing a hash digest.
+The fixed length of a hash digest in field elements.
 
-In this scheme, a digest is the output of the Poseidon2 hash function. It is a
-fixed-length list of field elements (`Fp`) and serves as the fundamental
-building block for all cryptographic structures (e.g., a node in a Merkle tree).
+Derived from `PROD_CONFIG.HASH_LEN_FE`. This corresponds to the output length
+of the Poseidon2 hash function used in the XMSS scheme.
 """
+
+# Calculate the maximum number of nodes in a sparse Merkle tree layer:
+# - A bottom tree has at most 2^(LOG_LIFETIME/2) leaves
+# - With padding, we may add up to 2 additional nodes
+# - To be generous and future-proof, we use 2^(LOG_LIFETIME/2 + 1)
+NODE_LIST_LIMIT = 1 << (PROD_CONFIG.LOG_LIFETIME // 2 + 1)
+"""
+The maximum number of nodes that can be stored in a sparse Merkle tree layer.
+
+Calculated as `2^(LOG_LIFETIME/2 + 1)` from PROD_CONFIG to accommodate:
+- Bottom trees with up to `2^(LOG_LIFETIME/2)` nodes
+- Padding overhead (up to 2 additional nodes)
+- Future-proofing with 2x margin
+"""
+
+
+class HashDigestVector(SSZVector):
+    """
+    A single hash digest represented as a fixed-size vector of field elements.
+
+    This is the SSZ-compliant representation of a Poseidon2 hash output.
+    In SSZ notation: `Vector[Fp, HASH_DIGEST_LENGTH]`
+
+    The fixed size enables efficient serialization when used in collections,
+    as SSZ can pack these back-to-back without per-element offsets.
+    """
+
+    ELEMENT_TYPE = Fp
+    LENGTH = HASH_DIGEST_LENGTH
+
+
+class HashDigestList(SSZList):
+    """
+    Variable-length list of hash digests.
+
+    In SSZ notation: `List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]`
+
+    This type is used to represent collections of hash digests in the XMSS scheme.
+    """
+
+    ELEMENT_TYPE = HashDigestVector
+    LIMIT = NODE_LIST_LIMIT
+
 
 Parameter = List[Fp]
 """
@@ -51,16 +94,20 @@ the final signature for the verifier to reproduce the same hash.
 """
 
 
-def _serialize_digests(digests: List[HashDigest]) -> bytes:
+def _serialize_digests(digests: HashDigestList) -> bytes:
     """
     Serialize a list of hash digests.
 
-    Each digest is a list of field elements.
+    Args:
+        digests: SSZ-compliant list of hash digests.
+
+    Returns:
+        Concatenated serialized field elements.
     """
-    return b"".join(Fp.serialize_list(digest) for digest in digests)
+    return b"".join(Fp.serialize_list(list(digest.data)) for digest in digests)
 
 
-def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> List[HashDigest]:
+def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> HashDigestList:
     """
     Deserialize multiple hash digests from bytes.
 
@@ -70,7 +117,7 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> L
         elements_per_digest: Field elements per digest.
 
     Returns:
-        List of hash digests.
+        SSZ-compliant list of hash digests.
 
     Raises:
         ValueError: If data length doesn't match expectations.
@@ -78,10 +125,15 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> L
     total_elements = count * elements_per_digest
     all_elements = Fp.deserialize_list(data, total_elements)
 
-    return [
+    # Convert to list of lists first
+    digests = [
         all_elements[i : i + elements_per_digest]
         for i in range(0, len(all_elements), elements_per_digest)
     ]
+
+    # Wrap in SSZ types
+    ssz_digests = [HashDigestVector(data=digest) for digest in digests]
+    return HashDigestList(data=ssz_digests)
 
 
 class HashTreeOpening(StrictBaseModel):
@@ -93,8 +145,8 @@ class HashTreeOpening(StrictBaseModel):
     path from the leaf to the top of the tree.
     """
 
-    siblings: List[HashDigest]
-    """List of sibling hashes, from bottom to top."""
+    siblings: HashDigestList
+    """SSZ-compliant list of sibling hashes, from bottom to top."""
 
 
 class HashTreeLayer(StrictBaseModel):
@@ -107,8 +159,8 @@ class HashTreeLayer(StrictBaseModel):
 
     start_index: Uint64
     """The starting index of the first node in this layer."""
-    nodes: List[HashDigest]
-    """A list of the actual hash digests stored for this layer."""
+    nodes: HashDigestList
+    """SSZ-compliant list of hash digests stored for this layer."""
 
 
 class PublicKey(StrictBaseModel):
@@ -227,7 +279,7 @@ class Signature(StrictBaseModel):
     """The authentication path proving the one-time key's inclusion in the Merkle tree."""
     rho: Randomness
     """The randomness used to successfully encode the message."""
-    hashes: List[HashDigest]
+    hashes: HashDigestList
     """The one-time signature itself: a list of intermediate Winternitz chain hashes."""
 
     def __bytes__(self) -> bytes:
@@ -262,11 +314,11 @@ class Signature(StrictBaseModel):
                 f"got {len(self.path.siblings)}"
             )
 
-        for i, sibling in enumerate(self.path.siblings):
-            if len(sibling) != config.HASH_LEN_FE:
+        for i, sibling_vector in enumerate(self.path.siblings):
+            if len(sibling_vector) != config.HASH_LEN_FE:
                 raise ValueError(
                     f"Invalid sibling {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(sibling)}"
+                    f"got {len(sibling_vector)}"
                 )
 
         # Validate randomness
@@ -281,11 +333,11 @@ class Signature(StrictBaseModel):
                 f"Invalid hashes length: expected {config.DIMENSION} hashes, got {len(self.hashes)}"
             )
 
-        for i, hash_digest in enumerate(self.hashes):
-            if len(hash_digest) != config.HASH_LEN_FE:
+        for i, hash_vector in enumerate(self.hashes):
+            if len(hash_vector) != config.HASH_LEN_FE:
                 raise ValueError(
                     f"Invalid hash {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(hash_digest)}"
+                    f"got {len(hash_vector)}"
                 )
 
         return bytes(self)
