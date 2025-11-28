@@ -400,7 +400,7 @@ class SecretKey(StrictBaseModel):
     in its lowest layer. Its root is the public key's Merkle root.
     """
 
-    left_bottom_tree_index: int | None = None
+    left_bottom_tree_index: Uint64
     """
     The index of the left bottom tree in the sliding window.
 

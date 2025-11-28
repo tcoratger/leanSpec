@@ -176,7 +176,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             self.merkle_tree,
             config,
             prf_key,
-            start_bottom_tree_index,
+            Uint64(start_bottom_tree_index),
             parameter,
         )
         right_bottom_tree = bottom_tree_from_prf_key(
@@ -185,7 +185,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             self.merkle_tree,
             config,
             prf_key,
-            start_bottom_tree_index + 1,
+            Uint64(start_bottom_tree_index + 1),
             parameter,
         )
 
@@ -203,7 +203,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
                 self.merkle_tree,
                 config,
                 prf_key,
-                i,
+                Uint64(i),
                 parameter,
             )
             root = tree.root()
@@ -216,7 +216,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             hasher=self.hasher,
             rand=self.rand,
             depth=config.LOG_LIFETIME,
-            start_bottom_tree_index=start_bottom_tree_index,
+            start_bottom_tree_index=Uint64(start_bottom_tree_index),
             parameter=parameter,
             bottom_tree_roots=bottom_tree_roots,
         )
@@ -232,7 +232,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             activation_epoch=Uint64(actual_activation_epoch),
             num_active_epochs=Uint64(actual_num_active_epochs),
             top_tree=top_tree,
-            left_bottom_tree_index=start_bottom_tree_index,
+            left_bottom_tree_index=Uint64(start_bottom_tree_index),
             left_bottom_tree=left_bottom_tree,
             right_bottom_tree=right_bottom_tree,
         )
@@ -360,7 +360,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # the bottom tree and top tree.
 
         # Ensure we have the required top-bottom tree structures.
-        if sk.top_tree is None or sk.left_bottom_tree_index is None:
+        if sk.top_tree is None:
             raise ValueError(
                 "Secret key is missing top-bottom tree structures. "
                 "This may be a legacy key format that is no longer supported."
@@ -368,9 +368,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # Determine which bottom tree contains this epoch.
         leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
-        boundary = (sk.left_bottom_tree_index + 1) * leafs_per_bottom_tree
+        boundary = (sk.left_bottom_tree_index + Uint64(1)) * Uint64(leafs_per_bottom_tree)
 
-        if int(epoch) < boundary:
+        if epoch < boundary:
             # Use left bottom tree
             bottom_tree = sk.left_bottom_tree
         else:
@@ -520,11 +520,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         Raises:
             ValueError: If the secret key is missing top-bottom tree structures.
         """
-        if sk.left_bottom_tree_index is None:
-            raise ValueError("Secret key missing top-bottom tree structures")
-
         leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
-        start = sk.left_bottom_tree_index * leafs_per_bottom_tree
+        start = int(sk.left_bottom_tree_index * Uint64(leafs_per_bottom_tree))
         end = start + (2 * leafs_per_bottom_tree)
         return range(start, end)
 
@@ -554,17 +551,15 @@ class GeneralizedXmssScheme(StrictBaseModel):
             ValueError: If the secret key is missing top-bottom tree structures
             or if advancing would exceed the activation interval.
         """
-        if sk.left_bottom_tree_index is None:
-            raise ValueError("Secret key missing top-bottom tree structures")
-
         if sk.left_bottom_tree is None or sk.right_bottom_tree is None:
             raise ValueError("Secret key missing bottom tree data")
 
         leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
 
         # Check if advancing would exceed the activation interval
-        next_prepared_end_epoch = (
-            sk.left_bottom_tree_index * leafs_per_bottom_tree + 3 * leafs_per_bottom_tree
+        next_prepared_end_epoch = int(
+            sk.left_bottom_tree_index * Uint64(leafs_per_bottom_tree)
+            + Uint64(3 * leafs_per_bottom_tree)
         )
         activation_interval = self.get_activation_interval(sk)
         if next_prepared_end_epoch > activation_interval.stop:
@@ -572,7 +567,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             return sk
 
         # Compute the next bottom tree (the one after the current right tree)
-        new_right_tree_index = sk.left_bottom_tree_index + 2
+        new_right_tree_index = sk.left_bottom_tree_index + Uint64(2)
         new_right_bottom_tree = bottom_tree_from_prf_key(
             prf=self.prf,
             hasher=self.hasher,
@@ -588,7 +583,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             update={
                 "left_bottom_tree": sk.right_bottom_tree,
                 "right_bottom_tree": new_right_bottom_tree,
-                "left_bottom_tree_index": sk.left_bottom_tree_index + 1,
+                "left_bottom_tree_index": sk.left_bottom_tree_index + Uint64(1),
             }
         )
 

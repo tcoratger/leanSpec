@@ -120,7 +120,6 @@ def test_advance_preparation() -> None:
     # Get initial prepared interval
     initial_interval = scheme.get_prepared_interval(sk)
     initial_left_index = sk.left_bottom_tree_index
-    assert initial_left_index is not None
 
     # Advance preparation (returns new SecretKey since models are immutable)
     sk = scheme.advance_preparation(sk)
@@ -128,10 +127,9 @@ def test_advance_preparation() -> None:
     # Get new prepared interval
     new_interval = scheme.get_prepared_interval(sk)
     new_left_index = sk.left_bottom_tree_index
-    assert new_left_index is not None
 
     # Verify the left index incremented
-    assert new_left_index == initial_left_index + 1
+    assert new_left_index == initial_left_index + Uint64(1)
 
     # Verify the prepared interval shifted forward
     leafs_per_bottom_tree = 1 << (scheme.config.LOG_LIFETIME // 2)

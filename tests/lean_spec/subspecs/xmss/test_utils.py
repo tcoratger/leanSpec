@@ -125,7 +125,7 @@ def test_bottom_tree_from_prf_key() -> None:
         merkle_tree=TEST_MERKLE_TREE,
         config=config,
         prf_key=prf_key,
-        bottom_tree_index=0,
+        bottom_tree_index=Uint64(0),
         parameter=parameter,
     )
 
@@ -157,7 +157,7 @@ def test_bottom_tree_from_prf_key_deterministic() -> None:
         merkle_tree=TEST_MERKLE_TREE,
         config=config,
         prf_key=prf_key,
-        bottom_tree_index=0,
+        bottom_tree_index=Uint64(0),
         parameter=parameter,
     )
 
@@ -167,7 +167,7 @@ def test_bottom_tree_from_prf_key_deterministic() -> None:
         merkle_tree=TEST_MERKLE_TREE,
         config=config,
         prf_key=prf_key,
-        bottom_tree_index=0,
+        bottom_tree_index=Uint64(0),
         parameter=parameter,
     )
 
@@ -188,7 +188,7 @@ def test_bottom_tree_from_prf_key_different_indices() -> None:
         merkle_tree=TEST_MERKLE_TREE,
         config=config,
         prf_key=prf_key,
-        bottom_tree_index=0,
+        bottom_tree_index=Uint64(0),
         parameter=parameter,
     )
 
@@ -198,7 +198,7 @@ def test_bottom_tree_from_prf_key_different_indices() -> None:
         merkle_tree=TEST_MERKLE_TREE,
         config=config,
         prf_key=prf_key,
-        bottom_tree_index=1,
+        bottom_tree_index=Uint64(1),
         parameter=parameter,
     )
 

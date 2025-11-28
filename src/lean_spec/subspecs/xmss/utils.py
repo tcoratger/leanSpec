@@ -124,7 +124,7 @@ def bottom_tree_from_prf_key(
     merkle_tree: "MerkleTree",
     config: XmssConfig,
     prf_key: bytes,
-    bottom_tree_index: int,
+    bottom_tree_index: Uint64,
     parameter: List[Fp],
 ) -> "HashSubTree":
     """
@@ -165,13 +165,13 @@ def bottom_tree_from_prf_key(
     leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
 
     # Determine the epoch range for this bottom tree.
-    start_epoch = bottom_tree_index * leafs_per_bottom_tree
-    end_epoch = start_epoch + leafs_per_bottom_tree
+    start_epoch = bottom_tree_index * Uint64(leafs_per_bottom_tree)
+    end_epoch = start_epoch + Uint64(leafs_per_bottom_tree)
 
     # Generate leaf hashes for all epochs in this bottom tree.
     leaf_hashes: List[HashDigest] = []
 
-    for epoch in range(start_epoch, end_epoch):
+    for epoch in range(int(start_epoch), int(end_epoch)):
         # For each epoch, compute the one-time public key (chain endpoints).
         chain_ends: List[HashDigest] = []
 
