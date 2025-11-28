@@ -5,13 +5,53 @@ from typing import TYPE_CHECKING, List
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .constants import XmssConfig
-from .containers import HashDigest
+from .containers import HashDigest, HashTreeLayer
+from .rand import Rand
 
 if TYPE_CHECKING:
     from .merkle_tree import MerkleTree
     from .prf import Prf
     from .subtree import HashSubTree
     from .tweak_hash import TweakHasher
+
+
+def get_padded_layer(rand: Rand, nodes: List[HashDigest], start_index: Uint64) -> HashTreeLayer:
+    """
+    Pads a layer of nodes with random hashes to simplify tree construction.
+
+    This helper enforces a crucial invariant: every active layer must start at an
+    even index and end at an odd index. This guarantees that every node within
+    the layer can be neatly paired with a sibling (a left child with a right
+    child), which dramatically simplifies the parent generation logic by
+    removing the need to handle edge cases.
+
+    Args:
+        rand: Random generator for padding values.
+        nodes: The list of active nodes for the current layer.
+        start_index: The starting index of the first node in `nodes`.
+
+    Returns:
+        A new `HashTreeLayer` with the necessary padding applied.
+    """
+    nodes_with_padding: List[HashDigest] = []
+    end_index = start_index + Uint64(len(nodes)) - Uint64(1)
+
+    # Prepend random padding if the layer starts at an odd index.
+    if start_index % Uint64(2) == Uint64(1):
+        nodes_with_padding.append(rand.domain())
+
+    # The actual start index of the padded layer is always the even
+    # number at or immediately before the original start_index.
+    actual_start_index = start_index - (start_index % Uint64(2))
+
+    # Add the actual node content.
+    nodes_with_padding.extend(nodes)
+
+    # Append random padding if the layer ends at an even index.
+    if end_index % Uint64(2) == Uint64(0):
+        nodes_with_padding.append(rand.domain())
+
+    return HashTreeLayer(start_index=actual_start_index, nodes=nodes_with_padding)
 
 
 def int_to_base_p(value: int, num_limbs: int) -> List[Fp]:
