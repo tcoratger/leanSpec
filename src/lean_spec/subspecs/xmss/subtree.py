@@ -16,6 +16,7 @@ from .containers import (
     HashDigestList,
     HashDigestVector,
     HashTreeLayer,
+    HashTreeLayers,
     HashTreeOpening,
     Parameter,
 )
@@ -72,9 +73,11 @@ class HashSubTree(StrictBaseModel):
     layers 16 through 32 (the root).
     """
 
-    layers: List[HashTreeLayer]
+    layers: HashTreeLayers
     """
     The layers of this subtree, from `lowest_layer` to the root.
+
+    SSZ notation: `List[HashTreeLayer, LAYERS_LIMIT]`
 
     - `layers[0]` corresponds to layer `lowest_layer` in the full tree
     - `layers[-1]` corresponds to the highest layer in this subtree
@@ -179,7 +182,11 @@ class HashSubTree(StrictBaseModel):
             layers.append(current_layer)
 
         # Return the completed subtree.
-        return cls(depth=Uint64(depth), lowest_layer=Uint64(lowest_layer), layers=layers)
+        return cls(
+            depth=Uint64(depth),
+            lowest_layer=Uint64(lowest_layer),
+            layers=HashTreeLayers(data=layers),
+        )
 
     @classmethod
     def new_top_tree(
@@ -326,7 +333,7 @@ class HashSubTree(StrictBaseModel):
         # the bottom_tree_index (if it's the left child of its parent in the top tree)
         # or bottom_tree_index (if it's the right child). Since we're at layer depth/2,
         # the position is simply bottom_tree_index.
-        middle_layer = full_tree.layers[depth // 2]
+        middle_layer = cast(HashTreeLayer, full_tree.layers.data[depth // 2])
 
         # The root is at position (start_index >> (depth // 2)) = bottom_tree_index
         # within the middle layer. We need to find it in the stored nodes.
@@ -336,7 +343,7 @@ class HashSubTree(StrictBaseModel):
         root = list(root_data)
 
         # Truncate layers to keep only 0 through depth/2 - 1.
-        truncated_layers = full_tree.layers[: (depth // 2)]
+        truncated_layers = list(full_tree.layers.data[: (depth // 2)])
 
         # Add a final layer containing just the root.
         root_vector = HashDigestVector(data=root)
@@ -345,7 +352,11 @@ class HashSubTree(StrictBaseModel):
         )
         truncated_layers.append(root_layer)
 
-        return cls(depth=Uint64(depth), lowest_layer=Uint64(0), layers=truncated_layers)
+        return cls(
+            depth=Uint64(depth),
+            lowest_layer=Uint64(0),
+            layers=HashTreeLayers(data=truncated_layers),
+        )
 
     def root(self) -> HashDigestVector:
         """
@@ -363,7 +374,7 @@ class HashSubTree(StrictBaseModel):
         if len(self.layers) == 0:
             raise ValueError("Cannot get root of empty subtree.")
 
-        highest_layer = self.layers[-1]
+        highest_layer = cast(HashTreeLayer, self.layers.data[-1])
         if len(highest_layer.nodes.data) == 0:
             raise ValueError("Highest layer of subtree is empty.")
 
@@ -394,7 +405,7 @@ class HashSubTree(StrictBaseModel):
         if len(self.layers) == 0:
             raise ValueError("Cannot generate path for empty subtree.")
 
-        lowest_layer = self.layers[0]
+        lowest_layer = cast(HashTreeLayer, self.layers.data[0])
         if position < lowest_layer.start_index:
             raise ValueError("Position is before the subtree's start index.")
 
@@ -407,8 +418,9 @@ class HashSubTree(StrictBaseModel):
 
         # Iterate through layers from lowest to highest, EXCLUDING the final root layer.
         # The root layer doesn't contribute a sibling to the authentication path.
-        # self.layers[:-1] gives all layers except the last (root) layer.
-        for layer in self.layers[:-1]:
+        # self.layers.data[:-1] gives all layers except the last (root) layer.
+        for layer_raw in self.layers.data[:-1]:
+            layer = cast(HashTreeLayer, layer_raw)
             # Determine the sibling's position by flipping the last bit.
             sibling_position = current_position ^ Uint64(1)
             sibling_index = sibling_position - layer.start_index
@@ -498,7 +510,7 @@ def combined_path(
     # Verify that the provided bottom_tree actually corresponds to this position.
     # The bottom tree's lowest layer starts at bottom_tree_index * leafs_per_bottom_tree.
     expected_start = bottom_tree_index * Uint64(leafs_per_bottom_tree)
-    actual_start = bottom_tree.layers[0].start_index
+    actual_start = cast(HashTreeLayer, bottom_tree.layers.data[0]).start_index
 
     if actual_start != expected_start:
         raise ValueError(

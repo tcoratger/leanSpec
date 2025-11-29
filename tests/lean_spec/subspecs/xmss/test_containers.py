@@ -12,6 +12,7 @@ from lean_spec.subspecs.xmss.containers import (
     HashTreeOpening,
     Parameter,
     PublicKey,
+    Randomness,
     Signature,
 )
 
@@ -113,7 +114,7 @@ class TestSignature:
             for _ in range(TEST_CONFIG.LOG_LIFETIME)
         ]
         path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
-        rho = [Fp(value=i) for i in range(TEST_CONFIG.RAND_LEN_FE)]
+        rho = Randomness(data=[Fp(value=i) for i in range(TEST_CONFIG.RAND_LEN_FE)])
         # Create SSZ-compliant hashes
         hashes_data = [
             HashDigestVector(data=[Fp(value=i + j) for i in range(TEST_CONFIG.HASH_LEN_FE)])
@@ -134,7 +135,7 @@ class TestSignature:
             for _ in range(TEST_CONFIG.LOG_LIFETIME)
         ]
         path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
-        rho = [Fp(value=0)] * TEST_CONFIG.RAND_LEN_FE
+        rho = Randomness(data=[Fp(value=0)] * TEST_CONFIG.RAND_LEN_FE)
         hashes_data = [
             HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE)
             for _ in range(TEST_CONFIG.DIMENSION)
@@ -154,12 +155,9 @@ class TestSignature:
         with pytest.raises(ValueError, match="Invalid path length"):
             invalid_sig.to_bytes(TEST_CONFIG)
 
-        # Invalid rho length
-        invalid_sig = Signature(
-            path=path, rho=[Fp(value=0)] * 3, hashes=HashDigestList(data=hashes_data)
-        )
-        with pytest.raises(ValueError, match="Invalid rho length"):
-            invalid_sig.to_bytes(TEST_CONFIG)
+        # Invalid rho length - Randomness validates length at construction
+        with pytest.raises(ValueError, match="requires exactly"):
+            Randomness(data=[Fp(value=0)] * 3)
 
         # Invalid hashes count
         invalid_hashes = [
@@ -176,7 +174,7 @@ class TestSignature:
             for j in range(TEST_CONFIG.LOG_LIFETIME)
         ]
         path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
-        rho = [Fp(value=i * 10) for i in range(TEST_CONFIG.RAND_LEN_FE)]
+        rho = Randomness(data=[Fp(value=i * 10) for i in range(TEST_CONFIG.RAND_LEN_FE)])
         hashes_data = [
             HashDigestVector(data=[Fp(value=i + j * 100) for i in range(TEST_CONFIG.HASH_LEN_FE)])
             for j in range(TEST_CONFIG.DIMENSION)
@@ -199,7 +197,7 @@ class TestSignature:
             for i in range(PROD_CONFIG.LOG_LIFETIME)
         ]
         path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
-        rho = [Fp(value=i) for i in range(PROD_CONFIG.RAND_LEN_FE)]
+        rho = Randomness(data=[Fp(value=i) for i in range(PROD_CONFIG.RAND_LEN_FE)])
         hashes_data = [
             HashDigestVector(data=[Fp(value=i + j) for i in range(PROD_CONFIG.HASH_LEN_FE)])
             for j in range(PROD_CONFIG.DIMENSION)
@@ -228,7 +226,7 @@ class TestSignature:
             for i in range(TEST_CONFIG.LOG_LIFETIME)
         ]
         path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
-        rho = [Fp(value=i + 100) for i in range(TEST_CONFIG.RAND_LEN_FE)]
+        rho = Randomness(data=[Fp(value=i + 100) for i in range(TEST_CONFIG.RAND_LEN_FE)])
         hashes_data = [
             HashDigestVector(data=[Fp(value=i + j + 200) for i in range(TEST_CONFIG.HASH_LEN_FE)])
             for j in range(TEST_CONFIG.DIMENSION)
@@ -273,7 +271,7 @@ class TestSerializationProperties:
             for _ in range(TEST_CONFIG.LOG_LIFETIME)
         ]
         path = HashTreeOpening(siblings=HashDigestList(data=siblings_data))
-        rho = [Fp(value=0)] * TEST_CONFIG.RAND_LEN_FE
+        rho = Randomness(data=[Fp(value=0)] * TEST_CONFIG.RAND_LEN_FE)
         hashes_data = [
             HashDigestVector(data=[Fp(value=0)] * TEST_CONFIG.HASH_LEN_FE)
             for _ in range(TEST_CONFIG.DIMENSION)
