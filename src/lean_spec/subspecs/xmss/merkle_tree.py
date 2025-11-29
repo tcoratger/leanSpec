@@ -46,6 +46,7 @@ from .containers import (
     HashDigestList,
     HashDigestVector,
     HashTreeLayer,
+    HashTreeLayers,
     HashTreeOpening,
     Parameter,
 )
@@ -166,7 +167,9 @@ class MerkleTree(StrictBaseModel):
 
         # Return the completed tree containing all computed layers.
         # A full tree is represented as a HashSubTree with lowest_layer=0
-        return HashSubTree(depth=Uint64(depth), lowest_layer=Uint64(0), layers=layers)
+        return HashSubTree(
+            depth=Uint64(depth), lowest_layer=Uint64(0), layers=HashTreeLayers(data=layers)
+        )
 
     def root(self, tree: HashSubTree) -> HashDigestVector:
         """
@@ -176,7 +179,7 @@ class MerkleTree(StrictBaseModel):
         and serves as the primary component of the master public key.
         """
         # The root is the single node in the final layer.
-        return cast(HashDigestVector, tree.layers[-1].nodes[0])
+        return cast(HashDigestVector, cast(HashTreeLayer, tree.layers.data[-1]).nodes[0])
 
     def path(self, tree: HashSubTree, position: Uint64) -> HashTreeOpening:
         """
@@ -204,10 +207,11 @@ class MerkleTree(StrictBaseModel):
             raise ValueError("Cannot generate path for empty tree.")
 
         # Check that the position is within the tree's range.
-        if position < tree.layers[0].start_index:
+        first_layer = cast(HashTreeLayer, tree.layers.data[0])
+        if position < first_layer.start_index:
             raise ValueError("Position (before start) is invalid.")
 
-        if position >= tree.layers[0].start_index + Uint64(len(tree.layers[0].nodes)):
+        if position >= first_layer.start_index + Uint64(len(first_layer.nodes)):
             raise ValueError("Position (after end) is invalid.")
 
         co_path: List[List[Fp]] = []
@@ -218,7 +222,7 @@ class MerkleTree(StrictBaseModel):
             # Determine the sibling's position by flipping the last bit (XOR with 1).
             sibling_position = current_position ^ Uint64(1)
             # Find the sibling's index within our sparsely stored `nodes` vector.
-            layer = tree.layers[level]
+            layer = cast(HashTreeLayer, tree.layers.data[level])
             sibling_index_in_vec = sibling_position - layer.start_index
             # Add the sibling's hash to the co-path.
             sibling_node = cast(HashDigestVector, layer.nodes.data[int(sibling_index_in_vec)])

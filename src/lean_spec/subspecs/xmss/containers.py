@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, List, cast
 from ...types import StrictBaseModel, Uint64
 from ...types.byte_arrays import BaseBytes
 from ...types.collections import SSZList, SSZVector
+from ...types.container import Container
 from ..koalabear import P_BYTES, Fp
 from .constants import PRF_KEY_LENGTH, PROD_CONFIG
 
@@ -160,7 +161,7 @@ class HashTreeOpening(StrictBaseModel):
     """SSZ-compliant list of sibling hashes, from bottom to top."""
 
 
-class HashTreeLayer(StrictBaseModel):
+class HashTreeLayer(Container):
     """
     Represents a single horizontal "slice" of the sparse Merkle tree.
 
@@ -172,6 +173,33 @@ class HashTreeLayer(StrictBaseModel):
     """The starting index of the first node in this layer."""
     nodes: HashDigestList
     """SSZ-compliant list of hash digests stored for this layer."""
+
+
+LAYERS_LIMIT = PROD_CONFIG.LOG_LIFETIME + 1
+"""
+The maximum number of layers in a subtree.
+
+This is `LOG_LIFETIME + 1` to accommodate all layers from 0 (leaves) to LOG_LIFETIME (root),
+inclusive. For PROD_CONFIG with LOG_LIFETIME=32, this allows up to 33 layers.
+"""
+
+
+class HashTreeLayers(SSZList):
+    """
+    Variable-length list of Merkle tree layers.
+
+    In SSZ notation: `List[HashTreeLayer, LAYERS_LIMIT]`
+
+    This type represents the layers of a subtree, from the lowest layer up to the root.
+
+    The number of layers varies based on the subtree structure:
+    - Bottom trees: `LOG_LIFETIME/2` layers
+    - Top trees: `LOG_LIFETIME/2` layers
+    - Maximum: `LOG_LIFETIME + 1` layers
+    """
+
+    ELEMENT_TYPE = HashTreeLayer
+    LIMIT = LAYERS_LIMIT
 
 
 class PublicKey(StrictBaseModel):

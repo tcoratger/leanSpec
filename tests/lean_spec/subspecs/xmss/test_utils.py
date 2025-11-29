@@ -1,13 +1,13 @@
 """Tests for the utility functions in the XMSS signature scheme."""
 
 import secrets
-from typing import List
+from typing import List, cast
 
 import pytest
 
 from lean_spec.subspecs.koalabear.field import Fp, P
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.containers import Parameter
+from lean_spec.subspecs.xmss.containers import HashTreeLayer, Parameter
 from lean_spec.subspecs.xmss.merkle_tree import TEST_MERKLE_TREE
 from lean_spec.subspecs.xmss.prf import TEST_PRF
 from lean_spec.subspecs.xmss.tweak_hash import TEST_TWEAK_HASHER
@@ -138,12 +138,12 @@ def test_bottom_tree_from_prf_key() -> None:
     assert len(bottom_tree.layers) > 0
 
     # Verify the root layer has exactly one node
-    root_layer = bottom_tree.layers[-1]
+    root_layer = cast(HashTreeLayer, bottom_tree.layers.data[-1])
     assert len(root_layer.nodes) == 1
 
     # Verify the leaf layer covers the right range
     leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
-    leaf_layer = bottom_tree.layers[0]
+    leaf_layer = cast(HashTreeLayer, bottom_tree.layers.data[0])
     assert len(leaf_layer.nodes) == leafs_per_bottom_tree
 
 
@@ -177,7 +177,10 @@ def test_bottom_tree_from_prf_key_deterministic() -> None:
     )
 
     # Verify the roots are identical
-    assert tree1.layers[-1].nodes[0] == tree2.layers[-1].nodes[0]
+    assert (
+        cast(HashTreeLayer, tree1.layers.data[-1]).nodes[0]
+        == cast(HashTreeLayer, tree2.layers.data[-1]).nodes[0]
+    )
 
 
 def test_bottom_tree_from_prf_key_different_indices() -> None:
@@ -210,4 +213,7 @@ def test_bottom_tree_from_prf_key_different_indices() -> None:
     )
 
     # Verify the roots are different
-    assert tree0.layers[-1].nodes[0] != tree1.layers[-1].nodes[0]
+    assert (
+        cast(HashTreeLayer, tree0.layers.data[-1]).nodes[0]
+        != cast(HashTreeLayer, tree1.layers.data[-1]).nodes[0]
+    )
