@@ -29,7 +29,7 @@ This process involves three main stages:
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, cast
 
 from pydantic import model_validator
 
@@ -190,7 +190,13 @@ class MessageHasher(StrictBaseModel):
             iteration_separator = [Fp(value=i)]
 
             # The input is: rho || P || epoch || message || iteration.
-            combined_input = rho + parameter + epoch_fe + message_fe + iteration_separator
+            combined_input = (
+                rho
+                + cast(List[Fp], list(parameter.data))
+                + epoch_fe
+                + message_fe
+                + iteration_separator
+            )
 
             # Hash the combined input using Poseidon2 compression mode.
             iteration_output = self.poseidon.compress(

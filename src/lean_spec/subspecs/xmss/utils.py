@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, List
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .constants import XmssConfig
-from .containers import HashDigestList, HashDigestVector, HashTreeLayer, PRFKey
+from .containers import HashDigestList, HashDigestVector, HashTreeLayer, Parameter, PRFKey
 from .rand import Rand
 
 if TYPE_CHECKING:
@@ -168,7 +168,7 @@ def bottom_tree_from_prf_key(
     config: XmssConfig,
     prf_key: PRFKey,
     bottom_tree_index: Uint64,
-    parameter: List[Fp],
+    parameter: Parameter,
 ) -> "HashSubTree":
     """
     Generates a single bottom tree on-demand from the PRF key.

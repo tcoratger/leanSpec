@@ -27,7 +27,7 @@ unique across the entire scheme, we guarantee that every hash computation is
 from __future__ import annotations
 
 from itertools import chain
-from typing import List, Union
+from typing import List, Union, cast
 
 from pydantic import Field, model_validator
 
@@ -189,14 +189,19 @@ class TweakHasher(StrictBaseModel):
             # Case 1: Hashing a single digest (used in hash chains).
             #
             # We use the efficient width-16 compression mode.
-            input_vec = parameter + encoded_tweak + message_parts[0]
+            input_vec = cast(List[Fp], list(parameter.data)) + encoded_tweak + message_parts[0]
             return self.poseidon.compress(input_vec, 16, config.HASH_LEN_FE)
 
         elif len(message_parts) == 2:
             # Case 2: Hashing two digests (used for Merkle tree nodes).
             #
             # We use the slightly larger width-24 compression mode.
-            input_vec = parameter + encoded_tweak + message_parts[0] + message_parts[1]
+            input_vec = (
+                cast(List[Fp], list(parameter.data))
+                + encoded_tweak
+                + message_parts[0]
+                + message_parts[1]
+            )
             return self.poseidon.compress(input_vec, 24, config.HASH_LEN_FE)
 
         else:
@@ -205,7 +210,7 @@ class TweakHasher(StrictBaseModel):
             # We use the robust sponge mode.
             # First, flatten the list of message parts into a single vector.
             flattened_message = list(chain.from_iterable(message_parts))
-            input_vec = parameter + encoded_tweak + flattened_message
+            input_vec = cast(List[Fp], list(parameter.data)) + encoded_tweak + flattened_message
 
             # Create a domain separator for the sponge mode based on the input dimensions.
             #

@@ -7,6 +7,7 @@ import pytest
 
 from lean_spec.subspecs.koalabear.field import Fp, P
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
+from lean_spec.subspecs.xmss.containers import Parameter
 from lean_spec.subspecs.xmss.merkle_tree import TEST_MERKLE_TREE
 from lean_spec.subspecs.xmss.prf import TEST_PRF
 from lean_spec.subspecs.xmss.tweak_hash import TEST_TWEAK_HASHER
@@ -116,7 +117,9 @@ def test_bottom_tree_from_prf_key() -> None:
     prf_key = TEST_PRF.key_gen()
 
     # Generate a random parameter
-    parameter = [Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+    parameter = Parameter(
+        data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+    )
 
     # Generate bottom tree 0
     bottom_tree = bottom_tree_from_prf_key(
@@ -148,7 +151,9 @@ def test_bottom_tree_from_prf_key_deterministic() -> None:
     """Tests that bottom_tree_from_prf_key is deterministic."""
     config = TEST_CONFIG
     prf_key = TEST_PRF.key_gen()
-    parameter = [Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+    parameter = Parameter(
+        data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+    )
 
     # Generate the same bottom tree twice
     tree1 = bottom_tree_from_prf_key(
@@ -179,7 +184,9 @@ def test_bottom_tree_from_prf_key_different_indices() -> None:
     """Tests that different bottom tree indices produce different trees."""
     config = TEST_CONFIG
     prf_key = TEST_PRF.key_gen()
-    parameter = [Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+    parameter = Parameter(
+        data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
+    )
 
     # Generate two different bottom trees
     tree0 = bottom_tree_from_prf_key(

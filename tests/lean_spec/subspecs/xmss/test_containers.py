@@ -10,6 +10,7 @@ from lean_spec.subspecs.xmss.containers import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
+    Parameter,
     PublicKey,
     Signature,
 )
@@ -21,7 +22,7 @@ class TestPublicKey:
     def test_bytes_protocol(self) -> None:
         """Test that PublicKey implements Python's bytes protocol."""
         root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=i + 100) for i in range(TEST_CONFIG.PARAMETER_LEN)]
+        parameter = Parameter(data=[Fp(value=i + 100) for i in range(TEST_CONFIG.PARAMETER_LEN)])
         pk = PublicKey(root=root, parameter=parameter)
 
         # Test __bytes__()
@@ -32,7 +33,7 @@ class TestPublicKey:
     def test_to_bytes_with_validation(self) -> None:
         """Test that to_bytes validates field lengths."""
         root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=i) for i in range(TEST_CONFIG.PARAMETER_LEN)]
+        parameter = Parameter(data=[Fp(value=i) for i in range(TEST_CONFIG.PARAMETER_LEN)])
         pk = PublicKey(root=root, parameter=parameter)
 
         # Valid serialization
@@ -43,15 +44,14 @@ class TestPublicKey:
         with pytest.raises(ValueError, match="requires exactly"):
             HashDigestVector(data=[Fp(value=0)] * 5)
 
-        # Invalid parameter length
-        invalid_pk = PublicKey(root=root, parameter=[Fp(value=0)] * 3)
-        with pytest.raises(ValueError, match="Invalid parameter length"):
-            invalid_pk.to_bytes(TEST_CONFIG)
+        # Invalid parameter length - Parameter validates length at construction
+        with pytest.raises(ValueError, match="requires exactly"):
+            Parameter(data=[Fp(value=0)] * 3)
 
     def test_roundtrip_test_config(self) -> None:
         """Test serialization round-trip with TEST_CONFIG."""
         root = HashDigestVector(data=[Fp(value=i * 10) for i in range(TEST_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=i * 20) for i in range(TEST_CONFIG.PARAMETER_LEN)]
+        parameter = Parameter(data=[Fp(value=i * 20) for i in range(TEST_CONFIG.PARAMETER_LEN)])
         original = PublicKey(root=root, parameter=parameter)
 
         # Serialize and deserialize
@@ -65,7 +65,7 @@ class TestPublicKey:
     def test_roundtrip_prod_config(self) -> None:
         """Test serialization round-trip with PROD_CONFIG."""
         root = HashDigestVector(data=[Fp(value=i) for i in range(PROD_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=i + 1000) for i in range(PROD_CONFIG.PARAMETER_LEN)]
+        parameter = Parameter(data=[Fp(value=i + 1000) for i in range(PROD_CONFIG.PARAMETER_LEN)])
         original = PublicKey(root=root, parameter=parameter)
 
         data = original.to_bytes(PROD_CONFIG)
@@ -86,7 +86,7 @@ class TestPublicKey:
     def test_serialization_format(self) -> None:
         """Test that serialization follows the documented format: root || parameter."""
         root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=i + 100) for i in range(TEST_CONFIG.PARAMETER_LEN)]
+        parameter = Parameter(data=[Fp(value=i + 100) for i in range(TEST_CONFIG.PARAMETER_LEN)])
         pk = PublicKey(root=root, parameter=parameter)
 
         data = bytes(pk)
@@ -95,7 +95,7 @@ class TestPublicKey:
         from typing import List, cast
 
         root_data = Fp.serialize_list(cast(List[Fp], list(root.data)))
-        parameter_data = Fp.serialize_list(parameter)
+        parameter_data = Fp.serialize_list(cast(List[Fp], list(parameter.data)))
 
         assert data == root_data + parameter_data
         assert data[: len(root_data)] == root_data
@@ -255,7 +255,7 @@ class TestSerializationProperties:
     def test_public_key_deterministic(self) -> None:
         """Test that serialization is deterministic."""
         root = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=i) for i in range(TEST_CONFIG.PARAMETER_LEN)]
+        parameter = Parameter(data=[Fp(value=i) for i in range(TEST_CONFIG.PARAMETER_LEN)])
         pk = PublicKey(root=root, parameter=parameter)
 
         # Serialize multiple times
@@ -291,7 +291,7 @@ class TestSerializationProperties:
         """Test that different values produce different serializations."""
         root1 = HashDigestVector(data=[Fp(value=i) for i in range(TEST_CONFIG.HASH_LEN_FE)])
         root2 = HashDigestVector(data=[Fp(value=i + 1) for i in range(TEST_CONFIG.HASH_LEN_FE)])
-        parameter = [Fp(value=0)] * TEST_CONFIG.PARAMETER_LEN
+        parameter = Parameter(data=[Fp(value=0)] * TEST_CONFIG.PARAMETER_LEN)
 
         pk1 = PublicKey(root=root1, parameter=parameter)
         pk2 = PublicKey(root=root2, parameter=parameter)
