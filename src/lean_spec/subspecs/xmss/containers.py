@@ -90,14 +90,19 @@ class Parameter(SSZVector):
     LENGTH = PROD_CONFIG.PARAMETER_LEN
 
 
-Randomness = List[Fp]
-"""
-A type alias for the randomness `rho` (ρ) used during signing.
+class Randomness(SSZVector):
+    """
+    The randomness `rho` (ρ) used during signing.
 
-This value provides a variable input to the message hash, allowing the signer to
-repeatedly try hashing until a valid "codeword" is found. It must be included in
-the final signature for the verifier to reproduce the same hash.
-"""
+    This value provides a variable input to the message hash, allowing the signer to
+    repeatedly try hashing until a valid "codeword" is found. It must be included in
+    the final signature for the verifier to reproduce the same hash.
+
+    SSZ notation: `Vector[Fp, RAND_LEN_FE]`
+    """
+
+    ELEMENT_TYPE = Fp
+    LENGTH = PROD_CONFIG.RAND_LEN_FE
 
 
 def _serialize_digests(digests: HashDigestList) -> bytes:
@@ -298,7 +303,7 @@ class Signature(StrictBaseModel):
         """
         return (
             _serialize_digests(self.path.siblings)
-            + Fp.serialize_list(self.rho)
+            + Fp.serialize_list(cast(List[Fp], list(self.rho.data)))
             + _serialize_digests(self.hashes)
         )
 
@@ -399,7 +404,7 @@ class Signature(StrictBaseModel):
 
         return cls(
             path=HashTreeOpening(siblings=siblings),
-            rho=rho,
+            rho=Randomness(data=rho),
             hashes=hashes,
         )
 

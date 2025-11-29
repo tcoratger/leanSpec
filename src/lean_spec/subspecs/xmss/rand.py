@@ -40,7 +40,7 @@ class Rand(StrictBaseModel):
 
     def rho(self) -> Randomness:
         """Generates randomness `rho` for message encoding."""
-        return self.field_elements(self.config.RAND_LEN_FE)
+        return Randomness(data=self.field_elements(self.config.RAND_LEN_FE))
 
 
 PROD_RAND = Rand(config=PROD_CONFIG)

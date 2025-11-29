@@ -191,7 +191,7 @@ class MessageHasher(StrictBaseModel):
 
             # The input is: rho || P || epoch || message || iteration.
             combined_input = (
-                rho
+                cast(List[Fp], list(rho.data))
                 + cast(List[Fp], list(parameter.data))
                 + epoch_fe
                 + message_fe

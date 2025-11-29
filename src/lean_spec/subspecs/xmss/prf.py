@@ -24,7 +24,7 @@ from .constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from .containers import PRFKey
+from .containers import PRFKey, Randomness
 
 PRF_DOMAIN_SEP: bytes = bytes(
     [
@@ -172,7 +172,7 @@ class Prf(StrictBaseModel):
 
     def get_randomness(
         self, key: PRFKey, epoch: Uint64, message: bytes, counter: Uint64
-    ) -> List[Fp]:
+    ) -> Randomness:
         """
         Derives pseudorandom field elements for use in deterministic signing.
 
@@ -200,7 +200,7 @@ class Prf(StrictBaseModel):
             counter: The attempt number (used when retrying encoding).
 
         Returns:
-            A list of field elements to use as randomness for encoding (i.e., `rho`).
+            Randomness for encoding (i.e., `rho`).
         """
         config = self.config
 
@@ -224,16 +224,18 @@ class Prf(StrictBaseModel):
         num_bytes_to_read = PRF_BYTES_PER_FE * config.RAND_LEN_FE
         prf_output_bytes = hashlib.shake_128(input_data).digest(num_bytes_to_read)
 
-        # Convert to field elements
-        return [
-            Fp(
-                value=int.from_bytes(
-                    prf_output_bytes[i * PRF_BYTES_PER_FE : (i + 1) * PRF_BYTES_PER_FE],
-                    "big",
+        # Convert to field elements and wrap in Randomness
+        return Randomness(
+            data=[
+                Fp(
+                    value=int.from_bytes(
+                        prf_output_bytes[i * PRF_BYTES_PER_FE : (i + 1) * PRF_BYTES_PER_FE],
+                        "big",
+                    )
                 )
-            )
-            for i in range(config.RAND_LEN_FE)
-        ]
+                for i in range(config.RAND_LEN_FE)
+            ]
+        )
 
 
 PROD_PRF = Prf(config=PROD_CONFIG)
