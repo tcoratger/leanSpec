@@ -104,7 +104,7 @@ class Prf(StrictBaseModel):
         Returns:
             A new, randomly generated PRF key of `PRF_KEY_LENGTH` bytes.
         """
-        return os.urandom(PRF_KEY_LENGTH)
+        return PRFKey(os.urandom(PRF_KEY_LENGTH))
 
     def apply(self, key: PRFKey, epoch: Uint64, chain_index: Uint64) -> List[Fp]:
         """
