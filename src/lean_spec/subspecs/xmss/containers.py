@@ -77,14 +77,18 @@ class HashDigestList(SSZList):
     LIMIT = NODE_LIST_LIMIT
 
 
-Parameter = List[Fp]
-"""
-A type alias for the public parameter `P`.
+class Parameter(SSZVector):
+    """
+    The public parameter P.
 
-This is a unique, randomly generated value associated with a single key pair. It
-is mixed into every hash computation to "personalize" the hash function, preventing
-certain cross-key attacks. It is public knowledge.
-"""
+    This is a unique, randomly generated value associated with a single key pair. It
+    is mixed into every hash computation to "personalize" the hash function, preventing
+    certain cross-key attacks. It is public knowledge.
+    """
+
+    ELEMENT_TYPE = Fp
+    LENGTH = PROD_CONFIG.PARAMETER_LEN
+
 
 Randomness = List[Fp]
 """
@@ -199,7 +203,7 @@ class PublicKey(StrictBaseModel):
             True
         """
         return Fp.serialize_list(cast(List[Fp], list(self.root.data))) + Fp.serialize_list(
-            self.parameter
+            cast(List[Fp], list(self.parameter.data))
         )
 
     def to_bytes(self, config: XmssConfig) -> bytes:
@@ -266,7 +270,7 @@ class PublicKey(StrictBaseModel):
         root = Fp.deserialize_list(data[:root_len], config.HASH_LEN_FE)
         parameter = Fp.deserialize_list(data[root_len:], config.PARAMETER_LEN)
 
-        return cls(root=HashDigestVector(data=root), parameter=parameter)
+        return cls(root=HashDigestVector(data=root), parameter=Parameter(data=parameter))
 
 
 class Signature(StrictBaseModel):

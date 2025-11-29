@@ -32,7 +32,7 @@ class Rand(StrictBaseModel):
 
     def parameter(self) -> Parameter:
         """Generates a random public parameter."""
-        return self.field_elements(self.config.PARAMETER_LEN)
+        return Parameter(data=self.field_elements(self.config.PARAMETER_LEN))
 
     def domain(self) -> List[Fp]:
         """Generates a random hash digest."""
