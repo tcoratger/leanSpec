@@ -33,5 +33,5 @@ class SignedAttestationSpec(CamelModel):
     """
     The signature for the attestation.
 
-    If None, uses Signature.zero() for testing.
+    If None, uses an empty signature for testing.
     """

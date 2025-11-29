@@ -206,15 +206,6 @@ class Signature(Container):
     hashes: HashDigestList
     """The one-time signature itself: a list of intermediate Winternitz chain hashes."""
 
-    @classmethod
-    def zero(cls) -> "Signature":
-        """Create an empty/zero signature for testing purposes."""
-        return cls(
-            path=HashTreeOpening(siblings=HashDigestList(data=[])),
-            rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-            hashes=HashDigestList(data=[]),
-        )
-
     def verify(
         self,
         public_key: PublicKey,
