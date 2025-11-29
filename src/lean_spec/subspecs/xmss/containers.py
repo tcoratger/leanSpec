@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from lean_spec.subspecs.koalabear import Fp
+
 from ...types import Uint64
 from ...types.byte_arrays import BaseBytes
 from ...types.collections import SSZList, SSZVector
 from ...types.container import Container
-from ..koalabear import Fp
 from .constants import PRF_KEY_LENGTH, PROD_CONFIG
 
 if TYPE_CHECKING:
+    from .interface import GeneralizedXmssScheme
     from .subtree import HashSubTree
 
 
@@ -103,48 +105,6 @@ class Randomness(SSZVector):
 
     ELEMENT_TYPE = Fp
     LENGTH = PROD_CONFIG.RAND_LEN_FE
-
-
-def _serialize_digests(digests: HashDigestList) -> bytes:
-    """
-    Serialize a list of hash digests.
-
-    Args:
-        digests: SSZ-compliant list of hash digests.
-
-    Returns:
-        Concatenated serialized field elements.
-    """
-    return b"".join(Fp.serialize_list(list(digest.data)) for digest in digests)
-
-
-def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> HashDigestList:
-    """
-    Deserialize multiple hash digests from bytes.
-
-    Args:
-        data: Raw bytes to deserialize.
-        count: Number of digests.
-        elements_per_digest: Field elements per digest.
-
-    Returns:
-        SSZ-compliant list of hash digests.
-
-    Raises:
-        ValueError: If data length doesn't match expectations.
-    """
-    total_elements = count * elements_per_digest
-    all_elements = Fp.deserialize_list(data, total_elements)
-
-    # Convert to list of lists first
-    digests = [
-        all_elements[i : i + elements_per_digest]
-        for i in range(0, len(all_elements), elements_per_digest)
-    ]
-
-    # Wrap in SSZ types
-    ssz_digests = [HashDigestVector(data=digest) for digest in digests]
-    return HashDigestList(data=ssz_digests)
 
 
 class HashTreeOpening(Container):
@@ -245,6 +205,33 @@ class Signature(Container):
     """The randomness used to successfully encode the message."""
     hashes: HashDigestList
     """The one-time signature itself: a list of intermediate Winternitz chain hashes."""
+
+    @classmethod
+    def zero(cls) -> "Signature":
+        """Create an empty/zero signature for testing purposes."""
+        return cls(
+            path=HashTreeOpening(siblings=HashDigestList(data=[])),
+            rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
+            hashes=HashDigestList(data=[]),
+        )
+
+    def verify(
+        self,
+        public_key: PublicKey,
+        epoch: "Uint64",
+        message: bytes,
+        scheme: "GeneralizedXmssScheme | None" = None,
+    ) -> bool:
+        """Verify the signature using XMSS verification algorithm."""
+        from .interface import TEST_SIGNATURE_SCHEME
+
+        if scheme is None:
+            scheme = TEST_SIGNATURE_SCHEME
+
+        try:
+            return scheme.verify(public_key, epoch, message, self)
+        except Exception:
+            return False
 
 
 class SecretKey(Container):

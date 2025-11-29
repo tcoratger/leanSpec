@@ -9,7 +9,6 @@ from lean_spec.subspecs.containers import (
     AttestationData,
     BlockBody,
     Checkpoint,
-    Signature,
     SignedAttestation,
     State,
 )
@@ -24,6 +23,7 @@ from lean_spec.subspecs.containers.state.types import (
     JustifiedSlots,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
 

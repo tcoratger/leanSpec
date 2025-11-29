@@ -2,10 +2,9 @@ from lean_spec.subspecs.containers import (
     Attestation,
     AttestationData,
     Checkpoint,
-    Signature,
     SignedAttestation,
 )
-from lean_spec.subspecs.containers.block.types import BlockSignatures
+from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.types.byte_arrays import Bytes32
 from lean_spec.types.validator import ValidatorIndex
 

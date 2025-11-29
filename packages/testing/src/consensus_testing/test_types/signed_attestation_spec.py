@@ -1,7 +1,7 @@
 """Lightweight attestation specification for test definitions."""
 
-from lean_spec.subspecs.containers.signature import Signature
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.types import CamelModel, Uint64, ValidatorIndex
 
 

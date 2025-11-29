@@ -8,7 +8,6 @@ from typing import ClassVar, List
 from pydantic import model_validator
 
 from lean_spec.subspecs.chain.config import SECONDS_PER_SLOT
-from lean_spec.subspecs.containers import Signature
 from lean_spec.subspecs.containers.attestation import (
     Attestation,
     AttestationData,
@@ -27,6 +26,7 @@ from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz import hash_tree_root
+from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
