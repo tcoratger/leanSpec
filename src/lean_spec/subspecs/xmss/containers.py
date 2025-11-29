@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, List, cast
-
-from pydantic import Field
+from typing import TYPE_CHECKING, List, cast
 
 from ...types import StrictBaseModel, Uint64
+from ...types.byte_arrays import BaseBytes
 from ...types.collections import SSZList, SSZVector
 from ..koalabear import P_BYTES, Fp
 from .constants import PRF_KEY_LENGTH, PROD_CONFIG
@@ -15,13 +14,16 @@ if TYPE_CHECKING:
     from .constants import XmssConfig
     from .subtree import HashSubTree
 
-PRFKey = Annotated[bytes, Field(min_length=PRF_KEY_LENGTH, max_length=PRF_KEY_LENGTH)]
-"""
-A type alias for the PRF **master secret key**.
 
-This is a high-entropy byte string that acts as the single root secret from
-which all one-time signing keys are deterministically derived.
-"""
+class PRFKey(BaseBytes):
+    """
+    The PRF master secret key.
+
+    This is a high-entropy byte string that acts as the single root secret from
+    which all one-time signing keys are deterministically derived.
+    """
+
+    LENGTH = PRF_KEY_LENGTH
 
 
 HASH_DIGEST_LENGTH = PROD_CONFIG.HASH_LEN_FE

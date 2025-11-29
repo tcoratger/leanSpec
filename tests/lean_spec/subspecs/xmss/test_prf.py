@@ -4,6 +4,7 @@ from lean_spec.subspecs.xmss.constants import (
     PRF_KEY_LENGTH,
     TEST_CONFIG,
 )
+from lean_spec.subspecs.xmss.containers import PRFKey
 from lean_spec.subspecs.xmss.prf import TEST_PRF
 from lean_spec.types.uint import Uint64
 
@@ -52,14 +53,14 @@ def test_apply_is_sensitive_to_inputs() -> None:
     config = TEST_CONFIG
 
     # Generate a baseline output with a set of initial inputs.
-    key1 = b"\x11" * PRF_KEY_LENGTH
+    key1 = PRFKey(b"\x11" * PRF_KEY_LENGTH)
     epoch1 = Uint64(10)
     chain_index1 = Uint64(20)
     baseline_output = prf.apply(key1, epoch1, chain_index1)
     assert len(baseline_output) == config.HASH_LEN_FE
 
     # Test sensitivity to the key.
-    key2 = b"\x22" * PRF_KEY_LENGTH
+    key2 = PRFKey(b"\x22" * PRF_KEY_LENGTH)
     output_key_changed = prf.apply(key2, epoch1, chain_index1)
     assert baseline_output != output_key_changed
 

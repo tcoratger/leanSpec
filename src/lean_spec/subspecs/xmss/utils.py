@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, List
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .constants import XmssConfig
-from .containers import HashDigestList, HashDigestVector, HashTreeLayer
+from .containers import HashDigestList, HashDigestVector, HashTreeLayer, PRFKey
 from .rand import Rand
 
 if TYPE_CHECKING:
@@ -166,7 +166,7 @@ def bottom_tree_from_prf_key(
     hasher: "TweakHasher",
     merkle_tree: "MerkleTree",
     config: XmssConfig,
-    prf_key: bytes,
+    prf_key: PRFKey,
     bottom_tree_index: Uint64,
     parameter: List[Fp],
 ) -> "HashSubTree":
