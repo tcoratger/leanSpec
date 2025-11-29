@@ -178,7 +178,7 @@ class XmssKeyManager:
         xmss_sig = self.scheme.sign(sk, epoch, message)
 
         # Convert the signature to the wire format (byte array).
-        signature_bytes = xmss_sig.to_bytes(self.scheme.config)
+        signature_bytes = xmss_sig.encode_bytes()
 
         # Ensure the signature meets the consensus spec length (3116 bytes).
         #

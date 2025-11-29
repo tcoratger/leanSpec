@@ -24,7 +24,7 @@ class Signature(Bytes3116):
             # Signature container is always 3116 bytes, but scheme config may expect less.
             # Slice to the expected size if needed, assumes padding to the right.
             signature_data = bytes(self)[: scheme.config.SIGNATURE_LEN_BYTES]
-            signature = XmssSignature.from_bytes(signature_data, scheme.config)
+            signature = XmssSignature.decode_bytes(signature_data)
             return scheme.verify(public_key, epoch, message, signature)
         except Exception:
             return False

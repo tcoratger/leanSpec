@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, cast
+from typing import TYPE_CHECKING
 
-from ...types import StrictBaseModel, Uint64
+from ...types import Uint64
 from ...types.byte_arrays import BaseBytes
 from ...types.collections import SSZList, SSZVector
 from ...types.container import Container
-from ..koalabear import P_BYTES, Fp
+from ..koalabear import Fp
 from .constants import PRF_KEY_LENGTH, PROD_CONFIG
 
 if TYPE_CHECKING:
-    from .constants import XmssConfig
     from .subtree import HashSubTree
 
 
@@ -148,13 +147,16 @@ def _deserialize_digests(data: bytes, count: int, elements_per_digest: int) -> H
     return HashDigestList(data=ssz_digests)
 
 
-class HashTreeOpening(StrictBaseModel):
+class HashTreeOpening(Container):
     """
     A Merkle authentication path.
 
     This object contains the minimal proof required to connect a specific leaf
     to the Merkle root. It consists of the list of all sibling nodes along the
     path from the leaf to the top of the tree.
+
+    SSZ Container with fields:
+    - siblings: List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]
     """
 
     siblings: HashDigestList
@@ -202,20 +204,18 @@ class HashTreeLayers(SSZList):
     LIMIT = LAYERS_LIMIT
 
 
-class PublicKey(StrictBaseModel):
+class PublicKey(Container):
     """
     The public-facing component of a key pair.
 
     This is the data a verifier needs to check signatures. It is compact, safe to
     distribute publicly, and acts as the signer's identity.
 
-    Binary Format
-    -------------
-    The serialized format concatenates:
-    1. Merkle root (`HASH_LEN_FE` field elements)
-    2. Public parameter (`PARAMETER_LEN` field elements)
+    SSZ Container with fields:
+    - root: Vector[Fp, HASH_LEN_FE]
+    - parameter: Vector[Fp, PARAMETER_LEN]
 
-    All field elements are serialized in little-endian byte order.
+    Serialization is handled automatically by SSZ.
     """
 
     root: HashDigestVector
@@ -223,97 +223,20 @@ class PublicKey(StrictBaseModel):
     parameter: Parameter
     """The public parameter `P` that personalizes the hash function."""
 
-    def __bytes__(self) -> bytes:
-        """
-        Serialize using Python's bytes protocol.
 
-        Format: root || parameter (concatenated field elements).
-
-        Example:
-            >>> pk = PublicKey(root=[Fp(value=0)] * 8, parameter=[Fp(value=1)] * 5)
-            >>> data = bytes(pk)
-            >>> isinstance(data, bytes)
-            True
-        """
-        return Fp.serialize_list(cast(List[Fp], list(self.root.data))) + Fp.serialize_list(
-            cast(List[Fp], list(self.parameter.data))
-        )
-
-    def to_bytes(self, config: XmssConfig) -> bytes:
-        """
-        Serialize with validation against configuration.
-
-        This validates field lengths match the expected configuration before
-        serialization, providing better error messages for invalid keys.
-
-        Args:
-            config: XMSS configuration for validation.
-
-        Returns:
-            Binary representation of the public key.
-
-        Raises:
-            ValueError: If field lengths don't match configuration.
-        """
-        if len(self.root) != config.HASH_LEN_FE:
-            raise ValueError(
-                f"Invalid root length: expected {config.HASH_LEN_FE}, got {len(self.root)}"
-            )
-
-        if len(self.parameter) != config.PARAMETER_LEN:
-            raise ValueError(
-                f"Invalid parameter length: expected {config.PARAMETER_LEN}, "
-                f"got {len(self.parameter)}"
-            )
-
-        return bytes(self)
-
-    @classmethod
-    def from_bytes(cls, data: bytes, config: XmssConfig) -> PublicKey:
-        """
-        Deserialize a public key from bytes.
-
-        Args:
-            data: Binary representation of a public key.
-            config: The XMSS configuration defining field lengths.
-
-        Returns:
-            Deserialized PublicKey instance.
-
-        Raises:
-            ValueError: If the data has incorrect length or format.
-
-        Example:
-            >>> data = bytes(PROD_CONFIG.PUBLIC_KEY_LEN_BYTES)
-            >>> pk = PublicKey.from_bytes(data, PROD_CONFIG)
-            >>> isinstance(pk, PublicKey)
-            True
-        """
-        expected_length = config.PUBLIC_KEY_LEN_BYTES
-
-        if len(data) != expected_length:
-            raise ValueError(
-                f"Invalid public key length: expected {expected_length} bytes "
-                f"({config.HASH_LEN_FE} root + {config.PARAMETER_LEN} parameter "
-                f"× {P_BYTES} bytes each), got {len(data)} bytes"
-            )
-
-        # Parse: root || parameter
-        root_len = config.HASH_LEN_FE * P_BYTES
-        root = Fp.deserialize_list(data[:root_len], config.HASH_LEN_FE)
-        parameter = Fp.deserialize_list(data[root_len:], config.PARAMETER_LEN)
-
-        return cls(root=HashDigestVector(data=root), parameter=Parameter(data=parameter))
-
-
-class Signature(StrictBaseModel):
+class Signature(Container):
     """
     A signature produced by the `sign` function.
 
     It contains all the necessary components for a verifier to confirm that a
     specific message was signed by the owner of a `PublicKey` for a specific epoch.
 
-    All field elements are serialized in little-endian byte order.
+    SSZ Container with fields:
+    - path: HashTreeOpening (container with siblings list)
+    - rho: Vector[Fp, RAND_LEN_FE]
+    - hashes: List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]
+
+    Serialization is handled automatically by SSZ.
     """
 
     path: HashTreeOpening
@@ -323,126 +246,25 @@ class Signature(StrictBaseModel):
     hashes: HashDigestList
     """The one-time signature itself: a list of intermediate Winternitz chain hashes."""
 
-    def __bytes__(self) -> bytes:
-        """
-        Serialize using Python's bytes protocol.
 
-        Format: path siblings || rho || hashes (concatenated field elements).
-        """
-        return (
-            _serialize_digests(self.path.siblings)
-            + Fp.serialize_list(cast(List[Fp], list(self.rho.data)))
-            + _serialize_digests(self.hashes)
-        )
-
-    def to_bytes(self, config: XmssConfig) -> bytes:
-        """
-        Serialize the signature to bytes with validation.
-
-        Args:
-            config: The XMSS configuration defining field lengths.
-
-        Returns:
-            Binary representation of the signature.
-
-        Raises:
-            ValueError: If any component has incorrect length.
-        """
-        # Validate Merkle path
-        if len(self.path.siblings) != config.LOG_LIFETIME:
-            raise ValueError(
-                f"Invalid path length: expected {config.LOG_LIFETIME} siblings, "
-                f"got {len(self.path.siblings)}"
-            )
-
-        for i, sibling_vector in enumerate(self.path.siblings):
-            if len(sibling_vector) != config.HASH_LEN_FE:
-                raise ValueError(
-                    f"Invalid sibling {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(sibling_vector)}"
-                )
-
-        # Validate randomness
-        if len(self.rho) != config.RAND_LEN_FE:
-            raise ValueError(
-                f"Invalid rho length: expected {config.RAND_LEN_FE} elements, got {len(self.rho)}"
-            )
-
-        # Validate OTS hashes
-        if len(self.hashes) != config.DIMENSION:
-            raise ValueError(
-                f"Invalid hashes length: expected {config.DIMENSION} hashes, got {len(self.hashes)}"
-            )
-
-        for i, hash_vector in enumerate(self.hashes):
-            if len(hash_vector) != config.HASH_LEN_FE:
-                raise ValueError(
-                    f"Invalid hash {i} length: expected {config.HASH_LEN_FE} elements, "
-                    f"got {len(hash_vector)}"
-                )
-
-        return bytes(self)
-
-    @classmethod
-    def from_bytes(cls, data: bytes, config: XmssConfig) -> Signature:
-        """
-        Deserialize a signature from bytes.
-
-        Args:
-            data: Binary representation of a signature.
-            config: The XMSS configuration defining field lengths.
-
-        Returns:
-            Deserialized Signature instance.
-
-        Raises:
-            ValueError: If the data has incorrect length or format.
-        """
-        expected_length = config.SIGNATURE_LEN_BYTES
-
-        if len(data) != expected_length:
-            raise ValueError(
-                f"Invalid signature length: expected {expected_length} bytes, got {len(data)} bytes"
-            )
-
-        # Calculate section sizes
-        path_size = config.LOG_LIFETIME * config.HASH_LEN_FE * P_BYTES
-        rho_size = config.RAND_LEN_FE * P_BYTES
-
-        # Parse: path siblings || rho || hashes
-        offset = 0
-        path_data = data[offset : offset + path_size]
-        offset += path_size
-        rho_data = data[offset : offset + rho_size]
-        offset += rho_size
-        hashes_data = data[offset:]
-
-        # Deserialize components
-        siblings = _deserialize_digests(
-            path_data,
-            count=config.LOG_LIFETIME,
-            elements_per_digest=config.HASH_LEN_FE,
-        )
-        rho = Fp.deserialize_list(rho_data, count=config.RAND_LEN_FE)
-        hashes = _deserialize_digests(
-            hashes_data,
-            count=config.DIMENSION,
-            elements_per_digest=config.HASH_LEN_FE,
-        )
-
-        return cls(
-            path=HashTreeOpening(siblings=siblings),
-            rho=Randomness(data=rho),
-            hashes=hashes,
-        )
-
-
-class SecretKey(StrictBaseModel):
+class SecretKey(Container):
     """
     The private component of a key pair. **MUST BE KEPT CONFIDENTIAL.**
 
     This object contains all the secret material and pre-computed data needed to
     generate signatures for any epoch within its active lifetime.
+
+    SSZ Container with fields:
+    - prf_key: Bytes[PRF_KEY_LENGTH]
+    - parameter: Vector[Fp, PARAMETER_LEN]
+    - activation_epoch: uint64
+    - num_active_epochs: uint64
+    - top_tree: HashSubTree
+    - left_bottom_tree_index: uint64
+    - left_bottom_tree: HashSubTree
+    - right_bottom_tree: HashSubTree
+
+    Serialization is handled automatically by SSZ.
     """
 
     prf_key: PRFKey
@@ -467,7 +289,7 @@ class SecretKey(StrictBaseModel):
     `sqrt(LIFETIME)`, with a minimum of `2 * sqrt(LIFETIME)`.
     """
 
-    top_tree: HashSubTree
+    top_tree: "HashSubTree"
     """
     The top tree containing the root and top `LOG_LIFETIME/2` layers.
 
@@ -487,7 +309,7 @@ class SecretKey(StrictBaseModel):
 
     """
 
-    left_bottom_tree: HashSubTree
+    left_bottom_tree: "HashSubTree"
     """
     The left bottom tree in the sliding window.
 
@@ -495,7 +317,7 @@ class SecretKey(StrictBaseModel):
     [left_bottom_tree_index * sqrt(LIFETIME), (left_bottom_tree_index + 1) * sqrt(LIFETIME))
     """
 
-    right_bottom_tree: HashSubTree
+    right_bottom_tree: "HashSubTree"
     """
     The right bottom tree in the sliding window.
 
