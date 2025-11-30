@@ -34,6 +34,8 @@ The fixed length of a hash digest in field elements.
 
 Derived from `PROD_CONFIG.HASH_LEN_FE`. This corresponds to the output length
 of the Poseidon2 hash function used in the XMSS scheme.
+
+TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
 """
 
 # Calculate the maximum number of nodes in a sparse Merkle tree layer:
@@ -48,6 +50,8 @@ Calculated as `2^(LOG_LIFETIME/2 + 1)` from PROD_CONFIG to accommodate:
 - Bottom trees with up to `2^(LOG_LIFETIME/2)` nodes
 - Padding overhead (up to 2 additional nodes)
 - Future-proofing with 2x margin
+
+TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
 """
 
 
@@ -86,6 +90,8 @@ class Parameter(SSZVector):
     This is a unique, randomly generated value associated with a single key pair. It
     is mixed into every hash computation to "personalize" the hash function, preventing
     certain cross-key attacks. It is public knowledge.
+
+    TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
     """
 
     ELEMENT_TYPE = Fp
@@ -101,6 +107,8 @@ class Randomness(SSZVector):
     the final signature for the verifier to reproduce the same hash.
 
     SSZ notation: `Vector[Fp, RAND_LEN_FE]`
+
+    TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
     """
 
     ELEMENT_TYPE = Fp
@@ -143,6 +151,8 @@ The maximum number of layers in a subtree.
 
 This is `LOG_LIFETIME + 1` to accommodate all layers from 0 (leaves) to LOG_LIFETIME (root),
 inclusive. For PROD_CONFIG with LOG_LIFETIME=32, this allows up to 33 layers.
+
+TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
 """
 
 
