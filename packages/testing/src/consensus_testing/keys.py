@@ -175,7 +175,6 @@ class XmssKeyManager:
         message = bytes(hash_tree_root(attestation))
 
         # Generate and return the XMSS signature using the validator's (now prepared) secret key.
-        # With SSZ everywhere, we can just return the signature directly - no padding needed!
         return self.scheme.sign(sk, epoch, message)
 
     def get_public_key(self, validator_index: ValidatorIndex) -> PublicKey:
