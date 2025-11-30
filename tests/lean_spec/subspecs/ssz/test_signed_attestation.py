@@ -34,7 +34,18 @@ def test_encode_decode_signed_attestation_roundtrip() -> None:
         ),
     )
 
-    # Test that encoding and decoding round-trips correctly
+    # Test that encoding produces the expected hardcoded value
     encode = signed_attestation.encode_bytes()
+    expected_value = (
+        "000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000000000000000000000000000000000"
+        "000000000000000000000000000000008c00000024000000000000000000"
+        "000000000000000000000000000000000000000000002800000004000000"
+    )
+    assert encode.hex() == expected_value, "Encoded value must match hardcoded expected value"
+
+    # Test that decoding round-trips correctly
     decoded = SignedAttestation.decode_bytes(encode)
     assert decoded == signed_attestation
