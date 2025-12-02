@@ -28,13 +28,9 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import (
-    HashDigestList,
-    HashTreeOpening,
-    Randomness,
-    Signature,
-)
+from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
+from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
 from ..keys import XmssKeyManager

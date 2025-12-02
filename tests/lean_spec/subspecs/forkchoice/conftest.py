@@ -25,12 +25,8 @@ from lean_spec.subspecs.containers.state.types import (
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import (
-    HashDigestList,
-    HashTreeOpening,
-    Randomness,
-    Signature,
-)
+from lean_spec.subspecs.xmss.containers import Signature
+from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64, ValidatorIndex
 
 

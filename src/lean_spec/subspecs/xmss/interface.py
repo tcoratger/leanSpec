@@ -25,7 +25,7 @@ from .constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from .containers import HashDigestVector, PublicKey, SecretKey, Signature
+from .containers import PublicKey, SecretKey, Signature
 from .merkle_tree import (
     PROD_MERKLE_TREE,
     TEST_MERKLE_TREE,
@@ -38,6 +38,7 @@ from .tweak_hash import (
     TEST_TWEAK_HASHER,
     TweakHasher,
 )
+from .types import HashDigestVector
 from .utils import bottom_tree_from_prf_key, expand_activation_time
 
 
@@ -389,7 +390,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # - The Merkle path,
         # - The randomness `rho` needed for verification.
         # Wrap ots_hashes in SSZ types
-        from .containers import HashDigestList, HashDigestVector
+        from .types import HashDigestList, HashDigestVector
 
         ssz_hashes = [HashDigestVector(data=hash_digest) for hash_digest in ots_hashes]
         return Signature(path=path, rho=rho, hashes=HashDigestList(data=ssz_hashes))

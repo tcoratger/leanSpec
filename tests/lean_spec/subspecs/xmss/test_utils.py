@@ -7,10 +7,10 @@ import pytest
 
 from lean_spec.subspecs.koalabear.field import Fp, P
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.containers import HashTreeLayer, Parameter
 from lean_spec.subspecs.xmss.merkle_tree import TEST_MERKLE_TREE
 from lean_spec.subspecs.xmss.prf import TEST_PRF
 from lean_spec.subspecs.xmss.tweak_hash import TEST_TWEAK_HASHER
+from lean_spec.subspecs.xmss.types import HashTreeLayer, Parameter
 from lean_spec.subspecs.xmss.utils import (
     bottom_tree_from_prf_key,
     expand_activation_time,

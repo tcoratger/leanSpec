@@ -13,12 +13,12 @@ from pydantic import model_validator
 from lean_spec.types import StrictBaseModel, Uint64
 
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .containers import Parameter, Randomness
 from .message_hash import (
     PROD_MESSAGE_HASHER,
     TEST_MESSAGE_HASHER,
     MessageHasher,
 )
+from .types import Parameter, Randomness
 
 
 class TargetSumEncoder(StrictBaseModel):

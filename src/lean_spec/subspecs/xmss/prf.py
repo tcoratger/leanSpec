@@ -24,7 +24,7 @@ from .constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from .containers import PRFKey, Randomness
+from .types import PRFKey, Randomness
 
 PRF_DOMAIN_SEP: bytes = bytes(
     [

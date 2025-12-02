@@ -13,7 +13,8 @@ from lean_spec.types import Uint64
 from lean_spec.types.container import Container
 
 from ..koalabear import Fp
-from .containers import (
+from .tweak_hash import TreeTweak
+from .types import (
     HashDigestList,
     HashDigestVector,
     HashTreeLayer,
@@ -21,7 +22,6 @@ from .containers import (
     HashTreeOpening,
     Parameter,
 )
-from .tweak_hash import TreeTweak
 from .utils import get_padded_layer
 
 if TYPE_CHECKING:
