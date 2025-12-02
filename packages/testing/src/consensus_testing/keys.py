@@ -2,33 +2,32 @@
 XMSS Key Management for Consensus Testing
 ==========================================
 
-This module provides XMSS key pairs for test validators.
+Management of XMSS key pairs for test validators.
 
-To avoid expensive key generation during test runs, keys are
-pre-generated once and stored in a JSON file.
+Keys are pre-generated and cached on disk to avoid expensive generation during tests.
 
-File Format
------------
-The JSON file contains an array of key pairs:
+Regenerating Keys:
 
-    [
-        {"public": "<hex-encoded SSZ>", "secret": "<hex-encoded SSZ>"},
-        {"public": "<hex-encoded SSZ>", "secret": "<hex-encoded SSZ>"},
-        ...,
-    ]
+    python -m consensus_testing.keys                   # defaults
+    python -m consensus_testing.keys --count 20        # more validators
+    python -m consensus_testing.keys --max-slot 200    # longer lifetime
 
-Regenerating Keys
------------------
-If you need more validators or epochs, update the constants and run:
-
-    python -m consensus_testing.keys
-
-This regenerates `test_keys.json` with the new parameters.
+File Format:
+    Keys are stored as hex-encoded SSZ in JSON:
+    [{"public": "0a1b...", "secret": "2c3d..."}, ...]
 """
 
+from __future__ import annotations
+
+import argparse
 import json
+import os
+import tempfile
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, Iterator, Self
 
 from lean_spec.subspecs.containers import Attestation
 from lean_spec.subspecs.containers.slot import Slot
@@ -37,97 +36,92 @@ from lean_spec.subspecs.xmss.containers import PublicKey, SecretKey, Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME, GeneralizedXmssScheme
 from lean_spec.types import Uint64, ValidatorIndex
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+
 KEYS_FILE = Path(__file__).parent / "test_keys.json"
 """Path to the pre-generated keys file."""
 
 NUM_VALIDATORS = 12
-"""Number of validator key pairs to generate."""
+"""Default number of validator key pairs."""
 
 DEFAULT_MAX_SLOT = Slot(100)
 """Maximum slot for test signatures (inclusive)."""
 
 NUM_ACTIVE_EPOCHS = int(DEFAULT_MAX_SLOT) + 1
-"""Number of epochs each key is valid for (DEFAULT_MAX_SLOT + 1 to include genesis)."""
+"""Key lifetime in epochs (derived from DEFAULT_MAX_SLOT)."""
 
 
-class KeyPair(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class KeyPair:
     """
-    A validator's XMSS key pair.
+    Immutable XMSS key pair for a validator.
 
     Attributes:
-    ----------
-    public : PublicKey
-        The public key used for signature verification.
-    secret : SecretKey
-        The secret key used for signing. Contains Merkle tree structures.
+        public: Public key for signature verification.
+        secret: Secret key containing Merkle tree structures.
     """
 
     public: PublicKey
     secret: SecretKey
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, str]) -> Self:
+        """Deserialize from JSON-compatible dict with hex-encoded SSZ."""
+        return cls(
+            public=PublicKey.decode_bytes(bytes.fromhex(data["public"])),
+            secret=SecretKey.decode_bytes(bytes.fromhex(data["secret"])),
+        )
 
-def _load_keys_from_file() -> dict[ValidatorIndex, KeyPair]:
+    def to_dict(self) -> dict[str, str]:
+        """Serialize to JSON-compatible dict with hex-encoded SSZ."""
+        return {
+            "public": self.public.encode_bytes().hex(),
+            "secret": self.secret.encode_bytes().hex(),
+        }
+
+    def with_secret(self, secret: SecretKey) -> KeyPair:
+        """Return a new KeyPair with updated secret key (for state advancement)."""
+        return KeyPair(public=self.public, secret=secret)
+
+
+@cache
+def load_keys() -> dict[ValidatorIndex, KeyPair]:
     """
-    Load pre-generated keys from the JSON file.
+    Load pre-generated keys from disk (cached after first call).
 
     Returns:
-    -------
-    dict[ValidatorIndex, KeyPair]
         Mapping from validator index to key pair.
 
     Raises:
-    ------
-    FileNotFoundError
-        If the keys file doesn't exist. Run `python -m consensus_testing.keys`.
+        FileNotFoundError: If keys file is missing.
     """
     if not KEYS_FILE.exists():
         raise FileNotFoundError(
-            f"Pre-generated keys not found: {KEYS_FILE}\nRun: python -m consensus_testing.keys"
+            f"Keys not found: {KEYS_FILE}\nRun: python -m consensus_testing.keys"
         )
-
     data = json.loads(KEYS_FILE.read_text())
-    return {
-        ValidatorIndex(i): KeyPair(
-            public=PublicKey.decode_bytes(bytes.fromhex(kp["public"])),
-            secret=SecretKey.decode_bytes(bytes.fromhex(kp["secret"])),
-        )
-        for i, kp in enumerate(data)
-    }
-
-
-_CACHED_KEYS: dict[ValidatorIndex, KeyPair] | None = None
-"""Module-level cache (loaded once on first access)"""
-
-
-def _get_keys() -> dict[ValidatorIndex, KeyPair]:
-    """Get pre-generated keys, loading from file on first call."""
-    global _CACHED_KEYS
-    if _CACHED_KEYS is None:
-        _CACHED_KEYS = _load_keys_from_file()
-    return _CACHED_KEYS
+    return {ValidatorIndex(i): KeyPair.from_dict(kp) for i, kp in enumerate(data)}
 
 
 class XmssKeyManager:
     """
-    Key manager for test validators using pre-generated XMSS keys.
+    Stateful manager for XMSS signing operations.
 
-    This class provides access to validator key pairs and signing operations.
-    Keys are loaded from `test_keys.json` on first access.
+    Handles automatic key state advancement for the stateful XMSS scheme.
 
-    Parameters
-    ----------
-    max_slot : Slot, optional
-        Maximum slot for signatures. Defaults to Slot(100).
-        Must not exceed the pre-generated key lifetime.
-    scheme : GeneralizedXmssScheme, optional
-        XMSS scheme for signing operations. Defaults to TEST_SIGNATURE_SCHEME.
+    Keys are lazily loaded from disk on first access.
+
+    Args:
+        max_slot: Maximum slot for signatures. Defaults to DEFAULT_MAX_SLOT.
+        scheme: XMSS scheme instance. Defaults to TEST_SIGNATURE_SCHEME.
 
     Examples:
-    --------
-    >>> manager = XmssKeyManager()
-    >>> key_pair = manager[ValidatorIndex(0)]
-    >>> pubkey = manager.get_public_key(ValidatorIndex(1))
-    >>> signature = manager.sign_attestation(attestation)
+        >>> mgr = XmssKeyManager()
+        >>> mgr[ValidatorIndex(0)]  # Get key pair
+        >>> mgr.get_public_key(ValidatorIndex(1))  # Get public key only
+        >>> mgr.sign_attestation(attestation)  # Sign with auto-advancement
     """
 
     def __init__(
@@ -135,71 +129,66 @@ class XmssKeyManager:
         max_slot: Slot | None = None,
         scheme: GeneralizedXmssScheme = TEST_SIGNATURE_SCHEME,
     ) -> None:
-        """Initialize the key manager with pre-generated XMSS keys."""
-        self.max_slot = max_slot if max_slot is not None else DEFAULT_MAX_SLOT
+        """Initialize the manager with optional custom configuration."""
+        self.max_slot = max_slot or DEFAULT_MAX_SLOT
         self.scheme = scheme
-        self._keys = _get_keys()
-        self._state: dict[ValidatorIndex, KeyPair] = {}  # Tracks advanced key states
+        self._state: dict[ValidatorIndex, KeyPair] = {}
 
-    def __getitem__(self, validator_index: ValidatorIndex) -> KeyPair:
-        """
-        Get a validator's key pair.
+    @property
+    def keys(self) -> dict[ValidatorIndex, KeyPair]:
+        """Lazy access to immutable base keys."""
+        return load_keys()
 
-        Parameters
-        ----------
-        validator_index : ValidatorIndex
-            The validator index (0 to NUM_VALIDATORS-1).
+    def __getitem__(self, idx: ValidatorIndex) -> KeyPair:
+        """Get key pair, returning advanced state if available."""
+        if idx in self._state:
+            return self._state[idx]
+        if idx not in self.keys:
+            raise KeyError(f"Validator {idx} not found (max: {len(self.keys) - 1})")
+        return self.keys[idx]
 
-        Returns:
-        -------
-        KeyPair
-            The validator's public and secret keys.
+    def __contains__(self, idx: ValidatorIndex) -> bool:
+        """Check if validator index exists."""
+        return idx in self.keys
 
-        Raises:
-        ------
-        KeyError
-            If the validator index is not in the pre-generated set.
-        """
-        if validator_index in self._state:
-            return self._state[validator_index]
+    def __len__(self) -> int:
+        """Number of available validators."""
+        return len(self.keys)
 
-        if validator_index not in self._keys:
-            raise KeyError(
-                f"Validator {validator_index} not found. Available: {list(self._keys.keys())}"
-            )
+    def __iter__(self) -> Iterator[ValidatorIndex]:
+        """Iterate over validator indices."""
+        return iter(self.keys)
 
-        key_pair = self._keys[validator_index]
-        self._state[validator_index] = key_pair
-        return key_pair
+    def get_public_key(self, idx: ValidatorIndex) -> PublicKey:
+        """Get a validator's public key."""
+        return self[idx].public
+
+    def get_all_public_keys(self) -> dict[ValidatorIndex, PublicKey]:
+        """Get all public keys (from base keys, not advanced state)."""
+        return {idx: kp.public for idx, kp in self.keys.items()}
 
     def sign_attestation(self, attestation: Attestation) -> Signature:
         """
-        Sign an attestation using the validator's XMSS key.
+        Sign an attestation with automatic key state advancement.
 
-        This method handles key advancement automatically when signing for
-        slots outside the currently prepared interval.
+        XMSS is stateful: signing advances the internal key state.
+        This method handles advancement transparently.
 
-        Parameters
-        ----------
-        attestation : Attestation
-            The attestation to sign. Uses `validator_id` and `data.slot`.
+        Args:
+            attestation: The attestation to sign.
 
         Returns:
-        -------
-        Signature
-            The XMSS signature.
+            XMSS signature.
 
         Raises:
-        ------
-        ValueError
-            If the slot exceeds the key's maximum lifetime.
+            ValueError: If slot exceeds key lifetime.
         """
-        validator_id = attestation.validator_id
-        key_pair = self[validator_id]
-        sk = key_pair.secret
+        idx = attestation.validator_id
         epoch = attestation.data.slot
+        kp = self[idx]
+        sk = kp.secret
 
-        # Advance key state if needed to cover the requested epoch
+        # Advance key state until epoch is in prepared interval
         prepared = self.scheme.get_prepared_interval(sk)
         while int(epoch) not in prepared:
             activation = self.scheme.get_activation_interval(sk)
@@ -208,55 +197,77 @@ class XmssKeyManager:
             sk = self.scheme.advance_preparation(sk)
             prepared = self.scheme.get_prepared_interval(sk)
 
-        # Save advanced state for future calls
-        self._state[validator_id] = KeyPair(public=key_pair.public, secret=sk)
+        # Cache advanced state
+        self._state[idx] = kp.with_secret(sk)
 
-        # Sign the attestation's hash tree root
+        # Sign hash tree root
         message = bytes(hash_tree_root(attestation))
         return self.scheme.sign(sk, epoch, message)
 
-    def get_public_key(self, validator_index: ValidatorIndex) -> PublicKey:
-        """Get a validator's public key."""
-        return self[validator_index].public
 
-    def get_all_public_keys(self) -> dict[ValidatorIndex, PublicKey]:
-        """Get all pre-generated public keys."""
-        return {i: kp.public for i, kp in self._keys.items()}
-
-    def __contains__(self, validator_index: ValidatorIndex) -> bool:
-        """Check if a validator has pre-generated keys."""
-        return validator_index in self._keys
-
-    def __len__(self) -> int:
-        """Return the number of available validators."""
-        return len(self._keys)
+def _generate_single_keypair(num_epochs: int) -> dict[str, str]:
+    """Generate one key pair (module-level for pickling in ProcessPoolExecutor)."""
+    pk, sk = TEST_SIGNATURE_SCHEME.key_gen(Uint64(0), Uint64(num_epochs))
+    return KeyPair(public=pk, secret=sk).to_dict()
 
 
-def generate_keys() -> None:
+def generate_keys(count: int = NUM_VALIDATORS, max_slot: int = int(DEFAULT_MAX_SLOT)) -> None:
     """
-    Generate XMSS key pairs and save to JSON file.
+    Generate XMSS key pairs in parallel and save atomically.
 
-    This function generates `NUM_VALIDATORS` key pairs with `NUM_ACTIVE_EPOCHS`
-    lifetime and saves them to `KEYS_FILE`.
+    Uses ProcessPoolExecutor to saturate CPU cores for faster generation.
+    Writes to a temp file then renames for crash safety.
 
-    Run via: `python -m consensus_testing.keys`
+    Args:
+        count: Number of validators.
+        max_slot: Maximum slot (key lifetime = max_slot + 1 epochs).
     """
-    print(f"Generating {NUM_VALIDATORS} XMSS key pairs ({NUM_ACTIVE_EPOCHS} epochs)...")
+    num_epochs = max_slot + 1
+    num_workers = os.cpu_count() or 1
 
-    key_pairs = []
-    for i in range(NUM_VALIDATORS):
-        print(f"  Validator {i}...")
-        pk, sk = TEST_SIGNATURE_SCHEME.key_gen(Uint64(0), Uint64(NUM_ACTIVE_EPOCHS))
-        key_pairs.append(
-            {
-                "public": pk.encode_bytes().hex(),
-                "secret": sk.encode_bytes().hex(),
-            }
-        )
+    print(f"Generating {count} XMSS key pairs ({num_epochs} epochs) using {num_workers} cores...")
 
-    KEYS_FILE.write_text(json.dumps(key_pairs, indent=2))
-    print(f"Saved to {KEYS_FILE}")
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        key_pairs = list(executor.map(_generate_single_keypair, [num_epochs] * count))
+
+    # Atomic write: temp file -> rename
+    fd, temp_path = tempfile.mkstemp(suffix=".json", dir=KEYS_FILE.parent)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(key_pairs, f, indent=2)
+        Path(temp_path).replace(KEYS_FILE)
+    except Exception:
+        Path(temp_path).unlink(missing_ok=True)
+        raise
+
+    print(f"Saved {len(key_pairs)} key pairs to {KEYS_FILE}")
+
+    # Clear cache so new keys are loaded
+    load_keys.cache_clear()
+
+
+def main() -> None:
+    """CLI entry point for key generation."""
+    parser = argparse.ArgumentParser(
+        description="Generate XMSS key pairs for consensus testing",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=NUM_VALIDATORS,
+        help="Number of validator key pairs",
+    )
+    parser.add_argument(
+        "--max-slot",
+        type=int,
+        default=int(DEFAULT_MAX_SLOT),
+        help="Maximum slot (key lifetime = max_slot + 1)",
+    )
+    args = parser.parse_args()
+
+    generate_keys(count=args.count, max_slot=args.max_slot)
 
 
 if __name__ == "__main__":
-    generate_keys()
+    main()
