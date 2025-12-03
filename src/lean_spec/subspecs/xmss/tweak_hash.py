@@ -41,12 +41,12 @@ from .constants import (
     TWEAK_PREFIX_TREE,
     XmssConfig,
 )
-from .containers import Parameter
 from .poseidon import (
     PROD_POSEIDON,
     TEST_POSEIDON,
     PoseidonXmss,
 )
+from .types import Parameter
 from .utils import int_to_base_p
 
 

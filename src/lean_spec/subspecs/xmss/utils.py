@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, List
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .constants import XmssConfig
-from .containers import HashDigestList, HashDigestVector, HashTreeLayer, Parameter, PRFKey
 from .rand import Rand
+from .types import HashDigestList, HashDigestVector, HashTreeLayer, Parameter, PRFKey
 
 if TYPE_CHECKING:
     from .merkle_tree import MerkleTree

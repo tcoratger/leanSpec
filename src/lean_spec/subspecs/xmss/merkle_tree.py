@@ -42,14 +42,6 @@ from .constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from .containers import (
-    HashDigestList,
-    HashDigestVector,
-    HashTreeLayer,
-    HashTreeLayers,
-    HashTreeOpening,
-    Parameter,
-)
 from .rand import PROD_RAND, TEST_RAND, Rand
 from .subtree import HashSubTree
 from .tweak_hash import (
@@ -57,6 +49,14 @@ from .tweak_hash import (
     TEST_TWEAK_HASHER,
     TreeTweak,
     TweakHasher,
+)
+from .types import (
+    HashDigestList,
+    HashDigestVector,
+    HashTreeLayer,
+    HashTreeLayers,
+    HashTreeOpening,
+    Parameter,
 )
 from .utils import get_padded_layer
 

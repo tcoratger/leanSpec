@@ -47,12 +47,12 @@ from .constants import (
     TWEAK_PREFIX_MESSAGE,
     XmssConfig,
 )
-from .containers import Parameter, Randomness
 from .hypercube import (
     hypercube_find_layer,
     hypercube_part_size,
     map_to_vertex,
 )
+from .types import Parameter, Randomness
 from .utils import int_to_base_p
 
 

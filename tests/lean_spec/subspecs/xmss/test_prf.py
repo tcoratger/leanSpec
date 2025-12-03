@@ -4,8 +4,8 @@ from lean_spec.subspecs.xmss.constants import (
     PRF_KEY_LENGTH,
     TEST_CONFIG,
 )
-from lean_spec.subspecs.xmss.containers import PRFKey
 from lean_spec.subspecs.xmss.prf import TEST_PRF
+from lean_spec.subspecs.xmss.types import PRFKey
 from lean_spec.types.uint import Uint64
 
 

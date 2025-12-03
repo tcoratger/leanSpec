@@ -6,13 +6,9 @@ It exposes the core data structures and the main interface functions.
 """
 
 from .constants import PROD_CONFIG, TEST_CONFIG
-from .containers import (
-    HashTreeOpening,
-    PublicKey,
-    SecretKey,
-    Signature,
-)
+from .containers import PublicKey, SecretKey, Signature
 from .interface import GeneralizedXmssScheme
+from .types import HashTreeOpening
 
 __all__ = [
     "GeneralizedXmssScheme",

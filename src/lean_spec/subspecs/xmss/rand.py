@@ -9,7 +9,7 @@ from lean_spec.types import StrictBaseModel
 
 from ..koalabear import Fp, P
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .containers import Parameter, Randomness
+from .types import Parameter, Randomness
 
 
 class Rand(StrictBaseModel):
