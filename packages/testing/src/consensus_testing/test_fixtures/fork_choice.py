@@ -292,14 +292,8 @@ class ForkChoiceTest(BaseConsensusFixture):
         """
         Build a full SignedBlockWithAttestation from a lightweight BlockSpec.
 
-        Builds blocks via state transition dry-run, similar to state transition tests,
-        but also creates a proper proposer attestation for fork choice.
-        This mimics what a local block builder would do.
-
-        TODO: We cannot use Store.produce_block_with_signatures() because it has
-        side effects (adds block to store at lines 556-559 of store.py). If the spec
-        is refactored to separate block production from store updates, we should use
-        that method instead. Until then, this manual approach is necessary.
+        This method combines spec logic (via Store.build_block) with test-specific
+        logic (label resolution and signing) to produce a complete signed block.
 
         Parameters
         ----------
@@ -309,87 +303,34 @@ class ForkChoiceTest(BaseConsensusFixture):
             The fork choice store (used to get head state and latest justified).
         block_registry : dict[str, Block]
             Registry of labeled blocks for fork creation.
+        key_manager : XmssKeyManager
+            Key manager for signing attestations.
 
         Returns:
         -------
         SignedBlockWithAttestation
             A complete signed block ready for processing.
         """
-        # Determine proposer
-        if spec.proposer_index is None:
-            validator_count = store.states[store.head].validators.count
-            proposer_index = ValidatorIndex(int(spec.slot) % int(validator_count))
-        else:
-            proposer_index = spec.proposer_index
-
-        # Resolve parent block if parent_label is specified
-        if spec.parent_label is not None:
-            if spec.parent_label not in block_registry:
-                raise ValueError(
-                    f"parent_label '{spec.parent_label}' not found - "
-                    f"available labels: {list(block_registry.keys())}"
-                )
-            parent_block = block_registry[spec.parent_label]
-            parent_root = hash_tree_root(parent_block)
-
-            # Get state at the parent block
-            if parent_root not in store.states:
-                raise ValueError(
-                    f"parent_label '{spec.parent_label}' (root=0x{parent_root.hex()[:16]}...) "
-                    f"has no state in store - cannot build on this fork"
-                )
-            parent_state = store.states[parent_root]
-
-            # Advance state to the new block's slot
-            temp_state = parent_state.process_slots(spec.slot)
-        else:
-            # Default: build on current head
-            head_state = store.states[store.head]
-            temp_state = head_state.process_slots(spec.slot)
-            parent_root = hash_tree_root(temp_state.latest_block_header)
-
-        # Prepare attestations from spec if provided
-        attestations = []
-        attestation_signatures = []
-        if spec.attestations is not None:
-            for attestation in spec.attestations:
-                if isinstance(attestation, SignedAttestationSpec):
-                    # Use the parent state's latest_justified for source checkpoint
-                    parent_state = store.states[parent_root]
-                    signed_attestation = self._build_signed_attestation_from_spec(
-                        attestation, block_registry, parent_state
-                    )
-                    # Extract the Attestation message and signature
-                    attestations.append(signed_attestation.message)
-                    attestation_signatures.append(signed_attestation.signature)
-                else:
-                    # Already a SignedAttestation, extract the message
-                    attestations.append(attestation.message)
-                    attestation_signatures.append(attestation.signature)
-
-        # Build block with collected attestations
-        body = BlockBody(attestations=Attestations(data=attestations))
-
-        # Create temporary block for dry-run
-        temp_block = Block(
-            slot=spec.slot,
-            proposer_index=proposer_index,
-            parent_root=parent_root,
-            state_root=Bytes32.zero(),
-            body=body,
+        # Determine proposer index
+        proposer_index = (
+            spec.proposer_index
+            if spec.proposer_index is not None
+            else ValidatorIndex(int(spec.slot) % store.states[store.head].validators.count)
         )
 
-        # Process to get correct state root
-        post_state = temp_state.process_block(temp_block)
-        correct_state_root = hash_tree_root(post_state)
+        # Resolve parent root from label or default to head
+        parent_root = self._resolve_parent_root(spec, store, block_registry)
 
-        # Create final block
-        final_block = Block(
+        # Build attestations from spec
+        attestations = self._build_attestations_from_spec(spec, store, block_registry, parent_root)
+
+        # Use State.build_block for core block building (pure spec logic)
+        parent_state = store.states[parent_root]
+        final_block, _ = parent_state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
-            state_root=correct_state_root,
-            body=body,
+            attestations=attestations,
         )
 
         # Create proposer attestation for this block
@@ -400,17 +341,13 @@ class ForkChoiceTest(BaseConsensusFixture):
                 slot=spec.slot,
                 head=Checkpoint(root=block_root, slot=spec.slot),
                 target=Checkpoint(root=block_root, slot=spec.slot),
-                # Use the anchor block as source for genesis case
-                source=Checkpoint(root=parent_root, slot=temp_state.latest_block_header.slot),
+                source=Checkpoint(root=parent_root, slot=parent_state.latest_block_header.slot),
             ),
         )
 
         # Sign all attestations and the proposer attestation
-        signature_list = []
-        for attestation in final_block.body.attestations:
-            signature_list.append(key_manager.sign_attestation(attestation))
-        proposer_attestation_signature = key_manager.sign_attestation(proposer_attestation)
-        signature_list.append(proposer_attestation_signature)
+        signature_list = [key_manager.sign_attestation(att) for att in attestations]
+        signature_list.append(key_manager.sign_attestation(proposer_attestation))
 
         return SignedBlockWithAttestation(
             message=BlockWithAttestation(
@@ -419,6 +356,62 @@ class ForkChoiceTest(BaseConsensusFixture):
             ),
             signature=BlockSignatures(data=signature_list),
         )
+
+    def _resolve_parent_root(
+        self,
+        spec: BlockSpec,
+        store: Store,
+        block_registry: dict[str, Block],
+    ) -> Bytes32:
+        """
+        Resolve parent root from BlockSpec.
+
+        If parent_label is specified, look it up in the registry.
+        Otherwise, default to the current head's parent.
+        """
+        if spec.parent_label is not None:
+            if spec.parent_label not in block_registry:
+                raise ValueError(
+                    f"parent_label '{spec.parent_label}' not found - "
+                    f"available labels: {list(block_registry.keys())}"
+                )
+            parent_block = block_registry[spec.parent_label]
+            parent_root = hash_tree_root(parent_block)
+
+            if parent_root not in store.states:
+                raise ValueError(
+                    f"parent_label '{spec.parent_label}' (root=0x{parent_root.hex()[:16]}...) "
+                    f"has no state in store - cannot build on this fork"
+                )
+            return parent_root
+
+        # Default: use current head as parent
+        return store.head
+
+    def _build_attestations_from_spec(
+        self,
+        spec: BlockSpec,
+        store: Store,
+        block_registry: dict[str, Block],
+        parent_root: Bytes32,
+    ) -> list[Attestation]:
+        """Build attestations list from BlockSpec."""
+        if spec.attestations is None:
+            return []
+
+        parent_state = store.states[parent_root]
+        attestations = []
+
+        for att_spec in spec.attestations:
+            if isinstance(att_spec, SignedAttestationSpec):
+                signed_att = self._build_signed_attestation_from_spec(
+                    att_spec, block_registry, parent_state
+                )
+                attestations.append(signed_att.message)
+            else:
+                attestations.append(att_spec.message)
+
+        return attestations
 
     def _build_signed_attestation_from_spec(
         self,

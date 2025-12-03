@@ -17,6 +17,7 @@ from lean_spec.types import (
     is_proposer,
 )
 
+from ..attestation import Attestation
 from ..block import Block, BlockBody, BlockHeader
 from ..block.types import Attestations
 from ..checkpoint import Checkpoint
@@ -516,3 +517,52 @@ class State(Container):
             raise AssertionError("Invalid block state root")
 
         return new_state
+
+    def build_block(
+        self,
+        slot: Slot,
+        proposer_index: ValidatorIndex,
+        parent_root: Bytes32,
+        attestations: list[Attestation] | None = None,
+    ) -> tuple[Block, "State"]:
+        """
+        Build a valid block on top of this state.
+
+        This is a pure function that:
+        1. Advances the state to the target slot
+        2. Processes the block to compute the correct state root
+        3. Returns the finalized block and post-state
+
+        Args:
+            slot: Target slot for the block.
+            proposer_index: Validator index of the proposer.
+            parent_root: Root of this state's block (the parent).
+            attestations: Attestations to include. Defaults to empty.
+
+        Returns:
+            Tuple of (finalized Block, post-state State).
+        """
+        atts = attestations if attestations is not None else []
+
+        # Build block with temporary state root
+        temp_block = Block(
+            slot=slot,
+            proposer_index=proposer_index,
+            parent_root=parent_root,
+            state_root=Bytes32.zero(),
+            body=BlockBody(attestations=Attestations(data=atts)),
+        )
+
+        # Compute post-state via state transition
+        post_state = self.process_slots(slot).process_block(temp_block)
+
+        # Finalize block with correct state root
+        final_block = Block(
+            slot=slot,
+            proposer_index=proposer_index,
+            parent_root=parent_root,
+            state_root=hash_tree_root(post_state),
+            body=BlockBody(attestations=Attestations(data=atts)),
+        )
+
+        return final_block, post_state
