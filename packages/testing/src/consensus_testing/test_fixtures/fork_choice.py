@@ -365,28 +365,38 @@ class ForkChoiceTest(BaseConsensusFixture):
     ) -> Bytes32:
         """
         Resolve parent root from BlockSpec.
-
-        If parent_label is specified, look it up in the registry.
-        Otherwise, default to the current head's parent.
+            - If parent_label is specified, look it up in the registry.
+            - Otherwise, default to the current head's parent.
         """
-        if spec.parent_label is not None:
-            if spec.parent_label not in block_registry:
-                raise ValueError(
-                    f"parent_label '{spec.parent_label}' not found - "
-                    f"available labels: {list(block_registry.keys())}"
-                )
-            parent_block = block_registry[spec.parent_label]
-            parent_root = hash_tree_root(parent_block)
+        # Fast path: no label means build on current head.
+        if not (label := spec.parent_label):
+            return store.head
 
-            if parent_root not in store.states:
-                raise ValueError(
-                    f"parent_label '{spec.parent_label}' (root=0x{parent_root.hex()[:16]}...) "
-                    f"has no state in store - cannot build on this fork"
-                )
-            return parent_root
+        # Label was provided: look up the block in the registry.
+        if not (parent_block := block_registry.get(label)):
+            raise ValueError(f"Parent label '{label}' not found. Available: {list(block_registry)}")
 
-        # Default: use current head as parent
-        return store.head
+        # Compute the SSZ root of the parent block.
+        #
+        # This root serves as both:
+        # - The key to look up the parent's post-state in the store
+        # - The value to place in the new block's `parent_root` field
+        parent_root = hash_tree_root(parent_block)
+
+        # Verify the parent's state exists in the store.
+        #
+        # Building a block requires the parent's post-state to:
+        # - Advance slots via `process_slots()`
+        # - Apply the new block via `process_block()`
+        #
+        # If the state is missing, we cannot proceed.
+        if parent_root not in store.states:
+            raise ValueError(
+                f"Parent '{label}' (root=0x{parent_root.hex()[:16]}...) "
+                "has no state in store - cannot build on this fork"
+            )
+
+        return parent_root
 
     def _build_attestations_from_spec(
         self,
