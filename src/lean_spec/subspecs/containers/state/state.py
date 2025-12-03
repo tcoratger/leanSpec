@@ -542,7 +542,8 @@ class State(Container):
         Returns:
             Tuple of (finalized Block, post-state State).
         """
-        atts = attestations if attestations is not None else []
+        # Default to empty attestations
+        attestations = attestations or []
 
         # Build block with temporary state root
         temp_block = Block(
@@ -550,7 +551,7 @@ class State(Container):
             proposer_index=proposer_index,
             parent_root=parent_root,
             state_root=Bytes32.zero(),
-            body=BlockBody(attestations=Attestations(data=atts)),
+            body=BlockBody(attestations=Attestations(data=attestations)),
         )
 
         # Compute post-state via state transition
@@ -562,7 +563,7 @@ class State(Container):
             proposer_index=proposer_index,
             parent_root=parent_root,
             state_root=hash_tree_root(post_state),
-            body=BlockBody(attestations=Attestations(data=atts)),
+            body=BlockBody(attestations=Attestations(data=attestations)),
         )
 
         return final_block, post_state
