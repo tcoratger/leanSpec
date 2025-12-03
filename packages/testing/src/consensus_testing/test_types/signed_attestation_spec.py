@@ -2,7 +2,7 @@
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.types import CamelModel, Uint64, ValidatorIndex
+from lean_spec.types import CamelModel, Uint64
 
 
 class SignedAttestationSpec(CamelModel):
@@ -13,7 +13,7 @@ class SignedAttestationSpec(CamelModel):
     Head and source are automatically derived from target.
     """
 
-    validator_id: ValidatorIndex | Uint64
+    validator_id: Uint64
     """The index of the validator making the attestation (required)."""
 
     slot: Slot

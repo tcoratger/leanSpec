@@ -34,7 +34,7 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.containers import PublicKey, SecretKey, Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME, GeneralizedXmssScheme
-from lean_spec.types import Uint64, ValidatorIndex
+from lean_spec.types import Uint64
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -87,7 +87,7 @@ class KeyPair:
 
 
 @cache
-def load_keys() -> dict[ValidatorIndex, KeyPair]:
+def load_keys() -> dict[Uint64, KeyPair]:
     """
     Load pre-generated keys from disk (cached after first call).
 
@@ -102,7 +102,7 @@ def load_keys() -> dict[ValidatorIndex, KeyPair]:
             f"Keys not found: {KEYS_FILE}\nRun: python -m consensus_testing.keys"
         )
     data = json.loads(KEYS_FILE.read_text())
-    return {ValidatorIndex(i): KeyPair.from_dict(kp) for i, kp in enumerate(data)}
+    return {Uint64(i): KeyPair.from_dict(kp) for i, kp in enumerate(data)}
 
 
 class XmssKeyManager:
@@ -119,8 +119,8 @@ class XmssKeyManager:
 
     Examples:
         >>> mgr = XmssKeyManager()
-        >>> mgr[ValidatorIndex(0)]  # Get key pair
-        >>> mgr.get_public_key(ValidatorIndex(1))  # Get public key only
+        >>> mgr[Uint64(0)]  # Get key pair
+        >>> mgr.get_public_key(Uint64(1))  # Get public key only
         >>> mgr.sign_attestation(attestation)  # Sign with auto-advancement
     """
 
@@ -132,14 +132,14 @@ class XmssKeyManager:
         """Initialize the manager with optional custom configuration."""
         self.max_slot = max_slot or DEFAULT_MAX_SLOT
         self.scheme = scheme
-        self._state: dict[ValidatorIndex, KeyPair] = {}
+        self._state: dict[Uint64, KeyPair] = {}
 
     @property
-    def keys(self) -> dict[ValidatorIndex, KeyPair]:
+    def keys(self) -> dict[Uint64, KeyPair]:
         """Lazy access to immutable base keys."""
         return load_keys()
 
-    def __getitem__(self, idx: ValidatorIndex) -> KeyPair:
+    def __getitem__(self, idx: Uint64) -> KeyPair:
         """Get key pair, returning advanced state if available."""
         if idx in self._state:
             return self._state[idx]
@@ -147,7 +147,7 @@ class XmssKeyManager:
             raise KeyError(f"Validator {idx} not found (max: {len(self.keys) - 1})")
         return self.keys[idx]
 
-    def __contains__(self, idx: ValidatorIndex) -> bool:
+    def __contains__(self, idx: Uint64) -> bool:
         """Check if validator index exists."""
         return idx in self.keys
 
@@ -155,15 +155,15 @@ class XmssKeyManager:
         """Number of available validators."""
         return len(self.keys)
 
-    def __iter__(self) -> Iterator[ValidatorIndex]:
+    def __iter__(self) -> Iterator[Uint64]:
         """Iterate over validator indices."""
         return iter(self.keys)
 
-    def get_public_key(self, idx: ValidatorIndex) -> PublicKey:
+    def get_public_key(self, idx: Uint64) -> PublicKey:
         """Get a validator's public key."""
         return self[idx].public
 
-    def get_all_public_keys(self) -> dict[ValidatorIndex, PublicKey]:
+    def get_all_public_keys(self) -> dict[Uint64, PublicKey]:
         """Get all public keys (from base keys, not advanced state)."""
         return {idx: kp.public for idx, kp in self.keys.items()}
 

@@ -4,7 +4,7 @@ from typing import Any
 
 from lean_spec.subspecs.containers.state import State, Validators
 from lean_spec.subspecs.containers.validator import Validator
-from lean_spec.types import Bytes52, Uint64, ValidatorIndex
+from lean_spec.types import Bytes52, Uint64
 
 
 def generate_pre_state(**kwargs: Any) -> State:
@@ -25,7 +25,7 @@ def generate_pre_state(**kwargs: Any) -> State:
     # TODO: Set an appropriate default here for test fixtures
     if "validators" not in kwargs:
         validators = Validators(
-            data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(4)]
+            data=[Validator(pubkey=Bytes52.zero(), index=Uint64(i)) for i in range(4)]
         )
     else:
         validators = kwargs["validators"]

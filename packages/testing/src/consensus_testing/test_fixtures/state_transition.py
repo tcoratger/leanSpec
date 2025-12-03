@@ -8,7 +8,7 @@ from lean_spec.subspecs.containers.block.block import Block, BlockBody
 from lean_spec.subspecs.containers.block.types import Attestations
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, ValidatorIndex
+from lean_spec.types import Bytes32, Uint64
 
 from ..test_types import BlockSpec, StateExpectation
 from .base import BaseConsensusFixture
@@ -202,7 +202,7 @@ class StateTransitionTest(BaseConsensusFixture):
         if spec.proposer_index is not None:
             proposer_index = spec.proposer_index
         else:
-            proposer_index = ValidatorIndex(int(spec.slot) % int(state.validators.count))
+            proposer_index = Uint64(int(spec.slot) % int(state.validators.count))
 
         # Use provided parent_root or compute it
         if spec.parent_root is not None:

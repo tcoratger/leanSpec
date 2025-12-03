@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Literal
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, CamelModel, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, CamelModel, Uint64
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.containers import SignedAttestation
@@ -19,7 +19,7 @@ class AttestationCheck(CamelModel):
     Used to validate attestation content beyond just counting.
     """
 
-    validator: ValidatorIndex
+    validator: Uint64
     """Which validator's attestation to check."""
 
     attestation_slot: Slot | None = None

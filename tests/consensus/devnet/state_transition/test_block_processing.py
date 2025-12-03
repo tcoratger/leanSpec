@@ -9,7 +9,7 @@ from consensus_testing import (
 )
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, ValidatorIndex
+from lean_spec.types import Bytes32, Uint64
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -184,14 +184,14 @@ def test_block_with_invalid_proposer(
     # Manually specify wrong proposer (not matching slot % validators)
     #
     # For slot 1:
-    # - expected proposer is ValidatorIndex(1),
-    # - we'll try to use ValidatorIndex(5) instead
+    # - expected proposer is Uint64(1),
+    # - we'll try to use Uint64(5) instead
     state_transition_test(
         pre=generate_pre_state(),
         blocks=[
             BlockSpec(
                 slot=Slot(1),
-                proposer_index=ValidatorIndex(3),  # Wrong proposer
+                proposer_index=Uint64(3),  # Wrong proposer
             ),
         ],
         post=None,  # Expect failure
