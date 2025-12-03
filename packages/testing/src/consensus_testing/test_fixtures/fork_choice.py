@@ -314,10 +314,8 @@ class ForkChoiceTest(BaseConsensusFixture):
             A complete signed block ready for processing.
         """
         # Determine proposer index
-        proposer_index = (
-            spec.proposer_index
-            if spec.proposer_index is not None
-            else ValidatorIndex(int(spec.slot) % store.states[store.head].validators.count)
+        proposer_index = spec.proposer_index or ValidatorIndex(
+            int(spec.slot) % store.states[store.head].validators.count
         )
 
         # Resolve parent root from label or default to head
