@@ -968,14 +968,14 @@ class Store(Container):
             )
             post_state = head_state.process_slots(slot).process_block(temp_block)
 
-            # Find new valid attestations
+            # Find new valid attestations matching post-state justification
             new_attestations: list[Attestation] = []
             new_signatures: list[Signature] = []
 
             for signed_attestation in store.latest_known_attestations.values():
                 data = signed_attestation.message.data
 
-                # Skip unknown target blocks
+                # Skip if target block is unknown in our store
                 if data.head.root not in store.blocks:
                     continue
 
@@ -983,19 +983,20 @@ class Store(Container):
                 if data.source != post_state.latest_justified:
                     continue
 
-                # Add if not already included
+                # Add attestation if not already included
                 if signed_attestation.message not in attestations:
                     new_attestations.append(signed_attestation.message)
                     new_signatures.append(signed_attestation.signature)
 
-            # Fixed point reached
+            # Fixed point reached: no new attestations found
             if not new_attestations:
                 break
 
+            # Add new attestations and continue iteration
             attestations.extend(new_attestations)
             signatures.extend(new_signatures)
 
-        # Build final block using State.build_block
+        # Build final block and post-state
         final_block, final_post_state = head_state.build_block(
             slot=slot,
             proposer_index=validator_index,
@@ -1003,7 +1004,7 @@ class Store(Container):
             attestations=attestations,
         )
 
-        # Store block and state
+        # Store block and state immutably
         block_hash = hash_tree_root(final_block)
         store = store.model_copy(
             update={
