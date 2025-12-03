@@ -475,8 +475,7 @@ class ForkChoiceTest(BaseConsensusFixture):
             message=attestation,
             signature=(
                 spec.signature
-                if spec.signature is not None
-                else Signature(
+                or Signature(
                     path=HashTreeOpening(siblings=HashDigestList(data=[])),
                     rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
                     hashes=HashDigestList(data=[]),
