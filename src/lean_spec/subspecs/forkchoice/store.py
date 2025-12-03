@@ -947,7 +947,7 @@ class Store(Container):
         store, head_root = self.get_proposal_head(slot)
         head_state = store.states[head_root]
 
-        # Validate proposer authorization for this slo
+        # Validate proposer authorization for this slot
         num_validators = Uint64(head_state.validators.count)
         assert is_proposer(validator_index, slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
@@ -962,7 +962,7 @@ class Store(Container):
         # Continue until no new attestations can be added to the block.
         # This ensures we include the maximal valid attestation set.
         while True:
-            # Compute post-state to check attestation validity (inline, no hash_tree_root)
+            # Create candidate block with current attestation set
             temp_block = Block(
                 slot=slot,
                 proposer_index=validator_index,
