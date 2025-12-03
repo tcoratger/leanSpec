@@ -918,20 +918,31 @@ class Store(Container):
         validator_index: ValidatorIndex,
     ) -> tuple["Store", Block, list[Signature]]:
         """
-        Produce a block with attestation signatures and store it.
+        Produce a block and attestation signatures for the target slot.
 
-        This method builds a block using the fixed-point attestation collection
-        algorithm and stores it in the fork choice store.
+        The proposer returns the block and a naive signature list so it can
+        later craft its `SignedBlockWithAttestation` with minimal extra work.
 
-        Algorithm
-        ---------
-        1. Validate proposer authorization for the slot
-        2. Get current chain head as parent
-        3. Iteratively collect valid attestations (fixed-point algorithm)
-        4. Build and store the final block
+        Algorithm Overview
+        ------------------
+        1. **Validate Authorization**: Verify proposer is authorized for slot
+        2. **Get Proposal Head**: Retrieve current chain head as parent
+        3. **Iteratively Build Attestation Set**:
+            - Create candidate block with current attestations
+            - Apply state transition (slot advancement + block processing)
+            - Find new valid attestations matching post-state requirements
+            - Continue until no new attestations can be added (fixed point)
+        4. **Finalize Block**: Compute state root and store block
 
-        The fixed-point algorithm ensures the block includes the maximal valid
-        attestation set by repeating until no new attestations can be added.
+        The Fixed-Point Algorithm
+        --------------------------
+        Attestations are collected iteratively because:
+        - Block processing updates the justified checkpoint
+        - Some attestations only become valid after this update
+        - We repeat until no new valid attestations are found
+
+        This ensures the block includes the maximal valid attestation set,
+        maximizing the block's contribution to chain consensus.
 
         Args:
             slot: Target slot number for block production.
