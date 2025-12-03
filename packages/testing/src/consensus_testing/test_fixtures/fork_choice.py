@@ -292,8 +292,10 @@ class ForkChoiceTest(BaseConsensusFixture):
         """
         Build a full SignedBlockWithAttestation from a lightweight BlockSpec.
 
-        This method combines spec logic (via Store.build_block) with test-specific
-        logic (label resolution and signing) to produce a complete signed block.
+        This method combines:
+            - spec logic (via the state block building logic),
+            - test-specific logic (label resolution and signing),
+        to produce a complete signed block.
 
         Parameters
         ----------
