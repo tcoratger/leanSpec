@@ -1,12 +1,9 @@
-"""Validator-related type definitions and utilities for the specification."""
+"""Validator-related utilities for the specification."""
 
 from .uint import Uint64
 
-ValidatorIndex = Uint64
-"""A type alias for a validator's index in the registry."""
 
-
-def is_proposer(validator_index: ValidatorIndex, slot: Uint64, num_validators: Uint64) -> bool:
+def is_proposer(validator_index: Uint64, slot: Uint64, num_validators: Uint64) -> bool:
     """
     Determine if a validator is the proposer for a given slot.
 

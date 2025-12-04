@@ -8,14 +8,13 @@ from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
-from lean_spec.types.byte_arrays import Bytes32
-from lean_spec.types.validator import ValidatorIndex
+from lean_spec.types import Bytes32, Uint64
 
 
 def test_encode_decode_signed_attestation_roundtrip() -> None:
     signed_attestation = SignedAttestation(
         message=Attestation(
-            validator_id=ValidatorIndex(0),
+            validator_id=Uint64(0),
             data=AttestationData(
                 slot=0,
                 head=Checkpoint(root=Bytes32.zero(), slot=0),

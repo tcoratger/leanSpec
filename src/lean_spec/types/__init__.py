@@ -8,7 +8,7 @@ from .collections import SSZList, SSZVector
 from .container import Container
 from .ssz_base import SSZType
 from .uint import Uint64
-from .validator import ValidatorIndex, is_proposer
+from .validator import is_proposer
 
 __all__ = [
     "Uint64",
@@ -19,7 +19,6 @@ __all__ = [
     "ZERO_HASH",
     "CamelModel",
     "StrictBaseModel",
-    "ValidatorIndex",
     "is_proposer",
     "SSZList",
     "SSZVector",

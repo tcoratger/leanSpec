@@ -40,7 +40,6 @@ from lean_spec.types import (
     ZERO_HASH,
     Bytes32,
     Uint64,
-    ValidatorIndex,
     is_proposer,
 )
 from lean_spec.types.container import Container
@@ -122,7 +121,7 @@ class Store(Container):
     `Store`'s latest justified and latest finalized checkpoints.
     """
 
-    latest_known_attestations: Dict[ValidatorIndex, SignedAttestation] = {}
+    latest_known_attestations: Dict[Uint64, SignedAttestation] = {}
     """
     Latest signed attestations by validator that have been processed.
 
@@ -130,7 +129,7 @@ class Store(Container):
     - Keyed by validator index to enforce one attestation per validator.
     """
 
-    latest_new_attestations: Dict[ValidatorIndex, SignedAttestation] = {}
+    latest_new_attestations: Dict[Uint64, SignedAttestation] = {}
     """
     Latest signed attestations by validator that are pending processing.
 
@@ -297,7 +296,7 @@ class Store(Container):
         self.validate_attestation(signed_attestation)
 
         # Extract the validator index that produced this attestation.
-        validator_id = ValidatorIndex(signed_attestation.message.validator_id)
+        validator_id = Uint64(signed_attestation.message.validator_id)
 
         # Extract the attestation's slot:
         # - used to decide if this attestation is "newer" than a previous one.
@@ -504,7 +503,7 @@ class Store(Container):
     def _compute_lmd_ghost_head(
         self,
         start_root: Bytes32,
-        attestations: Dict[ValidatorIndex, SignedAttestation],
+        attestations: Dict[Uint64, SignedAttestation],
         min_score: int = 0,
     ) -> Bytes32:
         """
@@ -915,7 +914,7 @@ class Store(Container):
     def produce_block_with_signatures(
         self,
         slot: Slot,
-        validator_index: ValidatorIndex,
+        validator_index: Uint64,
     ) -> tuple["Store", Block, list[Signature]]:
         """
         Produce a block and attestation signatures for the target slot.

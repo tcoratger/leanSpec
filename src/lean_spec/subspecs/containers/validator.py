@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lean_spec.types import Bytes52, Container, ValidatorIndex
+from lean_spec.types import Bytes52, Container, Uint64
 
 from ..xmss.containers import PublicKey
 from ..xmss.interface import TEST_SIGNATURE_SCHEME, GeneralizedXmssScheme
@@ -15,7 +15,7 @@ class Validator(Container):
     pubkey: Bytes52
     """XMSS one-time signature public key."""
 
-    index: ValidatorIndex = ValidatorIndex(0)
+    index: Uint64 = Uint64(0)
     """Validator index in the registry."""
 
     def get_pubkey(self, scheme: GeneralizedXmssScheme = TEST_SIGNATURE_SCHEME) -> PublicKey:

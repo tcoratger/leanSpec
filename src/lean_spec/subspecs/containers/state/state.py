@@ -13,7 +13,6 @@ from lean_spec.types import (
     Bytes32,
     Container,
     Uint64,
-    ValidatorIndex,
     is_proposer,
 )
 
@@ -95,7 +94,7 @@ class State(Container):
         # Build the genesis block header for the state.
         genesis_header = BlockHeader(
             slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
+            proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
             body_root=hash_tree_root(BlockBody(attestations=Attestations(data=[]))),

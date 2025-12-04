@@ -10,7 +10,7 @@ from lean_spec.subspecs.containers.block.block import (
 )
 from lean_spec.subspecs.containers.block.types import Attestations, BlockSignatures
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
-from lean_spec.types import Bytes32, ValidatorIndex
+from lean_spec.types import Bytes32, Uint64
 
 
 def test_encode_decode_signed_block_with_attestation_roundtrip() -> None:
@@ -18,13 +18,13 @@ def test_encode_decode_signed_block_with_attestation_roundtrip() -> None:
         message=BlockWithAttestation(
             block=Block(
                 slot=0,
-                proposer_index=ValidatorIndex(0),
+                proposer_index=Uint64(0),
                 parent_root=Bytes32.zero(),
                 state_root=Bytes32.zero(),
                 body=BlockBody(attestations=Attestations(data=[])),
             ),
             proposer_attestation=Attestation(
-                validator_id=ValidatorIndex(0),
+                validator_id=Uint64(0),
                 data=AttestationData(
                     slot=0,
                     head=Checkpoint(root=Bytes32.zero(), slot=0),
