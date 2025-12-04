@@ -22,17 +22,14 @@ from lean_spec.subspecs.chain.config import (
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.containers import (
-    Attestation,
     AttestationData,
     Block,
-    BlockBody,
     Checkpoint,
     Config,
     SignedAttestation,
     SignedBlockWithAttestation,
     State,
 )
-from lean_spec.subspecs.containers.block import Attestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.containers import Signature
@@ -963,60 +960,13 @@ class Store(Container):
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )
 
-        # Initialize empty attestation set for iterative collection
-        attestations: list[Attestation] = []
-        signatures: list[Signature] = []
-
-        # Iteratively collect valid attestations using fixed-point algorithm
-        #
-        # Continue until no new attestations can be added to the block.
-        # This ensures we include the maximal valid attestation set.
-        while True:
-            # Create candidate block with current attestation set
-            temp_block = Block(
-                slot=slot,
-                proposer_index=validator_index,
-                parent_root=head_root,
-                # Temporary; updated after state computation
-                state_root=Bytes32.zero(),
-                body=BlockBody(attestations=Attestations(data=attestations)),
-            )
-            post_state = head_state.process_slots(slot).process_block(temp_block)
-
-            # Find new valid attestations matching post-state justification
-            new_attestations: list[Attestation] = []
-            new_signatures: list[Signature] = []
-
-            for signed_attestation in store.latest_known_attestations.values():
-                data = signed_attestation.message.data
-
-                # Skip if target block is unknown in our store
-                if data.head.root not in store.blocks:
-                    continue
-
-                # Skip if source doesn't match post-state's justified
-                if data.source != post_state.latest_justified:
-                    continue
-
-                # Add attestation if not already included
-                if signed_attestation.message not in attestations:
-                    new_attestations.append(signed_attestation.message)
-                    new_signatures.append(signed_attestation.signature)
-
-            # Fixed point reached: no new attestations found
-            if not new_attestations:
-                break
-
-            # Add new attestations and continue iteration
-            attestations.extend(new_attestations)
-            signatures.extend(new_signatures)
-
-        # Build final block and post-state
-        final_block, final_post_state = head_state.build_block(
+        # Build block with fixed-point attestation collection
+        final_block, final_post_state, _, signatures = head_state.build_block(
             slot=slot,
             proposer_index=validator_index,
             parent_root=head_root,
-            attestations=attestations,
+            available_signed_attestations=store.latest_known_attestations.values(),
+            known_block_roots=set(store.blocks.keys()),
         )
 
         # Store block and state immutably

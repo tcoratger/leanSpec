@@ -324,7 +324,7 @@ class ForkChoiceTest(BaseConsensusFixture):
 
         # Use State.build_block for core block building (pure spec logic)
         parent_state = store.states[parent_root]
-        final_block, _ = parent_state.build_block(
+        final_block, _, _, _ = parent_state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
