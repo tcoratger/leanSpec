@@ -5,7 +5,7 @@ from typing import Union
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.block import BlockBody
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, CamelModel, ValidatorIndex
+from lean_spec.types import Bytes32, CamelModel, Uint64
 
 from .signed_attestation_spec import SignedAttestationSpec
 
@@ -22,14 +22,14 @@ class BlockSpec(CamelModel):
 
     Usage:
     - Simple: BlockSpec(slot=Slot(1)) - framework computes everything
-    - Custom: BlockSpec(slot=Slot(1), proposer_index=ValidatorIndex(5)) - override specific fields
+    - Custom: BlockSpec(slot=Slot(1), proposer_index=Uint64(5)) - override specific fields
     - Invalid: BlockSpec(slot=Slot(1), state_root=Bytes32.zero()) - test invalid blocks
     """
 
     slot: Slot
     """The slot for this block (required)."""
 
-    proposer_index: ValidatorIndex | None = None
+    proposer_index: Uint64 | None = None
     """
     The proposer index for this block.
 

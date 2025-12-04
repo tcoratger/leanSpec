@@ -15,7 +15,7 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Bytes52, Uint64
 
 from .conftest import build_signed_attestation
 
@@ -32,7 +32,7 @@ def sample_store(sample_config: Config) -> Store:
     # Create a genesis block with empty body
     genesis_block = Block(
         slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
+        proposer_index=Uint64(0),
         parent_root=Bytes32.zero(),
         state_root=Bytes32(b"state" + b"\x00" * 27),
         body=BlockBody(attestations=Attestations(data=[])),
@@ -43,7 +43,7 @@ def sample_store(sample_config: Config) -> Store:
 
     # Create genesis state with 10 validators for testing
     validators = Validators(
-        data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(10)]
+        data=[Validator(pubkey=Bytes52.zero(), index=Uint64(i)) for i in range(10)]
     )
     state = State.generate_genesis(
         genesis_time=sample_config.genesis_time,
@@ -150,8 +150,8 @@ class TestIntervalTicking:
 
         # Add some test attestations for processing
         test_checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(1))
-        sample_store.latest_new_attestations[ValidatorIndex(0)] = build_signed_attestation(
-            ValidatorIndex(0),
+        sample_store.latest_new_attestations[Uint64(0)] = build_signed_attestation(
+            Uint64(0),
             test_checkpoint,
         )
 
@@ -236,8 +236,8 @@ class TestAttestationProcessingTiming:
         """Test basic new attestation processing."""
         # Add some new attestations
         checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(1))
-        sample_store.latest_new_attestations[ValidatorIndex(0)] = build_signed_attestation(
-            ValidatorIndex(0),
+        sample_store.latest_new_attestations[Uint64(0)] = build_signed_attestation(
+            Uint64(0),
             checkpoint,
         )
 
@@ -266,8 +266,8 @@ class TestAttestationProcessingTiming:
         ]
 
         for i, checkpoint in enumerate(checkpoints):
-            sample_store.latest_new_attestations[ValidatorIndex(i)] = build_signed_attestation(
-                ValidatorIndex(i),
+            sample_store.latest_new_attestations[Uint64(i)] = build_signed_attestation(
+                Uint64(i),
                 checkpoint,
             )
 
@@ -280,7 +280,7 @@ class TestAttestationProcessingTiming:
 
         # Verify correct mapping
         for i, checkpoint in enumerate(checkpoints):
-            stored = sample_store.latest_known_attestations[ValidatorIndex(i)]
+            stored = sample_store.latest_known_attestations[Uint64(i)]
             assert stored.message.data.target == checkpoint
 
     def test_accept_new_attestations_empty(self, sample_store: Store) -> None:
@@ -338,8 +338,8 @@ class TestProposalHeadTiming:
         # Add some new attestations (immutable update)
         checkpoint = Checkpoint(root=Bytes32(b"attestation" + b"\x00" * 21), slot=Slot(1))
         new_new_attestations = dict(sample_store.latest_new_attestations)
-        new_new_attestations[ValidatorIndex(10)] = build_signed_attestation(
-            ValidatorIndex(10),
+        new_new_attestations[Uint64(10)] = build_signed_attestation(
+            Uint64(10),
             checkpoint,
         )
         sample_store = sample_store.model_copy(
@@ -350,9 +350,9 @@ class TestProposalHeadTiming:
         store, _ = sample_store.get_proposal_head(Slot(1))
 
         # Attestations should have been processed (moved to known attestations)
-        assert ValidatorIndex(10) not in store.latest_new_attestations
-        assert ValidatorIndex(10) in store.latest_known_attestations
-        stored = store.latest_known_attestations[ValidatorIndex(10)]
+        assert Uint64(10) not in store.latest_new_attestations
+        assert Uint64(10) in store.latest_known_attestations
+        stored = store.latest_known_attestations[Uint64(10)]
         assert stored.message.data.target == checkpoint
 
 

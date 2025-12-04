@@ -27,7 +27,7 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Uint64
 
 
 class MockState(State):
@@ -42,7 +42,7 @@ class MockState(State):
 
         genesis_header = BlockHeader(
             slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
+            proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
             body_root=hash_tree_root(BlockBody(attestations=Attestations(data=[]))),
@@ -63,7 +63,7 @@ class MockState(State):
 
 
 def build_signed_attestation(
-    validator: ValidatorIndex,
+    validator: Uint64,
     target: Checkpoint,
     source: Checkpoint | None = None,
 ) -> SignedAttestation:

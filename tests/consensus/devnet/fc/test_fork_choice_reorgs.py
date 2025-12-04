@@ -14,7 +14,7 @@ from consensus_testing import (
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import Validator
-from lean_spec.types import Bytes52, ValidatorIndex
+from lean_spec.types import Bytes52, Uint64
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -363,7 +363,7 @@ def test_reorg_with_slot_gaps(
     fork_choice_test(
         anchor_state=generate_pre_state(
             validators=Validators(
-                data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(10)]
+                data=[Validator(pubkey=Bytes52.zero(), index=Uint64(i)) for i in range(10)]
             ),
         ),
         steps=[
@@ -579,7 +579,7 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
     fork_choice_test(
         anchor_state=generate_pre_state(
             validators=Validators(
-                data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(12)]
+                data=[Validator(pubkey=Bytes52.zero(), index=Uint64(i)) for i in range(12)]
             )
         ),
         steps=[
@@ -816,7 +816,7 @@ def test_reorg_on_newly_justified_slot(
         # Using 9 validators: 3 for Fork A and 6 for Fork B to achieve 2/3rd for Fork B
         anchor_state=generate_pre_state(
             validators=Validators(
-                data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(9)]
+                data=[Validator(pubkey=Bytes52.zero(), index=Uint64(i)) for i in range(9)]
             )
         ),
         steps=[
@@ -876,13 +876,13 @@ def test_reorg_on_newly_justified_slot(
                     label="fork_b_2",
                     attestations=[
                         SignedAttestationSpec(
-                            validator_id=ValidatorIndex(0),
+                            validator_id=Uint64(0),
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",
                         ),
                         SignedAttestationSpec(
-                            validator_id=ValidatorIndex(1),
+                            validator_id=Uint64(1),
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",
@@ -892,25 +892,25 @@ def test_reorg_on_newly_justified_slot(
                         # two attestations below because block proposer's attestations
                         # are not being counted towards justification
                         SignedAttestationSpec(
-                            validator_id=ValidatorIndex(5),
+                            validator_id=Uint64(5),
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",
                         ),
                         SignedAttestationSpec(
-                            validator_id=ValidatorIndex(6),
+                            validator_id=Uint64(6),
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",
                         ),
                         SignedAttestationSpec(
-                            validator_id=ValidatorIndex(7),
+                            validator_id=Uint64(7),
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",
                         ),
                         SignedAttestationSpec(
-                            validator_id=ValidatorIndex(8),
+                            validator_id=Uint64(8),
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",

@@ -31,7 +31,7 @@ from lean_spec.subspecs.xmss.constants import PROD_CONFIG
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
-from lean_spec.types import Bytes32, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Uint64
 
 from ..keys import XmssKeyManager
 from ..test_types import (
@@ -194,9 +194,7 @@ class ForkChoiceTest(BaseConsensusFixture):
 
         # Update validator pubkeys to match key_manager's generated keys
         updated_validators = [
-            validator.model_copy(
-                update={"pubkey": key_manager[ValidatorIndex(i)].public.encode_bytes()}
-            )
+            validator.model_copy(update={"pubkey": key_manager[Uint64(i)].public.encode_bytes()})
             for i, validator in enumerate(self.anchor_state.validators)
         ]
 
@@ -318,7 +316,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Determine proposer
         if spec.proposer_index is None:
             validator_count = store.states[store.head].validators.count
-            proposer_index = ValidatorIndex(int(spec.slot) % int(validator_count))
+            proposer_index = Uint64(int(spec.slot) % int(validator_count))
         else:
             proposer_index = spec.proposer_index
 
@@ -459,23 +457,16 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Derive source from state's latest justified checkpoint
         source_checkpoint = state.latest_justified
 
-        # Convert validator_id to Uint64 if needed
-        validator_id = (
-            spec.validator_id
-            if isinstance(spec.validator_id, Uint64)
-            else Uint64(int(spec.validator_id))
-        )
-
-        # Create attestation data
-        attestation_data = AttestationData(
-            slot=spec.slot,
-            head=head_checkpoint,
-            target=target_checkpoint,
-            source=source_checkpoint,
-        )
-
         # Create attestation
-        attestation = Attestation(validator_id=validator_id, data=attestation_data)
+        attestation = Attestation(
+            validator_id=spec.validator_id,
+            data=AttestationData(
+                slot=spec.slot,
+                head=head_checkpoint,
+                target=target_checkpoint,
+                source=source_checkpoint,
+            ),
+        )
 
         # Create signed attestation
         return SignedAttestation(

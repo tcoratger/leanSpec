@@ -22,7 +22,7 @@ from lean_spec.subspecs.containers.state.types import (
 )
 from lean_spec.subspecs.containers.validator import Validator
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Bytes52, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Bytes52, Uint64
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -129,7 +129,7 @@ def test_genesis_custom_validator_set(
     """
     # Create 8 validators with unique pubkeys
     validators = Validators(
-        data=[Validator(pubkey=Bytes52(bytes([i] * 52)), index=ValidatorIndex(i)) for i in range(8)]
+        data=[Validator(pubkey=Bytes52(bytes([i] * 52)), index=Uint64(i)) for i in range(8)]
     )
 
     state_transition_test(
@@ -175,7 +175,7 @@ def test_genesis_block_hash_comparison() -> None:
     # Generate genesis block from first state
     genesis_block1 = Block(
         slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
+        proposer_index=Uint64(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state1),
         body=BlockBody(attestations=Attestations(data=[])),
@@ -192,7 +192,7 @@ def test_genesis_block_hash_comparison() -> None:
 
     genesis_block1_copy = Block(
         slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
+        proposer_index=Uint64(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state1_copy),
         body=BlockBody(attestations=Attestations(data=[])),
@@ -217,7 +217,7 @@ def test_genesis_block_hash_comparison() -> None:
 
     genesis_block2 = Block(
         slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
+        proposer_index=Uint64(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state2),
         body=BlockBody(attestations=Attestations(data=[])),
@@ -242,7 +242,7 @@ def test_genesis_block_hash_comparison() -> None:
 
     genesis_block3 = Block(
         slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
+        proposer_index=Uint64(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state3),
         body=BlockBody(attestations=Attestations(data=[])),
