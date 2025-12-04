@@ -520,7 +520,7 @@ class State(Container):
     def build_block(
         self,
         slot: Slot,
-        proposer_index: ValidatorIndex,
+        proposer_index: Uint64,
         parent_root: Bytes32,
         attestations: list[Attestation] | None = None,
     ) -> tuple[Block, "State"]:

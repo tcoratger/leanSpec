@@ -312,7 +312,7 @@ class ForkChoiceTest(BaseConsensusFixture):
             A complete signed block ready for processing.
         """
         # Determine proposer index
-        proposer_index = spec.proposer_index or ValidatorIndex(
+        proposer_index = spec.proposer_index or Uint64(
             int(spec.slot) % store.states[store.head].validators.count
         )
 
