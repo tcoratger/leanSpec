@@ -258,18 +258,16 @@ class State(Container):
         )
 
         # If there were empty slots between parent and this block, fill them.
-        num_empty_slots = block.slot - parent_header.slot - Slot(1)
+        num_empty_slots = int(block.slot - parent_header.slot - Slot(1))
 
         # Build new historical hashes list
         new_historical_hashes_data = (
-            self.historical_block_hashes + [parent_root] + [ZERO_HASH] * int(num_empty_slots)
+            self.historical_block_hashes + [parent_root] + [ZERO_HASH] * num_empty_slots
         )
 
         # Build new justified slots list
         new_justified_slots_data = (
-            self.justified_slots
-            + [Boolean(is_genesis_parent)]
-            + [Boolean(False)] * int(num_empty_slots)
+            self.justified_slots + [Boolean(is_genesis_parent)] + [Boolean(False)] * num_empty_slots
         )
 
         # Construct the new latest block header.
