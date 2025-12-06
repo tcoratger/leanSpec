@@ -272,17 +272,12 @@ class State(Container):
         # - For all other blocks: We retain the existing checkpoints. Future
         #   updates rely entirely on validator attestations which are processed
         #   later in the block body.
-        new_latest_justified = (
-            self.latest_justified.model_copy(update={"root": parent_root})
-            if is_genesis_parent
-            else self.latest_justified
-        )
-
-        new_latest_finalized = (
-            self.latest_finalized.model_copy(update={"root": parent_root})
-            if is_genesis_parent
-            else self.latest_finalized
-        )
+        if is_genesis_parent:
+            new_latest_justified = self.latest_justified.model_copy(update={"root": parent_root})
+            new_latest_finalized = self.latest_finalized.model_copy(update={"root": parent_root})
+        else:
+            new_latest_justified = self.latest_justified
+            new_latest_finalized = self.latest_finalized
 
         # Historical Data Management
 
@@ -297,7 +292,7 @@ class State(Container):
         #
         # Structure: [Existing history] + [Parent root] + [Zero hash for gaps]
         new_historical_hashes_data = (
-            self.historical_block_hashes + [parent_root] + ([ZERO_HASH] * num_empty_slots)
+            self.historical_block_hashes + [parent_root] + [ZERO_HASH] * num_empty_slots
         )
 
         # Update the list of justified slot flags.
@@ -320,9 +315,7 @@ class State(Container):
         #    current block. Since no blocks exist there, they are permanently
         #    unjustified.
         new_justified_slots_data = (
-            self.justified_slots
-            + [Boolean(is_genesis_parent)]
-            + ([Boolean(False)] * num_empty_slots)
+            self.justified_slots + [Boolean(is_genesis_parent)] + [Boolean(False)] * num_empty_slots
         )
 
         # Construct the new latest block header.
