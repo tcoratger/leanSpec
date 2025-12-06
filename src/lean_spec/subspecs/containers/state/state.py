@@ -1,10 +1,4 @@
-"""
-State Container for the Lean Ethereum consensus specification.
-
-The state contains everything needed for consensus. It tracks the current slot,
-recent blocks, and validator attestations. State also records which blocks are
-justified and finalized.
-"""
+"""State Container for the Lean Ethereum consensus specification."""
 
 from typing import TYPE_CHECKING, AbstractSet, Iterable
 
@@ -173,7 +167,6 @@ class State(Container):
             #
             # 2. Slot Increment:
             #    It always increments the slot number by one.
-            #
             state = state.model_copy(
                 update={
                     "latest_block_header": (
