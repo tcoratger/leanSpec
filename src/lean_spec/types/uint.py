@@ -170,10 +170,6 @@ class BaseUint(int, SSZType):
         """The maximum value for this unsigned integer."""
         return cls(2**cls.BITS - 1)
 
-    def as_int(self) -> int:
-        """Convert the unsigned integer to a plain integer."""
-        return int(self)
-
     def to_bytes(
         self,
         length: SupportsIndex | None = None,
@@ -391,6 +387,10 @@ class BaseUint(int, SSZType):
     def __hash__(self) -> int:
         """Return a distinct hash for the object."""
         return hash((type(self), int(self)))
+
+    def __index__(self) -> int:
+        """Return self as an integer for use in slicing and indexing."""
+        return int(self)
 
 
 class Uint8(BaseUint):

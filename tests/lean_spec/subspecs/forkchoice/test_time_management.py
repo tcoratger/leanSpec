@@ -93,8 +93,8 @@ class TestOnTick:
         # Try to advance to current time (should be no-op)
         sample_store = sample_store.on_tick(current_target, has_proposal=True)
 
-        # Should not change significantly
-        assert abs(sample_store.time.as_int() - initial_time.as_int()) <= 10  # small tolerance
+        # Should not change significantly (time can only increase)
+        assert sample_store.time - initial_time <= Uint64(10)  # small tolerance
 
     def test_on_tick_small_increment(self, sample_store: Store) -> None:
         """Test on_tick with small time increment."""
@@ -156,12 +156,12 @@ class TestIntervalTicking:
         )
 
         # Tick through a complete slot cycle
-        for interval in range(INTERVALS_PER_SLOT.as_int()):
+        for interval in range(INTERVALS_PER_SLOT):
             has_proposal = interval == 0  # Proposal only in first interval
             sample_store = sample_store.tick_interval(has_proposal=has_proposal)
 
             current_interval = sample_store.time % INTERVALS_PER_SLOT
-            expected_interval = Uint64((interval + 1) % INTERVALS_PER_SLOT.as_int())
+            expected_interval = Uint64((interval + 1)) % INTERVALS_PER_SLOT
             assert current_interval == expected_interval
 
 
@@ -175,15 +175,15 @@ class TestSlotTimeCalculations:
         genesis_time = sample_config.genesis_time
 
         # Slot 0 should be at genesis time
-        slot_0_time = genesis_time + Uint64(0 * SECONDS_PER_SLOT.as_int())
+        slot_0_time = genesis_time + Uint64(0) * SECONDS_PER_SLOT
         assert slot_0_time == genesis_time
 
         # Slot 1 should be at genesis + SECONDS_PER_SLOT
-        slot_1_time = genesis_time + Uint64(1 * SECONDS_PER_SLOT.as_int())
+        slot_1_time = genesis_time + Uint64(1) * SECONDS_PER_SLOT
         assert slot_1_time == genesis_time + SECONDS_PER_SLOT
 
         # Slot 10 should be at genesis + 10 * SECONDS_PER_SLOT
-        slot_10_time = genesis_time + Uint64(10 * SECONDS_PER_SLOT.as_int())
+        slot_10_time = genesis_time + Uint64(10) * SECONDS_PER_SLOT
         assert slot_10_time == genesis_time + Uint64(10) * SECONDS_PER_SLOT
 
     def test_time_to_slot_conversion(self, sample_config: Config) -> None:

@@ -35,7 +35,8 @@ class Slot(Uint64):
         assert self >= finalized_slot, "Candidate slot must not be before finalized slot"
 
         # Calculate the distance in slots from the last finalized slot.
-        delta = (self - finalized_slot).as_int()
+        # Convert to int for pure arithmetic operations below.
+        delta = int(self - finalized_slot)
 
         return (
             # Rule 1: The first 5 slots after finalization are always justifiable.
