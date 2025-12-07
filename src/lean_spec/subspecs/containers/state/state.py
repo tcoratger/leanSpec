@@ -382,24 +382,28 @@ class State(Container):
         State
             A new state with updated justification/finalization.
         """
-        # NOTE:
-        # The state already contains three pieces of data:
-        #   1. A list of block roots that have received justification votes.
-        #   2. A long sequence of boolean entries representing all validator votes,
-        #      flattened into a single list.
-        #   3. The total number of validators.
+        # Reconstruct the vote-tracking structure
         #
-        # The flattened vote list is organized so that votes from all validators for
-        # each block root appear together, and those groups are simply placed back-to-back.
+        # The state stores justification data in a compact SSZ layout:
         #
-        # To work with attestations, we must rebuild the intuitive structure:
-        #   “for each block root, here is the list of validator votes for it”.
+        #   - A list of block roots that are currently being tracked.
+        #   - One long flat list containing validator vote flags.
         #
-        # Reconstructing this is done by cutting the long vote list into consecutive
-        # segments, where:
-        #   - each segment corresponds to one block root,
-        #   - each segment has length equal to the number of validators,
-        #   - and the ordering of block roots is preserved.
+        # For each tracked block, there is a consecutive segment of vote flags.
+        # Every segment has the same length: the number of validators.
+        #
+        # Conceptually, we want to recover a more natural view:
+        #
+        #   "For each block root, here is the list of votes from all validators."
+        #
+        # We rebuild this intuitive structure by slicing the flat vote list back
+        # into its individual segments. Each slice corresponds to one tracked block.
+        #
+        # This gives us a mapping:
+        #
+        #       (block root) → [vote flags for validators 0..N-1]
+        #
+        # which makes the rest of the logic easier to express and understand.
         justifications = (
             {
                 root: self.justifications_validators[
@@ -416,100 +420,139 @@ class State(Container):
         latest_finalized = self.latest_finalized
         justified_slots = self.justified_slots
 
-        # Process each attestation in the block.
+        # Process each attestation independently
+        #
+        # Every attestation is a claim:
+        #
+        # "I vote to extend the chain from SOURCE to TARGET."
+        #
+        # The rules below filter out invalid or irrelevant votes.
         for attestation in attestations:
-            attestation_data = attestation.data
-            source = attestation_data.source
-            target = attestation_data.target
+            source = attestation.data.source
+            target = attestation.data.target
 
-            # Ignore attestations whose source is not already justified,
-            # or whose target is not in the history, or whose target is not a
-            # valid justifiable slot
-
-            # Source slot must be justified
+            # Check that the source is already trusted
+            #
+            # A vote may only originate from a point in history that is already justified.
+            # A source that lacks existing justification cannot be used to anchor a new vote.
             if not justified_slots[source.slot]:
                 continue
 
-            # Target slot must not be already justified
-            # This condition is missing in 3sf mini but has been added here because
-            # we don't want to re-introduce the target again for remaining votes if
-            # the slot is already justified and its tracking already cleared out
-            # from justifications map
+            # Ignore votes for targets that have already reached consensus
+            #
+            # If a block is already justified, additional votes do not change anything.
+            # We simply skip them.
             if justified_slots[target.slot]:
                 continue
 
-            # Source root must match the state's historical block hashes
-            if source.root != self.historical_block_hashes[source.slot]:
+            # Ensure the vote refers to blocks that actually exist on our chain
+            #
+            # The attestation must match our canonical chain.
+            # Both the source root and target root must equal the recorded block roots
+            # stored for those slots in history.
+            #
+            # This prevents votes about unknown or conflicting forks.
+            if (
+                source.root != self.historical_block_hashes[source.slot]
+                and target.root != self.historical_block_hashes[target.slot]
+            ):
                 continue
 
-            # Target root must match the state's historical block hashes
-            if target.root != self.historical_block_hashes[target.slot]:
-                continue
-
-            # Target slot must be after source slot
+            # Ensure time flows forward
+            #
+            # A target must always lie strictly after its source slot.
+            # Otherwise the vote makes no chronological sense.
             if target.slot <= source.slot:
                 continue
 
-            # Target slot must be justifiable after the latest finalized slot
+            # Ensure the target falls on a slot that can be justified after the finalized one.
+            #
+            # In 3SF-mini, justification does not advance freely through time.
+            #
+            # Only certain positions beyond the finalized slot are allowed to
+            # receive new votes. These positions form a small, structured set:
+            #
+            #   - the immediate steps right after finalization,
+            #   - the square-number distances,
+            #   - and the pronic-number distances.
+            #
+            # Any target outside this pattern is not eligible for justification,
+            # so votes for it are simply ignored.
             if not target.slot.is_justifiable_after(self.latest_finalized.slot):
                 continue
 
-            # Track attempts to justify new hashes
+            # Record the vote
+            #
+            # If this is the first vote for the target block, create a fresh tally sheet:
+            # - one boolean per validator, all initially False.
             if target.root not in justifications:
                 justifications[target.root] = [Boolean(False)] * self.validators.count
 
+            # Mark that this validator has voted for the target.
+            #
+            # A vote is represented as a boolean flag.
+            # If it was previously absent, flip it to True.
             if not justifications[target.root][attestation.validator_id]:
                 justifications[target.root][attestation.validator_id] = Boolean(True)
 
+            # Check whether the vote count crosses the supermajority threshold
+            #
+            # A block becomes justified when more than two-thirds of validators
+            # have voted for it.
+            #
+            # We compare integers to avoid floating-point division:
+            #
+            # 3 * (number of votes) ≥ 2 * (total validators)
             count = sum(bool(justified) for justified in justifications[target.root])
 
-            # If 2/3 attested to the same new valid hash to justify
-            # in 3sf mini this is strict equality, but we have updated it to >=
-            # also have modified it from count >= (2 * state.config.num_validators) // 3
-            # to prevent integer division which could lead to less than 2/3 of validators
-            # justifying specially if the num_validators is low in testing scenarios
             if 3 * count >= (2 * self.validators.count):
+                # The block becomes justified
+                #
+                # The chain now considers this block part of its safe head.
                 latest_justified = target
                 justified_slots[target.slot] = True
+
+                # There is no longer any need to track individual votes for this block.
                 del justifications[target.root]
 
-                # Finalization: if the target is the next valid justifiable
-                # hash after the source
+                # Consider whether finalization can advance
+                #
+                # Finalization requires a continuous chain of trust from the
+                # previously finalized checkpoint up to the new justified point.
+                #
+                # If every slot in between is justifiable relative to the old
+                # finalized point, then the earlier source checkpoint becomes finalized.
+                #
+                # In short:
+                #
+                #     If there is no break in the chain, advance finalization.
                 if not any(
                     Slot(slot).is_justifiable_after(self.latest_finalized.slot)
                     for slot in range(source.slot + Slot(1), target.slot)
                 ):
                     latest_finalized = source
 
-        # Converting the justification map into SSZ form
+        # Convert the vote structure back into SSZ format
         #
-        # The justification data has been maintained as a convenient map from
-        # block roots to lists of validator votes. Before storing it in the
-        # consensus state, it must be transformed into the strict SSZ layout.
+        # Internally, we used a mapping:
         #
-        # This requires two steps:
+        #       block root → list of votes
         #
-        #   1. Order all block roots deterministically.
-        #      This ensures every node produces the same state representation.
+        # SSZ requires:
         #
-        #   2. Produce a single list of votes by taking, in that order,
-        #      the complete vote list for each block root and placing them
-        #      back-to-back without nesting.
+        #   - a sorted list of block roots
+        #   - a single flat list of votes (all roots concatenated in sorted order)
         #
-        # The result is a list of ordered roots and one flat sequence of votes,
-        # matching the exact structure expected by SSZ.
+        # Sorting ensures that every node produces identical state representation.
         sorted_roots = sorted(justifications.keys())
 
-        justifications_roots = JustificationRoots(data=sorted_roots)
-        justifications_validators = JustificationValidators(
-            data=[vote for root in sorted_roots for vote in justifications[root]]
-        )
-
-        # Return the updated state.
+        # Construct and return the updated state
         return self.model_copy(
             update={
-                "justifications_roots": justifications_roots,
-                "justifications_validators": justifications_validators,
+                "justifications_roots": JustificationRoots(data=sorted_roots),
+                "justifications_validators": JustificationValidators(
+                    data=[vote for root in sorted_roots for vote in justifications[root]]
+                ),
                 "justified_slots": JustifiedSlots(data=justified_slots),
                 "latest_justified": latest_justified,
                 "latest_finalized": latest_finalized,
