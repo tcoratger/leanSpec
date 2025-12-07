@@ -1,10 +1,4 @@
-"""
-State Container for the Lean Ethereum consensus specification.
-
-The state contains everything needed for consensus. It tracks the current slot,
-recent blocks, and validator attestations. State also records which blocks are
-justified and finalized.
-"""
+"""State Container for the Lean Ethereum consensus specification."""
 
 from typing import TYPE_CHECKING, AbstractSet, Iterable
 
@@ -173,7 +167,6 @@ class State(Container):
             #
             # 2. Slot Increment:
             #    It always increments the slot number by one.
-            #
             state = state.model_copy(
                 update={
                     "latest_block_header": (
@@ -223,56 +216,107 @@ class State(Container):
             If any header check fails.
         """
         # Validation
+        #
+        # - Retrieve the header of the previous block (the parent).
+        # - Compute the parent root hash.
         parent_header = self.latest_block_header
         parent_root = hash_tree_root(parent_header)
 
-        # The block must be for the current slot.
+        # Consensus checks
+
+        # Verify the block corresponds to the current state slot.
+        #
+        # To move to this slot, we have processed any intermediate slots before.
         assert block.slot == self.slot, "Block slot mismatch"
 
         # The block must be newer than the current latest header.
         assert block.slot > parent_header.slot, "Block is older than latest header"
 
-        # The proposer must be the expected validator for this slot.
+        # Verify the block proposer.
+        #
+        # Ensures the block was proposed by the assigned validator for this round.
         assert is_proposer(
             validator_index=block.proposer_index,
             slot=self.slot,
             num_validators=Uint64(self.validators.count),
         ), "Incorrect block proposer"
 
-        # The declared parent must match the hash of the latest block header.
+        # Verify the chain link.
+        #
+        # The block must cryptographically point to the known parent.
         assert block.parent_root == parent_root, "Block parent root mismatch"
 
-        # State Updates
+        # Checkpoint Updates
 
-        # Special case: first block after genesis.
+        # Detect if we are transitioning from the genesis block.
+        #
+        # This flag is True only when processing the very first block of the chain.
+        # This means the parent is the Genesis block (Slot 0).
         is_genesis_parent = parent_header.slot == Slot(0)
-        new_latest_justified = (
-            self.latest_justified.model_copy(update={"root": parent_root})
-            if is_genesis_parent
-            else self.latest_justified
-        )
-        new_latest_finalized = (
-            self.latest_finalized.model_copy(update={"root": parent_root})
-            if is_genesis_parent
-            else self.latest_finalized
-        )
 
-        # If there were empty slots between parent and this block, fill them.
+        # Update the consensus checkpoints.
+        #
+        # This logic acts as the trust anchor for the chain:
+        #
+        # - If the parent is the Genesis block: It cannot receive votes as it
+        #   precedes the start of the chain. Therefore, we explicitly force it
+        #   to be Justified and Finalized immediately.
+        #
+        # - For all other blocks: We retain the existing checkpoints. Future
+        #   updates rely entirely on validator attestations which are processed
+        #   later in the block body.
+        if is_genesis_parent:
+            new_latest_justified = self.latest_justified.model_copy(update={"root": parent_root})
+            new_latest_finalized = self.latest_finalized.model_copy(update={"root": parent_root})
+        else:
+            new_latest_justified = self.latest_justified
+            new_latest_finalized = self.latest_finalized
+
+        # Historical Data Management
+
+        # Calculate the gap between the parent and the current block.
+        #
+        # If slots were skipped (missed proposals), we must record them.
+        #
+        # Formula: (Current - Parent - 1). Adjacent blocks have a gap of 0.
         num_empty_slots = int(block.slot - parent_header.slot - Slot(1))
 
-        # Build new historical hashes list
+        # Update the list of historical block roots.
+        #
+        # Structure: [Existing history] + [Parent root] + [Zero hash for gaps]
         new_historical_hashes_data = (
             self.historical_block_hashes + [parent_root] + [ZERO_HASH] * num_empty_slots
         )
 
-        # Build new justified slots list
+        # Update the list of justified slot flags.
+        #
+        # Structure: [Existing flags] + [Is genesis parent?] + [False for gaps]
+        #
+        # We construct the new history list by concatenating three segments:
+        #
+        # 1. The existing history:
+        #    We preserve the flags for all previously processed blocks.
+        #
+        # 2. The parent block status (one entry):
+        #    We append the status of the block immediately preceding any gaps.
+        #    - If Genesis: True (Justified by definition).
+        #    - If Normal: False (Pending). It remains unjustified until validators
+        #      vote for it later in the process.
+        #
+        # 3. The skipped slots status (multiple entries):
+        #    We append False for every empty slot between the parent and the
+        #    current block. Since no blocks exist there, they are permanently
+        #    unjustified.
         new_justified_slots_data = (
             self.justified_slots + [Boolean(is_genesis_parent)] + [Boolean(False)] * num_empty_slots
         )
 
         # Construct the new latest block header.
         #
-        # Leave state_root empty; it will be filled on the next process_slot call.
+        # The new header object represents the tip of the chain.
+        #
+        # Leave state root empty.
+        # It is not computed until the block body is fully processed or the next slot begins.
         new_header = BlockHeader(
             slot=block.slot,
             proposer_index=block.proposer_index,
@@ -283,15 +327,14 @@ class State(Container):
 
         # Final Immutable Copy
         #
-        # Return the state with all header updates applied in one go.
+        # Return a new immutable state instance.
+        # All calculated updates are applied atomically here.
         return self.model_copy(
             update={
                 "latest_justified": new_latest_justified,
                 "latest_finalized": new_latest_finalized,
-                "historical_block_hashes": self.historical_block_hashes.__class__(
-                    data=new_historical_hashes_data
-                ),
-                "justified_slots": self.justified_slots.__class__(data=new_justified_slots_data),
+                "historical_block_hashes": HistoricalBlockHashes(data=new_historical_hashes_data),
+                "justified_slots": JustifiedSlots(data=new_justified_slots_data),
                 "latest_block_header": new_header,
             }
         )
@@ -467,7 +510,7 @@ class State(Container):
             update={
                 "justifications_roots": justifications_roots,
                 "justifications_validators": justifications_validators,
-                "justified_slots": self.justified_slots.__class__(data=justified_slots),
+                "justified_slots": JustifiedSlots(data=justified_slots),
                 "latest_justified": latest_justified,
                 "latest_finalized": latest_finalized,
             }
