@@ -163,12 +163,11 @@ class SignedBlockWithAttestation(Container):
 
         # Verify each attestation signature
         for attestation, signature in zip(all_attestations, signatures, strict=True):
-            # Identify the validator who created this attestation
-            validator_id = attestation.validator_id.as_int()
-
             # Ensure validator exists in the active set
-            assert validator_id < len(validators), "Validator index out of range"
-            validator = cast(Validator, validators[validator_id])
+            assert attestation.validator_id < Uint64(len(validators)), (
+                "Validator index out of range"
+            )
+            validator = cast(Validator, validators[attestation.validator_id])
 
             # Verify the XMSS signature
             #

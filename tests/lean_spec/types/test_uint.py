@@ -135,7 +135,7 @@ def test_arithmetic_operators(uint_class: Type[BaseUint]) -> None:
     assert uint_class(b_val) ** 4 == uint_class(b_val**4)
     if uint_class.BITS <= 16:  # Pow gets too big quickly
         with pytest.raises(OverflowError):
-            _ = a ** b.as_int()
+            _ = a ** int(b)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -239,6 +239,63 @@ def test_hash(uint_class: Type[BaseUint]) -> None:
     assert hash(uint_class(1)) != hash(1)
     assert hash(uint_class(1)) == hash(uint_class(1))
     assert hash(uint_class(1)) != hash(uint_class(2))
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_index_list_access(uint_class: Type[BaseUint]) -> None:
+    """Tests that Uint types can be used directly for list indexing."""
+    data = ["a", "b", "c", "d", "e"]
+    idx = uint_class(2)
+    assert data[idx] == "c"
+    assert data[uint_class(0)] == "a"
+    assert data[uint_class(4)] == "e"
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_index_slicing(uint_class: Type[BaseUint]) -> None:
+    """Tests that Uint types can be used in slice operations."""
+    data = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    start = uint_class(2)
+    stop = uint_class(7)
+    step = uint_class(2)
+
+    assert data[start:stop] == [2, 3, 4, 5, 6]
+    assert data[:stop] == [0, 1, 2, 3, 4, 5, 6]
+    assert data[start:] == [2, 3, 4, 5, 6, 7, 8, 9]
+    assert data[start:stop:step] == [2, 4, 6]
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_index_range(uint_class: Type[BaseUint]) -> None:
+    """Tests that Uint types can be used in range()."""
+    n = uint_class(5)
+    result = list(range(n))
+    assert result == [0, 1, 2, 3, 4]
+
+    start = uint_class(2)
+    stop = uint_class(8)
+    step = uint_class(2)
+    result = list(range(start, stop, step))
+    assert result == [2, 4, 6]
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_index_hex_bin_oct(uint_class: Type[BaseUint]) -> None:
+    """Tests that Uint types work with hex(), bin(), oct()."""
+    val = uint_class(42)
+    assert hex(val) == "0x2a"
+    assert bin(val) == "0b101010"
+    assert oct(val) == "0o52"
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+def test_index_operator_index(uint_class: Type[BaseUint]) -> None:
+    """Tests that operator.index() works with Uint types."""
+    import operator
+
+    val = uint_class(42)
+    assert operator.index(val) == 42
+    assert isinstance(operator.index(val), int)
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)

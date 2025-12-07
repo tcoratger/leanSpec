@@ -279,7 +279,7 @@ class State(Container):
         # If slots were skipped (missed proposals), we must record them.
         #
         # Formula: (Current - Parent - 1). Adjacent blocks have a gap of 0.
-        num_empty_slots = (block.slot - parent_header.slot - Slot(1)).as_int()
+        num_empty_slots = int(block.slot - parent_header.slot - Slot(1))
 
         # Update the list of historical block roots.
         #
@@ -425,11 +425,9 @@ class State(Container):
             # Ignore attestations whose source is not already justified,
             # or whose target is not in the history, or whose target is not a
             # valid justifiable slot
-            source_slot = source.slot.as_int()
-            target_slot = target.slot.as_int()
 
             # Source slot must be justified
-            if not justified_slots[source_slot]:
+            if not justified_slots[source.slot]:
                 continue
 
             # Target slot must not be already justified
@@ -437,15 +435,15 @@ class State(Container):
             # we don't want to re-introduce the target again for remaining votes if
             # the slot is already justified and its tracking already cleared out
             # from justifications map
-            if justified_slots[target_slot]:
+            if justified_slots[target.slot]:
                 continue
 
             # Source root must match the state's historical block hashes
-            if source.root != self.historical_block_hashes[source_slot]:
+            if source.root != self.historical_block_hashes[source.slot]:
                 continue
 
             # Target root must match the state's historical block hashes
-            if target.root != self.historical_block_hashes[target_slot]:
+            if target.root != self.historical_block_hashes[target.slot]:
                 continue
 
             # Target slot must be after source slot
@@ -460,9 +458,8 @@ class State(Container):
             if target.root not in justifications:
                 justifications[target.root] = [Boolean(False)] * self.validators.count
 
-            validator_id = attestation.validator_id.as_int()
-            if not justifications[target.root][validator_id]:
-                justifications[target.root][validator_id] = Boolean(True)
+            if not justifications[target.root][attestation.validator_id]:
+                justifications[target.root][attestation.validator_id] = Boolean(True)
 
             count = sum(bool(justified) for justified in justifications[target.root])
 
@@ -473,14 +470,14 @@ class State(Container):
             # justifying specially if the num_validators is low in testing scenarios
             if 3 * count >= (2 * self.validators.count):
                 latest_justified = target
-                justified_slots[target_slot] = True
+                justified_slots[target.slot] = True
                 del justifications[target.root]
 
                 # Finalization: if the target is the next valid justifiable
                 # hash after the source
                 if not any(
                     Slot(slot).is_justifiable_after(self.latest_finalized.slot)
-                    for slot in range(source_slot + 1, target_slot)
+                    for slot in range(source.slot + Slot(1), target.slot)
                 ):
                     latest_finalized = source
 
