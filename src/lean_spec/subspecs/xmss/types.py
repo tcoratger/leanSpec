@@ -1,5 +1,7 @@
 """Base types for the XMSS signature scheme."""
 
+from typing import List
+
 from lean_spec.subspecs.koalabear import Fp
 
 from ...types import Uint64
@@ -61,6 +63,11 @@ class HashDigestVector(SSZVector):
     ELEMENT_TYPE = Fp
     LENGTH = HASH_DIGEST_LENGTH
 
+    @property
+    def elements(self) -> List[Fp]:
+        """Return the field elements as a typed list."""
+        return list(self.data)  # type: ignore[arg-type]
+
 
 class HashDigestList(SSZList):
     """
@@ -92,6 +99,11 @@ class Parameter(SSZVector):
 
     ELEMENT_TYPE = Fp
     LENGTH = PROD_CONFIG.PARAMETER_LEN
+
+    @property
+    def elements(self) -> List[Fp]:
+        """Return the field elements as a typed list."""
+        return list(self.data)  # type: ignore[arg-type]
 
 
 class Randomness(SSZVector):

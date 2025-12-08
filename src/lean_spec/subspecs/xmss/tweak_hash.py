@@ -26,8 +26,7 @@ unique across the entire scheme, we guarantee that every hash computation is
 
 from __future__ import annotations
 
-from itertools import chain
-from typing import List, Union, cast
+from typing import List, Union
 
 from pydantic import Field, model_validator
 
@@ -185,25 +184,23 @@ class TweakHasher(StrictBaseModel):
         encoded_tweak = self._encode_tweak(tweak, config.TWEAK_LEN_FE)
 
         # Route to the correct Poseidon2 mode based on the input size.
-        # Note: cast is needed because SSZVector.data is typed as Tuple[SSZType, ...]
-        # but we know it's actually Tuple[Fp, ...] for Parameter and HashDigestVector.
-        param_data = cast(List[Fp], list(parameter.data))
-
         if len(message_parts) == 1:
             # Case 1: Hashing a single digest (used in hash chains).
             #
             # We use the efficient width-16 compression mode.
-            msg_data = cast(List[Fp], list(message_parts[0].data))
-            input_vec = param_data + encoded_tweak + msg_data
+            input_vec = parameter.elements + encoded_tweak + message_parts[0].elements
             result = self.poseidon.compress(input_vec, 16, config.HASH_LEN_FE)
 
         elif len(message_parts) == 2:
             # Case 2: Hashing two digests (used for Merkle tree nodes).
             #
             # We use the slightly larger width-24 compression mode.
-            msg0_data = cast(List[Fp], list(message_parts[0].data))
-            msg1_data = cast(List[Fp], list(message_parts[1].data))
-            input_vec = param_data + encoded_tweak + msg0_data + msg1_data
+            input_vec = (
+                parameter.elements
+                + encoded_tweak
+                + message_parts[0].elements
+                + message_parts[1].elements
+            )
             result = self.poseidon.compress(input_vec, 24, config.HASH_LEN_FE)
 
         else:
@@ -211,10 +208,10 @@ class TweakHasher(StrictBaseModel):
             #
             # We use the robust sponge mode.
             # First, flatten the list of message parts into a single vector.
-            flattened_message = cast(
-                List[Fp], list(chain.from_iterable(part.data for part in message_parts))
-            )
-            input_vec = param_data + encoded_tweak + flattened_message
+            flattened_message: List[Fp] = []
+            for part in message_parts:
+                flattened_message.extend(part.elements)
+            input_vec = parameter.elements + encoded_tweak + flattened_message
 
             # Create a domain separator for the sponge mode based on the input dimensions.
             #
