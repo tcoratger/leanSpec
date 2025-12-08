@@ -143,48 +143,37 @@ class HashSubTree(Container):
         Returns:
             A `HashSubTree` containing all computed layers from `lowest_layer` to root.
         """
-        # Validate that we have enough space in the tree for these nodes.
-        # At layer `lowest_layer`, there are 2^(depth - lowest_layer) possible positions.
-        max_index_at_layer = 1 << (depth - lowest_layer)
-        if start_index + Uint64(len(lowest_layer_nodes)) > Uint64(max_index_at_layer):
+        # Validate: nodes must fit in available positions at this layer.
+        max_positions = 1 << (depth - lowest_layer)
+        if int(start_index) + len(lowest_layer_nodes) > max_positions:
             raise ValueError(
-                f"Not enough space at layer {lowest_layer}: "
-                f"start_index={start_index}, nodes={len(lowest_layer_nodes)}, "
-                f"max={max_index_at_layer}"
+                f"Overflow at layer {lowest_layer}: "
+                f"start={start_index}, count={len(lowest_layer_nodes)}, max={max_positions}"
             )
 
-        # Start with the lowest layer nodes and apply initial padding.
+        # Initialize with padded input layer.
         layers: List[HashTreeLayer] = []
-        current_layer = get_padded_layer(rand, lowest_layer_nodes, start_index)
-        layers.append(current_layer)
+        current = get_padded_layer(rand, lowest_layer_nodes, start_index)
+        layers.append(current)
 
-        # Build the tree layer by layer from lowest_layer up to the root.
+        # Build upward: hash pairs of children to create parents.
         for level in range(lowest_layer, depth):
-            parents: List[List[Fp]] = []
+            parent_start = current.start_index // Uint64(2)
 
-            # Group current layer's nodes into pairs of (left, right) siblings.
-            # The padding guarantees this works perfectly without orphan nodes.
-            num_nodes = len(current_layer.nodes)
-            for i in range(0, num_nodes, 2):
-                left_node = current_layer.nodes[i]
-                right_node = current_layer.nodes[i + 1]
+            # Hash each pair of siblings into their parent.
+            parents = [
+                hasher.apply(
+                    parameter,
+                    TreeTweak(level=level + 1, index=int(parent_start) + i),
+                    [list(current.nodes[2 * i]), list(current.nodes[2 * i + 1])],
+                )
+                for i in range(len(current.nodes) // 2)
+            ]
 
-                # Calculate the position of the parent node in the next level up.
-                parent_index = (current_layer.start_index // Uint64(2)) + Uint64(i // 2)
-                # Create the tweak for hashing these two children.
-                tweak = TreeTweak(level=level + 1, index=parent_index)
-                # Hash the left and right children to get their parent.
-                left_data = list(left_node)
-                right_data = list(right_node)
-                parent_node = hasher.apply(parameter, tweak, [left_data, right_data])
-                parents.append(parent_node)
+            # Pad and store the new layer.
+            current = get_padded_layer(rand, parents, parent_start)
+            layers.append(current)
 
-            # Pad the new list of parents to prepare for the next iteration.
-            new_start_index = current_layer.start_index // Uint64(2)
-            current_layer = get_padded_layer(rand, parents, new_start_index)
-            layers.append(current_layer)
-
-        # Return the completed subtree.
         return cls(
             depth=Uint64(depth),
             lowest_layer=Uint64(lowest_layer),
@@ -234,26 +223,17 @@ class HashSubTree(Container):
             ValueError: If depth is odd (top-bottom split requires even depth).
         """
         if depth % 2 != 0:
-            raise ValueError(
-                f"Top-bottom tree split requires even depth, got {depth}. "
-                f"The top tree must start at depth/2, which must be an integer."
-            )
+            raise ValueError(f"Depth must be even for top-bottom split, got {depth}.")
 
-        # The top tree starts at the middle layer.
-        lowest_layer = depth // 2
-
-        # Convert HashDigestVector roots to List[Fp] for building
-        roots_as_lists: List[List[Fp]] = [list(root) for root in bottom_tree_roots]
-
-        # Build the top tree using the bottom tree roots as the lowest layer.
+        # Build from middle layer using bottom tree roots as leaves.
         return cls.new(
             hasher=hasher,
             rand=rand,
-            lowest_layer=lowest_layer,
+            lowest_layer=depth // 2,
             depth=depth,
             start_index=start_bottom_tree_index,
             parameter=parameter,
-            lowest_layer_nodes=roots_as_lists,
+            lowest_layer_nodes=[list(root) for root in bottom_tree_roots],
         )
 
     @classmethod
@@ -303,60 +283,40 @@ class HashSubTree(Container):
             ValueError: If depth is odd or leaves count doesn't match `sqrt(LIFETIME)`.
         """
         if depth % 2 != 0:
+            raise ValueError(f"Depth must be even for top-bottom split, got {depth}.")
+
+        # Each bottom tree has exactly sqrt(LIFETIME) leaves.
+        leafs_per_tree = 1 << (depth // 2)
+        if len(leaves) != leafs_per_tree:
             raise ValueError(
-                f"Top-bottom tree split requires even depth, got {depth}. "
-                f"Bottom trees must span exactly depth/2 layers."
+                f"Expected {leafs_per_tree} leaves for depth={depth}, got {len(leaves)}."
             )
 
-        leafs_per_bottom_tree = 1 << (depth // 2)
-        if len(leaves) != leafs_per_bottom_tree:
-            raise ValueError(
-                f"Bottom tree must have exactly {leafs_per_bottom_tree} leaves "
-                f"(sqrt(LIFETIME) for depth={depth}), got {len(leaves)}"
-            )
-
-        # Calculate the starting index for this bottom tree's leaves.
-        start_index = bottom_tree_index * Uint64(leafs_per_bottom_tree)
-
-        # Build a full subtree from layer 0 using the leaves.
+        # Build full tree from leaves.
         full_tree = cls.new(
             hasher=hasher,
             rand=rand,
             lowest_layer=0,
             depth=depth,
-            start_index=start_index,
+            start_index=bottom_tree_index * Uint64(leafs_per_tree),
             parameter=parameter,
             lowest_layer_nodes=leaves,
         )
 
-        # Truncate to remove upper layers that would be incompatible with the top tree.
-        # We keep layers 0 through depth/2 (inclusive).
-        #
-        # Extract the root at layer depth/2. The root's index in that layer is either
-        # the bottom_tree_index (if it's the left child of its parent in the top tree)
-        # or bottom_tree_index (if it's the right child). Since we're at layer depth/2,
-        # the position is simply bottom_tree_index.
-        middle_layer = full_tree.layers[depth // 2]
-
-        # The root is at position (start_index >> (depth // 2)) = bottom_tree_index
-        # within the middle layer. We need to find it in the stored nodes.
-        root_position_in_layer = bottom_tree_index - middle_layer.start_index
-        root_node = middle_layer.nodes[int(root_position_in_layer)]
-        root: List[Fp] = list(root_node)
-
-        # Truncate layers to keep only 0 through depth/2 - 1.
-        truncated_layers: List[HashTreeLayer] = [full_tree.layers[i] for i in range(depth // 2)]
-
-        # Add a final layer containing just the root.
+        # Extract root from middle layer.
+        middle = full_tree.layers[depth // 2]
+        root_idx = int(bottom_tree_index - middle.start_index)
         root_layer = HashTreeLayer(
-            start_index=bottom_tree_index, nodes=HashDigestList(data=[HashDigestVector(data=root)])
+            start_index=bottom_tree_index,
+            nodes=HashDigestList(data=[HashDigestVector(data=list(middle.nodes[root_idx]))]),
         )
-        truncated_layers.append(root_layer)
 
+        # Keep bottom half + single root node.
+        truncated = [full_tree.layers[i] for i in range(depth // 2)]
         return cls(
             depth=Uint64(depth),
             lowest_layer=Uint64(0),
-            layers=HashTreeLayers(data=truncated_layers),
+            layers=HashTreeLayers(data=truncated + [root_layer]),
         )
 
     def root(self) -> HashDigestVector:
@@ -372,16 +332,11 @@ class HashSubTree(Container):
         Raises:
             ValueError: If the subtree has no layers or the highest layer is empty.
         """
-        if len(self.layers) == 0:
-            raise ValueError("Cannot get root of empty subtree.")
-
-        highest_layer = self.layers[-1]
-        if len(highest_layer.nodes) == 0:
-            raise ValueError("Highest layer of subtree is empty.")
-
-        # The root is the only node in the highest layer for proper subtrees.
-        # For top trees and bottom trees, the highest layer should have exactly one node.
-        return highest_layer.nodes[0]
+        if not self.layers:
+            raise ValueError("Empty subtree has no root.")
+        if not self.layers[-1].nodes:
+            raise ValueError("Top layer is empty.")
+        return self.layers[-1].nodes[0]
 
     def path(self, position: Uint64) -> HashTreeOpening:
         """
@@ -403,46 +358,34 @@ class HashSubTree(Container):
         Raises:
             ValueError: If the subtree is empty or the position is out of bounds.
         """
-        if len(self.layers) == 0:
-            raise ValueError("Cannot generate path for empty subtree.")
+        if not self.layers:
+            raise ValueError("Empty subtree.")
 
-        first_layer = self.layers[0]
-        if position < first_layer.start_index:
-            raise ValueError("Position is before the subtree's start index.")
+        # Check bounds.
+        first = self.layers[0]
+        if not (first.start_index <= position < first.start_index + Uint64(len(first.nodes))):
+            raise ValueError(f"Position {position} out of bounds.")
 
-        if position >= first_layer.start_index + Uint64(len(first_layer.nodes)):
-            raise ValueError("Position is beyond the subtree's range.")
-
-        # Build the co-path directly with SSZ types
+        # Collect sibling at each layer (except root).
         siblings: List[HashDigestVector] = []
-        current_position = position
+        pos = position
 
-        # Iterate through layers from lowest to highest, EXCLUDING the final root layer.
-        # The root layer doesn't contribute a sibling to the authentication path.
-        num_layers = len(self.layers)
-        for layer_idx in range(num_layers - 1):
-            layer = self.layers[layer_idx]
-            # Determine the sibling's position by flipping the last bit.
-            sibling_position = current_position ^ Uint64(1)
-            sibling_index = int(sibling_position - layer.start_index)
+        for layer in list(self.layers)[:-1]:
+            # Sibling index: flip last bit of position, adjust for layer offset.
+            sibling_idx = int((pos ^ Uint64(1)) - layer.start_index)
+            if not (0 <= sibling_idx < len(layer.nodes)):
+                raise ValueError(f"Sibling index {sibling_idx} out of bounds.")
 
-            # Ensure the sibling exists in this layer
-            if sibling_index < 0 or sibling_index >= len(layer.nodes):
-                raise ValueError(
-                    f"Sibling index {sibling_index} out of bounds for layer "
-                    f"with {len(layer.nodes)} nodes"
-                )
-
-            siblings.append(layer.nodes[sibling_index])
-
-            # Move to the parent's position for the next iteration.
-            current_position = current_position // Uint64(2)
+            siblings.append(layer.nodes[sibling_idx])
+            pos = pos // Uint64(2)  # Move to parent position.
 
         return HashTreeOpening(siblings=HashDigestList(data=siblings))
 
 
 def combined_path(
-    top_tree: HashSubTree, bottom_tree: HashSubTree, position: Uint64
+    top_tree: HashSubTree,
+    bottom_tree: HashSubTree,
+    position: Uint64,
 ) -> HashTreeOpening:
     """
     Generates a combined authentication path spanning top and bottom trees.
@@ -480,58 +423,31 @@ def combined_path(
 
     Raises:
         ValueError: If trees have mismatched depths, odd depth, or position is
-                   out of bounds for the bottom tree.
+        out of bounds for the bottom tree.
     """
-    # Validate that both trees have the same depth.
+    # Validate matching depths.
     if top_tree.depth != bottom_tree.depth:
+        raise ValueError(f"Depth mismatch: top={top_tree.depth}, bottom={bottom_tree.depth}.")
+
+    depth = int(top_tree.depth)
+    if depth % 2 != 0:
+        raise ValueError(f"Depth must be even, got {depth}.")
+
+    # Validate bottom tree matches position.
+    leafs_per_tree = Uint64(1 << (depth // 2))
+    expected_start = (position // leafs_per_tree) * leafs_per_tree
+    if bottom_tree.layers[0].start_index != expected_start:
         raise ValueError(
-            f"Top and bottom trees must have same depth: "
-            f"top={top_tree.depth}, bottom={bottom_tree.depth}"
+            f"Wrong bottom tree: position {position} needs start {expected_start}, "
+            f"got {bottom_tree.layers[0].start_index}."
         )
 
-    depth = top_tree.depth
-
-    # Validate even depth (required for top-bottom split).
-    if depth % Uint64(2) != Uint64(0):
-        raise ValueError(
-            f"Top-bottom tree traversal requires even depth, got {depth}. "
-            f"Cannot split tree into equal top and bottom halves."
-        )
-
-    # Calculate parameters for bottom trees.
-    leafs_per_bottom_tree = 1 << int(depth // Uint64(2))
-
-    # Determine which bottom tree this position belongs to.
-    #
-    # Bottom tree index = floor(position / sqrt(LIFETIME))
-    bottom_tree_index = position // Uint64(leafs_per_bottom_tree)
-
-    # Verify that the provided bottom_tree actually corresponds to this position.
-    # The bottom tree's lowest layer starts at bottom_tree_index * leafs_per_bottom_tree.
-    expected_start = bottom_tree_index * Uint64(leafs_per_bottom_tree)
-    actual_start = bottom_tree.layers[0].start_index
-
-    if actual_start != expected_start:
-        raise ValueError(
-            f"Bottom tree mismatch: position {position} belongs to "
-            f"bottom tree {bottom_tree_index} (should start at {expected_start}), "
-            f"but provided bottom tree starts at {actual_start}"
-        )
-
-    # Get the authentication path within the bottom tree (from leaf to bottom tree root).
+    # Concatenate: bottom path + top path.
     bottom_path = bottom_tree.path(position)
+    top_path = top_tree.path(position // leafs_per_tree)
+    combined = list(bottom_path.siblings) + list(top_path.siblings)
 
-    # Get the authentication path within the top tree (from bottom tree root to global root).
-    # The bottom tree's root is at position `bottom_tree_index` in the top tree's lowest layer.
-    top_path = top_tree.path(Uint64(bottom_tree_index))
-
-    # Concatenate the two paths: bottom siblings first, then top siblings.
-    # This creates a complete path from leaf to global root.
-    combined_siblings: List[HashDigestVector] = [
-        bottom_path.siblings[i] for i in range(len(bottom_path.siblings))
-    ] + [top_path.siblings[i] for i in range(len(top_path.siblings))]
-
-    return HashTreeOpening(siblings=HashDigestList(data=combined_siblings))
+    return HashTreeOpening(siblings=HashDigestList(data=combined))
 
 
 def verify_path(
@@ -584,41 +500,33 @@ def verify_path(
     """
     # Compute the depth
     depth = len(opening.siblings)
-    # Compute the number of leafs in the tree
-    num_leafs = 2**depth
-    # Check that the tree depth is at most 32.
-    if len(opening.siblings) > 32:
-        raise ValueError("Tree depth must be at most 32.")
-    # Check that the position and path length match.
-    if int(position) >= num_leafs:
-        raise ValueError("Position and path length do not match.")
+    if depth > 32:
+        raise ValueError("Depth exceeds maximum of 32.")
+    if int(position) >= (1 << depth):
+        raise ValueError("Position exceeds tree capacity.")
 
-    # The first step is to hash the constituent parts of the leaf to get
-    # the actual node at layer 0 of the tree.
-    leaf_tweak = TreeTweak(level=0, index=int(position))
-    current_node = hasher.apply(parameter, leaf_tweak, leaf_parts)
+    # Start: hash leaf parts to get leaf node.
+    current = hasher.apply(
+        parameter,
+        TreeTweak(level=0, index=int(position)),
+        leaf_parts,
+    )
+    pos = int(position)
 
-    # Iterate up the tree, hashing the current node with its sibling from
-    # the path at each level.
-    current_position = int(position)
-    for level in range(len(opening.siblings)):
-        sibling_node: List[Fp] = list(opening.siblings[level])
-
-        # Determine if the current node is a left or right child.
-        if current_position % 2 == 0:
-            # Current node is a left child; sibling is on the right.
-            children = [current_node, sibling_node]
+    # Walk up: hash current with each sibling.
+    for level, sibling in enumerate(opening.siblings):
+        # Left child has even position, right child has odd.
+        if pos % 2 == 0:
+            left, right = current, list(sibling)
         else:
-            # Current node is a right child; sibling is on the left.
-            children = [sibling_node, current_node]
+            left, right = list(sibling), current
 
-        # Move up to the parent's position for the next iteration.
-        current_position //= 2
-        # Create the tweak for the parent's level and position.
-        parent_tweak = TreeTweak(level=level + 1, index=current_position)
-        # Hash the children to compute the parent node.
-        current_node = hasher.apply(parameter, parent_tweak, children)
+        pos //= 2  # Parent position.
+        current = hasher.apply(
+            parameter,
+            TreeTweak(level=level + 1, index=pos),
+            [left, right],
+        )
 
-    # After iterating through the entire path, the final computed node
-    # should be the root of the tree.
-    return current_node == list(root)
+    # Valid if we reconstructed the expected root.
+    return current == list(root)
