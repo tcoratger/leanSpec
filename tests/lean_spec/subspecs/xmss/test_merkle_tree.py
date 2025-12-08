@@ -55,7 +55,7 @@ def _run_commit_open_verify_roundtrip(
         for i, leaf_parts in enumerate(leaves)
     ]
 
-    # COMMIT: Build the Merkle tree from the leaf hashes using HashSubTree.new().
+    # COMMIT: Build the Merkle tree from the leaf hashes.
     tree = HashSubTree.new(
         hasher=hasher,
         rand=rand,
