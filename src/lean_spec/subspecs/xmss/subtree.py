@@ -25,6 +25,7 @@ from .types import (
 from .utils import get_padded_layer
 
 if TYPE_CHECKING:
+    from ..koalabear import Fp
     from .rand import Rand
     from .tweak_hash import TweakHasher
 
@@ -540,3 +541,93 @@ def combined_path(
     combined_siblings_data = list(bottom_path.siblings.data) + list(top_path.siblings.data)
 
     return HashTreeOpening(siblings=HashDigestList(data=combined_siblings_data))
+
+
+def verify_path(
+    hasher: "TweakHasher",
+    parameter: Parameter,
+    root: HashDigestVector,
+    position: Uint64,
+    leaf_parts: List[List["Fp"]],
+    opening: HashTreeOpening,
+) -> bool:
+    """
+    Verifies a Merkle authentication path against a known, trusted root.
+
+    This function is the final check in signature verification. It proves that the
+    one-time public key used for the signature (represented by `leaf_parts`) is a
+    legitimate member of the set committed to by the Merkle `root`.
+
+    ### Verification Algorithm
+
+    1.  **Leaf Computation**: The process begins at the bottom. The verifier first
+        hashes the `leaf_parts` to compute the actual leaf digest. This becomes the
+        starting `current_node` for the climb up the tree.
+
+    2.  **Bottom-Up Reconstruction**: The verifier iterates through the `opening.siblings`
+        path. At each `level`, it takes the `current_node` and the `sibling_node`
+        from the path.
+
+    3.  **Parent Calculation**: It determines if the `current_node` is a left or
+        right child based on its `position`. The two nodes are placed in the
+        correct `(left, right)` order and hashed (with the correct `TreeTweak`)
+        to compute the parent. This parent becomes the `current_node` for the
+        next level.
+
+    4.  **Final Comparison**: After all siblings are used, the final `current_node`
+        is the candidate root. The path is valid if and only if it matches the trusted `root`.
+
+    Args:
+        hasher: The tweakable hash instance for computing parent nodes.
+        parameter: The public parameter `P` for the hash function.
+        root: The known, trusted Merkle root from the public key.
+        position: The absolute index of the leaf being verified.
+        leaf_parts: The list of digests that constitute the original leaf.
+        opening: The `HashTreeOpening` object containing the sibling path.
+
+    Returns:
+        `True` if the path is valid and reconstructs the root, `False` otherwise.
+
+    Raises:
+        ValueError: If the tree depth exceeds 32 or position doesn't match path length.
+    """
+    # Compute the depth
+    depth = len(opening.siblings)
+    # Compute the number of leafs in the tree
+    num_leafs = 2**depth
+    # Check that the tree depth is at most 32.
+    if len(opening.siblings) > 32:
+        raise ValueError("Tree depth must be at most 32.")
+    # Check that the position and path length match.
+    if int(position) >= num_leafs:
+        raise ValueError("Position and path length do not match.")
+
+    # The first step is to hash the constituent parts of the leaf to get
+    # the actual node at layer 0 of the tree.
+    leaf_tweak = TreeTweak(level=0, index=int(position))
+    current_node = hasher.apply(parameter, leaf_tweak, leaf_parts)
+
+    # Iterate up the tree, hashing the current node with its sibling from
+    # the path at each level.
+    current_position = int(position)
+    for level, sibling_vector in enumerate(opening.siblings):
+        # Convert HashDigestVector to List[Fp]
+        sibling_node = list(sibling_vector.data)
+        # Determine if the current node is a left or right child.
+        if current_position % 2 == 0:
+            # Current node is a left child; sibling is on the right.
+            children = [current_node, sibling_node]
+        else:
+            # Current node is a right child; sibling is on the left.
+            children = [sibling_node, current_node]
+
+        # Move up to the parent's position for the next iteration.
+        current_position //= 2
+        # Create the tweak for the parent's level and position.
+        parent_tweak = TreeTweak(level=level + 1, index=current_position)
+        # Hash the children to compute the parent node.
+        current_node = hasher.apply(parameter, parent_tweak, children)
+
+    # After iterating through the entire path, the final computed node
+    # should be the root of the tree.
+    return current_node == list(root.data)

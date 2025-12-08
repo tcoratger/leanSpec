@@ -26,11 +26,6 @@ from .constants import (
     XmssConfig,
 )
 from .containers import PublicKey, SecretKey, Signature
-from .merkle_tree import (
-    PROD_MERKLE_TREE,
-    TEST_MERKLE_TREE,
-    MerkleTree,
-)
 from .prf import PROD_PRF, TEST_PRF, Prf
 from .rand import PROD_RAND, TEST_RAND, Rand
 from .tweak_hash import (
@@ -60,9 +55,6 @@ class GeneralizedXmssScheme(StrictBaseModel):
     hasher: TweakHasher
     """Hash function with tweakable domain separation."""
 
-    merkle_tree: MerkleTree
-    """Merkle tree implementation for authentication paths."""
-
     encoder: TargetSumEncoder
     """Message encoder that produces valid codewords."""
 
@@ -76,7 +68,6 @@ class GeneralizedXmssScheme(StrictBaseModel):
             "config": XmssConfig,
             "prf": Prf,
             "hasher": TweakHasher,
-            "merkle_tree": MerkleTree,
             "encoder": TargetSumEncoder,
             "rand": Rand,
         }
@@ -175,7 +166,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         left_bottom_tree = bottom_tree_from_prf_key(
             self.prf,
             self.hasher,
-            self.merkle_tree,
+            self.rand,
             config,
             prf_key,
             Uint64(start_bottom_tree_index),
@@ -184,7 +175,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         right_bottom_tree = bottom_tree_from_prf_key(
             self.prf,
             self.hasher,
-            self.merkle_tree,
+            self.rand,
             config,
             prf_key,
             Uint64(start_bottom_tree_index + 1),
@@ -202,7 +193,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             tree = bottom_tree_from_prf_key(
                 self.prf,
                 self.hasher,
-                self.merkle_tree,
+                self.rand,
                 config,
                 prf_key,
                 Uint64(i),
@@ -475,7 +466,10 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # - Hashes the `chain_ends` to get the leaf node for the epoch,
         # - Uses the `opening` path from the signature to compute a candidate root.
         # - It returns true if and only if this candidate root matches the public key's root.
-        return self.merkle_tree.verify_path(
+        from .subtree import verify_path
+
+        return verify_path(
+            hasher=self.hasher,
             parameter=pk.parameter,
             root=pk.root,
             position=epoch,
@@ -568,7 +562,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         new_right_bottom_tree = bottom_tree_from_prf_key(
             prf=self.prf,
             hasher=self.hasher,
-            merkle_tree=self.merkle_tree,
+            rand=self.rand,
             config=self.config,
             prf_key=sk.prf_key,
             bottom_tree_index=new_right_tree_index,
@@ -589,7 +583,6 @@ PROD_SIGNATURE_SCHEME = GeneralizedXmssScheme(
     config=PROD_CONFIG,
     prf=PROD_PRF,
     hasher=PROD_TWEAK_HASHER,
-    merkle_tree=PROD_MERKLE_TREE,
     encoder=PROD_TARGET_SUM_ENCODER,
     rand=PROD_RAND,
 )
@@ -599,7 +592,6 @@ TEST_SIGNATURE_SCHEME = GeneralizedXmssScheme(
     config=TEST_CONFIG,
     prf=TEST_PRF,
     hasher=TEST_TWEAK_HASHER,
-    merkle_tree=TEST_MERKLE_TREE,
     encoder=TEST_TARGET_SUM_ENCODER,
     rand=TEST_RAND,
 )

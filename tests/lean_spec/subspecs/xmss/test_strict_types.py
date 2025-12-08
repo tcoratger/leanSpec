@@ -10,7 +10,6 @@ from pydantic import ValidationError
 
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
 from lean_spec.subspecs.xmss.interface import GeneralizedXmssScheme
-from lean_spec.subspecs.xmss.merkle_tree import PROD_MERKLE_TREE, MerkleTree
 from lean_spec.subspecs.xmss.message_hash import PROD_MESSAGE_HASHER, MessageHasher
 from lean_spec.subspecs.xmss.poseidon import PROD_POSEIDON, PoseidonXmss
 from lean_spec.subspecs.xmss.prf import PROD_PRF, Prf
@@ -145,83 +144,6 @@ class TestTweakHasherStrictTypes:
             PROD_TWEAK_HASHER.config = TEST_CONFIG
 
 
-class TestMerkleTreeStrictTypes:
-    """Tests for MerkleTree strict type checking."""
-
-    def test_merkle_tree_accepts_exact_types(self) -> None:
-        """MerkleTree initialization succeeds with exact types."""
-        tree = MerkleTree(config=PROD_CONFIG, hasher=PROD_TWEAK_HASHER, rand=PROD_RAND)
-        assert tree.config == PROD_CONFIG
-
-    def test_merkle_tree_rejects_subclass_config(self) -> None:
-        """MerkleTree rejects XmssConfig subclass."""
-
-        class CustomConfig(XmssConfig):
-            pass
-
-        custom_config = XmssConfig.__new__(CustomConfig)
-        custom_config.__dict__.update(PROD_CONFIG.__dict__)
-
-        with pytest.raises(TypeError, match="config must be exactly XmssConfig"):
-            MerkleTree(config=custom_config, hasher=PROD_TWEAK_HASHER, rand=PROD_RAND)
-
-    def test_merkle_tree_rejects_subclass_hasher(self) -> None:
-        """MerkleTree rejects TweakHasher subclass."""
-
-        class CustomHasher(TweakHasher):
-            pass
-
-        custom_hasher = TweakHasher.__new__(CustomHasher)
-        custom_hasher.__dict__.update(PROD_TWEAK_HASHER.__dict__)
-
-        with pytest.raises(TypeError, match="hasher must be exactly TweakHasher"):
-            MerkleTree(config=PROD_CONFIG, hasher=custom_hasher, rand=PROD_RAND)
-
-    def test_merkle_tree_rejects_subclass_rand(self) -> None:
-        """MerkleTree rejects Rand subclass."""
-
-        class CustomRand(Rand):
-            pass
-
-        custom_rand = Rand.__new__(CustomRand)
-        custom_rand.__dict__.update(PROD_RAND.__dict__)
-
-        with pytest.raises(TypeError, match="rand must be exactly Rand"):
-            MerkleTree(config=PROD_CONFIG, hasher=PROD_TWEAK_HASHER, rand=custom_rand)
-
-    def test_merkle_tree_rejects_wrong_type_config(self) -> None:
-        """MerkleTree rejects completely wrong type for config."""
-
-        class RandomClass:
-            pass
-
-        with pytest.raises((TypeError, ValidationError)):
-            MerkleTree(config=RandomClass(), hasher=PROD_TWEAK_HASHER, rand=PROD_RAND)
-
-    def test_merkle_tree_rejects_wrong_type_hasher(self) -> None:
-        """MerkleTree rejects completely wrong type for hasher."""
-
-        class RandomClass:
-            pass
-
-        with pytest.raises((TypeError, ValidationError)):
-            MerkleTree(config=PROD_CONFIG, hasher=RandomClass(), rand=PROD_RAND)
-
-    def test_merkle_tree_rejects_wrong_type_rand(self) -> None:
-        """MerkleTree rejects completely wrong type for rand."""
-
-        class RandomClass:
-            pass
-
-        with pytest.raises((TypeError, ValidationError)):
-            MerkleTree(config=PROD_CONFIG, hasher=PROD_TWEAK_HASHER, rand=RandomClass())
-
-    def test_merkle_tree_frozen(self) -> None:
-        """MerkleTree is immutable (frozen)."""
-        with pytest.raises(ValidationError):
-            PROD_MERKLE_TREE.config = TEST_CONFIG
-
-
 class TestTargetSumEncoderStrictTypes:
     """Tests for TargetSumEncoder strict type checking."""
 
@@ -287,7 +209,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
             config=PROD_CONFIG,
             prf=PROD_PRF,
             hasher=PROD_TWEAK_HASHER,
-            merkle_tree=PROD_MERKLE_TREE,
             encoder=PROD_TARGET_SUM_ENCODER,
             rand=PROD_RAND,
         )
@@ -307,7 +228,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
                 config=custom_config,
                 prf=PROD_PRF,
                 hasher=PROD_TWEAK_HASHER,
-                merkle_tree=PROD_MERKLE_TREE,
                 encoder=PROD_TARGET_SUM_ENCODER,
                 rand=PROD_RAND,
             )
@@ -326,7 +246,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
                 config=PROD_CONFIG,
                 prf=custom_prf,
                 hasher=PROD_TWEAK_HASHER,
-                merkle_tree=PROD_MERKLE_TREE,
                 encoder=PROD_TARGET_SUM_ENCODER,
                 rand=PROD_RAND,
             )
@@ -345,26 +264,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
                 config=PROD_CONFIG,
                 prf=PROD_PRF,
                 hasher=custom_hasher,
-                merkle_tree=PROD_MERKLE_TREE,
-                encoder=PROD_TARGET_SUM_ENCODER,
-                rand=PROD_RAND,
-            )
-
-    def test_scheme_rejects_subclass_merkle_tree(self) -> None:
-        """GeneralizedXmssScheme rejects MerkleTree subclass."""
-
-        class CustomMerkleTree(MerkleTree):
-            pass
-
-        custom_tree = MerkleTree.__new__(CustomMerkleTree)
-        custom_tree.__dict__.update(PROD_MERKLE_TREE.__dict__)
-
-        with pytest.raises(TypeError, match="merkle_tree must be exactly MerkleTree"):
-            GeneralizedXmssScheme(
-                config=PROD_CONFIG,
-                prf=PROD_PRF,
-                hasher=PROD_TWEAK_HASHER,
-                merkle_tree=custom_tree,
                 encoder=PROD_TARGET_SUM_ENCODER,
                 rand=PROD_RAND,
             )
@@ -383,7 +282,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
                 config=PROD_CONFIG,
                 prf=PROD_PRF,
                 hasher=PROD_TWEAK_HASHER,
-                merkle_tree=PROD_MERKLE_TREE,
                 encoder=custom_encoder,
                 rand=PROD_RAND,
             )
@@ -402,7 +300,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
                 config=PROD_CONFIG,
                 prf=PROD_PRF,
                 hasher=PROD_TWEAK_HASHER,
-                merkle_tree=PROD_MERKLE_TREE,
                 encoder=PROD_TARGET_SUM_ENCODER,
                 rand=custom_rand,
             )
@@ -414,7 +311,6 @@ class TestGeneralizedXmssSchemeStrictTypes:
                 config=PROD_CONFIG,
                 prf=PROD_PRF,
                 hasher=PROD_TWEAK_HASHER,
-                merkle_tree=PROD_MERKLE_TREE,
                 encoder=PROD_TARGET_SUM_ENCODER,
                 rand=PROD_RAND,
                 extra_field="should_fail",

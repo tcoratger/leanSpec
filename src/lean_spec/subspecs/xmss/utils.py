@@ -9,7 +9,6 @@ from .rand import Rand
 from .types import HashDigestList, HashDigestVector, HashTreeLayer, Parameter, PRFKey
 
 if TYPE_CHECKING:
-    from .merkle_tree import MerkleTree
     from .prf import Prf
     from .subtree import HashSubTree
     from .tweak_hash import TweakHasher
@@ -164,7 +163,7 @@ def expand_activation_time(
 def bottom_tree_from_prf_key(
     prf: "Prf",
     hasher: "TweakHasher",
-    merkle_tree: "MerkleTree",
+    rand: Rand,
     config: XmssConfig,
     prf_key: PRFKey,
     bottom_tree_index: Uint64,
@@ -193,7 +192,7 @@ def bottom_tree_from_prf_key(
     Args:
         prf: The PRF instance for key derivation.
         hasher: The tweakable hash instance.
-        merkle_tree: The Merkle tree instance for tree construction.
+        rand: Random generator for padding values.
         config: The XMSS configuration.
         prf_key: The master PRF secret key.
         bottom_tree_index: The index of the bottom tree to generate (0, 1, 2, ...).
@@ -243,7 +242,7 @@ def bottom_tree_from_prf_key(
 
     return HashSubTree.new_bottom_tree(
         hasher=hasher,
-        rand=merkle_tree.rand,
+        rand=rand,
         depth=config.LOG_LIFETIME,
         bottom_tree_index=bottom_tree_index,
         parameter=parameter,
