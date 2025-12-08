@@ -7,7 +7,7 @@ implementing the memory-efficient top-bottom tree traversal approach.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, List, Tuple, cast
+from typing import TYPE_CHECKING, List
 
 from lean_spec.types import Uint64
 from lean_spec.types.container import Container
@@ -25,7 +25,6 @@ from .types import (
 from .utils import get_padded_layer
 
 if TYPE_CHECKING:
-    from ..koalabear import Fp
     from .rand import Rand
     from .tweak_hash import TweakHasher
 
@@ -165,24 +164,19 @@ class HashSubTree(Container):
 
             # Group current layer's nodes into pairs of (left, right) siblings.
             # The padding guarantees this works perfectly without orphan nodes.
-            children_iter = cast(
-                Iterator[Tuple[HashDigestVector, HashDigestVector]],
-                zip(
-                    current_layer.nodes.data[0::2],
-                    current_layer.nodes.data[1::2],
-                    strict=False,
-                ),
-            )
-            for i, children in enumerate(children_iter):
+            num_nodes = len(current_layer.nodes)
+            for i in range(0, num_nodes, 2):
+                left_node = current_layer.nodes[i]
+                right_node = current_layer.nodes[i + 1]
+
                 # Calculate the position of the parent node in the next level up.
-                parent_index = (current_layer.start_index // Uint64(2)) + Uint64(i)
+                parent_index = (current_layer.start_index // Uint64(2)) + Uint64(i // 2)
                 # Create the tweak for hashing these two children.
                 tweak = TreeTweak(level=level + 1, index=parent_index)
                 # Hash the left and right children to get their parent.
-                # Convert HashDigestVector to List[Fp] for hashing
-                left_data = cast("Tuple[Fp, ...]", children[0].data)
-                right_data = cast("Tuple[Fp, ...]", children[1].data)
-                parent_node = hasher.apply(parameter, tweak, [list(left_data), list(right_data)])
+                left_data = list(left_node)
+                right_data = list(right_node)
+                parent_node = hasher.apply(parameter, tweak, [left_data, right_data])
                 parents.append(parent_node)
 
             # Pad the new list of parents to prepare for the next iteration.
@@ -249,7 +243,7 @@ class HashSubTree(Container):
         lowest_layer = depth // 2
 
         # Convert HashDigestVector roots to List[Fp] for building
-        roots_as_lists = [cast(List[Fp], list(root.data)) for root in bottom_tree_roots]
+        roots_as_lists: List[List[Fp]] = [list(root) for root in bottom_tree_roots]
 
         # Build the top tree using the bottom tree roots as the lowest layer.
         return cls.new(
@@ -342,22 +336,20 @@ class HashSubTree(Container):
         # the bottom_tree_index (if it's the left child of its parent in the top tree)
         # or bottom_tree_index (if it's the right child). Since we're at layer depth/2,
         # the position is simply bottom_tree_index.
-        middle_layer = cast(HashTreeLayer, full_tree.layers.data[depth // 2])
+        middle_layer = full_tree.layers[depth // 2]
 
         # The root is at position (start_index >> (depth // 2)) = bottom_tree_index
         # within the middle layer. We need to find it in the stored nodes.
         root_position_in_layer = bottom_tree_index - middle_layer.start_index
-        root_node = cast(HashDigestVector, middle_layer.nodes.data[int(root_position_in_layer)])
-        root_data = cast("Tuple[Fp, ...]", root_node.data)
-        root = list(root_data)
+        root_node = middle_layer.nodes[int(root_position_in_layer)]
+        root: List[Fp] = list(root_node)
 
         # Truncate layers to keep only 0 through depth/2 - 1.
-        truncated_layers = list(full_tree.layers.data[: (depth // 2)])
+        truncated_layers: List[HashTreeLayer] = [full_tree.layers[i] for i in range(depth // 2)]
 
         # Add a final layer containing just the root.
-        root_vector = HashDigestVector(data=root)
         root_layer = HashTreeLayer(
-            start_index=bottom_tree_index, nodes=HashDigestList(data=[root_vector])
+            start_index=bottom_tree_index, nodes=HashDigestList(data=[HashDigestVector(data=root)])
         )
         truncated_layers.append(root_layer)
 
@@ -383,13 +375,13 @@ class HashSubTree(Container):
         if len(self.layers) == 0:
             raise ValueError("Cannot get root of empty subtree.")
 
-        highest_layer = cast(HashTreeLayer, self.layers.data[-1])
-        if len(highest_layer.nodes.data) == 0:
+        highest_layer = self.layers[-1]
+        if len(highest_layer.nodes) == 0:
             raise ValueError("Highest layer of subtree is empty.")
 
         # The root is the only node in the highest layer for proper subtrees.
         # For top trees and bottom trees, the highest layer should have exactly one node.
-        return cast(HashDigestVector, highest_layer.nodes[0])
+        return highest_layer.nodes[0]
 
     def path(self, position: Uint64) -> HashTreeOpening:
         """
@@ -414,41 +406,39 @@ class HashSubTree(Container):
         if len(self.layers) == 0:
             raise ValueError("Cannot generate path for empty subtree.")
 
-        lowest_layer = cast(HashTreeLayer, self.layers.data[0])
-        if position < lowest_layer.start_index:
+        first_layer = self.layers[0]
+        if position < first_layer.start_index:
             raise ValueError("Position is before the subtree's start index.")
 
-        if position >= lowest_layer.start_index + Uint64(len(lowest_layer.nodes)):
+        if position >= first_layer.start_index + Uint64(len(first_layer.nodes)):
             raise ValueError("Position is beyond the subtree's range.")
 
         # Build the co-path directly with SSZ types
-        siblings = HashDigestList(data=[])
+        siblings: List[HashDigestVector] = []
         current_position = position
 
         # Iterate through layers from lowest to highest, EXCLUDING the final root layer.
         # The root layer doesn't contribute a sibling to the authentication path.
-        # self.layers.data[:-1] gives all layers except the last (root) layer.
-        for layer_raw in self.layers.data[:-1]:
-            layer = cast(HashTreeLayer, layer_raw)
+        num_layers = len(self.layers)
+        for layer_idx in range(num_layers - 1):
+            layer = self.layers[layer_idx]
             # Determine the sibling's position by flipping the last bit.
             sibling_position = current_position ^ Uint64(1)
-            sibling_index = sibling_position - layer.start_index
+            sibling_index = int(sibling_position - layer.start_index)
 
             # Ensure the sibling exists in this layer
-            if sibling_index < Uint64(0) or sibling_index >= Uint64(len(layer.nodes)):
+            if sibling_index < 0 or sibling_index >= len(layer.nodes):
                 raise ValueError(
                     f"Sibling index {sibling_index} out of bounds for layer "
                     f"with {len(layer.nodes)} nodes"
                 )
 
-            # Access the sibling directly from the SSZ list and add to path
-            siblings = siblings + [layer.nodes[int(sibling_index)]]
+            siblings.append(layer.nodes[sibling_index])
 
             # Move to the parent's position for the next iteration.
             current_position = current_position // Uint64(2)
 
-        # Return the opening with SSZ-typed siblings
-        return HashTreeOpening(siblings=siblings)
+        return HashTreeOpening(siblings=HashDigestList(data=siblings))
 
 
 def combined_path(
@@ -519,7 +509,7 @@ def combined_path(
     # Verify that the provided bottom_tree actually corresponds to this position.
     # The bottom tree's lowest layer starts at bottom_tree_index * leafs_per_bottom_tree.
     expected_start = bottom_tree_index * Uint64(leafs_per_bottom_tree)
-    actual_start = cast(HashTreeLayer, bottom_tree.layers.data[0]).start_index
+    actual_start = bottom_tree.layers[0].start_index
 
     if actual_start != expected_start:
         raise ValueError(
@@ -537,10 +527,11 @@ def combined_path(
 
     # Concatenate the two paths: bottom siblings first, then top siblings.
     # This creates a complete path from leaf to global root.
-    # Since siblings are now HashDigestList, we need to concatenate their data.
-    combined_siblings_data = list(bottom_path.siblings.data) + list(top_path.siblings.data)
+    combined_siblings: List[HashDigestVector] = [
+        bottom_path.siblings[i] for i in range(len(bottom_path.siblings))
+    ] + [top_path.siblings[i] for i in range(len(top_path.siblings))]
 
-    return HashTreeOpening(siblings=HashDigestList(data=combined_siblings_data))
+    return HashTreeOpening(siblings=HashDigestList(data=combined_siblings))
 
 
 def verify_path(
@@ -548,7 +539,7 @@ def verify_path(
     parameter: Parameter,
     root: HashDigestVector,
     position: Uint64,
-    leaf_parts: List[List["Fp"]],
+    leaf_parts: List[List[Fp]],
     opening: HashTreeOpening,
 ) -> bool:
     """
@@ -610,9 +601,9 @@ def verify_path(
     # Iterate up the tree, hashing the current node with its sibling from
     # the path at each level.
     current_position = int(position)
-    for level, sibling_vector in enumerate(opening.siblings):
-        # Convert HashDigestVector to List[Fp]
-        sibling_node = list(sibling_vector.data)
+    for level in range(len(opening.siblings)):
+        sibling_node: List[Fp] = list(opening.siblings[level])
+
         # Determine if the current node is a left or right child.
         if current_position % 2 == 0:
             # Current node is a left child; sibling is on the right.
@@ -630,4 +621,4 @@ def verify_path(
 
     # After iterating through the entire path, the final computed node
     # should be the root of the tree.
-    return current_node == list(root.data)
+    return current_node == list(root)

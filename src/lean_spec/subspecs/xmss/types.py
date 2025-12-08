@@ -74,6 +74,10 @@ class HashDigestList(SSZList):
     ELEMENT_TYPE = HashDigestVector
     LIMIT = NODE_LIST_LIMIT
 
+    def __getitem__(self, index: int) -> HashDigestVector:
+        """Access a hash digest by index with proper typing."""
+        return self.data[index]  # type: ignore[return-value]
+
 
 class Parameter(SSZVector):
     """
@@ -164,3 +168,7 @@ class HashTreeLayers(SSZList):
 
     ELEMENT_TYPE = HashTreeLayer
     LIMIT = LAYERS_LIMIT
+
+    def __getitem__(self, index: int) -> HashTreeLayer:
+        """Access a layer by index with proper typing."""
+        return self.data[index]  # type: ignore[return-value]
