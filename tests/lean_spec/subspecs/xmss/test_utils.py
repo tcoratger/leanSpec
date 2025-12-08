@@ -7,8 +7,8 @@ import pytest
 
 from lean_spec.subspecs.koalabear.field import Fp, P
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.merkle_tree import TEST_MERKLE_TREE
 from lean_spec.subspecs.xmss.prf import TEST_PRF
+from lean_spec.subspecs.xmss.rand import TEST_RAND
 from lean_spec.subspecs.xmss.tweak_hash import TEST_TWEAK_HASHER
 from lean_spec.subspecs.xmss.types import HashTreeLayer, Parameter
 from lean_spec.subspecs.xmss.utils import (
@@ -125,7 +125,7 @@ def test_bottom_tree_from_prf_key() -> None:
     bottom_tree = bottom_tree_from_prf_key(
         prf=TEST_PRF,
         hasher=TEST_TWEAK_HASHER,
-        merkle_tree=TEST_MERKLE_TREE,
+        rand=TEST_RAND,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -159,7 +159,7 @@ def test_bottom_tree_from_prf_key_deterministic() -> None:
     tree1 = bottom_tree_from_prf_key(
         prf=TEST_PRF,
         hasher=TEST_TWEAK_HASHER,
-        merkle_tree=TEST_MERKLE_TREE,
+        rand=TEST_RAND,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -169,7 +169,7 @@ def test_bottom_tree_from_prf_key_deterministic() -> None:
     tree2 = bottom_tree_from_prf_key(
         prf=TEST_PRF,
         hasher=TEST_TWEAK_HASHER,
-        merkle_tree=TEST_MERKLE_TREE,
+        rand=TEST_RAND,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -195,7 +195,7 @@ def test_bottom_tree_from_prf_key_different_indices() -> None:
     tree0 = bottom_tree_from_prf_key(
         prf=TEST_PRF,
         hasher=TEST_TWEAK_HASHER,
-        merkle_tree=TEST_MERKLE_TREE,
+        rand=TEST_RAND,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -205,7 +205,7 @@ def test_bottom_tree_from_prf_key_different_indices() -> None:
     tree1 = bottom_tree_from_prf_key(
         prf=TEST_PRF,
         hasher=TEST_TWEAK_HASHER,
-        merkle_tree=TEST_MERKLE_TREE,
+        rand=TEST_RAND,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(1),
