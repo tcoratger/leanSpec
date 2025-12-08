@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-from typing import List
 
 from pydantic import model_validator
 
@@ -24,7 +23,7 @@ from .constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from .types import PRFKey, Randomness
+from .types import HashDigestVector, PRFKey, Randomness
 
 PRF_DOMAIN_SEP: bytes = bytes(
     [
@@ -106,7 +105,7 @@ class Prf(StrictBaseModel):
         """
         return PRFKey(os.urandom(PRF_KEY_LENGTH))
 
-    def apply(self, key: PRFKey, epoch: Uint64, chain_index: Uint64) -> List[Fp]:
+    def apply(self, key: PRFKey, epoch: Uint64, chain_index: Uint64) -> HashDigestVector:
         """
         Applies the PRF to derive the secret starting value for a single hash chain.
 
@@ -127,8 +126,7 @@ class Prf(StrictBaseModel):
             chain_index: The index of the hash chain within that epoch's OTS.
 
         Returns:
-            A list of field elements representing the secret start of a single
-            hash chain (i.e., a `HashDigest`).
+            A hash digest representing the secret start of a single hash chain.
         """
         # Retrieve the scheme's configuration parameters.
         config = self.config
@@ -160,15 +158,17 @@ class Prf(StrictBaseModel):
         # - Slice an 8-byte (64-bit) chunk from the `prf_output_bytes`.
         # - Convert that chunk from a big-endian byte representation to an integer.
         # - Create a field element from the integer (the Fp constructor handles the modulo).
-        return [
-            Fp(
-                value=int.from_bytes(
-                    prf_output_bytes[i * PRF_BYTES_PER_FE : (i + 1) * PRF_BYTES_PER_FE],
-                    "big",
+        return HashDigestVector(
+            data=[
+                Fp(
+                    value=int.from_bytes(
+                        prf_output_bytes[i * PRF_BYTES_PER_FE : (i + 1) * PRF_BYTES_PER_FE],
+                        "big",
+                    )
                 )
-            )
-            for i in range(config.HASH_LEN_FE)
-        ]
+                for i in range(config.HASH_LEN_FE)
+            ]
+        )
 
     def get_randomness(
         self, key: PRFKey, epoch: Uint64, message: bytes, counter: Uint64

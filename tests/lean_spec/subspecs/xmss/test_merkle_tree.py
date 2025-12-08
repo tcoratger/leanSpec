@@ -2,7 +2,6 @@
 
 import pytest
 
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.rand import PROD_RAND, Rand
 from lean_spec.subspecs.xmss.subtree import HashSubTree, verify_path
 from lean_spec.subspecs.xmss.tweak_hash import (
@@ -10,6 +9,7 @@ from lean_spec.subspecs.xmss.tweak_hash import (
     TreeTweak,
     TweakHasher,
 )
+from lean_spec.subspecs.xmss.types import HashDigestVector
 from lean_spec.types import Uint64
 
 
@@ -41,12 +41,12 @@ def _run_commit_open_verify_roundtrip(
     """
     # SETUP: Generate a random parameter and the raw leaf data.
     parameter = rand.parameter()
-    leaves: list[list[list[Fp]]] = [
+    leaves: list[list[HashDigestVector]] = [
         [rand.domain() for _ in range(leaf_parts_len)] for _ in range(num_leaves)
     ]
 
     # HASH LEAVES: Compute the layer 0 nodes by hashing the leaf parts.
-    leaf_hashes: list[list[Fp]] = [
+    leaf_hashes: list[HashDigestVector] = [
         hasher.apply(
             parameter,
             TreeTweak(level=0, index=start_index + i),

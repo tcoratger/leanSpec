@@ -26,8 +26,7 @@ unique across the entire scheme, we guarantee that every hash computation is
 
 from __future__ import annotations
 
-from itertools import chain
-from typing import List, Union, cast
+from typing import List, Union
 
 from pydantic import Field, model_validator
 
@@ -46,7 +45,7 @@ from .poseidon import (
     TEST_POSEIDON,
     PoseidonXmss,
 )
-from .types import Parameter
+from .types import HashDigestVector, Parameter
 from .utils import int_to_base_p
 
 
@@ -150,8 +149,8 @@ class TweakHasher(StrictBaseModel):
         self,
         parameter: Parameter,
         tweak: Union[TreeTweak, ChainTweak],
-        message_parts: List[List[Fp]],
-    ) -> List[Fp]:
+        message_parts: List[HashDigestVector],
+    ) -> HashDigestVector:
         """
         Applies the tweakable Poseidon2 hash function to a message.
 
@@ -189,28 +188,30 @@ class TweakHasher(StrictBaseModel):
             # Case 1: Hashing a single digest (used in hash chains).
             #
             # We use the efficient width-16 compression mode.
-            input_vec = cast(List[Fp], list(parameter.data)) + encoded_tweak + message_parts[0]
-            return self.poseidon.compress(input_vec, 16, config.HASH_LEN_FE)
+            input_vec = parameter.elements + encoded_tweak + message_parts[0].elements
+            result = self.poseidon.compress(input_vec, 16, config.HASH_LEN_FE)
 
         elif len(message_parts) == 2:
             # Case 2: Hashing two digests (used for Merkle tree nodes).
             #
             # We use the slightly larger width-24 compression mode.
             input_vec = (
-                cast(List[Fp], list(parameter.data))
+                parameter.elements
                 + encoded_tweak
-                + message_parts[0]
-                + message_parts[1]
+                + message_parts[0].elements
+                + message_parts[1].elements
             )
-            return self.poseidon.compress(input_vec, 24, config.HASH_LEN_FE)
+            result = self.poseidon.compress(input_vec, 24, config.HASH_LEN_FE)
 
         else:
             # Case 3: Hashing many digests (used for the Merkle tree leaf).
             #
             # We use the robust sponge mode.
             # First, flatten the list of message parts into a single vector.
-            flattened_message = list(chain.from_iterable(message_parts))
-            input_vec = cast(List[Fp], list(parameter.data)) + encoded_tweak + flattened_message
+            flattened_message: List[Fp] = []
+            for part in message_parts:
+                flattened_message.extend(part.elements)
+            input_vec = parameter.elements + encoded_tweak + flattened_message
 
             # Create a domain separator for the sponge mode based on the input dimensions.
             #
@@ -223,7 +224,9 @@ class TweakHasher(StrictBaseModel):
             ]
             capacity_value = self.poseidon.safe_domain_separator(lengths, config.CAPACITY)
 
-            return self.poseidon.sponge(input_vec, capacity_value, config.HASH_LEN_FE, 24)
+            result = self.poseidon.sponge(input_vec, capacity_value, config.HASH_LEN_FE, 24)
+
+        return HashDigestVector(data=result)
 
     def hash_chain(
         self,
@@ -232,8 +235,8 @@ class TweakHasher(StrictBaseModel):
         chain_index: int,
         start_step: int,
         num_steps: int,
-        start_digest: List[Fp],
-    ) -> List[Fp]:
+        start_digest: HashDigestVector,
+    ) -> HashDigestVector:
         """
         Performs repeated hashing to traverse a WOTS+ hash chain.
 
