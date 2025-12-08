@@ -19,7 +19,6 @@ from lean_spec.subspecs.xmss.target_sum import (
 )
 from lean_spec.types import StrictBaseModel, Uint64
 
-from ..koalabear import Fp
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
@@ -330,7 +329,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             raise RuntimeError("Encoding is broken: returned too many or too few chunks.")
 
         # Compute the one-time signature hashes based on the codeword.
-        ots_hashes: List[List[Fp]] = []
+        ots_hashes: List[HashDigestVector] = []
         for chain_index, steps in enumerate(codeword):
             # Derive the secret start of the current chain using the master PRF key.
             start_digest = self.prf.apply(sk.prf_key, epoch, Uint64(chain_index))
@@ -380,11 +379,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # - The OTS,
         # - The Merkle path,
         # - The randomness `rho` needed for verification.
-        # Wrap ots_hashes in SSZ types
-        from .types import HashDigestList, HashDigestVector
+        from .types import HashDigestList
 
-        ssz_hashes = [HashDigestVector(data=hash_digest) for hash_digest in ots_hashes]
-        return Signature(path=path, rho=rho, hashes=HashDigestList(data=ssz_hashes))
+        return Signature(path=path, rho=rho, hashes=HashDigestList(data=ots_hashes))
 
     def verify(self, pk: PublicKey, epoch: Uint64, message: bytes, sig: Signature) -> bool:
         r"""
@@ -441,10 +438,10 @@ class GeneralizedXmssScheme(StrictBaseModel):
             return False
 
         # Reconstruct the one-time public key (the list of chain endpoints).
-        chain_ends: List[List[Fp]] = []
+        chain_ends: List[HashDigestVector] = []
         for chain_index, xi in enumerate(codeword):
             # The signature provides `start_digest`, which is the hash value after `xi` steps.
-            start_digest: List[Fp] = list(sig.hashes[chain_index])
+            start_digest = sig.hashes[chain_index]
             # We must perform the remaining `BASE - 1 - xi` hashing steps
             # to compute the public endpoint of the chain.
             num_steps_remaining = config.BASE - 1 - xi

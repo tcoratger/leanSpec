@@ -9,7 +9,7 @@ from lean_spec.types import StrictBaseModel
 
 from ..koalabear import Fp, P
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .types import Parameter, Randomness
+from .types import HashDigestVector, Parameter, Randomness
 
 
 class Rand(StrictBaseModel):
@@ -34,9 +34,9 @@ class Rand(StrictBaseModel):
         """Generates a random public parameter."""
         return Parameter(data=self.field_elements(self.config.PARAMETER_LEN))
 
-    def domain(self) -> List[Fp]:
+    def domain(self) -> HashDigestVector:
         """Generates a random hash digest."""
-        return self.field_elements(self.config.HASH_LEN_FE)
+        return HashDigestVector(data=self.field_elements(self.config.HASH_LEN_FE))
 
     def rho(self) -> Randomness:
         """Generates randomness `rho` for message encoding."""

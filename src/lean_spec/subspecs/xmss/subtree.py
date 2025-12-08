@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, List
 from lean_spec.types import Uint64
 from lean_spec.types.container import Container
 
-from ..koalabear import Fp
 from .tweak_hash import TreeTweak
 from .types import (
     HashDigestList,
@@ -105,7 +104,7 @@ class HashSubTree(Container):
         depth: int,
         start_index: Uint64,
         parameter: Parameter,
-        lowest_layer_nodes: List[List[Fp]],
+        lowest_layer_nodes: List[HashDigestVector],
     ) -> HashSubTree:
         """
         Builds a new sparse Merkle subtree starting from a specified layer.
@@ -165,7 +164,7 @@ class HashSubTree(Container):
                 hasher.apply(
                     parameter,
                     TreeTweak(level=level + 1, index=int(parent_start) + i),
-                    [list(current.nodes[2 * i]), list(current.nodes[2 * i + 1])],
+                    [current.nodes[2 * i], current.nodes[2 * i + 1]],
                 )
                 for i in range(len(current.nodes) // 2)
             ]
@@ -233,7 +232,7 @@ class HashSubTree(Container):
             depth=depth,
             start_index=start_bottom_tree_index,
             parameter=parameter,
-            lowest_layer_nodes=[list(root) for root in bottom_tree_roots],
+            lowest_layer_nodes=bottom_tree_roots,
         )
 
     @classmethod
@@ -244,7 +243,7 @@ class HashSubTree(Container):
         depth: int,
         bottom_tree_index: Uint64,
         parameter: Parameter,
-        leaves: List[List[Fp]],
+        leaves: List[HashDigestVector],
     ) -> HashSubTree:
         """
         Constructs a single bottom tree from leaf hashes.
@@ -308,7 +307,7 @@ class HashSubTree(Container):
         root_idx = int(bottom_tree_index - middle.start_index)
         root_layer = HashTreeLayer(
             start_index=bottom_tree_index,
-            nodes=HashDigestList(data=[HashDigestVector(data=list(middle.nodes[root_idx]))]),
+            nodes=HashDigestList(data=[middle.nodes[root_idx]]),
         )
 
         # Keep bottom half + single root node.
@@ -370,7 +369,10 @@ class HashSubTree(Container):
         siblings: List[HashDigestVector] = []
         pos = position
 
-        for layer in list(self.layers)[:-1]:
+        # Iterate over all layers except the last (root).
+        num_layers = len(self.layers)
+        for i in range(num_layers - 1):
+            layer = self.layers[i]
             # Sibling index: flip last bit of position, adjust for layer offset.
             sibling_idx = int((pos ^ Uint64(1)) - layer.start_index)
             if not (0 <= sibling_idx < len(layer.nodes)):
@@ -445,7 +447,7 @@ def combined_path(
     # Concatenate: bottom path + top path.
     bottom_path = bottom_tree.path(position)
     top_path = top_tree.path(position // leafs_per_tree)
-    combined = list(bottom_path.siblings) + list(top_path.siblings)
+    combined = bottom_path.siblings.data + top_path.siblings.data
 
     return HashTreeOpening(siblings=HashDigestList(data=combined))
 
@@ -455,7 +457,7 @@ def verify_path(
     parameter: Parameter,
     root: HashDigestVector,
     position: Uint64,
-    leaf_parts: List[List[Fp]],
+    leaf_parts: List[HashDigestVector],
     opening: HashTreeOpening,
 ) -> bool:
     """
@@ -517,9 +519,9 @@ def verify_path(
     for level, sibling in enumerate(opening.siblings):
         # Left child has even position, right child has odd.
         if pos % 2 == 0:
-            left, right = current, list(sibling)
+            left, right = current, sibling
         else:
-            left, right = list(sibling), current
+            left, right = sibling, current
 
         pos //= 2  # Parent position.
         current = hasher.apply(
@@ -529,4 +531,4 @@ def verify_path(
         )
 
     # Valid if we reconstructed the expected root.
-    return current == list(root)
+    return current == root

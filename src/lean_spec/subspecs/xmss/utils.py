@@ -14,7 +14,9 @@ if TYPE_CHECKING:
     from .tweak_hash import TweakHasher
 
 
-def get_padded_layer(rand: Rand, nodes: List[List[Fp]], start_index: Uint64) -> HashTreeLayer:
+def get_padded_layer(
+    rand: Rand, nodes: List[HashDigestVector], start_index: Uint64
+) -> HashTreeLayer:
     """
     Pads a layer of nodes with random hashes to simplify tree construction.
 
@@ -32,7 +34,7 @@ def get_padded_layer(rand: Rand, nodes: List[List[Fp]], start_index: Uint64) -> 
     Returns:
         A new `HashTreeLayer` with the necessary padding applied.
     """
-    nodes_with_padding: List[List[Fp]] = []
+    nodes_with_padding: List[HashDigestVector] = []
     end_index = start_index + Uint64(len(nodes)) - Uint64(1)
 
     # Prepend random padding if the layer starts at an odd index.
@@ -50,10 +52,9 @@ def get_padded_layer(rand: Rand, nodes: List[List[Fp]], start_index: Uint64) -> 
     if end_index % Uint64(2) == Uint64(0):
         nodes_with_padding.append(rand.domain())
 
-    # Convert to SSZ-friendly types: each digest becomes a HashDigestVector,
-    # and the list becomes a HashDigestList.
-    ssz_nodes = [HashDigestVector(data=node) for node in nodes_with_padding]
-    return HashTreeLayer(start_index=actual_start_index, nodes=HashDigestList(data=ssz_nodes))
+    return HashTreeLayer(
+        start_index=actual_start_index, nodes=HashDigestList(data=nodes_with_padding)
+    )
 
 
 def int_to_base_p(value: int, num_limbs: int) -> List[Fp]:
@@ -211,11 +212,11 @@ def bottom_tree_from_prf_key(
     end_epoch = start_epoch + Uint64(leafs_per_bottom_tree)
 
     # Generate leaf hashes for all epochs in this bottom tree.
-    leaf_hashes: List[List[Fp]] = []
+    leaf_hashes: List[HashDigestVector] = []
 
     for epoch in range(int(start_epoch), int(end_epoch)):
         # For each epoch, compute the one-time public key (chain endpoints).
-        chain_ends: List[List[Fp]] = []
+        chain_ends: List[HashDigestVector] = []
 
         for chain_index in range(config.DIMENSION):
             # Derive the secret start of the chain from the PRF key.
