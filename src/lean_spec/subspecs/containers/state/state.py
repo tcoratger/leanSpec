@@ -361,7 +361,14 @@ class State(Container):
         # First process the block header.
         state = self.process_block_header(block)
 
-        # Validate no duplicate attestation data in block
+        # Reject blocks with duplicate attestation data
+        #
+        # Each aggregated attestation in a block must refer to a unique AttestationData.
+        # Duplicates would allow the same vote to be counted multiple times, breaking
+        # the integrity of the justification tally.
+        #
+        # This is a protocol-level invariant: honest proposers never include duplicates,
+        # and validators must reject blocks that violate this rule.
         assert not block.body.attestations.has_duplicate_data(), (
             "Block contains duplicate AttestationData"
         )
