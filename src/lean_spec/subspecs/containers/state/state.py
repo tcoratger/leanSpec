@@ -362,11 +362,9 @@ class State(Container):
         state = self.process_block_header(block)
 
         # Validate no duplicate attestation data in block
-        attestations_data = set()
-        for aggregated_att in block.body.attestations:
-            if aggregated_att.data in attestations_data:
-                raise AssertionError("Block contains duplicate AttestationData")
-            attestations_data.add(aggregated_att.data)
+        assert not block.body.attestations.has_duplicate_data(), (
+            "Block contains duplicate AttestationData"
+        )
 
         return state.process_attestations(block.body.attestations)
 
