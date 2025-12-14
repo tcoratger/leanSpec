@@ -233,7 +233,8 @@ class StateTransitionTest(BaseConsensusFixture):
             return block, None
 
         # Build the block using the state for standard case
-        # Convert aggregated attestations to plain attestations for build_block
+        #
+        # Convert aggregated attestations to plain attestations to build block
         plain_attestations = [
             Attestation(validator_id=vid, data=agg.data)
             for agg in aggregated_attestations
