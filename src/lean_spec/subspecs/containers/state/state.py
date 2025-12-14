@@ -12,11 +12,7 @@ from lean_spec.types import (
     is_proposer,
 )
 
-from ..attestation import (
-    AggregatedAttestation,
-    Attestation,
-    SignedAttestation,
-)
+from ..attestation import AggregatedAttestation, Attestation, SignedAttestation
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.xmss.containers import Signature
@@ -365,22 +361,18 @@ class State(Container):
         # First process the block header.
         state = self.process_block_header(block)
 
-        # Process justification attestations by converting aggregated payloads
-        attestations: list[Attestation] = []
+        # Validate no duplicate attestation data in block
         attestations_data = set()
         for aggregated_att in block.body.attestations:
-            # No partial aggregation is allowed.
             if aggregated_att.data in attestations_data:
                 raise AssertionError("Block contains duplicate AttestationData")
-
             attestations_data.add(aggregated_att.data)
-            attestations.extend(aggregated_att.to_plain())
 
-        return state.process_attestations(attestations)
+        return state.process_attestations(block.body.attestations)
 
     def process_attestations(
         self,
-        attestations: list[Attestation],
+        attestations: Iterable[AggregatedAttestation],
     ) -> "State":
         """
         Apply attestations and update justification/finalization
@@ -393,8 +385,8 @@ class State(Container):
 
         Parameters
         ----------
-        attestations : Attestations
-            The list of attestations to process.
+        attestations : Iterable[AggregatedAttestation]
+            The aggregated attestations to process.
 
         Returns:
         -------
@@ -507,12 +499,13 @@ class State(Container):
             if target.root not in justifications:
                 justifications[target.root] = [Boolean(False)] * len(self.validators)
 
-            # Mark that this validator has voted for the target.
+            # Mark that each validator in this aggregation has voted for the target.
             #
             # A vote is represented as a boolean flag.
             # If it was previously absent, flip it to True.
-            if not justifications[target.root][attestation.validator_id]:
-                justifications[target.root][attestation.validator_id] = Boolean(True)
+            for validator_id in attestation.aggregation_bits.to_validator_indices():
+                if not justifications[target.root][validator_id]:
+                    justifications[target.root][validator_id] = Boolean(True)
 
             # Check whether the vote count crosses the supermajority threshold
             #

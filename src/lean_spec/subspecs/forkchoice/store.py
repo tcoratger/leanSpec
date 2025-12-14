@@ -467,19 +467,17 @@ class Store(Container):
         for aggregated_attestation, aggregated_signature in zip(
             aggregated_attestations, attestation_signatures, strict=True
         ):
-            plain_attestations = aggregated_attestation.to_plain()
+            validator_ids = aggregated_attestation.aggregation_bits.to_validator_indices()
 
-            assert len(plain_attestations) == len(aggregated_signature), (
+            assert len(validator_ids) == len(aggregated_signature), (
                 "Aggregated attestation signature count mismatch"
             )
 
-            for attestation, signature in zip(
-                plain_attestations, aggregated_signature, strict=True
-            ):
+            for validator_id, signature in zip(validator_ids, aggregated_signature, strict=True):
                 store = store.on_attestation(
                     signed_attestation=SignedAttestation(
-                        validator_id=attestation.validator_id,
-                        message=attestation.data,
+                        validator_id=validator_id,
+                        message=aggregated_attestation.data,
                         signature=signature,
                     ),
                     is_from_block=True,

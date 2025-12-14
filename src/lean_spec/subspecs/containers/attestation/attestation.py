@@ -81,20 +81,6 @@ class AggregatedAttestation(Container):
     committee assignments.
     """
 
-    def to_plain(self) -> list[Attestation]:
-        """
-        Expand this aggregated attestation into plain per-validator attestations.
-
-        Returns:
-            One `Attestation` per participating validator index, all sharing the same
-            `AttestationData`.
-        """
-        validator_indices = self.aggregation_bits.to_validator_indices()
-        return [
-            Attestation(validator_id=validator_id, data=self.data)
-            for validator_id in validator_indices
-        ]
-
     @classmethod
     def aggregate_by_data(
         cls,
