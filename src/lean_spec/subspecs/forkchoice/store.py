@@ -690,7 +690,7 @@ class Store(Container):
         """
         # Get validator count from head state
         head_state = self.states[self.head]
-        num_validators = head_state.validators.count
+        num_validators = len(head_state.validators)
 
         # Calculate 2/3 majority threshold (ceiling division)
         min_target_score = -(-num_validators * 2 // 3)
@@ -967,7 +967,7 @@ class Store(Container):
         head_state = store.states[head_root]
 
         # Validate proposer authorization for this slot
-        num_validators = Uint64(head_state.validators.count)
+        num_validators = Uint64(len(head_state.validators))
         assert is_proposer(validator_index, slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )

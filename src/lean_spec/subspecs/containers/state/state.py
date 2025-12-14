@@ -242,7 +242,7 @@ class State(Container):
         assert is_proposer(
             validator_index=block.proposer_index,
             slot=self.slot,
-            num_validators=Uint64(self.validators.count),
+            num_validators=Uint64(len(self.validators)),
         ), "Incorrect block proposer"
 
         # Verify the chain link.
@@ -426,7 +426,7 @@ class State(Container):
         justifications = (
             {
                 root: self.justifications_validators[
-                    i * self.validators.count : (i + 1) * self.validators.count
+                    i * len(self.validators) : (i + 1) * len(self.validators)
                 ]
                 for i, root in enumerate(self.justifications_roots)
             }
@@ -505,7 +505,7 @@ class State(Container):
             # If this is the first vote for the target block, create a fresh tally sheet:
             # - one boolean per validator, all initially False.
             if target.root not in justifications:
-                justifications[target.root] = [Boolean(False)] * self.validators.count
+                justifications[target.root] = [Boolean(False)] * len(self.validators)
 
             # Mark that this validator has voted for the target.
             #
@@ -524,7 +524,7 @@ class State(Container):
             # 3 * (number of votes) ≥ 2 * (total validators)
             count = sum(bool(justified) for justified in justifications[target.root])
 
-            if 3 * count >= (2 * self.validators.count):
+            if 3 * count >= (2 * len(self.validators)):
                 # The block becomes justified
                 #
                 # The chain now considers this block part of its safe head.

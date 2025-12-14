@@ -195,7 +195,7 @@ class StateTransitionTest(BaseConsensusFixture):
             Block and cached post-state (None if not computed).
         """
         # Use provided proposer index or compute it
-        proposer_index = spec.proposer_index or Uint64(int(spec.slot) % int(state.validators.count))
+        proposer_index = spec.proposer_index or Uint64(int(spec.slot) % len(state.validators))
 
         # Use provided parent root or compute it
         if spec.parent_root is not None:

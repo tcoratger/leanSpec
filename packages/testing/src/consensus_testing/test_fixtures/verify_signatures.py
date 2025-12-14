@@ -185,7 +185,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
             A complete signed block with all attestations.
         """
         # Determine proposer index
-        proposer_index = spec.proposer_index or Uint64(int(spec.slot) % int(state.validators.count))
+        proposer_index = spec.proposer_index or Uint64(int(spec.slot) % len(state.validators))
 
         # Resolve parent root
         parent_state = state.process_slots(spec.slot)
