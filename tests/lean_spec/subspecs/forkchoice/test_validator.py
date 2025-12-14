@@ -643,7 +643,7 @@ class TestValidatorErrorHandling:
         # Get the state to determine number of validators
         genesis_hash = sample_store.head
         state = sample_store.states[genesis_hash]
-        num_validators = Uint64(state.validators.count)
+        num_validators = Uint64(len(state.validators))
 
         # is_proposer should work (though likely return False)
         result = is_proposer(large_validator, large_slot, num_validators)

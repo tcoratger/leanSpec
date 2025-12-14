@@ -316,7 +316,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         """
         # Determine proposer index
         proposer_index = spec.proposer_index or Uint64(
-            int(spec.slot) % store.states[store.head].validators.count
+            int(spec.slot) % len(store.states[store.head].validators)
         )
 
         # Resolve parent root from label or default to head
