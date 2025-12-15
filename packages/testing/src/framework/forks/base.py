@@ -97,10 +97,9 @@ class BaseFork(ABC, metaclass=BaseForkMeta):
         cls._children = set()
 
         # Track parent-child relationships
-        base_class = cls.__bases__[0]
-        if base_class != BaseFork and hasattr(base_class, "_children"):
-            # base_class is verified to have _children attribute via hasattr check
-            base_class._children.add(cls)  # type: ignore[attr-defined]
+        for base in cls.__bases__:
+            if base is not BaseFork and issubclass(base, BaseFork):
+                base._children.add(cls)
 
     @classmethod
     @abstractmethod
