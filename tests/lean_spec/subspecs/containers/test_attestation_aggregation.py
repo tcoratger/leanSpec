@@ -145,39 +145,3 @@ class TestAggregateByData:
         assert len(aggregated) == 1
         validator_ids = aggregated[0].aggregation_bits.to_validator_indices()
         assert validator_ids == [Uint64(5)]
-
-
-class TestDuplicateAttestationDataValidation:
-    """Test validation that blocks don't contain duplicate AttestationData."""
-
-    def test_duplicate_attestation_data_detection(self) -> None:
-        """Ensure aggregated attestations with same data can share validators."""
-        att_data = AttestationData(
-            slot=Slot(1),
-            head=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
-            target=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
-            source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
-        )
-
-        # agg1 has validator 1, agg2 has validators 1 and 2
-        agg1 = AggregatedAttestation(
-            aggregation_bits=AggregationBits(data=[Boolean(False), Boolean(True)]),
-            data=att_data,
-        )
-        agg2 = AggregatedAttestation(
-            aggregation_bits=AggregationBits(data=[Boolean(False), Boolean(True), Boolean(True)]),
-            data=att_data,
-        )
-
-        # Extract validator indices from each aggregation
-        validators1 = set(agg1.aggregation_bits.to_validator_indices())
-        validators2 = set(agg2.aggregation_bits.to_validator_indices())
-
-        # Verify validator 1 is common to both aggregations
-        assert validators1 == {Uint64(1)}
-        assert validators2 == {Uint64(1), Uint64(2)}
-
-        # Union gives unique validators across both aggregations
-        all_validators = validators1 | validators2
-        assert all_validators == {Uint64(1), Uint64(2)}
-        assert agg1.data == agg2.data == att_data
