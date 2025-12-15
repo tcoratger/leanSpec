@@ -29,7 +29,7 @@ This process involves three main stages:
 
 from __future__ import annotations
 
-from typing import List, cast
+from typing import List
 
 from pydantic import model_validator
 
@@ -191,8 +191,8 @@ class MessageHasher(StrictBaseModel):
 
             # The input is: rho || P || epoch || message || iteration.
             combined_input = (
-                cast(List[Fp], list(rho.data))
-                + cast(List[Fp], list(parameter.data))
+                list(rho.data)
+                + list(parameter.data)
                 + epoch_fe
                 + message_fe
                 + iteration_separator

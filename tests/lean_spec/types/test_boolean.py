@@ -1,7 +1,7 @@
 """ "Tests for the Boolean Type."""
 
 import io
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import pytest
 from pydantic import ValidationError, create_model
@@ -13,7 +13,8 @@ from lean_spec.types.boolean import Boolean
 def test_pydantic_validation_accepts_valid_bool(valid_value: bool) -> None:
     """Tests that Pydantic validation correctly accepts a valid boolean."""
     model = create_model("Model", value=(Boolean, ...))
-    instance: Any = model(value=valid_value)
+    # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
+    instance = cast(Any, model(value=valid_value))
     assert isinstance(instance.value, Boolean)
     assert instance.value == Boolean(valid_value)
 

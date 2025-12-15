@@ -21,6 +21,7 @@ from typing import (
     IO,
     Any,
     ClassVar,
+    Sequence,
     Tuple,
     overload,
 )
@@ -42,8 +43,8 @@ class BaseBitvector(SSZModel):
     LENGTH: ClassVar[int]
     """Number of bits in the vector."""
 
-    data: Tuple[Boolean, ...] = Field(default_factory=tuple)
-    """The immutable bit data stored as a tuple."""
+    data: Sequence[Any] = Field(default_factory=tuple)
+    """The immutable bit data stored as a tuple (converted to Boolean at validation)."""
 
     @field_validator("data", mode="before")
     @classmethod
@@ -129,8 +130,8 @@ class BaseBitlist(SSZModel):
     LIMIT: ClassVar[int]
     """Maximum number of bits allowed."""
 
-    data: Tuple[Boolean, ...] = Field(default_factory=tuple)
-    """The immutable bit data stored as a tuple."""
+    data: Sequence[Any] = Field(default_factory=tuple)
+    """The immutable bit data stored as a tuple (converted to Boolean at validation)."""
 
     @field_validator("data", mode="before")
     @classmethod
@@ -178,10 +179,12 @@ class BaseBitlist(SSZModel):
 
     def __add__(self, other: Any) -> Self:
         """Concatenate this bitlist with another sequence."""
+        # Cast to tuple for concatenation since Sequence doesn't support +
+        self_data = tuple(self.data)
         if isinstance(other, BaseBitlist):
-            new_data = self.data + other.data
+            new_data = self_data + tuple(other.data)
         elif isinstance(other, (list, tuple)):
-            new_data = self.data + tuple(Boolean(b) for b in other)
+            new_data = self_data + tuple(Boolean(b) for b in other)
         else:
             return NotImplemented
         return type(self)(data=new_data)

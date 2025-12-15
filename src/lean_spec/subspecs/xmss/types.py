@@ -1,7 +1,5 @@
 """Base types for the XMSS signature scheme."""
 
-from typing import List
-
 from lean_spec.subspecs.koalabear import Fp
 
 from ...types import Uint64
@@ -49,7 +47,7 @@ TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
 """
 
 
-class HashDigestVector(SSZVector):
+class HashDigestVector(SSZVector[Fp]):
     """
     A single hash digest represented as a fixed-size vector of field elements.
 
@@ -64,12 +62,12 @@ class HashDigestVector(SSZVector):
     LENGTH = HASH_DIGEST_LENGTH
 
     @property
-    def elements(self) -> List[Fp]:
+    def elements(self) -> list[Fp]:
         """Return the field elements as a typed list."""
-        return list(self.data)  # type: ignore[arg-type]
+        return list(self.data)
 
 
-class HashDigestList(SSZList):
+class HashDigestList(SSZList[HashDigestVector]):
     """
     Variable-length list of hash digests.
 
@@ -81,12 +79,8 @@ class HashDigestList(SSZList):
     ELEMENT_TYPE = HashDigestVector
     LIMIT = NODE_LIST_LIMIT
 
-    def __getitem__(self, index: int) -> HashDigestVector:
-        """Access a hash digest by index with proper typing."""
-        return self.data[index]  # type: ignore[return-value]
 
-
-class Parameter(SSZVector):
+class Parameter(SSZVector[Fp]):
     """
     The public parameter P.
 
@@ -101,12 +95,12 @@ class Parameter(SSZVector):
     LENGTH = PROD_CONFIG.PARAMETER_LEN
 
     @property
-    def elements(self) -> List[Fp]:
+    def elements(self) -> list[Fp]:
         """Return the field elements as a typed list."""
-        return list(self.data)  # type: ignore[arg-type]
+        return list(self.data)
 
 
-class Randomness(SSZVector):
+class Randomness(SSZVector[Fp]):
     """
     The randomness `rho` (ρ) used during signing.
 
@@ -164,7 +158,7 @@ TODO: Make the configuration generic and don't hardcode `PROD_CONFIG`.
 """
 
 
-class HashTreeLayers(SSZList):
+class HashTreeLayers(SSZList[HashTreeLayer]):
     """
     Variable-length list of Merkle tree layers.
 
@@ -180,7 +174,3 @@ class HashTreeLayers(SSZList):
 
     ELEMENT_TYPE = HashTreeLayer
     LIMIT = LAYERS_LIMIT
-
-    def __getitem__(self, index: int) -> HashTreeLayer:
-        """Access a layer by index with proper typing."""
-        return self.data[index]  # type: ignore[return-value]

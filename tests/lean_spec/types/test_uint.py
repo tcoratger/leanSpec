@@ -1,7 +1,7 @@
 """Unsigned Integer Type Tests."""
 
 import io
-from typing import IO, Any, Type
+from typing import IO, Any, Type, cast
 
 import pytest
 from pydantic import ValidationError, create_model
@@ -27,7 +27,8 @@ def test_pydantic_validation_accepts_valid_int(uint_class: Type[BaseUint]) -> No
     model = create_model("Model", value=(uint_class, ...))
 
     # This should pass without errors
-    instance: Any = model(value=10)
+    # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
+    instance = cast(Any, model(value=10))
     assert isinstance(instance.value, uint_class)
     # This assert will also be fixed by the changes in the next section
     assert instance.value == uint_class(10)

@@ -1,7 +1,7 @@
 """ "Tests for the Bitvector and Bitlist types."""
 
 import io
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError, create_model
@@ -64,7 +64,8 @@ class TestBitvector:
             LENGTH = 4
 
         model = create_model("Model", value=(Bitvector4, ...))
-        instance: Any = model(value={"data": [True, False, True, False]})
+        # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
+        instance = cast(Any, model(value={"data": [True, False, True, False]}))
         assert isinstance(instance.value, Bitvector4)
         assert instance.value == Bitvector4(data=[True, False, True, False])
 
@@ -146,7 +147,8 @@ class TestBitlist:
             LIMIT = 8
 
         model = create_model("Model", value=(Bitlist8, ...))
-        instance: Any = model(value={"data": [True, False, True, False]})
+        # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
+        instance = cast(Any, model(value={"data": [True, False, True, False]}))
         assert isinstance(instance.value, Bitlist8)
         assert len(instance.value) == 4
 
