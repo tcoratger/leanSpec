@@ -72,13 +72,6 @@ python-version = "3.12"
 [tool.ty.terminal]
 error-on-warning = true
 
-# SSZ collections (SSZVector, SSZList) intentionally override BaseModel.__iter__
-# to iterate over elements (standard sequence semantics) instead of yielding
-# key-value pairs (Pydantic's dict(model) support). This is a deliberate design
-# choice for SSZ collection types to behave like Python sequences.
-[tool.ty.rules]
-invalid-method-override = "ignore"
-
 [tool.pytest.ini_options]
 minversion = "8.3.3"
 testpaths = ["tests"]

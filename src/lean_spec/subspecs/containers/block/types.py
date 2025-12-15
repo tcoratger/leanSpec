@@ -12,12 +12,6 @@ class AggregatedAttestations(SSZList[AggregatedAttestation]):
     ELEMENT_TYPE = AggregatedAttestation
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
 
-    def __getitem__(self, index: int) -> AggregatedAttestation:
-        """Access an aggregated attestation by index with proper typing."""
-        item = self.data[index]
-        assert isinstance(item, AggregatedAttestation)
-        return item
-
     def has_duplicate_data(self) -> bool:
         """Check if any two attestations share the same AttestationData."""
         seen: set[AttestationData] = set()

@@ -205,7 +205,7 @@ class SSZVector(SSZModel, Generic[T]):
         """Return the number of elements in the vector."""
         return len(self.data)
 
-    def __iter__(self) -> Iterator[T]:
+    def __iter__(self) -> Iterator[T]:  # type: ignore[override]
         """Iterate over vector elements."""
         return iter(self.data)
 
@@ -432,7 +432,7 @@ class SSZList(SSZModel, Generic[T]):
         """Return the number of elements in the list."""
         return len(self.data)
 
-    def __iter__(self) -> Iterator[T]:
+    def __iter__(self) -> Iterator[T]:  # type: ignore[override]
         """Iterate over list elements."""
         return iter(self.data)
 
