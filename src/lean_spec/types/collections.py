@@ -14,7 +14,6 @@ from typing import (
     TypeVar,
     cast,
     overload,
-    override,
 )
 
 from pydantic import Field, field_serializer, field_validator
@@ -206,9 +205,8 @@ class SSZVector(SSZModel, Generic[T]):
         """Return the number of elements in the vector."""
         return len(self.data)
 
-    @override
     def __iter__(self) -> Iterator[T]:
-        """Iterate over elements."""
+        """Iterate over vector elements."""
         return iter(self.data)
 
     @overload
@@ -216,7 +214,6 @@ class SSZVector(SSZModel, Generic[T]):
     @overload
     def __getitem__(self, index: slice) -> Sequence[T]: ...
 
-    @override
     def __getitem__(self, index: int | slice) -> T | Sequence[T]:
         """
         Access element(s) by index or slice.
@@ -435,9 +432,8 @@ class SSZList(SSZModel, Generic[T]):
         """Return the number of elements in the list."""
         return len(self.data)
 
-    @override
     def __iter__(self) -> Iterator[T]:
-        """Iterate over elements."""
+        """Iterate over list elements."""
         return iter(self.data)
 
     @overload
@@ -445,7 +441,6 @@ class SSZList(SSZModel, Generic[T]):
     @overload
     def __getitem__(self, index: slice) -> Sequence[T]: ...
 
-    @override
     def __getitem__(self, index: int | slice) -> T | Sequence[T]:
         """
         Access element(s) by index or slice.

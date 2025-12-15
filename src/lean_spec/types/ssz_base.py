@@ -115,15 +115,6 @@ class SSZModel(StrictBaseModel, SSZType):
             return len(data)
         return len(type(self).model_fields)
 
-    def __getitem__(self, key: Any) -> Any:
-        """Get an item from the collection's data or container field by name."""
-        data: Sequence[Any] | None = getattr(self, "data", None)
-        if data is not None:
-            return data[key]
-        if isinstance(key, str) and key in type(self).model_fields:
-            return getattr(self, key)
-        raise KeyError(f"Invalid key '{key}' for {self.__class__.__name__}")
-
     def __repr__(self) -> str:
         """String representation showing the class name and data."""
         data: Sequence[Any] | None = getattr(self, "data", None)
