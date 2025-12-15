@@ -1,9 +1,9 @@
 """Tests for the SSZVector and List types."""
 
-from typing import Any, Tuple, cast
+from typing import Any, Tuple
 
 import pytest
-from pydantic import ValidationError, create_model
+from pydantic import BaseModel, ValidationError
 from typing_extensions import Type
 
 from lean_spec.subspecs.koalabear import Fp
@@ -200,6 +200,12 @@ for i, v in {0: 1, 32: 2, 64: 3, 95: 0xFF}.items():
 sig_test_data = tuple(sig_test_data_list)
 
 
+class Uint8Vector2Model(BaseModel):
+    """Model for testing Pydantic validation of Uint8Vector2."""
+
+    value: Uint8Vector2
+
+
 class TestSSZVector:
     """Tests for the fixed-length, immutable SSZVector type."""
 
@@ -235,25 +241,29 @@ class TestSSZVector:
 
     def test_pydantic_validation(self) -> None:
         """Tests that Pydantic validation works for SSZVector types."""
-        model = create_model("Model", value=(Uint8Vector2, ...))
-        # Test valid data
-        # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
-        instance = cast(Any, model(value={"data": [10, 20]}))
+        # Test valid data - Pydantic coerces dict to Uint8Vector2
+        instance = Uint8Vector2Model(value={"data": [10, 20]})  # type: ignore[arg-type]
         assert isinstance(instance.value, Uint8Vector2)
         assert list(instance.value) == [Uint8(10), Uint8(20)]
         # Test invalid data
         with pytest.raises(ValidationError):
-            model(value={"data": [10]})  # Too short
+            Uint8Vector2Model(value={"data": [10]})  # type: ignore[arg-type]
         with pytest.raises(ValidationError):
-            model(value={"data": [10, 20, 30]})  # Too long
+            Uint8Vector2Model(value={"data": [10, 20, 30]})  # type: ignore[arg-type]
         with pytest.raises(TypeError):
-            model(value={"data": [10, "bad"]})  # Wrong element type
+            Uint8Vector2Model(value={"data": [10, "bad"]})  # type: ignore[arg-type]
 
     def test_vector_is_immutable(self) -> None:
         """Tests that attempting to change an item in an SSZVector raises a TypeError."""
         vec = Uint8Vector2(data=[Uint8(1), Uint8(2)])
         with pytest.raises(TypeError):
             vec[0] = 3  # type: ignore[index]  # Should fail because SSZModel is immutable
+
+
+class Uint8List4Model(BaseModel):
+    """Model for testing Pydantic validation of Uint8List4."""
+
+    value: Uint8List4
 
 
 class TestList:
@@ -282,15 +292,15 @@ class TestList:
 
     def test_pydantic_validation(self) -> None:
         """Tests that Pydantic validation works for List types."""
-        model = create_model("Model", value=(Uint8List4, ...))
         # Test valid data
-        # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
-        instance = cast(Any, model(value=Uint8List4(data=[Uint8(10), Uint8(20)])))
+        instance = Uint8List4Model(value=Uint8List4(data=[Uint8(10), Uint8(20)]))
         assert isinstance(instance.value, Uint8List4)
         assert list(instance.value) == [Uint8(10), Uint8(20)]
         # Test invalid data - list too long
         with pytest.raises(ValidationError):
-            model(value=Uint8List4(data=[Uint8(10), Uint8(20), Uint8(30), Uint8(40), Uint8(50)]))
+            Uint8List4Model(
+                value=Uint8List4(data=[Uint8(10), Uint8(20), Uint8(30), Uint8(40), Uint8(50)])
+            )
 
     def test_append_at_limit_raises_error(self) -> None:
         """Tests that creating a list at limit +1 fails during construction."""

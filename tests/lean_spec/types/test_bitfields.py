@@ -1,14 +1,39 @@
 """ "Tests for the Bitvector and Bitlist types."""
 
 import io
-from typing import Any, cast
+from typing import Any
 
 import pytest
-from pydantic import ValidationError, create_model
+from pydantic import BaseModel, ValidationError
 from typing_extensions import Tuple
 
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean
+
+
+# Define bitfield types at module level for reuse and model classes
+class Bitvector4(BaseBitvector):
+    """A bitvector of exactly 4 bits."""
+
+    LENGTH = 4
+
+
+class Bitvector4Model(BaseModel):
+    """Model for testing Pydantic validation of Bitvector4."""
+
+    value: Bitvector4
+
+
+class Bitlist8(BaseBitlist):
+    """A bitlist with up to 8 bits."""
+
+    LIMIT = 8
+
+
+class Bitlist8Model(BaseModel):
+    """Model for testing Pydantic validation of Bitlist8."""
+
+    value: Bitlist8
 
 
 class TestBitvector:
@@ -34,10 +59,6 @@ class TestBitvector:
 
     def test_instantiation_success(self) -> None:
         """Tests successful instantiation with the correct number of valid boolean items."""
-
-        class Bitvector4(BaseBitvector):
-            LENGTH = 4
-
         instance = Bitvector4(data=[Boolean(True), Boolean(False), Boolean(1), Boolean(0)])
         assert len(instance) == 4
         assert instance == Bitvector4(
@@ -53,23 +74,13 @@ class TestBitvector:
     )
     def test_instantiation_with_wrong_length_raises_error(self, values: list[Boolean]) -> None:
         """Tests that providing the wrong number of items during instantiation fails."""
-
-        class Bitvector4(BaseBitvector):
-            LENGTH = 4
-
         with pytest.raises(ValueError, match="requires exactly 4 bits"):
             Bitvector4(data=values)
 
     def test_pydantic_validation_accepts_valid_list(self) -> None:
         """Tests that Pydantic validation correctly accepts a valid list of booleans."""
-
-        class Bitvector4(BaseBitvector):
-            LENGTH = 4
-
-        model = create_model("Model", value=(Bitvector4, ...))
-        # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
         bits = [Boolean(True), Boolean(False), Boolean(True), Boolean(False)]
-        instance = cast(Any, model(value={"data": bits}))
+        instance = Bitvector4Model(value={"data": bits})  # type: ignore[arg-type]
         assert isinstance(instance.value, Bitvector4)
         assert instance.value == Bitvector4(data=bits)
 
@@ -81,16 +92,9 @@ class TestBitvector:
         ],
     )
     def test_pydantic_validation_rejects_invalid_values(self, invalid_value: Any) -> None:
-        """
-        Tests that Pydantic validation rejects lists of the wrong length or with invalid types.
-        """
-
-        class Bitvector4(BaseBitvector):
-            LENGTH = 4
-
-        model = create_model("Model", value=(Bitvector4, ...))
+        """Tests that Pydantic validation rejects lists of the wrong length."""
         with pytest.raises(ValidationError):
-            model(value=invalid_value)
+            Bitvector4Model(value=invalid_value)
 
     def test_bitvector_is_immutable(self) -> None:
         """Tests that attempting to change an item in a Bitvector raises a TypeError."""
@@ -126,10 +130,6 @@ class TestBitlist:
 
     def test_instantiation_success(self) -> None:
         """Tests successful instantiation with a valid number of items."""
-
-        class Bitlist8(BaseBitlist):
-            LIMIT = 8
-
         instance = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(1), Boolean(0)])
         assert len(instance) == 4
         expected = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(True), Boolean(False)])
@@ -146,14 +146,8 @@ class TestBitlist:
 
     def test_pydantic_validation_accepts_valid_list(self) -> None:
         """Tests that Pydantic validation correctly accepts a valid list of booleans."""
-
-        class Bitlist8(BaseBitlist):
-            LIMIT = 8
-
-        model = create_model("Model", value=(Bitlist8, ...))
-        # Cast to Any because create_model returns type[BaseModel] which doesn't have typed fields
         bits = [Boolean(True), Boolean(False), Boolean(True), Boolean(False)]
-        instance = cast(Any, model(value={"data": bits}))
+        instance = Bitlist8Model(value={"data": bits})  # type: ignore[arg-type]
         assert isinstance(instance.value, Bitlist8)
         assert len(instance.value) == 4
 
@@ -164,21 +158,12 @@ class TestBitlist:
         ],
     )
     def test_pydantic_validation_rejects_invalid_values(self, invalid_value: Any) -> None:
-        """Tests that Pydantic validation rejects lists that are too long or have invalid types."""
-
-        class Bitlist8(BaseBitlist):
-            LIMIT = 8
-
-        model = create_model("Model", value=(Bitlist8, ...))
+        """Tests that Pydantic validation rejects lists that exceed the limit."""
         with pytest.raises(ValidationError):
-            model(value=invalid_value)
+            Bitlist8Model(value=invalid_value)
 
     def test_add_with_list(self) -> None:
         """Tests concatenating a Bitlist with a regular list."""
-
-        class Bitlist8(BaseBitlist):
-            LIMIT = 8
-
         bitlist = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(True)])
         result = bitlist + [Boolean(False), Boolean(True)]
         assert len(result) == 5
@@ -193,10 +178,6 @@ class TestBitlist:
 
     def test_add_with_bitlist(self) -> None:
         """Tests concatenating two Bitlists of the same type."""
-
-        class Bitlist8(BaseBitlist):
-            LIMIT = 8
-
         bitlist1 = Bitlist8(data=[Boolean(True), Boolean(False)])
         bitlist2 = Bitlist8(data=[Boolean(True), Boolean(True)])
         result = bitlist1 + bitlist2
