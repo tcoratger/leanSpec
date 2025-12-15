@@ -73,10 +73,6 @@ python-version = "3.12"
 error-on-warning = true
 
 [tool.ty.rules]
-# SSZ collections (SSZVector, SSZList) intentionally override Pydantic's
-# __iter__ and __getitem__ to provide sequence-like iteration over elements
-# rather than field name/value pairs. This is a deliberate design decision
-# for the SSZ type system.
 invalid-method-override = "ignore"
 
 [tool.pytest.ini_options]

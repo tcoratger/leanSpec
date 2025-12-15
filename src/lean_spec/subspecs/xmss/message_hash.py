@@ -191,11 +191,7 @@ class MessageHasher(StrictBaseModel):
 
             # The input is: rho || P || epoch || message || iteration.
             combined_input = (
-                list(rho.data)
-                + list(parameter.data)
-                + epoch_fe
-                + message_fe
-                + iteration_separator
+                list(rho.data) + list(parameter.data) + epoch_fe + message_fe + iteration_separator
             )
 
             # Hash the combined input using Poseidon2 compression mode.
