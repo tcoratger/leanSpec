@@ -77,16 +77,16 @@ class BaseBitvector(SSZModel):
 
     def serialize(self, stream: IO[bytes]) -> int:
         """Write SSZ bytes to a binary stream."""
-        encoded = self.encode_bytes()
-        stream.write(encoded)
-        return len(encoded)
+        encoded_data = self.encode_bytes()
+        stream.write(encoded_data)
+        return len(encoded_data)
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Read SSZ bytes from a stream and return an instance."""
-        expected = cls.get_byte_length()
-        if scope != expected:
-            raise ValueError(f"{cls.__name__}: expected {expected} bytes, got {scope}")
+        expected_len = cls.get_byte_length()
+        if scope != expected_len:
+            raise ValueError(f"{cls.__name__}: expected {expected_len} bytes, got {scope}")
         data = stream.read(scope)
         if len(data) != scope:
             raise IOError(f"Expected {scope} bytes, got {len(data)}")
@@ -100,11 +100,11 @@ class BaseBitvector(SSZModel):
         bit i goes to byte i // 8 at bit position (i % 8).
         """
         byte_len = (self.LENGTH + 7) // 8
-        result = bytearray(byte_len)
+        byte_array = bytearray(byte_len)
         for i, bit in enumerate(self.data):
             if bit:
-                result[i // 8] |= 1 << (i % 8)
-        return bytes(result)
+                byte_array[i // 8] |= 1 << (i % 8)
+        return bytes(byte_array)
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:

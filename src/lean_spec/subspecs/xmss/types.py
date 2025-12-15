@@ -61,11 +61,6 @@ class HashDigestVector(SSZVector[Fp]):
     ELEMENT_TYPE = Fp
     LENGTH = HASH_DIGEST_LENGTH
 
-    @property
-    def elements(self) -> list[Fp]:
-        """Return the field elements as a typed list."""
-        return list(self.data)
-
 
 class HashDigestList(SSZList[HashDigestVector]):
     """
@@ -93,11 +88,6 @@ class Parameter(SSZVector[Fp]):
 
     ELEMENT_TYPE = Fp
     LENGTH = PROD_CONFIG.PARAMETER_LEN
-
-    @property
-    def elements(self) -> list[Fp]:
-        """Return the field elements as a typed list."""
-        return list(self.data)
 
 
 class Randomness(SSZVector[Fp]):

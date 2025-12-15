@@ -228,6 +228,11 @@ class SSZVector(SSZModel, Generic[T]):
         """
         return self.data[index]
 
+    @property
+    def elements(self) -> list[T]:
+        """Return the elements as a typed list."""
+        return list(self.data)
+
 
 class SSZList(SSZModel, Generic[T]):
     """
@@ -451,3 +456,8 @@ class SSZList(SSZModel, Generic[T]):
         - `lst[0:2]` returns `Sequence[T]`
         """
         return self.data[index]
+
+    @property
+    def elements(self) -> list[T]:
+        """Return the elements as a typed list."""
+        return list(self.data)
