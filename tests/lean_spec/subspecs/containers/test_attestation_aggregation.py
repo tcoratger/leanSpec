@@ -24,13 +24,15 @@ class TestAggregationBits:
 
     def test_to_validator_indices_single_bit(self) -> None:
         """Test conversion with a single bit set."""
-        bits = AggregationBits(data=[False, True, False])
+        bits = AggregationBits(data=[Boolean(False), Boolean(True), Boolean(False)])
         indices = bits.to_validator_indices()
         assert indices == [Uint64(1)]
 
     def test_to_validator_indices_multiple_bits(self) -> None:
         """Test conversion with multiple bits set."""
-        bits = AggregationBits(data=[True, False, True, True, False])
+        bits = AggregationBits(
+            data=[Boolean(True), Boolean(False), Boolean(True), Boolean(True), Boolean(False)]
+        )
         indices = bits.to_validator_indices()
         assert indices == [Uint64(0), Uint64(2), Uint64(3)]
 
@@ -144,11 +146,12 @@ class TestAggregateByData:
         validator_ids = aggregated[0].aggregation_bits.to_validator_indices()
         assert validator_ids == [Uint64(5)]
 
+
 class TestDuplicateAttestationDataValidation:
     """Test validation that blocks don't contain duplicate AttestationData."""
 
     def test_duplicate_attestation_data_detection(self) -> None:
-        """Ensure conversion to plain attestations preserves duplicates."""
+        """Ensure aggregated attestations with same data can share validators."""
         att_data = AttestationData(
             slot=Slot(1),
             head=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
@@ -156,9 +159,7 @@ class TestDuplicateAttestationDataValidation:
             source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
         )
 
-        from lean_spec.subspecs.containers.attestation import AggregatedAttestation
-        from lean_spec.subspecs.containers.attestation.types import AggregationBits
-
+        # agg1 has validator 1, agg2 has validators 1 and 2
         agg1 = AggregatedAttestation(
             aggregation_bits=AggregationBits(data=[Boolean(False), Boolean(True)]),
             data=att_data,
@@ -168,9 +169,15 @@ class TestDuplicateAttestationDataValidation:
             data=att_data,
         )
 
-        plain = [plain_att for aggregated in (agg1, agg2) for plain_att in aggregated.to_plain()]
+        # Extract validator indices from each aggregation
+        validators1 = set(agg1.aggregation_bits.to_validator_indices())
+        validators2 = set(agg2.aggregation_bits.to_validator_indices())
 
-        # Expect 2 plain attestations (because validator 1 is common in agg1 and agg2)
-        # validator 1 and validator 2 are the only unique validators in the attestations
-        assert len(set(plain)) == 2
-        assert all(att.data == att_data for att in plain)
+        # Verify validator 1 is common to both aggregations
+        assert validators1 == {Uint64(1)}
+        assert validators2 == {Uint64(1), Uint64(2)}
+
+        # Union gives unique validators across both aggregations
+        all_validators = validators1 | validators2
+        assert all_validators == {Uint64(1), Uint64(2)}
+        assert agg1.data == agg2.data == att_data
