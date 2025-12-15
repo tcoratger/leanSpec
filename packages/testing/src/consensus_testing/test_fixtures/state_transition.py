@@ -4,6 +4,7 @@ from typing import Any, ClassVar, List
 
 from pydantic import ConfigDict, PrivateAttr, field_serializer
 
+from lean_spec.subspecs.containers.attestation import Attestation
 from lean_spec.subspecs.containers.block.block import Block, BlockBody
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.state.state import State
@@ -232,14 +233,17 @@ class StateTransitionTest(BaseConsensusFixture):
             return block, None
 
         # Build the block using the state for standard case
+        #
+        # Convert aggregated attestations to plain attestations to build block
+        plain_attestations = [
+            Attestation(validator_id=vid, data=agg.data)
+            for agg in aggregated_attestations
+            for vid in agg.aggregation_bits.to_validator_indices()
+        ]
         block, post_state, _, _ = state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
-            attestations=[
-                attestation
-                for aggregated_attestation in aggregated_attestations
-                for attestation in aggregated_attestation.to_plain()
-            ],
+            attestations=plain_attestations,
         )
         return block, post_state
