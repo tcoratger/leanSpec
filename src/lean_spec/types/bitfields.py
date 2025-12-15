@@ -22,7 +22,6 @@ from typing import (
     Any,
     ClassVar,
     Sequence,
-    Tuple,
     overload,
 )
 
@@ -43,12 +42,17 @@ class BaseBitvector(SSZModel):
     LENGTH: ClassVar[int]
     """Number of bits in the vector."""
 
-    data: Sequence[Any] = Field(default_factory=tuple)
-    """The immutable bit data stored as a tuple (converted to Boolean at validation)."""
+    data: Sequence[Boolean] = Field(default_factory=tuple)
+    """
+    The immutable bit data stored as a sequence of Booleans.
+
+    Accepts lists, tuples, or iterables of bool-like values on input;
+    stored as a tuple of Boolean after validation.
+    """
 
     @field_validator("data", mode="before")
     @classmethod
-    def _validate_vector_data(cls, v: Any) -> Tuple[Boolean, ...]:
+    def _coerce_and_validate(cls, v: Any) -> tuple[Boolean, ...]:
         """Validate and convert input data to typed tuple of Booleans."""
         if not hasattr(cls, "LENGTH"):
             raise TypeError(f"{cls.__name__} must define LENGTH")
@@ -57,11 +61,9 @@ class BaseBitvector(SSZModel):
             v = tuple(v)
 
         if len(v) != cls.LENGTH:
-            raise ValueError(
-                f"{cls.__name__} requires exactly {cls.LENGTH} bits, but {len(v)} were provided."
-            )
+            raise ValueError(f"{cls.__name__} requires exactly {cls.LENGTH} bits, got {len(v)}")
 
-        return tuple(Boolean(item) for item in v)
+        return tuple(Boolean(bit) for bit in v)
 
     @classmethod
     def is_fixed_size(cls) -> bool:
@@ -75,17 +77,16 @@ class BaseBitvector(SSZModel):
 
     def serialize(self, stream: IO[bytes]) -> int:
         """Write SSZ bytes to a binary stream."""
-        encoded_data = self.encode_bytes()
-        stream.write(encoded_data)
-        return len(encoded_data)
+        encoded = self.encode_bytes()
+        stream.write(encoded)
+        return len(encoded)
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Read SSZ bytes from a stream and return an instance."""
-        if scope != cls.get_byte_length():
-            raise ValueError(
-                f"Invalid scope for {cls.__name__}: expected {cls.get_byte_length()}, got {scope}"
-            )
+        expected = cls.get_byte_length()
+        if scope != expected:
+            raise ValueError(f"{cls.__name__}: expected {expected} bytes, got {scope}")
         data = stream.read(scope)
         if len(data) != scope:
             raise IOError(f"Expected {scope} bytes, got {len(data)}")
@@ -99,11 +100,11 @@ class BaseBitvector(SSZModel):
         bit i goes to byte i // 8 at bit position (i % 8).
         """
         byte_len = (self.LENGTH + 7) // 8
-        byte_array = bytearray(byte_len)
+        result = bytearray(byte_len)
         for i, bit in enumerate(self.data):
             if bit:
-                byte_array[i // 8] |= 1 << (i % 8)
-        return bytes(byte_array)
+                result[i // 8] |= 1 << (i % 8)
+        return bytes(result)
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
@@ -112,9 +113,9 @@ class BaseBitvector(SSZModel):
 
         Expects exactly ceil(LENGTH / 8) bytes. No delimiter bit for Bitvector.
         """
-        expected_len = cls.get_byte_length()
-        if len(data) != expected_len:
-            raise ValueError(f"{cls.__name__} expected {expected_len} bytes, got {len(data)}")
+        expected = cls.get_byte_length()
+        if len(data) != expected:
+            raise ValueError(f"{cls.__name__}: expected {expected} bytes, got {len(data)}")
 
         bits = tuple(Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(cls.LENGTH))
         return cls(data=bits)
@@ -130,12 +131,17 @@ class BaseBitlist(SSZModel):
     LIMIT: ClassVar[int]
     """Maximum number of bits allowed."""
 
-    data: Sequence[Any] = Field(default_factory=tuple)
-    """The immutable bit data stored as a tuple (converted to Boolean at validation)."""
+    data: Sequence[Boolean] = Field(default_factory=tuple)
+    """
+    The immutable bit data stored as a sequence of Booleans.
+
+    Accepts lists, tuples, or iterables of bool-like values on input;
+    stored as a tuple of Boolean after validation.
+    """
 
     @field_validator("data", mode="before")
     @classmethod
-    def _validate_list_data(cls, v: Any) -> Tuple[Boolean, ...]:
+    def _coerce_and_validate(cls, v: Any) -> tuple[Boolean, ...]:
         """Validate and convert input to a tuple of Boolean elements."""
         if not hasattr(cls, "LIMIT"):
             raise TypeError(f"{cls.__name__} must define LIMIT")
@@ -150,14 +156,9 @@ class BaseBitlist(SSZModel):
 
         # Check limit
         if len(elements) > cls.LIMIT:
-            raise ValueError(
-                f"{cls.__name__} cannot contain more than {cls.LIMIT} bits, got {len(elements)}"
-            )
+            raise ValueError(f"{cls.__name__} cannot exceed {cls.LIMIT} bits, got {len(elements)}")
 
-        try:
-            return tuple(Boolean(element) for element in elements)
-        except Exception as e:
-            raise ValueError(f"Cannot convert elements to Boolean: {e}") from e
+        return tuple(Boolean(bit) for bit in elements)
 
     @overload
     def __getitem__(self, key: int) -> Boolean: ...
@@ -253,7 +254,7 @@ class BaseBitlist(SSZModel):
         the last data bit. All bits after the delimiter are assumed to be 0.
         """
         if len(data) == 0:
-            raise ValueError("Cannot decode empty data to Bitlist")
+            raise ValueError("Cannot decode empty bytes to Bitlist")
 
         # Find the position of the delimiter bit (rightmost 1).
         delimiter_pos = None
@@ -269,11 +270,9 @@ class BaseBitlist(SSZModel):
             raise ValueError("No delimiter bit found in Bitlist data")
 
         # Extract data bits (everything before the delimiter).
-        num_data_bits = delimiter_pos
-        if num_data_bits > cls.LIMIT:
-            raise ValueError(
-                f"{cls.__name__} decoded length {num_data_bits} exceeds limit {cls.LIMIT}"
-            )
+        num_bits = delimiter_pos
+        if num_bits > cls.LIMIT:
+            raise ValueError(f"{cls.__name__} decoded length {num_bits} exceeds limit {cls.LIMIT}")
 
-        bits = [bool((data[i // 8] >> (i % 8)) & 1) for i in range(num_data_bits)]
+        bits = tuple(Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(num_bits))
         return cls(data=bits)

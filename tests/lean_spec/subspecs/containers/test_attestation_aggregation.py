@@ -10,7 +10,7 @@ from lean_spec.subspecs.containers.attestation import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Boolean, Bytes32, Uint64
 
 
 class TestAttestationAggregation:
@@ -18,7 +18,7 @@ class TestAttestationAggregation:
 
     def test_reject_empty_aggregation_bits(self) -> None:
         """Validate aggregated attestation must include at least one validator."""
-        bits = AggregationBits(data=[False, False, False])
+        bits = AggregationBits(data=[Boolean(False), Boolean(False), Boolean(False)])
         with pytest.raises(AssertionError, match="at least one validator"):
             bits.to_validator_indices()
 
@@ -126,11 +126,11 @@ class TestDuplicateAttestationDataValidation:
         from lean_spec.subspecs.containers.attestation.types import AggregationBits
 
         agg1 = AggregatedAttestation(
-            aggregation_bits=AggregationBits(data=[False, True]),
+            aggregation_bits=AggregationBits(data=[Boolean(False), Boolean(True)]),
             data=att_data,
         )
         agg2 = AggregatedAttestation(
-            aggregation_bits=AggregationBits(data=[False, True, True]),
+            aggregation_bits=AggregationBits(data=[Boolean(False), Boolean(True), Boolean(True)]),
             data=att_data,
         )
 

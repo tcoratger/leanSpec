@@ -371,11 +371,12 @@ def test_hash_tree_root_bitvector(
     Its hash tree root is the Merkle root of these bytes, treated like a `ByteVector`.
     """
 
-    # Create the Bitvector instance.
+    # Create the Bitvector instance with Boolean values.
     class TestBitvector(BaseBitvector):
         LENGTH = len(bits)
 
-    bv = TestBitvector(data=bits)
+    bool_bits = tuple(Boolean(b) for b in bits)
+    bv = TestBitvector(data=bool_bits)
     # Sanity check: ensure the serialization is correct.
     assert bv.encode_bytes().hex() == expect_serial_hex
     # Verify the hash tree root.
@@ -407,11 +408,12 @@ def test_hash_tree_root_bitlist(
     part, and then mixes in the number of bits.
     """
 
-    # Create the Bitlist instance.
+    # Create the Bitlist instance with Boolean values.
     class TestBitlist(BaseBitlist):
         LIMIT = limit
 
-    bl = TestBitlist(data=bits)
+    bool_bits = tuple(Boolean(b) for b in bits)
+    bl = TestBitlist(data=bool_bits)
     # Sanity check the SSZ serialization.
     assert bl.encode_bytes().hex() == expect_serial_hex
     # Verify the hash tree root.
@@ -427,7 +429,7 @@ def test_hash_tree_root_bitvector_512_all_ones() -> None:
     class Bitvector512(BaseBitvector):
         LENGTH = 512
 
-    bv = Bitvector512(data=(1,) * 512)
+    bv = Bitvector512(data=tuple(Boolean(1) for _ in range(512)))
     # Both chunks will be all `0xff` bytes.
     left = "ff" * 32
     right = "ff" * 32
@@ -446,7 +448,7 @@ def test_hash_tree_root_bitlist_512_all_ones() -> None:
     class Bitlist512(BaseBitlist):
         LIMIT = 512
 
-    bl = Bitlist512(data=(1,) * 512)
+    bl = Bitlist512(data=tuple(Boolean(1) for _ in range(512)))
     # The data part is 512 bits (64 bytes), which forms two full chunks of `0xff`.
     # The Merkle root of the data is the hash of these two chunks.
     base = h("ff" * 32, "ff" * 32)
