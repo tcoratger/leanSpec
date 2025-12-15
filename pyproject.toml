@@ -127,7 +127,7 @@ test = [
     "lean-ethereum-testing",
 ]
 lint = [
-    "ty>=0.0.1a13",
+    "ty>=0.0.1a34",
     "ruff>=0.13.2,<1",
     "codespell>=2.4.1,<3",
 ]
