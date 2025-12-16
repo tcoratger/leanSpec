@@ -59,7 +59,7 @@ class AggregationBits(BaseBitlist):
         return indices
 
 
-class NaiveAggregatedSignature(SSZList):
+class NaiveAggregatedSignature(SSZList[Signature]):
     """Naive list of validator signatures used for aggregation placeholders."""
 
     ELEMENT_TYPE = Signature

@@ -166,7 +166,7 @@ class HashSubTree(Container):
             parents = [
                 hasher.apply(
                     parameter,
-                    TreeTweak(level=level + 1, index=int(parent_start) + i),
+                    TreeTweak(level=level + 1, index=Uint64(int(parent_start) + i)),
                     [current.nodes[2 * i], current.nodes[2 * i + 1]],
                 )
                 for i in range(len(current.nodes) // 2)
@@ -394,7 +394,7 @@ class HashSubTree(Container):
                 chain_ends.append(end_digest)
 
             # Hash the chain ends to get the leaf for this epoch.
-            leaf_tweak = TreeTweak(level=0, index=epoch)
+            leaf_tweak = TreeTweak(level=0, index=Uint64(epoch))
             leaf_hash = hasher.apply(parameter, leaf_tweak, chain_ends)
             leaf_hashes.append(leaf_hash)
 
@@ -537,7 +537,7 @@ def combined_path(
     # Concatenate: bottom path + top path.
     bottom_path = bottom_tree.path(position)
     top_path = top_tree.path(position // leafs_per_tree)
-    combined = bottom_path.siblings.data + top_path.siblings.data
+    combined = tuple(bottom_path.siblings.data) + tuple(top_path.siblings.data)
 
     return HashTreeOpening(siblings=HashDigestList(data=combined))
 
@@ -600,7 +600,7 @@ def verify_path(
     # Start: hash leaf parts to get leaf node.
     current = hasher.apply(
         parameter,
-        TreeTweak(level=0, index=int(position)),
+        TreeTweak(level=0, index=Uint64(position)),
         leaf_parts,
     )
     pos = int(position)
@@ -616,7 +616,7 @@ def verify_path(
         pos //= 2  # Parent position.
         current = hasher.apply(
             parameter,
-            TreeTweak(level=level + 1, index=pos),
+            TreeTweak(level=level + 1, index=Uint64(pos)),
             [left, right],
         )
 

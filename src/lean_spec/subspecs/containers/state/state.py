@@ -333,8 +333,8 @@ class State(Container):
             update={
                 "latest_justified": new_latest_justified,
                 "latest_finalized": new_latest_finalized,
-                "historical_block_hashes": HistoricalBlockHashes(data=new_historical_hashes_data),
-                "justified_slots": JustifiedSlots(data=new_justified_slots_data),
+                "historical_block_hashes": new_historical_hashes_data,
+                "justified_slots": new_justified_slots_data,
                 "latest_block_header": new_header,
             }
         )
@@ -570,7 +570,7 @@ class State(Container):
                 "justifications_validators": JustificationValidators(
                     data=[vote for root in sorted_roots for vote in justifications[root]]
                 ),
-                "justified_slots": JustifiedSlots(data=justified_slots),
+                "justified_slots": justified_slots,
                 "latest_justified": latest_justified,
                 "latest_finalized": latest_finalized,
             }

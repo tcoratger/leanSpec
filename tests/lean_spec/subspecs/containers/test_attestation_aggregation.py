@@ -10,7 +10,7 @@ from lean_spec.subspecs.containers.attestation import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Boolean, Bytes32, Uint64
 
 
 class TestAggregationBits:
@@ -18,19 +18,21 @@ class TestAggregationBits:
 
     def test_reject_empty_aggregation_bits(self) -> None:
         """Validate aggregated attestation must include at least one validator."""
-        bits = AggregationBits(data=[False, False, False])
+        bits = AggregationBits(data=[Boolean(False), Boolean(False), Boolean(False)])
         with pytest.raises(AssertionError, match="at least one validator"):
             bits.to_validator_indices()
 
     def test_to_validator_indices_single_bit(self) -> None:
         """Test conversion with a single bit set."""
-        bits = AggregationBits(data=[False, True, False])
+        bits = AggregationBits(data=[Boolean(False), Boolean(True), Boolean(False)])
         indices = bits.to_validator_indices()
         assert indices == [Uint64(1)]
 
     def test_to_validator_indices_multiple_bits(self) -> None:
         """Test conversion with multiple bits set."""
-        bits = AggregationBits(data=[True, False, True, True, False])
+        bits = AggregationBits(
+            data=[Boolean(True), Boolean(False), Boolean(True), Boolean(True), Boolean(False)]
+        )
         indices = bits.to_validator_indices()
         assert indices == [Uint64(0), Uint64(2), Uint64(3)]
 

@@ -24,7 +24,7 @@ from lean_spec.subspecs.containers.state import State, Validators
 from lean_spec.subspecs.containers.validator import Validator
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Bytes52, Uint64
 
 
 def test_on_block_processes_multi_validator_aggregations() -> None:
@@ -32,7 +32,7 @@ def test_on_block_processes_multi_validator_aggregations() -> None:
     key_manager = XmssKeyManager(max_slot=Slot(10))
     validators = Validators(
         data=[
-            Validator(pubkey=key_manager[Uint64(i)].public.encode_bytes(), index=Uint64(i))
+            Validator(pubkey=Bytes52(key_manager[Uint64(i)].public.encode_bytes()), index=Uint64(i))
             for i in range(3)
         ]
     )

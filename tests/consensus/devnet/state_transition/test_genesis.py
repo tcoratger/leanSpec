@@ -159,7 +159,7 @@ def test_genesis_block_hash_comparison() -> None:
     # Fill pubkeys with different values (1, 2, 3)
     pubkeys1 = [Bytes52(bytes([i + 1] * 52)) for i in range(3)]
     validators1 = Validators(
-        data=[Validator(pubkey=pubkey, index=i) for i, pubkey in enumerate(pubkeys1)]
+        data=[Validator(pubkey=pubkey, index=Uint64(i)) for i, pubkey in enumerate(pubkeys1)]
     )
 
     genesis_state1 = State.generate_genesis(
@@ -202,7 +202,7 @@ def test_genesis_block_hash_comparison() -> None:
     # Fill pubkeys with different values (10, 11, 12)
     pubkeys2 = [Bytes52(bytes([i + 10] * 52)) for i in range(3)]
     validators2 = Validators(
-        data=[Validator(pubkey=pubkey, index=i) for i, pubkey in enumerate(pubkeys2)]
+        data=[Validator(pubkey=pubkey, index=Uint64(i)) for i, pubkey in enumerate(pubkeys2)]
     )
 
     genesis_state2 = State.generate_genesis(
@@ -227,7 +227,7 @@ def test_genesis_block_hash_comparison() -> None:
     # Same as pubkeys1
     pubkeys3 = [Bytes52(bytes([i + 1] * 52)) for i in range(3)]
     validators3 = Validators(
-        data=[Validator(pubkey=pubkey, index=i) for i, pubkey in enumerate(pubkeys3)]
+        data=[Validator(pubkey=pubkey, index=Uint64(i)) for i, pubkey in enumerate(pubkeys3)]
     )
 
     genesis_state3 = State.generate_genesis(

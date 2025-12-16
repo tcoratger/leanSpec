@@ -1,4 +1,5 @@
 from lean_spec.subspecs.containers import AttestationData, Checkpoint, SignedAttestation
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
 from lean_spec.subspecs.xmss.containers import Signature
@@ -8,10 +9,10 @@ from lean_spec.types import Bytes32, Uint64
 
 def test_encode_decode_signed_attestation_roundtrip() -> None:
     attestation_data = AttestationData(
-        slot=0,
-        head=Checkpoint(root=Bytes32.zero(), slot=0),
-        target=Checkpoint(root=Bytes32.zero(), slot=0),
-        source=Checkpoint(root=Bytes32.zero(), slot=0),
+        slot=Slot(0),
+        head=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
+        target=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
+        source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
     )
     signed_attestation = SignedAttestation(
         validator_id=Uint64(0),

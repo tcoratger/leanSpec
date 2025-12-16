@@ -6,17 +6,11 @@ from ...chain.config import VALIDATOR_REGISTRY_LIMIT
 from ..attestation import AggregatedAttestation, AttestationData, NaiveAggregatedSignature
 
 
-class AggregatedAttestations(SSZList):
+class AggregatedAttestations(SSZList[AggregatedAttestation]):
     """List of aggregated attestations included in a block."""
 
     ELEMENT_TYPE = AggregatedAttestation
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
-
-    def __getitem__(self, index: int) -> AggregatedAttestation:
-        """Access an aggregated attestation by index with proper typing."""
-        item = self.data[index]
-        assert isinstance(item, AggregatedAttestation)
-        return item
 
     def has_duplicate_data(self) -> bool:
         """Check if any two attestations share the same AttestationData."""
@@ -28,7 +22,7 @@ class AggregatedAttestations(SSZList):
         return False
 
 
-class AttestationSignatures(SSZList):
+class AttestationSignatures(SSZList[NaiveAggregatedSignature]):
     """List of per-attestation naive signature lists aligned with block body attestations."""
 
     ELEMENT_TYPE = NaiveAggregatedSignature
