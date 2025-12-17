@@ -61,8 +61,8 @@ class StateTransitionTest(BaseConsensusFixture):
     """
     The filled Blocks, processed through the specs.
 
-    This is a private attribute not part of the model schema. Tests cannot set
-    this. The framework populates it during make_fixture().
+    This is a private attribute not part of the model schema. Tests cannot set this.
+    The framework populates it during make_fixture().
     """
 
     post: StateExpectation | None = None
@@ -215,11 +215,11 @@ class StateTransitionTest(BaseConsensusFixture):
         if not spec.skip_slot_processing:
             temp_state = state.process_slots(spec.slot)
 
-        # Use provided parent_root or compute it
+        # Use provided parent root or compute it
         if spec.parent_root is not None:
             parent_root = spec.parent_root
         else:
-            source_state = temp_state if temp_state is not None else state
+            source_state = temp_state or state
             parent_root = hash_tree_root(source_state.latest_block_header)
 
         # Extract attestations from body if provided
@@ -238,16 +238,15 @@ class StateTransitionTest(BaseConsensusFixture):
             )
             return block, None
 
-        temp_block = Block(
-            slot=spec.slot,
-            proposer_index=proposer_index,
-            parent_root=parent_root,
-            state_root=Bytes32.zero(),
-            body=spec.body or BlockBody(attestations=aggregated_attestations),
-        )
-
+        # For invalid tests, return incomplete block without processing
         if self.expect_exception is not None or spec.skip_slot_processing:
-            return temp_block, None
+            return Block(
+                slot=spec.slot,
+                proposer_index=proposer_index,
+                parent_root=parent_root,
+                state_root=Bytes32.zero(),
+                body=spec.body or BlockBody(attestations=aggregated_attestations),
+            ), None
 
         # Convert aggregated attestations to plain attestations to build block
         plain_attestations = [

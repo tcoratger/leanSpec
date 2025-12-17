@@ -113,7 +113,8 @@ class BlockSpec(CamelModel):
 
     skip_slot_processing: bool = False
     """
-    If True, the state transition fixture skips automatic slot advancement before
-    processing this block. Useful for tests that intentionally exercise slot
-    mismatch failures.
+    If True, the state transition fixture skips automatic slot advancement
+    before processing this block.
+
+    Useful for tests that intentionally exercise slot mismatch failures.
     """
