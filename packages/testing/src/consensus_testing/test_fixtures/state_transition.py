@@ -61,8 +61,8 @@ class StateTransitionTest(BaseConsensusFixture):
     """
     The filled Blocks, processed through the specs.
 
-    This is a private attribute not part of the model schema. Tests cannot set this.
-    The framework populates it during make_fixture().
+    This is a private attribute not part of the model schema. Tests cannot set
+    this. The framework populates it during make_fixture().
     """
 
     post: StateExpectation | None = None
@@ -75,6 +75,9 @@ class StateTransitionTest(BaseConsensusFixture):
 
     expect_exception: type[Exception] | None = None
     """Expected exception type for invalid tests."""
+
+    expect_exception_message: str | None = None
+    """Expected exception message for invalid tests."""
 
     @field_serializer("blocks", when_used="json")
     def serialize_blocks(self, value: List[BlockSpec]) -> List[dict[str, Any]]:
@@ -139,11 +142,15 @@ class StateTransitionTest(BaseConsensusFixture):
                 filled_blocks.append(block)
 
                 # Use cached state if available, otherwise run state transition
-                state = (
-                    cached_state
-                    if cached_state is not None
-                    else state.state_transition(block=block, valid_signatures=True)
-                )
+                if cached_state is not None:
+                    state = cached_state
+                elif getattr(block_spec, "skip_slot_processing", False):
+                    state = state.process_block(block)
+                else:
+                    state = state.state_transition(
+                        block=block,
+                        valid_signatures=True,
+                    )
 
             actual_post_state = state
         except (AssertionError, ValueError) as e:
@@ -168,6 +175,12 @@ class StateTransitionTest(BaseConsensusFixture):
                     f"Expected {self.expect_exception.__name__} "
                     f"but got {type(exception_raised).__name__}: {exception_raised}"
                 )
+            if self.expect_exception_message is not None:
+                if str(exception_raised) != self.expect_exception_message:
+                    raise AssertionError(
+                        f"Expected exception message '{self.expect_exception_message}' "
+                        f"but got '{exception_raised}'"
+                    )
 
         # Validate post-state expectations if provided
         if self.post is not None and actual_post_state is not None:
@@ -198,12 +211,16 @@ class StateTransitionTest(BaseConsensusFixture):
         # Use provided proposer index or compute it
         proposer_index = spec.proposer_index or Uint64(int(spec.slot) % len(state.validators))
 
-        # Use provided parent root or compute it
+        temp_state: State | None = None
+        if not spec.skip_slot_processing:
+            temp_state = state.process_slots(spec.slot)
+
+        # Use provided parent_root or compute it
         if spec.parent_root is not None:
             parent_root = spec.parent_root
         else:
-            temp_state = state.process_slots(spec.slot)
-            parent_root = hash_tree_root(temp_state.latest_block_header)
+            source_state = temp_state if temp_state is not None else state
+            parent_root = hash_tree_root(source_state.latest_block_header)
 
         # Extract attestations from body if provided
         aggregated_attestations = (
@@ -221,25 +238,24 @@ class StateTransitionTest(BaseConsensusFixture):
             )
             return block, None
 
-        # For invalid tests, return incomplete block without processing
-        if self.expect_exception is not None:
-            block = Block(
-                slot=spec.slot,
-                proposer_index=proposer_index,
-                parent_root=parent_root,
-                state_root=Bytes32.zero(),
-                body=spec.body or BlockBody(attestations=aggregated_attestations),
-            )
-            return block, None
+        temp_block = Block(
+            slot=spec.slot,
+            proposer_index=proposer_index,
+            parent_root=parent_root,
+            state_root=Bytes32.zero(),
+            body=spec.body or BlockBody(attestations=aggregated_attestations),
+        )
 
-        # Build the block using the state for standard case
-        #
+        if self.expect_exception is not None or spec.skip_slot_processing:
+            return temp_block, None
+
         # Convert aggregated attestations to plain attestations to build block
         plain_attestations = [
             Attestation(validator_id=vid, data=agg.data)
             for agg in aggregated_attestations
             for vid in agg.aggregation_bits.to_validator_indices()
         ]
+
         block, post_state, _, _ = state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
