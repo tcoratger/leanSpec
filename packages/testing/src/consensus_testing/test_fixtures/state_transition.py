@@ -61,7 +61,10 @@ class StateTransitionTest(BaseConsensusFixture):
     """
     The filled Blocks, processed through the specs.
 
-    This is a private attribute not part of the model schema. Tests cannot set this.
+    This is a private attribute not part of the model schema.
+
+    Tests cannot set this.
+
     The framework populates it during make_fixture().
     """
 
