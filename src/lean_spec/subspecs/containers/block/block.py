@@ -12,6 +12,7 @@ can propose.
 from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
 from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.container import Container
 
@@ -135,7 +136,9 @@ class SignedBlockWithAttestation(Container):
     aggregation of all signatures).
     """
 
-    def verify_signatures(self, parent_state: "State") -> bool:
+    def verify_signatures(
+        self, parent_state: "State", scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME
+    ) -> bool:
         """
         Verify all XMSS signatures in this signed block.
 
@@ -147,6 +150,7 @@ class SignedBlockWithAttestation(Container):
         Args:
             parent_state: The state at the parent block, used to retrieve
                 validator public keys and verify signatures.
+            scheme: The XMSS signature scheme to use for verification.
 
         Returns:
             True if all signatures are cryptographically valid.
@@ -189,6 +193,7 @@ class SignedBlockWithAttestation(Container):
                     validator.get_pubkey(),
                     aggregated_attestation.data.slot,
                     attestation_root,
+                    scheme,
                 ), "Attestation signature verification failed"
 
         # Verify proposer attestation signature
@@ -203,6 +208,7 @@ class SignedBlockWithAttestation(Container):
             proposer.get_pubkey(),
             proposer_attestation.data.slot,
             proposer_attestation.data.data_root_bytes(),
+            scheme,
         ), "Proposer signature verification failed"
 
         return True
