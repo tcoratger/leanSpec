@@ -78,8 +78,13 @@ class Signature(Container):
         Verify the signature using XMSS verification algorithm.
 
         This is a convenience method that delegates to `scheme.verify()`.
-        Invalid signatures return `False`; only `ValueError` exceptions
-        (e.g., invalid epoch) are caught and converted to `False`.
+
+        Invalid or malformed signatures return `False`.
+
+        Expected exceptions:
+        - `ValueError` for invalid epochs,
+        - `IndexError` for malformed signatures
+        are caught and converted to `False`.
 
         Args:
             public_key: The public key to verify against.
@@ -92,7 +97,7 @@ class Signature(Container):
         """
         try:
             return scheme.verify(public_key, epoch, message, self)
-        except ValueError:
+        except (ValueError, IndexError):
             return False
 
 
