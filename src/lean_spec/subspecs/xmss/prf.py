@@ -88,9 +88,9 @@ class Prf(StrictBaseModel):
 
     @model_validator(mode="after")
     def enforce_strict_types(self) -> "Prf":
-        """Validates that only exact approved types are used (rejects subclasses)."""
+        """Reject subclasses to prevent type confusion attacks."""
         if type(self.config) is not XmssConfig:
-            raise TypeError(f"config must be exactly XmssConfig, got {type(self.config).__name__}")
+            raise TypeError("config must be exactly XmssConfig, not a subclass")
         return self
 
     def key_gen(self) -> PRFKey:

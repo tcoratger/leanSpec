@@ -7,7 +7,7 @@ implementing the memory-efficient top-bottom tree traversal approach.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from lean_spec.types import Uint64
 from lean_spec.types.container import Container
@@ -107,7 +107,7 @@ class HashSubTree(Container):
         depth: int,
         start_index: Uint64,
         parameter: Parameter,
-        lowest_layer_nodes: List[HashDigestVector],
+        lowest_layer_nodes: list[HashDigestVector],
     ) -> HashSubTree:
         """
         Builds a new sparse Merkle subtree starting from a specified layer.
@@ -154,7 +154,7 @@ class HashSubTree(Container):
             )
 
         # Initialize with padded input layer.
-        layers: List[HashTreeLayer] = []
+        layers: list[HashTreeLayer] = []
         current = get_padded_layer(rand, lowest_layer_nodes, start_index)
         layers.append(current)
 
@@ -190,7 +190,7 @@ class HashSubTree(Container):
         depth: int,
         start_bottom_tree_index: Uint64,
         parameter: Parameter,
-        bottom_tree_roots: List[HashDigestVector],
+        bottom_tree_roots: list[HashDigestVector],
     ) -> HashSubTree:
         """
         Constructs a top tree from the roots of bottom trees.
@@ -246,7 +246,7 @@ class HashSubTree(Container):
         depth: int,
         bottom_tree_index: Uint64,
         parameter: Parameter,
-        leaves: List[HashDigestVector],
+        leaves: list[HashDigestVector],
     ) -> HashSubTree:
         """
         Constructs a single bottom tree from leaf hashes.
@@ -372,11 +372,11 @@ class HashSubTree(Container):
         end_epoch = start_epoch + Uint64(leafs_per_bottom_tree)
 
         # Generate leaf hashes for all epochs in this bottom tree.
-        leaf_hashes: List[HashDigestVector] = []
+        leaf_hashes: list[HashDigestVector] = []
 
         for epoch in range(int(start_epoch), int(end_epoch)):
             # For each epoch, compute the one-time public key (chain endpoints).
-            chain_ends: List[HashDigestVector] = []
+            chain_ends: list[HashDigestVector] = []
 
             for chain_index in range(config.DIMENSION):
                 # Derive the secret start of the chain from the PRF key.
@@ -456,7 +456,7 @@ class HashSubTree(Container):
             raise ValueError(f"Position {position} out of bounds.")
 
         # Collect sibling at each layer (except root).
-        siblings: List[HashDigestVector] = []
+        siblings: list[HashDigestVector] = []
         pos = position
 
         # Iterate over all layers except the last (root).
@@ -547,7 +547,7 @@ def verify_path(
     parameter: Parameter,
     root: HashDigestVector,
     position: Uint64,
-    leaf_parts: List[HashDigestVector],
+    leaf_parts: list[HashDigestVector],
     opening: HashTreeOpening,
 ) -> bool:
     """

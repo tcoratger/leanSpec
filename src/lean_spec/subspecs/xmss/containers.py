@@ -72,12 +72,27 @@ class Signature(Container):
         public_key: PublicKey,
         epoch: "Uint64",
         message: bytes,
-        scheme: GeneralizedXmssScheme,
+        scheme: "GeneralizedXmssScheme",
     ) -> bool:
-        """Verify the signature using XMSS verification algorithm."""
+        """
+        Verify the signature using XMSS verification algorithm.
+
+        This is a convenience method that delegates to `scheme.verify()`.
+        Invalid signatures return `False`; only `ValueError` exceptions
+        (e.g., invalid epoch) are caught and converted to `False`.
+
+        Args:
+            public_key: The public key to verify against.
+            epoch: The epoch the signature corresponds to.
+            message: The message that was supposedly signed.
+            scheme: The XMSS scheme instance to use for verification.
+
+        Returns:
+            `True` if the signature is valid, `False` otherwise.
+        """
         try:
             return scheme.verify(public_key, epoch, message, self)
-        except Exception:
+        except ValueError:
             return False
 
 

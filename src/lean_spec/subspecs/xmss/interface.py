@@ -8,8 +8,6 @@ This constitutes the public API of the signature scheme.
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 from pydantic import model_validator
 
 from lean_spec.config import LEAN_ENV
@@ -28,13 +26,13 @@ from .constants import (
 from .containers import PublicKey, SecretKey, Signature
 from .prf import PROD_PRF, TEST_PRF, Prf
 from .rand import PROD_RAND, TEST_RAND, Rand
-from .subtree import HashSubTree
+from .subtree import HashSubTree, combined_path, verify_path
 from .tweak_hash import (
     PROD_TWEAK_HASHER,
     TEST_TWEAK_HASHER,
     TweakHasher,
 )
-from .types import HashDigestVector
+from .types import HashDigestList, HashDigestVector
 from .utils import expand_activation_time
 
 
@@ -42,9 +40,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
     """
     Instance of the Generalized XMSS signature scheme for a given config.
 
-    This class enforces strict type checking to ensure only approved component
-    implementations are used. Subclasses of the base component types (such as
-    SeededPrf or SeededRand) are explicitly rejected.
+    This class holds the configuration and component instances needed to
+    perform key generation, signing, and verification operations.
     """
 
     config: XmssConfig
@@ -64,25 +61,22 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
     @model_validator(mode="after")
     def enforce_strict_types(self) -> "GeneralizedXmssScheme":
-        """Validates that only exact approved types are used (rejects subclasses)."""
-        checks = {
-            "config": XmssConfig,
-            "prf": Prf,
-            "hasher": TweakHasher,
-            "encoder": TargetSumEncoder,
-            "rand": Rand,
-        }
-        for field, expected in checks.items():
-            if type(getattr(self, field)) is not expected:
-                raise TypeError(
-                    f"{field} must be exactly {expected.__name__}, "
-                    f"got {type(getattr(self, field)).__name__}"
-                )
+        """Reject subclasses to prevent type confusion attacks."""
+        if type(self.config) is not XmssConfig:
+            raise TypeError("config must be exactly XmssConfig, not a subclass")
+        if type(self.prf) is not Prf:
+            raise TypeError("prf must be exactly Prf, not a subclass")
+        if type(self.hasher) is not TweakHasher:
+            raise TypeError("hasher must be exactly TweakHasher, not a subclass")
+        if type(self.encoder) is not TargetSumEncoder:
+            raise TypeError("encoder must be exactly TargetSumEncoder, not a subclass")
+        if type(self.rand) is not Rand:
+            raise TypeError("rand must be exactly Rand, not a subclass")
         return self
 
     def key_gen(
         self, activation_epoch: Uint64, num_active_epochs: Uint64
-    ) -> Tuple[PublicKey, SecretKey]:
+    ) -> tuple[PublicKey, SecretKey]:
         """
         Generates a new cryptographic key pair for a specified range of epochs.
 
@@ -184,7 +178,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
 
         # Collect roots for building the top tree.
-        bottom_tree_roots: List[HashDigestVector] = [
+        bottom_tree_roots: list[HashDigestVector] = [
             left_bottom_tree.root(),
             right_bottom_tree.root(),
         ]
@@ -328,7 +322,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             raise RuntimeError("Encoding is broken: returned too many or too few chunks.")
 
         # Compute the one-time signature hashes based on the codeword.
-        ots_hashes: List[HashDigestVector] = []
+        ots_hashes: list[HashDigestVector] = []
         for chain_index, steps in enumerate(codeword):
             # Derive the secret start of the current chain using the master PRF key.
             start_digest = self.prf.apply(sk.prf_key, epoch, Uint64(chain_index))
@@ -370,16 +364,12 @@ class GeneralizedXmssScheme(StrictBaseModel):
             )
 
         # Generate the combined authentication path
-        from .subtree import combined_path
-
         path = combined_path(sk.top_tree, bottom_tree, epoch)
 
         # Assemble and return the final signature, which contains:
         # - The OTS,
         # - The Merkle path,
         # - The randomness `rho` needed for verification.
-        from .types import HashDigestList
-
         return Signature(path=path, rho=rho, hashes=HashDigestList(data=ots_hashes))
 
     def verify(self, pk: PublicKey, epoch: Uint64, message: bytes, sig: Signature) -> bool:
@@ -437,7 +427,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             return False
 
         # Reconstruct the one-time public key (the list of chain endpoints).
-        chain_ends: List[HashDigestVector] = []
+        chain_ends: list[HashDigestVector] = []
         for chain_index, xi in enumerate(codeword):
             # The signature provides `start_digest`, which is the hash value after `xi` steps.
             start_digest = sig.hashes[chain_index]
@@ -460,8 +450,6 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # - Hashes the `chain_ends` to get the leaf node for the epoch,
         # - Uses the `opening` path from the signature to compute a candidate root.
         # - It returns true if and only if this candidate root matches the public key's root.
-        from .subtree import verify_path
-
         return verify_path(
             hasher=self.hasher,
             parameter=pk.parameter,
