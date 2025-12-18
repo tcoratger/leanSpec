@@ -162,14 +162,16 @@ class HashSubTree(Container):
         for level in range(lowest_layer, depth):
             parent_start = current.start_index // Uint64(2)
 
-            # Hash each pair of siblings into their parent.
+            # Hash each pair of siblings into their parent using zip for cleaner indexing.
+            parent_start_int = int(parent_start)
+            node_pairs = zip(current.nodes[::2], current.nodes[1::2], strict=True)
             parents = [
                 hasher.apply(
                     parameter,
-                    TreeTweak(level=level + 1, index=Uint64(int(parent_start) + i)),
-                    [current.nodes[2 * i], current.nodes[2 * i + 1]],
+                    TreeTweak(level=level + 1, index=Uint64(parent_start_int + i)),
+                    [left, right],
                 )
-                for i in range(len(current.nodes) // 2)
+                for i, (left, right) in enumerate(node_pairs)
             ]
 
             # Pad and store the new layer.
@@ -608,11 +610,7 @@ def verify_path(
     # Walk up: hash current with each sibling.
     for level, sibling in enumerate(opening.siblings):
         # Left child has even position, right child has odd.
-        if pos % 2 == 0:
-            left, right = current, sibling
-        else:
-            left, right = sibling, current
-
+        left, right = (current, sibling) if pos % 2 == 0 else (sibling, current)
         pos //= 2  # Parent position.
         current = hasher.apply(
             parameter,

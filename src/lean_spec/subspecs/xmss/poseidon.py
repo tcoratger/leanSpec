@@ -88,9 +88,8 @@ class PoseidonXmss(StrictBaseModel):
         assert width in (16, 24), "Width must be 16 or 24"
         params = self.params16 if width == 16 else self.params24
 
-        # Create a fixed-width buffer and copy the input, padding with zeros.
-        padded_input = [Fp(value=0)] * width
-        padded_input[: len(input_vec)] = input_vec
+        # Create a padded input by extending with zeros to match the state width.
+        padded_input = list(input_vec) + [Fp(value=0)] * (width - len(input_vec))
 
         # Apply the Poseidon2 permutation.
         permuted_state = permute(padded_input, params)

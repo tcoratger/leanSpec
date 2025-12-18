@@ -239,20 +239,17 @@ def map_to_vertex(w: int, v: int, d: int, x: int) -> list[int]:
 
         # This loop finds which block of sub-hypercubes the index `x_curr` falls into.
         #
-        # It skips over full blocks by subtracting their size
-        # from `x_curr` until the correct one is found.
-        ji = -1  # Sentinel value
+        # It skips over full blocks by subtracting their size from `x_curr` until found.
+        ji = None
         range_start = max(0, d_curr - (w - 1) * dim_remaining)
         for j in range(range_start, min(w, d_curr + 1)):
             count = prev_dim_layer_info.sizes[d_curr - j]
-            if x_curr >= count:
-                x_curr -= count
-            else:
-                # Found the correct block.
+            if x_curr < count:
                 ji = j
                 break
+            x_curr -= count
 
-        if ji == -1:
+        if ji is None:
             raise RuntimeError("Internal logic error: failed to find coordinate")
 
         # Convert the block's distance contribution `ji` to a coordinate `ai`.

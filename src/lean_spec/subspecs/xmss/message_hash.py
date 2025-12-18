@@ -179,21 +179,16 @@ class MessageHasher(StrictBaseModel):
         epoch_fe = self.encode_epoch(epoch)
 
         # Iteratively call Poseidon2 to generate a long hash output.
+        #
+        # The base input (rho || P || epoch || message) is reused each iteration.
+        base_input = list(rho.data) + list(parameter.data) + epoch_fe + message_fe
         poseidon_outputs: list[Fp] = []
+        output_len = self.config.POS_OUTPUT_LEN_PER_INV_FE
         for i in range(self.config.POS_INVOCATIONS):
-            # Use the iteration number as a domain separator for each hash call.
-            iteration_separator = [Fp(value=i)]
-
-            # The input is: rho || P || epoch || message || iteration.
-            combined_input = (
-                list(rho.data) + list(parameter.data) + epoch_fe + message_fe + iteration_separator
+            # Append iteration number as domain separator and hash.
+            poseidon_outputs.extend(
+                self.poseidon.compress(base_input + [Fp(value=i)], 24, output_len)
             )
-
-            # Hash the combined input using Poseidon2 compression mode.
-            iteration_output = self.poseidon.compress(
-                combined_input, 24, self.config.POS_OUTPUT_LEN_PER_INV_FE
-            )
-            poseidon_outputs.extend(iteration_output)
 
         # Map the final aggregated list of field elements into a hypercube vertex.
         return self._map_into_hypercube_part(poseidon_outputs)

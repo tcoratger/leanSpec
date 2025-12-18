@@ -271,11 +271,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
         config = self.config
 
         # Verify that the secret key is currently active for the requested signing epoch.
-        # Note: range() requires int, so we convert only for the range check
+        epoch_int = int(epoch)
         activation_int = int(sk.activation_epoch)
-        num_epochs_int = int(sk.num_active_epochs)
-        active_range = range(activation_int, activation_int + num_epochs_int)
-        if int(epoch) not in active_range:
+        if not (activation_int <= epoch_int < activation_int + int(sk.num_active_epochs)):
             raise ValueError("Key is not active for the specified epoch.")
 
         # Verify that the epoch is within the prepared interval (covered by loaded bottom trees).
@@ -284,11 +282,13 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # signed without computing additional bottom trees.
         #
         # If the epoch is outside this range, we need to slide the window forward.
-        prepared_interval = self.get_prepared_interval(sk)
-        if int(epoch) not in prepared_interval:
+        leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
+        prepared_start = int(sk.left_bottom_tree_index) * leafs_per_bottom_tree
+        prepared_end = prepared_start + 2 * leafs_per_bottom_tree
+        if not (prepared_start <= epoch_int < prepared_end):
             raise ValueError(
                 f"Epoch {epoch} is outside the prepared interval "
-                f"[{prepared_interval.start}, {prepared_interval.stop}). "
+                f"[{prepared_start}, {prepared_end}). "
                 f"Call advance_preparation() to slide the window forward."
             )
 
@@ -344,16 +344,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # With top-bottom tree traversal, we use combined_path to merge paths from
         # the bottom tree and top tree.
 
-        # Determine which bottom tree contains this epoch.
-        leafs_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
-        boundary = (sk.left_bottom_tree_index + Uint64(1)) * Uint64(leafs_per_bottom_tree)
-
-        if epoch < boundary:
-            # Use left bottom tree
-            bottom_tree = sk.left_bottom_tree
-        else:
-            # Use right bottom tree
-            bottom_tree = sk.right_bottom_tree
+        # Determine which bottom tree contains this epoch (reuse leafs_per_bottom_tree from above).
+        boundary = (int(sk.left_bottom_tree_index) + 1) * leafs_per_bottom_tree
+        bottom_tree = sk.left_bottom_tree if epoch_int < boundary else sk.right_bottom_tree
 
         # Ensure bottom tree exists
         if bottom_tree is None:
@@ -498,9 +491,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
             ValueError: If the secret key is missing top-bottom tree structures.
         """
         leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
-        start = int(sk.left_bottom_tree_index * Uint64(leafs_per_bottom_tree))
-        end = start + (2 * leafs_per_bottom_tree)
-        return range(start, end)
+        start = int(sk.left_bottom_tree_index) * leafs_per_bottom_tree
+        return range(start, start + 2 * leafs_per_bottom_tree)
 
     def advance_preparation(self, sk: SecretKey) -> SecretKey:
         """
@@ -528,26 +520,23 @@ class GeneralizedXmssScheme(StrictBaseModel):
             ValueError: If advancing would exceed the activation interval.
         """
         leafs_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
+        left_index = int(sk.left_bottom_tree_index)
 
         # Check if advancing would exceed the activation interval
-        next_prepared_end_epoch = int(
-            sk.left_bottom_tree_index * Uint64(leafs_per_bottom_tree)
-            + Uint64(3 * leafs_per_bottom_tree)
-        )
-        activation_interval = self.get_activation_interval(sk)
-        if next_prepared_end_epoch > activation_interval.stop:
+        next_prepared_end_epoch = (left_index + 3) * leafs_per_bottom_tree
+        activation_end = int(sk.activation_epoch) + int(sk.num_active_epochs)
+        if next_prepared_end_epoch > activation_end:
             # Nothing to do - we're already at the end of the activation interval
             return sk
 
         # Compute the next bottom tree (the one after the current right tree)
-        new_right_tree_index = sk.left_bottom_tree_index + Uint64(2)
         new_right_bottom_tree = HashSubTree.from_prf_key(
             prf=self.prf,
             hasher=self.hasher,
             rand=self.rand,
             config=self.config,
             prf_key=sk.prf_key,
-            bottom_tree_index=new_right_tree_index,
+            bottom_tree_index=Uint64(left_index + 2),
             parameter=sk.parameter,
         )
 
@@ -556,7 +545,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             update={
                 "left_bottom_tree": sk.right_bottom_tree,
                 "right_bottom_tree": new_right_bottom_tree,
-                "left_bottom_tree_index": sk.left_bottom_tree_index + Uint64(1),
+                "left_bottom_tree_index": Uint64(left_index + 1),
             }
         )
 

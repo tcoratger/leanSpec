@@ -201,9 +201,7 @@ class TweakHasher(StrictBaseModel):
             #
             # We use the robust sponge mode.
             # First, flatten the list of message parts into a single vector.
-            flattened_message: list[Fp] = []
-            for part in message_parts:
-                flattened_message.extend(part.elements)
+            flattened_message = [elem for part in message_parts for elem in part.elements]
             input_vec = parameter.elements + encoded_tweak + flattened_message
 
             # Create a domain separator for the sponge mode based on the input dimensions.
