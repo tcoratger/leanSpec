@@ -1,9 +1,4 @@
-"""
-Internal validation utilities for the XMSS scheme.
-
-This module provides utilities to enforce strict type constraints on Pydantic models,
-preventing type confusion attacks through subclass injection.
-"""
+"""Internal validation utilities for the XMSS scheme."""
 
 from __future__ import annotations
 
