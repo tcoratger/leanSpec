@@ -14,10 +14,12 @@ class SSZError(Exception):
     """
 
     def __init__(self, message: str) -> None:
+        """Initialize the exception with a message."""
         self.message = message
         super().__init__(message)
 
     def __repr__(self) -> str:
+        """Return a string representation of the exception."""
         return f"{self.__class__.__name__}({self.message!r})"
 
 
@@ -42,6 +44,7 @@ class SSZTypeDefinitionError(SSZTypeError):
         missing_attr: str | None = None,
         detail: str | None = None,
     ) -> None:
+        """Initialize the exception with type definition error details."""
         self.type_name = type_name
         self.missing_attr = missing_attr
         self.detail = detail
@@ -72,6 +75,7 @@ class SSZTypeCoercionError(SSZTypeError):
         actual_type: str,
         value: Any = None,
     ) -> None:
+        """Initialize the exception with type coercion error details."""
         self.expected_type = expected_type
         self.actual_type = actual_type
         self.value = value
@@ -113,6 +117,7 @@ class SSZOverflowError(SSZValueError):
         min_value: int = 0,
         max_value: int,
     ) -> None:
+        """Initialize the exception with overflow error details."""
         self.value = value
         self.type_name = type_name
         self.min_value = min_value
@@ -142,6 +147,7 @@ class SSZLengthError(SSZValueError):
         actual: int,
         is_limit: bool = False,
     ) -> None:
+        """Initialize the exception with length error details."""
         self.type_name = type_name
         self.expected = expected
         self.actual = actual
@@ -176,6 +182,7 @@ class SSZDecodeError(SSZSerializationError):
         *,
         offset: int | None = None,
     ) -> None:
+        """Initialize the exception with decode error details."""
         self.type_name = type_name
         self.detail = detail
         self.offset = offset
@@ -206,6 +213,7 @@ class SSZStreamError(SSZSerializationError):
         expected_bytes: int | None = None,
         actual_bytes: int | None = None,
     ) -> None:
+        """Initialize the exception with stream error details."""
         self.type_name = type_name
         self.operation = operation
         self.expected_bytes = expected_bytes
@@ -246,6 +254,7 @@ class SSZOffsetError(SSZDecodeError):
         start_offset: int | None = None,
         end_offset: int | None = None,
     ) -> None:
+        """Initialize the exception with offset error details."""
         self.field_name = field_name
         self.start_offset = start_offset
         self.end_offset = end_offset
@@ -280,6 +289,7 @@ class SSZSelectorError(SSZDecodeError):
         selector: int,
         num_options: int,
     ) -> None:
+        """Initialize the exception with selector error details."""
         self.selector = selector
         self.num_options = num_options
 
