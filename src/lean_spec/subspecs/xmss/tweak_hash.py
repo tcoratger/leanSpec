@@ -121,17 +121,18 @@ class TweakHasher(StrictBaseModel):
         # Pack the tweak's integer fields into a single large integer.
         #
         # A hardcoded prefix is included for domain separation between tweak types.
-        if isinstance(tweak, TreeTweak):
-            # Packing scheme: (level << 40) | (index << 8) | PREFIX
-            acc = (tweak.level << 40) | (int(tweak.index) << 8) | TWEAK_PREFIX_TREE.value
-        else:
-            # Packing scheme: (epoch << 24) | (chain_index << 16) | (step << 8) | PREFIX
-            acc = (
-                (int(tweak.epoch) << 24)
-                | (tweak.chain_index << 16)
-                | (tweak.step << 8)
-                | TWEAK_PREFIX_CHAIN.value
-            )
+        match tweak:
+            case TreeTweak(level=level, index=index):
+                # Packing scheme: (level << 40) | (index << 8) | PREFIX
+                acc = (level << 40) | (int(index) << 8) | TWEAK_PREFIX_TREE.value
+            case ChainTweak(epoch=epoch, chain_index=chain_index, step=step):
+                # Packing scheme: (epoch << 24) | (chain_index << 16) | (step << 8) | PREFIX
+                acc = (
+                    (int(epoch) << 24)
+                    | (chain_index << 16)
+                    | (step << 8)
+                    | TWEAK_PREFIX_CHAIN.value
+                )
 
         # Decompose the packed integer `acc` into a list of base-P field elements.
         return int_to_base_p(acc, length)
