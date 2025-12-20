@@ -31,6 +31,7 @@ from pydantic import Field, model_validator
 from lean_spec.types import StrictBaseModel, Uint64
 
 from ..koalabear import Fp
+from ._validation import enforce_strict_types
 from .constants import (
     PROD_CONFIG,
     TEST_CONFIG,
@@ -86,12 +87,9 @@ class TweakHasher(StrictBaseModel):
     """Poseidon permutation instance for hashing."""
 
     @model_validator(mode="after")
-    def enforce_strict_types(self) -> "TweakHasher":
+    def _validate_strict_types(self) -> "TweakHasher":
         """Reject subclasses to prevent type confusion attacks."""
-        if type(self.config) is not XmssConfig:
-            raise TypeError("config must be exactly XmssConfig, not a subclass")
-        if type(self.poseidon) is not PoseidonXmss:
-            raise TypeError("poseidon must be exactly PoseidonXmss, not a subclass")
+        enforce_strict_types(self, config=XmssConfig, poseidon=PoseidonXmss)
         return self
 
     def _encode_tweak(self, tweak: TreeTweak | ChainTweak, length: int) -> list[Fp]:
