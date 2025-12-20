@@ -16,12 +16,7 @@ from typing import IO, Any, Type
 from typing_extensions import Self
 
 from .constants import OFFSET_BYTE_LENGTH
-from .exceptions import (
-    SSZOffsetError,
-    SSZStreamError,
-    SSZTypeCoercionError,
-    SSZTypeDefinitionError,
-)
+from .exceptions import SSZSerializationError, SSZTypeError
 from .ssz_base import SSZModel, SSZType
 from .uint import Uint32
 
@@ -41,11 +36,7 @@ def _get_ssz_field_type(annotation: Any) -> Type[SSZType]:
     """
     # Check if it's a class and is a subclass of SSZType
     if not (inspect.isclass(annotation) and issubclass(annotation, SSZType)):
-        raise SSZTypeCoercionError(
-            expected_type="SSZType subclass",
-            actual_type=str(annotation),
-            value=annotation,
-        )
+        raise SSZTypeError(f"Expected SSZType subclass, got {annotation}")
     return annotation
 
 
@@ -109,10 +100,7 @@ class Container(SSZModel):
         """
         # Only fixed-size containers have a deterministic byte length
         if not cls.is_fixed_size():
-            raise SSZTypeDefinitionError(
-                type_name=cls.__name__,
-                detail="variable-size containers have no fixed byte length",
-            )
+            raise SSZTypeError(f"{cls.__name__}: variable-size container has no fixed byte length")
 
         # Sum the byte lengths of all fixed-size fields
         return sum(
@@ -211,11 +199,8 @@ class Container(SSZModel):
                 size = field_type.get_byte_length()
                 data = stream.read(size)
                 if len(data) != size:
-                    raise SSZStreamError(
-                        type_name=cls.__name__,
-                        operation=f"reading field '{field_name}'",
-                        expected_bytes=size,
-                        actual_bytes=len(data),
+                    raise SSZSerializationError(
+                        f"{cls.__name__}.{field_name}: expected {size} bytes, got {len(data)}"
                     )
                 fields[field_name] = field_type.decode_bytes(data)
                 bytes_read += size
@@ -223,11 +208,9 @@ class Container(SSZModel):
                 # Read offset pointer for variable field
                 offset_bytes = stream.read(OFFSET_BYTE_LENGTH)
                 if len(offset_bytes) != OFFSET_BYTE_LENGTH:
-                    raise SSZStreamError(
-                        type_name=cls.__name__,
-                        operation=f"reading offset for field '{field_name}'",
-                        expected_bytes=OFFSET_BYTE_LENGTH,
-                        actual_bytes=len(offset_bytes),
+                    raise SSZSerializationError(
+                        f"{cls.__name__}.{field_name}: "
+                        f"expected {OFFSET_BYTE_LENGTH} offset bytes, got {len(offset_bytes)}"
                     )
                 offset = int(Uint32.decode_bytes(offset_bytes))
                 var_fields.append((field_name, field_type, offset))
@@ -239,11 +222,9 @@ class Container(SSZModel):
             var_section_size = scope - bytes_read
             var_section = stream.read(var_section_size)
             if len(var_section) != var_section_size:
-                raise SSZStreamError(
-                    type_name=cls.__name__,
-                    operation="reading variable section",
-                    expected_bytes=var_section_size,
-                    actual_bytes=len(var_section),
+                raise SSZSerializationError(
+                    f"{cls.__name__}: "
+                    f"expected {var_section_size} variable bytes, got {len(var_section)}"
                 )
 
             # Extract each variable field using offsets
@@ -256,11 +237,8 @@ class Container(SSZModel):
 
                 # Validate offset bounds
                 if rel_start < 0 or rel_start > rel_end:
-                    raise SSZOffsetError(
-                        type_name=cls.__name__,
-                        field_name=name,
-                        start_offset=start,
-                        end_offset=end,
+                    raise SSZSerializationError(
+                        f"{cls.__name__}.{name}: invalid offsets start={start}, end={end}"
                     )
 
                 # Deserialize field from its slice

@@ -8,12 +8,7 @@ from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 from typing_extensions import Self
 
-from .exceptions import (
-    SSZDecodeError,
-    SSZOverflowError,
-    SSZStreamError,
-    SSZTypeCoercionError,
-)
+from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 from .ssz_base import SSZType
 
 
@@ -33,19 +28,12 @@ class BaseUint(int, SSZType):
         """
         # We should accept only ints.
         if not isinstance(value, int) or isinstance(value, bool):
-            raise SSZTypeCoercionError(
-                expected_type="int",
-                actual_type=type(value).__name__,
-                value=value,
-            )
+            raise SSZTypeError(f"Expected int, got {type(value).__name__}")
 
         int_value = int(value)
-        if not (0 <= int_value < (2**cls.BITS)):
-            raise SSZOverflowError(
-                value=int_value,
-                type_name=cls.__name__,
-                max_value=2**cls.BITS - 1,
-            )
+        max_value = 2**cls.BITS - 1
+        if not (0 <= int_value <= max_value):
+            raise SSZValueError(f"{int_value} out of range for {cls.__name__} [0, {max_value}]")
         return super().__new__(cls, int_value)
 
     @classmethod
@@ -126,9 +114,8 @@ class BaseUint(int, SSZType):
         # Ensure the input data has the correct number of bytes.
         expected_length = cls.get_byte_length()
         if len(data) != expected_length:
-            raise SSZDecodeError(
-                type_name=cls.__name__,
-                detail=f"expected {expected_length} bytes, got {len(data)}",
+            raise SSZSerializationError(
+                f"{cls.__name__}: expected {expected_length} bytes, got {len(data)}"
             )
         # The `from_bytes` class method from `int` is used to convert the data.
         return cls(int.from_bytes(data, "little"))
@@ -169,19 +156,15 @@ class BaseUint(int, SSZType):
         # For a fixed-size type, the scope must exactly match the byte length.
         byte_length = cls.get_byte_length()
         if scope != byte_length:
-            raise SSZDecodeError(
-                type_name=cls.__name__,
-                detail=f"invalid scope: expected {byte_length} bytes, got {scope}",
+            raise SSZSerializationError(
+                f"{cls.__name__}: invalid scope, expected {byte_length} bytes, got {scope}"
             )
         # Read the required number of bytes from the stream.
         data = stream.read(byte_length)
         # Ensure the correct number of bytes was read.
         if len(data) != byte_length:
-            raise SSZStreamError(
-                type_name=cls.__name__,
-                operation="decoding",
-                expected_bytes=byte_length,
-                actual_bytes=len(data),
+            raise SSZSerializationError(
+                f"{cls.__name__}: expected {byte_length} bytes, got {len(data)}"
             )
         # Decode the bytes into a new instance.
         return cls.decode_bytes(data)

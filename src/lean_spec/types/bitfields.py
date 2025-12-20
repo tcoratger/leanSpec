@@ -29,13 +29,7 @@ from pydantic import Field, field_validator
 from typing_extensions import Self
 
 from .boolean import Boolean
-from .exceptions import (
-    SSZDecodeError,
-    SSZLengthError,
-    SSZStreamError,
-    SSZTypeCoercionError,
-    SSZTypeDefinitionError,
-)
+from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 from .ssz_base import SSZModel
 
 
@@ -62,19 +56,14 @@ class BaseBitvector(SSZModel):
     def _coerce_and_validate(cls, v: Any) -> tuple[Boolean, ...]:
         """Validate and convert input data to typed tuple of Booleans."""
         if not hasattr(cls, "LENGTH"):
-            raise SSZTypeDefinitionError(
-                type_name=cls.__name__,
-                missing_attr="LENGTH",
-            )
+            raise SSZTypeError(f"{cls.__name__} must define LENGTH")
 
         if not isinstance(v, (list, tuple)):
             v = tuple(v)
 
         if len(v) != cls.LENGTH:
-            raise SSZLengthError(
-                type_name=cls.__name__,
-                expected=cls.LENGTH,
-                actual=len(v),
+            raise SSZValueError(
+                f"{cls.__name__} requires exactly {cls.LENGTH} elements, got {len(v)}"
             )
 
         return tuple(Boolean(bit) for bit in v)
@@ -100,18 +89,12 @@ class BaseBitvector(SSZModel):
         """Read SSZ bytes from a stream and return an instance."""
         expected_len = cls.get_byte_length()
         if scope != expected_len:
-            raise SSZDecodeError(
-                type_name=cls.__name__,
-                detail=f"expected {expected_len} bytes, got {scope}",
+            raise SSZSerializationError(
+                f"{cls.__name__}: expected {expected_len} bytes, got {scope}"
             )
         data = stream.read(scope)
         if len(data) != scope:
-            raise SSZStreamError(
-                type_name=cls.__name__,
-                operation="decoding",
-                expected_bytes=scope,
-                actual_bytes=len(data),
-            )
+            raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
         return cls.decode_bytes(data)
 
     def encode_bytes(self) -> bytes:
@@ -137,11 +120,7 @@ class BaseBitvector(SSZModel):
         """
         expected = cls.get_byte_length()
         if len(data) != expected:
-            raise SSZLengthError(
-                type_name=cls.__name__,
-                expected=expected,
-                actual=len(data),
-            )
+            raise SSZValueError(f"{cls.__name__}: expected {expected} bytes, got {len(data)}")
 
         bits = tuple(Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(cls.LENGTH))
         return cls(data=bits)
@@ -170,10 +149,7 @@ class BaseBitlist(SSZModel):
     def _coerce_and_validate(cls, v: Any) -> tuple[Boolean, ...]:
         """Validate and convert input to a tuple of Boolean elements."""
         if not hasattr(cls, "LIMIT"):
-            raise SSZTypeDefinitionError(
-                type_name=cls.__name__,
-                missing_attr="LIMIT",
-            )
+            raise SSZTypeError(f"{cls.__name__} must define LIMIT")
 
         # Handle various input types
         if isinstance(v, (list, tuple)):
@@ -181,20 +157,11 @@ class BaseBitlist(SSZModel):
         elif hasattr(v, "__iter__") and not isinstance(v, (str, bytes)):
             elements = list(v)
         else:
-            raise SSZTypeCoercionError(
-                expected_type="iterable",
-                actual_type=type(v).__name__,
-                value=v,
-            )
+            raise SSZTypeError(f"Expected iterable, got {type(v).__name__}")
 
         # Check limit
         if len(elements) > cls.LIMIT:
-            raise SSZLengthError(
-                type_name=cls.__name__,
-                expected=cls.LIMIT,
-                actual=len(elements),
-                is_limit=True,
-            )
+            raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(elements)}")
 
         return tuple(Boolean(bit) for bit in elements)
 
@@ -235,11 +202,8 @@ class BaseBitlist(SSZModel):
 
     @classmethod
     def get_byte_length(cls) -> int:
-        """Lists are variable-size, so this raises an SSZTypeDefinitionError."""
-        raise SSZTypeDefinitionError(
-            type_name=cls.__name__,
-            detail="variable-size bitlist has no fixed byte length",
-        )
+        """Lists are variable-size, so this raises an SSZTypeError."""
+        raise SSZTypeError(f"{cls.__name__}: variable-size bitlist has no fixed byte length")
 
     def serialize(self, stream: IO[bytes]) -> int:
         """Write SSZ bytes to a binary stream."""
@@ -252,12 +216,7 @@ class BaseBitlist(SSZModel):
         """Read SSZ bytes from a stream and return an instance."""
         data = stream.read(scope)
         if len(data) != scope:
-            raise SSZStreamError(
-                type_name=cls.__name__,
-                operation="decoding",
-                expected_bytes=scope,
-                actual_bytes=len(data),
-            )
+            raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
         return cls.decode_bytes(data)
 
     def encode_bytes(self) -> bytes:
@@ -300,10 +259,7 @@ class BaseBitlist(SSZModel):
         the last data bit. All bits after the delimiter are assumed to be 0.
         """
         if len(data) == 0:
-            raise SSZDecodeError(
-                type_name=cls.__name__,
-                detail="cannot decode empty bytes to Bitlist",
-            )
+            raise SSZSerializationError(f"{cls.__name__}: cannot decode empty bytes")
 
         # Find the position of the delimiter bit (rightmost 1).
         delimiter_pos = None
@@ -316,20 +272,12 @@ class BaseBitlist(SSZModel):
                 break
 
         if delimiter_pos is None:
-            raise SSZDecodeError(
-                type_name=cls.__name__,
-                detail="no delimiter bit found in Bitlist data",
-            )
+            raise SSZSerializationError(f"{cls.__name__}: no delimiter bit found")
 
         # Extract data bits (everything before the delimiter).
         num_bits = delimiter_pos
         if num_bits > cls.LIMIT:
-            raise SSZLengthError(
-                type_name=cls.__name__,
-                expected=cls.LIMIT,
-                actual=num_bits,
-                is_limit=True,
-            )
+            raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {num_bits}")
 
         bits = tuple(Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(num_bits))
         return cls(data=bits)

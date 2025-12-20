@@ -7,16 +7,8 @@ from .byte_arrays import ZERO_HASH, Bytes32, Bytes52, Bytes3116
 from .collections import SSZList, SSZVector
 from .container import Container
 from .exceptions import (
-    SSZDecodeError,
     SSZError,
-    SSZLengthError,
-    SSZOffsetError,
-    SSZOverflowError,
-    SSZSelectorError,
     SSZSerializationError,
-    SSZStreamError,
-    SSZTypeCoercionError,
-    SSZTypeDefinitionError,
     SSZTypeError,
     SSZValueError,
 )
@@ -40,16 +32,9 @@ __all__ = [
     "SSZType",
     "Boolean",
     "Container",
+    # Exceptions
     "SSZError",
     "SSZTypeError",
-    "SSZTypeDefinitionError",
-    "SSZTypeCoercionError",
     "SSZValueError",
-    "SSZOverflowError",
-    "SSZLengthError",
     "SSZSerializationError",
-    "SSZDecodeError",
-    "SSZStreamError",
-    "SSZOffsetError",
-    "SSZSelectorError",
 ]

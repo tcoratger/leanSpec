@@ -19,11 +19,7 @@ from lean_spec.types.byte_arrays import (
     BaseBytes,
     BaseByteList,
 )
-from lean_spec.types.exceptions import (
-    SSZDecodeError,
-    SSZLengthError,
-    SSZStreamError,
-)
+from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 
 
 def sha256(b: bytes) -> bytes:
@@ -66,11 +62,11 @@ def test_bytevector_coercion(value: Any, expected: bytes) -> None:
 
 
 def test_bytevector_wrong_length_raises() -> None:
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         Bytes4(b"\x00\x01\x02")  # 3 != 4
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         Bytes4([0, 1, 2])  # 3 != 4
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         Bytes4("000102")  # 3 != 4 (hex nibbles -> 3 bytes)
 
 
@@ -94,7 +90,7 @@ def test_bytelist_coercion(value: Any, expected: bytes) -> None:
 
 def test_bytelist_over_limit_raises() -> None:
     # Test with ByteList64 that has limit 64
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         ByteList64(data=b"\x00" * 65)  # Over the limit
 
 
@@ -175,7 +171,7 @@ def test_encode_decode_roundtrip_vector(Typ: Type[BaseBytes], payload: bytes) ->
 def test_vector_deserialize_scope_mismatch_raises() -> None:
     v = Bytes4(b"\x00\x01\x02\x03")
     buf = io.BytesIO(v.encode_bytes())
-    with pytest.raises(SSZDecodeError, match="expected 4 bytes, got 3"):
+    with pytest.raises(SSZSerializationError, match="expected 4 bytes, got 3"):
         Bytes4.deserialize(buf, 3)  # wrong scope
 
 
@@ -209,7 +205,7 @@ def test_list_deserialize_over_limit_raises() -> None:
         LIMIT = 2
 
     buf = io.BytesIO(b"\x00\x01\x02")
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         TestByteList2.deserialize(buf, 3)
 
 
@@ -218,7 +214,7 @@ def test_list_deserialize_short_stream_raises() -> None:
         LIMIT = 10
 
     buf = io.BytesIO(b"\x00\x01")
-    with pytest.raises(SSZStreamError):
+    with pytest.raises(SSZSerializationError):
         TestByteList10.deserialize(buf, 3)  # stream too short
 
 
@@ -254,11 +250,11 @@ def test_pydantic_accepts_various_inputs_for_vectors() -> None:
 
 
 def test_pydantic_validates_vector_lengths() -> None:
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         ModelVectors(root=Bytes32(b"\x11" * 31), key=Bytes4(b"\x00\x01\x02\x03"))  # too short
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         ModelVectors(root=Bytes32(b"\x11" * 33), key=Bytes4(b"\x00\x01\x02\x03"))  # too long
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         ModelVectors(root=Bytes32(b"\x11" * 32), key=Bytes4(b"\x00\x01\x02"))  # key too short
 
 
@@ -282,7 +278,7 @@ def test_pydantic_accepts_and_serializes_bytelist() -> None:
 
 
 def test_pydantic_bytelist_limit_enforced() -> None:
-    with pytest.raises(SSZLengthError):
+    with pytest.raises(SSZValueError):
         ModelLists(payload=ByteList16(data=bytes(range(17))))  # over limit
 
 
