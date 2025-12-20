@@ -16,6 +16,12 @@ from typing import IO, Any, Type
 from typing_extensions import Self
 
 from .constants import OFFSET_BYTE_LENGTH
+from .exceptions import (
+    SSZOffsetError,
+    SSZStreamError,
+    SSZTypeCoercionError,
+    SSZTypeDefinitionError,
+)
 from .ssz_base import SSZModel, SSZType
 from .uint import Uint32
 
@@ -31,13 +37,14 @@ def _get_ssz_field_type(annotation: Any) -> Type[SSZType]:
         The SSZType class.
 
     Raises:
-        TypeError: If the annotation is not a valid SSZType class.
+        SSZTypeCoercionError: If the annotation is not a valid SSZType class.
     """
     # Check if it's a class and is a subclass of SSZType
     if not (inspect.isclass(annotation) and issubclass(annotation, SSZType)):
-        raise TypeError(
-            f"Field annotation {annotation} is not a valid SSZType class. "
-            f"Container fields must be concrete SSZType subclasses."
+        raise SSZTypeCoercionError(
+            expected_type="SSZType subclass",
+            actual_type=str(annotation),
+            value=annotation,
         )
     return annotation
 
@@ -98,11 +105,14 @@ class Container(SSZModel):
             Total byte length of all fields summed together.
 
         Raises:
-            TypeError: If called on a variable-size container.
+            SSZTypeDefinitionError: If called on a variable-size container.
         """
         # Only fixed-size containers have a deterministic byte length
         if not cls.is_fixed_size():
-            raise TypeError(f"{cls.__name__} is variable-size")
+            raise SSZTypeDefinitionError(
+                type_name=cls.__name__,
+                detail="variable-size containers have no fixed byte length",
+            )
 
         # Sum the byte lengths of all fixed-size fields
         return sum(
@@ -185,8 +195,8 @@ class Container(SSZModel):
             New container instance with deserialized values.
 
         Raises:
-            IOError: If stream ends unexpectedly.
-            ValueError: If offsets are invalid.
+            SSZStreamError: If stream ends unexpectedly.
+            SSZOffsetError: If offsets are invalid.
         """
         fields = {}  # Collected field values
         var_fields = []  # (name, type, offset) for variable fields
@@ -201,14 +211,24 @@ class Container(SSZModel):
                 size = field_type.get_byte_length()
                 data = stream.read(size)
                 if len(data) != size:
-                    raise IOError(f"Unexpected EOF reading {field_name}")
+                    raise SSZStreamError(
+                        type_name=cls.__name__,
+                        operation=f"reading field '{field_name}'",
+                        expected_bytes=size,
+                        actual_bytes=len(data),
+                    )
                 fields[field_name] = field_type.decode_bytes(data)
                 bytes_read += size
             else:
                 # Read offset pointer for variable field
                 offset_bytes = stream.read(OFFSET_BYTE_LENGTH)
                 if len(offset_bytes) != OFFSET_BYTE_LENGTH:
-                    raise IOError(f"Unexpected EOF reading offset for {field_name}")
+                    raise SSZStreamError(
+                        type_name=cls.__name__,
+                        operation=f"reading offset for field '{field_name}'",
+                        expected_bytes=OFFSET_BYTE_LENGTH,
+                        actual_bytes=len(offset_bytes),
+                    )
                 offset = int(Uint32.decode_bytes(offset_bytes))
                 var_fields.append((field_name, field_type, offset))
                 bytes_read += OFFSET_BYTE_LENGTH
@@ -219,7 +239,12 @@ class Container(SSZModel):
             var_section_size = scope - bytes_read
             var_section = stream.read(var_section_size)
             if len(var_section) != var_section_size:
-                raise IOError("Unexpected EOF in variable section")
+                raise SSZStreamError(
+                    type_name=cls.__name__,
+                    operation="reading variable section",
+                    expected_bytes=var_section_size,
+                    actual_bytes=len(var_section),
+                )
 
             # Extract each variable field using offsets
             offsets = [offset for _, _, offset in var_fields] + [scope]
@@ -231,7 +256,12 @@ class Container(SSZModel):
 
                 # Validate offset bounds
                 if rel_start < 0 or rel_start > rel_end:
-                    raise ValueError(f"Invalid offsets for {name}")
+                    raise SSZOffsetError(
+                        type_name=cls.__name__,
+                        field_name=name,
+                        start_offset=start,
+                        end_offset=end,
+                    )
 
                 # Deserialize field from its slice
                 field_data = var_section[rel_start:rel_end]

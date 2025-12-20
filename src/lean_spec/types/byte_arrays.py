@@ -16,6 +16,12 @@ from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 from typing_extensions import Self
 
+from .exceptions import (
+    SSZDecodeError,
+    SSZLengthError,
+    SSZStreamError,
+    SSZTypeDefinitionError,
+)
 from .ssz_base import SSZModel, SSZType
 
 
@@ -64,14 +70,22 @@ class BaseBytes(bytes, SSZType):
             value: Any value coercible to bytes (see `_coerce_to_bytes`).
 
         Raises:
-            ValueError: If the resulting byte length differs from `LENGTH`.
+            SSZTypeDefinitionError: If the class doesn't define LENGTH.
+            SSZLengthError: If the resulting byte length differs from `LENGTH`.
         """
         if not hasattr(cls, "LENGTH"):
-            raise TypeError(f"{cls.__name__} must define LENGTH")
+            raise SSZTypeDefinitionError(
+                type_name=cls.__name__,
+                missing_attr="LENGTH",
+            )
 
         b = _coerce_to_bytes(value)
         if len(b) != cls.LENGTH:
-            raise ValueError(f"{cls.__name__} expects exactly {cls.LENGTH} bytes, got {len(b)}")
+            raise SSZLengthError(
+                type_name=cls.__name__,
+                expected=cls.LENGTH,
+                actual=len(b),
+            )
         return super().__new__(cls, b)
 
     @classmethod
@@ -112,16 +126,22 @@ class BaseBytes(bytes, SSZType):
         For a fixed-size type, `scope` must match `LENGTH`.
 
         Raises:
-            ValueError: if `scope` != `LENGTH`.
-            IOError: if the stream ends prematurely.
+            SSZDecodeError: if `scope` != `LENGTH`.
+            SSZStreamError: if the stream ends prematurely.
         """
         if scope != cls.LENGTH:
-            raise ValueError(
-                f"Invalid scope for ByteVector[{cls.LENGTH}]: expected {cls.LENGTH}, got {scope}"
+            raise SSZDecodeError(
+                type_name=cls.__name__,
+                detail=f"expected {cls.LENGTH} bytes, got {scope}",
             )
         data = stream.read(scope)
         if len(data) != scope:
-            raise IOError("Stream ended prematurely while decoding ByteVector")
+            raise SSZStreamError(
+                type_name=cls.__name__,
+                operation="decoding",
+                expected_bytes=scope,
+                actual_bytes=len(data),
+            )
         return cls(data)
 
     def encode_bytes(self) -> bytes:
@@ -136,7 +156,11 @@ class BaseBytes(bytes, SSZType):
         For a fixed-size type, the data must be exactly `LENGTH` bytes.
         """
         if len(data) != cls.LENGTH:
-            raise ValueError(f"{cls.__name__} expects exactly {cls.LENGTH} bytes, got {len(data)}")
+            raise SSZLengthError(
+                type_name=cls.__name__,
+                expected=cls.LENGTH,
+                actual=len(data),
+            )
         return cls(data)
 
     @classmethod
@@ -262,11 +286,19 @@ class BaseByteList(SSZModel):
     def _validate_byte_list_data(cls, v: Any) -> bytes:
         """Validate and convert input to bytes with limit checking."""
         if not hasattr(cls, "LIMIT"):
-            raise TypeError(f"{cls.__name__} must define LIMIT")
+            raise SSZTypeDefinitionError(
+                type_name=cls.__name__,
+                missing_attr="LIMIT",
+            )
 
         b = _coerce_to_bytes(v)
         if len(b) > cls.LIMIT:
-            raise ValueError(f"ByteList[{cls.LIMIT}] length {len(b)} exceeds limit {cls.LIMIT}")
+            raise SSZLengthError(
+                type_name=cls.__name__,
+                expected=cls.LIMIT,
+                actual=len(b),
+                is_limit=True,
+            )
         return b
 
     @field_serializer("data", when_used="json")
@@ -282,7 +314,10 @@ class BaseByteList(SSZModel):
     @classmethod
     def get_byte_length(cls) -> int:
         """ByteList is variable-size, so this should not be called."""
-        raise TypeError(f"{cls.__name__} is variable-size and has no fixed byte length")
+        raise SSZTypeDefinitionError(
+            type_name=cls.__name__,
+            detail="variable-size byte list has no fixed byte length",
+        )
 
     def serialize(self, stream: IO[bytes]) -> int:
         """
@@ -303,16 +338,30 @@ class BaseByteList(SSZModel):
         knows how many bytes belong to this value in its context).
 
         Raises:
-            ValueError: if the decoded length exceeds `LIMIT`.
-            IOError: if the stream ends prematurely.
+            SSZDecodeError: if the scope is negative.
+            SSZLengthError: if the decoded length exceeds `LIMIT`.
+            SSZStreamError: if the stream ends prematurely.
         """
         if scope < 0:
-            raise ValueError("Invalid scope for ByteList: negative")
+            raise SSZDecodeError(
+                type_name=cls.__name__,
+                detail="negative scope",
+            )
         if scope > cls.LIMIT:
-            raise ValueError(f"ByteList[{cls.LIMIT}] scope {scope} exceeds limit")
+            raise SSZLengthError(
+                type_name=cls.__name__,
+                expected=cls.LIMIT,
+                actual=scope,
+                is_limit=True,
+            )
         data = stream.read(scope)
         if len(data) != scope:
-            raise IOError("Stream ended prematurely while decoding ByteList")
+            raise SSZStreamError(
+                type_name=cls.__name__,
+                operation="decoding",
+                expected_bytes=scope,
+                actual_bytes=len(data),
+            )
         return cls(data=data)
 
     def encode_bytes(self) -> bytes:
@@ -327,7 +376,12 @@ class BaseByteList(SSZModel):
         For variable-size types, the data length must be `<= LIMIT`.
         """
         if len(data) > cls.LIMIT:
-            raise ValueError(f"ByteList[{cls.LIMIT}] length {len(data)} exceeds limit")
+            raise SSZLengthError(
+                type_name=cls.__name__,
+                expected=cls.LIMIT,
+                actual=len(data),
+                is_limit=True,
+            )
         return cls(data=data)
 
     def __bytes__(self) -> bytes:

@@ -6,11 +6,26 @@ from .boolean import Boolean
 from .byte_arrays import ZERO_HASH, Bytes32, Bytes52, Bytes3116
 from .collections import SSZList, SSZVector
 from .container import Container
+from .exceptions import (
+    SSZDecodeError,
+    SSZError,
+    SSZLengthError,
+    SSZOffsetError,
+    SSZOverflowError,
+    SSZSelectorError,
+    SSZSerializationError,
+    SSZStreamError,
+    SSZTypeCoercionError,
+    SSZTypeDefinitionError,
+    SSZTypeError,
+    SSZValueError,
+)
 from .ssz_base import SSZType
 from .uint import Uint64
 from .validator import is_proposer
 
 __all__ = [
+    # Core types
     "Uint64",
     "BasisPoint",
     "Bytes32",
@@ -25,4 +40,16 @@ __all__ = [
     "SSZType",
     "Boolean",
     "Container",
+    "SSZError",
+    "SSZTypeError",
+    "SSZTypeDefinitionError",
+    "SSZTypeCoercionError",
+    "SSZValueError",
+    "SSZOverflowError",
+    "SSZLengthError",
+    "SSZSerializationError",
+    "SSZDecodeError",
+    "SSZStreamError",
+    "SSZOffsetError",
+    "SSZSelectorError",
 ]

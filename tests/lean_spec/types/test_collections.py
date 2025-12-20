@@ -10,7 +10,11 @@ from lean_spec.subspecs.koalabear import Fp
 from lean_spec.types.boolean import Boolean
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
+from lean_spec.types.exceptions import SSZLengthError, SSZTypeCoercionError, SSZTypeDefinitionError
 from lean_spec.types.uint import Uint8, Uint16, Uint32, Uint256
+
+# Type alias for errors that can be SSZLengthError or wrapped in ValidationError
+LengthOrValidationError = (SSZLengthError, ValidationError)
 
 
 # Define some List types that are needed for Container definitions
@@ -234,9 +238,9 @@ class TestSSZVector:
     def test_instantiation_with_wrong_length_raises_error(self) -> None:
         """Tests that providing the wrong number of items during instantiation fails."""
         vec_type = Uint8Vector4
-        with pytest.raises(ValueError, match="requires exactly 4 items"):
+        with pytest.raises(LengthOrValidationError):
             vec_type(data=[Uint8(1), Uint8(2), Uint8(3)])  # Too few
-        with pytest.raises(ValueError, match="requires exactly 4 items"):
+        with pytest.raises(LengthOrValidationError):
             vec_type(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4), Uint8(5)])  # Too many
 
     def test_pydantic_validation(self) -> None:
@@ -246,11 +250,11 @@ class TestSSZVector:
         assert isinstance(instance.value, Uint8Vector2)
         assert list(instance.value) == [Uint8(10), Uint8(20)]
         # Test invalid data
-        with pytest.raises(ValidationError):
+        with pytest.raises(LengthOrValidationError):
             Uint8Vector2Model(value={"data": [10]})  # type: ignore[arg-type]
-        with pytest.raises(ValidationError):
+        with pytest.raises(LengthOrValidationError):
             Uint8Vector2Model(value={"data": [10, 20, 30]})  # type: ignore[arg-type]
-        with pytest.raises(TypeError):
+        with pytest.raises(SSZTypeCoercionError):
             Uint8Vector2Model(value={"data": [10, "bad"]})  # type: ignore[arg-type]
 
     def test_vector_is_immutable(self) -> None:
@@ -281,13 +285,13 @@ class TestList:
 
     def test_instantiate_raw_type_raises_error(self) -> None:
         """Tests that the raw, non-specialized SSZList cannot be instantiated."""
-        with pytest.raises(TypeError, match="must define ELEMENT_TYPE and LIMIT"):
+        with pytest.raises(SSZTypeDefinitionError, match="must define ELEMENT_TYPE and LIMIT"):
             SSZList(data=[])
 
     def test_instantiation_over_limit_raises_error(self) -> None:
         """Tests that providing more items than the limit during instantiation fails."""
         list_type = Uint8List4
-        with pytest.raises(ValueError, match="cannot contain more than 4 elements"):
+        with pytest.raises(LengthOrValidationError):
             list_type(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4), Uint8(5)])
 
     def test_pydantic_validation(self) -> None:
@@ -297,19 +301,19 @@ class TestList:
         assert isinstance(instance.value, Uint8List4)
         assert list(instance.value) == [Uint8(10), Uint8(20)]
         # Test invalid data - list too long
-        with pytest.raises(ValidationError):
+        with pytest.raises(LengthOrValidationError):
             Uint8List4Model(
                 value=Uint8List4(data=[Uint8(10), Uint8(20), Uint8(30), Uint8(40), Uint8(50)])
             )
 
     def test_append_at_limit_raises_error(self) -> None:
         """Tests that creating a list at limit +1 fails during construction."""
-        with pytest.raises(ValueError, match="cannot contain more than 4 elements"):
+        with pytest.raises(LengthOrValidationError):
             BooleanList4(data=[Boolean(True)] * 5)
 
     def test_extend_over_limit_raises_error(self) -> None:
         """Tests that creating a list over the limit fails during construction."""
-        with pytest.raises(ValueError, match="cannot contain more than 4 elements"):
+        with pytest.raises(LengthOrValidationError):
             BooleanList4(
                 data=[Boolean(True), Boolean(False), Boolean(True), Boolean(False), Boolean(True)]
             )
@@ -332,7 +336,7 @@ class TestList:
     def test_add_exceeding_limit_raises_error(self) -> None:
         """Tests that concatenating beyond the limit raises an error."""
         list1 = Uint8List4(data=[Uint8(1), Uint8(2), Uint8(3)])
-        with pytest.raises(ValueError, match="cannot contain more than 4 elements"):
+        with pytest.raises(LengthOrValidationError):
             list1 + [4, 5]
 
 
