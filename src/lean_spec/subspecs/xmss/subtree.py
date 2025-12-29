@@ -376,7 +376,7 @@ class HashSubTree(Container):
         # Generate leaf hashes for all epochs in this bottom tree.
         leaf_hashes: list[HashDigestVector] = []
 
-        for epoch in range(int(start_epoch), int(end_epoch)):
+        for epoch in range(start_epoch, end_epoch):
             # For each epoch, compute the one-time public key (chain endpoints).
             chain_ends: list[HashDigestVector] = []
 
