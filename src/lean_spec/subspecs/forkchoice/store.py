@@ -25,6 +25,7 @@ from lean_spec.subspecs.containers import (
     AggregationBits,
     Attestation,
     AttestationData,
+    AttestationsByValidator,
     Block,
     Checkpoint,
     Config,
@@ -32,16 +33,15 @@ from lean_spec.subspecs.containers import (
     SignedBlockWithAttestation,
     State,
 )
+from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state.types import (
-    AggregatedSignaturePayloads,
-    AttestationsByValidator,
-    AttestationSignatureKey,
-    BlockLookup,
-    StateLookup,
-)
+from lean_spec.subspecs.containers.state import StateLookup
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import MultisigAggregatedSignature
+from lean_spec.subspecs.xmss.aggregation import (
+    AggregatedSignaturePayloads,
+    AttestationSignatureKey,
+    MultisigAggregatedSignature,
+)
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
 from lean_spec.types import (

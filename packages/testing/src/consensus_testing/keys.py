@@ -44,8 +44,10 @@ from lean_spec.subspecs.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state.types import AttestationSignatureKey
-from lean_spec.subspecs.xmss.aggregation import MultisigAggregatedSignature
+from lean_spec.subspecs.xmss.aggregation import (
+    AttestationSignatureKey,
+    MultisigAggregatedSignature,
+)
 from lean_spec.subspecs.xmss.containers import KeyPair, PublicKey, Signature
 from lean_spec.subspecs.xmss.interface import (
     PROD_SIGNATURE_SCHEME,

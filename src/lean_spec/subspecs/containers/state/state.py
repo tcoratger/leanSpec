@@ -3,7 +3,11 @@
 from typing import AbstractSet, Iterable
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import MultisigAggregatedSignature
+from lean_spec.subspecs.xmss.aggregation import (
+    AggregatedSignaturePayloads,
+    AttestationSignatureKey,
+    MultisigAggregatedSignature,
+)
 from lean_spec.subspecs.xmss.containers import PublicKey, Signature
 from lean_spec.types import (
     ZERO_HASH,
@@ -21,8 +25,6 @@ from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
 from .types import (
-    AggregatedSignaturePayloads,
-    AttestationSignatureKey,
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
