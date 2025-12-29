@@ -1,8 +1,10 @@
 """State Container for the Lean Ethereum consensus specification."""
 
-from typing import TYPE_CHECKING, AbstractSet, Iterable
+from typing import AbstractSet, Iterable
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.subspecs.xmss.aggregation import MultisigAggregatedSignature
+from lean_spec.subspecs.xmss.containers import PublicKey, Signature
 from lean_spec.types import (
     ZERO_HASH,
     Boolean,
@@ -12,16 +14,15 @@ from lean_spec.types import (
     is_proposer,
 )
 
-from ..attestation import AggregatedAttestation, Attestation, SignedAttestation
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.xmss.containers import Signature
+from ..attestation import AggregatedAttestation, AggregationBits, Attestation
 from ..block import Block, BlockBody, BlockHeader
 from ..block.types import AggregatedAttestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
 from .types import (
+    AggregatedSignaturePayloads,
+    AttestationSignatureKey,
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
@@ -356,22 +357,10 @@ class State(Container):
         Raises:
         ------
         AssertionError
-            If block contains duplicate AttestationData.
+            If block contains duplicate aggregated attestations with no unique participant.
         """
         # First process the block header.
         state = self.process_block_header(block)
-
-        # Reject blocks with duplicate attestation data
-        #
-        # Each aggregated attestation in a block must refer to a unique AttestationData.
-        # Duplicates would allow the same vote to be counted multiple times, breaking
-        # the integrity of the justification tally.
-        #
-        # This is a protocol-level invariant: honest proposers never include duplicates,
-        # and validators must reject blocks that violate this rule.
-        assert not block.body.attestations.has_duplicate_data(), (
-            "Block contains duplicate AttestationData"
-        )
 
         return state.process_attestations(block.body.attestations)
 
@@ -620,40 +609,99 @@ class State(Container):
 
         return new_state
 
+    def _aggregate_signatures_from_gossip(
+        self,
+        validator_ids: list[Uint64],
+        data_root: bytes,
+        epoch: Slot,
+        gossip_signatures: dict[AttestationSignatureKey, "Signature"] | None = None,
+    ) -> tuple[MultisigAggregatedSignature, AggregationBits, set[Uint64]] | None:
+        """
+        Aggregate per-validator XMSS signatures into a single payload.
+
+        Returns:
+        -------
+            - MultisigAggregatedSignature: The aggregated signature.
+            - AggregationBits: The aggregation bits.
+            - set[Uint64]: The validator ids whose id's were missing from the gossip signatures.
+
+        Raises:
+            AssertionError: If the aggregation fails.
+        """
+        if not gossip_signatures or not validator_ids:
+            return None
+
+        signatures: list[Signature] = []
+        public_keys: list[PublicKey] = []
+
+        included_validator_ids: set[Uint64] = set()
+        missing_validator_ids: set[Uint64] = set()
+
+        for validator_index in validator_ids:
+            # Attempt to retrieve the signature; fail fast if any are missing.
+            if (sig := gossip_signatures.get((validator_index, data_root))) is None:
+                missing_validator_ids.add(validator_index)
+                continue
+
+            included_validator_ids.add(validator_index)
+            signatures.append(sig)
+            public_keys.append(self.validators[validator_index].get_pubkey())
+
+        if not included_validator_ids:
+            return None
+
+        return (
+            MultisigAggregatedSignature.aggregate_signatures(
+                public_keys=public_keys,
+                signatures=signatures,
+                message=data_root,
+                epoch=epoch,
+            ),
+            AggregationBits.from_validator_indices(list(included_validator_ids)),
+            missing_validator_ids,
+        )
+
     def build_block(
         self,
         slot: Slot,
         proposer_index: Uint64,
         parent_root: Bytes32,
         attestations: list[Attestation] | None = None,
-        available_signed_attestations: Iterable[SignedAttestation] | None = None,
+        available_attestations: Iterable[Attestation] | None = None,
         known_block_roots: AbstractSet[Bytes32] | None = None,
-    ) -> tuple[Block, "State", list[Attestation], list["Signature"]]:
+        gossip_signatures: dict[AttestationSignatureKey, "Signature"] | None = None,
+        aggregated_payloads: dict[AttestationSignatureKey, AggregatedSignaturePayloads]
+        | None = None,
+    ) -> tuple[Block, "State", list[AggregatedAttestation], list[MultisigAggregatedSignature]]:
         """
         Build a valid block on top of this state.
 
         Computes the post-state and creates a block with the correct state root.
 
-        If `available_signed_attestations` and `known_block_roots` are provided,
+        If `available_attestations` and `known_block_roots` are provided,
         performs fixed-point attestation collection: iteratively adds valid
         attestations until no more can be included. This is necessary because
         processing attestations may update the justified checkpoint, which may
         make additional attestations valid.
+
+        Signatures are looked up from the provided signature maps using
+        (validator_id, attestation_data_root) as the key.
 
         Args:
             slot: Target slot for the block.
             proposer_index: Validator index of the proposer.
             parent_root: Root of the parent block.
             attestations: Initial attestations to include.
-            available_signed_attestations: Pool of attestations to collect from.
+            available_attestations: Pool of attestations to collect from.
             known_block_roots: Set of known block roots for attestation validation.
+            gossip_signatures: Per-validator XMSS signatures learned from gossip.
+            aggregated_payloads: Aggregated signature payloads learned from blocks.
 
         Returns:
             Tuple of (Block, post-State, collected attestations, signatures).
         """
-        # Initialize empty attestation set for iterative collection
+        # Initialize empty attestation set for iterative collection.
         attestations = list(attestations or [])
-        signatures: list[Signature] = []
 
         # Iteratively collect valid attestations using fixed-point algorithm
         #
@@ -677,19 +725,17 @@ class State(Container):
             post_state = self.process_slots(slot).process_block(candidate_block)
 
             # No attestation source provided: done after computing post_state
-            if available_signed_attestations is None or known_block_roots is None:
+            if available_attestations is None or known_block_roots is None:
                 break
 
             # Find new valid attestations matching post-state justification
             new_attestations: list[Attestation] = []
-            new_signatures: list[Signature] = []
 
-            for signed_attestation in available_signed_attestations:
-                data = signed_attestation.message
-                attestation = Attestation(
-                    validator_id=signed_attestation.validator_id,
-                    data=data,
-                )
+            for attestation in available_attestations:
+                data = attestation.data
+                validator_id = attestation.validator_id
+                data_root = data.data_root_bytes()
+                attestation_key = (validator_id, data_root)
 
                 # Skip if target block is unknown
                 if data.head.root not in known_block_roots:
@@ -699,10 +745,23 @@ class State(Container):
                 if data.source != post_state.latest_justified:
                     continue
 
-                # Add attestation if not already included
-                if attestation not in attestations:
+                # Avoid adding duplicates of attestations already in the candidate set
+                if attestation in attestations:
+                    continue
+
+                # We can only include an attestation if we have some way to later provide
+                # an aggregated payload for its group:
+                # - either a per validator XMSS signature from gossip, or
+                # - at least one aggregated payload learned from a block that references
+                #   this validator+data.
+                has_gossip_sig = bool(gossip_signatures and attestation_key in gossip_signatures)
+
+                has_block_payload = bool(
+                    aggregated_payloads and attestation_key in aggregated_payloads
+                )
+
+                if has_gossip_sig or has_block_payload:
                     new_attestations.append(attestation)
-                    new_signatures.append(signed_attestation.signature)
 
             # Fixed point reached: no new attestations found
             if not new_attestations:
@@ -710,9 +769,181 @@ class State(Container):
 
             # Add new attestations and continue iteration
             attestations.extend(new_attestations)
-            signatures.extend(new_signatures)
 
-        # Store the post state root in the block
-        final_block = candidate_block.model_copy(update={"state_root": hash_tree_root(post_state)})
+        # Compute the aggregated signatures for the attestations.
+        # If the attestations cannot be aggregated, split it in a greedy way.
+        aggregated_attestations, aggregated_signatures = self.compute_aggregated_signatures(
+            attestations,
+            gossip_signatures,
+            aggregated_payloads,
+        )
 
-        return final_block, post_state, attestations, signatures
+        # Update the block with the aggregated attestations
+        final_block = candidate_block.model_copy(
+            update={
+                "body": BlockBody(
+                    attestations=AggregatedAttestations(
+                        data=aggregated_attestations,
+                    ),
+                ),
+                # Store the post state root in the block
+                "state_root": hash_tree_root(post_state),
+            }
+        )
+
+        return final_block, post_state, aggregated_attestations, aggregated_signatures
+
+    def compute_aggregated_signatures(
+        self,
+        attestations: list[Attestation],
+        gossip_signatures: dict[AttestationSignatureKey, "Signature"] | None = None,
+        aggregated_payloads: dict[AttestationSignatureKey, AggregatedSignaturePayloads]
+        | None = None,
+    ) -> tuple[list[AggregatedAttestation], list[MultisigAggregatedSignature]]:
+        """
+        Compute aggregated signatures for a set of attestations.
+
+        Tries to aggregate all attestations together. If that fails, splits them greedily to
+        generate the minimal number of aggregated attestations.
+
+        Args:
+            attestations: The attestations to compute aggregated signatures for.
+            gossip_signatures: Optional per-validator XMSS signatures learned from gossip.
+            aggregated_payloads: Optional aggregated signature payloads learned from blocks.
+
+        Returns:
+            A tuple of `(aggregated_attestations, aggregated_signatures)`.
+        """
+        final_aggregated_attestations: list[AggregatedAttestation] = []
+        final_aggregated_signatures: list[MultisigAggregatedSignature] = []
+
+        # Aggregate all the attestations into a single aggregated attestation.
+        completely_aggregated_attestations = AggregatedAttestation.aggregate_by_data(attestations)
+
+        # Try to compute the aggregated signatures for the single aggregated attestation.
+        #
+        # We will try to compute the aggregated signatures for the completely aggregated
+        # attestations.
+        #     - either we can find per validator XMSS signatures from gossip, or
+        #     - we can find at least one aggregated payload learned from a block that references
+        #       this validator+data.
+        #
+        # If the aggregated signatures cannot be computed, we will split the completely aggregated
+        # attestations in a greedy way.
+        for completely_aggregated_attestation in completely_aggregated_attestations:
+            validator_ids = (
+                completely_aggregated_attestation.aggregation_bits.to_validator_indices()
+            )
+            data_root = completely_aggregated_attestation.data.data_root_bytes()
+            slot = completely_aggregated_attestation.data.slot
+
+            aggregated_signatures: list[MultisigAggregatedSignature] = []
+            aggregated_signatures_bitlists: list[AggregationBits] = []
+
+            # Try to find per validator XMSS signatures from gossip.
+            gossip_result = self._aggregate_signatures_from_gossip(
+                validator_ids,
+                data_root,
+                slot,
+                gossip_signatures,
+            )
+
+            if gossip_result is not None:
+                gossip_aggregated_signature, gossip_aggregated_bitlist, remaining_validator_ids = (
+                    gossip_result
+                )
+                aggregated_signatures.append(gossip_aggregated_signature)
+                aggregated_signatures_bitlists.append(gossip_aggregated_bitlist)
+            else:
+                remaining_validator_ids = set(validator_ids)
+
+            # Try to pick a single aggregated signature from the aggregated signatures
+            # that covers the most validators.
+            while remaining_validator_ids:
+                aggregated_signature, aggregated_signature_bitlist, remaining_validator_ids = (
+                    self._pick_from_aggregated_signatures(
+                        remaining_validator_ids,
+                        data_root,
+                        aggregated_payloads,
+                    )
+                )
+                aggregated_signatures.append(aggregated_signature)
+                aggregated_signatures_bitlists.append(aggregated_signature_bitlist)
+
+            # TODO: Recursively aggregate the signatures in aggregated_signatures and append it to
+            # final_aggregated_signatures. Since we currently don't support recursive aggregation,
+            # we will just append the aggregated signatures to final_aggregated_signatures.
+            # There might be a case where we have multiple aggregated signatures that cover the same
+            # validators. This is fine for now, eventually we will recursively aggregate into one.
+            for aggregated_signature, aggregated_signature_bitlist in zip(
+                aggregated_signatures, aggregated_signatures_bitlists, strict=True
+            ):
+                final_aggregated_attestations.append(
+                    AggregatedAttestation(
+                        aggregation_bits=aggregated_signature_bitlist,
+                        data=completely_aggregated_attestation.data,
+                    )
+                )
+                final_aggregated_signatures.append(aggregated_signature)
+
+        return final_aggregated_attestations, final_aggregated_signatures
+
+    def _pick_from_aggregated_signatures(
+        self,
+        remaining_validator_ids: set[Uint64],
+        data_root: bytes,
+        aggregated_payloads: dict[AttestationSignatureKey, AggregatedSignaturePayloads]
+        | None = None,
+    ) -> tuple[MultisigAggregatedSignature, AggregationBits, set[Uint64]]:
+        """
+        Pick a single aggregated signature from aggregated signatures that covers the most
+        remaining validator ids.
+
+        Args:
+            remaining_validator_ids: The validator ids to pick from.
+            data_root: The data root to pick from.
+            aggregated_payloads: The aggregated payloads to pick from.
+
+        Returns:
+            - MultisigAggregatedSignature: The aggregated signature.
+            - AggregationBits: The aggregation bits.
+            - set[Uint64]: The remaining validator ids.
+
+        Raises:
+            ValueError: If remaining validator ids is empty or aggregated payloads is not provided.
+            ValueError: If the best aggregated signature is not found.
+        """
+        if not remaining_validator_ids:
+            raise ValueError(
+                "remaining validator ids cannot be empty when picking aggregated signatures"
+            )
+
+        if aggregated_payloads is None:
+            raise ValueError("aggregated payloads is required when gossip coverage is incomplete")
+
+        best_aggregated_signature: MultisigAggregatedSignature | None = None
+        best_aggregated_signature_participants: set[Uint64] = set()
+        best_remaining_validator_ids: set[Uint64] = set()
+
+        representative_validator_id = next(iter(remaining_validator_ids))
+
+        for aggregated_signature_bitlist, aggregated_signature in aggregated_payloads.get(
+            (representative_validator_id, data_root), []
+        ):
+            participants = set(aggregated_signature_bitlist.to_validator_indices())
+            overlap = participants.intersection(remaining_validator_ids)
+            if len(overlap) > len(best_aggregated_signature_participants):
+                best_aggregated_signature = aggregated_signature
+                best_aggregated_signature_participants = overlap
+                best_remaining_validator_ids = set(remaining_validator_ids).difference(overlap)
+
+        if best_aggregated_signature is None:
+            raise ValueError(
+                "Failed to locate an aggregated signature payload for the remaining validators"
+            )
+
+        return (
+            best_aggregated_signature,
+            AggregationBits.from_validator_indices(list(best_aggregated_signature_participants)),
+            best_remaining_validator_ids,
+        )
