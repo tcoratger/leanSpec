@@ -655,7 +655,7 @@ class State(Container):
             public_keys=public_keys,
             signatures=signatures,
             message=data_root,
-            epoch=Uint64(epoch),
+            epoch=epoch,
         )
         return proof, missing_validator_ids
 

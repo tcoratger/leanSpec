@@ -310,7 +310,7 @@ class XmssKeyManager:
                 public_keys=public_keys,
                 signatures=signatures,
                 message=message,
-                epoch=Uint64(epoch),
+                epoch=epoch,
             )
             proofs.append(proof)
 
