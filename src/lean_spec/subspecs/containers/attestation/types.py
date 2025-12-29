@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from lean_spec.types import SSZList, Uint64
+from typing import TYPE_CHECKING
+
+from lean_spec.types import Uint64
 from lean_spec.types.bitfields import BaseBitlist
 
 from ...chain.config import VALIDATOR_REGISTRY_LIMIT
-from ...xmss.containers import Signature
+
+if TYPE_CHECKING:
+    from .attestation import AttestationData
+
+AttestationsByValidator = dict[Uint64, "AttestationData"]
+"""Mapping from validator index to attestation data."""
 
 
 class AggregationBits(BaseBitlist):
@@ -57,10 +64,3 @@ class AggregationBits(BaseBitlist):
             raise AssertionError("Aggregated attestation must reference at least one validator")
 
         return indices
-
-
-class NaiveAggregatedSignature(SSZList[Signature]):
-    """Naive list of validator signatures used for aggregation placeholders."""
-
-    ELEMENT_TYPE = Signature
-    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)

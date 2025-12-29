@@ -4,17 +4,15 @@ from .attestation import (
     AggregatedAttestation,
     Attestation,
     AttestationData,
-    SignedAggregatedAttestation,
     SignedAttestation,
 )
-from .types import AggregationBits, NaiveAggregatedSignature
+from .types import AggregationBits, AttestationsByValidator
 
 __all__ = [
-    "AttestationData",
-    "Attestation",
-    "SignedAttestation",
-    "SignedAggregatedAttestation",
     "AggregatedAttestation",
-    "NaiveAggregatedSignature",
     "AggregationBits",
+    "Attestation",
+    "AttestationData",
+    "AttestationsByValidator",
+    "SignedAttestation",
 ]

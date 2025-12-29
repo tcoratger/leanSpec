@@ -11,12 +11,14 @@ from .block import (
 from .types import (
     AggregatedAttestations,
     AttestationSignatures,
+    BlockLookup,
 )
 
 __all__ = [
     "Block",
     "BlockBody",
     "BlockHeader",
+    "BlockLookup",
     "BlockSignatures",
     "BlockWithAttestation",
     "SignedBlockWithAttestation",

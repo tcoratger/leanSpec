@@ -7,7 +7,7 @@ Multisig signature aggregation + verification.
 
 from __future__ import annotations
 
-from typing import Self, Sequence
+from typing import TYPE_CHECKING, Self, Sequence
 
 from lean_multisig_py import aggregate_signatures as aggregate_signatures_py
 from lean_multisig_py import setup_prover, setup_verifier
@@ -17,6 +17,12 @@ from lean_spec.subspecs.xmss.containers import PublicKey
 from lean_spec.subspecs.xmss.containers import Signature as XmssSignature
 from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import ByteListMiB
+
+if TYPE_CHECKING:
+    from lean_spec.subspecs.containers.attestation import AggregationBits
+
+AttestationSignatureKey = tuple[Uint64, bytes]
+"""Key type for looking up signatures: (validator id, attestation data root)."""
 
 
 class MultisigError(RuntimeError):
@@ -108,3 +114,10 @@ class MultisigAggregatedSignature(ByteListMiB):
             )
         except Exception as exc:
             raise MultisigAggregationError(f"Multisig verification failed: {exc}") from exc
+
+
+AggregatedSignaturePayload = tuple["AggregationBits", "MultisigAggregatedSignature"]
+"""Aggregated signature payload with its participant bitlist."""
+
+AggregatedSignaturePayloads = list[AggregatedSignaturePayload]
+"""List of aggregated signature payloads with their participant bitlists."""

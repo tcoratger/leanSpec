@@ -22,7 +22,7 @@ from lean_spec.types import Container, Uint64
 
 from ...xmss.containers import Signature
 from ..checkpoint import Checkpoint
-from .types import AggregationBits, NaiveAggregatedSignature
+from .types import AggregationBits
 
 
 class AttestationData(Container):
@@ -107,22 +107,3 @@ class AggregatedAttestation(Container):
             )
             for data, validator_ids in data_to_validator_ids.items()
         ]
-
-
-class SignedAggregatedAttestation(Container):
-    """Aggregated attestation bundled with aggregated signatures."""
-
-    message: AggregatedAttestation
-    """Aggregated attestation data."""
-
-    signature: NaiveAggregatedSignature
-    """Aggregated attestation plus its combined signature.
-
-    Stores a naive list of validator signatures that mirrors the attestation
-    order.
-
-    TODO:
-    - signatures will be replaced by MegaBytes in next PR to include leanVM proof.
-    - this will be replaced by a SNARK in future devnets.
-    - this will be aggregated by aggregators in future devnets.
-    """

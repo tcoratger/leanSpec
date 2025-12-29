@@ -13,8 +13,7 @@ from .attestation import (
     AggregationBits,
     Attestation,
     AttestationData,
-    NaiveAggregatedSignature,
-    SignedAggregatedAttestation,
+    AttestationsByValidator,
     SignedAttestation,
 )
 from .block import (
@@ -31,19 +30,18 @@ from .validator import Validator
 
 __all__ = [
     "AggregatedAttestation",
-    "NaiveAggregatedSignature",
     "AggregationBits",
-    "AttestationData",
     "Attestation",
-    "SignedAttestation",
-    "SignedAggregatedAttestation",
+    "AttestationData",
+    "AttestationsByValidator",
     "Block",
-    "BlockWithAttestation",
     "BlockBody",
     "BlockHeader",
+    "BlockWithAttestation",
     "Checkpoint",
     "Config",
+    "SignedAttestation",
     "SignedBlockWithAttestation",
-    "Validator",
     "State",
+    "Validator",
 ]

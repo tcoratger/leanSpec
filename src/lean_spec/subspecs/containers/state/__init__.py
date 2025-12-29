@@ -2,11 +2,6 @@
 
 from .state import State
 from .types import (
-    AggregatedSignaturePayload,
-    AggregatedSignaturePayloads,
-    AttestationsByValidator,
-    AttestationSignatureKey,
-    BlockLookup,
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
@@ -16,16 +11,11 @@ from .types import (
 )
 
 __all__ = [
-    "State",
-    "AggregatedSignaturePayload",
-    "AggregatedSignaturePayloads",
-    "AttestationSignatureKey",
-    "AttestationsByValidator",
-    "BlockLookup",
     "HistoricalBlockHashes",
     "JustificationRoots",
     "JustificationValidators",
     "JustifiedSlots",
+    "State",
     "StateLookup",
     "Validators",
 ]
