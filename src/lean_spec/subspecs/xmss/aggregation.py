@@ -116,7 +116,7 @@ class MultisigAggregatedSignature(ByteListMiB):
             raise MultisigAggregationError(f"Multisig verification failed: {exc}") from exc
 
 
-AggregatedSignaturePayload = tuple[AggregationBits, MultisigAggregatedSignature]
+AggregatedSignaturePayload = tuple["AggregationBits", "MultisigAggregatedSignature"]
 """Aggregated signature payload with its participant bitlist."""
 
 AggregatedSignaturePayloads = list[AggregatedSignaturePayload]
