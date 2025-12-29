@@ -2,6 +2,7 @@
 
 from .base import CamelModel, StrictBaseModel
 from .basispt import BasisPoint
+from .bitfields import BaseBitlist
 from .boolean import Boolean
 from .byte_arrays import ZERO_HASH, Bytes32, Bytes52, Bytes3116
 from .collections import SSZList, SSZVector
@@ -18,6 +19,7 @@ from .validator import is_proposer
 
 __all__ = [
     # Core types
+    "BaseBitlist",
     "Uint64",
     "BasisPoint",
     "Bytes32",

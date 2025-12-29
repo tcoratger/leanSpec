@@ -22,7 +22,7 @@ from lean_spec.types import Container, Uint64
 
 from ...xmss.containers import Signature
 from ..checkpoint import Checkpoint
-from .types import AggregationBits
+from .aggregation_bits import AggregationBits
 
 
 class AttestationData(Container):

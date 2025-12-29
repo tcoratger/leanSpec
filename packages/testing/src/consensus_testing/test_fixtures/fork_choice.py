@@ -29,7 +29,7 @@ from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AttestationSignatureKey
+from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64
@@ -404,14 +404,14 @@ class ForkChoiceTest(BaseConsensusFixture):
         block_registry: dict[str, Block],
         parent_root: Bytes32,
         key_manager: XmssKeyManager,
-    ) -> tuple[list[Attestation], dict[AttestationSignatureKey, Signature]]:
+    ) -> tuple[list[Attestation], dict[SignatureKey, Signature]]:
         """Build attestations list from BlockSpec and their signatures."""
         if spec.attestations is None:
             return [], {}
 
         parent_state = store.states[parent_root]
         attestations = []
-        signature_lookup: dict[AttestationSignatureKey, Signature] = {}
+        signature_lookup: dict[SignatureKey, Signature] = {}
 
         for att_spec in spec.attestations:
             if isinstance(att_spec, SignedAttestationSpec):
@@ -423,9 +423,10 @@ class ForkChoiceTest(BaseConsensusFixture):
 
             attestation = Attestation(validator_id=signed_att.validator_id, data=signed_att.message)
             attestations.append(attestation)
-            signature_lookup[(attestation.validator_id, attestation.data.data_root_bytes())] = (
-                signed_att.signature
+            sig_key = SignatureKey(
+                attestation.validator_id, Bytes32(attestation.data.data_root_bytes())
             )
+            signature_lookup[sig_key] = signed_att.signature
 
         return attestations, signature_lookup
 

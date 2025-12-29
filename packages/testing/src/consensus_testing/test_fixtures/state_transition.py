@@ -9,6 +9,7 @@ from lean_spec.subspecs.containers.block.block import Block, BlockBody
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.types import Bytes32, Uint64
 
 from ..keys import get_shared_key_manager
@@ -262,7 +263,9 @@ class StateTransitionTest(BaseConsensusFixture):
         if plain_attestations:
             key_manager = get_shared_key_manager(max_slot=spec.slot)
             gossip_signatures = {
-                (att.validator_id, att.data.data_root_bytes()): key_manager.sign_attestation_data(
+                SignatureKey(
+                    att.validator_id, Bytes32(att.data.data_root_bytes())
+                ): key_manager.sign_attestation_data(
                     att.validator_id,
                     att.data,
                 )

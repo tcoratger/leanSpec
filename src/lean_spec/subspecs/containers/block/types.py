@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lean_spec.subspecs.xmss.aggregation import MultisigAggregatedSignature
+from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, SSZList
 
 from ...chain.config import VALIDATOR_REGISTRY_LIMIT
@@ -24,13 +24,16 @@ class AggregatedAttestations(SSZList[AggregatedAttestation]):
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
 
 
-class AttestationSignatures(SSZList[MultisigAggregatedSignature]):
+class AttestationSignatures(SSZList[AggregatedSignatureProof]):
     """
-    List of per-attestation aggregated signature proof blobs.
+    List of per-attestation aggregated signature proofs.
 
-    Each entry corresponds to an aggregated attestation from the block body and contains
-    the raw bytes of the leanVM signature aggregation proof.
+    Each entry corresponds to an aggregated attestation from the block body.
+
+    It contains:
+        - the participants bitfield,
+        - proof bytes from leanVM signature aggregation.
     """
 
-    ELEMENT_TYPE = MultisigAggregatedSignature
+    ELEMENT_TYPE = AggregatedSignatureProof
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
