@@ -637,6 +637,7 @@ class State(Container):
         missing_validator_ids: set[Uint64] = set()
 
         for validator_index in validator_ids:
+            # Attempt to retrieve the signature; fail fast if any are missing.
             key = SignatureKey(validator_index, Bytes32(data_root))
             if (sig := gossip_signatures.get(key)) is None:
                 missing_validator_ids.add(validator_index)
