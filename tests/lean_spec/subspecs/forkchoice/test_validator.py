@@ -196,8 +196,8 @@ class TestBlockProduction:
         )
         sample_store.latest_known_attestations[Uint64(5)] = signed_5.message
         sample_store.latest_known_attestations[Uint64(6)] = signed_6.message
-        sig_key_5 = SignatureKey(Uint64(5), Bytes32(signed_5.message.data_root_bytes()))
-        sig_key_6 = SignatureKey(Uint64(6), Bytes32(signed_6.message.data_root_bytes()))
+        sig_key_5 = SignatureKey(Uint64(5), signed_5.message.data_root_bytes())
+        sig_key_6 = SignatureKey(Uint64(6), signed_6.message.data_root_bytes())
         sample_store.gossip_signatures[sig_key_5] = signed_5.signature
         sample_store.gossip_signatures[sig_key_6] = signed_6.signature
 
@@ -290,7 +290,7 @@ class TestBlockProduction:
             target=sample_store.get_attestation_target(),
         )
         sample_store.latest_known_attestations[Uint64(7)] = signed_7.message
-        sig_key_7 = SignatureKey(Uint64(7), Bytes32(signed_7.message.data_root_bytes()))
+        sig_key_7 = SignatureKey(Uint64(7), signed_7.message.data_root_bytes())
         sample_store.gossip_signatures[sig_key_7] = signed_7.signature
 
         store, block, _signatures = sample_store.produce_block_with_signatures(

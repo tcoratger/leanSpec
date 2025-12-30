@@ -317,7 +317,7 @@ class Store(Container):
 
         # Store signature for later lookup during block building
         new_gossip_sigs = dict(self.gossip_signatures)
-        sig_key = SignatureKey(validator_id, Bytes32(attestation_data.data_root_bytes()))
+        sig_key = SignatureKey(validator_id, attestation_data.data_root_bytes())
         new_gossip_sigs[sig_key] = signature
 
         # Process the attestation data
@@ -573,7 +573,7 @@ class Store(Container):
                 # Update Proof Map
                 #
                 # Store the proof so future block builders can reuse this aggregation
-                key = SignatureKey(vid, Bytes32(data_root))
+                key = SignatureKey(vid, data_root)
                 new_block_proofs.setdefault(key, []).append(proof)
 
                 # Update Fork Choice
@@ -604,7 +604,7 @@ class Store(Container):
         # We also store the proposer's signature for potential future block building.
         proposer_sig_key = SignatureKey(
             proposer_attestation.validator_id,
-            Bytes32(proposer_attestation.data.data_root_bytes()),
+            proposer_attestation.data.data_root_bytes(),
         )
         new_gossip_sigs = dict(store.gossip_signatures)
         new_gossip_sigs[proposer_sig_key] = (

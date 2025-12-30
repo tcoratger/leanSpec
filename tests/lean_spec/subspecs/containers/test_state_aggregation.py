@@ -249,9 +249,7 @@ def test_compute_aggregated_signatures_prefers_full_gossip_payload() -> None:
     att_data = make_attestation_data(2, make_bytes32(3), make_bytes32(4), source=source)
     attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(2)]
     data_root = att_data.data_root_bytes()
-    gossip_signatures = {
-        SignatureKey(Uint64(i), Bytes32(data_root)): make_signature(i) for i in range(2)
-    }
+    gossip_signatures = {SignatureKey(Uint64(i), data_root): make_signature(i) for i in range(2)}
 
     aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
         attestations,
@@ -269,12 +267,12 @@ def test_compute_aggregated_signatures_splits_when_needed() -> None:
     att_data = make_attestation_data(3, make_bytes32(5), make_bytes32(6), source=source)
     attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(3)]
     data_root = att_data.data_root_bytes()
-    gossip_signatures = {SignatureKey(Uint64(0), Bytes32(data_root)): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), data_root): make_signature(0)}
 
     block_proof = make_test_proof([Uint64(1), Uint64(2)], b"block-12")
     aggregated_payloads = {
-        SignatureKey(Uint64(1), Bytes32(data_root)): [block_proof],
-        SignatureKey(Uint64(2), Bytes32(data_root)): [block_proof],
+        SignatureKey(Uint64(1), data_root): [block_proof],
+        SignatureKey(Uint64(2), data_root): [block_proof],
     }
 
     aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
@@ -317,7 +315,7 @@ def test_build_block_collects_valid_available_attestations() -> None:
     attestation = Attestation(validator_id=Uint64(0), data=att_data)
     data_root = att_data.data_root_bytes()
 
-    gossip_signatures = {SignatureKey(Uint64(0), Bytes32(data_root)): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), data_root): make_signature(0)}
 
     # Proposer for slot 1 with 2 validators: slot % num_validators = 1 % 2 = 1
     block, post_state, aggregated_atts, aggregated_proofs = state.build_block(
@@ -453,10 +451,10 @@ def test_compute_aggregated_signatures_with_multiple_data_groups() -> None:
     data_root2 = att_data2.data_root_bytes()
 
     gossip_signatures = {
-        SignatureKey(Uint64(0), Bytes32(data_root1)): make_signature(0),
-        SignatureKey(Uint64(1), Bytes32(data_root1)): make_signature(1),
-        SignatureKey(Uint64(2), Bytes32(data_root2)): make_signature(2),
-        SignatureKey(Uint64(3), Bytes32(data_root2)): make_signature(3),
+        SignatureKey(Uint64(0), data_root1): make_signature(0),
+        SignatureKey(Uint64(1), data_root1): make_signature(1),
+        SignatureKey(Uint64(2), data_root2): make_signature(2),
+        SignatureKey(Uint64(3), data_root2): make_signature(3),
     }
 
     aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
@@ -478,13 +476,13 @@ def test_compute_aggregated_signatures_falls_back_to_block_payload() -> None:
     data_root = att_data.data_root_bytes()
 
     # Only gossip signature for validator 0 (incomplete)
-    gossip_signatures = {SignatureKey(Uint64(0), Bytes32(data_root)): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), data_root): make_signature(0)}
 
     # Block payload covers both validators
     block_proof = make_test_proof([Uint64(0), Uint64(1)], b"block-fallback")
     aggregated_payloads = {
-        SignatureKey(Uint64(0), Bytes32(data_root)): [block_proof],
-        SignatureKey(Uint64(1), Bytes32(data_root)): [block_proof],
+        SignatureKey(Uint64(0), data_root): [block_proof],
+        SignatureKey(Uint64(1), data_root): [block_proof],
     }
 
     aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(

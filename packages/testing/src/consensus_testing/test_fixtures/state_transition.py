@@ -264,7 +264,7 @@ class StateTransitionTest(BaseConsensusFixture):
             key_manager = get_shared_key_manager(max_slot=spec.slot)
             gossip_signatures = {
                 SignatureKey(
-                    att.validator_id, Bytes32(att.data.data_root_bytes())
+                    att.validator_id, att.data.data_root_bytes()
                 ): key_manager.sign_attestation_data(
                     att.validator_id,
                     att.data,

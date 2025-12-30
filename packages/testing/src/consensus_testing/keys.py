@@ -55,7 +55,7 @@ from lean_spec.subspecs.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
 )
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Uint64
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -296,7 +296,7 @@ class XmssKeyManager:
             public_keys: list[PublicKey] = [self.get_public_key(vid) for vid in validator_ids]
             signatures: list[Signature] = [
                 (
-                    lookup.get(SignatureKey(vid, Bytes32(message)))
+                    lookup.get(SignatureKey(vid, message))
                     or self.sign_attestation_data(vid, agg.data)
                 )
                 for vid in validator_ids

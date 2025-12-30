@@ -423,9 +423,7 @@ class ForkChoiceTest(BaseConsensusFixture):
 
             attestation = Attestation(validator_id=signed_att.validator_id, data=signed_att.message)
             attestations.append(attestation)
-            sig_key = SignatureKey(
-                attestation.validator_id, Bytes32(attestation.data.data_root_bytes())
-            )
+            sig_key = SignatureKey(attestation.validator_id, attestation.data.data_root_bytes())
             signature_lookup[sig_key] = signed_att.signature
 
         return attestations, signature_lookup

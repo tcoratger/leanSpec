@@ -188,7 +188,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         # fixed-point collection when available_attestations/known_block_roots are used.
         # This might contain invalid signatures as we are not validating them here.
         gossip_signatures = {
-            SignatureKey(att.validator_id, Bytes32(att.data.data_root_bytes())): sig
+            SignatureKey(att.validator_id, att.data.data_root_bytes()): sig
             for att, sig in zip(attestations, attestation_signature_inputs, strict=True)
         }
 

@@ -613,7 +613,7 @@ class State(Container):
     def _aggregate_signatures_from_gossip(
         self,
         validator_ids: list[Uint64],
-        data_root: bytes,
+        data_root: Bytes32,
         epoch: Slot,
         gossip_signatures: dict[SignatureKey, "Signature"] | None = None,
     ) -> tuple[AggregatedSignatureProof, set[Uint64]] | None:
@@ -638,7 +638,7 @@ class State(Container):
 
         for validator_index in validator_ids:
             # Attempt to retrieve the signature; fail fast if any are missing.
-            key = SignatureKey(validator_index, Bytes32(data_root))
+            key = SignatureKey(validator_index, data_root)
             if (sig := gossip_signatures.get(key)) is None:
                 missing_validator_ids.add(validator_index)
                 continue
@@ -733,7 +733,7 @@ class State(Container):
                 data = attestation.data
                 validator_id = attestation.validator_id
                 data_root = data.data_root_bytes()
-                sig_key = SignatureKey(validator_id, Bytes32(data_root))
+                sig_key = SignatureKey(validator_id, data_root)
 
                 # Skip if target block is unknown
                 if data.head.root not in known_block_roots:
@@ -873,7 +873,7 @@ class State(Container):
     def _pick_from_aggregated_proofs(
         self,
         remaining_validator_ids: set[Uint64],
-        data_root: bytes,
+        data_root: Bytes32,
         aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] | None = None,
     ) -> tuple[AggregatedSignatureProof, set[Uint64]]:
         """
@@ -901,7 +901,7 @@ class State(Container):
         best_remaining: set[Uint64] = set()
 
         representative_validator_id = next(iter(remaining_validator_ids))
-        key = SignatureKey(representative_validator_id, Bytes32(data_root))
+        key = SignatureKey(representative_validator_id, data_root)
 
         for proof in aggregated_payloads.get(key, []):
             participants = set(proof.participants.to_validator_indices())

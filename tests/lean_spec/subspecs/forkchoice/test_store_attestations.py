@@ -60,7 +60,7 @@ def test_on_block_processes_multi_validator_aggregations() -> None:
     # Store signatures in gossip_signatures
     data_root = attestation_data.data_root_bytes()
     gossip_sigs = {
-        SignatureKey(validator_id, Bytes32(data_root)): key_manager.sign_attestation_data(
+        SignatureKey(validator_id, data_root): key_manager.sign_attestation_data(
             validator_id, attestation_data
         )
         for validator_id in (Uint64(1), Uint64(2))
@@ -151,7 +151,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
         validator_id: attestation_data_1 for validator_id in (Uint64(1), Uint64(2))
     }
     gossip_sigs_1 = {
-        SignatureKey(validator_id, Bytes32(data_root_1)): key_manager.sign_attestation_data(
+        SignatureKey(validator_id, data_root_1): key_manager.sign_attestation_data(
             validator_id, attestation_data_1
         )
         for validator_id in (Uint64(1), Uint64(2))
@@ -217,7 +217,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
         validator_id: attestation_data_2 for validator_id in (Uint64(1), Uint64(2))
     }
     gossip_sigs_2 = {
-        SignatureKey(validator_id, Bytes32(data_root_2)): key_manager.sign_attestation_data(
+        SignatureKey(validator_id, data_root_2): key_manager.sign_attestation_data(
             validator_id, attestation_data_2
         )
         for validator_id in (Uint64(1), Uint64(2))
