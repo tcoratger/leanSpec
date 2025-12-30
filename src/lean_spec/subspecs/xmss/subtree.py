@@ -146,7 +146,7 @@ class HashSubTree(Container):
             A `HashSubTree` containing all computed layers from `lowest_layer` to root.
         """
         # Validate: nodes must fit in available positions at this layer.
-        max_positions = 1 << (depth - lowest_layer)
+        max_positions = 1 << int(depth - lowest_layer)
         if int(start_index) + len(lowest_layer_nodes) > max_positions:
             raise ValueError(
                 f"Overflow at layer {lowest_layer}: "
