@@ -59,8 +59,8 @@ def _run_commit_open_verify_roundtrip(
     tree = HashSubTree.new(
         hasher=hasher,
         rand=rand,
-        lowest_layer=0,
-        depth=depth,
+        lowest_layer=Uint64(0),
+        depth=Uint64(depth),
         start_index=Uint64(start_index),
         parameter=parameter,
         lowest_layer_nodes=leaf_hashes,
