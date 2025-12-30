@@ -103,8 +103,8 @@ class HashSubTree(Container):
         cls,
         hasher: TweakHasher,
         rand: Rand,
-        lowest_layer: int,
-        depth: int,
+        lowest_layer: Uint64,
+        depth: Uint64,
         start_index: Uint64,
         parameter: Parameter,
         lowest_layer_nodes: list[HashDigestVector],
@@ -146,7 +146,7 @@ class HashSubTree(Container):
             A `HashSubTree` containing all computed layers from `lowest_layer` to root.
         """
         # Validate: nodes must fit in available positions at this layer.
-        max_positions = 1 << (depth - lowest_layer)
+        max_positions = 1 << int(depth - lowest_layer)
         if int(start_index) + len(lowest_layer_nodes) > max_positions:
             raise ValueError(
                 f"Overflow at layer {lowest_layer}: "
@@ -163,12 +163,11 @@ class HashSubTree(Container):
             parent_start = current.start_index // Uint64(2)
 
             # Hash each pair of siblings into their parent using zip for cleaner indexing.
-            parent_start_int = int(parent_start)
             node_pairs = zip(current.nodes[::2], current.nodes[1::2], strict=True)
             parents = [
                 hasher.apply(
                     parameter,
-                    TreeTweak(level=level + 1, index=Uint64(parent_start_int + i)),
+                    TreeTweak(level=level + 1, index=parent_start + Uint64(i)),
                     [left, right],
                 )
                 for i, (left, right) in enumerate(node_pairs)
@@ -179,8 +178,8 @@ class HashSubTree(Container):
             layers.append(current)
 
         return cls(
-            depth=Uint64(depth),
-            lowest_layer=Uint64(lowest_layer),
+            depth=depth,
+            lowest_layer=lowest_layer,
             layers=HashTreeLayers(data=layers),
         )
 
@@ -233,8 +232,8 @@ class HashSubTree(Container):
         return cls.new(
             hasher=hasher,
             rand=rand,
-            lowest_layer=depth // 2,
-            depth=depth,
+            lowest_layer=Uint64(depth // 2),
+            depth=Uint64(depth),
             start_index=start_bottom_tree_index,
             parameter=parameter,
             lowest_layer_nodes=bottom_tree_roots,
@@ -300,8 +299,8 @@ class HashSubTree(Container):
         full_tree = cls.new(
             hasher=hasher,
             rand=rand,
-            lowest_layer=0,
-            depth=depth,
+            lowest_layer=Uint64(0),
+            depth=Uint64(depth),
             start_index=bottom_tree_index * Uint64(leafs_per_tree),
             parameter=parameter,
             lowest_layer_nodes=leaves,
