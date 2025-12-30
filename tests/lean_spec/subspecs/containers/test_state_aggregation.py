@@ -117,7 +117,7 @@ def test_gossip_aggregation_succeeds_with_all_signatures() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         validator_ids,
-        data_root,
+        Bytes32(data_root),
         Slot(3),
         gossip_signatures,
     )
@@ -135,7 +135,7 @@ def test_gossip_aggregation_returns_partial_result_when_some_missing() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(2),
         gossip_signatures,
     )
@@ -154,7 +154,7 @@ def test_gossip_aggregation_returns_none_if_no_signature_matches() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(2),
         gossip_signatures,
     )
@@ -177,7 +177,7 @@ def test_pick_from_aggregated_proofs_prefers_widest_overlap() -> None:
 
     proof, remaining = state._pick_from_aggregated_proofs(
         remaining_validator_ids=remaining_validator_ids,
-        data_root=data_root,
+        data_root=Bytes32(data_root),
         aggregated_payloads=aggregated_payloads,
     )
 
@@ -200,7 +200,7 @@ def test_pick_from_aggregated_proofs_returns_remaining_for_partial_payload() -> 
 
     proof, remaining = state._pick_from_aggregated_proofs(
         remaining_validator_ids=remaining_validator_ids,
-        data_root=data_root,
+        data_root=Bytes32(data_root),
         aggregated_payloads=aggregated_payloads,
     )
 
@@ -215,7 +215,7 @@ def test_pick_from_aggregated_proofs_requires_payloads() -> None:
     with pytest.raises(ValueError, match="aggregated payloads required"):
         state._pick_from_aggregated_proofs(
             remaining_validator_ids={Uint64(0)},
-            data_root=b"\x55" * 32,
+            data_root=Bytes32(b"\x55" * 32),
             aggregated_payloads=None,
         )
 
@@ -226,7 +226,7 @@ def test_pick_from_aggregated_proofs_errors_on_empty_remaining() -> None:
     with pytest.raises(ValueError, match="remaining validator ids cannot be empty"):
         state._pick_from_aggregated_proofs(
             remaining_validator_ids=set(),
-            data_root=b"\x66" * 32,
+            data_root=Bytes32(b"\x66" * 32),
             aggregated_payloads={},
         )
 
@@ -238,7 +238,7 @@ def test_pick_from_aggregated_proofs_errors_when_no_candidates() -> None:
     with pytest.raises(ValueError, match="Failed to locate aggregated proof"):
         state._pick_from_aggregated_proofs(
             remaining_validator_ids={Uint64(0)},
-            data_root=data_root,
+            data_root=Bytes32(data_root),
             aggregated_payloads={SignatureKey(Uint64(0), Bytes32(data_root)): []},
         )
 
@@ -381,7 +381,7 @@ def test_gossip_aggregation_with_empty_validator_list() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [],  # empty validator list
-        data_root,
+        Bytes32(data_root),
         Slot(1),
         gossip_signatures,
     )
@@ -396,7 +396,7 @@ def test_gossip_aggregation_with_none_gossip_signatures() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(1),
         None,  # None gossip_signatures
     )
@@ -411,7 +411,7 @@ def test_gossip_aggregation_with_empty_gossip_signatures() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(1),
         {},  # empty dict
     )
