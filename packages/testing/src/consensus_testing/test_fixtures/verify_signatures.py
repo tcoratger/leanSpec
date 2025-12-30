@@ -21,6 +21,7 @@ from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
+from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
@@ -187,7 +188,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         # fixed-point collection when available_attestations/known_block_roots are used.
         # This might contain invalid signatures as we are not validating them here.
         gossip_signatures = {
-            (att.validator_id, att.data.data_root_bytes()): sig
+            SignatureKey(att.validator_id, att.data.data_root_bytes()): sig
             for att, sig in zip(attestations, attestation_signature_inputs, strict=True)
         }
 

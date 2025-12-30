@@ -17,7 +17,7 @@ from lean_spec.subspecs.containers.state.types import Validators
 from lean_spec.subspecs.containers.validator import Validator
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import MultisigAggregatedSignature
+from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.subspecs.xmss.containers import PublicKey, Signature
 from lean_spec.subspecs.xmss.types import (
     HashDigestList,
@@ -27,8 +27,19 @@ from lean_spec.subspecs.xmss.types import (
     Randomness,
 )
 from lean_spec.types import Bytes32, Bytes52, Uint64
+from lean_spec.types.byte_arrays import ByteListMiB
 
-TEST_AGGREGATED_SIGNATURE = MultisigAggregatedSignature(data=b"\x00")
+
+def make_test_proof(validator_ids: list[Uint64], data: bytes = b"\x00") -> AggregatedSignatureProof:
+    """Create a test AggregatedSignatureProof with given participants."""
+    return AggregatedSignatureProof(
+        participants=AggregationBits.from_validator_indices(validator_ids),
+        proof_data=ByteListMiB(data=data),
+    )
+
+
+# Default test proof with empty participants (will be replaced in most tests)
+TEST_AGGREGATED_PROOF = make_test_proof([Uint64(0), Uint64(1)])
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -100,40 +111,38 @@ def test_gossip_aggregation_succeeds_with_all_signatures() -> None:
     data_root = b"\x11" * 32
     validator_ids = [Uint64(0), Uint64(1)]
     gossip_signatures = {
-        (Uint64(0), data_root): make_signature(0),
-        (Uint64(1), data_root): make_signature(1),
+        SignatureKey(Uint64(0), Bytes32(data_root)): make_signature(0),
+        SignatureKey(Uint64(1), Bytes32(data_root)): make_signature(1),
     }
 
     result = state._aggregate_signatures_from_gossip(
         validator_ids,
-        data_root,
+        Bytes32(data_root),
         Slot(3),
         gossip_signatures,
     )
 
     assert result is not None
-    aggregated_signature, aggregated_bitlist, remaining = result
-    assert aggregated_signature == TEST_AGGREGATED_SIGNATURE
-    assert set(aggregated_bitlist.to_validator_indices()) == set(validator_ids)
+    proof, remaining = result
+    assert set(proof.participants.to_validator_indices()) == set(validator_ids)
     assert remaining == set()
 
 
 def test_gossip_aggregation_returns_partial_result_when_some_missing() -> None:
     state = make_state(2)
     data_root = b"\x22" * 32
-    gossip_signatures = {(Uint64(0), data_root): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), Bytes32(data_root)): make_signature(0)}
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(2),
         gossip_signatures,
     )
 
     assert result is not None
-    aggregated_signature, aggregated_bitlist, remaining = result
-    assert aggregated_signature == TEST_AGGREGATED_SIGNATURE
-    assert aggregated_bitlist.to_validator_indices() == [Uint64(0)]
+    proof, remaining = result
+    assert proof.participants.to_validator_indices() == [Uint64(0)]
     assert remaining == {Uint64(1)}
 
 
@@ -141,11 +150,11 @@ def test_gossip_aggregation_returns_none_if_no_signature_matches() -> None:
     state = make_state(2)
     data_root = b"\x33" * 32
     # Gossip data exists but for a different validator key, so no signatures match
-    gossip_signatures = {(Uint64(9), data_root): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(9), Bytes32(data_root)): make_signature(0)}
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(2),
         gossip_signatures,
     )
@@ -153,96 +162,84 @@ def test_gossip_aggregation_returns_none_if_no_signature_matches() -> None:
     assert result is None
 
 
-def test_pick_from_aggregated_signatures_prefers_widest_overlap() -> None:
+def test_pick_from_aggregated_proofs_prefers_widest_overlap() -> None:
     state = make_state(3)
     data_root = b"\x44" * 32
     remaining_validator_ids = {Uint64(0), Uint64(1)}
 
-    narrow_bits = AggregationBits.from_validator_indices([Uint64(0)])
-    best_bits = AggregationBits.from_validator_indices([Uint64(0), Uint64(1)])
-    narrow_signature = MultisigAggregatedSignature(data=b"narrow")
-    best_signature = MultisigAggregatedSignature(data=b"best")
+    narrow_proof = make_test_proof([Uint64(0)], b"narrow")
+    best_proof = make_test_proof([Uint64(0), Uint64(1)], b"best")
 
     aggregated_payloads = {
-        (Uint64(0), data_root): [
-            (narrow_bits, narrow_signature),
-            (best_bits, best_signature),
-        ],
-        (Uint64(1), data_root): [
-            (best_bits, best_signature),
-            (narrow_bits, narrow_signature),
-        ],
+        SignatureKey(Uint64(0), Bytes32(data_root)): [narrow_proof, best_proof],
+        SignatureKey(Uint64(1), Bytes32(data_root)): [best_proof, narrow_proof],
     }
 
-    signature, bitlist, remaining = state._pick_from_aggregated_signatures(
+    proof, remaining = state._pick_from_aggregated_proofs(
         remaining_validator_ids=remaining_validator_ids,
-        data_root=data_root,
+        data_root=Bytes32(data_root),
         aggregated_payloads=aggregated_payloads,
     )
 
-    assert signature == best_signature
-    assert set(bitlist.to_validator_indices()) == {Uint64(0), Uint64(1)}
+    assert set(proof.participants.to_validator_indices()) == {Uint64(0), Uint64(1)}
     assert remaining == set()
 
 
-def test_pick_from_aggregated_signatures_returns_remaining_for_partial_payload() -> None:
+def test_pick_from_aggregated_proofs_returns_remaining_for_partial_payload() -> None:
     state = make_state(2)
     data_root = b"\x45" * 32
     remaining_validator_ids = {Uint64(0), Uint64(1)}
 
-    partial_bits_0 = AggregationBits.from_validator_indices([Uint64(0)])
-    partial_bits_1 = AggregationBits.from_validator_indices([Uint64(1)])
-    partial_signature_0 = MultisigAggregatedSignature(data=b"partial-0")
-    partial_signature_1 = MultisigAggregatedSignature(data=b"partial-1")
+    partial_proof_0 = make_test_proof([Uint64(0)], b"partial-0")
+    partial_proof_1 = make_test_proof([Uint64(1)], b"partial-1")
 
     aggregated_payloads = {
-        (Uint64(0), data_root): [(partial_bits_0, partial_signature_0)],
-        (Uint64(1), data_root): [(partial_bits_1, partial_signature_1)],
+        SignatureKey(Uint64(0), Bytes32(data_root)): [partial_proof_0],
+        SignatureKey(Uint64(1), Bytes32(data_root)): [partial_proof_1],
     }
 
-    signature, bitlist, remaining = state._pick_from_aggregated_signatures(
+    proof, remaining = state._pick_from_aggregated_proofs(
         remaining_validator_ids=remaining_validator_ids,
-        data_root=data_root,
+        data_root=Bytes32(data_root),
         aggregated_payloads=aggregated_payloads,
     )
 
-    covered_validators = set(bitlist.to_validator_indices())
+    covered_validators = set(proof.participants.to_validator_indices())
     assert covered_validators <= {Uint64(0), Uint64(1)}
-    assert signature in {partial_signature_0, partial_signature_1}
     assert remaining == remaining_validator_ids - covered_validators
 
 
-def test_pick_from_aggregated_signatures_requires_payloads() -> None:
+def test_pick_from_aggregated_proofs_requires_payloads() -> None:
     state = make_state(1)
 
-    with pytest.raises(ValueError, match="aggregated payloads is required"):
-        state._pick_from_aggregated_signatures(
+    with pytest.raises(ValueError, match="aggregated payloads required"):
+        state._pick_from_aggregated_proofs(
             remaining_validator_ids={Uint64(0)},
-            data_root=b"\x55" * 32,
+            data_root=Bytes32(b"\x55" * 32),
             aggregated_payloads=None,
         )
 
 
-def test_pick_from_aggregated_signatures_errors_on_empty_remaining() -> None:
+def test_pick_from_aggregated_proofs_errors_on_empty_remaining() -> None:
     state = make_state(1)
 
     with pytest.raises(ValueError, match="remaining validator ids cannot be empty"):
-        state._pick_from_aggregated_signatures(
+        state._pick_from_aggregated_proofs(
             remaining_validator_ids=set(),
-            data_root=b"\x66" * 32,
+            data_root=Bytes32(b"\x66" * 32),
             aggregated_payloads={},
         )
 
 
-def test_pick_from_aggregated_signatures_errors_when_no_candidates() -> None:
+def test_pick_from_aggregated_proofs_errors_when_no_candidates() -> None:
     state = make_state(1)
     data_root = b"\x77" * 32
 
-    with pytest.raises(ValueError, match="Failed to locate an aggregated signature payload"):
-        state._pick_from_aggregated_signatures(
+    with pytest.raises(ValueError, match="Failed to locate aggregated proof"):
+        state._pick_from_aggregated_proofs(
             remaining_validator_ids={Uint64(0)},
-            data_root=data_root,
-            aggregated_payloads={(Uint64(0), data_root): []},
+            data_root=Bytes32(data_root),
+            aggregated_payloads={SignatureKey(Uint64(0), Bytes32(data_root)): []},
         )
 
 
@@ -252,15 +249,16 @@ def test_compute_aggregated_signatures_prefers_full_gossip_payload() -> None:
     att_data = make_attestation_data(2, make_bytes32(3), make_bytes32(4), source=source)
     attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(2)]
     data_root = att_data.data_root_bytes()
-    gossip_signatures = {(Uint64(i), data_root): make_signature(i) for i in range(2)}
+    gossip_signatures = {SignatureKey(Uint64(i), data_root): make_signature(i) for i in range(2)}
 
-    aggregated_atts, aggregated_sigs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
     )
 
     assert len(aggregated_atts) == 1
-    assert aggregated_sigs == [TEST_AGGREGATED_SIGNATURE]
+    assert len(aggregated_proofs) == 1
+    assert set(aggregated_proofs[0].participants.to_validator_indices()) == {Uint64(0), Uint64(1)}
 
 
 def test_compute_aggregated_signatures_splits_when_needed() -> None:
@@ -269,16 +267,15 @@ def test_compute_aggregated_signatures_splits_when_needed() -> None:
     att_data = make_attestation_data(3, make_bytes32(5), make_bytes32(6), source=source)
     attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(3)]
     data_root = att_data.data_root_bytes()
-    gossip_signatures = {(Uint64(0), data_root): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), data_root): make_signature(0)}
 
-    block_bits = AggregationBits.from_validator_indices([Uint64(1), Uint64(2)])
-    block_signature = MultisigAggregatedSignature(data=b"block-12")
+    block_proof = make_test_proof([Uint64(1), Uint64(2)], b"block-12")
     aggregated_payloads = {
-        (Uint64(1), data_root): [(block_bits, block_signature)],
-        (Uint64(2), data_root): [(block_bits, block_signature)],
+        SignatureKey(Uint64(1), data_root): [block_proof],
+        SignatureKey(Uint64(2), data_root): [block_proof],
     }
 
-    aggregated_atts, aggregated_sigs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
         aggregated_payloads=aggregated_payloads,
@@ -290,8 +287,12 @@ def test_compute_aggregated_signatures_splits_when_needed() -> None:
     ]
     assert (0,) in seen_participants
     assert (1, 2) in seen_participants
-    assert block_signature in aggregated_sigs
-    assert TEST_AGGREGATED_SIGNATURE in aggregated_sigs
+    # Check we have both proofs
+    proof_participants = [
+        tuple(int(v) for v in p.participants.to_validator_indices()) for p in aggregated_proofs
+    ]
+    assert (0,) in proof_participants
+    assert (1, 2) in proof_participants
 
 
 def test_build_block_collects_valid_available_attestations() -> None:
@@ -314,10 +315,10 @@ def test_build_block_collects_valid_available_attestations() -> None:
     attestation = Attestation(validator_id=Uint64(0), data=att_data)
     data_root = att_data.data_root_bytes()
 
-    gossip_signatures = {(Uint64(0), data_root): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), data_root): make_signature(0)}
 
     # Proposer for slot 1 with 2 validators: slot % num_validators = 1 % 2 = 1
-    block, post_state, aggregated_atts, aggregated_sigs = state.build_block(
+    block, post_state, aggregated_atts, aggregated_proofs = state.build_block(
         slot=Slot(1),
         proposer_index=Uint64(1),
         parent_root=parent_root,
@@ -330,7 +331,8 @@ def test_build_block_collects_valid_available_attestations() -> None:
 
     assert post_state.latest_block_header.slot == Slot(1)
     assert list(block.body.attestations.data) == aggregated_atts
-    assert aggregated_sigs == [TEST_AGGREGATED_SIGNATURE]
+    assert len(aggregated_proofs) == 1
+    assert aggregated_proofs[0].participants.to_validator_indices() == [Uint64(0)]
     assert block.body.attestations.data[0].aggregation_bits.to_validator_indices() == [Uint64(0)]
 
 
@@ -354,7 +356,7 @@ def test_build_block_skips_attestations_without_signatures() -> None:
     attestation = Attestation(validator_id=Uint64(0), data=att_data)
 
     # Proposer for slot 1 with 1 validator: slot % num_validators = 1 % 1 = 0
-    block, post_state, aggregated_atts, aggregated_sigs = state.build_block(
+    block, post_state, aggregated_atts, aggregated_proofs = state.build_block(
         slot=Slot(1),
         proposer_index=Uint64(0),
         parent_root=parent_root,
@@ -367,7 +369,7 @@ def test_build_block_skips_attestations_without_signatures() -> None:
 
     assert post_state.latest_block_header.slot == Slot(1)
     assert aggregated_atts == []
-    assert aggregated_sigs == []
+    assert aggregated_proofs == []
     assert list(block.body.attestations.data) == []
 
 
@@ -375,11 +377,11 @@ def test_gossip_aggregation_with_empty_validator_list() -> None:
     """Empty validator list should return None."""
     state = make_state(2)
     data_root = b"\x99" * 32
-    gossip_signatures = {(Uint64(0), data_root): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), Bytes32(data_root)): make_signature(0)}
 
     result = state._aggregate_signatures_from_gossip(
         [],  # empty validator list
-        data_root,
+        Bytes32(data_root),
         Slot(1),
         gossip_signatures,
     )
@@ -394,7 +396,7 @@ def test_gossip_aggregation_with_none_gossip_signatures() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(1),
         None,  # None gossip_signatures
     )
@@ -409,7 +411,7 @@ def test_gossip_aggregation_with_empty_gossip_signatures() -> None:
 
     result = state._aggregate_signatures_from_gossip(
         [Uint64(0), Uint64(1)],
-        data_root,
+        Bytes32(data_root),
         Slot(1),
         {},  # empty dict
     )
@@ -449,20 +451,20 @@ def test_compute_aggregated_signatures_with_multiple_data_groups() -> None:
     data_root2 = att_data2.data_root_bytes()
 
     gossip_signatures = {
-        (Uint64(0), data_root1): make_signature(0),
-        (Uint64(1), data_root1): make_signature(1),
-        (Uint64(2), data_root2): make_signature(2),
-        (Uint64(3), data_root2): make_signature(3),
+        SignatureKey(Uint64(0), data_root1): make_signature(0),
+        SignatureKey(Uint64(1), data_root1): make_signature(1),
+        SignatureKey(Uint64(2), data_root2): make_signature(2),
+        SignatureKey(Uint64(3), data_root2): make_signature(3),
     }
 
-    aggregated_atts, aggregated_sigs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
     )
 
     # Should have 2 aggregated attestations (one per data group)
     assert len(aggregated_atts) == 2
-    assert len(aggregated_sigs) == 2
+    assert len(aggregated_proofs) == 2
 
 
 def test_compute_aggregated_signatures_falls_back_to_block_payload() -> None:
@@ -474,24 +476,25 @@ def test_compute_aggregated_signatures_falls_back_to_block_payload() -> None:
     data_root = att_data.data_root_bytes()
 
     # Only gossip signature for validator 0 (incomplete)
-    gossip_signatures = {(Uint64(0), data_root): make_signature(0)}
+    gossip_signatures = {SignatureKey(Uint64(0), data_root): make_signature(0)}
 
     # Block payload covers both validators
-    block_bits = AggregationBits.from_validator_indices([Uint64(0), Uint64(1)])
-    block_signature = MultisigAggregatedSignature(data=b"block-fallback")
+    block_proof = make_test_proof([Uint64(0), Uint64(1)], b"block-fallback")
     aggregated_payloads = {
-        (Uint64(0), data_root): [(block_bits, block_signature)],
-        (Uint64(1), data_root): [(block_bits, block_signature)],
+        SignatureKey(Uint64(0), data_root): [block_proof],
+        SignatureKey(Uint64(1), data_root): [block_proof],
     }
 
-    aggregated_atts, aggregated_sigs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
         aggregated_payloads=aggregated_payloads,
     )
 
-    # Should include both gossip-covered and fallback payload attestations/signatures
+    # Should include both gossip-covered and fallback payload attestations/proofs
     assert len(aggregated_atts) == 2
-    assert len(aggregated_sigs) == 2
-    assert block_signature in aggregated_sigs
-    assert TEST_AGGREGATED_SIGNATURE in aggregated_sigs
+    assert len(aggregated_proofs) == 2
+    # Check we have one proof with validator 0 and one proof with both validators
+    proof_participants = [set(p.participants.to_validator_indices()) for p in aggregated_proofs]
+    assert {Uint64(0)} in proof_participants
+    assert {Uint64(0), Uint64(1)} in proof_participants

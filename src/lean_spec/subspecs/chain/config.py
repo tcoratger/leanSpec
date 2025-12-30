@@ -7,7 +7,8 @@ Lean Consensus Experimental Chain.
 
 from typing_extensions import Final
 
-from lean_spec.types import StrictBaseModel, Uint64
+from lean_spec.types.base import StrictBaseModel
+from lean_spec.types.uint import Uint64
 
 # --- Time Parameters ---
 

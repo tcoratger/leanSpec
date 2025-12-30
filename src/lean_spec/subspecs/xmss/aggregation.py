@@ -1,123 +1,128 @@
-"""
-Multisig aggregation helpers bridging leanSpec containers to bindings.
-
-This module wraps the Python bindings exposed by the `leanMultisig-py` project to provide
-Multisig signature aggregation + verification.
-"""
+"""Signature aggregation for the Lean Ethereum consensus specification."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self, Sequence
+from typing import NamedTuple, Self, Sequence
 
-from lean_multisig_py import aggregate_signatures as aggregate_signatures_py
-from lean_multisig_py import setup_prover, setup_verifier
-from lean_multisig_py import verify_aggregated_signatures as verify_aggregated_signatures_py
+from lean_multisig_py import aggregate_signatures as _aggregate_signatures_py
+from lean_multisig_py import setup_prover as _setup_prover
+from lean_multisig_py import setup_verifier as _setup_verifier
+from lean_multisig_py import verify_aggregated_signatures as _verify_aggregated_signatures_py
 
-from lean_spec.subspecs.xmss.containers import PublicKey
-from lean_spec.subspecs.xmss.containers import Signature as XmssSignature
-from lean_spec.types import Uint64
+from lean_spec.subspecs.containers.attestation import AggregationBits
+from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.byte_arrays import ByteListMiB
+from lean_spec.types.container import Container
 
-if TYPE_CHECKING:
-    from lean_spec.subspecs.containers.attestation import AggregationBits
-
-AttestationSignatureKey = tuple[Uint64, bytes]
-"""Key type for looking up signatures: (validator id, attestation data root)."""
+from .containers import PublicKey, Signature
 
 
-class MultisigError(RuntimeError):
-    """Base exception for multisig aggregation helpers."""
+class SignatureKey(NamedTuple):
+    """
+    Key for looking up individual validator signatures.
+
+    Used to index signature caches by (validator, message) pairs.
+    """
+
+    validator_id: Uint64
+    """The validator who produced the signature."""
+
+    data_root: Bytes32
+    """The hash of the signed data (e.g., attestation data root)."""
 
 
-class MultisigAggregationError(MultisigError):
-    """Raised when multisig fails to aggregate or verify signatures."""
+class AggregationError(Exception):
+    """Raised when signature aggregation or verification fails."""
 
 
-class MultisigAggregatedSignature(ByteListMiB):
-    """Variable-length byte list with a limit of 1048576 bytes."""
+class AggregatedSignatureProof(Container):
+    """
+    Cryptographic proof that a set of validators signed a message.
 
-    # This function will change for recursive aggregation
-    # which might additionally require hints.
+    This container encapsulates the output of the leanVM signature aggregation,
+    combining the participant set with the proof bytes. This design ensures
+    the proof is self-describing: it carries information about which validators
+    it covers.
+
+    The proof can verify that all participants signed the same message in the
+    same epoch, using a single verification operation instead of checking
+    each signature individually.
+    """
+
+    participants: AggregationBits
+    """Bitfield indicating which validators' signatures are included."""
+
+    proof_data: ByteListMiB
+    """The raw aggregated proof bytes from leanVM."""
+
     @classmethod
-    def aggregate_signatures(
+    def aggregate(
         cls,
+        participants: AggregationBits,
         public_keys: Sequence[PublicKey],
-        signatures: Sequence[XmssSignature],
+        signatures: Sequence[Signature],
         message: bytes,
         epoch: Uint64,
     ) -> Self:
         """
-        Aggregate XMSS signatures.
+        Aggregate individual XMSS signatures into a single proof.
 
         Args:
-            public_keys: Public keys of the signers, one per signature.
+            participants: Bitfield of validators whose signatures are included.
+            public_keys: Public keys of the signers (must match signatures order).
             signatures: Individual XMSS signatures to aggregate.
             message: The 32-byte message that was signed.
             epoch: The epoch in which the signatures were created.
 
         Returns:
-            The aggregated signature payload.
+            An aggregated signature proof covering all participants.
 
         Raises:
-            MultisigError: If lean-multisig-py is unavailable or aggregation fails.
+            AggregationError: If aggregation fails.
         """
-        setup_prover()
+        _setup_prover()
         try:
-            pub_keys_bytes = [pk.encode_bytes() for pk in public_keys]
-            sig_bytes = [sig.encode_bytes() for sig in signatures]
-
-            # In test mode, we return a single zero byte payload.
-            # TODO: Remove test mode once leanVM is supports correct signature encoding.
-            aggregated_bytes = aggregate_signatures_py(
-                pub_keys_bytes,
-                sig_bytes,
+            # TODO: Remove test_mode once leanVM supports correct signature encoding.
+            proof_bytes = _aggregate_signatures_py(
+                [pk.encode_bytes() for pk in public_keys],
+                [sig.encode_bytes() for sig in signatures],
                 message,
                 epoch,
                 test_mode=True,
             )
-            return cls(data=aggregated_bytes)
+            return cls(
+                participants=participants,
+                proof_data=ByteListMiB(data=proof_bytes),
+            )
         except Exception as exc:
-            raise MultisigAggregationError(f"Multisig aggregation failed: {exc}") from exc
+            raise AggregationError(f"Signature aggregation failed: {exc}") from exc
 
-    # This function will change for recursive aggregation verification
-    # which might additionally require hints.
-    def verify_aggregated_payload(
+    def verify(
         self,
         public_keys: Sequence[PublicKey],
         message: bytes,
         epoch: Uint64,
     ) -> None:
         """
-        Verify a lean-multisig-py aggregated signature payload.
+        Verify this aggregated signature proof.
 
         Args:
-            public_keys: Public keys of the signers, one per original signature.
-            payload: MultisigAggregatedSignature of the aggregated signature payload.
+            public_keys: Public keys of the participants (order must match participants bitfield).
             message: The 32-byte message that was signed.
             epoch: The epoch in which the signatures were created.
 
         Raises:
-            MultisigError: If lean-multisig-py is unavailable or verification fails.
+            AggregationError: If verification fails.
         """
-        setup_verifier()
+        _setup_verifier()
         try:
-            pub_keys_bytes = [pk.encode_bytes() for pk in public_keys]
-
-            # In test mode, we allow verification of a single zero byte payload.
-            # TODO: Remove test mode once leanVM is supports correct signature encoding.
-            verify_aggregated_signatures_py(
-                pub_keys_bytes,
+            # TODO: Remove test_mode once leanVM supports correct signature encoding.
+            _verify_aggregated_signatures_py(
+                [pk.encode_bytes() for pk in public_keys],
                 message,
-                self.encode_bytes(),
+                self.proof_data.encode_bytes(),
                 int(epoch),
                 test_mode=True,
             )
         except Exception as exc:
-            raise MultisigAggregationError(f"Multisig verification failed: {exc}") from exc
-
-
-AggregatedSignaturePayload = tuple["AggregationBits", "MultisigAggregatedSignature"]
-"""Aggregated signature payload with its participant bitlist."""
-
-AggregatedSignaturePayloads = list[AggregatedSignaturePayload]
-"""List of aggregated signature payloads with their participant bitlists."""
+            raise AggregationError(f"Signature verification failed: {exc}") from exc

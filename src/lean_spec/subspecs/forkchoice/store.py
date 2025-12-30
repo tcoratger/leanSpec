@@ -22,10 +22,8 @@ from lean_spec.subspecs.chain.config import (
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.containers import (
-    AggregationBits,
     Attestation,
     AttestationData,
-    AttestationsByValidator,
     Block,
     Checkpoint,
     Config,
@@ -38,9 +36,8 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import StateLookup
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
-    AggregatedSignaturePayloads,
-    AttestationSignatureKey,
-    MultisigAggregatedSignature,
+    AggregatedSignatureProof,
+    SignatureKey,
 )
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
@@ -129,7 +126,7 @@ class Store(Container):
     `Store`'s latest justified and latest finalized checkpoints.
     """
 
-    latest_known_attestations: AttestationsByValidator = {}
+    latest_known_attestations: dict[Uint64, AttestationData] = {}
     """
     Latest attestation data by validator that have been processed.
 
@@ -138,7 +135,7 @@ class Store(Container):
     - Only stores the attestation data, not signatures.
     """
 
-    latest_new_attestations: AttestationsByValidator = {}
+    latest_new_attestations: dict[Uint64, AttestationData] = {}
     """
     Latest attestation data by validator that are pending processing.
 
@@ -148,20 +145,20 @@ class Store(Container):
     - Only stores the attestation data, not signatures.
     """
 
-    gossip_signatures: Dict[AttestationSignatureKey, Signature] = {}
+    gossip_signatures: Dict[SignatureKey, Signature] = {}
     """
     Per-validator XMSS signatures learned from gossip.
 
-    Keyed by (validator_id, attestation_data_root).
+    Keyed by SignatureKey(validator_id, attestation_data_root).
     """
 
-    aggregated_payloads: Dict[AttestationSignatureKey, AggregatedSignaturePayloads] = {}
+    aggregated_payloads: Dict[SignatureKey, list[AggregatedSignatureProof]] = {}
     """
-    Aggregated signature payloads learned from blocks.
+    Aggregated signature proofs learned from blocks.
 
-    - Keyed by (validator_id, attestation_data_root).
-    - Values are lists of (aggregation bits, payload) tuples so we know exactly which
-      validators signed.
+    - Keyed by SignatureKey(validator_id, attestation_data_root).
+    - Values are lists of AggregatedSignatureProof, each containing the participants
+      bitfield indicating which validators signed.
     - Used for recursive signature aggregation when building blocks.
     - Populated by on_block.
     """
@@ -320,7 +317,8 @@ class Store(Container):
 
         # Store signature for later lookup during block building
         new_gossip_sigs = dict(self.gossip_signatures)
-        new_gossip_sigs[(validator_id, attestation_data.data_root_bytes())] = signature
+        sig_key = SignatureKey(validator_id, attestation_data.data_root_bytes())
+        new_gossip_sigs[sig_key] = signature
 
         # Process the attestation data
         store = self.on_attestation(attestation=attestation, is_from_block=False)
@@ -561,24 +559,22 @@ class Store(Container):
             "Attestation signature groups must match aggregated attestations"
         )
 
-        # Copy the aggregated signature payloads map for updates
+        # Copy the aggregated proof map for updates
         # Must deep copy the lists to maintain immutability of previous store snapshots
-        new_block_sigs: Dict[AttestationSignatureKey, AggregatedSignaturePayloads] = copy.deepcopy(
+        new_block_proofs: Dict[SignatureKey, list[AggregatedSignatureProof]] = copy.deepcopy(
             store.aggregated_payloads
         )
 
-        for att, sig in zip(aggregated_attestations, attestation_signatures, strict=True):
+        for att, proof in zip(aggregated_attestations, attestation_signatures, strict=True):
             validator_ids = att.aggregation_bits.to_validator_indices()
             data_root = att.data.data_root_bytes()
 
-            # Pre-calculate the payload record once for this entire group
-            record = (AggregationBits.from_validator_indices(validator_ids), sig)
-
             for vid in validator_ids:
-                # Update Signature Map
+                # Update Proof Map
                 #
-                # Store the payload so future block builders can reuse this aggregation
-                new_block_sigs.setdefault((vid, data_root), []).append(record)
+                # Store the proof so future block builders can reuse this aggregation
+                key = SignatureKey(vid, data_root)
+                new_block_proofs.setdefault(key, []).append(proof)
 
                 # Update Fork Choice
                 #
@@ -588,8 +584,8 @@ class Store(Container):
                     is_from_block=True,
                 )
 
-        # Update store with new aggregated signature payloads
-        store = store.model_copy(update={"aggregated_payloads": new_block_sigs})
+        # Update store with new aggregated proofs
+        store = store.model_copy(update={"aggregated_payloads": new_block_proofs})
 
         # Update forkchoice head based on new block and attestations
         #
@@ -606,9 +602,12 @@ class Store(Container):
         # 3. Influence fork choice only after interval 3 (end of slot)
         #
         # We also store the proposer's signature for potential future block building.
-        proposer_data_root = proposer_attestation.data.data_root_bytes()
+        proposer_sig_key = SignatureKey(
+            proposer_attestation.validator_id,
+            proposer_attestation.data.data_root_bytes(),
+        )
         new_gossip_sigs = dict(store.gossip_signatures)
-        new_gossip_sigs[(proposer_attestation.validator_id, proposer_data_root)] = (
+        new_gossip_sigs[proposer_sig_key] = (
             signed_block_with_attestation.signature.proposer_signature
         )
 
@@ -1037,7 +1036,7 @@ class Store(Container):
         self,
         slot: Slot,
         validator_index: Uint64,
-    ) -> tuple["Store", Block, list[MultisigAggregatedSignature]]:
+    ) -> tuple["Store", Block, list[AggregatedSignatureProof]]:
         """
         Produce a block and per-aggregated-attestation signature payloads for the target slot.
 

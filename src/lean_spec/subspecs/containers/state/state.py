@@ -4,9 +4,8 @@ from typing import AbstractSet, Iterable
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
-    AggregatedSignaturePayloads,
-    AttestationSignatureKey,
-    MultisigAggregatedSignature,
+    AggregatedSignatureProof,
+    SignatureKey,
 )
 from lean_spec.subspecs.xmss.containers import PublicKey, Signature
 from lean_spec.types import (
@@ -614,21 +613,19 @@ class State(Container):
     def _aggregate_signatures_from_gossip(
         self,
         validator_ids: list[Uint64],
-        data_root: bytes,
+        data_root: Bytes32,
         epoch: Slot,
-        gossip_signatures: dict[AttestationSignatureKey, "Signature"] | None = None,
-    ) -> tuple[MultisigAggregatedSignature, AggregationBits, set[Uint64]] | None:
+        gossip_signatures: dict[SignatureKey, "Signature"] | None = None,
+    ) -> tuple[AggregatedSignatureProof, set[Uint64]] | None:
         """
-        Aggregate per-validator XMSS signatures into a single payload.
+        Aggregate per-validator XMSS signatures into a single proof.
 
         Returns:
-        -------
-            - MultisigAggregatedSignature: The aggregated signature.
-            - AggregationBits: The aggregation bits.
-            - set[Uint64]: The validator ids whose id's were missing from the gossip signatures.
+            A tuple of (proof, missing_validator_ids) or None if no signatures found.
+            The proof contains the participants bitfield.
 
         Raises:
-            AssertionError: If the aggregation fails.
+            AggregationError: If the aggregation fails.
         """
         if not gossip_signatures or not validator_ids:
             return None
@@ -641,7 +638,8 @@ class State(Container):
 
         for validator_index in validator_ids:
             # Attempt to retrieve the signature; fail fast if any are missing.
-            if (sig := gossip_signatures.get((validator_index, data_root))) is None:
+            key = SignatureKey(validator_index, data_root)
+            if (sig := gossip_signatures.get(key)) is None:
                 missing_validator_ids.add(validator_index)
                 continue
 
@@ -652,16 +650,15 @@ class State(Container):
         if not included_validator_ids:
             return None
 
-        return (
-            MultisigAggregatedSignature.aggregate_signatures(
-                public_keys=public_keys,
-                signatures=signatures,
-                message=data_root,
-                epoch=epoch,
-            ),
-            AggregationBits.from_validator_indices(list(included_validator_ids)),
-            missing_validator_ids,
+        participants = AggregationBits.from_validator_indices(list(included_validator_ids))
+        proof = AggregatedSignatureProof.aggregate(
+            participants=participants,
+            public_keys=public_keys,
+            signatures=signatures,
+            message=data_root,
+            epoch=epoch,
         )
+        return proof, missing_validator_ids
 
     def build_block(
         self,
@@ -671,10 +668,9 @@ class State(Container):
         attestations: list[Attestation] | None = None,
         available_attestations: Iterable[Attestation] | None = None,
         known_block_roots: AbstractSet[Bytes32] | None = None,
-        gossip_signatures: dict[AttestationSignatureKey, "Signature"] | None = None,
-        aggregated_payloads: dict[AttestationSignatureKey, AggregatedSignaturePayloads]
-        | None = None,
-    ) -> tuple[Block, "State", list[AggregatedAttestation], list[MultisigAggregatedSignature]]:
+        gossip_signatures: dict[SignatureKey, "Signature"] | None = None,
+        aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] | None = None,
+    ) -> tuple[Block, "State", list[AggregatedAttestation], list[AggregatedSignatureProof]]:
         """
         Build a valid block on top of this state.
 
@@ -737,7 +733,7 @@ class State(Container):
                 data = attestation.data
                 validator_id = attestation.validator_id
                 data_root = data.data_root_bytes()
-                attestation_key = (validator_id, data_root)
+                sig_key = SignatureKey(validator_id, data_root)
 
                 # Skip if target block is unknown
                 if data.head.root not in known_block_roots:
@@ -752,17 +748,14 @@ class State(Container):
                     continue
 
                 # We can only include an attestation if we have some way to later provide
-                # an aggregated payload for its group:
+                # an aggregated proof for its group:
                 # - either a per validator XMSS signature from gossip, or
-                # - at least one aggregated payload learned from a block that references
+                # - at least one aggregated proof learned from a block that references
                 #   this validator+data.
-                has_gossip_sig = bool(gossip_signatures and attestation_key in gossip_signatures)
+                has_gossip_sig = bool(gossip_signatures and sig_key in gossip_signatures)
+                has_block_proof = bool(aggregated_payloads and sig_key in aggregated_payloads)
 
-                has_block_payload = bool(
-                    aggregated_payloads and attestation_key in aggregated_payloads
-                )
-
-                if has_gossip_sig or has_block_payload:
+                if has_gossip_sig or has_block_proof:
                     new_attestations.append(attestation)
 
             # Fixed point reached: no new attestations found
@@ -798,10 +791,9 @@ class State(Container):
     def compute_aggregated_signatures(
         self,
         attestations: list[Attestation],
-        gossip_signatures: dict[AttestationSignatureKey, "Signature"] | None = None,
-        aggregated_payloads: dict[AttestationSignatureKey, AggregatedSignaturePayloads]
-        | None = None,
-    ) -> tuple[list[AggregatedAttestation], list[MultisigAggregatedSignature]]:
+        gossip_signatures: dict[SignatureKey, "Signature"] | None = None,
+        aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] | None = None,
+    ) -> tuple[list[AggregatedAttestation], list[AggregatedSignatureProof]]:
         """
         Compute aggregated signatures for a set of attestations.
 
@@ -817,7 +809,7 @@ class State(Container):
             A tuple of `(aggregated_attestations, aggregated_signatures)`.
         """
         final_aggregated_attestations: list[AggregatedAttestation] = []
-        final_aggregated_signatures: list[MultisigAggregatedSignature] = []
+        final_aggregated_proofs: list[AggregatedSignatureProof] = []
 
         # Aggregate all the attestations into a single aggregated attestation.
         completely_aggregated_attestations = AggregatedAttestation.aggregate_by_data(attestations)
@@ -839,8 +831,7 @@ class State(Container):
             data_root = completely_aggregated_attestation.data.data_root_bytes()
             slot = completely_aggregated_attestation.data.slot
 
-            aggregated_signatures: list[MultisigAggregatedSignature] = []
-            aggregated_signatures_bitlists: list[AggregationBits] = []
+            proofs: list[AggregatedSignatureProof] = []
 
             # Try to find per validator XMSS signatures from gossip.
             gossip_result = self._aggregate_signatures_from_gossip(
@@ -851,101 +842,76 @@ class State(Container):
             )
 
             if gossip_result is not None:
-                gossip_aggregated_signature, gossip_aggregated_bitlist, remaining_validator_ids = (
-                    gossip_result
-                )
-                aggregated_signatures.append(gossip_aggregated_signature)
-                aggregated_signatures_bitlists.append(gossip_aggregated_bitlist)
+                gossip_proof, remaining_validator_ids = gossip_result
+                proofs.append(gossip_proof)
             else:
                 remaining_validator_ids = set(validator_ids)
 
-            # Try to pick a single aggregated signature from the aggregated signatures
-            # that covers the most validators.
+            # Pick existing aggregated proofs to cover remaining validators.
             while remaining_validator_ids:
-                aggregated_signature, aggregated_signature_bitlist, remaining_validator_ids = (
-                    self._pick_from_aggregated_signatures(
-                        remaining_validator_ids,
-                        data_root,
-                        aggregated_payloads,
-                    )
+                proof, remaining_validator_ids = self._pick_from_aggregated_proofs(
+                    remaining_validator_ids,
+                    data_root,
+                    aggregated_payloads,
                 )
-                aggregated_signatures.append(aggregated_signature)
-                aggregated_signatures_bitlists.append(aggregated_signature_bitlist)
+                proofs.append(proof)
 
-            # TODO: Recursively aggregate the signatures in aggregated_signatures and append it to
-            # final_aggregated_signatures. Since we currently don't support recursive aggregation,
-            # we will just append the aggregated signatures to final_aggregated_signatures.
-            # There might be a case where we have multiple aggregated signatures that cover the same
-            # validators. This is fine for now, eventually we will recursively aggregate into one.
-            for aggregated_signature, aggregated_signature_bitlist in zip(
-                aggregated_signatures, aggregated_signatures_bitlists, strict=True
-            ):
+            # TODO: Recursively aggregate the proofs. Since we currently don't support
+            # recursive aggregation, we just append each proof separately. This is fine
+            # for now, eventually we will recursively aggregate into one.
+            for proof in proofs:
                 final_aggregated_attestations.append(
                     AggregatedAttestation(
-                        aggregation_bits=aggregated_signature_bitlist,
+                        aggregation_bits=proof.participants,
                         data=completely_aggregated_attestation.data,
                     )
                 )
-                final_aggregated_signatures.append(aggregated_signature)
+                final_aggregated_proofs.append(proof)
 
-        return final_aggregated_attestations, final_aggregated_signatures
+        return final_aggregated_attestations, final_aggregated_proofs
 
-    def _pick_from_aggregated_signatures(
+    def _pick_from_aggregated_proofs(
         self,
         remaining_validator_ids: set[Uint64],
-        data_root: bytes,
-        aggregated_payloads: dict[AttestationSignatureKey, AggregatedSignaturePayloads]
-        | None = None,
-    ) -> tuple[MultisigAggregatedSignature, AggregationBits, set[Uint64]]:
+        data_root: Bytes32,
+        aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] | None = None,
+    ) -> tuple[AggregatedSignatureProof, set[Uint64]]:
         """
-        Pick a single aggregated signature from aggregated signatures that covers the most
-        remaining validator ids.
+        Pick an aggregated proof that covers the most remaining validators.
 
         Args:
-            remaining_validator_ids: The validator ids to pick from.
-            data_root: The data root to pick from.
-            aggregated_payloads: The aggregated payloads to pick from.
+            remaining_validator_ids: The validator ids still needing coverage.
+            data_root: The attestation data root.
+            aggregated_payloads: Previously learned proofs keyed by (validator_id, data_root).
 
         Returns:
-            - MultisigAggregatedSignature: The aggregated signature.
-            - AggregationBits: The aggregation bits.
-            - set[Uint64]: The remaining validator ids.
+            A tuple of (proof, remaining_validator_ids after this proof is applied).
 
         Raises:
-            ValueError: If remaining validator ids is empty or aggregated payloads is not provided.
-            ValueError: If the best aggregated signature is not found.
+            ValueError: If no suitable proof is found.
         """
         if not remaining_validator_ids:
-            raise ValueError(
-                "remaining validator ids cannot be empty when picking aggregated signatures"
-            )
+            raise ValueError("remaining validator ids cannot be empty")
 
         if aggregated_payloads is None:
-            raise ValueError("aggregated payloads is required when gossip coverage is incomplete")
+            raise ValueError("aggregated payloads required when gossip coverage incomplete")
 
-        best_aggregated_signature: MultisigAggregatedSignature | None = None
-        best_aggregated_signature_participants: set[Uint64] = set()
-        best_remaining_validator_ids: set[Uint64] = set()
+        best_proof: AggregatedSignatureProof | None = None
+        best_overlap: set[Uint64] = set()
+        best_remaining: set[Uint64] = set()
 
         representative_validator_id = next(iter(remaining_validator_ids))
+        key = SignatureKey(representative_validator_id, data_root)
 
-        for aggregated_signature_bitlist, aggregated_signature in aggregated_payloads.get(
-            (representative_validator_id, data_root), []
-        ):
-            participants = set(aggregated_signature_bitlist.to_validator_indices())
+        for proof in aggregated_payloads.get(key, []):
+            participants = set(proof.participants.to_validator_indices())
             overlap = participants.intersection(remaining_validator_ids)
-            if len(overlap) > len(best_aggregated_signature_participants):
-                best_aggregated_signature = aggregated_signature
-                best_aggregated_signature_participants = overlap
-                best_remaining_validator_ids = set(remaining_validator_ids).difference(overlap)
+            if len(overlap) > len(best_overlap):
+                best_proof = proof
+                best_overlap = overlap
+                best_remaining = remaining_validator_ids - overlap
 
-        if best_aggregated_signature is None:
-            raise ValueError(
-                "Failed to locate an aggregated signature payload for the remaining validators"
-            )
+        if best_proof is None:
+            raise ValueError("Failed to locate aggregated proof for remaining validators")
 
-        return (
-            best_aggregated_signature,
-            AggregationBits.from_validator_indices(list(best_aggregated_signature_participants)),
-            best_remaining_validator_ids,
-        )
+        return best_proof, best_remaining
