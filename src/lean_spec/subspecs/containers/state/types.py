@@ -11,10 +11,7 @@ from lean_spec.types.bitfields import BaseBitlist
 from ..validator import Validator
 
 if TYPE_CHECKING:
-    from .state import State
-
-StateLookup = dict[Bytes32, "State"]
-"""Mapping from state root to State objects."""
+    pass
 
 
 class HistoricalBlockHashes(SSZList[Bytes32]):

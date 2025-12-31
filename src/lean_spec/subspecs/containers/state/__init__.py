@@ -6,7 +6,6 @@ from .types import (
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
-    StateLookup,
     Validators,
 )
 
@@ -16,6 +15,5 @@ __all__ = [
     "JustificationValidators",
     "JustifiedSlots",
     "State",
-    "StateLookup",
     "Validators",
 ]
