@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from lean_spec.subspecs.chain.config import DEVNET_CONFIG
 from lean_spec.types import Bytes32, SSZList
 from lean_spec.types.bitfields import BaseBitlist
 
 from ..validator import Validator
-
-if TYPE_CHECKING:
-    pass
 
 
 class HistoricalBlockHashes(SSZList[Bytes32]):
