@@ -912,6 +912,9 @@ class State(Container):
                     break
 
                 # Step 3: Record the proof and remove covered validators.
+                #
+                # TODO: We don't support recursive aggregation yet.
+                # In the future, we should be able to aggregate the proofs into a single proof.
                 results.append(
                     (
                         AggregatedAttestation(aggregation_bits=best.participants, data=data),
