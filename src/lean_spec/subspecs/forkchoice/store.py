@@ -33,7 +33,6 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import StateLookup
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
@@ -116,7 +115,7 @@ class Store(Container):
     Every block that might participate in fork choice must appear here.
     """
 
-    states: StateLookup = {}
+    states: dict[Bytes32, State] = {}
     """
     Mapping from state root to State objects.
 
