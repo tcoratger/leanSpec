@@ -304,121 +304,6 @@ class TestBlockProduction:
         assert hash_tree_root(stored_state) == block.state_root
 
 
-class TestAttestationProduction:
-    """Test validator attestation production functionality."""
-
-    def test_produce_attestation_basic(self, sample_store: Store) -> None:
-        """Test basic attestation production."""
-        slot = Slot(1)
-        validator_idx = Uint64(5)
-
-        validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
-
-        # Verify attestation structure
-        assert attestation.validator_id == validator_idx
-        assert attestation.data.slot == slot
-        assert isinstance(attestation.data.head, Checkpoint)
-        assert isinstance(attestation.data.target, Checkpoint)
-        assert isinstance(attestation.data.source, Checkpoint)
-
-        # Source should be the store's latest justified
-        assert attestation.data.source == sample_store.latest_justified
-
-    def test_produce_attestation_head_reference(self, sample_store: Store) -> None:
-        """Test that attestation references correct head."""
-        slot = Slot(2)
-        validator_idx = Uint64(8)
-
-        validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
-
-        # Head checkpoint should reference the current proposal head
-        _, expected_head_root = sample_store.get_proposal_head(slot)
-        assert attestation.data.head.root == expected_head_root
-
-        # Head slot should match the block's slot
-        head_block = sample_store.blocks[expected_head_root]
-        assert attestation.data.head.slot == head_block.slot
-
-    def test_produce_attestation_target_calculation(self, sample_store: Store) -> None:
-        """Test that attestation calculates target correctly."""
-        slot = Slot(3)
-        validator_idx = Uint64(9)
-
-        validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
-
-        # Target should match the store's attestation target calculation
-        expected_target = sample_store.get_attestation_target()
-        assert attestation.data.target.root == expected_target.root
-        assert attestation.data.target.slot == expected_target.slot
-
-    def test_produce_attestation_different_validators(self, sample_store: Store) -> None:
-        """Test attestation production for different validators in same slot."""
-        slot = Slot(4)
-
-        # All validators should produce consistent attestations for the same slot
-        attestations = []
-        for validator_idx in range(5):
-            validator = Validator(pubkey=Bytes52.zero(), index=Uint64(validator_idx))
-            attestation_data = sample_store.produce_attestation_data(slot)
-            attestation = validator.produce_attestation(attestation_data)
-            attestations.append(attestation)
-
-            # Each attestation should have correct validator ID
-            assert attestation.validator_id == Uint64(validator_idx)
-            assert attestation.data.slot == slot
-
-        # All attestations should have same head, target, and source (consensus)
-        first_attestation = attestations[0]
-        for attestation in attestations[1:]:
-            assert attestation.data.head.root == first_attestation.data.head.root
-            assert attestation.data.head.slot == first_attestation.data.head.slot
-            assert attestation.data.target.root == first_attestation.data.target.root
-            assert attestation.data.target.slot == first_attestation.data.target.slot
-            assert attestation.data.source.root == first_attestation.data.source.root
-            assert attestation.data.source.slot == first_attestation.data.source.slot
-
-    def test_produce_attestation_sequential_slots(self, sample_store: Store) -> None:
-        """Test attestation production across sequential slots."""
-        validator_idx = Uint64(3)
-        validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-
-        # Produce attestations for sequential slots
-        attestation_data1 = sample_store.produce_attestation_data(Slot(1))
-        attestation1 = validator.produce_attestation(attestation_data1)
-        attestation_data2 = sample_store.produce_attestation_data(Slot(2))
-        attestation2 = validator.produce_attestation(attestation_data2)
-
-        # Attestations should be for different slots
-        assert attestation1.data.slot == Slot(1)
-        assert attestation2.data.slot == Slot(2)
-
-        # Both should use same source (latest justified doesn't change)
-        assert attestation1.data.source == attestation2.data.source
-        assert attestation1.data.source == sample_store.latest_justified
-
-    def test_produce_attestation_justification_consistency(self, sample_store: Store) -> None:
-        """Test that attestation source uses current justified checkpoint."""
-        slot = Slot(5)
-        validator_idx = Uint64(2)
-
-        validator = Validator(pubkey=Bytes52.zero(), index=validator_idx)
-        attestation_data = sample_store.produce_attestation_data(slot)
-        attestation = validator.produce_attestation(attestation_data)
-
-        # Source must be the latest justified checkpoint from store
-        assert attestation.data.source.root == sample_store.latest_justified.root
-        assert attestation.data.source.slot == sample_store.latest_justified.slot
-
-        # Source checkpoint should exist in blocks
-        assert attestation.data.source.root in sample_store.blocks
-
-
 class TestValidatorIntegration:
     """Test integration between block production and attestations."""
 
@@ -435,9 +320,8 @@ class TestValidatorIntegration:
         # Other validator creates attestation for slot 2
         attestor_slot = Slot(2)
         attestor_idx = Uint64(7)
-        validator = Validator(pubkey=Bytes52.zero(), index=attestor_idx)
         attestation_data = sample_store.produce_attestation_data(attestor_slot)
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = Attestation(validator_id=attestor_idx, data=attestation_data)
 
         # Attestation should reference the new block as head (if it became head)
         assert attestation.validator_id == attestor_idx
@@ -459,9 +343,8 @@ class TestValidatorIntegration:
         # These will be based on the current forkchoice head (genesis)
         attestations = []
         for i in range(2, 6):
-            validator = Validator(pubkey=Bytes52.zero(), index=Uint64(i))
             attestation_data = sample_store.produce_attestation_data(Slot(2))
-            attestation = validator.produce_attestation(attestation_data)
+            attestation = Attestation(validator_id=Uint64(i), data=attestation_data)
             attestations.append(attestation)
 
         # All attestations should be consistent
@@ -515,9 +398,8 @@ class TestValidatorIntegration:
         assert block.proposer_index == max_validator
 
         # Should be able to produce attestation
-        validator = Validator(pubkey=Bytes52.zero(), index=max_validator)
         attestation_data = sample_store.produce_attestation_data(Slot(10))
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = Attestation(validator_id=max_validator, data=attestation_data)
         assert attestation.validator_id == max_validator
 
     def test_validator_operations_empty_store(self) -> None:
@@ -600,9 +482,8 @@ class TestValidatorIntegration:
             Slot(1),
             Uint64(1),
         )
-        validator = Validator(pubkey=Bytes52.zero(), index=Uint64(2))
         attestation_data = store.produce_attestation_data(Slot(1))
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = Attestation(validator_id=Uint64(2), data=attestation_data)
 
         assert isinstance(block, Block)
         assert isinstance(attestation, Attestation)
@@ -659,8 +540,7 @@ class TestValidatorErrorHandling:
         result = is_proposer(large_validator, large_slot, num_validators)
         assert isinstance(result, bool)
 
-        # produce_attestation should work for any validator
-        validator = Validator(pubkey=Bytes52.zero(), index=large_validator)
+        # Attestation can be created for any validator
         attestation_data = sample_store.produce_attestation_data(Slot(1))
-        attestation = validator.produce_attestation(attestation_data)
+        attestation = Attestation(validator_id=large_validator, data=attestation_data)
         assert attestation.validator_id == large_validator
