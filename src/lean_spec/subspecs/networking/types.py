@@ -20,3 +20,6 @@ SubnetId = Uint64
 
 Multiaddr = str
 """Multiaddress string, e.g. ``/ip4/192.168.1.1/tcp/9000``."""
+
+ForkDigest = Bytes4
+"""4-byte fork identifier ensuring network isolation between forks."""
