@@ -15,7 +15,7 @@ from .reqresp import (
     BlocksByRootResponse,
     Status,
 )
-from .types import DomainType, ProtocolId
+from .types import DomainType, ForkDigest, ProtocolId
 
 __all__ = [
     "MAX_REQUEST_BLOCKS",
@@ -31,4 +31,5 @@ __all__ = [
     "Status",
     "DomainType",
     "ProtocolId",
+    "ForkDigest",
 ]
