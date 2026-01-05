@@ -24,10 +24,6 @@ from lean_spec.types import StrictBaseModel
 from lean_spec.types.byte_arrays import BaseByteList, BaseBytes
 from lean_spec.types.uint import Uint8, Uint16
 
-# =============================================================================
-# Protocol Constants
-# =============================================================================
-
 PROTOCOL_ID: bytes = b"discv5"
 """Protocol identifier in packet header. 6 bytes."""
 
@@ -36,12 +32,6 @@ PROTOCOL_VERSION: int = 0x0001
 
 MAX_REQUEST_ID_LENGTH: int = 8
 """Maximum length of request-id in bytes."""
-
-# Note: Max ENR size (300 bytes) is defined in ENR.MAX_SIZE (enr/enr.py)
-
-# =============================================================================
-# Custom Types
-# =============================================================================
 
 
 class RequestId(BaseByteList):
@@ -87,20 +77,11 @@ class Nonce(BaseBytes):
     LENGTH: ClassVar[int] = 12
 
 
-# =============================================================================
-# Type Aliases
-# =============================================================================
-
 Distance = Uint16
 """Log2 distance (0-256). Distance 0 returns the node's own ENR."""
 
 Port = Uint16
 """UDP port number (0-65535)."""
-
-
-# =============================================================================
-# Packet Type Flags
-# =============================================================================
 
 
 class PacketFlag(IntEnum):
@@ -295,11 +276,6 @@ class TalkResp(StrictBaseModel):
 
     response: bytes
     """Protocol-specific response. Empty if protocol unknown."""
-
-
-# =============================================================================
-# Packet Header Structures
-# =============================================================================
 
 
 class StaticHeader(StrictBaseModel):
