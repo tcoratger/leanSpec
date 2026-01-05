@@ -26,11 +26,10 @@ See: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-inter
 
 from typing import ClassVar
 
+from lean_spec.subspecs.networking.types import ForkDigest
 from lean_spec.types import StrictBaseModel, Uint64
 from lean_spec.types.bitfields import BaseBitvector
 from lean_spec.types.boolean import Boolean
-
-from ..types import ForkDigest
 
 FAR_FUTURE_EPOCH = Uint64(2**64 - 1)
 """Sentinel value indicating no scheduled fork."""

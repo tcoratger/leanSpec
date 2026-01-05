@@ -51,9 +51,9 @@ References:
 
 from typing import ClassVar, Optional
 
+from lean_spec.subspecs.networking.types import Multiaddr, NodeId, SeqNumber
 from lean_spec.types import StrictBaseModel
 
-from ..types import Multiaddr, NodeId, SeqNumber
 from . import keys
 from .eth2 import AttestationSubnets, Eth2Data
 from .keys import EnrKey
