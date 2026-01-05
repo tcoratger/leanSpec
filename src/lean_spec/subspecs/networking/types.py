@@ -23,4 +23,3 @@ Multiaddr = str
 
 ForkDigest = Bytes4
 """4-byte fork identifier ensuring network isolation between forks."""
-
