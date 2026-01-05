@@ -1,8 +1,4 @@
-"""
-Tests for Discovery v5 Protocol Specification
-
-Test vectors from: https://github.com/ethereum/devp2p/blob/master/discv5/discv5-wire-test-vectors.md
-"""
+"""Tests for Discovery v5 Protocol Specification"""
 
 from lean_spec.subspecs.networking.support.discovery import (
     MAX_REQUEST_ID_LENGTH,
