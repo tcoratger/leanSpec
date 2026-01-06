@@ -1,104 +1,239 @@
 """
-Gossipsub protocol
+Gossipsub Message
+=================
 
-- Message ID computation based on topic and message data, with snappy decompression handling.
+Message representation and ID computation for the gossipsub protocol.
+
+Overview
+--------
+
+Each gossipsub message carries a topic and payload. Messages are
+identified by a 20-byte ID computed from their contents.
+
+Message ID Function
+-------------------
+
+Ethereum consensus uses a custom message ID function based on SHA256::
+
+    message_id = SHA256(domain + uint64_le(len(topic)) + topic + data)[:20]
+
+**Components:**
+
++-----------------+--------------------------------------------------------+
+| Component       | Description                                            |
++=================+========================================================+
+| domain          | 1-byte prefix indicating snappy validity (0x00/0x01)   |
++-----------------+--------------------------------------------------------+
+| uint64_le       | Topic length as 8-byte little-endian integer           |
++-----------------+--------------------------------------------------------+
+| topic           | Topic string as UTF-8 bytes                            |
++-----------------+--------------------------------------------------------+
+| data            | Message payload (decompressed if snappy is valid)      |
++-----------------+--------------------------------------------------------+
+
+**Domain Bytes:**
+
+- ``0x01`` (VALID_SNAPPY): Snappy decompression succeeded, use decompressed data
+- ``0x00`` (INVALID_SNAPPY): Decompression failed or no decompressor, use raw data
+
+This ensures messages with compression issues get different IDs,
+preventing cache pollution from invalid variants.
+
+Snappy Compression
+------------------
+
+Ethereum consensus requires SSZ data to be snappy-compressed.
+The message ID computation attempts decompression to determine
+which domain byte to use.
+
+References:
+----------
+- `Ethereum P2P spec <https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md>`_
+- `Gossipsub v1.0 <https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md>`_
 """
 
-import hashlib
-from typing import Annotated, Callable, Optional
+from __future__ import annotations
 
-from pydantic import Field
+import hashlib
+from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
 from lean_spec.subspecs.networking.config import (
     MESSAGE_DOMAIN_INVALID_SNAPPY,
     MESSAGE_DOMAIN_VALID_SNAPPY,
 )
+from lean_spec.types import Bytes20
 
-MessageId = Annotated[bytes, Field(min_length=20, max_length=20)]
-"""A 20-byte ID for gossipsub messages."""
+from .types import MessageId
+
+# =============================================================================
+# Snappy Decompressor Protocol
+# =============================================================================
 
 
-class GossipsubMessage:
+@runtime_checkable
+class SnappyDecompressor(Protocol):
+    """Protocol for snappy decompression functions.
+
+    Any callable matching this signature can be used for decompression.
+    The function should raise an exception if decompression fails.
+
+    Example::
+
+        import snappy
+
+        # Using python-snappy library
+        msg = GossipsubMessage(
+            topic=b"/leanconsensus/...",
+            raw_data=compressed_data,
+            snappy_decompress=snappy.decompress,
+        )
     """
-    Represents a gossipsub message and manages its ID computation.
 
-    This class encapsulates the topic, data, and the logic to generate a
-    message ID, correctly handling snappy decompression. The generated ID is
-    cached for efficiency.
-    """
-
-    def __init__(
-        self,
-        topic: bytes,
-        data: bytes,
-        snappy_decompress: Optional[Callable[[bytes], bytes]] = None,
-    ):
-        """
-        Initializes the message.
+    def __call__(self, data: bytes) -> bytes:
+        """Decompress snappy-compressed data.
 
         Args:
-            topic: The topic byte string.
-            data: The raw message data.
-            snappy_decompress: Optional snappy decompression function.
+            data: Compressed bytes.
+
+        Returns:
+            Decompressed bytes.
+
+        Raises:
+            Exception: If decompression fails.
         """
-        self.topic: bytes = topic
-        self.raw_data: bytes = data
-        self._snappy_decompress = snappy_decompress
-        # Cache for the computed ID
-        self._id: Optional[MessageId] = None
+        ...
+
+
+# =============================================================================
+# Gossipsub Message
+# =============================================================================
+
+
+@dataclass(slots=True)
+class GossipsubMessage:
+    r"""A gossipsub message with lazy ID computation.
+
+    Encapsulates topic, payload, and message ID logic. The ID is
+    computed lazily on first access and cached thereafter.
+
+    Message ID Computation
+    ----------------------
+
+    The 20-byte ID is computed as::
+
+        SHA256(domain + uint64_le(len(topic)) + topic + data)[:20]
+
+    Where `domain` depends on snappy decompression success.
+    """
+
+    topic: bytes
+    """Topic string as UTF-8 encoded bytes.
+
+    Example: ``b"/leanconsensus/0x12345678/block/ssz_snappy"``
+    """
+
+    raw_data: bytes
+    """Raw message payload.
+
+    Typically snappy-compressed SSZ data. The actual content
+    depends on the topic (block, attestation, etc.).
+    """
+
+    snappy_decompress: SnappyDecompressor | None = field(default=None, repr=False)
+    """Optional snappy decompression function.
+
+    If provided, decompression is attempted during ID computation
+    to determine the domain byte. Pass `snappy.decompress` from
+    the python-snappy library, or any compatible callable.
+    """
+
+    _cached_id: MessageId | None = field(
+        default=None, init=False, repr=False, compare=False, hash=False
+    )
+    """Cached message ID.
+
+    Computed lazily on first access to `id` property. Once computed,
+    the same ID is returned for all subsequent accesses.
+    """
 
     @property
     def id(self) -> MessageId:
-        """
-        Computes and returns the 20-byte message ID.
+        """Get the 20-byte message ID.
 
-        The ID is computed on first access and then cached. The computation
-        logic depends on whether the message data can be successfully
-        decompressed with snappy.
-        """
-        # Return the cached ID if it's already been computed
-        if self._id is not None:
-            return self._id
-
-        # Determine domain and data based on snappy decompression
-        if self._snappy_decompress:
-            try:
-                # Try to decompress the data with snappy
-                decompressed_data = self._snappy_decompress(self.raw_data)
-                # Valid snappy decompression - use valid domain
-                domain, data_for_hash = (
-                    MESSAGE_DOMAIN_VALID_SNAPPY,
-                    decompressed_data,
-                )
-            except Exception:
-                # Invalid snappy decompression - use invalid domain
-                domain, data_for_hash = (
-                    MESSAGE_DOMAIN_INVALID_SNAPPY,
-                    self.raw_data,
-                )
-        else:
-            # No decompressor provided - use invalid domain
-            domain, data_for_hash = (
-                MESSAGE_DOMAIN_INVALID_SNAPPY,
-                self.raw_data,
-            )
-
-        # Compute the raw ID bytes and assign with proper type annotation
-        self._id: MessageId = self._compute_raw_id(domain, data_for_hash)
-        return self._id
-
-    def _compute_raw_id(self, domain: bytes, message_data: bytes) -> bytes:
-        """
-        Computes SHA256(domain + uint64_le(len(topic)) + topic + message_data)[:20].
-
-        Args:
-            domain: The 4-byte domain for message-id isolation.
-            message_data: The message data (either decompressed or raw).
+        Computed lazily on first access using the Ethereum consensus
+        message ID function. The result is cached.
 
         Returns:
-            A 20-byte raw bytes digest.
+            20-byte message ID (Bytes20).
         """
-        # Concatenate all components: domain + topic_len + topic + data
-        data_to_hash = domain + len(self.topic).to_bytes(8, "little") + self.topic + message_data
-        # Compute SHA256 and take the first 20 bytes
-        return hashlib.sha256(data_to_hash).digest()[:20]
+        if self._cached_id is None:
+            self._cached_id = self.compute_id(self.topic, self.raw_data, self.snappy_decompress)
+        return self._cached_id
+
+    @staticmethod
+    def compute_id(
+        topic: bytes,
+        data: bytes,
+        snappy_decompress: SnappyDecompressor | None = None,
+    ) -> MessageId:
+        """Compute a 20-byte message ID from raw data.
+
+        Implements the Ethereum consensus message ID function::
+
+            SHA256(domain + uint64_le(len(topic)) + topic + data)[:20]
+
+        Domain Selection
+        ----------------
+
+        - If `snappy_decompress` is provided and succeeds:
+            domain = 0x01, use decompressed data
+        - Otherwise:
+            domain = 0x00, use raw data
+
+        Args:
+            topic: Topic string as bytes.
+            data: Message payload (potentially compressed).
+            snappy_decompress: Optional decompression function.
+
+        Returns:
+            20-byte message ID.
+
+        Example::
+
+            msg_id = GossipsubMessage.compute_id(
+                topic=b"/leanconsensus/0x12345678/block/ssz_snappy",
+                data=block_bytes,
+                snappy_decompress=snappy.decompress,
+            )
+        """
+        if snappy_decompress is not None:
+            try:
+                data_for_hash = snappy_decompress(data)
+                domain = MESSAGE_DOMAIN_VALID_SNAPPY
+            except Exception:
+                data_for_hash = data
+                domain = MESSAGE_DOMAIN_INVALID_SNAPPY
+        else:
+            data_for_hash = data
+            domain = MESSAGE_DOMAIN_INVALID_SNAPPY
+
+        preimage = bytes(domain) + len(topic).to_bytes(8, "little") + topic + data_for_hash
+
+        return Bytes20(hashlib.sha256(preimage).digest()[:20])
+
+    @property
+    def topic_str(self) -> str:
+        """Get the topic as a UTF-8 string.
+
+        Returns:
+            Topic decoded from bytes to string.
+        """
+        return self.topic.decode("utf-8")
+
+    def __hash__(self) -> int:
+        """Hash based on message ID.
+
+        Allows messages to be used in sets and as dict keys.
+        """
+        return hash(self.id)

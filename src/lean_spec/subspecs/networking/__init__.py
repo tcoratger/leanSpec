@@ -7,7 +7,7 @@ from .config import (
 )
 from .gossipsub.message import GossipsubMessage
 from .gossipsub.parameters import GossipsubParameters
-from .gossipsub.topic import GossipsubTopic
+from .gossipsub.topic import GossipTopic
 from .reqresp import (
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
@@ -22,7 +22,7 @@ __all__ = [
     "MESSAGE_DOMAIN_INVALID_SNAPPY",
     "MESSAGE_DOMAIN_VALID_SNAPPY",
     "GossipsubParameters",
-    "GossipsubTopic",
+    "GossipTopic",
     "GossipsubMessage",
     "BLOCKS_BY_ROOT_PROTOCOL_V1",
     "STATUS_PROTOCOL_V1",

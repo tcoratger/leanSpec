@@ -209,6 +209,12 @@ class Bytes8(BaseBytes):
     LENGTH = 8
 
 
+class Bytes20(BaseBytes):
+    """Fixed-size byte array of exactly 20 bytes."""
+
+    LENGTH = 20
+
+
 class Bytes32(BaseBytes):
     """Fixed-size byte array of exactly 32 bytes."""
 

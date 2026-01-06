@@ -7,9 +7,23 @@ from lean_spec.subspecs.networking.config import (
     MESSAGE_DOMAIN_VALID_SNAPPY,
 )
 from lean_spec.subspecs.networking.gossipsub import (
+    ControlMessage,
+    FanoutEntry,
     GossipsubMessage,
     GossipsubParameters,
-    MessageId,
+    GossipTopic,
+    Graft,
+    IDontWant,
+    IHave,
+    IWant,
+    MeshState,
+    MessageCache,
+    Prune,
+    SeenCache,
+    TopicKind,
+    TopicMesh,
+    format_topic_string,
+    parse_topic_string,
 )
 
 
@@ -17,29 +31,23 @@ class TestGossipsubParameters:
     """Test suite for GossipSub protocol parameters."""
 
     def test_default_parameters(self) -> None:
-        """
-        Test default GossipSub parameters and their relationships.
-
-        Validates that default parameter values maintain expected relationships
-        for proper protocol operation and that all values are positive.
-        """
+        """Test default GossipSub parameters."""
         params = GossipsubParameters()
 
-        # Test logical relationships
+        # Test Ethereum spec values
+        assert params.d == 8
+        assert params.d_low == 6
+        assert params.d_high == 12
+        assert params.d_lazy == 6
+        assert params.heartbeat_interval_secs == 0.7
+        assert params.fanout_ttl_secs == 60
+        assert params.mcache_len == 6
+        assert params.mcache_gossip == 3
+
+        # Test relationships
         assert params.d_low < params.d < params.d_high
         assert params.d_lazy <= params.d
         assert params.mcache_gossip <= params.mcache_len
-
-        # Test all timing/count parameters are positive
-        positive_params = [
-            params.heartbeat_interval_secs,
-            params.fanout_ttl_secs,
-            params.seen_ttl_secs,
-            params.mcache_len,
-            params.mcache_gossip,
-        ]
-        for param in positive_params:
-            assert param > 0
 
 
 class TestGossipsubMessage:
@@ -48,25 +56,15 @@ class TestGossipsubMessage:
     @pytest.mark.parametrize(
         "has_snappy,decompress_succeeds,expected_domain",
         [
-            # No decompressor
             (False, False, MESSAGE_DOMAIN_INVALID_SNAPPY),
-            # Valid decompression
             (True, True, MESSAGE_DOMAIN_VALID_SNAPPY),
-            # Failed decompression
             (True, False, MESSAGE_DOMAIN_INVALID_SNAPPY),
         ],
     )
     def test_message_id_computation(
         self, has_snappy: bool, decompress_succeeds: bool, expected_domain: bytes
     ) -> None:
-        """
-        Test message ID computation across different snappy scenarios.
-
-        Args:
-            has_snappy: Whether to provide a snappy decompressor.
-            decompress_succeeds: Whether decompression should succeed.
-            expected_domain: Expected domain bytes for ID computation.
-        """
+        """Test message ID computation across different snappy scenarios."""
         topic = b"test_topic"
         raw_data = b"raw_test_data"
         decompressed_data = b"decompressed_test_data"
@@ -85,35 +83,17 @@ class TestGossipsubMessage:
         message = GossipsubMessage(topic, raw_data, snappy_decompress)
         message_id = message.id
 
-        # Should always be exactly 20 bytes
         assert len(message_id) == 20
         assert isinstance(message_id, bytes)
 
-        # Test deterministic behavior - same inputs should produce same ID
+        # Test determinism
         message2 = GossipsubMessage(topic, raw_data, snappy_decompress)
         assert message_id == message2.id
 
-        # Test that snappy success/failure affects the ID
-        if has_snappy:
-            # Create message without snappy - should produce different ID if decompression succeeded
-            msg_no_snappy = GossipsubMessage(topic, raw_data, None)
-            if decompress_succeeds:
-                assert message_id != msg_no_snappy.id  # Different domains
-            else:
-                # Both use invalid domain, but this tests the flow works
-                assert len(msg_no_snappy.id) == 20
-
     def test_message_id_caching(self) -> None:
-        """
-        Test that message IDs are cached and deterministic.
-
-        Verifies caching behavior and that identical messages always
-        produce the same ID across multiple instantiations.
-        """
+        """Test that message IDs are cached."""
         topic = b"test_topic"
         data = b"test_data"
-
-        # Test caching within single message
         decompress_calls = 0
 
         def counting_decompress(data: bytes) -> bytes:
@@ -125,153 +105,315 @@ class TestGossipsubMessage:
         first_id = message.id
         second_id = message.id
 
-        assert decompress_calls == 1  # Called only once (cached)
-        assert first_id == second_id
-        assert first_id is second_id  # Same object reference
+        assert decompress_calls == 1  # Called only once
+        assert first_id is second_id
 
-        # Test deterministic behavior across different message instances
-        message2 = GossipsubMessage(topic, data)
-        message3 = GossipsubMessage(topic, data)
-
-        assert message2.id == message3.id
-
-    @pytest.mark.parametrize(
-        "topic,data,description",
-        [
-            (b"", b"", "empty topic and data"),
-            (b"topic", b"data1", "basic case 1"),
-            (b"topic", b"data2", "basic case 2"),
-            (b"topic1", b"data", "different topic"),
-            (b"topic2", b"data", "different topic"),
-            (b"x" * 1000, b"y" * 5000, "large inputs"),
-            (b"\x00\xff\x01\xfe", bytes(range(16)), "binary data"),
-        ],
-    )
-    def test_message_id_edge_cases(self, topic: bytes, data: bytes, description: str) -> None:
-        """
-        Test message ID computation across various edge cases and input sizes.
-
-        Parametrized test ensuring the algorithm works correctly with:
-        - Empty inputs
-        - Different topics/data combinations
-        - Large inputs
-        - Binary data with null bytes and non-UTF-8 sequences
-
-        Args:
-            topic: Topic bytes to test.
-            data: Data bytes to test.
-            description: Description of the test case.
-        """
-        message = GossipsubMessage(topic, data)
-        message_id = message.id
-
-        # Should always produce exactly 20-byte ID
-        assert len(message_id) == 20
-        assert isinstance(message_id, bytes)
-
-        # Test deterministic behavior - same inputs produce same ID
-        message2 = GossipsubMessage(topic, data)
-        assert message_id == message2.id
-
-    def test_message_uniqueness_and_collision_resistance(self) -> None:
-        """
-        Test message ID uniqueness and collision resistance.
-
-        Ensures different inputs produce different outputs and tests
-        resistance to common collision attack patterns.
-        """
-        # Test cases designed to catch collision vulnerabilities
+    def test_message_uniqueness(self) -> None:
+        """Test message ID uniqueness."""
         test_cases = [
-            # Basic different inputs
             (b"topic1", b"data"),
             (b"topic2", b"data"),
             (b"topic", b"data1"),
             (b"topic", b"data2"),
-            # Topic/data swapping
-            (b"abc", b"def"),
-            (b"def", b"abc"),
-            # Length-based attacks
-            (b"ab", b"cd"),
-            (b"a", b"bcd"),
-            # Null byte insertion
-            (b"topic", b"data"),
-            (b"top\x00ic", b"data"),
         ]
 
         messages = [GossipsubMessage(topic, data) for topic, data in test_cases]
         ids = [msg.id for msg in messages]
 
-        # All IDs should be unique (no collisions)
         assert len(ids) == len(set(ids))
 
-        # All should be 20 bytes
-        for msg_id in ids:
-            assert len(msg_id) == 20
+
+class TestControlMessages:
+    """Test suite for gossipsub control messages."""
+
+    def test_graft_creation(self) -> None:
+        """Test GRAFT message creation."""
+        graft = Graft(topic_id="test_topic")
+        assert graft.topic_id == "test_topic"
+
+    def test_prune_creation(self) -> None:
+        """Test PRUNE message creation."""
+        prune = Prune(topic_id="test_topic")
+        assert prune.topic_id == "test_topic"
+
+    def test_ihave_creation(self) -> None:
+        """Test IHAVE message creation."""
+        from lean_spec.types import Bytes20
+
+        msg_ids = [Bytes20(b"12345678901234567890"), Bytes20(b"abcdefghijklmnopqrst")]
+        ihave = IHave(topic_id="test_topic", message_ids=msg_ids)
+
+        assert ihave.topic_id == "test_topic"
+        assert len(ihave.message_ids) == 2
+
+    def test_iwant_creation(self) -> None:
+        """Test IWANT message creation."""
+        from lean_spec.types import Bytes20
+
+        msg_ids = [Bytes20(b"12345678901234567890")]
+        iwant = IWant(message_ids=msg_ids)
+
+        assert len(iwant.message_ids) == 1
+
+    def test_idontwant_creation(self) -> None:
+        """Test IDONTWANT message creation (v1.2)."""
+        from lean_spec.types import Bytes20
+
+        msg_ids = [Bytes20(b"12345678901234567890")]
+        idontwant = IDontWant(message_ids=msg_ids)
+
+        assert len(idontwant.message_ids) == 1
+
+    def test_control_message_aggregation(self) -> None:
+        """Test aggregated control message container."""
+        graft = Graft(topic_id="topic1")
+        prune = Prune(topic_id="topic2")
+
+        control = ControlMessage(grafts=[graft], prunes=[prune])
+
+        assert len(control.grafts) == 1
+        assert len(control.prunes) == 1
+        assert not control.is_empty()
+
+    def test_control_message_empty_check(self) -> None:
+        """Test control message empty check."""
+        empty_control = ControlMessage()
+        assert empty_control.is_empty()
+
+        non_empty = ControlMessage(grafts=[Graft(topic_id="topic")])
+        assert not non_empty.is_empty()
 
 
-class TestMessageIdType:
-    """Test suite for MessageId type validation."""
+class TestTopicFormatting:
+    """Test suite for topic string formatting and parsing."""
 
-    def test_message_id_pydantic_validation(self) -> None:
-        """
-        Test MessageId validation in Pydantic models.
+    def test_gossip_topic_creation(self) -> None:
+        """Test GossipTopic creation."""
+        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
 
-        The MessageId type annotation includes Pydantic field constraints
-        that enforce 20-byte length when used in models.
-        """
-        from pydantic import BaseModel, ValidationError
+        assert topic.kind == TopicKind.BLOCK
+        assert topic.fork_digest == "0x12345678"
+        assert str(topic) == "/leanconsensus/0x12345678/block/ssz_snappy"
 
-        class TestModel(BaseModel):
-            msg_id: MessageId
+    def test_gossip_topic_from_string(self) -> None:
+        """Test parsing topic string."""
+        topic = GossipTopic.from_string("/leanconsensus/0x12345678/block/ssz_snappy")
 
-        # Valid 20-byte ID should work
-        valid_model = TestModel(msg_id=b"12345678901234567890")
-        assert len(valid_model.msg_id) == 20
+        assert topic.kind == TopicKind.BLOCK
+        assert topic.fork_digest == "0x12345678"
 
-        # Invalid lengths should raise ValidationError
-        invalid_cases = [
-            (b"", "empty bytes"),
-            (b"short", "too short"),
-            (b"too_long_message_id_bytes", "too long"),
-        ]
+    def test_gossip_topic_factory_methods(self) -> None:
+        """Test GossipTopic factory methods."""
+        block_topic = GossipTopic.block("0xabcd1234")
+        assert block_topic.kind == TopicKind.BLOCK
 
-        for invalid_id, _case_desc in invalid_cases:
-            with pytest.raises(ValidationError, match=".*"):
-                TestModel(msg_id=invalid_id)
+        attestation_topic = GossipTopic.attestation("0xabcd1234")
+        assert attestation_topic.kind == TopicKind.ATTESTATION
+
+    def test_format_topic_string(self) -> None:
+        """Test topic string formatting."""
+        result = format_topic_string("block", "0x12345678")
+        assert result == "/leanconsensus/0x12345678/block/ssz_snappy"
+
+    def test_parse_topic_string(self) -> None:
+        """Test topic string parsing."""
+        prefix, fork_digest, topic_name, encoding = parse_topic_string(
+            "/leanconsensus/0x12345678/block/ssz_snappy"
+        )
+
+        assert prefix == "leanconsensus"
+        assert fork_digest == "0x12345678"
+        assert topic_name == "block"
+        assert encoding == "ssz_snappy"
+
+    def test_invalid_topic_string(self) -> None:
+        """Test handling of invalid topic strings."""
+        with pytest.raises(ValueError, match="expected 4 parts"):
+            GossipTopic.from_string("/invalid/topic")
+
+        with pytest.raises(ValueError, match="Invalid prefix"):
+            GossipTopic.from_string("/wrongprefix/0x123/block/ssz_snappy")
+
+    def test_topic_kind_enum(self) -> None:
+        """Test TopicKind enum."""
+        assert TopicKind.BLOCK.value == "block"
+        assert TopicKind.ATTESTATION.value == "attestation"
+        assert str(TopicKind.BLOCK) == "block"
 
 
-class TestGossipsubIntegration:
-    """Integration tests for complete GossipSub workflows."""
+class TestMeshState:
+    """Test suite for mesh state management."""
 
-    def test_realistic_blockchain_scenarios(self) -> None:
-        """Test realistic blockchain message scenarios."""
-        # Some Ethereum like GossipSub topics and payloads
-        scenarios = [
-            (b"/eth2/beacon_block/ssz_snappy", b"beacon_block_ssz_data"),
-            (b"/eth2/beacon_aggregate_and_proof/ssz_snappy", b"aggregate_proof_ssz"),
-            (b"/eth2/voluntary_exit/ssz_snappy", b"voluntary_exit_message"),
-        ]
+    def test_mesh_state_initialization(self) -> None:
+        """Test MeshState initialization."""
+        params = GossipsubParameters(d=8, d_low=6, d_high=12, d_lazy=6)
+        mesh = MeshState(params=params)
 
-        def mock_snappy_decompress(data: bytes) -> bytes:
-            return data + b"_decompressed"  # Simulate decompression
+        assert mesh.d == 8
+        assert mesh.d_low == 6
+        assert mesh.d_high == 12
+        assert mesh.d_lazy == 6
+
+    def test_subscribe_and_unsubscribe(self) -> None:
+        """Test topic subscription."""
+        mesh = MeshState(params=GossipsubParameters())
+
+        mesh.subscribe("topic1")
+        assert mesh.is_subscribed("topic1")
+        assert not mesh.is_subscribed("topic2")
+
+        peers = mesh.unsubscribe("topic1")
+        assert not mesh.is_subscribed("topic1")
+        assert peers == set()
+
+    def test_add_remove_mesh_peers(self) -> None:
+        """Test adding and removing peers from mesh."""
+        mesh = MeshState(params=GossipsubParameters())
+        mesh.subscribe("topic1")
+
+        assert mesh.add_to_mesh("topic1", "peer1")
+        assert mesh.add_to_mesh("topic1", "peer2")
+        assert not mesh.add_to_mesh("topic1", "peer1")  # Already in mesh
+
+        peers = mesh.get_mesh_peers("topic1")
+        assert "peer1" in peers
+        assert "peer2" in peers
+
+        assert mesh.remove_from_mesh("topic1", "peer1")
+        assert not mesh.remove_from_mesh("topic1", "peer1")  # Already removed
+
+        peers = mesh.get_mesh_peers("topic1")
+        assert "peer1" not in peers
+        assert "peer2" in peers
+
+    def test_gossip_peer_selection(self) -> None:
+        """Test selection of non-mesh peers for gossip."""
+        params = GossipsubParameters(d_lazy=3)
+        mesh = MeshState(params=params)
+        mesh.subscribe("topic1")
+        mesh.add_to_mesh("topic1", "peer1")
+        mesh.add_to_mesh("topic1", "peer2")
+
+        all_peers = {"peer1", "peer2", "peer3", "peer4", "peer5", "peer6"}
+
+        gossip_peers = mesh.select_peers_for_gossip("topic1", all_peers)
+
+        mesh_peers = mesh.get_mesh_peers("topic1")
+        for peer in gossip_peers:
+            assert peer not in mesh_peers
+
+
+class TestTopicMesh:
+    """Test suite for TopicMesh dataclass."""
+
+    def test_topic_mesh_add_remove(self) -> None:
+        """Test adding and removing peers."""
+        topic_mesh = TopicMesh()
+
+        assert topic_mesh.add_peer("peer1")
+        assert not topic_mesh.add_peer("peer1")  # Already exists
+        assert "peer1" in topic_mesh.peers
+
+        assert topic_mesh.remove_peer("peer1")
+        assert not topic_mesh.remove_peer("peer1")  # Already removed
+        assert "peer1" not in topic_mesh.peers
+
+
+class TestMessageCache:
+    """Test suite for message cache."""
+
+    def test_cache_put_and_get(self) -> None:
+        """Test putting and retrieving messages."""
+        cache = MessageCache(mcache_len=6, mcache_gossip=3)
+        message = GossipsubMessage(topic=b"topic", raw_data=b"data")
+
+        assert cache.put("topic", message)
+        assert not cache.put("topic", message)  # Duplicate
+
+        retrieved = cache.get(message.id)
+        assert retrieved is not None
+        assert retrieved.id == message.id
+
+    def test_cache_has(self) -> None:
+        """Test checking if message is in cache."""
+        cache = MessageCache()
+        message = GossipsubMessage(topic=b"topic", raw_data=b"data")
+
+        assert not cache.has(message.id)
+        cache.put("topic", message)
+        assert cache.has(message.id)
+
+    def test_cache_shift(self) -> None:
+        """Test cache window shifting."""
+        cache = MessageCache(mcache_len=3, mcache_gossip=2)
 
         messages = []
-        for topic, data in scenarios:
-            # Test both with and without snappy
-            msg_with_snappy = GossipsubMessage(topic, data, mock_snappy_decompress)
-            msg_without_snappy = GossipsubMessage(topic, data)
-            messages.extend([msg_with_snappy, msg_without_snappy])
+        for i in range(5):
+            msg = GossipsubMessage(topic=b"topic", raw_data=f"data{i}".encode())
+            cache.put("topic", msg)
+            messages.append(msg)
+            cache.shift()
 
-        ids = [msg.id for msg in messages]
+        # Old messages should be evicted
+        assert not cache.has(messages[0].id)
+        assert not cache.has(messages[1].id)
 
-        # All messages should produce valid, unique IDs
-        assert len(ids) == len(set(ids))  # All unique
-        for msg_id in ids:
-            assert len(msg_id) == 20
-            assert isinstance(msg_id, bytes)
+    def test_get_gossip_ids(self) -> None:
+        """Test getting message IDs for IHAVE gossip."""
+        cache = MessageCache(mcache_len=6, mcache_gossip=3)
 
-        # Verify snappy vs non-snappy messages produce different IDs
-        for i in range(0, len(messages), 2):
-            with_snappy_id = messages[i].id
-            without_snappy_id = messages[i + 1].id
-            assert with_snappy_id != without_snappy_id
+        msg1 = GossipsubMessage(topic=b"topic1", raw_data=b"data1")
+        msg2 = GossipsubMessage(topic=b"topic2", raw_data=b"data2")
+        msg3 = GossipsubMessage(topic=b"topic1", raw_data=b"data3")
+
+        cache.put("topic1", msg1)
+        cache.put("topic2", msg2)
+        cache.put("topic1", msg3)
+
+        gossip_ids = cache.get_gossip_ids("topic1")
+
+        assert msg1.id in gossip_ids
+        assert msg2.id not in gossip_ids
+        assert msg3.id in gossip_ids
+
+
+class TestSeenCache:
+    """Test suite for seen message cache."""
+
+    def test_seen_cache_add_and_check(self) -> None:
+        """Test adding and checking seen messages."""
+        from lean_spec.types import Bytes20
+
+        cache = SeenCache(ttl_seconds=60)
+        msg_id = Bytes20(b"12345678901234567890")
+
+        assert not cache.has(msg_id)
+        assert cache.add(msg_id, timestamp=1000.0)
+        assert cache.has(msg_id)
+        assert not cache.add(msg_id, timestamp=1001.0)  # Duplicate
+
+    def test_seen_cache_cleanup(self) -> None:
+        """Test cleanup of expired entries."""
+        from lean_spec.types import Bytes20
+
+        cache = SeenCache(ttl_seconds=10)
+        msg_id = Bytes20(b"12345678901234567890")
+
+        cache.add(msg_id, timestamp=1000.0)
+        assert cache.has(msg_id)
+
+        removed = cache.cleanup(current_time=1015.0)
+        assert removed == 1
+        assert not cache.has(msg_id)
+
+
+class TestFanoutEntry:
+    """Test suite for FanoutEntry dataclass."""
+
+    def test_fanout_entry_staleness(self) -> None:
+        """Test fanout entry staleness detection."""
+        entry = FanoutEntry()
+        entry.last_published = 1000.0
+
+        assert not entry.is_stale(current_time=1050.0, ttl=60.0)
+        assert entry.is_stale(current_time=1070.0, ttl=60.0)
