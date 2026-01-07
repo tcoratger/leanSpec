@@ -15,17 +15,15 @@ from lean_spec.types.uint import Uint8, Uint16, Uint32
 from lean_spec.types.union import SSZUnion
 
 
-class Uint8Vector3(SSZVector):
+class Uint8Vector3(SSZVector[Uint8]):
     """A vector of exactly 3 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 3
 
 
-class Uint16List8(SSZList):
+class Uint16List8(SSZList[Uint16]):
     """A list with up to 8 Uint16 values."""
 
-    ELEMENT_TYPE = Uint16
     LIMIT = 8
 
 

@@ -18,10 +18,9 @@ ValueOrValidationError = (SSZValueError, ValidationError)
 
 
 # Define some List types that are needed for Container definitions
-class Uint16List4(SSZList):
+class Uint16List4(SSZList[Uint16]):
     """A list with up to 4 Uint16 values."""
 
-    ELEMENT_TYPE = Uint16
     LIMIT = 4
 
 
@@ -40,160 +39,138 @@ class VariableContainer(Container):
 
 
 # Define explicit SSZVector types for testing
-class Uint16Vector2(SSZVector):
+class Uint16Vector2(SSZVector[Uint16]):
     """A vector of exactly 2 Uint16 values."""
 
-    ELEMENT_TYPE = Uint16
     LENGTH = 2
 
 
-class Uint8Vector4(SSZVector):
+class Uint8Vector4(SSZVector[Uint8]):
     """A vector of exactly 4 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 4
 
 
-class Uint8Vector48(SSZVector):
+class Uint8Vector48(SSZVector[Uint8]):
     """A vector of exactly 48 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 48
 
 
-class Uint8Vector96(SSZVector):
+class Uint8Vector96(SSZVector[Uint8]):
     """A vector of exactly 96 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 96
 
 
-class FixedContainerVector2(SSZVector):
+class FixedContainerVector2(SSZVector[FixedContainer]):
     """A vector of exactly 2 FixedContainer values."""
 
-    ELEMENT_TYPE = FixedContainer
     LENGTH = 2
 
 
-class VariableContainerVector2(SSZVector):
+class VariableContainerVector2(SSZVector[VariableContainer]):
     """A vector of exactly 2 VariableContainer values."""
 
-    ELEMENT_TYPE = VariableContainer
     LENGTH = 2
 
 
 # Define explicit List types for testing
-class Uint16List32(SSZList):
+class Uint16List32(SSZList[Uint16]):
     """A list with up to 32 Uint16 values."""
 
-    ELEMENT_TYPE = Uint16
     LIMIT = 32
 
 
-class Uint8List10(SSZList):
+class Uint8List10(SSZList[Uint8]):
     """A list with up to 10 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LIMIT = 10
 
 
-class Uint32List128(SSZList):
+class Uint32List128(SSZList[Uint32]):
     """A list with up to 128 Uint32 values."""
 
-    ELEMENT_TYPE = Uint32
     LIMIT = 128
 
 
-class Uint256List32(SSZList):
+class Uint256List32(SSZList[Uint256]):
     """A list with up to 32 Uint256 values."""
 
-    ELEMENT_TYPE = Uint256
     LIMIT = 32
 
 
-class Uint256List128(SSZList):
+class Uint256List128(SSZList[Uint256]):
     """A list with up to 128 Uint256 values."""
 
-    ELEMENT_TYPE = Uint256
     LIMIT = 128
 
 
-class VariableContainerList2(SSZList):
+class VariableContainerList2(SSZList[VariableContainer]):
     """A list with up to 2 VariableContainer values."""
 
-    ELEMENT_TYPE = VariableContainer
     LIMIT = 2
 
 
 # Additional SSZVector classes for tests
-class Uint8Vector32(SSZVector):
+class Uint8Vector32(SSZVector[Uint8]):
     """A vector of exactly 32 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 32
 
 
-class Uint16Vector32(SSZVector):
+class Uint16Vector32(SSZVector[Uint16]):
     """A vector of exactly 32 Uint16 values."""
 
-    ELEMENT_TYPE = Uint16
     LENGTH = 32
 
 
-class Uint8Vector64(SSZVector):
+class Uint8Vector64(SSZVector[Uint8]):
     """A vector of exactly 64 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 64
 
 
-class Uint8Vector2(SSZVector):
+class Uint8Vector2(SSZVector[Uint8]):
     """A vector of exactly 2 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LENGTH = 2
 
 
-class FpVector8(SSZVector):
+class FpVector8(SSZVector[Fp]):
     """A vector of exactly 8 Fp values."""
 
-    ELEMENT_TYPE = Fp
     LENGTH = 8
 
 
 # Additional List classes for tests
-class Uint8List32(SSZList):
+class Uint8List32(SSZList[Uint8]):
     """A list with up to 32 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LIMIT = 32
 
 
-class Uint8List64(SSZList):
+class Uint8List64(SSZList[Uint8]):
     """A list with up to 64 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LIMIT = 64
 
 
-class Uint8List4(SSZList):
+class Uint8List4(SSZList[Uint8]):
     """A list with up to 4 Uint8 values."""
 
-    ELEMENT_TYPE = Uint8
     LIMIT = 4
 
 
-class BooleanList4(SSZList):
+class BooleanList4(SSZList[Boolean]):
     """A list with up to 4 Boolean values."""
 
-    ELEMENT_TYPE = Boolean
     LIMIT = 4
 
 
-class FpList8(SSZList):
+class FpList8(SSZList[Fp]):
     """A list with up to 8 Fp values."""
 
-    ELEMENT_TYPE = Fp
     LIMIT = 8
 
 
