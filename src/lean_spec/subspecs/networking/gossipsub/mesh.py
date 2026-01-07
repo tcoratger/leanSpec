@@ -45,12 +45,9 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
+from .parameters import GossipsubParameters
 from .types import PeerId, TopicId
-
-if TYPE_CHECKING:
-    from .parameters import GossipsubParameters
 
 
 @dataclass(slots=True)
@@ -256,7 +253,8 @@ class MeshState:
             peer_id: Peer to add.
 
         Returns:
-            True if added, False if already present or not subscribed.
+            - True if added,
+            - False if already present or not subscribed.
         """
         mesh = self._meshes.get(topic)
         if mesh is None:
@@ -271,7 +269,8 @@ class MeshState:
             peer_id: Peer to remove.
 
         Returns:
-            True if removed, False if not present or not subscribed.
+            - True if removed,
+            - False if not present or not subscribed.
         """
         mesh = self._meshes.get(topic)
         if mesh is None:

@@ -139,8 +139,8 @@ class GossipsubParameters(StrictBaseModel):
     mcache_len: int = 6
     """Total number of history windows in the message cache.
 
-    Messages are stored for this many heartbeat intervals.
-    After mcache_len heartbeats, messages are evicted.
+    - Messages are stored for this many heartbeat intervals.
+    - After mcache_len heartbeats, messages are evicted.
     """
 
     mcache_gossip: int = 3
@@ -170,5 +170,7 @@ class GossipsubParameters(StrictBaseModel):
 
     When receiving a message larger than this threshold,
     immediately send IDONTWANT to mesh peers to prevent
-    redundant transmissions. Set to 1KB by default.
+    redundant transmissions.
+
+    Set to 1KB by default.
     """

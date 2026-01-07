@@ -66,10 +66,6 @@ from lean_spec.types import Bytes20
 
 from .types import MessageId
 
-# =============================================================================
-# Snappy Decompressor Protocol
-# =============================================================================
-
 
 @runtime_checkable
 class SnappyDecompressor(Protocol):

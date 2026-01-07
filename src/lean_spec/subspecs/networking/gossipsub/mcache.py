@@ -272,19 +272,6 @@ class SeenCache:
     - Skip processing of already-seen messages
     - Avoid forwarding duplicates to mesh peers
     - Bound memory with automatic TTL cleanup
-
-    Example::
-
-        seen = SeenCache(ttl_seconds=120)
-
-        # Check and mark as seen
-        if seen.add(msg_id, current_time):
-            process_message(msg)  # First time seeing this
-        else:
-            pass  # Duplicate, skip
-
-        # Periodic cleanup
-        removed = seen.cleanup(current_time)
     """
 
     ttl_seconds: int = 120
