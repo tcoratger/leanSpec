@@ -1,6 +1,6 @@
 """Tests for Discovery v5 Protocol Specification"""
 
-from lean_spec.subspecs.networking.support.discovery import (
+from lean_spec.subspecs.networking.discovery import (
     MAX_REQUEST_ID_LENGTH,
     PROTOCOL_ID,
     PROTOCOL_VERSION,
@@ -25,7 +25,7 @@ from lean_spec.subspecs.networking.support.discovery import (
     TalkResp,
     WhoAreYouAuthdata,
 )
-from lean_spec.subspecs.networking.support.discovery.config import (
+from lean_spec.subspecs.networking.discovery.config import (
     ALPHA,
     BOND_EXPIRY_SECS,
     BUCKET_COUNT,
@@ -36,7 +36,7 @@ from lean_spec.subspecs.networking.support.discovery.config import (
     MIN_PACKET_SIZE,
     REQUEST_TIMEOUT_SECS,
 )
-from lean_spec.subspecs.networking.support.discovery.routing import (
+from lean_spec.subspecs.networking.discovery.routing import (
     NodeEntry,
     log2_distance,
     xor_distance,
