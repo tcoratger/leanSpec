@@ -18,10 +18,6 @@ from enum import IntEnum, auto
 from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import Bytes4, Bytes32
 
-# =============================================================================
-# Type Aliases
-# =============================================================================
-
 DomainType = Bytes4
 """4-byte domain for message-id isolation in Gossipsub."""
 
