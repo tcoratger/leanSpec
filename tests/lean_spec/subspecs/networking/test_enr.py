@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.subspecs.networking.support.enr import ENR, Eth2Data, keys
-from lean_spec.subspecs.networking.support.enr.eth2 import AttestationSubnets
+from lean_spec.subspecs.networking.enr import ENR, Eth2Data, keys
+from lean_spec.subspecs.networking.enr.eth2 import AttestationSubnets
 from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import Bytes4
 
