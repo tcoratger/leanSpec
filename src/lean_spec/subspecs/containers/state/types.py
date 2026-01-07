@@ -12,14 +12,12 @@ from ..validator import Validator
 class HistoricalBlockHashes(SSZList[Bytes32]):
     """List of historical block root hashes up to historical_roots_limit."""
 
-    ELEMENT_TYPE = Bytes32
     LIMIT = int(DEVNET_CONFIG.historical_roots_limit)
 
 
 class JustificationRoots(SSZList[Bytes32]):
     """List of justified block roots up to historical_roots_limit."""
 
-    ELEMENT_TYPE = Bytes32
     LIMIT = int(DEVNET_CONFIG.historical_roots_limit)
 
 
@@ -38,5 +36,4 @@ class JustificationValidators(BaseBitlist):
 class Validators(SSZList[Validator]):
     """Validator registry tracked in the state."""
 
-    ELEMENT_TYPE = Validator
     LIMIT = int(DEVNET_CONFIG.validator_registry_limit)

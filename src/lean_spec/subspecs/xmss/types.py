@@ -54,7 +54,6 @@ class HashDigestVector(SSZVector[Fp]):
     as SSZ can pack these back-to-back without per-element offsets.
     """
 
-    ELEMENT_TYPE = Fp
     LENGTH = HASH_DIGEST_LENGTH
 
 
@@ -67,7 +66,6 @@ class HashDigestList(SSZList[HashDigestVector]):
     This type is used to represent collections of hash digests in the XMSS scheme.
     """
 
-    ELEMENT_TYPE = HashDigestVector
     LIMIT = NODE_LIST_LIMIT
 
 
@@ -80,7 +78,6 @@ class Parameter(SSZVector[Fp]):
     certain cross-key attacks. It is public knowledge.
     """
 
-    ELEMENT_TYPE = Fp
     LENGTH = TARGET_CONFIG.PARAMETER_LEN
 
 
@@ -95,7 +92,6 @@ class Randomness(SSZVector[Fp]):
     SSZ notation: `Vector[Fp, RAND_LEN_FE]`
     """
 
-    ELEMENT_TYPE = Fp
     LENGTH = TARGET_CONFIG.RAND_LEN_FE
 
 
@@ -152,5 +148,4 @@ class HashTreeLayers(SSZList[HashTreeLayer]):
     - Maximum: `LOG_LIFETIME + 1` layers
     """
 
-    ELEMENT_TYPE = HashTreeLayer
     LIMIT = LAYERS_LIMIT

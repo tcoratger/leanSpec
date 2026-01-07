@@ -28,28 +28,23 @@ from lean_spec.types.union import SSZUnion
 
 
 # Concrete SSZList classes for tests
-class Uint16List32(SSZList):
-    ELEMENT_TYPE = Uint16
+class Uint16List32(SSZList[Uint16]):
     LIMIT = 32
 
 
-class Uint16List128(SSZList):
-    ELEMENT_TYPE = Uint16
+class Uint16List128(SSZList[Uint16]):
     LIMIT = 128
 
 
-class Uint16List1024(SSZList):
-    ELEMENT_TYPE = Uint16
+class Uint16List1024(SSZList[Uint16]):
     LIMIT = 1024
 
 
-class Uint32List128(SSZList):
-    ELEMENT_TYPE = Uint32
+class Uint32List128(SSZList[Uint32]):
     LIMIT = 128
 
 
-class Uint256List32(SSZList):
-    ELEMENT_TYPE = Uint256
+class Uint256List32(SSZList[Uint256]):
     LIMIT = 32
 
 
@@ -460,10 +455,9 @@ def test_hash_tree_root_bitlist_512_all_ones() -> None:
 
 
 # Define explicit SSZVector types for testing our new approach
-class Uint16Vector2(SSZVector):
+class Uint16Vector2(SSZVector[Uint16]):
     """A vector of exactly 2 Uint16 values."""
 
-    ELEMENT_TYPE = Uint16
     LENGTH = 2
 
 

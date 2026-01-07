@@ -38,7 +38,6 @@ This TypeVar enables proper static typing for collection access:
 
 Example:
     class Uint64Vector4(SSZVector[Uint64]):
-        ELEMENT_TYPE = Uint64
         LENGTH = 4
 
     vec = Uint64Vector4(data=[...])
@@ -54,12 +53,12 @@ class SSZVector(SSZModel, Generic[T]):
     The length is fixed at the type level and cannot change at runtime.
 
     Subclasses must define:
-        ELEMENT_TYPE: The SSZ type of each element
         LENGTH: The exact number of elements
+
+    The ELEMENT_TYPE is automatically inferred from the generic parameter.
 
     Example:
         class Uint16Vector2(SSZVector[Uint16]):
-            ELEMENT_TYPE = Uint16
             LENGTH = 2
 
         vec = Uint16Vector2(data=[Uint16(1), Uint16(2)])
@@ -72,17 +71,29 @@ class SSZVector(SSZModel, Generic[T]):
     """
 
     ELEMENT_TYPE: ClassVar[Type[SSZType]]
-    """The SSZ type of elements in this vector."""
+    """The SSZ type of elements in this vector (auto-inferred from generic parameter)."""
 
     LENGTH: ClassVar[int]
     """The exact number of elements (fixed at the type level)."""
 
     data: Sequence[T] = Field(default_factory=tuple)
-    """
-    The immutable sequence of elements.
 
-    Accepts lists or tuples on input; stored as a tuple after validation.
-    """
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Automatically set ELEMENT_TYPE from the generic parameter."""
+        super().__init_subclass__(**kwargs)
+
+        # Skip if ELEMENT_TYPE is explicitly defined in this class
+        if "ELEMENT_TYPE" in cls.__dict__:
+            return
+
+        # Extract type argument from Pydantic's generic metadata
+        for base in cls.__bases__:
+            metadata = getattr(base, "__pydantic_generic_metadata__", None)
+            if metadata and metadata.get("origin") is SSZVector:
+                args = metadata.get("args", ())
+                if args:
+                    cls.ELEMENT_TYPE = args[0]
+                    return
 
     @field_serializer("data", when_used="json")
     def _serialize_data(self, value: Sequence[T]) -> list[Any]:
@@ -243,12 +254,12 @@ class SSZList(SSZModel, Generic[T]):
     Unlike Vector, the length can vary at runtime.
 
     Subclasses must define:
-        ELEMENT_TYPE: The SSZ type of each element
         LIMIT: The maximum number of elements allowed
+
+    The ELEMENT_TYPE is automatically inferred from the generic parameter.
 
     Example:
         class Uint64List32(SSZList[Uint64]):
-            ELEMENT_TYPE = Uint64
             LIMIT = 32
 
         my_list = Uint64List32(data=[Uint64(1), Uint64(2)])
@@ -262,17 +273,30 @@ class SSZList(SSZModel, Generic[T]):
     """
 
     ELEMENT_TYPE: ClassVar[Type[SSZType]]
-    """The SSZ type of elements in this list."""
+    """The SSZ type of elements in this list (auto-inferred from generic parameter)."""
 
     LIMIT: ClassVar[int]
     """The maximum number of elements allowed."""
 
     data: Sequence[T] = Field(default_factory=tuple)
-    """
-    The immutable sequence of elements.
+    """The immutable sequence of elements."""
 
-    Accepts lists or tuples on input; stored as a tuple after validation.
-    """
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Automatically set ELEMENT_TYPE from the generic parameter."""
+        super().__init_subclass__(**kwargs)
+
+        # Skip if ELEMENT_TYPE is explicitly defined in this class
+        if "ELEMENT_TYPE" in cls.__dict__:
+            return
+
+        # Extract type argument from Pydantic's generic metadata
+        for base in cls.__bases__:
+            metadata = getattr(base, "__pydantic_generic_metadata__", None)
+            if metadata and metadata.get("origin") is SSZList:
+                args = metadata.get("args", ())
+                if args:
+                    cls.ELEMENT_TYPE = args[0]
+                    return
 
     @field_serializer("data", when_used="json")
     def _serialize_data(self, value: Sequence[T]) -> list[Any]:
