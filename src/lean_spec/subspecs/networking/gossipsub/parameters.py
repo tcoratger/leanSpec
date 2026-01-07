@@ -71,6 +71,9 @@ class GossipsubParameters(StrictBaseModel):
     Default values follow the Ethereum consensus P2P specification.
     """
 
+    protocol_id: str = "/meshsub/1.3.0"
+    """The protocol ID for gossip messages."""
+
     # -------------------------------------------------------------------------
     # Mesh Degree Parameters
     # -------------------------------------------------------------------------
