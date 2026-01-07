@@ -23,6 +23,7 @@ from .block import (
 )
 from .checkpoint import Checkpoint
 from .config import Config
+from .slot import Slot
 from .state import State
 from .validator import Validator
 
@@ -38,6 +39,7 @@ __all__ = [
     "Config",
     "SignedAttestation",
     "SignedBlockWithAttestation",
+    "Slot",
     "State",
     "Validator",
 ]
