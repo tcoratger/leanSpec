@@ -1,17 +1,4 @@
-"""
-Networking Types
-================
-
-Core type definitions for the Ethereum consensus networking layer.
-
-This module defines the fundamental types used across the networking stack:
-type aliases for identifiers and addresses, and enumerations for protocol
-states and messages.
-
-References:
------------
-- `Ethereum P2P spec <https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md>`_
-"""
+"""Networking Types"""
 
 from enum import IntEnum, auto
 
