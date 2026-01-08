@@ -46,8 +46,9 @@ uvx tox                  # Everything (checks + tests + docs)
 ## Code Style
 
 - Line length: 100 characters, type hints everywhere
-- Google docstring style (no docstrings for `__init__`)
+- Google docstring style
 - Test files/functions must start with `test_`
+- **No example code in docstrings**: Do not include `Example:` sections with code blocks in docstrings. Keep documentation concise and focused on explaining *what* and *why*, not *how to use*. Unit tests serve as usage examples.
 
 ## Test Framework Structure
 
@@ -117,6 +118,7 @@ def test_block(state_transition_test: StateTransitionTestFiller) -> None:
 - Use Pydantic models for validation
 - Keep specs simple, readable, and clear
 - Repository is `leanSpec` not `lean-spec`
+- **Always run linter checks before finishing**: Run `uvx tox -e all-checks` at the end of any code changes to ensure all linting, formatting, type checking, and spell checking passes.
 
 ## SSZ Type Design Patterns
 
