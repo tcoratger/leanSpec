@@ -1,9 +1,12 @@
 """Exports the networking subspec components."""
 
 from .config import (
+    MAX_PAYLOAD_SIZE,
     MAX_REQUEST_BLOCKS,
     MESSAGE_DOMAIN_INVALID_SNAPPY,
     MESSAGE_DOMAIN_VALID_SNAPPY,
+    RESP_TIMEOUT,
+    TTFB_TIMEOUT,
 )
 from .gossipsub.message import GossipsubMessage
 from .gossipsub.parameters import GossipsubParameters
@@ -13,22 +16,39 @@ from .reqresp import (
     STATUS_PROTOCOL_V1,
     BlocksByRootRequest,
     BlocksByRootResponse,
+    CodecError,
+    ResponseCode,
     Status,
+    decode_request,
+    encode_request,
 )
 from .types import DomainType, ForkDigest, ProtocolId
 
 __all__ = [
+    # Config
     "MAX_REQUEST_BLOCKS",
+    "MAX_PAYLOAD_SIZE",
+    "TTFB_TIMEOUT",
+    "RESP_TIMEOUT",
     "MESSAGE_DOMAIN_INVALID_SNAPPY",
     "MESSAGE_DOMAIN_VALID_SNAPPY",
+    # Gossipsub
     "GossipsubParameters",
     "GossipTopic",
     "GossipsubMessage",
+    # ReqResp - Protocol IDs
     "BLOCKS_BY_ROOT_PROTOCOL_V1",
     "STATUS_PROTOCOL_V1",
+    # ReqResp - Message types
     "BlocksByRootRequest",
     "BlocksByRootResponse",
     "Status",
+    # ReqResp - Codec
+    "CodecError",
+    "ResponseCode",
+    "encode_request",
+    "decode_request",
+    # Types
     "DomainType",
     "ProtocolId",
     "ForkDigest",
