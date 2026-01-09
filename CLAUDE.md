@@ -49,6 +49,7 @@ uvx tox                  # Everything (checks + tests + docs)
 - Google docstring style
 - Test files/functions must start with `test_`
 - **No example code in docstrings**: Do not include `Example:` sections with code blocks in docstrings. Keep documentation concise and focused on explaining *what* and *why*, not *how to use*. Unit tests serve as usage examples.
+- **Avoid explicit function names in documentation**: In docstrings and comments, describe behavior using plain language rather than explicit function or method names. Names change over time, making documentation stale. Prefer descriptive sentences like "tick the store forward" instead of referencing the exact API signature.
 
 ## Test Framework Structure
 
