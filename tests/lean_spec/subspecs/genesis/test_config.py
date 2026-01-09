@@ -175,7 +175,7 @@ class TestReamCompatibility:
 
     def test_ream_format_config(self) -> None:
         """Loads config in ream format with 0x-prefixed pubkeys."""
-        # This matches the format used in ream/bin/ream/assets/lean/config.json
+        # This matches the format used in ream/bin/ream/assets/lean/config.yaml
         json_content = json.dumps(
             {
                 "GENESIS_TIME": 1704085200,
