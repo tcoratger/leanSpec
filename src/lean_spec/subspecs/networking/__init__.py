@@ -22,6 +22,16 @@ from .reqresp import (
     decode_request,
     encode_request,
 )
+from .service import (
+    GossipAttestationEvent,
+    GossipBlockEvent,
+    NetworkEvent,
+    NetworkEventSource,
+    NetworkService,
+    PeerConnectedEvent,
+    PeerDisconnectedEvent,
+    PeerStatusEvent,
+)
 from .types import DomainType, ForkDigest, ProtocolId
 
 __all__ = [
@@ -48,6 +58,15 @@ __all__ = [
     "ResponseCode",
     "encode_request",
     "decode_request",
+    # Service
+    "GossipAttestationEvent",
+    "GossipBlockEvent",
+    "NetworkEvent",
+    "NetworkEventSource",
+    "NetworkService",
+    "PeerConnectedEvent",
+    "PeerDisconnectedEvent",
+    "PeerStatusEvent",
     # Types
     "DomainType",
     "ProtocolId",

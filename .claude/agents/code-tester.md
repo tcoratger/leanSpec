@@ -148,6 +148,15 @@ For SSZ types, always test:
 6. **Clean Linting**: Must pass `ruff check` and `ruff format`
 7. **Type Safety**: All functions must have complete type annotations
 
+## Meaningful Assertions (Critical)
+
+**Fewer tests with strong assertions are better than many tests with trivial assertions.**
+
+- **Don't test**: Internal counters, flags, or that code "ran without error"
+- **Do test**: Real state changes, data transformations, and business logic outcomes
+- When testing services or routing layers, verify the downstream effect on actual system state
+- If a test would pass even when the core logic is broken, the test is worthless
+
 ## Decision Framework
 
 When uncertain about test design:
