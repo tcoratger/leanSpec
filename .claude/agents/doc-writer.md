@@ -159,6 +159,41 @@ def verify_block(self, block: Block) -> bool:
     """
 ```
 
+### Use bullet points or enumeration for lists
+
+When listing multiple items, use structured formatting. Helps readers maintain focus.
+
+**Bad** - Inline list, hard to scan:
+```python
+"""
+The verification checks structural validity, cryptographic correctness,
+and state transition rules before accepting the block.
+"""
+```
+
+**Good** - Bullet points:
+```python
+"""
+The verification checks:
+
+- Structural validity
+- Cryptographic correctness
+- State transition rules
+"""
+```
+
+**Good** - Numbered steps for sequential operations:
+```python
+"""
+Processing proceeds in order:
+
+1. Validate input format
+2. Check signatures
+3. Apply state transition
+4. Update forkchoice
+"""
+```
+
 ## Project-Specific Requirements
 
 - Line length: 100 characters maximum
