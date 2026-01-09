@@ -88,6 +88,41 @@ Good:
 # Includes initial checkpoints, validator registry, and config.
 ```
 
+**Use bullet points or enumeration for lists.**
+
+When listing multiple items, use structured formatting. Helps readers maintain focus.
+
+Bad:
+```python
+"""
+The verification checks structural validity, cryptographic correctness,
+and state transition rules before accepting the block.
+"""
+```
+
+Good:
+```python
+"""
+The verification checks:
+
+- Structural validity
+- Cryptographic correctness
+- State transition rules
+"""
+```
+
+Or with numbered steps:
+```python
+"""
+Processing proceeds in order:
+
+1. Validate input format
+2. Check signatures
+3. Apply state transition
+4. Update forkchoice
+"""
+```
+
 Bad:
 ```python
 """
