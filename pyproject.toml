@@ -68,7 +68,7 @@ force-single-line = false
 known-first-party = ["lean_spec"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "F401", "F403"]
+"tests/**" = ["D"]
 
 [tool.ty.environment]
 python-version = "3.12"

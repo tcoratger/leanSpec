@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import Any, Iterable, Tuple, Type
+from typing import Iterable, Tuple, Type
 
 import pytest
 
@@ -11,10 +11,9 @@ from lean_spec.subspecs.ssz.hash import HashTreeRoot, hash_tree_root
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean
 from lean_spec.types.byte import Byte
-from lean_spec.types.byte_arrays import BaseByteList, BaseBytes, Bytes48
+from lean_spec.types.byte_arrays import BaseByteList, Bytes48
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
-from lean_spec.types.ssz_base import SSZType
 from lean_spec.types.uint import (
     BaseUint,
     Uint8,
