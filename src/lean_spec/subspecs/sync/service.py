@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
+from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.types import PeerId
@@ -319,6 +320,38 @@ class SyncService:
         # We check after every block because gossip can deliver the final
         # block needed to catch up with the network.
         await self._check_sync_complete()
+
+    async def on_gossip_attestation(
+        self,
+        attestation: SignedAttestation,
+        peer_id: PeerId,  # noqa: ARG002
+    ) -> None:
+        """
+        Handle attestation received via gossip.
+
+        Attestations are votes from validators about which chain head they see.
+        They influence forkchoice by adding weight to branches of the block tree.
+        A branch with more attestation weight is more likely to become canonical.
+
+        Unlike blocks, attestations do not require parent lookups. They reference
+        a target checkpoint that must already exist in our store.
+
+        Args:
+            attestation: The signed attestation received.
+            peer_id: The peer that propagated the attestation (unused for now).
+        """
+        # Guard: Only process gossip in states that accept it.
+        #
+        # Without peer status information, we cannot assess the validity context
+        # of incoming attestations. IDLE state waits for peer discovery.
+        if not self._state.accepts_gossip:
+            return
+
+        # Integrate the attestation into forkchoice state.
+        #
+        # The store validates the signature and updates branch weights.
+        # Invalid attestations (bad signature, unknown target) are rejected.
+        self.store = self.store.on_gossip_attestation(attestation)
 
     async def start_sync(self) -> None:
         """
