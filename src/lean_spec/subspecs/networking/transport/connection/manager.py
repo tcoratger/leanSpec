@@ -132,7 +132,7 @@ class YamuxConnection:
     _yamux: YamuxSession
     """Underlying yamux session."""
 
-    _peer_id: str
+    _peer_id: PeerId
     """Remote peer's ID (derived from their verified secp256k1 identity key)."""
 
     _remote_addr: str
@@ -158,7 +158,7 @@ class YamuxConnection:
     """Whether the connection has been closed."""
 
     @property
-    def peer_id(self) -> str:
+    def peer_id(self) -> PeerId:
         """Remote peer's ID."""
         return self._peer_id
 
@@ -277,10 +277,10 @@ class ConnectionManager:
     _noise_public: x25519.X25519PublicKey
     """Our X25519 public key for Noise."""
 
-    _peer_id: str
+    _peer_id: PeerId
     """Our PeerId (derived from identity key)."""
 
-    _connections: dict[str, YamuxConnection] = field(default_factory=dict)
+    _connections: dict[PeerId, YamuxConnection] = field(default_factory=dict)
     """Active connections by peer ID."""
 
     _server: asyncio.Server | None = None
@@ -316,7 +316,7 @@ class ConnectionManager:
         # identity public key, making it verifiable. During Noise handshake, we
         # exchange identity proofs (signature over Noise static key) to prove
         # we own the claimed identity.
-        peer_id = str(identity_key.to_peer_id())
+        peer_id = identity_key.to_peer_id()
 
         return cls(
             _identity_key=identity_key,
@@ -326,7 +326,7 @@ class ConnectionManager:
         )
 
     @property
-    def peer_id(self) -> str:
+    def peer_id(self) -> PeerId:
         """Our local PeerId."""
         return self._peer_id
 
@@ -488,7 +488,7 @@ class ConnectionManager:
         #
         # The remote identity was exchanged and verified during Noise handshake.
         # The signature proves they own both the identity key and the Noise key.
-        peer_id = str(PeerId.from_secp256k1(noise_session.remote_identity))
+        peer_id = PeerId.from_secp256k1(noise_session.remote_identity)
 
         # Start the yamux read loop in the background.
         #
@@ -573,7 +573,7 @@ class ConnectionManager:
         yamux = YamuxSession(noise=noise_session, is_initiator=False)
 
         # Derive the remote peer's identity from their verified secp256k1 key.
-        peer_id = str(PeerId.from_secp256k1(noise_session.remote_identity))
+        peer_id = PeerId.from_secp256k1(noise_session.remote_identity)
 
         # Start background read loop and store task reference.
         read_task = asyncio.create_task(yamux.run())
