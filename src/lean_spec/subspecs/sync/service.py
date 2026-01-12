@@ -44,8 +44,8 @@ from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.forkchoice import Store
+from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.types import PeerId
 
 from .backfill_sync import BackfillSync, NetworkRequester
 from .block_cache import BlockCache

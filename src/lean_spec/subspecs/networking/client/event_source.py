@@ -31,6 +31,7 @@ from lean_spec.subspecs.networking.service.events import (
     PeerDisconnectedEvent,
     PeerStatusEvent,
 )
+from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.subspecs.networking.transport.connection.manager import (
     ConnectionManager,
     YamuxConnection,
@@ -80,7 +81,7 @@ class LiveNetworkEventSource:
     _events: asyncio.Queue[NetworkEvent] = field(default_factory=asyncio.Queue)
     """Queue of pending events to yield."""
 
-    _connections: dict[str, YamuxConnection] = field(default_factory=dict)
+    _connections: dict[PeerId, YamuxConnection] = field(default_factory=dict)
     """Active connections by peer ID."""
 
     _our_status: Status | None = None
@@ -155,7 +156,7 @@ class LiveNetworkEventSource:
 
         return await self._events.get()
 
-    async def dial(self, multiaddr: str) -> str | None:
+    async def dial(self, multiaddr: str) -> PeerId | None:
         """
         Connect to a peer at the given multiaddr.
 
@@ -227,7 +228,7 @@ class LiveNetworkEventSource:
 
     async def _exchange_status(
         self,
-        peer_id: str,
+        peer_id: PeerId,
         conn: YamuxConnection,
     ) -> None:
         """
@@ -255,7 +256,7 @@ class LiveNetworkEventSource:
         except Exception as e:
             logger.warning("Status exchange failed with %s: %s", peer_id, e)
 
-    async def disconnect(self, peer_id: str) -> None:
+    async def disconnect(self, peer_id: PeerId) -> None:
         """
         Disconnect from a peer.
 
@@ -280,7 +281,7 @@ class LiveNetworkEventSource:
     async def _emit_gossip_block(
         self,
         block: SignedBlockWithAttestation,
-        peer_id: str,
+        peer_id: PeerId,
     ) -> None:
         """
         Emit a gossip block event.
@@ -295,7 +296,7 @@ class LiveNetworkEventSource:
     async def _emit_gossip_attestation(
         self,
         attestation: SignedAttestation,
-        peer_id: str,
+        peer_id: PeerId,
     ) -> None:
         """
         Emit a gossip attestation event.

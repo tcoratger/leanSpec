@@ -44,11 +44,11 @@ from lean_spec.subspecs.networking.reqresp.message import (
     BlocksByRootRequest,
     Status,
 )
+from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.subspecs.networking.transport.connection.manager import (
     ConnectionManager,
     YamuxConnection,
 )
-from lean_spec.subspecs.networking.types import PeerId
 from lean_spec.types import Bytes32
 
 logger = logging.getLogger(__name__)
@@ -74,13 +74,13 @@ class ReqRespClient:
     connection_manager: ConnectionManager
     """Connection manager providing transport."""
 
-    _connections: dict[str, YamuxConnection] = field(default_factory=dict)
+    _connections: dict[PeerId, YamuxConnection] = field(default_factory=dict)
     """Active connections by peer ID."""
 
     timeout: float = REQUEST_TIMEOUT_SECONDS
     """Request timeout in seconds."""
 
-    def register_connection(self, peer_id: str, conn: YamuxConnection) -> None:
+    def register_connection(self, peer_id: PeerId, conn: YamuxConnection) -> None:
         """
         Register a connection for req/resp use.
 
@@ -90,7 +90,7 @@ class ReqRespClient:
         """
         self._connections[peer_id] = conn
 
-    def unregister_connection(self, peer_id: str) -> None:
+    def unregister_connection(self, peer_id: PeerId) -> None:
         """
         Unregister a connection.
 
@@ -120,7 +120,7 @@ class ReqRespClient:
         if not roots:
             return []
 
-        conn = self._connections.get(str(peer_id))
+        conn = self._connections.get(peer_id)
         if conn is None:
             logger.debug("No connection to peer %s for blocks_by_root", peer_id)
             return []
@@ -214,7 +214,7 @@ class ReqRespClient:
         Returns:
             Peer's status, or None on error.
         """
-        conn = self._connections.get(str(peer_id))
+        conn = self._connections.get(peer_id)
         if conn is None:
             logger.debug("No connection to peer %s for status", peer_id)
             return None

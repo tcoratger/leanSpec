@@ -6,6 +6,7 @@ import asyncio
 
 import pytest
 
+from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.subspecs.networking.transport.connection.manager import (
     NOISE_PROTOCOL_ID,
     SUPPORTED_MUXERS,
@@ -123,10 +124,10 @@ class TestConnectionManagerCreate:
         """Create derives PeerId from identity key."""
         manager = ConnectionManager.create()
 
-        assert len(manager.peer_id) > 0
-        assert isinstance(manager.peer_id, str)
-        # secp256k1 PeerIds start with "16Uiu2"
-        assert manager.peer_id.startswith("16Uiu2")
+        # PeerId is now a dataclass with a multihash field
+        assert len(manager.peer_id.multihash) > 0
+        # secp256k1 PeerIds start with "16Uiu2" when Base58 encoded
+        assert str(manager.peer_id).startswith("16Uiu2")
 
     def test_create_starts_with_empty_connections(self) -> None:
         """Create starts with no active connections."""
@@ -161,8 +162,8 @@ class TestConnectionManagerProperties:
 
         peer_id = manager.peer_id
 
-        assert isinstance(peer_id, str)
-        assert len(peer_id) > 10  # PeerIds are base58 encoded, reasonably long
+        assert isinstance(peer_id, PeerId)
+        assert len(peer_id.multihash) > 10  # PeerIds have reasonably long multihash
 
 
 class TestYamuxConnectionProperties:
@@ -170,9 +171,10 @@ class TestYamuxConnectionProperties:
 
     def test_peer_id_property(self) -> None:
         """peer_id property returns remote peer ID."""
-        conn = _create_mock_connection(peer_id="QmTestPeer123")
+        test_peer_id = PeerId.from_base58("QmTestPeer123")
+        conn = _create_mock_connection(peer_id=test_peer_id)
 
-        assert conn.peer_id == "QmTestPeer123"
+        assert conn.peer_id == test_peer_id
 
     def test_remote_addr_property(self) -> None:
         """remote_addr property returns address."""
@@ -258,10 +260,12 @@ class TestTransportConnectionError:
 
 
 def _create_mock_connection(
-    peer_id: str = "QmTestPeer",
+    peer_id: PeerId | None = None,
     remote_addr: str = "/ip4/127.0.0.1/tcp/9000",
 ) -> YamuxConnection:
     """Create a mock YamuxConnection for testing."""
+    if peer_id is None:
+        peer_id = PeerId.from_base58("QmTestPeer")
     return YamuxConnection(
         _yamux=MockYamuxSession(),  # type: ignore[arg-type]
         _peer_id=peer_id,
