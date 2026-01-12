@@ -136,7 +136,7 @@ class PendingBlock:
     """
 
 
-@dataclass
+@dataclass(slots=True)
 class BlockCache:
     """
     Cache for blocks awaiting parent resolution.

@@ -45,6 +45,58 @@ Example:
 """
 
 
+def _extract_element_type_from_generic(cls: type, origin_class: type) -> Type[SSZType] | None:
+    """
+    Extract ELEMENT_TYPE from Pydantic's generic metadata.
+
+    When a class inherits from `SSZVector[Uint64]` or `SSZList[Uint64]`,
+    Pydantic stores the type argument in `__pydantic_generic_metadata__`.
+    This helper extracts that type argument.
+
+    Args:
+        cls: The subclass being initialized.
+        origin_class: The generic base class (SSZVector or SSZList).
+
+    Returns:
+        The extracted element type, or None if not found.
+    """
+    for base in cls.__bases__:
+        metadata = getattr(base, "__pydantic_generic_metadata__", None)
+        if metadata and metadata.get("origin") is origin_class:
+            args = metadata.get("args", ())
+            if args:
+                return cast(Type[SSZType], args[0])
+    return None
+
+
+def _serialize_ssz_elements_to_json(value: Sequence[Any]) -> list[Any]:
+    """
+    Serialize SSZ collection elements to JSON-compatible format.
+
+    Handles special cases:
+    - BaseBytes → hex string with 0x prefix
+    - Fp field elements → raw integer value
+    - Other SSZ types → pass through (rely on Pydantic serialization)
+
+    Args:
+        value: Sequence of SSZ elements to serialize.
+
+    Returns:
+        List of JSON-serializable values.
+    """
+    from lean_spec.subspecs.koalabear import Fp
+
+    result: list[Any] = []
+    for item in value:
+        if isinstance(item, BaseBytes):
+            result.append("0x" + item.hex())
+        elif isinstance(item, Fp):
+            result.append(item.value)
+        else:
+            result.append(item)
+    return result
+
+
 class SSZVector(SSZModel, Generic[T]):
     """
     Fixed-length, immutable SSZ sequence.
@@ -86,29 +138,14 @@ class SSZVector(SSZModel, Generic[T]):
         if "ELEMENT_TYPE" in cls.__dict__:
             return
 
-        # Extract type argument from Pydantic's generic metadata
-        for base in cls.__bases__:
-            metadata = getattr(base, "__pydantic_generic_metadata__", None)
-            if metadata and metadata.get("origin") is SSZVector:
-                args = metadata.get("args", ())
-                if args:
-                    cls.ELEMENT_TYPE = args[0]
-                    return
+        element_type = _extract_element_type_from_generic(cls, SSZVector)
+        if element_type is not None:
+            cls.ELEMENT_TYPE = element_type
 
     @field_serializer("data", when_used="json")
     def _serialize_data(self, value: Sequence[T]) -> list[Any]:
         """Serialize vector elements to JSON."""
-        from lean_spec.subspecs.koalabear import Fp
-
-        result: list[Any] = []
-        for item in value:
-            if isinstance(item, BaseBytes):
-                result.append("0x" + item.hex())
-            elif isinstance(item, Fp):
-                result.append(item.value)
-            else:
-                result.append(item)
-        return result
+        return _serialize_ssz_elements_to_json(value)
 
     @field_validator("data", mode="before")
     @classmethod
@@ -289,33 +326,14 @@ class SSZList(SSZModel, Generic[T]):
         if "ELEMENT_TYPE" in cls.__dict__:
             return
 
-        # Extract type argument from Pydantic's generic metadata
-        for base in cls.__bases__:
-            metadata = getattr(base, "__pydantic_generic_metadata__", None)
-            if metadata and metadata.get("origin") is SSZList:
-                args = metadata.get("args", ())
-                if args:
-                    cls.ELEMENT_TYPE = args[0]
-                    return
+        element_type = _extract_element_type_from_generic(cls, SSZList)
+        if element_type is not None:
+            cls.ELEMENT_TYPE = element_type
 
     @field_serializer("data", when_used="json")
     def _serialize_data(self, value: Sequence[T]) -> list[Any]:
         """Serialize list elements to JSON."""
-        from lean_spec.subspecs.koalabear import Fp
-
-        result: list[Any] = []
-        for item in value:
-            # For BaseBytes subclasses, manually add 0x prefix
-            if isinstance(item, BaseBytes):
-                result.append("0x" + item.hex())
-            # For Fp field elements, extract the value attribute
-            elif isinstance(item, Fp):
-                result.append(item.value)
-            else:
-                # For other types (Uint, etc.), convert to int
-                # BaseUint inherits from int, so this cast is safe
-                result.append(item)
-        return result
+        return _serialize_ssz_elements_to_json(value)
 
     @field_validator("data", mode="before")
     @classmethod

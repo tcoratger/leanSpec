@@ -75,8 +75,6 @@ class HandshakeState(IntEnum):
 class NoiseError(Exception):
     """Raised when handshake fails."""
 
-    pass
-
 
 @dataclass(slots=True)
 class NoiseHandshake:

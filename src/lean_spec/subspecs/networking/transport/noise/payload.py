@@ -30,12 +30,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from lean_spec.subspecs.networking import varint
+
 from ..identity import (
     IdentityKeypair,
     create_identity_proof,
     verify_identity_proof,
 )
-from ..peer_id import KeyType, PeerId, PublicKeyProto, Varint
+from ..peer_id import KeyType, PeerId, PublicKeyProto
 
 # Protobuf field tags for NoiseHandshakePayload
 _TAG_IDENTITY_KEY = 0x0A  # (1 << 3) | 2 = field 1, length-delimited
@@ -70,12 +72,12 @@ class NoiseIdentityPayload:
         """
         # Field 1: identity_key (length-delimited)
         field1 = (
-            bytes([_TAG_IDENTITY_KEY]) + Varint.encode(len(self.identity_key)) + self.identity_key
+            bytes([_TAG_IDENTITY_KEY]) + varint.encode(len(self.identity_key)) + self.identity_key
         )
 
         # Field 2: identity_sig (length-delimited)
         field2 = (
-            bytes([_TAG_IDENTITY_SIG]) + Varint.encode(len(self.identity_sig)) + self.identity_sig
+            bytes([_TAG_IDENTITY_SIG]) + varint.encode(len(self.identity_sig)) + self.identity_sig
         )
 
         return field1 + field2

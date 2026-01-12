@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import inspect
 import io
-from typing import IO, Any, Type
+from typing import IO, Any
 
 from typing_extensions import Self
 
@@ -21,7 +21,7 @@ from .ssz_base import SSZModel, SSZType
 from .uint import Uint32
 
 
-def _get_ssz_field_type(annotation: Any) -> Type[SSZType]:
+def _get_ssz_field_type(annotation: Any) -> type[SSZType]:
     """
     Extract the SSZType class from a field annotation, with validation.
 

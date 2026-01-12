@@ -37,6 +37,8 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Final
 
+from lean_spec.subspecs.networking import varint
+
 __all__ = [
     # Main types
     "PeerId",
@@ -47,7 +49,6 @@ __all__ = [
     "MultihashCode",
     # Utility classes
     "Base58",
-    "Varint",
 ]
 
 
@@ -102,40 +103,6 @@ class _ProtobufTag(IntEnum):
 
     DATA = 0x12  # (2 << 3) | 2 = field 2, length-delimited
     """Tag for Data field: field 2, length-delimited bytes."""
-
-
-class Varint:
-    """
-    Unsigned LEB128 varint encoding.
-
-    Varints are used in protobuf to compactly encode integers.
-    Each byte uses 7 bits for data and 1 bit as continuation flag.
-    """
-
-    @staticmethod
-    def encode(value: int) -> bytes:
-        """
-        Encode integer as unsigned LEB128 varint.
-
-        Args:
-            value: Non-negative integer to encode.
-
-        Returns:
-            Varint-encoded bytes.
-
-        Raises:
-            ValueError: If value is negative.
-        """
-        if value < 0:
-            raise ValueError("Varint must be non-negative")
-
-        result: list[int] = []
-        while value > 0x7F:
-            result.append((value & 0x7F) | 0x80)
-            value >>= 7
-        result.append(value)
-
-        return bytes(result) if result else b"\x00"
 
 
 class Base58:
@@ -364,10 +331,10 @@ class PublicKeyProto:
             Protobuf-encoded PublicKey message bytes.
         """
         # Field 1: Type (tag = 0x08, value = key_type as varint)
-        type_field = bytes([_ProtobufTag.TYPE]) + Varint.encode(self.key_type)
+        type_field = bytes([_ProtobufTag.TYPE]) + varint.encode(self.key_type)
 
         # Field 2: Data (tag = 0x12, value = length-delimited bytes)
-        data_field = bytes([_ProtobufTag.DATA]) + Varint.encode(len(self.key_data)) + self.key_data
+        data_field = bytes([_ProtobufTag.DATA]) + varint.encode(len(self.key_data)) + self.key_data
 
         return type_field + data_field
 

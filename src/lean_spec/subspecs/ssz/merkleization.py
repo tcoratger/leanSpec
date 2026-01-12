@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from typing import Sequence
 
 from lean_spec.subspecs.ssz.utils import get_power_of_two_ceil, hash_nodes
 from lean_spec.types import ZERO_HASH
@@ -13,7 +13,7 @@ class Merkle:
     """Static Merkle helpers for SSZ."""
 
     @staticmethod
-    def merkleize(chunks: Sequence[Bytes32], limit: Optional[int] = None) -> Bytes32:
+    def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:
         """Compute the Merkle root of `chunks`.
 
         Behavior
@@ -48,7 +48,7 @@ class Merkle:
             return chunks[0]
 
         # Start with the leaf layer: provided chunks + ZERO padding
-        level: List[Bytes32] = list(chunks) + [ZERO_HASH] * (width - n)
+        level: list[Bytes32] = list(chunks) + [ZERO_HASH] * (width - n)
 
         # Reduce bottom-up: pairwise hash until a single root remains
         while len(level) > 1:

@@ -26,46 +26,13 @@ from __future__ import annotations
 import asyncio
 import struct
 from dataclasses import dataclass, field
-from typing import Protocol
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 
 from ..identity import IdentityKeypair
+from ..protocols import StreamReaderProtocol, StreamWriterProtocol
 from .payload import NoiseIdentityPayload
 from .types import CipherState
-
-
-class StreamReaderProtocol(Protocol):
-    """Protocol for objects that can read data like asyncio.StreamReader."""
-
-    async def read(self, n: int) -> bytes:
-        """Read up to n bytes."""
-        ...
-
-    async def readexactly(self, n: int) -> bytes:
-        """Read exactly n bytes."""
-        ...
-
-
-class StreamWriterProtocol(Protocol):
-    """Protocol for objects that can write data like asyncio.StreamWriter."""
-
-    def write(self, data: bytes) -> None:
-        """Write data to buffer."""
-        ...
-
-    async def drain(self) -> None:
-        """Flush the buffer."""
-        ...
-
-    def close(self) -> None:
-        """Close the writer."""
-        ...
-
-    async def wait_closed(self) -> None:
-        """Wait for the writer to close."""
-        ...
-
 
 MAX_MESSAGE_SIZE: int = 65535
 """Maximum encrypted message size including 16-byte auth tag."""
@@ -79,8 +46,6 @@ MAX_PLAINTEXT_SIZE: int = MAX_MESSAGE_SIZE - AUTH_TAG_SIZE
 
 class SessionError(Exception):
     """Raised when session operations fail."""
-
-    pass
 
 
 @dataclass(slots=True)
