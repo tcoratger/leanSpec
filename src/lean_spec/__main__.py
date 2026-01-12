@@ -1,7 +1,7 @@
 """
 Lean consensus node CLI entry point.
 
-Run a minimal lean consensus client that can sync with ream/zeam nodes.
+Run a minimal lean consensus client that can sync with other lean consensus nodes.
 
 Usage::
 
