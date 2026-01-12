@@ -209,6 +209,18 @@ class Bytes8(BaseBytes):
     LENGTH = 8
 
 
+class Bytes12(BaseBytes):
+    """Fixed-size byte array of exactly 12 bytes (ChaCha20-Poly1305 nonce)."""
+
+    LENGTH = 12
+
+
+class Bytes16(BaseBytes):
+    """Fixed-size byte array of exactly 16 bytes (Poly1305 authentication tag)."""
+
+    LENGTH = 16
+
+
 class Bytes20(BaseBytes):
     """Fixed-size byte array of exactly 20 bytes."""
 
