@@ -30,6 +30,7 @@ dependencies = [
     "pydantic>=2.12.0,<3",
     "typing-extensions>=4.4",
     "lean-multisig-py>=0.1.0",
+    "cryptography>=46.0.0",
 ]
 
 [project.license]
