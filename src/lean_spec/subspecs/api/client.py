@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from lean_spec.subspecs.chain.config import DEVNET_CONFIG
+from lean_spec.subspecs.containers import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 if TYPE_CHECKING:
@@ -27,8 +28,6 @@ FINALIZED_STATE_ENDPOINT = "/lean/states/finalized"
 
 class CheckpointSyncError(Exception):
     """Error during checkpoint sync."""
-
-    pass
 
 
 async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
@@ -52,9 +51,7 @@ async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
 
     logger.info(f"Fetching finalized state from {full_url}")
 
-    headers = {
-        "Accept": "application/octet-stream",
-    }
+    headers = {"Accept": "application/octet-stream"}
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
@@ -77,8 +74,6 @@ async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
         raise CheckpointSyncError(
             f"HTTP error {exc.response.status_code}: {exc.response.text[:200]}"
         ) from exc
-    except CheckpointSyncError:
-        raise
     except Exception as e:
         raise CheckpointSyncError(f"Failed to fetch state: {e}") from e
 
@@ -96,9 +91,7 @@ async def verify_checkpoint_state(state: "State") -> bool:
         True if valid, False otherwise
     """
     try:
-        computed_root = hash_tree_root(state)
-
-        if int(state.slot) < 0:
+        if state.slot < Slot(0):
             logger.error("Invalid state: negative slot")
             return False
 
@@ -114,7 +107,8 @@ async def verify_checkpoint_state(state: "State") -> bool:
             )
             return False
 
-        root_preview = computed_root.hex()[:16]
+        state_root = hash_tree_root(state)
+        root_preview = state_root.hex()[:16]
         logger.info(f"Checkpoint state verified: slot={state.slot}, root={root_preview}...")
         return True
 

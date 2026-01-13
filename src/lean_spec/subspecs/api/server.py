@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from aiohttp import web
@@ -22,6 +22,16 @@ if TYPE_CHECKING:
     from lean_spec.subspecs.forkchoice import Store
 
 logger = logging.getLogger(__name__)
+
+
+def _no_store() -> Store | None:
+    """Default store getter that returns None."""
+    return None
+
+
+async def _handle_health(_request: web.Request) -> web.Response:
+    """Handle health check endpoint."""
+    return web.json_response({"status": "healthy", "service": "lean-spec-api"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +48,7 @@ class ApiServerConfig:
     """Whether the API server is enabled."""
 
 
+@dataclass(slots=True)
 class ApiServer:
     """
     HTTP API server for checkpoint sync and node status.
@@ -49,36 +60,22 @@ class ApiServer:
     Uses aiohttp to handle HTTP protocol details efficiently.
     """
 
-    def __init__(
-        self,
-        config: ApiServerConfig,
-        store_getter: Callable[[], Store | None] = lambda: None,
-    ):
-        """
-        Initialize the API server.
+    config: ApiServerConfig
+    """Server configuration."""
 
-        Args:
-            config: Server configuration.
-            store_getter: Callable that returns the current Store instance.
-        """
-        self.config = config
-        self._store_getter = store_getter
-        self._runner: web.AppRunner | None = None
-        self._site: web.TCPSite | None = None
+    store_getter: Callable[[], Store | None] = _no_store
+    """Callable that returns the current Store instance."""
 
-    def set_store_getter(self, getter: Callable[[], Store | None]) -> None:
-        """
-        Set the store getter function.
+    _runner: web.AppRunner | None = field(default=None, init=False)
+    """The aiohttp application runner."""
 
-        Args:
-            getter: Callable that returns the current Store instance.
-        """
-        self._store_getter = getter
+    _site: web.TCPSite | None = field(default=None, init=False)
+    """The TCP site for the server."""
 
     @property
     def store(self) -> Store | None:
         """Get the current Store instance."""
-        return self._store_getter()
+        return self.store_getter()
 
     async def start(self) -> None:
         """Start the API server in the background."""
@@ -89,7 +86,7 @@ class ApiServer:
         app = web.Application()
         app.add_routes(
             [
-                web.get("/health", self._handle_health),
+                web.get("/health", _handle_health),
                 web.get("/lean/states/finalized", self._handle_finalized_state),
             ]
         )
@@ -127,11 +124,7 @@ class ApiServer:
             self._site = None
             logger.info("API server stopped")
 
-    async def _handle_health(self, request: web.Request) -> web.Response:
-        """Handle health check endpoint."""
-        return web.json_response({"status": "healthy", "service": "lean-spec-api"})
-
-    async def _handle_finalized_state(self, request: web.Request) -> web.Response:
+    async def _handle_finalized_state(self, _request: web.Request) -> web.Response:
         """
         Handle finalized checkpoint state endpoint.
 

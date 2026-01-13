@@ -56,9 +56,7 @@ class TestApiServerStoreIntegration:
     def test_store_getter_provides_access_to_store(self, store: Store) -> None:
         """Store getter callable provides access to the forkchoice store."""
         config = ApiServerConfig()
-        server = ApiServer(config=config)
-
-        server.set_store_getter(lambda: store)
+        server = ApiServer(config=config, store_getter=lambda: store)
 
         assert server.store is store
 
