@@ -79,8 +79,8 @@ from lean_spec.snappy import SnappyDecompressionError, frame_compress, frame_dec
 
 from ..config import MAX_PAYLOAD_SIZE
 from ..varint import VarintError
-from ..varint import decode as _decode_varint
-from ..varint import encode as _encode_varint
+from ..varint import decode as decode_varint
+from ..varint import encode as encode_varint
 
 
 class CodecError(Exception):
@@ -92,25 +92,6 @@ class CodecError(Exception):
       - Snappy decompression failures
       - Length mismatches after decompression
     """
-
-
-def encode_varint(value: int) -> bytes:
-    """Encode an unsigned integer as LEB128 varint.
-
-    This is a thin wrapper that delegates to the varint module.
-    """
-    return _encode_varint(value)
-
-
-def decode_varint(data: bytes, offset: int = 0) -> tuple[int, int]:
-    """Decode a varint from bytes, returning (value, bytes_consumed).
-
-    Raises CodecError if the varint is malformed.
-    """
-    try:
-        return _decode_varint(data, offset)
-    except VarintError as e:
-        raise CodecError(str(e)) from e
 
 
 def encode_request(ssz_data: bytes) -> bytes:

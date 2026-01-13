@@ -108,15 +108,8 @@ class NoiseIdentityPayload:
             offset += 1
 
             # Decode length varint
-            length = 0
-            shift = 0
-            while offset < len(data):
-                byte = data[offset]
-                offset += 1
-                length |= (byte & 0x7F) << shift
-                if not (byte & 0x80):
-                    break
-                shift += 7
+            length, consumed = varint.decode(data, offset)
+            offset += consumed
 
             if offset + length > len(data):
                 raise ValueError("Truncated payload")
@@ -202,15 +195,8 @@ class NoiseIdentityPayload:
             offset += 1
 
             # Read type varint
-            key_type = 0
-            shift = 0
-            while offset < len(self.identity_key):
-                byte = self.identity_key[offset]
-                offset += 1
-                key_type |= (byte & 0x7F) << shift
-                if not (byte & 0x80):
-                    break
-                shift += 7
+            key_type, consumed = varint.decode(self.identity_key, offset)
+            offset += consumed
 
             if key_type != KeyType.SECP256K1:
                 return None
@@ -221,15 +207,8 @@ class NoiseIdentityPayload:
             offset += 1
 
             # Read length varint
-            length = 0
-            shift = 0
-            while offset < len(self.identity_key):
-                byte = self.identity_key[offset]
-                offset += 1
-                length |= (byte & 0x7F) << shift
-                if not (byte & 0x80):
-                    break
-                shift += 7
+            length, consumed = varint.decode(self.identity_key, offset)
+            offset += consumed
 
             if offset + length > len(self.identity_key):
                 return None
