@@ -254,7 +254,8 @@ async def perform_handshake_initiator(
     remote_payload = NoiseIdentityPayload.decode(payload2)
 
     # After reading msg2, we have responder's Noise static key
-    assert handshake.remote_static_public is not None
+    if handshake.remote_static_public is None:
+        raise SessionError("Remote static key not established")
     remote_noise_pubkey = handshake.remote_static_public.public_bytes_raw()
 
     if not remote_payload.verify(remote_noise_pubkey):
@@ -339,7 +340,8 @@ async def perform_handshake_responder(
     remote_payload = NoiseIdentityPayload.decode(payload3)
 
     # After reading msg3, we have initiator's Noise static key
-    assert handshake.remote_static_public is not None
+    if handshake.remote_static_public is None:
+        raise SessionError("Remote static key not established")
     remote_noise_pubkey = handshake.remote_static_public.public_bytes_raw()
 
     if not remote_payload.verify(remote_noise_pubkey):

@@ -148,7 +148,7 @@ class PeerManager:
         if peer is not None:
             peer.on_request_complete()
 
-    def on_request_failure(self, peer_id: PeerId, reason: str = "") -> None:
+    def on_request_failure(self, peer_id: PeerId) -> None:
         """Record a failed request to a peer."""
         peer = self._peers.get(peer_id)
         if peer is not None:

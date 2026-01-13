@@ -273,8 +273,8 @@ class TestYamuxFrameDecoding:
 
         frame = YamuxFrame.decode(header)
 
-        assert frame.is_syn()
-        assert not frame.is_ack()
+        assert frame.has_flag(YamuxFlags.SYN)
+        assert not frame.has_flag(YamuxFlags.ACK)
         assert frame.stream_id == 3
 
     def test_decode_with_ack_flag(self) -> None:
@@ -283,8 +283,8 @@ class TestYamuxFrameDecoding:
 
         frame = YamuxFrame.decode(header)
 
-        assert frame.is_ack()
-        assert not frame.is_syn()
+        assert frame.has_flag(YamuxFlags.ACK)
+        assert not frame.has_flag(YamuxFlags.SYN)
 
     def test_decode_with_fin_flag(self) -> None:
         """Decode frame with FIN flag."""
@@ -292,8 +292,8 @@ class TestYamuxFrameDecoding:
 
         frame = YamuxFrame.decode(header)
 
-        assert frame.is_fin()
-        assert not frame.is_rst()
+        assert frame.has_flag(YamuxFlags.FIN)
+        assert not frame.has_flag(YamuxFlags.RST)
 
     def test_decode_with_rst_flag(self) -> None:
         """Decode frame with RST flag."""
@@ -301,7 +301,7 @@ class TestYamuxFrameDecoding:
 
         frame = YamuxFrame.decode(header)
 
-        assert frame.is_rst()
+        assert frame.has_flag(YamuxFlags.RST)
 
     def test_decode_ping(self) -> None:
         """Decode PING frame."""
@@ -412,54 +412,6 @@ class TestFlagMethods:
         assert frame.has_flag(YamuxFlags.FIN)
         assert not frame.has_flag(YamuxFlags.ACK)
         assert not frame.has_flag(YamuxFlags.RST)
-
-    def test_is_syn(self) -> None:
-        """is_syn method."""
-        syn_frame_inst = YamuxFrame(
-            frame_type=YamuxType.WINDOW_UPDATE,
-            flags=YamuxFlags.SYN,
-            stream_id=1,
-            length=YAMUX_INITIAL_WINDOW,
-        )
-        assert syn_frame_inst.is_syn()
-
-        no_syn = YamuxFrame(
-            frame_type=YamuxType.DATA,
-            flags=YamuxFlags.NONE,
-            stream_id=1,
-            length=0,
-        )
-        assert not no_syn.is_syn()
-
-    def test_is_ack(self) -> None:
-        """is_ack method."""
-        ack = YamuxFrame(
-            frame_type=YamuxType.WINDOW_UPDATE,
-            flags=YamuxFlags.ACK,
-            stream_id=1,
-            length=YAMUX_INITIAL_WINDOW,
-        )
-        assert ack.is_ack()
-
-    def test_is_fin(self) -> None:
-        """is_fin method."""
-        fin = YamuxFrame(
-            frame_type=YamuxType.DATA,
-            flags=YamuxFlags.FIN,
-            stream_id=1,
-            length=0,
-        )
-        assert fin.is_fin()
-
-    def test_is_rst(self) -> None:
-        """is_rst method."""
-        rst = YamuxFrame(
-            frame_type=YamuxType.DATA,
-            flags=YamuxFlags.RST,
-            stream_id=1,
-            length=0,
-        )
-        assert rst.is_rst()
 
 
 class TestFrameFactoryFunctions:
