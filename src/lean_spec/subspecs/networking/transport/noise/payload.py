@@ -101,9 +101,6 @@ class NoiseIdentityPayload:
 
         offset = 0
         while offset < len(data):
-            if offset >= len(data):
-                break
-
             tag = data[offset]
             offset += 1
 

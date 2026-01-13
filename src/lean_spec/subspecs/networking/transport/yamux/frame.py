@@ -252,22 +252,6 @@ class YamuxFrame:
         """Check if a specific flag is set."""
         return bool(self.flags & flag)
 
-    def is_syn(self) -> bool:
-        """Check if SYN flag is set (new stream)."""
-        return self.has_flag(YamuxFlags.SYN)
-
-    def is_ack(self) -> bool:
-        """Check if ACK flag is set (stream acknowledged)."""
-        return self.has_flag(YamuxFlags.ACK)
-
-    def is_fin(self) -> bool:
-        """Check if FIN flag is set (half-close)."""
-        return self.has_flag(YamuxFlags.FIN)
-
-    def is_rst(self) -> bool:
-        """Check if RST flag is set (abort)."""
-        return self.has_flag(YamuxFlags.RST)
-
 
 def data_frame(stream_id: int, data: bytes, flags: YamuxFlags = YamuxFlags.NONE) -> YamuxFrame:
     """

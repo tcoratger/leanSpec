@@ -41,6 +41,7 @@ from .frame import (
     YAMUX_HEADER_SIZE,
     YAMUX_INITIAL_WINDOW,
     YamuxError,
+    YamuxFlags,
     YamuxFrame,
     YamuxGoAwayCode,
     YamuxType,
@@ -639,19 +640,19 @@ class YamuxSession:
             return
 
         # Stream-level messages.
-        if frame.is_syn():
+        if frame.has_flag(YamuxFlags.SYN):
             await self._handle_syn(frame)
         elif frame.stream_id in self._streams:
             stream = self._streams[frame.stream_id]
             await self._handle_stream_frame(stream, frame)
-        elif frame.is_ack():
+        elif frame.has_flag(YamuxFlags.ACK):
             # ACK for unknown stream - could be late ACK after we closed.
             logger.debug("ACK for unknown stream %d", frame.stream_id)
         # Ignore frames for unknown streams (they may have been reset).
 
     async def _handle_stream_frame(self, stream: YamuxStream, frame: YamuxFrame) -> None:
         """Handle a frame for an existing stream."""
-        if frame.is_rst():
+        if frame.has_flag(YamuxFlags.RST):
             # RST takes priority - abort the stream.
             stream._handle_reset()
             del self._streams[frame.stream_id]
@@ -660,11 +661,11 @@ class YamuxSession:
         if frame.frame_type == YamuxType.DATA:
             if frame.data:
                 stream._handle_data(frame.data)
-            if frame.is_fin():
+            if frame.has_flag(YamuxFlags.FIN):
                 stream._handle_fin()
         elif frame.frame_type == YamuxType.WINDOW_UPDATE:
             stream._handle_window_update(frame.length)
-            if frame.is_fin():
+            if frame.has_flag(YamuxFlags.FIN):
                 stream._handle_fin()
 
         # Clean up fully closed streams.
@@ -718,7 +719,7 @@ class YamuxSession:
 
     async def _handle_ping(self, frame: YamuxFrame) -> None:
         """Handle PING frame."""
-        if not frame.is_ack():
+        if not frame.has_flag(YamuxFlags.ACK):
             # This is a ping request - echo back with ACK.
             response = ping_frame(opaque=frame.length, is_response=True)
             await self._send_frame(response)

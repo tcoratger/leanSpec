@@ -220,7 +220,7 @@ class BackfillSync:
 
         except Exception:
             # Network error.
-            self.peer_manager.on_request_failure(peer.peer_id, "backfill request failed")
+            self.peer_manager.on_request_failure(peer.peer_id)
 
     async def _process_received_blocks(
         self,

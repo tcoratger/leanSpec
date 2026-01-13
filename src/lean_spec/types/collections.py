@@ -10,7 +10,6 @@ from typing import (
     Generic,
     Iterator,
     Sequence,
-    Type,
     TypeVar,
     cast,
     overload,
@@ -45,7 +44,7 @@ Example:
 """
 
 
-def _extract_element_type_from_generic(cls: type, origin_class: type) -> Type[SSZType] | None:
+def _extract_element_type_from_generic(cls: type, origin_class: type) -> type[SSZType] | None:
     """
     Extract ELEMENT_TYPE from Pydantic's generic metadata.
 
@@ -65,7 +64,7 @@ def _extract_element_type_from_generic(cls: type, origin_class: type) -> Type[SS
         if metadata and metadata.get("origin") is origin_class:
             args = metadata.get("args", ())
             if args:
-                return cast(Type[SSZType], args[0])
+                return cast(type[SSZType], args[0])
     return None
 
 
@@ -122,7 +121,7 @@ class SSZVector(SSZModel, Generic[T]):
         - Variable-size elements: Offset table followed by element data
     """
 
-    ELEMENT_TYPE: ClassVar[Type[SSZType]]
+    ELEMENT_TYPE: ClassVar[type[SSZType]]
     """The SSZ type of elements in this vector (auto-inferred from generic parameter)."""
 
     LENGTH: ClassVar[int]
@@ -309,7 +308,7 @@ class SSZList(SSZModel, Generic[T]):
         - Hash tree root includes the element count (mixed-in)
     """
 
-    ELEMENT_TYPE: ClassVar[Type[SSZType]]
+    ELEMENT_TYPE: ClassVar[type[SSZType]]
     """The SSZ type of elements in this list (auto-inferred from generic parameter)."""
 
     LIMIT: ClassVar[int]
