@@ -183,7 +183,7 @@ class BaseBytes(bytes, SSZType):
         return f"{tname}({self.hex()})"
 
     def __hash__(self) -> int:
-        """Return the hash of the bytes."""
+        """Return a hash distinct from raw bytes."""
         return hash((type(self), bytes(self)))
 
     def hex(self, sep: str | bytes | None = None, bytes_per_sep: SupportsIndex = 1) -> str:

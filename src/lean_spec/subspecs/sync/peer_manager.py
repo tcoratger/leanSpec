@@ -129,18 +129,15 @@ class PeerManager:
 
         Returns the mode (most common) finalized slot reported by connected peers.
         """
-        finalized_slots: list[Slot] = []
-
-        for peer in self._peers.values():
-            if peer.status is not None and peer.is_connected():
-                finalized_slots.append(peer.status.finalized.slot)
-
-        if not finalized_slots:
+        slots = (
+            peer.status.finalized.slot
+            for peer in self._peers.values()
+            if peer.status is not None and peer.is_connected()
+        )
+        counter = Counter(slots)
+        if not counter:
             return None
-
-        counter = Counter(finalized_slots)
-        most_common = counter.most_common(1)
-        return most_common[0][0] if most_common else None
+        return counter.most_common(1)[0][0]
 
     def on_request_success(self, peer_id: PeerId) -> None:
         """Record a successful request to a peer."""

@@ -242,7 +242,7 @@ class SyncService:
             network_finalized_slot=int(network_slot) if network_slot else None,
             blocks_processed=self._blocks_processed,
             # Only count peers that have an active connection.
-            peers_connected=len([p for p in self.peer_manager.get_all_peers() if p.is_connected()]),
+            peers_connected=sum(1 for p in self.peer_manager.get_all_peers() if p.is_connected()),
             cache_size=len(self.block_cache),
             # Orphans are blocks waiting for parents to be fetched via backfill.
             orphan_count=self.block_cache.orphan_count,

@@ -151,14 +151,13 @@ class Container(SSZModel):
         offset = sum(len(part) if part else OFFSET_BYTE_LENGTH for part in fixed_parts)
 
         # Write fixed part with calculated offsets
-        var_index = 0
+        var_iter = iter(variable_data)
         for part in fixed_parts:
             if part:  # Fixed-size field data
                 stream.write(part)
             else:  # Variable-size field offset
                 stream.write(Uint32(offset).encode_bytes())
-                offset += len(variable_data[var_index])
-                var_index += 1
+                offset += len(next(var_iter))
 
         # Append all variable data at the end
         for data in variable_data:
