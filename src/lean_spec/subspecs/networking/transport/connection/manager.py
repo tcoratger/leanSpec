@@ -111,8 +111,6 @@ SUPPORTED_MUXERS = [YAMUX_PROTOCOL_ID]
 class TransportConnectionError(Exception):
     """Raised when connection operations fail."""
 
-    pass
-
 
 @dataclass(slots=True)
 class YamuxConnection:
@@ -755,6 +753,12 @@ class _NoiseWriter:
             await self._wrapper._noise.write(self._pending)
             self._pending = b""
 
+    def close(self) -> None:
+        """No-op. Actual noise session is closed separately."""
+
+    async def wait_closed(self) -> None:
+        """No-op. Actual noise session is closed separately."""
+
 
 class _StreamNegotiationWrapper:
     """
@@ -832,3 +836,9 @@ class _StreamWriter:
         if self._pending:
             await self._wrapper._stream.write(self._pending)
             self._pending = b""
+
+    def close(self) -> None:
+        """No-op. Actual yamux stream is closed separately."""
+
+    async def wait_closed(self) -> None:
+        """No-op. Actual yamux stream is closed separately."""

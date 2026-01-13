@@ -5,7 +5,7 @@ This module defines the data structures for the peer-to-peer request/response
 domain. All messages are SSZ-encoded and then compressed with Snappy frames.
 """
 
-from typing import ClassVar, Type
+from typing import ClassVar
 
 from lean_spec.subspecs.containers import Checkpoint, SignedBlockWithAttestation
 from lean_spec.types import Bytes32, SSZList, SSZType
@@ -55,7 +55,7 @@ class BlocksByRootRequest(SSZList[Bytes32]):
     This is primarily used to recover recent or missing blocks from a peer.
     """
 
-    ELEMENT_TYPE: ClassVar[Type[SSZType]] = Bytes32
+    ELEMENT_TYPE: ClassVar[type[SSZType]] = Bytes32
     LIMIT: ClassVar[int] = MAX_REQUEST_BLOCKS
 
 
@@ -68,5 +68,5 @@ class BlocksByRootResponse(SSZList[SignedBlockWithAttestation]):
     separate `response_chunk`.
     """
 
-    ELEMENT_TYPE: ClassVar[Type[SSZType]] = SignedBlockWithAttestation
+    ELEMENT_TYPE: ClassVar[type[SSZType]] = SignedBlockWithAttestation
     LIMIT: ClassVar[int] = MAX_REQUEST_BLOCKS

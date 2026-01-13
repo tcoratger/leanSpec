@@ -13,7 +13,7 @@ Design notes
 
 from __future__ import annotations
 
-from typing import Iterable, List, Sequence
+from typing import Iterable, Sequence
 
 from lean_spec.subspecs.ssz.constants import BITS_PER_BYTE, BYTES_PER_CHUNK
 from lean_spec.types.byte_arrays import Bytes32
@@ -37,7 +37,7 @@ class Packer:
         return b + b"\x00" * pad
 
     @staticmethod
-    def _partition_chunks(b: bytes) -> List[Bytes32]:
+    def _partition_chunks(b: bytes) -> list[Bytes32]:
         """Partition an already-aligned byte-string into 32-byte chunks.
 
         Precondition: `len(b)` must be a multiple of 32.
@@ -50,7 +50,7 @@ class Packer:
         return [Bytes32(b[i : i + BYTES_PER_CHUNK]) for i in range(0, len(b), BYTES_PER_CHUNK)]
 
     @staticmethod
-    def pack_basic_serialized(serialized_basic_values: Iterable[bytes]) -> List[Bytes32]:
+    def pack_basic_serialized(serialized_basic_values: Iterable[bytes]) -> list[Bytes32]:
         """Pack *serialized* basic values (e.g. uintN/boolean/byte) into chunks.
 
         Parameters
@@ -70,12 +70,12 @@ class Packer:
         )
 
     @staticmethod
-    def pack_bytes(data: bytes) -> List[Bytes32]:
+    def pack_bytes(data: bytes) -> list[Bytes32]:
         """Pack raw bytes (e.g. ByteVector/ByteList content) into 32-byte chunks."""
         return Packer._partition_chunks(Packer._right_pad_to_chunk(data))
 
     @staticmethod
-    def pack_bits(bools: Sequence[bool]) -> List[Bytes32]:
+    def pack_bits(bools: Sequence[bool]) -> list[Bytes32]:
         """Pack a boolean sequence into a bitfield, then into 32-byte chunks.
 
         Notes:

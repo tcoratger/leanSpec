@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+from lean_spec.subspecs.networking import varint
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
 from lean_spec.subspecs.networking.transport.peer_id import (
     Base58,
@@ -22,7 +23,6 @@ from lean_spec.subspecs.networking.transport.peer_id import (
     MultihashCode,
     PeerId,
     PublicKeyProto,
-    Varint,
 )
 
 # Protobuf tag constants for test assertions
@@ -99,26 +99,26 @@ class TestVarintEncoding:
 
     def test_encode_zero(self) -> None:
         """Zero encodes to single byte."""
-        assert Varint.encode(0) == b"\x00"
+        assert varint.encode(0) == b"\x00"
 
     def test_encode_small_values(self) -> None:
         """Values < 128 encode to single byte."""
-        assert Varint.encode(1) == b"\x01"
-        assert Varint.encode(127) == b"\x7f"
+        assert varint.encode(1) == b"\x01"
+        assert varint.encode(127) == b"\x7f"
 
     def test_encode_128(self) -> None:
         """128 requires two bytes."""
-        assert Varint.encode(128) == b"\x80\x01"
+        assert varint.encode(128) == b"\x80\x01"
 
     def test_encode_large_values(self) -> None:
         """Large values use multiple bytes."""
-        assert Varint.encode(300) == b"\xac\x02"
-        assert Varint.encode(16384) == b"\x80\x80\x01"
+        assert varint.encode(300) == b"\xac\x02"
+        assert varint.encode(16384) == b"\x80\x80\x01"
 
     def test_encode_negative_raises(self) -> None:
         """Negative values raise ValueError."""
         with pytest.raises(ValueError, match="non-negative"):
-            Varint.encode(-1)
+            varint.encode(-1)
 
 
 class TestMultihash:

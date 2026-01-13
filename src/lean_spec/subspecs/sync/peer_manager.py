@@ -62,7 +62,7 @@ class SyncPeer:
         self.requests_in_flight = max(0, self.requests_in_flight - 1)
 
 
-@dataclass
+@dataclass(slots=True)
 class PeerManager:
     """
     Manages peers for sync operations.

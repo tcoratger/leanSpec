@@ -33,34 +33,12 @@ References:
 from __future__ import annotations
 
 import asyncio
-from typing import Final, Protocol
+from typing import Final
 
-from lean_spec.subspecs.networking.reqresp.codec import decode_varint, encode_varint
+from lean_spec.subspecs.networking.varint import decode as decode_varint
+from lean_spec.subspecs.networking.varint import encode as encode_varint
 
-
-class StreamReaderProtocol(Protocol):
-    """Protocol for objects that can read data like asyncio.StreamReader."""
-
-    async def read(self, n: int) -> bytes:
-        """Read up to n bytes."""
-        ...
-
-    async def readexactly(self, n: int) -> bytes:
-        """Read exactly n bytes."""
-        ...
-
-
-class StreamWriterProtocol(Protocol):
-    """Protocol for objects that can write data like asyncio.StreamWriter."""
-
-    def write(self, data: bytes) -> None:
-        """Write data to buffer."""
-        ...
-
-    async def drain(self) -> None:
-        """Flush the buffer."""
-        ...
-
+from ..protocols import StreamReaderProtocol, StreamWriterProtocol
 
 MULTISTREAM_PROTOCOL_ID: Final[str] = "/multistream/1.0.0"
 """Protocol identifier for multistream-select 1.0."""
@@ -80,8 +58,6 @@ DEFAULT_TIMEOUT: Final[float] = 30.0
 
 class NegotiationError(Exception):
     """Raised when protocol negotiation fails."""
-
-    pass
 
 
 async def negotiate_client(

@@ -44,7 +44,8 @@ from .multistream import (
     negotiate_server,
 )
 from .noise import CipherState, NoiseHandshake, NoiseSession
-from .peer_id import Base58, KeyType, Multihash, MultihashCode, PeerId, PublicKeyProto, Varint
+from .peer_id import Base58, KeyType, Multihash, MultihashCode, PeerId, PublicKeyProto
+from .protocols import StreamReaderProtocol, StreamWriterProtocol
 from .yamux import (
     YamuxError,
     YamuxFlags,
@@ -90,5 +91,7 @@ __all__ = [
     "KeyType",
     "MultihashCode",
     "Base58",
-    "Varint",
+    # Stream protocols
+    "StreamReaderProtocol",
+    "StreamWriterProtocol",
 ]

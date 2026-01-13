@@ -138,8 +138,6 @@ class YamuxGoAwayCode(IntEnum):
 class YamuxError(Exception):
     """Raised when yamux framing fails."""
 
-    pass
-
 
 @dataclass(frozen=True, slots=True)
 class YamuxFrame:
