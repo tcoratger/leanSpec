@@ -145,10 +145,11 @@ class Node:
         # Create API server if configured
         api_server: ApiServer | None = None
         if config.api_config is not None:
-            api_server = ApiServer(config=config.api_config)
-            # Set up store getter so API server can access current state
-            # We use a lambda that captures sync_service to get the live store
-            api_server.set_store_getter(lambda: sync_service.store)
+            # Store getter captures sync_service to get the live store
+            api_server = ApiServer(
+                config=config.api_config,
+                store_getter=lambda: sync_service.store,
+            )
 
         return cls(
             store=store,
