@@ -10,23 +10,13 @@ import pytest
 
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
-    Attestation,
     AttestationData,
-    Block,
-    BlockBody,
-    BlockWithAttestation,
     Checkpoint,
     SignedBlockWithAttestation,
 )
 from lean_spec.subspecs.containers.attestation import SignedAttestation
-from lean_spec.subspecs.containers.block import BlockSignatures
-from lean_spec.subspecs.containers.block.types import (
-    AggregatedAttestations,
-    AttestationSignatures,
-)
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.peer.info import PeerInfo
@@ -44,10 +34,8 @@ from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.sync.states import SyncState
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64
+from tests.lean_spec.helpers import make_mock_signature, make_signed_block
 
 
 @dataclass
@@ -128,54 +116,6 @@ class MockStore:
         return new_store
 
 
-def create_mock_signature() -> Signature:
-    """Create a minimal mock signature for testing."""
-    return Signature(
-        path=HashTreeOpening(siblings=HashDigestList(data=[])),
-        rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-        hashes=HashDigestList(data=[]),
-    )
-
-
-def create_signed_block(
-    slot: Slot,
-    proposer_index: Uint64,
-    parent_root: Bytes32,
-    state_root: Bytes32,
-) -> SignedBlockWithAttestation:
-    """Create a signed block with minimal valid structure for testing."""
-    block = Block(
-        slot=slot,
-        proposer_index=proposer_index,
-        parent_root=parent_root,
-        state_root=state_root,
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-
-    block_root = hash_tree_root(block)
-
-    attestation = Attestation(
-        validator_id=proposer_index,
-        data=AttestationData(
-            slot=slot,
-            head=Checkpoint(root=block_root, slot=slot),
-            target=Checkpoint(root=block_root, slot=slot),
-            source=Checkpoint(root=parent_root, slot=Slot(0)),
-        ),
-    )
-
-    return SignedBlockWithAttestation(
-        message=BlockWithAttestation(
-            block=block,
-            proposer_attestation=attestation,
-        ),
-        signature=BlockSignatures(
-            attestation_signatures=AttestationSignatures(data=[]),
-            proposer_signature=create_mock_signature(),
-        ),
-    )
-
-
 def create_sync_service(peer_id: PeerId) -> SyncService:
     """Create a SyncService with MockStore for testing."""
     mock_store = MockStore(head_slot=0)
@@ -224,7 +164,7 @@ class TestBlockRoutingToForkchoice:
 
         genesis_root = sync_service.store.head
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -259,7 +199,7 @@ class TestBlockRoutingToForkchoice:
         genesis_root = sync_service.store.head
         assert genesis_root == Bytes32.zero()
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -291,7 +231,7 @@ class TestBlockRoutingToForkchoice:
         genesis_root = sync_service.store.head
         initial_blocks_count = len(sync_service.store.blocks)
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -331,7 +271,7 @@ class TestAttestationRoutingToForkchoice:
                 target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
                 source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
             ),
-            signature=create_mock_signature(),
+            signature=make_mock_signature(),
         )
 
         # Track initial attestations count
@@ -375,7 +315,7 @@ class TestAttestationRoutingToForkchoice:
                 target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
                 source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
             ),
-            signature=create_mock_signature(),
+            signature=make_mock_signature(),
         )
 
         events: list[NetworkEvent] = [
@@ -478,7 +418,7 @@ class TestIntegrationEventSequence:
         )
 
         # Block to process (slot 1 - will exceed network finalized)
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -516,7 +456,7 @@ class TestIntegrationEventSequence:
         genesis_root = sync_service.store.head
 
         # Block arrives BEFORE status
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -555,7 +495,7 @@ class TestIntegrationEventSequence:
         genesis_root = sync_service.store.head
 
         # Create chain: genesis -> block1 -> block2
-        block1 = create_signed_block(
+        block1 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -563,7 +503,7 @@ class TestIntegrationEventSequence:
         )
         block1_root = hash_tree_root(block1.message.block)
 
-        block2 = create_signed_block(
+        block2 = make_signed_block(
             slot=Slot(2),
             proposer_index=Uint64(1),
             parent_root=block1_root,

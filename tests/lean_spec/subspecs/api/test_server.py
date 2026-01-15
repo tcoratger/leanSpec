@@ -53,12 +53,12 @@ class TestApiServerStoreIntegration:
         assert server.config == config
         assert server.store is None
 
-    def test_store_getter_provides_access_to_store(self, store: Store) -> None:
+    def test_store_getter_provides_access_to_store(self, base_store: Store) -> None:
         """Store getter callable provides access to the forkchoice store."""
         config = ApiServerConfig()
-        server = ApiServer(config=config, store_getter=lambda: store)
+        server = ApiServer(config=config, store_getter=lambda: base_store)
 
-        assert server.store is store
+        assert server.store is base_store
 
 
 class TestHealthEndpoint:
@@ -113,12 +113,12 @@ class TestFinalizedStateEndpoint:
 
         asyncio.run(run_test())
 
-    def test_returns_ssz_state_when_store_available(self, store: Store) -> None:
+    def test_returns_ssz_state_when_store_available(self, base_store: Store) -> None:
         """Endpoint returns SSZ-encoded state as octet-stream."""
 
         async def run_test() -> None:
             config = ApiServerConfig(port=15056)
-            server = ApiServer(config=config, store_getter=lambda: store)
+            server = ApiServer(config=config, store_getter=lambda: base_store)
 
             await server.start()
 
@@ -205,12 +205,12 @@ class TestStateVerification:
 class TestCheckpointSyncClientServerIntegration:
     """Integration tests for checkpoint sync client fetching from server."""
 
-    def test_client_fetches_and_deserializes_state(self, store: Store) -> None:
+    def test_client_fetches_and_deserializes_state(self, base_store: Store) -> None:
         """Client successfully fetches and deserializes state from server."""
 
         async def run_test() -> None:
             config = ApiServerConfig(port=15058)
-            server = ApiServer(config=config, store_getter=lambda: store)
+            server = ApiServer(config=config, store_getter=lambda: base_store)
 
             await server.start()
 

@@ -16,8 +16,7 @@ from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Uint64
-
-from .conftest import build_signed_attestation
+from tests.lean_spec.helpers import make_signed_attestation
 
 
 @pytest.fixture
@@ -150,7 +149,7 @@ class TestIntervalTicking:
 
         # Add some test attestations for processing
         test_checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(1))
-        sample_store.latest_new_attestations[Uint64(0)] = build_signed_attestation(
+        sample_store.latest_new_attestations[Uint64(0)] = make_signed_attestation(
             Uint64(0),
             test_checkpoint,
         ).message
@@ -236,7 +235,7 @@ class TestAttestationProcessingTiming:
         """Test basic new attestation processing."""
         # Add some new attestations
         checkpoint = Checkpoint(root=Bytes32(b"test" + b"\x00" * 28), slot=Slot(1))
-        sample_store.latest_new_attestations[Uint64(0)] = build_signed_attestation(
+        sample_store.latest_new_attestations[Uint64(0)] = make_signed_attestation(
             Uint64(0),
             checkpoint,
         ).message
@@ -266,7 +265,7 @@ class TestAttestationProcessingTiming:
         ]
 
         for i, checkpoint in enumerate(checkpoints):
-            sample_store.latest_new_attestations[Uint64(i)] = build_signed_attestation(
+            sample_store.latest_new_attestations[Uint64(i)] = make_signed_attestation(
                 Uint64(i),
                 checkpoint,
             ).message
@@ -338,7 +337,7 @@ class TestProposalHeadTiming:
         # Add some new attestations (immutable update)
         checkpoint = Checkpoint(root=Bytes32(b"attestation" + b"\x00" * 21), slot=Slot(1))
         new_new_attestations = dict(sample_store.latest_new_attestations)
-        new_new_attestations[Uint64(10)] = build_signed_attestation(
+        new_new_attestations[Uint64(10)] = make_signed_attestation(
             Uint64(10),
             checkpoint,
         ).message

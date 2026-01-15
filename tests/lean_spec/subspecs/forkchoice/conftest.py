@@ -1,16 +1,16 @@
-"""Shared test utilities for forkchoice tests."""
+"""
+Shared pytest fixtures for forkchoice tests.
+
+Provides mock state for testing fork choice behavior.
+"""
+
+from __future__ import annotations
 
 from typing import Type
 
 import pytest
 
-from lean_spec.subspecs.containers import (
-    AttestationData,
-    BlockBody,
-    Checkpoint,
-    SignedAttestation,
-    State,
-)
+from lean_spec.subspecs.containers import BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.block import AggregatedAttestations, BlockHeader
 from lean_spec.subspecs.containers.config import Config
 from lean_spec.subspecs.containers.slot import Slot
@@ -21,20 +21,15 @@ from lean_spec.subspecs.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64
 
 
 class MockState(State):
-    """Mock state that exposes configurable ``latest_justified``."""
+    """Mock state with configurable latest_justified checkpoint."""
 
     def __init__(self, latest_justified: Checkpoint) -> None:
-        """Initialize a mock state with minimal defaults."""
-        # Create minimal defaults for all required fields
+        """Initialize mock state with minimal defaults."""
         genesis_config = Config(
             genesis_time=Uint64(0),
         )
@@ -59,31 +54,6 @@ class MockState(State):
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         )
-
-
-def build_signed_attestation(
-    validator: Uint64,
-    target: Checkpoint,
-    source: Checkpoint | None = None,
-) -> SignedAttestation:
-    """Construct a SignedValidatorAttestation pointing to ``target``."""
-
-    source_checkpoint = source or Checkpoint.default()
-    attestation_data = AttestationData(
-        slot=target.slot,
-        head=target,
-        target=target,
-        source=source_checkpoint,
-    )
-    return SignedAttestation(
-        validator_id=validator,
-        message=attestation_data,
-        signature=Signature(
-            path=HashTreeOpening(siblings=HashDigestList(data=[])),
-            rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-            hashes=HashDigestList(data=[]),
-        ),
-    )
 
 
 @pytest.fixture
