@@ -11,8 +11,7 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.block_cache import BlockCache, PendingBlock
 from lean_spec.subspecs.sync.config import MAX_CACHED_BLOCKS
 from lean_spec.types import Bytes32, Uint64
-
-from .conftest import create_signed_block
+from tests.lean_spec.helpers import make_signed_block
 
 
 class TestPendingBlock:
@@ -20,7 +19,7 @@ class TestPendingBlock:
 
     def test_create_pending_block(self, peer_id: PeerId) -> None:
         """PendingBlock can be created with required fields."""
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -46,7 +45,7 @@ class TestPendingBlock:
     def test_pending_block_default_received_at(self, peer_id: PeerId) -> None:
         """PendingBlock sets received_at to current time by default."""
         before = time()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -67,7 +66,7 @@ class TestPendingBlock:
 
     def test_pending_block_custom_backfill_depth(self, peer_id: PeerId) -> None:
         """PendingBlock can be created with custom backfill depth."""
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -101,7 +100,7 @@ class TestBlockCacheBasicOperations:
     def test_add_block(self, peer_id: PeerId) -> None:
         """Adding a block stores it in the cache."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -118,7 +117,7 @@ class TestBlockCacheBasicOperations:
     def test_contains_block(self, peer_id: PeerId) -> None:
         """Contains check works for cached blocks."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -133,7 +132,7 @@ class TestBlockCacheBasicOperations:
     def test_get_block(self, peer_id: PeerId) -> None:
         """Getting a block by root returns the PendingBlock."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -157,7 +156,7 @@ class TestBlockCacheBasicOperations:
     def test_remove_block(self, peer_id: PeerId) -> None:
         """Removing a block returns it and removes from cache."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -183,7 +182,7 @@ class TestBlockCacheBasicOperations:
         """Clear removes all blocks from the cache."""
         cache = BlockCache()
         for i in range(5):
-            block = create_signed_block(
+            block = make_signed_block(
                 slot=Slot(i + 1),
                 proposer_index=Uint64(0),
                 parent_root=Bytes32(i.to_bytes(32, "big")),
@@ -206,7 +205,7 @@ class TestBlockCacheDeduplication:
     def test_adding_same_block_twice_returns_existing(self, peer_id: PeerId) -> None:
         """Adding the same block twice returns the existing PendingBlock."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -224,7 +223,7 @@ class TestBlockCacheDeduplication:
     ) -> None:
         """Deduplication keeps the original peer, not the second sender."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -244,7 +243,7 @@ class TestBlockCacheOrphanTracking:
     def test_mark_orphan(self, peer_id: PeerId) -> None:
         """Marking a block as orphan adds it to the orphan set."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -259,7 +258,7 @@ class TestBlockCacheOrphanTracking:
     def test_mark_orphan_idempotent(self, peer_id: PeerId) -> None:
         """Marking the same block as orphan multiple times does not duplicate."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -283,7 +282,7 @@ class TestBlockCacheOrphanTracking:
     def test_unmark_orphan(self, peer_id: PeerId) -> None:
         """Unmarking an orphan removes it from the orphan set."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -308,7 +307,7 @@ class TestBlockCacheOrphanTracking:
     def test_remove_clears_orphan_status(self, peer_id: PeerId) -> None:
         """Removing a block also removes its orphan status."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -328,7 +327,7 @@ class TestBlockCacheOrphanTracking:
         """get_orphan_parents returns missing parent roots for orphans."""
         cache = BlockCache()
         parent_root = Bytes32(b"\x01" * 32)
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
@@ -349,13 +348,13 @@ class TestBlockCacheOrphanTracking:
         common_parent = Bytes32(b"\x01" * 32)
 
         # Two orphan blocks with the same missing parent
-        block1 = create_signed_block(
+        block1 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=common_parent,
             state_root=Bytes32.zero(),
         )
-        block2 = create_signed_block(
+        block2 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(1),
             parent_root=common_parent,
@@ -378,7 +377,7 @@ class TestBlockCacheOrphanTracking:
         cache = BlockCache()
 
         # Add a parent block
-        parent_block = create_signed_block(
+        parent_block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -387,7 +386,7 @@ class TestBlockCacheOrphanTracking:
         parent_pending = cache.add(parent_block, peer_id)
 
         # Add child block that references the cached parent
-        child_block = create_signed_block(
+        child_block = make_signed_block(
             slot=Slot(2),
             proposer_index=Uint64(0),
             parent_root=parent_pending.root,
@@ -417,7 +416,7 @@ class TestBlockCacheParentChildIndex:
         """get_children returns the single child of a parent."""
         cache = BlockCache()
         parent_root = Bytes32(b"\x01" * 32)
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
@@ -437,13 +436,13 @@ class TestBlockCacheParentChildIndex:
         parent_root = Bytes32(b"\x01" * 32)
 
         # Two blocks with the same parent (competing blocks)
-        block1 = create_signed_block(
+        block1 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
             state_root=Bytes32.zero(),
         )
-        block2 = create_signed_block(
+        block2 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(1),
             parent_root=parent_root,
@@ -466,19 +465,19 @@ class TestBlockCacheParentChildIndex:
         parent_root = Bytes32(b"\x01" * 32)
 
         # Add blocks out of order
-        block_slot3 = create_signed_block(
+        block_slot3 = make_signed_block(
             slot=Slot(3),
             proposer_index=Uint64(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x03" * 32),
         )
-        block_slot1 = create_signed_block(
+        block_slot1 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x01" * 32),
         )
-        block_slot2 = create_signed_block(
+        block_slot2 = make_signed_block(
             slot=Slot(2),
             proposer_index=Uint64(0),
             parent_root=parent_root,
@@ -500,7 +499,7 @@ class TestBlockCacheParentChildIndex:
         """Removing a block clears it from the parent-to-children index."""
         cache = BlockCache()
         parent_root = Bytes32(b"\x01" * 32)
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
@@ -524,7 +523,7 @@ class TestBlockCacheCapacityManagement:
 
         # Add more blocks than the limit
         for i in range(MAX_CACHED_BLOCKS + 10):
-            block = create_signed_block(
+            block = make_signed_block(
                 slot=Slot(i + 1),
                 proposer_index=Uint64(0),
                 parent_root=Bytes32(i.to_bytes(32, "big")),
@@ -541,7 +540,7 @@ class TestBlockCacheCapacityManagement:
         # Track the first blocks added
         first_roots = []
         for i in range(MAX_CACHED_BLOCKS):
-            block = create_signed_block(
+            block = make_signed_block(
                 slot=Slot(i + 1),
                 proposer_index=Uint64(0),
                 parent_root=Bytes32(i.to_bytes(32, "big")),
@@ -557,7 +556,7 @@ class TestBlockCacheCapacityManagement:
 
         # Add 10 more blocks to trigger eviction
         for i in range(10):
-            block = create_signed_block(
+            block = make_signed_block(
                 slot=Slot(MAX_CACHED_BLOCKS + i + 1),
                 proposer_index=Uint64(0),
                 parent_root=Bytes32((MAX_CACHED_BLOCKS + i).to_bytes(32, "big")),
@@ -576,7 +575,7 @@ class TestBlockCacheCapacityManagement:
         cache = BlockCache()
 
         # Add a block and mark it as orphan
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x01" * 32),
@@ -589,7 +588,7 @@ class TestBlockCacheCapacityManagement:
 
         # Fill cache to trigger eviction of the first block
         for i in range(MAX_CACHED_BLOCKS):
-            new_block = create_signed_block(
+            new_block = make_signed_block(
                 slot=Slot(i + 2),
                 proposer_index=Uint64(0),
                 parent_root=Bytes32((i + 1).to_bytes(32, "big")),
@@ -620,7 +619,7 @@ class TestBlockCacheProcessable:
         mock_store = MagicMock()
         mock_store.blocks = {}
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x01" * 32),
@@ -640,7 +639,7 @@ class TestBlockCacheProcessable:
         mock_store = MagicMock()
         mock_store.blocks = {parent_root: MagicMock()}
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
@@ -662,19 +661,19 @@ class TestBlockCacheProcessable:
         mock_store.blocks = {parent_root: MagicMock()}
 
         # Add blocks out of order
-        block3 = create_signed_block(
+        block3 = make_signed_block(
             slot=Slot(3),
             proposer_index=Uint64(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x03" * 32),
         )
-        block1 = create_signed_block(
+        block1 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x01" * 32),
         )
-        block2 = create_signed_block(
+        block2 = make_signed_block(
             slot=Slot(2),
             proposer_index=Uint64(0),
             parent_root=parent_root,
@@ -699,7 +698,7 @@ class TestBlockCacheBackfillDepth:
     def test_add_with_backfill_depth(self, peer_id: PeerId) -> None:
         """Adding a block with backfill depth tracks the depth."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -713,7 +712,7 @@ class TestBlockCacheBackfillDepth:
     def test_add_default_backfill_depth_is_zero(self, peer_id: PeerId) -> None:
         """Adding a block without backfill depth defaults to 0."""
         cache = BlockCache()
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),

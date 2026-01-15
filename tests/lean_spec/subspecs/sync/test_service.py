@@ -23,8 +23,7 @@ from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.sync.states import SyncState
 from lean_spec.types import Bytes32, Uint64
-
-from .conftest import create_signed_block
+from tests.lean_spec.helpers import make_signed_block
 
 
 class MockNetworkRequester:
@@ -142,7 +141,7 @@ class TestStateMachineTransitions:
         sync_service._state = SyncState.SYNCING
 
         # Add an orphan to the cache
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x01" * 32),
@@ -227,7 +226,7 @@ class TestGossipBlockHandling:
         """Gossip blocks are ignored when in IDLE state."""
         assert sync_service.state == SyncState.IDLE
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32.zero(),
@@ -251,7 +250,7 @@ class TestGossipBlockHandling:
         # Get genesis root from store
         genesis_root = sync_service.store.head
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=genesis_root,
@@ -272,7 +271,7 @@ class TestGossipBlockHandling:
         sync_service._state = SyncState.SYNCING
 
         # Block with unknown parent
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x01" * 32),
@@ -334,13 +333,13 @@ class TestProgressReporting:
     ) -> None:
         """Progress includes cache size and orphan count."""
         # Add blocks to cache
-        block1 = create_signed_block(
+        block1 = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32(b"\x01" * 32),
         )
-        block2 = create_signed_block(
+        block2 = make_signed_block(
             slot=Slot(2),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x02" * 32),
@@ -369,7 +368,7 @@ class TestReset:
         sync_service._state = SyncState.SYNCED
         sync_service._blocks_processed = 100
 
-        block = create_signed_block(
+        block = make_signed_block(
             slot=Slot(1),
             proposer_index=Uint64(0),
             parent_root=Bytes32(b"\x01" * 32),

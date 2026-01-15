@@ -24,14 +24,11 @@ from lean_spec.subspecs.containers.state import (
     Validators,
 )
 from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Bytes52, Uint64
 from lean_spec.types.validator import is_proposer
+from tests.lean_spec.helpers import make_mock_signature
 
 
 @pytest.fixture
@@ -120,32 +117,6 @@ def sample_store(config: Config, sample_state: State) -> Store:
     )
 
 
-def build_signed_attestation(
-    validator: Uint64,
-    slot: Slot,
-    head: Checkpoint,
-    source: Checkpoint,
-    target: Checkpoint,
-) -> SignedAttestation:
-    """Create a signed attestation with a zeroed signature."""
-
-    data = AttestationData(
-        slot=slot,
-        head=head,
-        target=target,
-        source=source,
-    )
-    return SignedAttestation(
-        validator_id=validator,
-        message=data,
-        signature=Signature(
-            path=HashTreeOpening(siblings=HashDigestList(data=[])),
-            rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-            hashes=HashDigestList(data=[]),
-        ),
-    )
-
-
 class TestBlockProduction:
     """Test validator block production functionality."""
 
@@ -180,19 +151,28 @@ class TestBlockProduction:
         head_block = sample_store.blocks[sample_store.head]
 
         # Add some attestations to the store
-        signed_5 = build_signed_attestation(
-            validator=Uint64(5),
+        head_checkpoint = Checkpoint(root=sample_store.head, slot=head_block.slot)
+        data_5 = AttestationData(
             slot=head_block.slot,
-            head=Checkpoint(root=sample_store.head, slot=head_block.slot),
-            source=sample_store.latest_justified,
+            head=head_checkpoint,
             target=sample_store.get_attestation_target(),
+            source=sample_store.latest_justified,
         )
-        signed_6 = build_signed_attestation(
-            validator=Uint64(6),
+        signed_5 = SignedAttestation(
+            validator_id=Uint64(5),
+            message=data_5,
+            signature=make_mock_signature(),
+        )
+        data_6 = AttestationData(
             slot=head_block.slot,
-            head=Checkpoint(root=sample_store.head, slot=head_block.slot),
-            source=sample_store.latest_justified,
+            head=head_checkpoint,
             target=sample_store.get_attestation_target(),
+            source=sample_store.latest_justified,
+        )
+        signed_6 = SignedAttestation(
+            validator_id=Uint64(6),
+            message=data_6,
+            signature=make_mock_signature(),
         )
         sample_store.latest_known_attestations[Uint64(5)] = signed_5.message
         sample_store.latest_known_attestations[Uint64(6)] = signed_6.message
@@ -282,12 +262,17 @@ class TestBlockProduction:
 
         # Add some attestations to test state computation
         head_block = sample_store.blocks[sample_store.head]
-        signed_7 = build_signed_attestation(
-            validator=Uint64(7),
+        head_checkpoint = Checkpoint(root=sample_store.head, slot=head_block.slot)
+        data_7 = AttestationData(
             slot=head_block.slot,
-            head=Checkpoint(root=sample_store.head, slot=head_block.slot),
-            source=sample_store.latest_justified,
+            head=head_checkpoint,
             target=sample_store.get_attestation_target(),
+            source=sample_store.latest_justified,
+        )
+        signed_7 = SignedAttestation(
+            validator_id=Uint64(7),
+            message=data_7,
+            signature=make_mock_signature(),
         )
         sample_store.latest_known_attestations[Uint64(7)] = signed_7.message
         sig_key_7 = SignatureKey(Uint64(7), signed_7.message.data_root_bytes())
