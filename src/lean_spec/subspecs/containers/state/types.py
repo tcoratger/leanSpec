@@ -69,7 +69,7 @@ class JustifiedSlots(BaseBitlist):
         self,
         finalized_slot: Slot,
         target_slot: Slot,
-        value: bool | Boolean,
+        value: Boolean,
     ) -> "JustifiedSlots":
         """
         Return a new bitfield with the justification status updated.
@@ -148,9 +148,7 @@ class JustifiedSlots(BaseBitlist):
         # Return a new instance with the extended data list.
         #
         # We extend the existing data with False values to bridge the gap.
-        return self.model_copy(
-            update={"data": list(self.data) + [Boolean(False)] * gap_size}
-        )
+        return self.model_copy(update={"data": list(self.data) + [Boolean(False)] * gap_size})
 
     def shift_window(self, delta: int) -> JustifiedSlots:
         """
