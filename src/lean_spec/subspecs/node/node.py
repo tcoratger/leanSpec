@@ -29,6 +29,7 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import NetworkEventSource, NetworkService
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
+from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.types import Bytes32, Uint64
 
 if TYPE_CHECKING:
@@ -71,6 +72,17 @@ class NodeConfig:
     Use \":memory:\" for in-memory database (testing only).
     """
 
+    validator_registry: ValidatorRegistry | None = field(default=None)
+    """
+    Optional validator registry with secret keys.
+
+    If provided, the node will participate in consensus by:
+    - Proposing blocks when scheduled
+    - Creating attestations every slot
+
+    If None, the node runs in passive mode (sync only).
+    """
+
 
 @dataclass(slots=True)
 class Node:
@@ -98,6 +110,9 @@ class Node:
 
     api_server: ApiServer | None = field(default=None)
     """Optional API server for checkpoint sync and status endpoints."""
+
+    validator_service: ValidatorService | None = field(default=None)
+    """Optional validator service for block/attestation production."""
 
     _shutdown: asyncio.Event = field(default_factory=asyncio.Event)
     """Event signaling shutdown request."""
@@ -195,6 +210,18 @@ class Node:
                 store_getter=lambda: sync_service.store,
             )
 
+        # Create validator service if registry provided.
+        #
+        # Validators need keys to sign blocks and attestations.
+        # Without a registry, the node runs in passive mode.
+        validator_service: ValidatorService | None = None
+        if config.validator_registry is not None:
+            validator_service = ValidatorService(
+                sync_service=sync_service,
+                clock=clock,
+                registry=config.validator_registry,
+            )
+
         return cls(
             store=store,
             clock=clock,
@@ -202,6 +229,7 @@ class Node:
             chain_service=chain_service,
             network_service=network_service,
             api_server=api_server,
+            validator_service=validator_service,
         )
 
     @staticmethod
@@ -297,6 +325,8 @@ class Node:
             tg.create_task(self.network_service.run())
             if self.api_server is not None:
                 tg.create_task(self.api_server.run())
+            if self.validator_service is not None:
+                tg.create_task(self.validator_service.run())
             tg.create_task(self._wait_shutdown())
 
     def _install_signal_handlers(self) -> None:
@@ -332,6 +362,8 @@ class Node:
         self.network_service.stop()
         if self.api_server is not None:
             self.api_server.stop()
+        if self.validator_service is not None:
+            self.validator_service.stop()
 
     def stop(self) -> None:
         """

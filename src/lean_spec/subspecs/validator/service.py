@@ -1,0 +1,377 @@
+"""
+Validator service for producing blocks and attestations.
+
+The Validator Problem
+---------------------
+Ethereum consensus requires active participation from validators.
+At specific intervals within each slot, validators must:
+
+- Interval 0: Propose blocks (if scheduled)
+- Interval 1: Create attestations
+
+This service drives validator duties by monitoring the slot clock
+and triggering production at the appropriate intervals.
+
+How It Works
+------------
+1. Sleep until next interval boundary
+2. Check if any validator we control has duties
+3. For interval 0: Check proposer schedule, produce block if our turn
+4. For interval 1: Produce attestations for all our validators
+5. Emit produced blocks/attestations via callbacks
+6. Repeat forever
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from lean_spec.subspecs.chain.clock import SlotClock
+from lean_spec.subspecs.chain.config import SECONDS_PER_INTERVAL
+from lean_spec.subspecs.containers import (
+    Attestation,
+    AttestationData,
+    Block,
+    SignedAttestation,
+    SignedBlockWithAttestation,
+)
+from lean_spec.subspecs.containers.block import (
+    AttestationSignatures,
+    BlockSignatures,
+    BlockWithAttestation,
+)
+from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
+from lean_spec.types import Uint64
+from lean_spec.types.validator import is_proposer
+
+from .registry import ValidatorRegistry
+
+if TYPE_CHECKING:
+    from lean_spec.subspecs.sync import SyncService
+
+
+# Callback types for publishing produced blocks and attestations.
+BlockPublisher = Callable[[SignedBlockWithAttestation], Awaitable[None]]
+"""Callback for publishing produced blocks."""
+AttestationPublisher = Callable[[SignedAttestation], Awaitable[None]]
+"""Callback for publishing produced attestations."""
+
+
+async def _noop_block_publisher(block: SignedBlockWithAttestation) -> None:  # noqa: ARG001
+    """Default no-op block publisher."""
+
+
+async def _noop_attestation_publisher(attestation: SignedAttestation) -> None:  # noqa: ARG001
+    """Default no-op attestation publisher."""
+
+
+@dataclass(slots=True)
+class ValidatorService:
+    """
+    Drives validator duties based on the slot clock.
+
+    The service:
+        - monitors interval boundaries
+        - triggers block production or attestation creation when our validators are scheduled.
+    """
+
+    sync_service: SyncService
+    """Sync service providing access to the forkchoice store."""
+
+    clock: SlotClock
+    """Slot clock for time calculation."""
+
+    registry: ValidatorRegistry
+    """Registry of validators we control."""
+
+    on_block: BlockPublisher = field(default=_noop_block_publisher)
+    """Callback invoked when a block is produced."""
+
+    on_attestation: AttestationPublisher = field(default=_noop_attestation_publisher)
+    """Callback invoked when an attestation is produced."""
+
+    _running: bool = field(default=False, repr=False)
+    """Whether the service is running."""
+
+    _blocks_produced: int = field(default=0, repr=False)
+    """Counter for produced blocks."""
+
+    _attestations_produced: int = field(default=0, repr=False)
+    """Counter for produced attestations."""
+
+    async def run(self) -> None:
+        """
+        Main loop - check duties every interval.
+
+        The loop:
+        1. Sleeps until the next interval boundary
+        2. Checks current interval within the slot
+        3. Triggers appropriate duties
+        4. Repeats until stopped
+        """
+        self._running = True
+
+        while self._running:
+            # Sleep until next interval boundary for precise timing.
+            await self._sleep_until_next_interval()
+
+            # Skip if we have no validators to manage.
+            if len(self.registry) == 0:
+                continue
+
+            # Get current slot and interval.
+            #
+            # Interval determines which duty type to check:
+            # - Interval 0: Block production
+            # - Interval 1: Attestation production
+            slot = self.clock.current_slot()
+            interval = self.clock.current_interval()
+
+            if interval == 0:
+                # Block production interval.
+                #
+                # Check if any of our validators is the proposer.
+                await self._maybe_produce_block(slot)
+
+            elif interval == 1:
+                # Attestation interval.
+                #
+                # All validators should attest to current head.
+                await self._produce_attestations(slot)
+
+    async def _maybe_produce_block(self, slot: Slot) -> None:
+        """
+        Produce a block if we are the proposer for this slot.
+
+        Checks the proposer schedule against our validator registry.
+        If one of our validators should propose, produces and emits the block.
+
+        Args:
+            slot: Current slot number.
+        """
+        store = self.sync_service.store
+        head_state = store.states.get(store.head)
+        if head_state is None:
+            return
+
+        num_validators = Uint64(len(head_state.validators))
+
+        # Check each validator we control.
+        #
+        # Only one validator can be the proposer per slot.
+        for validator_index in self.registry.indices():
+            if not is_proposer(validator_index, slot, num_validators):
+                continue
+
+            # We are the proposer.
+            #
+            # Produce the block using Store's production method.
+            try:
+                new_store, block, signatures = store.produce_block_with_signatures(
+                    slot=slot,
+                    validator_index=validator_index,
+                )
+
+                # Update the store through sync service.
+                #
+                # This ensures the block is integrated into forkchoice.
+                self.sync_service.store = new_store
+
+                # Create signed block wrapper for publishing.
+                signed_block = self._sign_block(block, validator_index, signatures)
+                self._blocks_produced += 1
+
+                # Emit the block for network propagation.
+                await self.on_block(signed_block)
+
+            except AssertionError:
+                # Proposer validation failed.
+                #
+                # This can happen during slot boundary transitions.
+                pass
+
+            # Only one proposer per slot.
+            break
+
+    async def _produce_attestations(self, slot: Slot) -> None:
+        """
+        Produce attestations for all validators we control.
+
+        Every validator should attest once per slot.
+
+        Args:
+            slot: Current slot number.
+        """
+        store = self.sync_service.store
+
+        for validator_index in self.registry.indices():
+            # Produce attestation data using Store's method.
+            #
+            # This calculates head, target, and source checkpoints.
+            attestation_data = store.produce_attestation_data(slot)
+
+            # Sign the attestation using our secret key.
+            signed_attestation = self._sign_attestation(attestation_data, validator_index)
+            self._attestations_produced += 1
+
+            # Emit the attestation for network propagation.
+            await self.on_attestation(signed_attestation)
+
+    def _sign_block(
+        self,
+        block: Block,
+        validator_index: Uint64,
+        attestation_signatures: list,
+    ) -> SignedBlockWithAttestation:
+        """
+        Sign a block and wrap it for publishing.
+
+        Creates the proposer attestation, signs it, and wraps everything
+        in SignedBlockWithAttestation.
+
+        Args:
+            block: The block to sign.
+            validator_index: Index of the proposing validator.
+            attestation_signatures: Aggregated signatures for included attestations.
+
+        Returns:
+            Signed block ready for publishing.
+        """
+        store = self.sync_service.store
+
+        # Create the proposer's attestation for this slot.
+        #
+        # The proposer also attests to the chain head they see.
+        proposer_attestation_data = store.produce_attestation_data(block.slot)
+        proposer_attestation = Attestation(
+            validator_id=validator_index,
+            data=proposer_attestation_data,
+        )
+
+        # Sign the proposer's attestation.
+        #
+        # Uses XMSS signature scheme from the validator's secret key.
+        entry = self.registry.get(validator_index)
+        if entry is None:
+            raise ValueError(f"No secret key for validator {validator_index}")
+
+        message_bytes = proposer_attestation_data.data_root_bytes()
+        proposer_signature = TARGET_SIGNATURE_SCHEME.sign(
+            entry.secret_key,
+            block.slot,
+            bytes(message_bytes),
+        )
+
+        # Create the message wrapper.
+        #
+        # Bundles the block with the proposer's attestation.
+        message = BlockWithAttestation(
+            block=block,
+            proposer_attestation=proposer_attestation,
+        )
+
+        # Create the signature payload.
+        #
+        # Contains signatures for all included attestations plus the proposer's.
+        signature = BlockSignatures(
+            attestation_signatures=AttestationSignatures(data=attestation_signatures),
+            proposer_signature=proposer_signature,
+        )
+
+        return SignedBlockWithAttestation(
+            message=message,
+            signature=signature,
+        )
+
+    def _sign_attestation(
+        self,
+        attestation_data: AttestationData,
+        validator_index: Uint64,
+    ) -> SignedAttestation:
+        """
+        Sign an attestation for publishing.
+
+        Uses XMSS signature scheme with the validator's secret key.
+
+        Args:
+            attestation_data: The attestation data to sign.
+            validator_index: Index of the attesting validator.
+
+        Returns:
+            Signed attestation ready for publishing.
+        """
+        # Get the secret key for this validator.
+        entry = self.registry.get(validator_index)
+        if entry is None:
+            raise ValueError(f"No secret key for validator {validator_index}")
+
+        # Sign the attestation data root.
+        #
+        # Uses XMSS one-time signature for the current epoch (slot).
+        message_bytes = attestation_data.data_root_bytes()
+        signature = TARGET_SIGNATURE_SCHEME.sign(
+            entry.secret_key,
+            attestation_data.slot,
+            bytes(message_bytes),
+        )
+
+        return SignedAttestation(
+            validator_id=validator_index,
+            message=attestation_data,
+            signature=signature,
+        )
+
+    async def _sleep_until_next_interval(self) -> None:
+        """
+        Sleep until the next interval boundary.
+
+        Calculates the precise sleep duration to wake up at the start
+        of the next interval.
+        """
+        now = self.clock._time_fn()
+        genesis = int(self.clock.genesis_time)
+
+        elapsed = now - genesis
+
+        if elapsed < 0:
+            # Before genesis - sleep until genesis.
+            await asyncio.sleep(-elapsed)
+            return
+
+        # Current interval number.
+        current_interval = int(elapsed // int(SECONDS_PER_INTERVAL))
+
+        # Next interval boundary.
+        next_boundary = genesis + (current_interval + 1) * int(SECONDS_PER_INTERVAL)
+
+        # Sleep until boundary.
+        sleep_time = max(0.0, next_boundary - now)
+        await asyncio.sleep(sleep_time)
+
+    def stop(self) -> None:
+        """
+        Stop the service.
+
+        Sets the running flag to False, causing the run() loop to exit
+        after completing its current sleep cycle.
+        """
+        self._running = False
+
+    @property
+    def is_running(self) -> bool:
+        """Check if the service is currently running."""
+        return self._running
+
+    @property
+    def blocks_produced(self) -> int:
+        """Total blocks produced since creation."""
+        return self._blocks_produced
+
+    @property
+    def attestations_produced(self) -> int:
+        """Total attestations produced since creation."""
+        return self._attestations_produced
