@@ -85,8 +85,13 @@ class MockStore:
         self._head_slot = head_slot
         self.head = Bytes32.zero()
         self.blocks: dict[Bytes32, Any] = {}
+        self.states: dict[Bytes32, Any] = {}
         self._attestations_received: list[SignedAttestation] = []
         self._setup_genesis()
+
+        # Required by metrics in the sync service
+        self.latest_justified = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
+        self.latest_finalized = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
 
     def _setup_genesis(self) -> None:
         """Set up genesis block in the store."""
@@ -100,6 +105,7 @@ class MockStore:
         """Process a block: add to blocks dict and update head."""
         new_store = MockStore(int(block.message.block.slot))
         new_store.blocks = dict(self.blocks)
+        new_store.states = dict(self.states)
         new_store._attestations_received = list(self._attestations_received)
         root = hash_tree_root(block.message.block)
         new_store.blocks[root] = block.message.block
@@ -110,6 +116,7 @@ class MockStore:
         """Process an attestation: track it for verification."""
         new_store = MockStore(self._head_slot)
         new_store.blocks = dict(self.blocks)
+        new_store.states = dict(self.states)
         new_store.head = self.head
         new_store._attestations_received = list(self._attestations_received)
         new_store._attestations_received.append(attestation)
