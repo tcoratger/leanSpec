@@ -292,25 +292,19 @@ class State(Container):
 
         # Update the list of justified slot flags.
         #
-        # Structure: [Existing flags] + [Is genesis parent?] + [False for gaps]
+        # IMPORTANT: This list is stored relative to the finalized boundary.
         #
-        # We construct the new history list by concatenating three segments:
+        # The first entry corresponds to the slot immediately following the
+        # latest finalized checkpoint.
         #
-        # 1. The existing history:
-        #    We preserve the flags for all previously processed blocks.
-        #
-        # 2. The parent block status (one entry):
-        #    We append the status of the block immediately preceding any gaps.
-        #    - If Genesis: True (Justified by definition).
-        #    - If Normal: False (Pending). It remains unjustified until validators
-        #      vote for it later in the process.
-        #
-        # 3. The skipped slots status (multiple entries):
-        #    We append False for every empty slot between the parent and the
-        #    current block. Since no blocks exist there, they are permanently
-        #    unjustified.
-        new_justified_slots_data = (
-            self.justified_slots + [Boolean(is_genesis_parent)] + [Boolean(False)] * num_empty_slots
+        # Here, we extend the storage capacity to ensure the range from the
+        # finalized boundary up to the last materialized slot is fully tracked
+        # and addressable. The current block's slot is not materialized until
+        # its header is fully processed, so we stop at slot (block.slot - 1).
+        last_materialized_slot = block.slot - Slot(1)
+        new_justified_slots_data = self.justified_slots.extend_to_slot(
+            self.latest_finalized.slot,
+            last_materialized_slot,
         )
 
         # Construct the new latest block header.
@@ -424,7 +418,16 @@ class State(Container):
         # Track state changes to be applied at the end
         latest_justified = self.latest_justified
         latest_finalized = self.latest_finalized
+        finalized_slot = latest_finalized.slot
         justified_slots = self.justified_slots
+
+        # Map roots to their slots for pruning when finalization advances.
+        # Only track roots after the finalized boundary; earlier roots are pruned.
+        start_slot = int(finalized_slot) + 1
+        root_to_slot = {
+            self.historical_block_hashes[i]: Slot(i)
+            for i in range(start_slot, len(self.historical_block_hashes))
+        }
 
         # Process each attestation independently
         #
@@ -441,14 +444,14 @@ class State(Container):
             #
             # A vote may only originate from a point in history that is already justified.
             # A source that lacks existing justification cannot be used to anchor a new vote.
-            if not justified_slots[source.slot]:
+            if not justified_slots.is_slot_justified(finalized_slot, source.slot):
                 continue
 
             # Ignore votes for targets that have already reached consensus
             #
             # If a block is already justified, additional votes do not change anything.
             # We simply skip them.
-            if justified_slots[target.slot]:
+            if justified_slots.is_slot_justified(finalized_slot, target.slot):
                 continue
 
             # Ensure the vote refers to blocks that actually exist on our chain
@@ -517,7 +520,11 @@ class State(Container):
                 #
                 # The chain now considers this block part of its safe head.
                 latest_justified = target
-                justified_slots[target.slot] = True
+                justified_slots = justified_slots.with_justified(
+                    finalized_slot,
+                    target.slot,
+                    True,
+                )
 
                 # There is no longer any need to track individual votes for this block.
                 del justifications[target.root]
@@ -537,7 +544,24 @@ class State(Container):
                     Slot(slot).is_justifiable_after(self.latest_finalized.slot)
                     for slot in range(source.slot + Slot(1), target.slot)
                 ):
+                    old_finalized_slot = finalized_slot
                     latest_finalized = source
+                    finalized_slot = latest_finalized.slot
+
+                    # Rebase/prune justification tracking across the new finalized boundary.
+                    #
+                    # The state stores `justified_slots` starting at (finalized_slot + 1),
+                    # so when finalization advances by `delta`, we drop the first `delta` bits.
+                    #
+                    # We also prune any pending `justifications` whose slots are now finalized.
+                    delta = int(finalized_slot - old_finalized_slot)
+                    if delta > 0:
+                        justified_slots = justified_slots.shift_window(delta)
+                        justifications = {
+                            root: votes
+                            for root, votes in justifications.items()
+                            if root_to_slot.get(root, Slot(0)) > finalized_slot
+                        }
 
         # Convert the vote structure back into SSZ format
         #
