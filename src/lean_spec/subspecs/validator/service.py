@@ -29,6 +29,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.chain.config import SECONDS_PER_INTERVAL
 from lean_spec.subspecs.containers import (
@@ -184,6 +185,7 @@ class ValidatorService:
                 # Create signed block wrapper for publishing.
                 signed_block = self._sign_block(block, validator_index, signatures)
                 self._blocks_produced += 1
+                metrics.blocks_proposed.inc()
 
                 # Emit the block for network propagation.
                 await self.on_block(signed_block)
@@ -217,6 +219,7 @@ class ValidatorService:
             # Sign the attestation using our secret key.
             signed_attestation = self._sign_attestation(attestation_data, validator_index)
             self._attestations_produced += 1
+            metrics.attestations_produced.inc()
 
             # Emit the attestation for network propagation.
             await self.on_attestation(signed_attestation)
