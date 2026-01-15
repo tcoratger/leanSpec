@@ -523,7 +523,7 @@ class State(Container):
                 justified_slots = justified_slots.with_justified(
                     finalized_slot,
                     target.slot,
-                    True,
+                    Boolean(True),
                 )
 
                 # There is no longer any need to track individual votes for this block.

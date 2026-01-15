@@ -27,7 +27,7 @@ class JustifiedSlots(BaseBitlist):
 
     LIMIT = int(DEVNET_CONFIG.historical_roots_limit)
 
-    def is_slot_justified(self, finalized_slot: Slot, target_slot: Slot) -> bool:
+    def is_slot_justified(self, finalized_slot: Slot, target_slot: Slot) -> Boolean:
         """
         Determine if a specific slot is considered justified.
 
@@ -50,7 +50,7 @@ class JustifiedSlots(BaseBitlist):
         # If the result is None, the slot is behind the finalized boundary.
         # By definition, finalized slots are justified.
         if (relative_index := target_slot.justified_index_after(finalized_slot)) is None:
-            return True
+            return Boolean(True)
 
         # Check the tracked bitfield for the slot's status.
         #
@@ -58,7 +58,7 @@ class JustifiedSlots(BaseBitlist):
         #
         # If the caller asks for a slot too far in the future, it indicates a logic error.
         try:
-            return bool(self[relative_index])
+            return self[relative_index]
         except IndexError as e:
             raise IndexError(
                 f"Slot {target_slot} is outside the tracked range "
@@ -69,7 +69,7 @@ class JustifiedSlots(BaseBitlist):
         self,
         finalized_slot: Slot,
         target_slot: Slot,
-        value: bool | Boolean,
+        value: Boolean,
     ) -> "JustifiedSlots":
         """
         Return a new bitfield with the justification status updated.
@@ -148,9 +148,7 @@ class JustifiedSlots(BaseBitlist):
         # Return a new instance with the extended data list.
         #
         # We extend the existing data with False values to bridge the gap.
-        return self.model_copy(
-            update={"data": list(self.data) + [Boolean(False)] * gap_size}
-        )
+        return self.model_copy(update={"data": list(self.data) + [Boolean(False)] * gap_size})
 
     def shift_window(self, delta: int) -> JustifiedSlots:
         """
