@@ -21,6 +21,7 @@ class MockEventSource:
         """Initialize with optional list of events."""
         self._events = events or []
         self._index = 0
+        self._published: list[tuple[str, bytes]] = []
 
     def __aiter__(self) -> MockEventSource:
         """Return self as async iterator."""
@@ -33,6 +34,10 @@ class MockEventSource:
         event = self._events[self._index]
         self._index += 1
         return event
+
+    async def publish(self, topic: str, data: bytes) -> None:
+        """Mock publish - records published messages for testing."""
+        self._published.append((topic, data))
 
 
 class MockNetworkRequester:

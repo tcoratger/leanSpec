@@ -13,6 +13,9 @@ from .exceptions import (
     SSZTypeError,
     SSZValueError,
 )
+from .rlp import RLPDecodingError, RLPItem
+from .rlp import decode as rlp_decode
+from .rlp import encode as rlp_encode
 from .ssz_base import SSZType
 from .uint import Uint64
 from .validator import is_proposer
@@ -37,6 +40,11 @@ __all__ = [
     "SSZType",
     "Boolean",
     "Container",
+    # RLP encoding/decoding
+    "rlp_encode",
+    "rlp_decode",
+    "RLPItem",
+    "RLPDecodingError",
     # Exceptions
     "SSZError",
     "SSZTypeError",

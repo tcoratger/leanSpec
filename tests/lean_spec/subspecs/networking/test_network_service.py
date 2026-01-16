@@ -44,6 +44,7 @@ class MockEventSource:
 
     events: list[NetworkEvent] = field(default_factory=list)
     _index: int = field(default=0, init=False)
+    _published: list[tuple[str, bytes]] = field(default_factory=list, init=False)
 
     def __aiter__(self) -> "MockEventSource":
         return self
@@ -55,6 +56,10 @@ class MockEventSource:
         self._index += 1
         await asyncio.sleep(0)
         return event
+
+    async def publish(self, topic: str, data: bytes) -> None:
+        """Mock publish - records published messages for testing."""
+        self._published.append((topic, data))
 
 
 @dataclass

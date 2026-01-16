@@ -214,12 +214,16 @@ class Node:
         #
         # Validators need keys to sign blocks and attestations.
         # Without a registry, the node runs in passive mode.
+        #
+        # Wire callbacks to publish produced blocks/attestations to the network.
         validator_service: ValidatorService | None = None
         if config.validator_registry is not None:
             validator_service = ValidatorService(
                 sync_service=sync_service,
                 clock=clock,
                 registry=config.validator_registry,
+                on_block=network_service.publish_block,
+                on_attestation=network_service.publish_attestation,
             )
 
         return cls(

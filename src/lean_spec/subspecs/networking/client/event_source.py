@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
+from lean_spec.subspecs.networking.config import GOSSIPSUB_DEFAULT_PROTOCOL_ID
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.service.events import (
@@ -36,6 +37,7 @@ from lean_spec.subspecs.networking.transport.connection.manager import (
     ConnectionManager,
     YamuxConnection,
 )
+from lean_spec.subspecs.networking.varint import encode as encode_varint
 
 from .reqresp_client import ReqRespClient
 
@@ -56,20 +58,7 @@ class LiveNetworkEventSource:
     - Accept incoming connections and emit PeerConnectedEvent
     - Dial outbound connections and emit PeerConnectedEvent
     - Exchange Status messages and emit PeerStatusEvent
-    - (Future) Handle gossip messages and emit GossipBlockEvent/GossipAttestationEvent
-
-    Usage
-    -----
-    ::
-
-        event_source = LiveNetworkEventSource.create(connection_manager)
-
-        # Dial bootnodes
-        await event_source.dial("/ip4/127.0.0.1/tcp/9000")
-
-        # Consume events
-        async for event in event_source:
-            await handle_event(event)
+    - Publish locally-produced blocks and attestations to the gossip network
     """
 
     connection_manager: ConnectionManager
@@ -309,3 +298,62 @@ class LiveNetworkEventSource:
         await self._events.put(
             GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic)
         )
+
+    # =========================================================================
+    # Outbound Publishing
+    # =========================================================================
+
+    async def publish(self, topic: str, data: bytes) -> None:
+        """
+        Broadcast a message to all connected peers on a topic.
+
+        Used by NetworkService to publish locally-produced blocks and
+        attestations to the gossip network.
+
+        Args:
+            topic: Gossip topic string.
+            data: Compressed message bytes (SSZ + Snappy).
+        """
+        if not self._connections:
+            logger.debug("No peers connected, cannot publish to %s", topic)
+            return
+
+        for peer_id, conn in list(self._connections.items()):
+            try:
+                await self._send_gossip_message(conn, topic, data)
+            except Exception as e:
+                logger.warning("Failed to publish to peer %s: %s", peer_id, e)
+
+    async def _send_gossip_message(
+        self,
+        conn: YamuxConnection,
+        topic: str,
+        data: bytes,
+    ) -> None:
+        """
+        Send a gossip message to a peer.
+
+        Opens a new stream for the gossip message and sends the data.
+
+        Args:
+            conn: Connection to the peer.
+            topic: Topic string for the message.
+            data: Message bytes to send.
+        """
+        # Open a new outbound stream for gossip protocol.
+        stream = await conn.open_stream(GOSSIPSUB_DEFAULT_PROTOCOL_ID)
+
+        try:
+            # Format: topic length (varint) + topic + data length (varint) + data
+            topic_bytes = topic.encode("utf-8")
+
+            # Write topic length and topic.
+            await stream.write(encode_varint(len(topic_bytes)))
+            await stream.write(topic_bytes)
+
+            # Write data length and data.
+            await stream.write(encode_varint(len(data)))
+            await stream.write(data)
+
+        finally:
+            await stream.close()
