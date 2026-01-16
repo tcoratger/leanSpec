@@ -21,10 +21,6 @@ from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.rlp import encode as rlp_encode
 from tests.lean_spec.helpers import make_genesis_state
 
-# =============================================================================
-# Test Data
-# =============================================================================
-
 
 # Valid ENR with IPv4 and TCP port (derived from EIP-778 test vector structure)
 # This ENR has: ip=192.168.1.1, tcp=9000
