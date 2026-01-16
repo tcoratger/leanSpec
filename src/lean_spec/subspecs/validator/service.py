@@ -27,7 +27,7 @@ This design has two benefits:
 
 The proposer's attestation is embedded in `BlockWithAttestation` alongside
 the block itself. At interval 1, we skip proposers because they already
-attested. This prevents double-attestation and matches the ream/zeam design.
+attested. This prevents double-attestation.
 
 How It Works
 ------------
@@ -234,11 +234,6 @@ class ValidatorService:
         Every validator attests exactly once per slot. Since proposers already
         bundled their attestation inside the block at interval 0, they are
         skipped here to prevent double-attestation.
-
-        This design matches ream/zeam implementations where:
-
-        - Proposer attestation travels inside BlockWithAttestation
-        - Non-proposer attestations are broadcast at interval 1
 
         Args:
             slot: Current slot number.
