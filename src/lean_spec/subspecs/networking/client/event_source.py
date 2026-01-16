@@ -263,10 +263,6 @@ class LiveNetworkEventSource:
         """Stop the event source."""
         self._running = False
 
-    # =========================================================================
-    # Gossip Message Handling (placeholder for future implementation)
-    # =========================================================================
-
     async def _emit_gossip_block(
         self,
         block: SignedBlockWithAttestation,
@@ -298,10 +294,6 @@ class LiveNetworkEventSource:
         await self._events.put(
             GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic)
         )
-
-    # =========================================================================
-    # Outbound Publishing
-    # =========================================================================
 
     async def publish(self, topic: str, data: bytes) -> None:
         """

@@ -228,10 +228,6 @@ class ENR(StrictBaseModel):
             parts.append(f"fork={eth2.fork_digest.hex()}")
         return ", ".join(parts) + ")"
 
-    # =========================================================================
-    # Parsing
-    # =========================================================================
-
     @classmethod
     def from_string(cls, enr_text: str) -> Self:
         """

@@ -50,10 +50,6 @@ Either:
 """
 
 
-# =============================================================================
-# Constants
-# =============================================================================
-
 SINGLE_BYTE_MAX = 0x7F
 """Boundary between single-byte encoding [0x00-0x7f] and string prefix."""
 
@@ -74,11 +70,6 @@ SHORT_LIST_MAX_LEN = 55
 
 LONG_LIST_BASE = 0xF7
 """Base for long list prefix. Final prefix = 0xf7 + length_of_length."""
-
-
-# =============================================================================
-# Encoding
-# =============================================================================
 
 
 def encode(item: RLPItem) -> bytes:
@@ -156,11 +147,6 @@ def _encode_length(value: int) -> bytes:
         # Defensive: should never be called with 0 for valid long encodings.
         return b""
     return value.to_bytes((value.bit_length() + 7) // 8, "big")
-
-
-# =============================================================================
-# Decoding
-# =============================================================================
 
 
 class RLPDecodingError(Exception):
