@@ -226,7 +226,6 @@ def test_three_block_deep_reorg(
     Reorg Details:
         - **Depth**: 3 blocks (deepest in this test suite)
         - **Trigger**: Alternative fork becomes longer
-        - **Weight advantage**: 4 proposer attestations vs 3
 
     Why This Matters
     ----------------
@@ -245,6 +244,7 @@ def test_three_block_deep_reorg(
     about chain history, ensuring safety and liveness even in adversarial scenarios.
     """
     fork_choice_test(
+        anchor_state=generate_pre_state(num_validators=6),
         steps=[
             # Common base
             BlockStep(
@@ -656,13 +656,13 @@ def test_back_and_forth_reorg_oscillation(
     tests fork choice correctness under extreme conditions.
 
     Oscillation Pattern:
-        Slot 2: Fork A leads (1 block) ← head
-        Slot 3: Fork B catches up (1 block each) → tie
-        Slot 4: Fork B extends (2 vs 1) ← head switches to B
-        Slot 5: Fork A extends (2 vs 2) → tie
-        Slot 6: Fork A extends (3 vs 2) ← head switches to A
-        Slot 7: Fork B extends (3 vs 3) → tie
-        Slot 8: Fork B extends (4 vs 3) ← head switches to B
+        Slot 2: Fork A leads (1 vs 0) ← head
+        Slot 2: Fork B created (1 vs 1) → tie, A maintains
+        Slot 3: Fork B extends (2 vs 1) ← head switches to B (REORG #1)
+        Slot 3: Fork A extends (2 vs 2) → tie, B maintains
+        Slot 4: Fork A extends (3 vs 2) ← head switches to A (REORG #2)
+        Slot 4: Fork B extends (3 vs 3) → tie, A maintains
+        Slot 5: Fork B extends (4 vs 3) ← head switches to B (REORG #3)
 
     Expected Behavior
     -----------------
@@ -671,7 +671,7 @@ def test_back_and_forth_reorg_oscillation(
     3. All reorgs are 1-2 blocks deep
     4. Fork choice remains consistent and correct throughout
 
-    Reorg Count: 3 reorgs in 6 slots (very high rate)
+    Reorg Count: 3 reorgs in 4 slots (very high rate)
 
     Why This Matters
     ----------------
@@ -694,6 +694,7 @@ def test_back_and_forth_reorg_oscillation(
     convergence.
     """
     fork_choice_test(
+        anchor_state=generate_pre_state(num_validators=6),
         steps=[
             # Common base
             BlockStep(
