@@ -12,12 +12,29 @@ At specific intervals within each slot, validators must:
 This service drives validator duties by monitoring the slot clock
 and triggering production at the appropriate intervals.
 
+Proposer Attestation Design
+---------------------------
+Each validator attests exactly once per slot. However, proposers and
+non-proposers attest at different times:
+
+- Proposers attest at interval 0, bundled inside their block
+- Non-proposers attest at interval 1, broadcast separately
+
+This design has two benefits:
+
+1. Proposers see their own attestation immediately (no network delay)
+2. Non-proposers can attest to a block they actually received
+
+The proposer's attestation is embedded in `BlockWithAttestation` alongside
+the block itself. At interval 1, we skip proposers because they already
+attested. This prevents double-attestation.
+
 How It Works
 ------------
 1. Sleep until next interval boundary
 2. Check if any validator we control has duties
 3. For interval 0: Check proposer schedule, produce block if our turn
-4. For interval 1: Produce attestations for all our validators
+4. For interval 1: Produce attestations for all non-proposer validators
 5. Emit produced blocks/attestations via callbacks
 6. Repeat forever
 """
@@ -151,6 +168,10 @@ class ValidatorService:
         Checks the proposer schedule against our validator registry.
         If one of our validators should propose, produces and emits the block.
 
+        The proposer's attestation is bundled into the block rather than
+        broadcast separately at interval 1. This ensures the proposer's vote
+        is included without network round-trip delays.
+
         Args:
             slot: Current slot number.
         """
@@ -168,9 +189,14 @@ class ValidatorService:
             if not is_proposer(validator_index, slot, num_validators):
                 continue
 
-            # We are the proposer.
+            # We are the proposer for this slot.
             #
-            # Produce the block using Store's production method.
+            # Block production includes two steps:
+            # 1. Create the block with aggregated attestations from the pool
+            # 2. Sign and bundle our own attestation into BlockWithAttestation
+            #
+            # Our attestation goes in the block envelope, not the body.
+            # This separates "attestations we're including" from "our own vote".
             try:
                 new_store, block, signatures = store.produce_block_with_signatures(
                     slot=slot,
@@ -183,6 +209,8 @@ class ValidatorService:
                 self.sync_service.store = new_store
 
                 # Create signed block wrapper for publishing.
+                #
+                # This adds our attestation and signatures to the block.
                 signed_block = self._sign_block(block, validator_index, signatures)
                 self._blocks_produced += 1
                 metrics.blocks_proposed.inc()
@@ -201,16 +229,31 @@ class ValidatorService:
 
     async def _produce_attestations(self, slot: Slot) -> None:
         """
-        Produce attestations for all validators we control.
+        Produce attestations for all non-proposer validators we control.
 
-        Every validator should attest once per slot.
+        Every validator attests exactly once per slot. Since proposers already
+        bundled their attestation inside the block at interval 0, they are
+        skipped here to prevent double-attestation.
 
         Args:
             slot: Current slot number.
         """
         store = self.sync_service.store
+        head_state = store.states.get(store.head)
+        if head_state is None:
+            return
+
+        num_validators = Uint64(len(head_state.validators))
 
         for validator_index in self.registry.indices():
+            # Skip proposer - they already attested within their block.
+            #
+            # The proposer signed and bundled their attestation at interval 0.
+            # Creating another attestation here would violate the
+            # "one attestation per validator per slot" invariant.
+            if is_proposer(validator_index, slot, num_validators):
+                continue
+
             # Produce attestation data using Store's method.
             #
             # This calculates head, target, and source checkpoints.

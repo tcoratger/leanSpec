@@ -210,6 +210,23 @@ class YamuxConnection:
 
         return yamux_stream
 
+    async def accept_stream(self) -> Stream:
+        """
+        Accept an incoming stream from the peer.
+
+        Blocks until a new stream is opened by the remote side.
+
+        Returns:
+            New stream opened by peer.
+
+        Raises:
+            TransportConnectionError: If connection is closed.
+        """
+        if self._closed:
+            raise TransportConnectionError("Connection is closed")
+
+        return await self._yamux.accept_stream()
+
     async def close(self) -> None:
         """Close the connection gracefully."""
         if self._closed:
