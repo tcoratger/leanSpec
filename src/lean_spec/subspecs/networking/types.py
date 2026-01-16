@@ -8,9 +8,10 @@ from lean_spec.types.byte_arrays import Bytes1, Bytes4, Bytes32
 DomainType = Bytes1
 """1-byte domain for message-id isolation in Gossipsub.
 
-Per Ethereum spec, the domain is a single byte prepended to the message
-hash to compute the gossip message ID. Valid messages use 0x01, invalid
-use 0x00.
+The domain is a single byte prepended to the message hash to compute the gossip message ID.
+
+- Valid messages use 0x01,
+- Invalid messages use 0x00.
 """
 
 NodeId = Bytes32
