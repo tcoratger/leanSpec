@@ -60,6 +60,7 @@ References:
 from __future__ import annotations
 
 from lean_spec.subspecs.chain.config import DEVNET_CONFIG
+from lean_spec.subspecs.networking.config import GOSSIPSUB_DEFAULT_PROTOCOL_ID
 from lean_spec.types import StrictBaseModel
 
 
@@ -71,7 +72,7 @@ class GossipsubParameters(StrictBaseModel):
     Default values follow the Ethereum consensus P2P specification.
     """
 
-    protocol_id: str = "/meshsub/1.3.0"
+    protocol_id: str = GOSSIPSUB_DEFAULT_PROTOCOL_ID
     """The protocol ID for gossip messages."""
 
     # -------------------------------------------------------------------------
