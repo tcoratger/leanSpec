@@ -23,6 +23,7 @@ from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.types import Uint64
+from lean_spec.types.validator import is_proposer
 
 
 class MockNetworkRequester(NetworkRequester):
@@ -274,3 +275,186 @@ class TestIntervalSleep:
         expected = float(genesis) - current_time  # 100 seconds
         assert captured_duration is not None
         assert abs(captured_duration - expected) < 0.001
+
+
+class TestProposerSkipping:
+    """Tests for proposer skipping during attestation production."""
+
+    def test_proposer_skipped_in_attestation_production(
+        self,
+        sync_service: SyncService,
+    ) -> None:
+        """Proposer is skipped when producing attestations at interval 1.
+
+        At slot 0, validator 0 is the proposer (0 % 3 == 0).
+        When controlling validators 0 and 1, only validator 1 should produce an attestation
+        since validator 0 already attested within their block.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+
+        # Registry with validators 0 and 1.
+        registry = ValidatorRegistry()
+        for i in [0, 1]:
+            mock_key = MagicMock()
+            registry.add(ValidatorEntry(index=Uint64(i), secret_key=mock_key))
+
+        # Track which validators had _sign_attestation called.
+        signed_validator_ids: list[Uint64] = []
+
+        def mock_sign_attestation(
+            self: ValidatorService,  # noqa: ARG001
+            attestation_data: object,  # noqa: ARG001
+            validator_index: Uint64,
+        ) -> SignedAttestation:
+            signed_validator_ids.append(validator_index)
+            return MagicMock(spec=SignedAttestation, validator_id=validator_index)
+
+        service = ValidatorService(
+            sync_service=sync_service,
+            clock=clock,
+            registry=registry,
+        )
+
+        async def produce() -> None:
+            # Slot 0: validator 0 is proposer (0 % 3 == 0).
+            with patch.object(
+                ValidatorService,
+                "_sign_attestation",
+                mock_sign_attestation,
+            ):
+                await service._produce_attestations(Slot(0))
+
+        asyncio.run(produce())
+
+        # Only validator 1 should have signed an attestation.
+        assert len(signed_validator_ids) == 1
+        assert signed_validator_ids[0] == Uint64(1)
+        assert service.attestations_produced == 1
+
+    def test_non_proposer_still_attests(
+        self,
+        sync_service: SyncService,
+    ) -> None:
+        """Non-proposer validators still produce attestations.
+
+        At slot 1, validator 1 is the proposer (1 % 3 == 1).
+        Validator 0 is not the proposer so should produce an attestation.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+
+        # Registry with only validator 0.
+        registry = ValidatorRegistry()
+        mock_key = MagicMock()
+        registry.add(ValidatorEntry(index=Uint64(0), secret_key=mock_key))
+
+        # Track which validators had _sign_attestation called.
+        signed_validator_ids: list[Uint64] = []
+
+        def mock_sign_attestation(
+            self: ValidatorService,  # noqa: ARG001
+            attestation_data: object,  # noqa: ARG001
+            validator_index: Uint64,
+        ) -> SignedAttestation:
+            signed_validator_ids.append(validator_index)
+            return MagicMock(spec=SignedAttestation, validator_id=validator_index)
+
+        service = ValidatorService(
+            sync_service=sync_service,
+            clock=clock,
+            registry=registry,
+        )
+
+        async def produce() -> None:
+            # Slot 1: validator 1 is proposer (1 % 3 == 1).
+            # Validator 0 is not proposer, should attest.
+            with patch.object(
+                ValidatorService,
+                "_sign_attestation",
+                mock_sign_attestation,
+            ):
+                await service._produce_attestations(Slot(1))
+
+        asyncio.run(produce())
+
+        # Validator 0 should have signed an attestation.
+        assert len(signed_validator_ids) == 1
+        assert signed_validator_ids[0] == Uint64(0)
+        assert service.attestations_produced == 1
+
+    def test_multiple_validators_only_non_proposers_attest(
+        self,
+        sync_service: SyncService,
+    ) -> None:
+        """With multiple validators, only non-proposers produce attestations.
+
+        At slot 2, validator 2 is the proposer (2 % 3 == 2).
+        Controlling validators 0, 1, and 2, only validators 0 and 1 should attest.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+
+        # Registry with validators 0, 1, and 2.
+        registry = ValidatorRegistry()
+        for i in [0, 1, 2]:
+            mock_key = MagicMock()
+            registry.add(ValidatorEntry(index=Uint64(i), secret_key=mock_key))
+
+        # Track which validators had _sign_attestation called.
+        signed_validator_ids: list[Uint64] = []
+
+        def mock_sign_attestation(
+            self: ValidatorService,  # noqa: ARG001
+            attestation_data: object,  # noqa: ARG001
+            validator_index: Uint64,
+        ) -> SignedAttestation:
+            signed_validator_ids.append(validator_index)
+            return MagicMock(spec=SignedAttestation, validator_id=validator_index)
+
+        service = ValidatorService(
+            sync_service=sync_service,
+            clock=clock,
+            registry=registry,
+        )
+
+        async def produce() -> None:
+            # Slot 2: validator 2 is proposer (2 % 3 == 2).
+            with patch.object(
+                ValidatorService,
+                "_sign_attestation",
+                mock_sign_attestation,
+            ):
+                await service._produce_attestations(Slot(2))
+
+        asyncio.run(produce())
+
+        # Validators 0 and 1 should have signed attestations.
+        assert len(signed_validator_ids) == 2
+        assert set(signed_validator_ids) == {Uint64(0), Uint64(1)}
+        assert service.attestations_produced == 2
+
+        # Verify validator 2 (proposer) did not sign.
+        assert Uint64(2) not in signed_validator_ids
+
+    def test_is_proposer_consistency_with_skip_logic(
+        self,
+        genesis_state: State,
+    ) -> None:
+        """The is_proposer function correctly identifies proposers.
+
+        Verifies the proposer selection logic used by the skip mechanism.
+        """
+        num_validators = Uint64(len(genesis_state.validators))
+
+        # At each slot, exactly one validator is the proposer.
+        for slot in range(6):
+            proposer_count = sum(
+                1
+                for i in range(int(num_validators))
+                if is_proposer(Uint64(i), Uint64(slot), num_validators)
+            )
+            assert proposer_count == 1
+
+        # Verify round-robin pattern.
+        assert is_proposer(Uint64(0), Uint64(0), num_validators)
+        assert is_proposer(Uint64(1), Uint64(1), num_validators)
+        assert is_proposer(Uint64(2), Uint64(2), num_validators)
+        assert is_proposer(Uint64(0), Uint64(3), num_validators)  # Wraps around
