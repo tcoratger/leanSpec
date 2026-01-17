@@ -421,13 +421,18 @@ class State(Container):
         finalized_slot = latest_finalized.slot
         justified_slots = self.justified_slots
 
-        # Map roots to their slots for pruning when finalization advances.
-        # Only track roots after the finalized boundary; earlier roots are pruned.
+        # Map roots to all slots where they appear.
+        #
+        # Missed slots produce duplicate zero hashes in history.
+        # During pruning, we must check all slot occurrences for each root.
+        # A single-slot mapping would fail when iterating over slots.
         start_slot = int(finalized_slot) + 1
-        root_to_slot = {
-            self.historical_block_hashes[i]: Slot(i)
-            for i in range(start_slot, len(self.historical_block_hashes))
-        }
+        root_to_slots: dict[Bytes32, list[Slot]] = {}
+        for i in range(start_slot, len(self.historical_block_hashes)):
+            root = self.historical_block_hashes[i]
+            if root not in root_to_slots:
+                root_to_slots[root] = []
+            root_to_slots[root].append(Slot(i))
 
         # Process each attestation independently
         #
@@ -550,17 +555,19 @@ class State(Container):
 
                     # Rebase/prune justification tracking across the new finalized boundary.
                     #
-                    # The state stores `justified_slots` starting at (finalized_slot + 1),
+                    # The state stores justified slot flags starting at (finalized_slot + 1),
                     # so when finalization advances by `delta`, we drop the first `delta` bits.
                     #
-                    # We also prune any pending `justifications` whose slots are now finalized.
+                    # We also prune any pending justifications whose slots are now finalized.
+                    # A root may appear at multiple slots; keep the justification if ANY
+                    # slot for that root is still unfinalized (conservative approach).
                     delta = int(finalized_slot - old_finalized_slot)
                     if delta > 0:
                         justified_slots = justified_slots.shift_window(delta)
                         justifications = {
                             root: votes
                             for root, votes in justifications.items()
-                            if root_to_slot.get(root, Slot(0)) > finalized_slot
+                            if any(slot > finalized_slot for slot in root_to_slots.get(root, []))
                         }
 
         # Convert the vote structure back into SSZ format
