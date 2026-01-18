@@ -8,12 +8,15 @@ Usage::
     python -m lean_spec --genesis genesis.json --bootnode /ip4/127.0.0.1/tcp/9000
     python -m lean_spec --genesis genesis.json --bootnode enr:-IS4QHCYrYZbAKW...
     python -m lean_spec --genesis genesis.json --checkpoint-sync-url http://localhost:5052
+    python -m lean_spec --genesis genesis.json --validator-keys ./keys --node-id node_0
 
 Options:
     --genesis              Path to genesis JSON file (required)
     --bootnode             Bootnode address (multiaddr or ENR string, can be repeated)
     --listen               Address to listen on (default: /ip4/0.0.0.0/tcp/9000)
     --checkpoint-sync-url  URL to fetch finalized checkpoint state for fast sync
+    --validator-keys       Path to validator keys directory
+    --node-id              Node identifier for validator assignment (default: node_0)
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.types import Bytes32
 
 logger = logging.getLogger(__name__)
@@ -139,6 +143,7 @@ def create_anchor_block(state: State) -> Block:
 def _init_from_genesis(
     genesis: GenesisConfig,
     event_source: LiveNetworkEventSource,
+    validator_registry: ValidatorRegistry | None = None,
 ) -> Node:
     """
     Initialize a node from genesis configuration.
@@ -146,6 +151,7 @@ def _init_from_genesis(
     Args:
         genesis: Genesis configuration with time and validators.
         event_source: Network transport for the node.
+        validator_registry: Optional registry with validator secret keys.
 
     Returns:
         A fully initialized Node starting from genesis.
@@ -165,6 +171,7 @@ def _init_from_genesis(
         validators=genesis.to_validators(),
         event_source=event_source,
         network=event_source.reqresp_client,
+        validator_registry=validator_registry,
     )
 
     # Create and return the node.
@@ -175,6 +182,7 @@ async def _init_from_checkpoint(
     checkpoint_sync_url: str,
     genesis: GenesisConfig,
     event_source: LiveNetworkEventSource,
+    validator_registry: ValidatorRegistry | None = None,
 ) -> Node | None:
     """
     Initialize a node from a checkpoint state fetched from a remote node.
@@ -200,6 +208,7 @@ async def _init_from_checkpoint(
         checkpoint_sync_url: URL of the node to fetch checkpoint state from.
         genesis: Local genesis configuration for validation.
         event_source: Network transport for the node.
+        validator_registry: Optional registry with validator secret keys.
 
     Returns:
         A fully initialized Node if successful, None if checkpoint sync failed.
@@ -269,6 +278,7 @@ async def _init_from_checkpoint(
             validators=state.validators,
             event_source=event_source,
             network=event_source.reqresp_client,
+            validator_registry=validator_registry,
         )
 
         # Create node and inject checkpoint store.
@@ -300,6 +310,8 @@ async def run_node(
     bootnodes: list[str],
     listen_addr: str,
     checkpoint_sync_url: str | None = None,
+    validator_keys_path: Path | None = None,
+    node_id: str = "node_0",
 ) -> None:
     """
     Run the lean consensus node.
@@ -309,6 +321,8 @@ async def run_node(
         bootnodes: List of bootnode multiaddrs to connect to.
         listen_addr: Address to listen on.
         checkpoint_sync_url: Optional URL to fetch checkpoint state for fast sync.
+        validator_keys_path: Optional path to validator keys directory.
+        node_id: Node identifier for validator assignment.
     """
     logger.info("Loading genesis from %s", genesis_path)
     genesis = GenesisConfig.from_json_file(genesis_path)
@@ -317,6 +331,27 @@ async def run_node(
         genesis.genesis_time,
         len(genesis.genesis_validators),
     )
+
+    # Load validator keys if path provided.
+    #
+    # The registry holds secret keys for validators assigned to this node.
+    # Without a registry, the node runs in passive mode (sync only).
+    validator_registry: ValidatorRegistry | None = None
+    if validator_keys_path is not None:
+        validator_registry = ValidatorRegistry.from_json(
+            node_id=node_id,
+            validators_path=validator_keys_path / "validators.json",
+            manifest_path=validator_keys_path / "hash-sig-keys/validator-keys-manifest.json",
+        )
+        if len(validator_registry) > 0:
+            logger.info(
+                "Loaded %d validators for node %s: indices=%s",
+                len(validator_registry),
+                node_id,
+                validator_registry.indices(),
+            )
+        else:
+            logger.warning("No validators assigned to node %s", node_id)
 
     event_source = LiveNetworkEventSource.create()
 
@@ -337,6 +372,7 @@ async def run_node(
             checkpoint_sync_url=checkpoint_sync_url,
             genesis=genesis,
             event_source=event_source,
+            validator_registry=validator_registry,
         )
         if node is None:
             # Checkpoint sync failed. Exit rather than falling back.
@@ -345,7 +381,11 @@ async def run_node(
             # They explicitly requested checkpoint sync for a reason.
             return
     else:
-        node = _init_from_genesis(genesis=genesis, event_source=event_source)
+        node = _init_from_genesis(
+            genesis=genesis,
+            event_source=event_source,
+            validator_registry=validator_registry,
+        )
 
     logger.info("Node initialized, peer_id=%s", event_source.connection_manager.peer_id)
 
@@ -419,6 +459,18 @@ def main() -> None:
         help="URL to fetch finalized checkpoint state for fast sync (e.g., http://localhost:5052)",
     )
     parser.add_argument(
+        "--validator-keys",
+        type=Path,
+        default=None,
+        help="Path to validator keys directory",
+    )
+    parser.add_argument(
+        "--node-id",
+        type=str,
+        default="node_0",
+        help="Node identifier for validator assignment (default: node_0)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -436,6 +488,8 @@ def main() -> None:
                 args.bootnodes,
                 args.listen,
                 args.checkpoint_sync_url,
+                args.validator_keys,
+                args.node_id,
             )
         )
     except KeyboardInterrupt:

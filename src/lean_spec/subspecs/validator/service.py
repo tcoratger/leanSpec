@@ -212,6 +212,7 @@ class ValidatorService:
                 #
                 # This adds our attestation and signatures to the block.
                 signed_block = self._sign_block(block, validator_index, signatures)
+
                 self._blocks_produced += 1
                 metrics.blocks_proposed.inc()
 
@@ -261,6 +262,7 @@ class ValidatorService:
 
             # Sign the attestation using our secret key.
             signed_attestation = self._sign_attestation(attestation_data, validator_index)
+
             self._attestations_produced += 1
             metrics.attestations_produced.inc()
 
