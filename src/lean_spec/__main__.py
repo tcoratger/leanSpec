@@ -5,13 +5,13 @@ Run a minimal lean consensus client that can sync with other lean consensus node
 
 Usage::
 
-    python -m lean_spec --genesis genesis.json --bootnode /ip4/127.0.0.1/tcp/9000
-    python -m lean_spec --genesis genesis.json --bootnode enr:-IS4QHCYrYZbAKW...
-    python -m lean_spec --genesis genesis.json --checkpoint-sync-url http://localhost:5052
-    python -m lean_spec --genesis genesis.json --validator-keys ./keys --node-id node_0
+    python -m lean_spec --genesis config.yaml --bootnode /ip4/127.0.0.1/tcp/9000
+    python -m lean_spec --genesis config.yaml --bootnode enr:-IS4QHCYrYZbAKW...
+    python -m lean_spec --genesis config.yaml --checkpoint-sync-url http://localhost:5052
+    python -m lean_spec --genesis config.yaml --validator-keys ./keys --node-id node_0
 
 Options:
-    --genesis              Path to genesis JSON file (required)
+    --genesis              Path to genesis YAML file (required)
     --bootnode             Bootnode address (multiaddr or ENR string, can be repeated)
     --listen               Address to listen on (default: /ip4/0.0.0.0/tcp/9001)
     --checkpoint-sync-url  URL to fetch finalized checkpoint state for fast sync
@@ -384,7 +384,7 @@ async def run_node(
     Run the lean consensus node.
 
     Args:
-        genesis_path: Path to genesis JSON file.
+        genesis_path: Path to genesis YAML file (config.yaml).
         bootnodes: List of bootnode multiaddrs to connect to.
         listen_addr: Address to listen on.
         checkpoint_sync_url: Optional URL to fetch checkpoint state for fast sync.
@@ -395,7 +395,7 @@ async def run_node(
     import time
 
     logger.info("Loading genesis from %s", genesis_path)
-    genesis = GenesisConfig.from_json_file(genesis_path)
+    genesis = GenesisConfig.from_yaml_file(genesis_path)
 
     # Override genesis time for testing if requested
     if genesis_time_now:
@@ -423,34 +423,24 @@ async def run_node(
     # The registry holds secret keys for validators assigned to this node.
     # Without a registry, the node runs in passive mode (sync only).
     #
-    # Supports two formats:
-    # 1. SSZ manifest: validators.json + hash-sig-keys/validator-keys-manifest.json
-    # 2. leansig-test-keys: validators.json + keys/{index}.json
+    # Expected directory structure (ream/zeam compatible):
+    #   validators.yaml - node to validator index mapping
+    #   hash-sig-keys/validator-keys-manifest.yaml - key metadata and file paths
     validator_registry: ValidatorRegistry | None = None
     if validator_keys_path is not None:
-        validators_json = validator_keys_path / "validators.json"
-        manifest_path = validator_keys_path / "hash-sig-keys/validator-keys-manifest.json"
-        keys_dir = validator_keys_path / "keys"
+        validators_yaml = validator_keys_path / "validators.yaml"
+        manifest_path = validator_keys_path / "hash-sig-keys/validator-keys-manifest.yaml"
 
         if manifest_path.exists():
-            # SSZ manifest format (ream-style)
-            validator_registry = ValidatorRegistry.from_json(
+            validator_registry = ValidatorRegistry.from_yaml(
                 node_id=node_id,
-                validators_path=validators_json,
+                validators_path=validators_yaml,
                 manifest_path=manifest_path,
-            )
-        elif keys_dir.exists():
-            # leansig-test-keys format (JSON key files)
-            validator_registry = ValidatorRegistry.from_key_dir(
-                node_id=node_id,
-                validators_path=validators_json,
-                keys_dir=keys_dir,
             )
         else:
             logger.error(
-                "No valid key format found in %s. "
-                "Expected either hash-sig-keys/validator-keys-manifest.json or keys/ directory.",
-                validator_keys_path,
+                "Validator keys manifest not found: %s",
+                manifest_path,
             )
 
         if validator_registry is not None and len(validator_registry) > 0:
@@ -566,7 +556,7 @@ def main() -> None:
         "--genesis",
         required=True,
         type=Path,
-        help="Path to genesis JSON file",
+        help="Path to genesis YAML file (config.yaml)",
     )
     parser.add_argument(
         "--bootnode",
