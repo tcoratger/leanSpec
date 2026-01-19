@@ -83,8 +83,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     create_subscription_rpc,
 )
 from lean_spec.subspecs.networking.transport import PeerId
-from lean_spec.subspecs.networking.varint import decode as varint_decode
-from lean_spec.subspecs.networking.varint import encode as varint_encode
+from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 from lean_spec.types import Bytes20
 
 if TYPE_CHECKING:
@@ -567,7 +566,7 @@ class GossipsubBehavior:
         try:
             data = rpc.encode()
             # Length-prefix the RPC (varint + data)
-            frame = varint_encode(len(data)) + data
+            frame = encode_varint(len(data)) + data
             logger.debug(
                 "Sending RPC to %s: %d bytes (subs=%d, msgs=%d)",
                 peer_id,
@@ -603,7 +602,7 @@ class GossipsubBehavior:
                             # Read length prefix
                             if len(buffer) < 1:
                                 break
-                            length, varint_size = varint_decode(bytes(buffer), 0)
+                            length, varint_size = decode_varint(bytes(buffer), 0)
                             if len(buffer) < varint_size + length:
                                 break
 

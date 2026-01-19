@@ -22,8 +22,7 @@ References:
 - Ethereum P2P: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
 """
 
-from lean_spec.subspecs.networking.varint import decode as decode_varint
-from lean_spec.subspecs.networking.varint import encode as encode_varint
+from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 from ..transport import PeerId
 from .behavior import (

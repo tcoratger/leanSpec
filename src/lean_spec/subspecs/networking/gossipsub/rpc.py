@@ -43,8 +43,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from lean_spec.subspecs.networking.varint import decode as varint_decode
-from lean_spec.subspecs.networking.varint import encode as varint_encode
+from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 if TYPE_CHECKING:
     pass
@@ -72,13 +71,13 @@ def _decode_varint_at(data: bytes, pos: int) -> tuple[int, int]:
 
     Wrapper around canonical varint.decode for protobuf parsing convenience.
     """
-    value, consumed = varint_decode(data, pos)
+    value, consumed = decode_varint(data, pos)
     return value, pos + consumed
 
 
 def encode_tag(field_number: int, wire_type: int) -> bytes:
     """Encode a protobuf field tag."""
-    return varint_encode((field_number << 3) | wire_type)
+    return encode_varint((field_number << 3) | wire_type)
 
 
 def decode_tag(data: bytes, pos: int) -> tuple[int, int, int]:
@@ -94,7 +93,7 @@ def decode_tag(data: bytes, pos: int) -> tuple[int, int, int]:
 
 def encode_length_delimited(field_number: int, data: bytes) -> bytes:
     """Encode a length-delimited field (string, bytes, embedded message)."""
-    return encode_tag(field_number, WIRE_TYPE_LENGTH_DELIMITED) + varint_encode(len(data)) + data
+    return encode_tag(field_number, WIRE_TYPE_LENGTH_DELIMITED) + encode_varint(len(data)) + data
 
 
 def encode_string(field_number: int, value: str) -> bytes:
@@ -109,12 +108,12 @@ def encode_bytes(field_number: int, value: bytes) -> bytes:
 
 def encode_bool(field_number: int, value: bool) -> bytes:
     """Encode a bool field."""
-    return encode_tag(field_number, WIRE_TYPE_VARINT) + varint_encode(1 if value else 0)
+    return encode_tag(field_number, WIRE_TYPE_VARINT) + encode_varint(1 if value else 0)
 
 
 def encode_uint64(field_number: int, value: int) -> bytes:
     """Encode a uint64 field."""
-    return encode_tag(field_number, WIRE_TYPE_VARINT) + varint_encode(value)
+    return encode_tag(field_number, WIRE_TYPE_VARINT) + encode_varint(value)
 
 
 # =============================================================================
