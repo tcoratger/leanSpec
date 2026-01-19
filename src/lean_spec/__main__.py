@@ -13,7 +13,7 @@ Usage::
 Options:
     --genesis              Path to genesis JSON file (required)
     --bootnode             Bootnode address (multiaddr or ENR string, can be repeated)
-    --listen               Address to listen on (default: /ip4/0.0.0.0/tcp/9000)
+    --listen               Address to listen on (default: /ip4/0.0.0.0/tcp/9001)
     --checkpoint-sync-url  URL to fetch finalized checkpoint state for fast sync
     --validator-keys       Path to validator keys directory
     --node-id              Node identifier for validator assignment (default: node_0)
@@ -32,11 +32,18 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
+from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Uint64
+
+# Fork identifier for gossip topics.
+#
+# Must match the fork string used by ream and other clients.
+# For devnet, this is "devnet0".
+GOSSIP_FORK_DIGEST = "devnet0"
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +179,7 @@ def _init_from_genesis(
         event_source=event_source,
         network=event_source.reqresp_client,
         validator_registry=validator_registry,
+        fork_digest=GOSSIP_FORK_DIGEST,
     )
 
     # Create and return the node.
@@ -279,6 +287,7 @@ async def _init_from_checkpoint(
             event_source=event_source,
             network=event_source.reqresp_client,
             validator_registry=validator_registry,
+            fork_digest=GOSSIP_FORK_DIGEST,
         )
 
         # Create node and inject checkpoint store.
@@ -295,14 +304,71 @@ async def _init_from_checkpoint(
         return None
 
 
-def setup_logging(verbose: bool = False) -> None:
-    """Configure logging for the node."""
+class ColoredFormatter(logging.Formatter):
+    """Logging formatter with ANSI colors for better readability."""
+
+    # ANSI color codes
+    GREY = "\x1b[38;5;244m"
+    BLUE = "\x1b[38;5;39m"
+    GREEN = "\x1b[38;5;40m"
+    YELLOW = "\x1b[38;5;220m"
+    RED = "\x1b[38;5;196m"
+    BOLD_RED = "\x1b[38;5;196;1m"
+    CYAN = "\x1b[38;5;51m"
+    RESET = "\x1b[0m"
+
+    LEVEL_COLORS = {
+        logging.DEBUG: GREY,
+        logging.INFO: GREEN,
+        logging.WARNING: YELLOW,
+        logging.ERROR: RED,
+        logging.CRITICAL: BOLD_RED,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record with colors."""
+        # Get color for this level
+        color = self.LEVEL_COLORS.get(record.levelno, self.RESET)
+
+        # Format timestamp in cyan
+        timestamp = self.formatTime(record, self.datefmt)
+        colored_time = f"{self.CYAN}{timestamp}{self.RESET}"
+
+        # Format level name with color
+        levelname = f"{color}{record.levelname:8}{self.RESET}"
+
+        # Format logger name in blue
+        name = f"{self.BLUE}{record.name}{self.RESET}"
+
+        # Format message
+        message = record.getMessage()
+
+        return f"{colored_time} {levelname} {name}: {message}"
+
+
+def setup_logging(verbose: bool = False, no_color: bool = False) -> None:
+    """Configure logging for the node with optional colors."""
     level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+
+    # Create handler
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+
+    # Use colored formatter unless disabled
+    if no_color:
+        formatter = logging.Formatter(
+            "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    else:
+        formatter = ColoredFormatter(datefmt="%Y-%m-%d %H:%M:%S")
+
+    handler.setFormatter(formatter)
+
+    # Configure root logger
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.addHandler(handler)
 
 
 async def run_node(
@@ -312,6 +378,7 @@ async def run_node(
     checkpoint_sync_url: str | None = None,
     validator_keys_path: Path | None = None,
     node_id: str = "node_0",
+    genesis_time_now: bool = False,
 ) -> None:
     """
     Run the lean consensus node.
@@ -323,9 +390,28 @@ async def run_node(
         checkpoint_sync_url: Optional URL to fetch checkpoint state for fast sync.
         validator_keys_path: Optional path to validator keys directory.
         node_id: Node identifier for validator assignment.
+        genesis_time_now: Override genesis time to current time for testing.
     """
+    import time
+
     logger.info("Loading genesis from %s", genesis_path)
     genesis = GenesisConfig.from_json_file(genesis_path)
+
+    # Override genesis time for testing if requested
+    if genesis_time_now:
+        original_time = genesis.genesis_time
+        new_time = Uint64(int(time.time()))
+        # Create new config with updated genesis time.
+        #
+        # GenesisConfig is frozen, so we use model_copy to create
+        # a new instance with the updated field.
+        genesis = genesis.model_copy(update={"genesis_time": new_time})
+        logger.warning(
+            "Overriding genesis time: %d -> %d (now)",
+            original_time,
+            new_time,
+        )
+
     logger.info(
         "Genesis loaded: time=%d, validators=%d",
         genesis.genesis_time,
@@ -336,24 +422,59 @@ async def run_node(
     #
     # The registry holds secret keys for validators assigned to this node.
     # Without a registry, the node runs in passive mode (sync only).
+    #
+    # Supports two formats:
+    # 1. SSZ manifest: validators.json + hash-sig-keys/validator-keys-manifest.json
+    # 2. leansig-test-keys: validators.json + keys/{index}.json
     validator_registry: ValidatorRegistry | None = None
     if validator_keys_path is not None:
-        validator_registry = ValidatorRegistry.from_json(
-            node_id=node_id,
-            validators_path=validator_keys_path / "validators.json",
-            manifest_path=validator_keys_path / "hash-sig-keys/validator-keys-manifest.json",
-        )
-        if len(validator_registry) > 0:
+        validators_json = validator_keys_path / "validators.json"
+        manifest_path = validator_keys_path / "hash-sig-keys/validator-keys-manifest.json"
+        keys_dir = validator_keys_path / "keys"
+
+        if manifest_path.exists():
+            # SSZ manifest format (ream-style)
+            validator_registry = ValidatorRegistry.from_json(
+                node_id=node_id,
+                validators_path=validators_json,
+                manifest_path=manifest_path,
+            )
+        elif keys_dir.exists():
+            # leansig-test-keys format (JSON key files)
+            validator_registry = ValidatorRegistry.from_key_dir(
+                node_id=node_id,
+                validators_path=validators_json,
+                keys_dir=keys_dir,
+            )
+        else:
+            logger.error(
+                "No valid key format found in %s. "
+                "Expected either hash-sig-keys/validator-keys-manifest.json or keys/ directory.",
+                validator_keys_path,
+            )
+
+        if validator_registry is not None and len(validator_registry) > 0:
             logger.info(
                 "Loaded %d validators for node %s: indices=%s",
                 len(validator_registry),
                 node_id,
                 validator_registry.indices(),
             )
-        else:
+        elif validator_registry is not None:
             logger.warning("No validators assigned to node %s", node_id)
 
     event_source = LiveNetworkEventSource.create()
+
+    # Subscribe to gossip topics.
+    #
+    # We subscribe before connecting to bootnodes so that when
+    # we establish connections, we can immediately announce our
+    # subscriptions to peers.
+    block_topic = str(GossipTopic.block(GOSSIP_FORK_DIGEST))
+    attestation_topic = str(GossipTopic.attestation(GOSSIP_FORK_DIGEST))
+    event_source.subscribe_gossip_topic(block_topic)
+    event_source.subscribe_gossip_topic(attestation_topic)
+    logger.info("Subscribed to gossip topics: %s, %s", block_topic, attestation_topic)
 
     # Two initialization paths: checkpoint sync or genesis sync.
     #
@@ -421,6 +542,13 @@ async def run_node(
         logger.info("Starting listener on %s", listen_addr)
         asyncio.create_task(event_source.listen(listen_addr))
 
+    # Start gossipsub behavior.
+    #
+    # This starts the heartbeat loop and enables message forwarding.
+    # Must be called after subscribing to topics and connecting to peers.
+    logger.info("Starting gossipsub behavior...")
+    await event_source.start_gossipsub()
+
     # Run the node.
     logger.info("Starting consensus node...")
     event_source._running = True
@@ -449,8 +577,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--listen",
-        default="/ip4/0.0.0.0/tcp/9000",
-        help="Address to listen on (default: /ip4/0.0.0.0/tcp/9000)",
+        default="/ip4/0.0.0.0/tcp/9001",
+        help="Address to listen on (default: /ip4/0.0.0.0/tcp/9001)",
     )
     parser.add_argument(
         "--checkpoint-sync-url",
@@ -476,10 +604,20 @@ def main() -> None:
         action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colored logging output",
+    )
+    parser.add_argument(
+        "--genesis-time-now",
+        action="store_true",
+        help="Override genesis time to current time (for testing)",
+    )
 
     args = parser.parse_args()
 
-    setup_logging(args.verbose)
+    setup_logging(args.verbose, args.no_color)
 
     try:
         asyncio.run(
@@ -490,6 +628,7 @@ def main() -> None:
                 args.checkpoint_sync_url,
                 args.validator_keys,
                 args.node_id,
+                args.genesis_time_now,
             )
         )
     except KeyboardInterrupt:

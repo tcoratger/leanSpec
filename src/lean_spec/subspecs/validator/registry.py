@@ -195,3 +195,62 @@ class ValidatorRegistry:
                 )
             )
         return registry
+
+    @classmethod
+    def from_key_dir(
+        cls,
+        node_id: str,
+        validators_path: Path | str,
+        keys_dir: Path | str,
+    ) -> ValidatorRegistry:
+        """
+        Load registry from leansig-test-keys format.
+
+        This format uses individual JSON files per validator:
+        - validators.json: maps node IDs to validator indices
+        - keys_dir/{index}.json: contains public/secret hex strings
+
+        Compatible with https://github.com/leanEthereum/leansig-test-keys
+
+        Args:
+            node_id: Identifier for this node in validators.json.
+            validators_path: Path to validators.json.
+            keys_dir: Directory containing {index}.json key files.
+
+        Returns:
+            Registry populated with validator keys for this node.
+        """
+        validators_path = Path(validators_path)
+        keys_dir = Path(keys_dir)
+
+        # Load node-to-validator mapping.
+        with validators_path.open() as f:
+            validators_config = json.load(f)
+
+        # Get indices assigned to this node.
+        assigned_indices = validators_config.get(node_id, [])
+        if not assigned_indices:
+            return cls()
+
+        # Load keys for assigned validators.
+        registry = cls()
+
+        for index in assigned_indices:
+            key_file = keys_dir / f"{index}.json"
+            if not key_file.exists():
+                continue
+
+            with key_file.open() as f:
+                key_data = json.load(f)
+
+            # Keys are hex-encoded without 0x prefix.
+            secret_key = SecretKey.decode_bytes(bytes.fromhex(key_data["secret"]))
+
+            registry.add(
+                ValidatorEntry(
+                    index=Uint64(index),
+                    secret_key=secret_key,
+                )
+            )
+
+        return registry

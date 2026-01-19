@@ -149,13 +149,13 @@ class ValidatorService:
             slot = self.clock.current_slot()
             interval = self.clock.current_interval()
 
-            if interval == 0:
+            if interval == Uint64(0):
                 # Block production interval.
                 #
                 # Check if any of our validators is the proposer.
                 await self._maybe_produce_block(slot)
 
-            elif interval == 1:
+            elif interval == Uint64(1):
                 # Attestation interval.
                 #
                 # All validators should attest to current head.

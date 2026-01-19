@@ -83,6 +83,13 @@ class NodeConfig:
     If None, the node runs in passive mode (sync only).
     """
 
+    fork_digest: str = field(default="0x00000000")
+    """
+    Fork digest for gossip topics.
+
+    For devnet testing with ream, use "devnet0".
+    """
+
 
 @dataclass(slots=True)
 class Node:
@@ -199,6 +206,7 @@ class Node:
         network_service = NetworkService(
             sync_service=sync_service,
             event_source=config.event_source,
+            fork_digest=config.fork_digest,
         )
 
         # Create API server if configured

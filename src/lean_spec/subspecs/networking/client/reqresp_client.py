@@ -49,6 +49,7 @@ from lean_spec.subspecs.networking.transport.connection.manager import (
     ConnectionManager,
     YamuxConnection,
 )
+from lean_spec.subspecs.networking.transport.quic.connection import QuicConnection
 from lean_spec.types import Bytes32
 
 logger = logging.getLogger(__name__)
@@ -74,19 +75,19 @@ class ReqRespClient:
     connection_manager: ConnectionManager
     """Connection manager providing transport."""
 
-    _connections: dict[PeerId, YamuxConnection] = field(default_factory=dict)
+    _connections: dict[PeerId, YamuxConnection | QuicConnection] = field(default_factory=dict)
     """Active connections by peer ID."""
 
     timeout: float = REQUEST_TIMEOUT_SECONDS
     """Request timeout in seconds."""
 
-    def register_connection(self, peer_id: PeerId, conn: YamuxConnection) -> None:
+    def register_connection(self, peer_id: PeerId, conn: YamuxConnection | QuicConnection) -> None:
         """
         Register a connection for req/resp use.
 
         Args:
             peer_id: Peer identifier.
-            conn: Established yamux connection.
+            conn: Established yamux or QUIC connection.
         """
         self._connections[peer_id] = conn
 
@@ -139,7 +140,7 @@ class ReqRespClient:
 
     async def _do_blocks_by_root_request(
         self,
-        conn: YamuxConnection,
+        conn: YamuxConnection | QuicConnection,
         roots: list[Bytes32],
     ) -> list[SignedBlockWithAttestation]:
         """
@@ -233,7 +234,7 @@ class ReqRespClient:
 
     async def _do_status_request(
         self,
-        conn: YamuxConnection,
+        conn: YamuxConnection | QuicConnection,
         status: Status,
     ) -> Status | None:
         """
