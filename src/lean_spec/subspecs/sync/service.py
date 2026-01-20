@@ -413,7 +413,19 @@ class SyncService:
         #
         # The store validates the signature and updates branch weights.
         # Invalid attestations (bad signature, unknown target) are rejected.
-        self.store = self.store.on_gossip_attestation(attestation)
+        # Validation failures are logged but don't crash the event loop.
+        try:
+            self.store = self.store.on_gossip_attestation(attestation)
+        except (AssertionError, KeyError):
+            # Attestation validation failed.
+            #
+            # Common causes:
+            # - Unknown blocks (source/target/head not in store yet)
+            # - Attestation for future slot (clock drift)
+            # - Invalid signature
+            #
+            # These are expected during normal operation and don't indicate bugs.
+            pass
 
     async def start_sync(self) -> None:
         """

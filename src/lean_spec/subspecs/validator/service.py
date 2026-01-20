@@ -130,15 +130,30 @@ class ValidatorService:
         2. Checks current interval within the slot
         3. Triggers appropriate duties
         4. Repeats until stopped
+
+        NOTE: We track the last handled interval to avoid skipping intervals.
+        If duty processing takes time and we end up in a new interval, we
+        handle that interval immediately instead of sleeping past it.
         """
         self._running = True
+        last_handled_total_interval: int | None = None
 
         while self._running:
-            # Sleep until next interval boundary for precise timing.
-            await self._sleep_until_next_interval()
+            # Get current total interval count (not just within-slot).
+            total_interval = int(self.clock.total_intervals())
+
+            # If we've already handled this interval, sleep until the next boundary.
+            already_handled = (
+                last_handled_total_interval is not None
+                and total_interval <= last_handled_total_interval
+            )
+            if already_handled:
+                await self._sleep_until_next_interval()
+                total_interval = int(self.clock.total_intervals())
 
             # Skip if we have no validators to manage.
             if len(self.registry) == 0:
+                last_handled_total_interval = total_interval
                 continue
 
             # Get current slot and interval.
@@ -160,6 +175,9 @@ class ValidatorService:
                 #
                 # All validators should attest to current head.
                 await self._produce_attestations(slot)
+
+            # Mark this interval as handled.
+            last_handled_total_interval = total_interval
 
     async def _maybe_produce_block(self, slot: Slot) -> None:
         """
@@ -212,6 +230,17 @@ class ValidatorService:
                 #
                 # This adds our attestation and signatures to the block.
                 signed_block = self._sign_block(block, validator_index, signatures)
+
+                # Process our own proposer attestation directly.
+                #
+                # The block was already stored by produce_block_with_signatures, so when
+                # this block is received via gossip, on_block will reject it as a duplicate.
+                # We must process our proposer attestation here to ensure it's counted.
+                proposer_attestation = signed_block.message.proposer_attestation
+                self.sync_service.store = self.sync_service.store.on_attestation(
+                    attestation=proposer_attestation,
+                    is_from_block=False,
+                )
 
                 self._blocks_produced += 1
                 metrics.blocks_proposed.inc()

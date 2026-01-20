@@ -304,7 +304,7 @@ class Store(Container):
             f"No state available to verify attestation signature for target block "
             f"{attestation_data.target.root.hex()}"
         )
-        assert validator_id < len(key_state.validators), (
+        assert validator_id < Uint64(len(key_state.validators)), (
             f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
         )
         public_key = key_state.validators[validator_id].get_pubkey()
@@ -1100,11 +1100,29 @@ class Store(Container):
         )
 
         # Store block and state immutably
+        #
+        # Also update justified/finalized checkpoints from post-state.
+        # This is necessary because locally-produced blocks skip on_block,
+        # which normally handles checkpoint updates.
         block_hash = hash_tree_root(final_block)
+
+        latest_justified = (
+            final_post_state.latest_justified
+            if final_post_state.latest_justified.slot > store.latest_justified.slot
+            else store.latest_justified
+        )
+        latest_finalized = (
+            final_post_state.latest_finalized
+            if final_post_state.latest_finalized.slot > store.latest_finalized.slot
+            else store.latest_finalized
+        )
+
         store = store.model_copy(
             update={
                 "blocks": {**store.blocks, block_hash: final_block},
                 "states": {**store.states, block_hash: final_post_state},
+                "latest_justified": latest_justified,
+                "latest_finalized": latest_finalized,
             }
         )
 
