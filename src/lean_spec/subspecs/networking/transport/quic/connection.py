@@ -66,6 +66,8 @@ class QuicStream:
     _stream_id: int
     _read_buffer: asyncio.Queue[bytes] = field(default_factory=lambda: asyncio.Queue())
     _closed: bool = False
+    _write_closed: bool = False
+    _read_closed: bool = False
     _protocol_id: str = ""
 
     @property
@@ -82,21 +84,19 @@ class QuicStream:
         """
         Read data from the stream.
 
-        Blocks until data is available.
+        Blocks until data is available. Returns empty bytes when the peer
+        has closed their write side (half-close).
 
         Returns:
-            Received data bytes.
-
-        Raises:
-            QuicTransportError: If stream is closed.
+            Received data bytes, or empty bytes when stream is half-closed.
         """
-        if self._closed:
-            raise QuicTransportError("Stream is closed")
+        if self._read_closed:
+            return b""
 
         data = await self._read_buffer.get()
         if data == b"":
-            self._closed = True
-            raise QuicTransportError("Stream closed by peer")
+            self._read_closed = True
+            return b""
 
         return data
 
@@ -108,20 +108,58 @@ class QuicStream:
             data: Bytes to send.
 
         Raises:
-            QuicTransportError: If stream is closed.
+            QuicTransportError: If write side is closed or aioquic rejects the write.
         """
-        if self._closed:
-            raise QuicTransportError("Stream is closed")
+        if self._write_closed:
+            raise QuicTransportError("Stream write side is closed")
 
-        self._protocol._quic.send_stream_data(self._stream_id, data)
+        # Check aioquic's internal stream state before writing.
+        #
+        # aioquic tracks stream state internally and will raise an exception
+        # if we try to write after FIN has been sent. This can happen due to
+        # race conditions in stream handling. We check first to give a clearer
+        # error message.
+        quic = self._protocol._quic
+        stream = quic._streams.get(self._stream_id)
+        if stream is not None and getattr(stream, "send_fin", False):
+            self._write_closed = True
+            raise QuicTransportError(
+                f"Stream {self._stream_id} write side is closed (aioquic FIN already sent)"
+            )
+
+        try:
+            quic.send_stream_data(self._stream_id, data)
+            self._protocol.transmit()
+        except Exception as e:
+            # If aioquic raises an exception, mark our stream as write-closed
+            # to prevent further attempts.
+            error_msg = str(e)
+            if "FIN" in error_msg or "closed" in error_msg.lower():
+                self._write_closed = True
+            raise QuicTransportError(f"Write failed on stream {self._stream_id}: {e}") from e
+
+    async def finish_write(self) -> None:
+        """
+        Signal end of writing (half-close).
+
+        Sends FIN for our write direction while keeping read side open.
+        Use this after sending a request to signal we're done writing.
+        """
+        if self._write_closed:
+            return
+
+        self._write_closed = True
+        self._protocol._quic.send_stream_data(self._stream_id, b"", end_stream=True)
         self._protocol.transmit()
 
     async def close(self) -> None:
-        """Close the stream gracefully."""
+        """Close the stream gracefully (both directions)."""
         if self._closed:
             return
 
         self._closed = True
+        self._write_closed = True
+        self._read_closed = True
         self._protocol._quic.send_stream_data(self._stream_id, b"", end_stream=True)
         self._protocol.transmit()
 
@@ -193,6 +231,16 @@ class QuicConnection:
             protocol,
         )
         stream._protocol_id = negotiated
+
+        # Yield to allow aioquic to process any pending events.
+        #
+        # After multistream negotiation, aioquic may have received packets
+        # that haven't been processed yet. A yield allows the event loop
+        # to process these, ensuring stream state is consistent.
+        await asyncio.sleep(0)
+
+        # Ensure any pending data from negotiation is transmitted.
+        self._protocol.transmit()
 
         return stream
 

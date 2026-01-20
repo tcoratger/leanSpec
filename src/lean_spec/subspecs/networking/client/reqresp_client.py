@@ -165,6 +165,11 @@ class ReqRespClient:
             request_bytes = encode_request(request.encode_bytes())
             await stream.write(request_bytes)
 
+            # Half-close to signal we're done sending.
+            finish_write = getattr(stream, "finish_write", None)
+            if finish_write is not None:
+                await finish_write()
+
             # Read response chunks.
             #
             # Each block is sent as a separate response chunk.
@@ -236,6 +241,7 @@ class ReqRespClient:
         self,
         conn: YamuxConnection | QuicConnection,
         status: Status,
+        retry_count: int = 0,
     ) -> Status | None:
         """
         Execute a Status request.
@@ -243,16 +249,35 @@ class ReqRespClient:
         Args:
             conn: Connection to use.
             status: Our status to send.
+            retry_count: Number of retries attempted (internal).
 
         Returns:
             Peer's status response.
         """
-        stream = await conn.open_stream(STATUS_PROTOCOL_V1)
-
+        stream = None
         try:
+            # Open stream and negotiate protocol.
+            #
+            # This may fail if the QUIC stream is in a bad state right after
+            # the handshake. The error "cannot call write() after FIN" can
+            # happen during multistream negotiation writes.
+            stream = await conn.open_stream(STATUS_PROTOCOL_V1)
+
+            # Yield to allow aioquic to complete any pending state transitions.
+            #
+            # After multistream negotiation, aioquic may still be processing
+            # internal events (epoch discards, stream state updates). A small
+            # yield allows the event loop to process these before we write.
+            await asyncio.sleep(0)
+
             # Send our status.
             request_bytes = encode_request(status.encode_bytes())
             await stream.write(request_bytes)
+
+            # Half-close to signal we're done sending.
+            finish_write = getattr(stream, "finish_write", None)
+            if finish_write is not None:
+                await finish_write()
 
             # Read peer's status response.
             response_data = await stream.read()
@@ -267,5 +292,30 @@ class ReqRespClient:
                 logger.debug("Status error response: %s", code)
                 return None
 
+        except Exception as e:
+            # Retry once with a new stream if the first attempt fails.
+            #
+            # QUIC stream 0 can sometimes be in a bad state right after
+            # the handshake completes. Retrying with a new stream (stream 4)
+            # often succeeds.
+            if retry_count < 1:
+                logger.debug(
+                    "Status request failed (attempt %d), retrying: %s",
+                    retry_count + 1,
+                    e,
+                )
+                if stream is not None:
+                    try:
+                        await stream.close()
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.01)  # Small delay before retry
+                return await self._do_status_request(conn, status, retry_count + 1)
+            raise
+
         finally:
-            await stream.close()
+            if stream is not None:
+                try:
+                    await stream.close()
+                except Exception:
+                    pass

@@ -528,9 +528,31 @@ async def run_node(
             logger.warning("Invalid bootnode %s: %s", bootnode[:40], e)
 
     # Start listening (in background).
+    #
+    # We start the listener as a background task, but give it a moment
+    # to bind the port. If binding fails (e.g., port already in use),
+    # we want to fail fast with a clear error rather than continue
+    # running without the ability to accept incoming connections.
+    listener_task = None
     if listen_addr:
         logger.info("Starting listener on %s", listen_addr)
-        asyncio.create_task(event_source.listen(listen_addr))
+        listener_task = asyncio.create_task(event_source.listen(listen_addr))
+
+        # Give the listener a moment to bind the port.
+        # If it fails immediately (e.g., "Address already in use"),
+        # the task will complete with an exception.
+        await asyncio.sleep(0.1)
+
+        if listener_task.done():
+            # Listener failed early - propagate the error.
+            try:
+                listener_task.result()
+            except OSError as e:
+                logger.error("Failed to start listener: %s", e)
+                logger.error(
+                    "Port may be in use. Run './scripts/run_leanspec.sh clean' to free ports."
+                )
+                return
 
     # Start gossipsub behavior.
     #
@@ -609,6 +631,8 @@ def main() -> None:
 
     setup_logging(args.verbose, args.no_color)
 
+    # Use asyncio.run with proper task cancellation on interrupt.
+    # This ensures all tasks are cancelled and resources are released.
     try:
         asyncio.run(
             run_node(
@@ -622,7 +646,17 @@ def main() -> None:
             )
         )
     except KeyboardInterrupt:
+        # asyncio.run() handles task cancellation, but we log for clarity.
         logger.info("Shutting down...")
+    finally:
+        # Force exit to ensure all threads/sockets are released.
+        # This is important for QUIC which may have background threads.
+        import os
+        import sys
+
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":

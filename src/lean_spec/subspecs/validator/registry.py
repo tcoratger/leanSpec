@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Uint64
@@ -50,6 +50,19 @@ class ValidatorManifestEntry(BaseModel):
 
     privkey_file: str
     """Filename of the private key file (e.g., validator_0_sk.ssz)."""
+
+    @field_validator("pubkey_hex", mode="before")
+    @classmethod
+    def parse_pubkey_hex(cls, v: str | int) -> str:
+        """
+        Convert integer to hex string if needed.
+
+        YAML parsers may interpret 0x-prefixed values as integers.
+        """
+        if isinstance(v, int):
+            # Convert to 0x-prefixed hex string, padded to 52 bytes (104 chars).
+            return f"0x{v:0104x}"
+        return v
 
 
 class ValidatorManifest(BaseModel):

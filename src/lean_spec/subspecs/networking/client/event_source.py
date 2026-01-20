@@ -236,7 +236,7 @@ class _QuicStreamReaderWriter:
         return result
 
     def write(self, data: bytes) -> None:
-        """Buffer data for writing."""
+        """Buffer data for writing (synchronous for StreamWriter compatibility)."""
         self._write_buffer += data
 
     async def drain(self) -> None:
@@ -245,10 +245,20 @@ class _QuicStreamReaderWriter:
             await self._stream.write(self._write_buffer)
             self._write_buffer = b""
 
-    def close(self) -> None:
-        """Close the stream."""
-        # Closing is handled by the caller
-        pass
+    async def close(self) -> None:
+        """Close the underlying stream."""
+        await self._stream.close()
+
+    async def finish_write(self) -> None:
+        """Half-close the stream (signal end of writing)."""
+        # Flush any buffered data first
+        if self._write_buffer:
+            await self._stream.write(self._write_buffer)
+            self._write_buffer = b""
+        # Call finish_write if available (QUIC streams have this)
+        finish_write = getattr(self._stream, "finish_write", None)
+        if finish_write is not None:
+            await finish_write()
 
     async def wait_closed(self) -> None:
         """Wait for the stream to close."""
@@ -849,16 +859,20 @@ class LiveNetworkEventSource:
             # Emit connected event.
             await self._events.put(PeerConnectedEvent(peer_id=peer_id))
 
+            # IMPORTANT: Start accepting streams FIRST, before any other operations.
+            #
+            # The peer (listener) will try to open an outbound gossipsub stream to us.
+            # If we don't start accepting streams before our own operations, there's
+            # a deadlock: we wait for them to accept our stream, they wait for us.
+            task = asyncio.create_task(self._accept_streams(peer_id, conn))
+            self._gossip_tasks.add(task)
+            task.add_done_callback(self._gossip_tasks.discard)
+
             # Exchange status.
             await self._exchange_status(peer_id, conn)
 
             # Set up gossipsub stream for full protocol support.
             await self._setup_gossipsub_stream(peer_id, conn)
-
-            # Start background task to accept incoming streams.
-            task = asyncio.create_task(self._accept_streams(peer_id, conn))
-            self._gossip_tasks.add(task)
-            task.add_done_callback(self._gossip_tasks.discard)
 
             logger.info("Connected to peer %s at %s", peer_id, multiaddr)
             return peer_id
@@ -939,9 +953,11 @@ class LiveNetworkEventSource:
 
         1. Register the connection for ReqResp operations
         2. Emit PeerConnectedEvent
-        3. Exchange Status messages
-        4. Set up GossipSub stream
-        5. Start background stream acceptor
+        3. Start background stream acceptor
+
+        The outbound gossipsub stream is set up LATER, after we receive the
+        peer's inbound gossipsub stream. This avoids interfering with the
+        dialer's status exchange.
 
         Args:
             conn: Established QUIC connection.
@@ -952,13 +968,25 @@ class LiveNetworkEventSource:
         self.reqresp_client.register_connection(peer_id, conn)
 
         await self._events.put(PeerConnectedEvent(peer_id=peer_id))
-        await self._exchange_status(peer_id, conn)
-        await self._setup_gossipsub_stream(peer_id, conn)
 
-        # Accept incoming streams in background.
+        # Start accepting streams to handle peer's requests.
         task = asyncio.create_task(self._accept_streams(peer_id, conn))
         self._gossip_tasks.add(task)
         task.add_done_callback(self._gossip_tasks.discard)
+
+        # NOTE: Do NOT initiate status exchange on inbound connections.
+        #
+        # Only the dialer (outbound connection) sends a status request.
+        # The listener (inbound connection) only responds to status requests.
+        # This matches ream's behavior and avoids race conditions where both
+        # sides try to open status streams simultaneously.
+
+        # NOTE: Do NOT set up outbound gossipsub stream immediately.
+        #
+        # Opening a stream to the dialer while they're doing status exchange
+        # causes aioquic to enter a bad state ("cannot call write() after FIN").
+        # Instead, we set up our outbound stream AFTER receiving their inbound
+        # gossipsub stream - see _accept_streams where this is triggered.
 
         logger.info("Accepted QUIC connection from peer %s", peer_id)
 
@@ -978,16 +1006,17 @@ class LiveNetworkEventSource:
         # Emit connected event.
         await self._events.put(PeerConnectedEvent(peer_id=peer_id))
 
-        # Exchange status.
-        await self._exchange_status(peer_id, conn)
-
-        # Set up gossipsub stream for full protocol support.
-        await self._setup_gossipsub_stream(peer_id, conn)
-
-        # Start background task to accept incoming streams.
+        # Start accepting streams to handle peer's requests.
         task = asyncio.create_task(self._accept_streams(peer_id, conn))
         self._gossip_tasks.add(task)
         task.add_done_callback(self._gossip_tasks.discard)
+
+        # NOTE: Do NOT initiate status exchange on inbound connections.
+        # See _handle_inbound_quic_connection for explanation.
+
+        # NOTE: Do NOT set up outbound gossipsub stream immediately.
+        # See _handle_inbound_quic_connection for explanation.
+        # The outbound stream is set up when we receive the peer's inbound stream.
 
         logger.info("Accepted connection from peer %s", peer_id)
 
@@ -1182,7 +1211,11 @@ class LiveNetworkEventSource:
                             peer_id,
                         )
                         protocol_id = await asyncio.wait_for(
-                            negotiate_server(wrapper, wrapper, set(SUPPORTED_PROTOCOLS)),
+                            negotiate_server(
+                                wrapper,
+                                wrapper,  # type: ignore[arg-type]
+                                set(SUPPORTED_PROTOCOLS),
+                            ),
                             timeout=RESP_TIMEOUT,
                         )
                         stream._protocol_id = protocol_id
@@ -1247,13 +1280,37 @@ class LiveNetworkEventSource:
                         self._gossipsub_behavior.add_peer(peer_id, wrapped_stream, inbound=True)
                     )
 
+                    # Now that we've received the peer's inbound stream, set up our
+                    # outbound stream if we don't have one yet.
+                    #
+                    # For dialers: They already set up their outbound stream in dial(),
+                    # so this check prevents opening a duplicate stream.
+                    #
+                    # For listeners: They don't set up an outbound stream immediately
+                    # (to avoid interfering with the dialer's status exchange), so this
+                    # is where their outbound stream gets set up.
+                    if not self._gossipsub_behavior.has_outbound_stream(peer_id):
+                        gossip_task = asyncio.create_task(
+                            self._setup_gossipsub_stream(peer_id, conn)
+                        )
+                        self._gossip_tasks.add(gossip_task)
+                        gossip_task.add_done_callback(self._gossip_tasks.discard)
+
                 elif protocol_id in REQRESP_PROTOCOL_IDS:
                     # ReqResp stream: Status or BlocksByRoot request.
                     #
                     # Handle in a separate task to allow concurrent request processing.
                     # The ReqRespServer handles decoding, dispatching, and responding.
+                    #
+                    # IMPORTANT: For QUIC streams, pass the wrapper (not raw stream).
+                    # The wrapper may have buffered data read during protocol negotiation.
+                    # Passing the raw stream would lose that buffered data.
+                    stream_for_handler = wrapper if isinstance(stream, QuicStream) else stream
                     task = asyncio.create_task(
-                        self._reqresp_server.handle_stream(stream, protocol_id)
+                        self._reqresp_server.handle_stream(
+                            stream_for_handler,  # type: ignore[arg-type]
+                            protocol_id,
+                        )
                     )
                     self._gossip_tasks.add(task)
                     task.add_done_callback(self._gossip_tasks.discard)

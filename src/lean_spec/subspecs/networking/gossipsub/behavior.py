@@ -344,6 +344,19 @@ class GossipsubBehavior:
                 rpc = create_subscription_rpc(list(self._subscriptions), subscribe=True)
                 await self._send_rpc(peer_id, rpc)
 
+    def has_outbound_stream(self, peer_id: PeerId) -> bool:
+        """
+        Check if a peer already has an outbound stream.
+
+        Args:
+            peer_id: Peer identifier.
+
+        Returns:
+            True if the peer has an outbound stream, False otherwise.
+        """
+        state = self._peers.get(peer_id)
+        return state is not None and state.outbound_stream is not None
+
     async def remove_peer(self, peer_id: PeerId) -> None:
         """
         Remove a disconnected peer.
@@ -467,9 +480,17 @@ class GossipsubBehavior:
         mesh_peers = self.mesh.get_mesh_peers(topic)
         mesh_size = len(mesh_peers)
 
-        # Find eligible peers (subscribed to topic, not in mesh)
+        # Find eligible peers (subscribed to topic, not in mesh, and can send to).
+        #
+        # IMPORTANT: Only consider peers we can actually send to.
+        # If we don't have an outbound stream yet (peer just connected, stream
+        # setup still in progress), skip them. They'll become eligible once
+        # their outbound stream is established.
         eligible = []
         for peer_id, state in self._peers.items():
+            # Must have outbound stream to send GRAFT
+            if state.outbound_stream is None:
+                continue
             if topic in state.subscriptions and peer_id not in mesh_peers:
                 # Check backoff
                 backoff_until = state.backoff.get(topic, 0)
@@ -515,8 +536,15 @@ class GossipsubBehavior:
         if not msg_ids:
             return
 
-        # Get all connected peers subscribed to this topic
-        all_topic_peers = {p for p, state in self._peers.items() if topic in state.subscriptions}
+        # Get all connected peers subscribed to this topic (with outbound streams).
+        #
+        # Only include peers we can actually send to. Peers without outbound
+        # streams yet (still setting up) are skipped.
+        all_topic_peers = {
+            p
+            for p, state in self._peers.items()
+            if topic in state.subscriptions and state.outbound_stream is not None
+        }
 
         # Select D_lazy non-mesh peers
         gossip_peers = self.mesh.select_peers_for_gossip(topic, all_topic_peers)
@@ -541,14 +569,18 @@ class GossipsubBehavior:
         """Broadcast subscription change to all peers."""
         rpc = create_subscription_rpc([topic], subscribe)
 
-        for peer_id in self._peers:
-            await self._send_rpc(peer_id, rpc)
+        # Only send to peers we have outbound streams for
+        for peer_id, state in self._peers.items():
+            if state.outbound_stream is not None:
+                await self._send_rpc(peer_id, rpc)
 
-        # If subscribing, send GRAFT to eligible peers
+        # If subscribing, send GRAFT to eligible peers (must have outbound stream)
         if subscribe:
-            eligible = [p for p, s in self._peers.items() if topic in s.subscriptions][
-                : self.params.d
-            ]
+            eligible = [
+                p
+                for p, s in self._peers.items()
+                if topic in s.subscriptions and s.outbound_stream is not None
+            ][: self.params.d]
 
             if eligible:
                 graft_rpc = create_graft_rpc([topic])
@@ -560,7 +592,9 @@ class GossipsubBehavior:
         """Send an RPC to a peer on the outbound stream."""
         state = self._peers.get(peer_id)
         if state is None or state.outbound_stream is None:
-            logger.warning("Cannot send RPC to %s: no outbound stream", peer_id)
+            # Expected during stream setup - peer might only have inbound stream yet.
+            # The outbound stream will be established shortly.
+            logger.debug("Cannot send RPC to %s: no outbound stream yet", peer_id)
             return
 
         try:

@@ -50,6 +50,14 @@ class GenesisConfig(StrictBaseModel):
     Immutable once the chain launches.
     """
 
+    num_validators: int | None = Field(default=None, alias="NUM_VALIDATORS")
+    """
+    Number of validators (optional, for ream compatibility).
+
+    This field is informational and may be included in ream config files.
+    The actual validator count is derived from the genesis_validators list.
+    """
+
     genesis_validators: list[Bytes52] = Field(alias="GENESIS_VALIDATORS")
     """
     Public keys of validators trusted to secure the chain from slot 0.
@@ -69,20 +77,27 @@ class GenesisConfig(StrictBaseModel):
 
     @field_validator("genesis_validators", mode="before")
     @classmethod
-    def parse_hex_pubkeys(cls, v: list[str]) -> list[Bytes52]:
+    def parse_hex_pubkeys(cls, v: list[str | int]) -> list[Bytes52]:
         """
-        Convert hex strings to validated Bytes52 pubkeys.
+        Convert hex strings or integers to validated Bytes52 pubkeys.
 
-        The YAML contains string representations.
-        We parse them into typed Bytes52 objects for validation and use.
+        YAML parsers may interpret 0x-prefixed values as integers.
+        We handle both string and integer inputs for compatibility.
 
         Args:
-            v: List of hex-encoded pubkey strings from YAML.
+            v: List of hex-encoded pubkey strings or integers from YAML.
 
         Returns:
             List of validated Bytes52 pubkey objects.
         """
-        return [Bytes52(pk) for pk in v]
+        result = []
+        for pk in v:
+            if isinstance(pk, int):
+                # YAML parsed 0x... as integer, convert back to hex string.
+                # Pad to 52 bytes (104 hex chars).
+                pk = f"0x{pk:0104x}"
+            result.append(Bytes52(pk))
+        return result
 
     def to_validators(self) -> Validators:
         """
