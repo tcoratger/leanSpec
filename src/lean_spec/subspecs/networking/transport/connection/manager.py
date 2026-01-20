@@ -345,6 +345,11 @@ class ConnectionManager:
         """Our local PeerId."""
         return self._peer_id
 
+    @property
+    def identity_key(self) -> IdentityKeypair:
+        """Our identity keypair for peer ID derivation."""
+        return self._identity_key
+
     async def connect(self, multiaddr: str) -> YamuxConnection:
         """
         Connect to a peer at the given multiaddr.

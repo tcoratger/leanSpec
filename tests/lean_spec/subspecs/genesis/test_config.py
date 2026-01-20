@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from lean_spec.subspecs.containers.slot import Slot
@@ -17,7 +17,7 @@ SAMPLE_PUBKEY_1 = "0x" + "00" * 52
 SAMPLE_PUBKEY_2 = "0x" + "01" * 52
 SAMPLE_PUBKEY_3 = "0x" + "02" * 52
 
-SAMPLE_JSON = json.dumps(
+SAMPLE_YAML = yaml.dump(
     {
         "GENESIS_TIME": 1704085200,
         "GENESIS_VALIDATORS": [SAMPLE_PUBKEY_1, SAMPLE_PUBKEY_2, SAMPLE_PUBKEY_3],
@@ -39,30 +39,30 @@ REAM_PUBKEY_3 = (
 )
 
 
-class TestGenesisConfigJsonLoading:
-    """Tests for JSON loading functionality."""
+class TestGenesisConfigYamlLoading:
+    """Tests for YAML loading functionality."""
 
-    def test_load_from_json_string(self) -> None:
-        """Parses JSON with UPPERCASE keys."""
-        config = GenesisConfig.from_json(SAMPLE_JSON)
+    def test_load_from_yaml_string(self) -> None:
+        """Parses YAML with UPPERCASE keys."""
+        config = GenesisConfig.from_yaml(SAMPLE_YAML)
 
         assert config.genesis_time == Uint64(1704085200)
         assert len(config.genesis_validators) == 3
 
-    def test_load_from_json_file(self) -> None:
+    def test_load_from_yaml_file(self) -> None:
         """Loads config from file path."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            f.write(SAMPLE_JSON)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(SAMPLE_YAML)
             f.flush()
 
-            config = GenesisConfig.from_json_file(f.name)
+            config = GenesisConfig.from_yaml_file(f.name)
 
             assert config.genesis_time == Uint64(1704085200)
             assert len(config.genesis_validators) == 3
 
     def test_pubkeys_parsed_correctly(self) -> None:
         """Pubkeys are converted to Bytes52 instances."""
-        config = GenesisConfig.from_json(SAMPLE_JSON)
+        config = GenesisConfig.from_yaml(SAMPLE_YAML)
 
         for pk in config.genesis_validators:
             assert isinstance(pk, Bytes52)
@@ -70,13 +70,13 @@ class TestGenesisConfigJsonLoading:
 
     def test_pubkey_without_0x_prefix(self) -> None:
         """Handles pubkeys without 0x prefix (zeam format)."""
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_TIME": 1704085200,
                 "GENESIS_VALIDATORS": ["00" * 52, "01" * 52],
             }
         )
-        config = GenesisConfig.from_json(json_content)
+        config = GenesisConfig.from_yaml(yaml_content)
 
         assert len(config.genesis_validators) == 2
         assert config.genesis_validators[0] == Bytes52(b"\x00" * 52)
@@ -87,7 +87,7 @@ class TestGenesisConfigValidators:
 
     def test_to_validators_creates_indexed_list(self) -> None:
         """Validators have correct indices."""
-        config = GenesisConfig.from_json(SAMPLE_JSON)
+        config = GenesisConfig.from_yaml(SAMPLE_YAML)
         validators = config.to_validators()
 
         assert len(validators.data) == 3
@@ -98,13 +98,13 @@ class TestGenesisConfigValidators:
 
     def test_empty_validators_list(self) -> None:
         """Handles empty validator list."""
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_TIME": 1704085200,
                 "GENESIS_VALIDATORS": [],
             }
         )
-        config = GenesisConfig.from_json(json_content)
+        config = GenesisConfig.from_yaml(yaml_content)
         validators = config.to_validators()
 
         assert len(validators.data) == 0
@@ -115,7 +115,7 @@ class TestGenesisConfigState:
 
     def test_create_state_returns_valid_genesis(self) -> None:
         """State has correct genesis time and validators."""
-        config = GenesisConfig.from_json(SAMPLE_JSON)
+        config = GenesisConfig.from_yaml(SAMPLE_YAML)
         state = config.create_state()
 
         # Genesis time is stored in the state's config.
@@ -129,45 +129,45 @@ class TestGenesisConfigValidation:
 
     def test_invalid_pubkey_raises_validation_error(self) -> None:
         """Rejects malformed hex."""
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_TIME": 1704085200,
                 "GENESIS_VALIDATORS": ["not_valid_hex"],
             }
         )
         with pytest.raises(ValidationError):
-            GenesisConfig.from_json(json_content)
+            GenesisConfig.from_yaml(yaml_content)
 
     def test_wrong_length_pubkey_raises_error(self) -> None:
         """Rejects pubkeys with wrong length."""
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_TIME": 1704085200,
                 "GENESIS_VALIDATORS": ["0x0011223344"],
             }
         )
         with pytest.raises(SSZValueError):
-            GenesisConfig.from_json(json_content)
+            GenesisConfig.from_yaml(yaml_content)
 
     def test_missing_genesis_time_raises_error(self) -> None:
         """Requires GENESIS_TIME field."""
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_VALIDATORS": [SAMPLE_PUBKEY_1],
             }
         )
         with pytest.raises(ValidationError):
-            GenesisConfig.from_json(json_content)
+            GenesisConfig.from_yaml(yaml_content)
 
     def test_missing_validators_raises_error(self) -> None:
         """Requires GENESIS_VALIDATORS field."""
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_TIME": 1704085200,
             }
         )
         with pytest.raises(ValidationError):
-            GenesisConfig.from_json(json_content)
+            GenesisConfig.from_yaml(yaml_content)
 
 
 class TestReamCompatibility:
@@ -176,13 +176,13 @@ class TestReamCompatibility:
     def test_ream_format_config(self) -> None:
         """Loads config in ream format with 0x-prefixed pubkeys."""
         # This matches the format used in ream/bin/ream/assets/lean/config.yaml
-        json_content = json.dumps(
+        yaml_content = yaml.dump(
             {
                 "GENESIS_TIME": 1704085200,
                 "GENESIS_VALIDATORS": [REAM_PUBKEY_1, REAM_PUBKEY_2, REAM_PUBKEY_3],
             }
         )
-        config = GenesisConfig.from_json(json_content)
+        config = GenesisConfig.from_yaml(yaml_content)
 
         assert config.genesis_time == Uint64(1704085200)
         assert len(config.genesis_validators) == 3

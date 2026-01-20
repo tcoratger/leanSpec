@@ -78,11 +78,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from lean_spec.snappy import frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.networking.transport.connection.types import Stream
+from lean_spec.subspecs.networking.varint import decode_varint
 from lean_spec.types import Bytes32
 
-from .codec import CodecError, ResponseCode, decode_request
+from .codec import ResponseCode
 from .message import (
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
@@ -168,7 +170,15 @@ class YamuxResponseStream:
         # 2. Adding the varint length prefix
         # 3. Compressing with Snappy framing
         encoded = ResponseCode.SUCCESS.encode(ssz_data)
-        await self._stream.write(encoded)
+
+        # Write using sync write + async drain for compatibility with both
+        # raw QUIC streams (async write) and wrapper streams (sync write + drain).
+        write_result = self._stream.write(encoded)
+        if hasattr(write_result, "__await__"):
+            await write_result
+        drain = getattr(self._stream, "drain", None)
+        if drain is not None:
+            await drain()
 
     async def send_error(self, code: ResponseCode, message: str) -> None:
         """
@@ -187,7 +197,14 @@ class YamuxResponseStream:
         # - SERVER_ERROR (2): Internal failure, handler exception
         # - RESOURCE_UNAVAILABLE (3): Block/blob not found
         encoded = code.encode(message.encode("utf-8"))
-        await self._stream.write(encoded)
+
+        # Write using sync write + async drain for compatibility.
+        write_result = self._stream.write(encoded)
+        if hasattr(write_result, "__await__"):
+            await write_result
+        drain = getattr(self._stream, "drain", None)
+        if drain is not None:
+            await drain()
 
     async def finish(self) -> None:
         """Close the stream gracefully."""
@@ -428,40 +445,21 @@ class ReqRespServer:
         response = YamuxResponseStream(_stream=stream)
 
         try:
-            # Step 1: Read the complete request before processing.
+            # Step 1: Read and decode the request.
             #
-            # Why read everything first?
+            # _read_request handles the wire format:
+            # - Reads varint length prefix
+            # - Reads and decompresses Snappy framed payload
+            # - Returns raw SSZ bytes
             #
-            # 1. Simplicity: No streaming parser needed for small requests.
-            # 2. Validation: Can reject malformed requests before touching state.
-            # 3. Atomic handling: Either process the full request or reject it.
-            #
-            # Request sizes are bounded by MAX_PAYLOAD_SIZE (10 MiB) in codec.py.
-            # Typical sizes: Status ~100 bytes, BlocksByRoot ~1KB.
-            data = await self._read_request(stream)
-            if not data:
+            # This does NOT wait for stream close - it reads exactly
+            # the amount of data specified by the length prefix.
+            ssz_bytes = await self._read_request(stream)
+            if not ssz_bytes:
                 await response.send_error(ResponseCode.INVALID_REQUEST, "Empty request")
                 return
 
-            # Step 2: Decode wire format to raw SSZ bytes.
-            #
-            # The wire format wraps SSZ with:
-            #
-            # - Varint length prefix (for buffer allocation)
-            # - Snappy framing (for compression and checksums)
-            #
-            # Decoding validates the length matches and checksums pass.
-            try:
-                ssz_bytes = decode_request(data)
-            except CodecError as e:
-                # Wire format error: malformed varint, bad Snappy, length mismatch.
-                #
-                # This is INVALID_REQUEST because the peer sent bad data.
-                logger.debug("Request decode error: %s", e)
-                await response.send_error(ResponseCode.INVALID_REQUEST, str(e))
-                return
-
-            # Step 3: Dispatch based on protocol ID.
+            # Step 2: Dispatch based on protocol ID.
             #
             # The protocol ID was negotiated via multistream-select before
             # this stream was created. It tells us:
@@ -496,23 +494,60 @@ class ReqRespServer:
 
     async def _read_request(self, stream: Stream) -> bytes:
         """
-        Read all request data from a stream.
+        Read length-prefixed request data from a stream.
 
-        Accumulates chunks until the stream closes.
+        The wire format is: [varint_length][snappy_framed_payload]
+
+        Reads the varint length first, then reads until we have enough
+        data to decompress successfully. Does NOT wait for stream close.
 
         Args:
             stream: Stream to read from.
 
         Returns:
-            Complete request data.
+            Complete SSZ request data (decompressed).
         """
         buffer = bytearray()
-        while True:
+
+        # Read until we have the varint length prefix
+        declared_length = None
+        varint_size = 0
+
+        while declared_length is None:
             chunk = await stream.read()
             if not chunk:
-                break
+                # Stream closed before we got the length
+                return bytes(buffer)
             buffer.extend(chunk)
-        return bytes(buffer)
+
+            # Try to decode the varint
+            try:
+                declared_length, varint_size = decode_varint(bytes(buffer))
+            except Exception:
+                # Need more data for varint
+                continue
+
+        # Now read until we can successfully decompress
+        compressed_data = buffer[varint_size:]
+
+        while True:
+            try:
+                decompressed = frame_decompress(bytes(compressed_data))
+                if len(decompressed) == declared_length:
+                    return decompressed
+                # Length mismatch - need more data
+            except Exception:
+                # Decompression failed - need more data
+                pass
+
+            chunk = await stream.read()
+            if not chunk:
+                # Stream closed, try one more decompress
+                try:
+                    return frame_decompress(bytes(compressed_data))
+                except Exception:
+                    return bytes(buffer)
+            compressed_data.extend(chunk)
 
     async def _dispatch(
         self,

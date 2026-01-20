@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
@@ -78,15 +78,15 @@ class TestValidatorRegistry:
         assert not registry.has(Uint64(1))
 
 
-class TestValidatorRegistryFromJson:
-    """Tests for JSON loading."""
+class TestValidatorRegistryFromYaml:
+    """Tests for YAML loading."""
 
-    def test_from_json_basic(self, tmp_path: Path) -> None:
-        """Registry loads from JSON files."""
-        # Create validators.json
-        validators_file = tmp_path / "validators.json"
+    def test_from_yaml_basic(self, tmp_path: Path) -> None:
+        """Registry loads from YAML files."""
+        # Create validators.yaml
+        validators_file = tmp_path / "validators.yaml"
         validators_file.write_text(
-            json.dumps(
+            yaml.dump(
                 {
                     "node_0": [0, 1],
                     "node_1": [2],
@@ -94,15 +94,22 @@ class TestValidatorRegistryFromJson:
             )
         )
 
-        # Create manifest.json
-        manifest_file = tmp_path / "manifest.json"
+        # Create validator-keys-manifest.yaml with all required fields
+        manifest_file = tmp_path / "validator-keys-manifest.yaml"
         manifest_file.write_text(
-            json.dumps(
+            yaml.dump(
                 {
+                    "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+                    "hash_function": "Poseidon2",
+                    "encoding": "TargetSum",
+                    "lifetime": 32,
+                    "log_num_active_epochs": 5,
+                    "num_active_epochs": 32,
+                    "num_validators": 3,
                     "validators": [
-                        {"index": 0, "privkey_file": "key_0.ssz"},
-                        {"index": 1, "privkey_file": "key_1.ssz"},
-                        {"index": 2, "privkey_file": "key_2.ssz"},
+                        {"index": 0, "pubkey_hex": "0x" + "00" * 52, "privkey_file": "key_0.ssz"},
+                        {"index": 1, "pubkey_hex": "0x" + "01" * 52, "privkey_file": "key_1.ssz"},
+                        {"index": 2, "pubkey_hex": "0x" + "02" * 52, "privkey_file": "key_2.ssz"},
                     ],
                 }
             )
@@ -118,7 +125,7 @@ class TestValidatorRegistryFromJson:
             "lean_spec.subspecs.xmss.SecretKey.decode_bytes",
             return_value=mock_key,
         ):
-            registry = ValidatorRegistry.from_json(
+            registry = ValidatorRegistry.from_yaml(
                 node_id="node_0",
                 validators_path=validators_file,
                 manifest_path=manifest_file,
@@ -129,15 +136,28 @@ class TestValidatorRegistryFromJson:
         assert registry.has(Uint64(1))
         assert not registry.has(Uint64(2))
 
-    def test_from_json_unknown_node(self, tmp_path: Path) -> None:
+    def test_from_yaml_unknown_node(self, tmp_path: Path) -> None:
         """Unknown node returns empty registry."""
-        validators_file = tmp_path / "validators.json"
-        validators_file.write_text(json.dumps({"node_0": [0]}))
+        validators_file = tmp_path / "validators.yaml"
+        validators_file.write_text(yaml.dump({"node_0": [0]}))
 
-        manifest_file = tmp_path / "manifest.json"
-        manifest_file.write_text(json.dumps({"validators": []}))
+        manifest_file = tmp_path / "validator-keys-manifest.yaml"
+        manifest_file.write_text(
+            yaml.dump(
+                {
+                    "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+                    "hash_function": "Poseidon2",
+                    "encoding": "TargetSum",
+                    "lifetime": 32,
+                    "log_num_active_epochs": 5,
+                    "num_active_epochs": 32,
+                    "num_validators": 0,
+                    "validators": [],
+                }
+            )
+        )
 
-        registry = ValidatorRegistry.from_json(
+        registry = ValidatorRegistry.from_yaml(
             node_id="unknown_node",
             validators_path=validators_file,
             manifest_path=manifest_file,
@@ -145,17 +165,24 @@ class TestValidatorRegistryFromJson:
 
         assert len(registry) == 0
 
-    def test_from_json_missing_validator_in_manifest(self, tmp_path: Path) -> None:
+    def test_from_yaml_missing_validator_in_manifest(self, tmp_path: Path) -> None:
         """Missing validator in manifest is skipped."""
-        validators_file = tmp_path / "validators.json"
-        validators_file.write_text(json.dumps({"node_0": [0, 99]}))
+        validators_file = tmp_path / "validators.yaml"
+        validators_file.write_text(yaml.dump({"node_0": [0, 99]}))
 
-        manifest_file = tmp_path / "manifest.json"
+        manifest_file = tmp_path / "validator-keys-manifest.yaml"
         manifest_file.write_text(
-            json.dumps(
+            yaml.dump(
                 {
+                    "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+                    "hash_function": "Poseidon2",
+                    "encoding": "TargetSum",
+                    "lifetime": 32,
+                    "log_num_active_epochs": 5,
+                    "num_active_epochs": 32,
+                    "num_validators": 1,
                     "validators": [
-                        {"index": 0, "privkey_file": "key_0.ssz"},
+                        {"index": 0, "pubkey_hex": "0x" + "00" * 52, "privkey_file": "key_0.ssz"},
                     ],
                 }
             )
@@ -168,7 +195,7 @@ class TestValidatorRegistryFromJson:
             "lean_spec.subspecs.xmss.SecretKey.decode_bytes",
             return_value=mock_key,
         ):
-            registry = ValidatorRegistry.from_json(
+            registry = ValidatorRegistry.from_yaml(
                 node_id="node_0",
                 validators_path=validators_file,
                 manifest_path=manifest_file,
@@ -177,3 +204,32 @@ class TestValidatorRegistryFromJson:
         # Only index 0 should be loaded (99 is not in manifest)
         assert len(registry) == 1
         assert registry.has(Uint64(0))
+
+    def test_from_yaml_empty_validators_file(self, tmp_path: Path) -> None:
+        """Empty validators.yaml returns empty registry."""
+        validators_file = tmp_path / "validators.yaml"
+        validators_file.write_text("")
+
+        manifest_file = tmp_path / "validator-keys-manifest.yaml"
+        manifest_file.write_text(
+            yaml.dump(
+                {
+                    "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+                    "hash_function": "Poseidon2",
+                    "encoding": "TargetSum",
+                    "lifetime": 32,
+                    "log_num_active_epochs": 5,
+                    "num_active_epochs": 32,
+                    "num_validators": 0,
+                    "validators": [],
+                }
+            )
+        )
+
+        registry = ValidatorRegistry.from_yaml(
+            node_id="node_0",
+            validators_path=validators_file,
+            manifest_path=manifest_file,
+        )
+
+        assert len(registry) == 0

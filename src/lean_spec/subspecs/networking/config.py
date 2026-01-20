@@ -65,3 +65,18 @@ Default protocol ID per Ethereum consensus spec requirements.
 The Ethereum consensus P2P spec states:
 "Clients MUST support the gossipsub v1 libp2p Protocol including the gossipsub v1.1 extension."
 """
+
+# --- Gossipsub Parameters ---
+
+PRUNE_BACKOFF: Final[int] = 60
+"""Default PRUNE backoff duration in seconds.
+
+When a peer is pruned from the mesh, they must wait this duration
+before attempting to re-graft. This prevents rapid mesh churn.
+"""
+
+MESSAGE_ID_SIZE: Final[int] = 20
+"""Size of gossipsub message IDs in bytes.
+
+Per Ethereum spec, message IDs are the first 20 bytes of SHA256(domain + topic_len + topic + data).
+"""

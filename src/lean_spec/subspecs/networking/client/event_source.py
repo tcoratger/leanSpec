@@ -31,7 +31,7 @@ When a peer publishes a block or attestation, it arrives as follows:
 1. Peer opens a yamux stream with protocol ID "/meshsub/1.1.0".
 2. Peer sends: [topic_length][topic][data_length][compressed_data].
 3. We parse the topic to determine message type (block vs attestation).
-4. We decompress the Snappy-framed payload.
+4. We decompress the raw Snappy payload.
 5. We decode the SSZ bytes into a typed object.
 6. We emit a GossipBlockEvent or GossipAttestationEvent.
 
@@ -95,7 +95,7 @@ References:
     - Ethereum P2P spec: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
     - Gossipsub v1.1: https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md
     - SSZ spec: https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md
-    - Snappy framing: https://github.com/google/snappy/blob/master/framing_format.txt
+    - Snappy format: https://github.com/google/snappy/blob/main/format_description.txt
 """
 
 from __future__ import annotations
@@ -104,10 +104,19 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.snappy import SnappyDecompressionError, frame_decompress
+from lean_spec.snappy import SnappyDecompressionError, decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
-from lean_spec.subspecs.networking.config import GOSSIPSUB_DEFAULT_PROTOCOL_ID
+from lean_spec.subspecs.networking.config import (
+    GOSSIPSUB_DEFAULT_PROTOCOL_ID,
+    GOSSIPSUB_PROTOCOL_ID_V12,
+    RESP_TIMEOUT,
+)
+from lean_spec.subspecs.networking.gossipsub.behavior import (
+    GossipsubBehavior,
+    GossipsubMessageEvent,
+)
+from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
@@ -130,9 +139,21 @@ from lean_spec.subspecs.networking.transport.connection.manager import (
     YamuxConnection,
 )
 from lean_spec.subspecs.networking.transport.connection.types import Stream
-from lean_spec.subspecs.networking.varint import VarintError
-from lean_spec.subspecs.networking.varint import decode as decode_varint
-from lean_spec.subspecs.networking.varint import encode as encode_varint
+from lean_spec.subspecs.networking.transport.multistream import (
+    NegotiationError,
+    negotiate_server,
+)
+from lean_spec.subspecs.networking.transport.quic.connection import (
+    QuicConnection,
+    QuicConnectionManager,
+    QuicStream,
+    is_quic_multiaddr,
+)
+from lean_spec.subspecs.networking.varint import (
+    VarintError,
+    decode_varint,
+    encode_varint,
+)
 from lean_spec.types.exceptions import SSZSerializationError
 
 from .reqresp_client import ReqRespClient
@@ -141,12 +162,108 @@ logger = logging.getLogger(__name__)
 
 
 class GossipMessageError(Exception):
-    """Raised when a gossip message cannot be processed.
+    """Raised when a gossip message cannot be processed."""
 
-    This error wraps underlying failures (topic parsing, decompression,
-    SSZ decoding) into a single type for cleaner error handling at the
-    stream processing level.
+
+SUPPORTED_PROTOCOLS: frozenset[str] = (
+    frozenset({GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12}) | REQRESP_PROTOCOL_IDS
+)
+"""Protocols supported for incoming stream negotiation.
+
+Includes:
+
+- GossipSub v1.1 and v1.2
+- Request/response protocols (Status, BlocksByRoot)
+"""
+
+
+class _QuicStreamReaderWriter:
+    """Adapts QuicStream for multistream-select negotiation.
+
+    Provides buffered read/write interface matching asyncio StreamReader/Writer.
+    Used during protocol negotiation on both TCP and QUIC streams.
     """
+
+    def __init__(self, stream: QuicStream | Stream) -> None:
+        self._stream = stream
+        self._buffer = b""
+        self._write_buffer = b""
+
+    async def read(self, n: int | None = None) -> bytes:
+        """Read bytes from the stream.
+
+        - If n is provided, returns at most n bytes.
+        - If n is None, returns all available data (no limit).
+
+        If buffer has data, returns from buffer.
+        Otherwise reads from stream and buffers excess.
+        """
+        # If no limit, return all buffered data plus new read
+        if n is None:
+            if self._buffer:
+                result = self._buffer
+                self._buffer = b""
+                return result
+            return await self._stream.read()
+
+        # If we have buffered data, return from that first (up to n bytes)
+        if self._buffer:
+            result = self._buffer[:n]
+            self._buffer = self._buffer[n:]
+            return result
+
+        # Read from stream
+        data = await self._stream.read()
+        if not data:
+            return b""
+
+        # Return up to n bytes, buffer the rest
+        if len(data) > n:
+            self._buffer = data[n:]
+            return data[:n]
+        return data
+
+    async def readexactly(self, n: int) -> bytes:
+        """Read exactly n bytes from the stream."""
+        while len(self._buffer) < n:
+            chunk = await self._stream.read()
+            if not chunk:
+                raise EOFError("Stream closed before enough data received")
+            self._buffer += chunk
+
+        result = self._buffer[:n]
+        self._buffer = self._buffer[n:]
+        return result
+
+    def write(self, data: bytes) -> None:
+        """Buffer data for writing (synchronous for StreamWriter compatibility)."""
+        self._write_buffer += data
+
+    async def drain(self) -> None:
+        """Flush buffered data to the stream."""
+        if self._write_buffer:
+            await self._stream.write(self._write_buffer)
+            self._write_buffer = b""
+
+    async def close(self) -> None:
+        """Close the underlying stream."""
+        await self._stream.close()
+
+    async def finish_write(self) -> None:
+        """Half-close the stream (signal end of writing)."""
+        # Flush any buffered data first
+        if self._write_buffer:
+            await self._stream.write(self._write_buffer)
+            self._write_buffer = b""
+        # Call finish_write if available (QUIC streams have this)
+        finish_write = getattr(self._stream, "finish_write", None)
+        if finish_write is not None:
+            await finish_write()
+
+    async def wait_closed(self) -> None:
+        """Wait for the stream to close."""
+        # No-op for QUIC streams
+        pass
 
 
 @dataclass(slots=True)
@@ -242,15 +359,16 @@ class GossipHandler:
 
         # Step 2: Decompress Snappy-framed data.
         #
-        # Snappy framing splits data into 64KB chunks with CRC32C checksums.
+        # Gossipsub uses raw Snappy compression (not framed).
+        #
+        # Raw Snappy has no stream identifier or CRC checksums.
         # Decompression fails if:
-        #   - Stream identifier is missing or invalid.
-        #   - Chunk CRC doesn't match (corruption detected).
-        #   - Chunk size exceeds 64KB limit.
+        #   - Compressed data is corrupted or truncated.
+        #   - Copy offsets reference data beyond buffer bounds.
         #
         # Failed decompression indicates network corruption or a malicious peer.
         try:
-            ssz_bytes = frame_decompress(compressed_data)
+            ssz_bytes = decompress(compressed_data)
         except SnappyDecompressionError as e:
             raise GossipMessageError(f"Snappy decompression failed: {e}") from e
 
@@ -468,7 +586,7 @@ class LiveNetworkEventSource:
     """
 
     connection_manager: ConnectionManager
-    """Underlying transport manager.
+    """Underlying transport manager for TCP connections.
 
     Handles the full connection stack: TCP, Noise encryption, yamux multiplexing.
     """
@@ -479,16 +597,24 @@ class LiveNetworkEventSource:
     Used for Status exchange and block/attestation requests.
     """
 
+    quic_manager: QuicConnectionManager | None = None
+    """Underlying transport manager for QUIC connections.
+
+    Handles QUIC connections with libp2p-tls authentication.
+    Initialized lazily on first QUIC connection.
+    """
+
     _events: asyncio.Queue[NetworkEvent] = field(default_factory=asyncio.Queue)
     """Queue of pending events to yield.
 
     Events are produced by background tasks and consumed via async iteration.
     """
 
-    _connections: dict[PeerId, YamuxConnection] = field(default_factory=dict)
+    _connections: dict[PeerId, YamuxConnection | QuicConnection] = field(default_factory=dict)
     """Active connections by peer ID.
 
     Used to route outbound messages and track peer state.
+    Supports both yamux (TCP) and QUIC connection types.
     """
 
     _our_status: Status | None = None
@@ -534,11 +660,24 @@ class LiveNetworkEventSource:
     Routes requests to the appropriate handler method.
     """
 
+    _gossipsub_behavior: GossipsubBehavior = field(init=False)
+    """GossipSub behavior for full protocol support.
+
+    Manages mesh topology, control messages (GRAFT/PRUNE/IHAVE/IWANT),
+    and message propagation for interoperability with rust-libp2p and go-libp2p.
+    """
+
+    _gossipsub_event_task: asyncio.Task | None = None
+    """Background task forwarding gossipsub events to our event queue."""
+
     def __post_init__(self) -> None:
         """Initialize handlers with current configuration."""
         object.__setattr__(self, "_gossip_handler", GossipHandler(fork_digest=self._fork_digest))
         object.__setattr__(self, "_reqresp_handler", DefaultRequestHandler())
         object.__setattr__(self, "_reqresp_server", ReqRespServer(handler=self._reqresp_handler))
+        object.__setattr__(
+            self, "_gossipsub_behavior", GossipsubBehavior(params=GossipsubParameters())
+        )
 
     @classmethod
     def create(
@@ -598,6 +737,77 @@ class LiveNetworkEventSource:
         """
         self._reqresp_handler.block_lookup = lookup
 
+    def subscribe_gossip_topic(self, topic: str) -> None:
+        """
+        Subscribe to a gossip topic.
+
+        This enables receiving messages for the topic and participating
+        in mesh management via GRAFT/PRUNE.
+
+        Args:
+            topic: Full topic string (e.g., "/leanconsensus/0x.../block/ssz_snappy").
+        """
+        self._gossipsub_behavior.subscribe(topic)
+        logger.debug("Subscribed to gossip topic %s", topic)
+
+    async def start_gossipsub(self) -> None:
+        """
+        Start the gossipsub behavior.
+
+        This begins the heartbeat loop for mesh maintenance and starts
+        forwarding gossipsub events to our event queue.
+        """
+        await self._gossipsub_behavior.start()
+
+        # Start task to forward gossipsub events to our queue.
+        self._gossipsub_event_task = asyncio.create_task(self._forward_gossipsub_events())
+        self._gossip_tasks.add(self._gossipsub_event_task)
+        self._gossipsub_event_task.add_done_callback(self._gossip_tasks.discard)
+
+        logger.info("GossipSub behavior started")
+
+    async def _forward_gossipsub_events(self) -> None:
+        """Forward events from GossipsubBehavior to our event queue."""
+        try:
+            async for event in self._gossipsub_behavior.events():
+                if isinstance(event, GossipsubMessageEvent):
+                    # Decode the message and emit appropriate event.
+                    await self._handle_gossipsub_message(event)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning("Error forwarding gossipsub events: %s", e)
+
+    async def _handle_gossipsub_message(self, event: GossipsubMessageEvent) -> None:
+        """
+        Handle a message received via GossipSub.
+
+        Decodes the message and emits the appropriate event type.
+
+        Args:
+            event: GossipSub message event from the behavior.
+        """
+        try:
+            # Parse the topic to determine message type.
+            topic = self._gossip_handler.get_topic(event.topic)
+
+            # Decompress and decode the message.
+            message = self._gossip_handler.decode_message(event.topic, event.data)
+
+            # Emit the appropriate event.
+            match topic.kind:
+                case TopicKind.BLOCK:
+                    if isinstance(message, SignedBlockWithAttestation):
+                        await self._emit_gossip_block(message, event.peer_id)
+                case TopicKind.ATTESTATION:
+                    if isinstance(message, SignedAttestation):
+                        await self._emit_gossip_attestation(message, event.peer_id)
+
+            logger.debug("Processed gossipsub message %s from %s", topic.kind.value, event.peer_id)
+
+        except GossipMessageError as e:
+            logger.warning("Failed to process gossipsub message: %s", e)
+
     def __aiter__(self) -> LiveNetworkEventSource:
         """Return self as async iterator."""
         return self
@@ -624,15 +834,22 @@ class LiveNetworkEventSource:
         Connect to a peer at the given multiaddr.
 
         Establishes connection, exchanges Status, and emits events.
+        Automatically detects transport type (TCP or QUIC) from multiaddr.
 
         Args:
-            multiaddr: Address like "/ip4/127.0.0.1/tcp/9000"
+            multiaddr: Address like "/ip4/127.0.0.1/tcp/9000" or
+                      "/ip4/127.0.0.1/udp/9000/quic-v1/p2p/16Uiu2HAm..."
 
         Returns:
             Peer ID on success, None on failure.
         """
         try:
-            conn = await self.connection_manager.connect(multiaddr)
+            # Detect transport type and connect accordingly.
+            if is_quic_multiaddr(multiaddr):
+                conn = await self._dial_quic(multiaddr)
+            else:
+                conn = await self.connection_manager.connect(multiaddr)
+
             peer_id = conn.peer_id
 
             # Register connection.
@@ -642,13 +859,20 @@ class LiveNetworkEventSource:
             # Emit connected event.
             await self._events.put(PeerConnectedEvent(peer_id=peer_id))
 
-            # Exchange status.
-            await self._exchange_status(peer_id, conn)
-
-            # Start background task to accept incoming streams.
+            # IMPORTANT: Start accepting streams FIRST, before any other operations.
+            #
+            # The peer (listener) will try to open an outbound gossipsub stream to us.
+            # If we don't start accepting streams before our own operations, there's
+            # a deadlock: we wait for them to accept our stream, they wait for us.
             task = asyncio.create_task(self._accept_streams(peer_id, conn))
             self._gossip_tasks.add(task)
             task.add_done_callback(self._gossip_tasks.discard)
+
+            # Exchange status.
+            await self._exchange_status(peer_id, conn)
+
+            # Set up gossipsub stream for full protocol support.
+            await self._setup_gossipsub_stream(peer_id, conn)
 
             logger.info("Connected to peer %s at %s", peer_id, multiaddr)
             return peer_id
@@ -657,21 +881,115 @@ class LiveNetworkEventSource:
             logger.warning("Failed to connect to %s: %s", multiaddr, e)
             return None
 
-    async def listen(self, multiaddr: str) -> None:
-        """
-        Start listening for incoming connections.
+    async def _ensure_quic_manager(self) -> None:
+        """Initialize QUIC manager lazily on first use.
 
-        This runs in the background, accepting connections and emitting
-        events for each.
+        Reuses the identity key from the connection manager for consistency.
+        This ensures the same peer ID is used for both TCP and QUIC connections.
+        Called automatically before any QUIC operation.
+        """
+        if self.quic_manager is None:
+            # Reuse the same identity key from the TCP connection manager.
+            # This ensures our peer ID is consistent across all transports.
+            identity_key = self.connection_manager.identity_key
+            self.quic_manager = await QuicConnectionManager.create(identity_key)
+
+    async def _dial_quic(self, multiaddr: str) -> QuicConnection:
+        """Connect to a peer using QUIC transport.
+
+        Ensures the QUIC manager is initialized before connecting.
 
         Args:
-            multiaddr: Address to listen on (e.g., "/ip4/0.0.0.0/tcp/9000")
+            multiaddr: QUIC address like "/ip4/127.0.0.1/udp/9000/quic-v1".
+
+        Returns:
+            Established QUIC connection.
+
+        Raises:
+            QuicTransportError: If connection fails.
+        """
+        await self._ensure_quic_manager()
+        return await self.quic_manager.connect(multiaddr)  # type: ignore[union-attr]
+
+    async def listen(self, multiaddr: str) -> None:
+        """Start listening for incoming connections.
+
+        Automatically detects transport type from multiaddr:
+
+        - QUIC: Routes to QUIC listener
+        - TCP: Routes to TCP listener
+
+        Args:
+            multiaddr: TCP or QUIC address to listen on.
         """
         self._running = True
-        await self.connection_manager.listen(
+
+        if is_quic_multiaddr(multiaddr):
+            await self._listen_quic(multiaddr)
+        else:
+            await self.connection_manager.listen(
+                multiaddr,
+                on_connection=self._handle_inbound_connection,
+            )
+
+    async def _listen_quic(self, multiaddr: str) -> None:
+        """Listen for incoming QUIC connections.
+
+        Ensures the QUIC manager is initialized.
+        Registers the connection callback for accepted connections.
+
+        Args:
+            multiaddr: QUIC address to listen on.
+        """
+        await self._ensure_quic_manager()
+        await self.quic_manager.listen(  # type: ignore[union-attr]
             multiaddr,
-            on_connection=self._handle_inbound_connection,
+            on_connection=self._handle_inbound_quic_connection,
         )
+
+    async def _handle_inbound_quic_connection(self, conn: QuicConnection) -> None:
+        """Handle a new inbound QUIC connection.
+
+        Performs the following steps:
+
+        1. Register the connection for ReqResp operations
+        2. Emit PeerConnectedEvent
+        3. Start background stream acceptor
+
+        The outbound gossipsub stream is set up LATER, after we receive the
+        peer's inbound gossipsub stream. This avoids interfering with the
+        dialer's status exchange.
+
+        Args:
+            conn: Established QUIC connection.
+        """
+        peer_id = conn.peer_id
+
+        self._connections[peer_id] = conn
+        self.reqresp_client.register_connection(peer_id, conn)
+
+        await self._events.put(PeerConnectedEvent(peer_id=peer_id))
+
+        # Start accepting streams to handle peer's requests.
+        task = asyncio.create_task(self._accept_streams(peer_id, conn))
+        self._gossip_tasks.add(task)
+        task.add_done_callback(self._gossip_tasks.discard)
+
+        # NOTE: Do NOT initiate status exchange on inbound connections.
+        #
+        # Only the dialer (outbound connection) sends a status request.
+        # The listener (inbound connection) only responds to status requests.
+        # This matches ream's behavior and avoids race conditions where both
+        # sides try to open status streams simultaneously.
+
+        # NOTE: Do NOT set up outbound gossipsub stream immediately.
+        #
+        # Opening a stream to the dialer while they're doing status exchange
+        # causes aioquic to enter a bad state ("cannot call write() after FIN").
+        # Instead, we set up our outbound stream AFTER receiving their inbound
+        # gossipsub stream - see _accept_streams where this is triggered.
+
+        logger.info("Accepted QUIC connection from peer %s", peer_id)
 
     async def _handle_inbound_connection(self, conn: YamuxConnection) -> None:
         """
@@ -689,20 +1007,24 @@ class LiveNetworkEventSource:
         # Emit connected event.
         await self._events.put(PeerConnectedEvent(peer_id=peer_id))
 
-        # Exchange status.
-        await self._exchange_status(peer_id, conn)
-
-        # Start background task to accept incoming streams.
+        # Start accepting streams to handle peer's requests.
         task = asyncio.create_task(self._accept_streams(peer_id, conn))
         self._gossip_tasks.add(task)
         task.add_done_callback(self._gossip_tasks.discard)
+
+        # NOTE: Do NOT initiate status exchange on inbound connections.
+        # See _handle_inbound_quic_connection for explanation.
+
+        # NOTE: Do NOT set up outbound gossipsub stream immediately.
+        # See _handle_inbound_quic_connection for explanation.
+        # The outbound stream is set up when we receive the peer's inbound stream.
 
         logger.info("Accepted connection from peer %s", peer_id)
 
     async def _exchange_status(
         self,
         peer_id: PeerId,
-        conn: YamuxConnection,
+        conn: YamuxConnection | QuicConnection,
     ) -> None:
         """
         Exchange Status messages with a peer.
@@ -729,6 +1051,36 @@ class LiveNetworkEventSource:
         except Exception as e:
             logger.warning("Status exchange failed with %s: %s", peer_id, e)
 
+    async def _setup_gossipsub_stream(
+        self,
+        peer_id: PeerId,
+        conn: YamuxConnection | QuicConnection,
+    ) -> None:
+        """
+        Set up the GossipSub stream for a peer.
+
+        Opens a persistent stream for gossipsub protocol and registers
+        the peer with the GossipsubBehavior.
+
+        Args:
+            peer_id: Peer identifier.
+            conn: Connection to use.
+        """
+        try:
+            # Open the gossipsub stream.
+            stream = await conn.open_stream(GOSSIPSUB_DEFAULT_PROTOCOL_ID)
+
+            # Wrap in reader/writer for buffered I/O.
+            wrapped_stream = _QuicStreamReaderWriter(stream)
+
+            # Add peer to the gossipsub behavior (outbound stream).
+            await self._gossipsub_behavior.add_peer(peer_id, wrapped_stream, inbound=False)
+
+            logger.info("GossipSub stream established with %s", peer_id)
+
+        except Exception as e:
+            logger.warning("Failed to setup gossipsub stream with %s: %s", peer_id, e)
+
     async def disconnect(self, peer_id: PeerId) -> None:
         """
         Disconnect from a peer.
@@ -746,6 +1098,10 @@ class LiveNetworkEventSource:
     def stop(self) -> None:
         """Stop the event source and cancel background tasks."""
         self._running = False
+
+        # Stop the gossipsub behavior.
+        asyncio.create_task(self._gossipsub_behavior.stop())
+
         for task in self._gossip_tasks:
             task.cancel()
 
@@ -781,7 +1137,9 @@ class LiveNetworkEventSource:
             GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic)
         )
 
-    async def _accept_streams(self, peer_id: PeerId, conn: YamuxConnection) -> None:
+    async def _accept_streams(
+        self, peer_id: PeerId, conn: YamuxConnection | QuicConnection
+    ) -> None:
         """
         Accept incoming streams from a connection.
 
@@ -840,29 +1198,120 @@ class LiveNetworkEventSource:
                     logger.debug("Stream accept failed for %s: %s", peer_id, e)
                     break
 
-                # Route the stream based on its negotiated protocol.
+                # For QUIC streams, we need to negotiate the protocol.
                 #
-                # The protocol ID was determined during multistream-select
-                # when the peer opened the stream. It tells us what kind
-                # of message to expect.
-                protocol_id = stream.protocol_id
+                # QUIC provides the transport but not the application protocol.
+                # Multistream-select runs on top to agree on what protocol to use.
+                # Yamux streams have protocol_id set during negotiation.
+                if isinstance(stream, QuicStream):
+                    try:
+                        wrapper = _QuicStreamReaderWriter(stream)
+                        logger.debug(
+                            "Accepting stream %d from %s, attempting protocol negotiation",
+                            stream.stream_id,
+                            peer_id,
+                        )
+                        protocol_id = await asyncio.wait_for(
+                            negotiate_server(
+                                wrapper,
+                                wrapper,  # type: ignore[arg-type]
+                                set(SUPPORTED_PROTOCOLS),
+                            ),
+                            timeout=RESP_TIMEOUT,
+                        )
+                        stream._protocol_id = protocol_id
+                        logger.debug("Negotiated protocol %s with %s", protocol_id, peer_id)
+                    except asyncio.TimeoutError:
+                        logger.debug(
+                            "Protocol negotiation timeout for %s stream %d",
+                            peer_id,
+                            stream.stream_id,
+                        )
+                        await stream.close()
+                        continue
+                    except NegotiationError as e:
+                        logger.debug(
+                            "Protocol negotiation failed for %s stream %d: %s",
+                            peer_id,
+                            stream.stream_id,
+                            e,
+                        )
+                        await stream.close()
+                        continue
+                    except EOFError:
+                        logger.debug(
+                            "Stream %d closed by peer %s during negotiation",
+                            stream.stream_id,
+                            peer_id,
+                        )
+                        await stream.close()
+                        continue
+                    except Exception as e:
+                        logger.warning(
+                            "Unexpected negotiation error for %s stream %d: %s",
+                            peer_id,
+                            stream.stream_id,
+                            e,
+                        )
+                        await stream.close()
+                        continue
+                else:
+                    # Yamux streams have protocol_id set during accept.
+                    protocol_id = stream.protocol_id
 
-                if protocol_id == GOSSIPSUB_DEFAULT_PROTOCOL_ID:
-                    # Gossipsub stream: contains a block or attestation.
+                if protocol_id in (GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12):
+                    # GossipSub stream: persistent RPC channel for protocol messages.
                     #
-                    # Handle in a separate task to avoid blocking stream acceptance.
-                    # This allows processing multiple gossip messages concurrently.
-                    task = asyncio.create_task(self._handle_gossip_stream(peer_id, stream))
-                    self._gossip_tasks.add(task)
-                    task.add_done_callback(self._gossip_tasks.discard)
+                    # If we receive an inbound gossipsub stream, add the peer to
+                    # the behavior. The behavior will handle all RPC exchange
+                    # (subscriptions, messages, control messages) on this stream.
+                    #
+                    # Libp2p uses separate streams for each direction:
+                    # - Outbound: we opened this to send our RPCs
+                    # - Inbound: they opened this to send us RPCs
+                    #
+                    # We support both v1.1 and v1.2 - the difference is IDONTWANT
+                    # messages which we can handle gracefully.
+                    logger.debug(
+                        "Received inbound gossipsub stream (%s) from %s", protocol_id, peer_id
+                    )
+                    # Wrap in reader/writer for buffered I/O.
+                    wrapped_stream = _QuicStreamReaderWriter(stream)
+                    asyncio.create_task(
+                        self._gossipsub_behavior.add_peer(peer_id, wrapped_stream, inbound=True)
+                    )
+
+                    # Now that we've received the peer's inbound stream, set up our
+                    # outbound stream if we don't have one yet.
+                    #
+                    # For dialers: They already set up their outbound stream in dial(),
+                    # so this check prevents opening a duplicate stream.
+                    #
+                    # For listeners: They don't set up an outbound stream immediately
+                    # (to avoid interfering with the dialer's status exchange), so this
+                    # is where their outbound stream gets set up.
+                    if not self._gossipsub_behavior.has_outbound_stream(peer_id):
+                        gossip_task = asyncio.create_task(
+                            self._setup_gossipsub_stream(peer_id, conn)
+                        )
+                        self._gossip_tasks.add(gossip_task)
+                        gossip_task.add_done_callback(self._gossip_tasks.discard)
 
                 elif protocol_id in REQRESP_PROTOCOL_IDS:
                     # ReqResp stream: Status or BlocksByRoot request.
                     #
                     # Handle in a separate task to allow concurrent request processing.
                     # The ReqRespServer handles decoding, dispatching, and responding.
+                    #
+                    # IMPORTANT: For QUIC streams, pass the wrapper (not raw stream).
+                    # The wrapper may have buffered data read during protocol negotiation.
+                    # Passing the raw stream would lose that buffered data.
+                    stream_for_handler = wrapper if isinstance(stream, QuicStream) else stream
                     task = asyncio.create_task(
-                        self._reqresp_server.handle_stream(stream, protocol_id)
+                        self._reqresp_server.handle_stream(
+                            stream_for_handler,  # type: ignore[arg-type]
+                            protocol_id,
+                        )
                     )
                     self._gossip_tasks.add(task)
                     task.add_done_callback(self._gossip_tasks.discard)
@@ -999,8 +1448,12 @@ class LiveNetworkEventSource:
         """
         Broadcast a message to all connected peers on a topic.
 
-        Used by NetworkService to publish locally-produced blocks and
-        attestations to the gossip network.
+        Uses the GossipSub behavior for proper mesh-based propagation.
+        The behavior handles:
+
+        - Sending to mesh peers
+        - Respecting PRUNE backoffs
+        - Deduplication via message cache
 
         Args:
             topic: Gossip topic string.
@@ -1010,15 +1463,15 @@ class LiveNetworkEventSource:
             logger.debug("No peers connected, cannot publish to %s", topic)
             return
 
-        for peer_id, conn in list(self._connections.items()):
-            try:
-                await self._send_gossip_message(conn, topic, data)
-            except Exception as e:
-                logger.warning("Failed to publish to peer %s: %s", peer_id, e)
+        try:
+            await self._gossipsub_behavior.publish(topic, data)
+            logger.debug("Published message to gossipsub topic %s", topic)
+        except Exception as e:
+            logger.warning("Failed to publish to gossipsub: %s", e)
 
     async def _send_gossip_message(
         self,
-        conn: YamuxConnection,
+        conn: YamuxConnection | QuicConnection,
         topic: str,
         data: bytes,
     ) -> None:

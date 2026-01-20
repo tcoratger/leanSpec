@@ -242,8 +242,8 @@ class TestStoreTicking:
 
         # Store should have been replaced
         assert sync_service.store is not initial_store
-        # New store should have tick record
-        assert len(sync_service.store.tick_calls) == 1
+        # New store should have tick records (initial tick + main loop tick)
+        assert len(sync_service.store.tick_calls) == 2
 
 
 class TestMultipleIntervals:
@@ -302,7 +302,8 @@ class TestEdgeCases:
 
         asyncio.run(run_once())
 
-        assert len(sync_service.store.tick_calls) == 1
+        # Initial tick + main loop tick
+        assert len(sync_service.store.tick_calls) == 2
         assert sync_service.store.tick_calls[0][0] == Uint64(5)
 
     def test_large_genesis_time(self) -> None:
@@ -323,5 +324,6 @@ class TestEdgeCases:
 
         asyncio.run(run_once())
 
-        assert len(sync_service.store.tick_calls) == 1
+        # Initial tick + main loop tick
+        assert len(sync_service.store.tick_calls) == 2
         assert sync_service.store.tick_calls[0][0] == Uint64(int(current_time))

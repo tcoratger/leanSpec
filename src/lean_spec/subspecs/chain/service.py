@@ -68,17 +68,47 @@ class ChainService:
         until each interval boundary and then advancing the store's time.
 
         The loop continues until the service is stopped.
+
+        NOTE: We track the last handled interval to avoid skipping intervals.
+        If processing takes time and we end up in a new interval, we
+        handle it immediately instead of sleeping past it.
         """
         self._running = True
+        last_handled_total_interval: int | None = None
+
+        # Perform initial tick to catch up store time to current wall clock.
+        #
+        # Without this, the store's time stays at 0 until the first interval
+        # boundary, causing attestation validation to reject most attestations.
+        await self._initial_tick()
 
         while self._running:
-            # Sleep until next interval boundary for precise timing.
-            #
-            # Interval boundaries occur every SECONDS_PER_INTERVAL (1 second).
-            # Sleeping to boundaries ensures consistent tick timing.
-            await self._sleep_until_next_interval()
+            # Get current wall-clock time.
+            current_time = Uint64(int(self.clock._time_fn()))
+            genesis_time = self.clock.genesis_time
 
-            # Get current wall-clock time as Unix timestamp.
+            # Wait for genesis if we're before it.
+            if current_time < genesis_time:
+                sleep_duration = int(genesis_time) - int(current_time)
+                await asyncio.sleep(sleep_duration)
+                continue
+
+            # Get current total interval count.
+            total_interval = int(self.clock.total_intervals())
+
+            # If we've already handled this interval, sleep until the next boundary.
+            already_handled = (
+                last_handled_total_interval is not None
+                and total_interval <= last_handled_total_interval
+            )
+            if already_handled:
+                await self._sleep_until_next_interval()
+                # Check if stopped during sleep.
+                if not self._running:
+                    break
+                total_interval = int(self.clock.total_intervals())
+
+            # Get current wall-clock time as Unix timestamp (may have changed after sleep).
             #
             # The store expects an absolute timestamp, not intervals.
             # It internally converts to intervals.
@@ -101,6 +131,27 @@ class ChainService:
             # SyncService owns the authoritative store. After ticking,
             # we update its reference so gossip block processing sees
             # the updated time.
+            self.sync_service.store = new_store
+
+            # Mark this interval as handled.
+            last_handled_total_interval = total_interval
+
+    async def _initial_tick(self) -> None:
+        """
+        Perform initial tick to catch up store time to current wall clock.
+
+        This is called once at startup to ensure the store's time reflects
+        actual wall clock time, not just the genesis anchor time.
+        """
+        current_time = Uint64(int(self.clock._time_fn()))
+        genesis_time = self.clock.genesis_time
+
+        # Only tick if we're past genesis.
+        if current_time >= genesis_time:
+            new_store = self.sync_service.store.on_tick(
+                time=current_time,
+                has_proposal=False,
+            )
             self.sync_service.store = new_store
 
     async def _sleep_until_next_interval(self) -> None:

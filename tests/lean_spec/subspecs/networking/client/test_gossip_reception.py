@@ -17,7 +17,7 @@ import asyncio
 
 import pytest
 
-from lean_spec.snappy import frame_compress
+from lean_spec.snappy import compress, decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
@@ -33,7 +33,7 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
     GossipTopic,
     TopicKind,
 )
-from lean_spec.subspecs.networking.varint import encode as encode_varint
+from lean_spec.subspecs.networking.varint import encode_varint
 from lean_spec.types import Bytes32, Uint64
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 
@@ -131,7 +131,7 @@ def build_gossip_message(topic: str, ssz_data: bytes) -> bytes:
     Format: [topic_len varint][topic][data_len varint][compressed_data]
     """
     topic_bytes = topic.encode("utf-8")
-    compressed_data = frame_compress(ssz_data)
+    compressed_data = compress(ssz_data)
 
     message = bytearray()
     message.extend(encode_varint(len(topic_bytes)))
@@ -245,7 +245,7 @@ class TestGossipHandlerDecodeMessage:
         handler = GossipHandler(fork_digest="0x00000000")
         block = make_test_signed_block()
         ssz_bytes = block.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
         topic_str = make_block_topic()
 
         result = handler.decode_message(topic_str, compressed)
@@ -257,7 +257,7 @@ class TestGossipHandlerDecodeMessage:
         handler = GossipHandler(fork_digest="0x00000000")
         attestation = make_test_signed_attestation()
         ssz_bytes = attestation.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
         topic_str = make_attestation_topic()
 
         result = handler.decode_message(topic_str, compressed)
@@ -267,7 +267,7 @@ class TestGossipHandlerDecodeMessage:
     def test_decode_invalid_topic_format(self) -> None:
         """Raises GossipMessageError for invalid topic format."""
         handler = GossipHandler(fork_digest="0x00000000")
-        compressed = frame_compress(b"\x00" * 32)
+        compressed = compress(b"\x00" * 32)
 
         with pytest.raises(GossipMessageError, match="Invalid topic"):
             handler.decode_message("/bad/topic", compressed)
@@ -276,7 +276,9 @@ class TestGossipHandlerDecodeMessage:
         """Raises GossipMessageError for invalid Snappy data."""
         handler = GossipHandler(fork_digest="0x00000000")
         topic_str = make_block_topic()
-        invalid_snappy = b"\x00\x01\x02\x03"  # Not valid Snappy framed data
+        # Invalid snappy: claims uncompressed length of 1000 bytes but has truncated data
+        # Snappy format: [uncompressed_length varint][compressed_data]
+        invalid_snappy = b"\xe8\x07"  # varint for 1000, but no data following
 
         with pytest.raises(GossipMessageError, match="Snappy decompression failed"):
             handler.decode_message(topic_str, invalid_snappy)
@@ -286,7 +288,7 @@ class TestGossipHandlerDecodeMessage:
         handler = GossipHandler(fork_digest="0x00000000")
         topic_str = make_block_topic()
         # Valid Snappy wrapping garbage SSZ
-        compressed = frame_compress(b"\xff\xff\xff\xff")
+        compressed = compress(b"\xff\xff\xff\xff")
 
         with pytest.raises(GossipMessageError, match="SSZ decode failed"):
             handler.decode_message(topic_str, compressed)
@@ -305,7 +307,7 @@ class TestGossipHandlerDecodeMessage:
         block = make_test_signed_block()
         ssz_bytes = block.encode_bytes()
         truncated = ssz_bytes[:10]  # Truncate SSZ data
-        compressed = frame_compress(truncated)
+        compressed = compress(truncated)
         topic_str = make_block_topic()
 
         with pytest.raises(GossipMessageError, match="SSZ decode failed"):
@@ -412,7 +414,7 @@ class TestReadGossipMessage:
         async def run() -> tuple[str, bytes]:
             topic = make_block_topic()
             topic_bytes = topic.encode("utf-8")
-            compressed = frame_compress(b"test data")
+            compressed = compress(b"test data")
             # Claim data is 1000 bytes but only provide partial
             data = (
                 encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(1000) + compressed[:5]
@@ -475,9 +477,7 @@ class TestReadGossipMessage:
 
         assert topic == topic_str
         # Verify the compressed data can be decompressed
-        from lean_spec.snappy import frame_decompress
-
-        decompressed = frame_decompress(compressed)
+        decompressed = decompress(compressed)
         assert decompressed == ssz_bytes
 
     def test_read_single_byte_chunks(self) -> None:
@@ -627,21 +627,17 @@ class TestGossipReceptionEdgeCases:
         assert topic_result == topic
         assert compressed == b""
 
-    def test_decode_corrupted_snappy_crc(self) -> None:
-        """Detects CRC corruption in Snappy framed data."""
+    def test_decode_corrupted_snappy_data(self) -> None:
+        """Detects corruption in Snappy compressed data."""
         handler = GossipHandler(fork_digest="0x00000000")
-        block = make_test_signed_block()
-        ssz_bytes = block.encode_bytes()
-        compressed = bytearray(frame_compress(ssz_bytes))
-
-        # Corrupt the CRC (located after stream identifier and chunk header)
-        if len(compressed) > 14:
-            compressed[14] ^= 0xFF
-
         topic_str = make_block_topic()
 
+        # Create truncated snappy data that claims large uncompressed length
+        # This will fail during decompression with "Truncated" or similar error
+        corrupted = b"\xff\xff\xff\x7f"  # varint claiming huge uncompressed length
+
         with pytest.raises(GossipMessageError, match="Snappy decompression failed"):
-            handler.decode_message(topic_str, bytes(compressed))
+            handler.decode_message(topic_str, corrupted)
 
     def test_very_long_topic_string(self) -> None:
         """Handles messages with unusually long topic strings."""
@@ -651,7 +647,7 @@ class TestGossipReceptionEdgeCases:
             long_digest = "0x" + "a" * 100
             topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
             topic_bytes = topic.encode("utf-8")
-            compressed = frame_compress(b"test")
+            compressed = compress(b"test")
 
             data = encode_varint(len(topic_bytes)) + topic_bytes
             data += encode_varint(len(compressed)) + compressed
