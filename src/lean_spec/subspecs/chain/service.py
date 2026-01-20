@@ -103,6 +103,9 @@ class ChainService:
             )
             if already_handled:
                 await self._sleep_until_next_interval()
+                # Check if stopped during sleep.
+                if not self._running:
+                    break
                 total_interval = int(self.clock.total_intervals())
 
             # Get current wall-clock time as Unix timestamp (may have changed after sleep).
