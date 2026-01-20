@@ -884,13 +884,14 @@ class LiveNetworkEventSource:
     async def _ensure_quic_manager(self) -> None:
         """Initialize QUIC manager lazily on first use.
 
-        Creates a new identity keypair if no manager exists.
+        Reuses the identity key from the connection manager for consistency.
+        This ensures the same peer ID is used for both TCP and QUIC connections.
         Called automatically before any QUIC operation.
         """
         if self.quic_manager is None:
-            from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-
-            identity_key = IdentityKeypair.generate()
+            # Reuse the same identity key from the TCP connection manager.
+            # This ensures our peer ID is consistent across all transports.
+            identity_key = self.connection_manager.identity_key
             self.quic_manager = await QuicConnectionManager.create(identity_key)
 
     async def _dial_quic(self, multiaddr: str) -> QuicConnection:
