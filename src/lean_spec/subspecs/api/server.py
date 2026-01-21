@@ -188,7 +188,7 @@ class ApiServer:
 
         return web.json_response(
             {
-                "slot": int(justified.slot),
+                "slot": justified.slot,
                 "root": justified.root.hex(),
             }
         )
