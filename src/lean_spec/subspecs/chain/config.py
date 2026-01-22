@@ -1,13 +1,7 @@
-"""
-Chain and Consensus Configuration Specification
-
-This file defines the core consensus parameters and chain presets for the
-Lean Consensus Experimental Chain.
-"""
+"""Chain and Consensus Configuration Specification"""
 
 from typing_extensions import Final
 
-from lean_spec.types.base import StrictBaseModel
 from lean_spec.types.uint import Uint64
 
 # --- Time Parameters ---
@@ -36,27 +30,3 @@ of approximately 12.1 days.
 
 VALIDATOR_REGISTRY_LIMIT: Final = Uint64(2**12)
 """The maximum number of validators that can be in the registry."""
-
-
-class _ChainConfig(StrictBaseModel):
-    """
-    A model holding the canonical, immutable configuration constants
-    for the chain.
-    """
-
-    # Time Parameters
-    seconds_per_slot: Uint64
-    justification_lookback_slots: Uint64
-
-    # State List Length Presets
-    historical_roots_limit: Uint64
-    validator_registry_limit: Uint64
-
-
-# The Devnet Chain Configuration.
-DEVNET_CONFIG: Final = _ChainConfig(
-    seconds_per_slot=SECONDS_PER_SLOT,
-    justification_lookback_slots=JUSTIFICATION_LOOKBACK_SLOTS,
-    historical_roots_limit=HISTORICAL_ROOTS_LIMIT,
-    validator_registry_limit=VALIDATOR_REGISTRY_LIMIT,
-)
