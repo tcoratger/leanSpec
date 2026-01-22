@@ -24,6 +24,7 @@ How It Works
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -34,6 +35,8 @@ from .config import SECONDS_PER_INTERVAL
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.sync import SyncService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -132,6 +135,25 @@ class ChainService:
             # we update its reference so gossip block processing sees
             # the updated time.
             self.sync_service.store = new_store
+
+            # Log slot progression after tick using SlotClock methods
+            current_slot = int(self.clock.current_slot())
+            current_interval = int(self.clock.total_intervals())
+
+            # Get head and finalized info for logging (defensive for testing/mocking)
+            head_str = new_store.head.hex() if hasattr(new_store, "head") else "unknown"
+            finalized_slot = (
+                new_store.latest_finalized.slot if hasattr(new_store, "latest_finalized") else 0
+            )
+
+            logger.info(
+                "Tick: slot=%d interval=%d time=%d head=%s finalized=slot%d",
+                current_slot,
+                current_interval,
+                current_time,
+                head_str,
+                finalized_slot,
+            )
 
             # Mark this interval as handled.
             last_handled_total_interval = total_interval
