@@ -3,7 +3,6 @@
 from .aggregated_attestation_spec import AggregatedAttestationSpec
 from .block_spec import BlockSpec
 from .genesis import generate_pre_state
-from .signed_attestation_spec import SignedAttestationSpec
 from .state_expectation import StateExpectation
 from .step_types import (
     AttestationStep,
@@ -21,7 +20,6 @@ __all__ = [
     "AttestationCheck",
     "BaseForkChoiceStep",
     "BlockSpec",
-    "SignedAttestationSpec",
     "TickStep",
     "BlockStep",
     "AttestationStep",
