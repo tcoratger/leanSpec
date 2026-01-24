@@ -82,7 +82,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
     """
     Test fixture for verifying signatures on SignedBlockWithAttestation.
 
-    The fixture takes a BlockSpec and optional SignedAttestationSpec inputs and generates
+    The fixture takes a BlockSpec and optional AggregatedAttestationSpec inputs and generates
     a complete SignedBlockWithAttestation as the test output.
 
     Use the generated test vectors to test that client implementation can verify signatures

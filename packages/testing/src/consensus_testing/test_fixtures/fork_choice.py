@@ -57,11 +57,6 @@ class ForkChoiceTest(BaseConsensusFixture):
 
     This tests LMD-GHOST algorithm, proposer boost, reorgs, and
     timing-sensitive behavior.
-
-    Structure:
-        anchor_state: Initial trusted state
-        anchor_block: Initial trusted block
-        steps: Sequence of events and checks
     """
 
     format_name: ClassVar[str] = "fork_choice_test"
