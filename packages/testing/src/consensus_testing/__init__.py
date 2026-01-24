@@ -10,6 +10,7 @@ from .test_fixtures import (
     VerifySignaturesTest,
 )
 from .test_types import (
+    AggregatedAttestationCheck,
     AggregatedAttestationSpec,
     AttestationCheck,
     AttestationStep,
@@ -48,6 +49,7 @@ __all__ = [
     "StateExpectation",
     "StoreChecks",
     "AttestationCheck",
+    "AggregatedAttestationCheck",
     # Type aliases for test function signatures
     "StateTransitionTestFiller",
     "ForkChoiceTestFiller",

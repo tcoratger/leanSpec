@@ -98,3 +98,45 @@ def test_invalid_aggregated_attestation_signature(
         ),
         expect_exception=AssertionError,
     )
+
+
+def test_valid_signature_wrong_validator(
+    verify_signatures_test: VerifySignaturesTestFiller,
+) -> None:
+    """
+    Test rejection when valid signatures don't match claimed validators.
+
+    Scenario
+    --------
+    - Block at slot 1 with 4 validators
+    - Aggregated attestation claims validators 0 and 1
+    - Signatures are cryptographically valid but from validators 2 and 3
+
+    Expected Behavior
+    -----------------
+    Verification rejects the attestation. The signatures are valid, but they
+    were created with different private keys than the claimed validators' keys.
+
+    Why This Matters
+    ----------------
+    Ensures verification checks the binding between validator identity and signature.
+    A valid signature alone is insufficient - it must correspond to the claimed signer.
+    This prevents attacks where an adversary substitutes their own valid signature
+    for another validator's attestation.
+    """
+    verify_signatures_test(
+        anchor_state=generate_pre_state(num_validators=4),
+        block=BlockSpec(
+            slot=Slot(1),
+            attestations=[
+                AggregatedAttestationSpec(
+                    validator_ids=[Uint64(0), Uint64(1)],
+                    signer_ids=[Uint64(2), Uint64(3)],
+                    slot=Slot(1),
+                    target_slot=Slot(0),
+                    target_root_label="genesis",
+                ),
+            ],
+        ),
+        expect_exception=AssertionError,
+    )

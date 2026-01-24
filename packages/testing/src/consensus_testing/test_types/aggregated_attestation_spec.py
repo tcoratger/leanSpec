@@ -38,3 +38,17 @@ class AggregatedAttestationSpec(CamelModel):
 
     Defaults to True (valid signatures).
     """
+
+    signer_ids: list[Uint64] | None = None
+    """
+    Override which validators actually sign the attestation.
+
+    When None (default), signatures are generated using the validators in validator_ids.
+    When specified, signatures are generated using these validator indices instead.
+
+    This creates a mismatch between claimed participants and actual signers.
+    Useful for testing that verification rejects attestations where valid signatures
+    don't correspond to the claimed validators.
+
+    Must have same length as validator_ids when specified.
+    """

@@ -276,8 +276,13 @@ class ForkChoiceTest(BaseConsensusFixture):
                 # Labels in checks are resolved to actual block roots.
                 if step.checks is not None:
                     step.checks.fill_hash_from_label(self._block_registry)
+                    # Pass filled_block for BlockStep to enable block body attestation checks
+                    filled_block = step._filled_block if isinstance(step, BlockStep) else None
                     step.checks.validate_against_store(
-                        store, step_index=i, block_registry=self._block_registry
+                        store,
+                        step_index=i,
+                        block_registry=self._block_registry,
+                        filled_block=filled_block,
                     )
 
             except Exception as e:
@@ -357,6 +362,25 @@ class ForkChoiceTest(BaseConsensusFixture):
         gossip_signatures = dict(store.gossip_signatures)
         gossip_signatures.update(attestation_signatures)
 
+        # Collect attestations from the store if requested.
+        #
+        # Previous proposers' attestations become available for inclusion.
+        # This makes test vectors more realistic.
+        available_attestations: list[Attestation] | None = None
+        known_block_roots: set[Bytes32] | None = None
+
+        if spec.include_store_attestations:
+            # Gather all attestations: both active and recently received.
+            available_attestations = [
+                Attestation(validator_id=vid, data=data)
+                for vid, data in store.latest_known_attestations.items()
+            ]
+            available_attestations.extend(
+                Attestation(validator_id=vid, data=data)
+                for vid, data in store.latest_new_attestations.items()
+            )
+            known_block_roots = set(store.blocks.keys())
+
         # Build the block using spec logic
         #
         # State handles the core block construction.
@@ -367,6 +391,8 @@ class ForkChoiceTest(BaseConsensusFixture):
             proposer_index=proposer_index,
             parent_root=parent_root,
             attestations=attestations,
+            available_attestations=available_attestations,
+            known_block_roots=known_block_roots,
             gossip_signatures=gossip_signatures,
             aggregated_payloads=store.aggregated_payloads,
         )

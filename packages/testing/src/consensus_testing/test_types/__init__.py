@@ -11,13 +11,14 @@ from .step_types import (
     ForkChoiceStep,
     TickStep,
 )
-from .store_checks import AttestationCheck, StoreChecks
+from .store_checks import AggregatedAttestationCheck, AttestationCheck, StoreChecks
 
 __all__ = [
     "AggregatedAttestationSpec",
     "StateExpectation",
     "StoreChecks",
     "AttestationCheck",
+    "AggregatedAttestationCheck",
     "BaseForkChoiceStep",
     "BlockSpec",
     "TickStep",
