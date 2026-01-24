@@ -1,8 +1,13 @@
-"""Fork choice test fixture format."""
+"""
+Fork choice test fixture format.
+
+Tests fork choice scenarios through time-ordered events.
+Validates Store responses to blocks, attestations, and time progression.
+"""
 
 from __future__ import annotations
 
-from typing import ClassVar, List
+from typing import ClassVar, Self
 
 from pydantic import model_validator
 
@@ -49,65 +54,70 @@ class ForkChoiceTest(BaseConsensusFixture):
     """
     Test fixture for event-driven fork choice scenarios.
 
-    Tests the fork choice Store through a sequence of events:
-    - on_tick: Time advancement
-    - on_block: Block arrival
-    - on_attestation: Attestation arrival (from gossip)
-    - checks: Store state validation
+    Fork choice tests simulate a node processing events over time.
+    The Store maintains all chain state needed to compute the head.
 
-    This tests LMD-GHOST algorithm, proposer boost, reorgs, and
-    timing-sensitive behavior.
+    Test structure:
+
+    1. Initialize Store from anchor state and block
+    2. Process steps in order (tick, block, attestation)
+    3. Validate Store state against expected values
+
+    Labels allow building forks.
+    Give a block a label, then reference it as a parent in later blocks.
     """
 
     format_name: ClassVar[str] = "fork_choice_test"
+    """Identifier used in fixture output paths and metadata."""
+
     description: ClassVar[str] = "Tests event-driven fork choice through Store operations"
+    """Human-readable summary for fixture documentation."""
 
     anchor_state: State | None = None
     """
-    The initial trusted consensus state.
+    Initial trusted consensus state.
 
-    If not provided, the framework will use the genesis fixture from pytest.
-    This allows tests to omit genesis for simpler test code while still
-    allowing customization when needed.
+    Most tests start from genesis.
+    The pytest fixture provides this automatically.
     """
 
     anchor_block: Block | None = None
     """
-    The initial trusted block (unsigned).
+    Initial trusted block (unsigned).
 
-    If not provided, will be auto-generated from anchor_state's latest_block_header.
-    This is typically the genesis block.
+    Derived from anchor state if not provided.
     """
 
-    steps: List[ForkChoiceStep]
+    steps: list[ForkChoiceStep]
     """
     Sequence of fork choice events to process.
 
-    Events are processed in order, with store state carrying forward.
+    Events execute in order.
+    Store state carries forward between steps.
+    Each step can validate Store state via checks.
     """
 
     max_slot: Slot | None = None
     """
-    Maximum slot for which XMSS keys should be valid.
+    Maximum slot for XMSS key validity.
 
-    If not provided, will be auto-calculated from the steps. This determines
-    how many slots worth of XMSS signatures can be generated. Keys must be
-    valid up to the highest slot used in any block or attestation.
+    Calculated from steps if not provided.
+    XMSS keys need precomputation up to this slot.
     """
 
     @model_validator(mode="after")
-    def set_anchor_block_default(self) -> ForkChoiceTest:
+    def set_anchor_block_default(self) -> Self:
         """
-        Auto-generate anchor_block from anchor_state if not provided.
+        Auto-generate anchor block from anchor state if not provided.
 
-        This creates a block from the state's latest_block_header, which is
-        typically the genesis block. The state_root is set to the hash of the
-        anchor_state itself.
-
-        Note: anchor_state can be None at this point - it will be injected
-        by the pytest plugin before make_fixture() is called.
+        Most tests start from genesis.
+        Deriving the anchor block from state reduces boilerplate.
         """
         if self.anchor_block is None and self.anchor_state is not None:
+            # Build a minimal genesis block from the state's header fields.
+            #
+            # The state already contains the block header.
+            # We extract its fields to create a matching Block.
             self.anchor_block = Block(
                 slot=self.anchor_state.latest_block_header.slot,
                 proposer_index=self.anchor_state.latest_block_header.proposer_index,
@@ -118,61 +128,73 @@ class ForkChoiceTest(BaseConsensusFixture):
         return self
 
     @model_validator(mode="after")
-    def set_max_slot_default(self) -> ForkChoiceTest:
+    def set_max_slot_default(self) -> Self:
         """
-        Auto-calculate max_slot from steps if not provided.
+        Auto-calculate max slot from steps if not provided.
 
-        Scans all steps to find the highest slot value used in blocks or
-        attestations. This ensures XMSS keys are generated with sufficient
-        capacity for the entire test.
+        XMSS keys require precomputation.
+        We scan steps to find the highest slot needed.
         """
         if self.max_slot is None:
-            max_slot_value = 0
+            max_slot_value = Slot(0)
 
+            # Find the maximum slot across all block and attestation steps.
+            #
+            # XMSS signatures are slot-dependent.
+            # Keys must be generated up to this slot before signing.
             for step in self.steps:
                 if isinstance(step, BlockStep):
-                    max_slot_value = max(max_slot_value, int(step.block.slot))
+                    max_slot_value = max(max_slot_value, step.block.slot)
                 elif isinstance(step, AttestationStep):
-                    max_slot_value = max(max_slot_value, int(step.attestation.message.slot))
+                    max_slot_value = max(max_slot_value, step.attestation.message.slot)
 
-            self.max_slot = Slot(max_slot_value)
+            self.max_slot = max_slot_value
 
         return self
 
-    def make_fixture(self) -> ForkChoiceTest:
+    def make_fixture(self) -> Self:
         """
         Generate the fixture by running the spec's Store.
 
-        This validates the test by:
-        1. Initializing Store from anchor_state and anchor_block
-        2. Processing each step through Store methods (building blocks from specs as needed)
-        3. Validating check assertions against Store state
+        Executes the test against the actual specification:
+
+        1. Initialize Store from anchor state and block
+        2. Process each step through Store
+        3. Validate check assertions
 
         Returns:
-        -------
-        ForkChoiceTest
             The validated fixture (self, since steps contain the test).
 
         Raises:
-        ------
-        AssertionError
-            If any step fails unexpectedly or checks don't match Store state.
+            AssertionError: If any step fails unexpectedly or checks mismatch.
         """
-        # Ensure anchor state and anchor block are set
-        assert self.anchor_state is not None, "anchor_state must be set before make_fixture"
-        assert self.anchor_block is not None, "anchor_block must be set before make_fixture"
-        assert self.max_slot is not None, "max_slot must be set before make_fixture"
+        # Precondition validation
+        #
+        # Pydantic validators should have populated these fields.
+        # These assertions guard against misuse.
+        assert self.anchor_state is not None, "anchor state must be set before making fixture"
+        assert self.anchor_block is not None, "anchor block must be set before making fixture"
+        assert self.max_slot is not None, "max slot must be set before making fixture"
 
-        # Get shared key manager with the required maximum slot
-        # This reuses keys across tests that require the same or lower maximum slot
+        # Key manager setup
+        #
+        # XMSS keys are expensive to generate.
+        # The shared key manager caches keys across tests.
+        # Tests requiring higher max slot trigger key expansion.
         key_manager = get_shared_key_manager(max_slot=self.max_slot)
 
-        # Update validator pubkeys to match key manager's generated keys
+        # Validator pubkey synchronization
+        #
+        # Test states use placeholder pubkeys.
+        # We must replace them with the key manager's actual keys.
+        # Otherwise signature verification will fail.
         updated_validators = [
             validator.model_copy(update={"pubkey": key_manager[Uint64(i)].public.encode_bytes()})
             for i, validator in enumerate(self.anchor_state.validators)
         ]
 
+        # Updating validators changes the state root.
+        # We must also update the anchor block to match.
         self.anchor_state = self.anchor_state.model_copy(
             update={"validators": Validators(data=updated_validators)}
         )
@@ -180,25 +202,36 @@ class ForkChoiceTest(BaseConsensusFixture):
             update={"state_root": hash_tree_root(self.anchor_state)}
         )
 
-        # Initialize Store from anchor
+        # Store initialization
+        #
+        # The Store is the node's local view of the chain.
+        # It starts from a trusted anchor (usually genesis).
         store = Store.get_forkchoice_store(
             state=self.anchor_state,
             anchor_block=self.anchor_block,
         )
 
-        # Block registry for label-based fork creation
-        # Register genesis/anchor block with implicit label
+        # Block registry for fork creation
+        #
+        # Labels let tests reference blocks by name.
+        # This enables building forks: "build block B with parent A".
+        # The "genesis" label is always available.
         self._block_registry: dict[str, Block] = {"genesis": self.anchor_block}
 
-        # Process each step (immutable pattern: store = store.method())
+        # Step processing loop
+        #
+        # Process each step against the Store.
+        # Store follows immutable pattern: each method returns a new Store.
         for i, step in enumerate(self.steps):
             try:
                 if isinstance(step, TickStep):
-                    # Advance time (immutable)
+                    # Time advancement may trigger slot boundaries.
+                    # At slot boundaries, pending attestations may become active.
                     store = store.on_tick(Uint64(step.time), has_proposal=False)
 
                 elif isinstance(step, BlockStep):
-                    # Build SignedBlockWithAttestation from BlockSpec
+                    # Build a complete signed block from the lightweight spec.
+                    # The spec contains minimal fields; we fill the rest.
                     signed_block = self._build_block_from_spec(
                         step.block, store, self._block_registry, key_manager
                     )
@@ -207,7 +240,8 @@ class ForkChoiceTest(BaseConsensusFixture):
                     block = signed_block.message.block
                     step._filled_block = signed_block.message
 
-                    # Register block if it has a label
+                    # Register labeled blocks for fork building.
+                    # Later blocks can reference this one as their parent.
                     if step.block.label is not None:
                         if step.block.label in self._block_registry:
                             raise ValueError(
@@ -216,15 +250,20 @@ class ForkChoiceTest(BaseConsensusFixture):
                             )
                         self._block_registry[step.block.label] = block
 
-                    # Automatically advance time to block's slot before processing (immutable)
+                    # Advance time to the block's slot.
+                    # Store rejects blocks from the future.
+                    # This tick includes a block (has proposal).
                     block_time = store.config.genesis_time + block.slot * Uint64(SECONDS_PER_SLOT)
                     store = store.on_tick(block_time, has_proposal=True)
 
-                    # Process the block (immutable)
+                    # Process the block through Store.
+                    # This validates, applies state transition, and updates head.
                     store = store.on_block(signed_block, LEAN_ENV_TO_SCHEMES[self.lean_env])
 
                 elif isinstance(step, AttestationStep):
-                    # Process attestation from gossip (immutable)
+                    # Process a gossip attestation.
+                    # Gossip attestations arrive outside of blocks.
+                    # They influence the fork choice weight calculation.
                     store = store.on_gossip_attestation(
                         step.attestation,
                         scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
@@ -233,7 +272,8 @@ class ForkChoiceTest(BaseConsensusFixture):
                 else:
                     raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
 
-                # Validate checks if provided
+                # Validate Store state if checks are provided.
+                # Labels in checks are resolved to actual block roots.
                 if step.checks is not None:
                     step.checks.fill_hash_from_label(self._block_registry)
                     step.checks.validate_against_store(
@@ -241,15 +281,18 @@ class ForkChoiceTest(BaseConsensusFixture):
                     )
 
             except Exception as e:
+                # Handle expected failures.
+                # Steps marked valid=False should raise exceptions.
                 if step.valid:
-                    # Expected to succeed but failed
                     raise AssertionError(
                         f"Step {i} ({type(step).__name__}) failed unexpectedly: {e}"
                     ) from e
-                # Expected to fail, continue
+
+                # Expected failure occurred. Continue to next step.
                 continue
 
-            # If we expected failure but succeeded, that's an error
+            # Handle unexpected success.
+            # If we expected failure but the step succeeded, that's a test bug.
             if not step.valid:
                 raise AssertionError(
                     f"Step {i} ({type(step).__name__}) succeeded but expected failure"
@@ -266,46 +309,58 @@ class ForkChoiceTest(BaseConsensusFixture):
         key_manager: XmssKeyManager,
     ) -> SignedBlockWithAttestation:
         """
-        Build a full SignedBlockWithAttestation from a lightweight BlockSpec.
+        Build a complete signed block from a lightweight specification.
 
-        This method combines:
-            - spec logic (via the state block building logic),
-            - test-specific logic (label resolution and signing),
-        to produce a complete signed block.
+        BlockSpec contains minimal fields (slot, parent label, attestations).
+        This method fills in all remaining fields and signatures.
 
-        Parameters
-        ----------
-        spec : BlockSpec
-            The lightweight block specification.
-        store : Store
-            The fork choice store (used to get head state and latest justified).
-        block_registry : dict[str, Block]
-            Registry of labeled blocks for fork creation.
-        key_manager : XmssKeyManager
-            Key manager for signing attestations.
+        The process:
+
+        1. Resolve parent (from label or default to head)
+        2. Build attestations from spec
+        3. Delegate to State for core block construction
+        4. Add proposer attestation and signatures
+
+        Args:
+            spec: Lightweight block specification.
+            store: Fork choice store for head state lookup.
+            block_registry: Labeled blocks for fork creation.
+            key_manager: Key manager for signing.
 
         Returns:
-        -------
-        SignedBlockWithAttestation
-            A complete signed block ready for processing.
+            Complete signed block ready for Store processing.
         """
-        # Determine proposer index
+        # Determine the proposer
+        #
+        # If not specified, use round-robin based on slot.
+        # Real proposer selection is more complex, but this suffices for tests.
         proposer_index = spec.proposer_index or Uint64(
             int(spec.slot) % len(store.states[store.head].validators)
         )
 
-        # Resolve parent root from label or default to head
+        # Resolve parent block
+        #
+        # Parent can be specified by label (for forks) or defaults to head.
+        # This is how tests build competing chain branches.
         parent_root = self._resolve_parent_root(spec, store, block_registry)
 
-        # Build attestations from spec
+        # Build attestations
+        #
+        # Attestations vote for blocks and influence fork choice weight.
+        # The spec may include attestations to include in this block.
         attestations, attestation_signatures = self._build_attestations_from_spec(
             spec, store, block_registry, parent_root, key_manager
         )
 
+        # Merge new attestation signatures with existing gossip signatures.
+        # These are needed for signature aggregation later.
         gossip_signatures = dict(store.gossip_signatures)
         gossip_signatures.update(attestation_signatures)
 
-        # Use State.build_block for core block building (pure spec logic)
+        # Build the block using spec logic
+        #
+        # State handles the core block construction.
+        # This includes state transition and root computation.
         parent_state = store.states[parent_root]
         final_block, _, _, _ = parent_state.build_block(
             slot=spec.slot,
@@ -316,7 +371,10 @@ class ForkChoiceTest(BaseConsensusFixture):
             aggregated_payloads=store.aggregated_payloads,
         )
 
-        # Create proposer attestation for this block
+        # Create proposer attestation
+        #
+        # The proposer must also attest to their own block.
+        # This attestation commits to the block they just created.
         block_root = hash_tree_root(final_block)
         proposer_attestation = Attestation(
             validator_id=proposer_index,
@@ -328,7 +386,10 @@ class ForkChoiceTest(BaseConsensusFixture):
             ),
         )
 
-        # Sign all attestations and the proposer attestation
+        # Sign everything
+        #
+        # Aggregate signatures for all attestations in the block body.
+        # Sign the proposer's attestation separately.
         attestation_signatures_blob = key_manager.build_attestation_signatures(
             final_block.body.attestations,
             attestation_signatures,
@@ -339,6 +400,9 @@ class ForkChoiceTest(BaseConsensusFixture):
             proposer_attestation.data,
         )
 
+        # Assemble the signed block
+        #
+        # Combine block, proposer attestation, and all signatures.
         return SignedBlockWithAttestation(
             message=BlockWithAttestation(
                 block=final_block,
@@ -357,9 +421,23 @@ class ForkChoiceTest(BaseConsensusFixture):
         block_registry: dict[str, Block],
     ) -> Bytes32:
         """
-        Resolve parent root from BlockSpec.
-            - If parent_label is specified, look it up in the registry.
-            - Otherwise, default to the current head's parent.
+        Resolve parent root from block specification.
+
+        Two resolution modes:
+
+        - Label provided: Look up block by label (for building forks)
+        - No label: Use current head (for extending canonical chain)
+
+        Args:
+            spec: Block specification with optional parent_label.
+            store: Fork choice store containing block states.
+            block_registry: Map of labels to blocks.
+
+        Returns:
+            Root hash of the parent block.
+
+        Raises:
+            ValueError: If label not found or parent state unavailable.
         """
         # Fast path: no label means build on current head.
         if not (label := spec.parent_label):
@@ -399,7 +477,24 @@ class ForkChoiceTest(BaseConsensusFixture):
         parent_root: Bytes32,
         key_manager: XmssKeyManager,
     ) -> tuple[list[Attestation], dict[SignatureKey, Signature]]:
-        """Build aggregated attestations from BlockSpec and their signatures."""
+        """
+        Build attestations and signatures from block specification.
+
+        Each AggregatedAttestationSpec produces multiple attestations.
+        All validators in a spec share the same attestation data.
+        Signatures are collected for later aggregation.
+
+        Args:
+            spec: Block specification with attestation specs.
+            store: Fork choice store for state lookup.
+            block_registry: Labeled blocks for target resolution.
+            parent_root: Root of the parent block.
+            key_manager: Key manager for signing.
+
+        Returns:
+            Tuple of (attestations list, signature lookup dict).
+        """
+        # No attestations specified means empty block body.
         if spec.attestations is None:
             return [], {}
 
@@ -408,12 +503,14 @@ class ForkChoiceTest(BaseConsensusFixture):
         signature_lookup: dict[SignatureKey, Signature] = {}
 
         for aggregated_spec in spec.attestations:
-            # Build attestation data (shared across all validators in this aggregation spec)
+            # Build attestation data once.
+            # All validators in this aggregation vote for the same target.
             attestation_data = self._build_attestation_data_from_spec(
                 aggregated_spec, block_registry, parent_state
             )
 
-            # Create individual attestations and signatures for each validator
+            # Create one attestation per validator.
+            # Each validator signs independently; signatures aggregate later.
             for validator_id in aggregated_spec.validator_ids:
                 attestation = Attestation(
                     validator_id=validator_id,
@@ -421,19 +518,24 @@ class ForkChoiceTest(BaseConsensusFixture):
                 )
                 attestations.append(attestation)
 
-                # Sign the attestation
+                # Generate signature or use invalid placeholder.
+                # Invalid signatures test rejection paths.
                 if aggregated_spec.valid_signature:
                     signature = key_manager.sign_attestation_data(
                         validator_id,
                         attestation_data,
                     )
                 else:
+                    # Dummy signature for testing invalid signature handling.
+                    # The Store should reject attestations with bad signatures.
                     signature = Signature(
                         path=HashTreeOpening(siblings=HashDigestList(data=[])),
                         rho=Randomness(data=[Fp(0) for _ in range(Randomness.LENGTH)]),
                         hashes=HashDigestList(data=[]),
                     )
 
+                # Index signature by validator and data root.
+                # This enables lookup during signature aggregation.
                 sig_key = SignatureKey(validator_id, attestation_data.data_root_bytes())
                 signature_lookup[sig_key] = signature
 
@@ -446,41 +548,46 @@ class ForkChoiceTest(BaseConsensusFixture):
         state: State,
     ) -> AttestationData:
         """
-        Build AttestationData from an AggregatedAttestationSpec.
+        Build attestation data from a specification.
 
-        Parameters
-        ----------
-        spec : AggregatedAttestationSpec
-            The aggregated attestation specification.
-        block_registry : dict[str, Block]
-            Registry of labeled blocks for resolving target_root_label.
-        state : State
-            The state to get latest_justified checkpoint from.
+        Attestation data contains the validator's vote:
+
+        - slot: When the attestation was made
+        - head: What block the validator sees as head
+        - target: Checkpoint being voted for (epoch boundary)
+        - source: Previously justified checkpoint (link source)
+
+        Target is resolved from label.
+        Source comes from the parent state's justified checkpoint.
+
+        Args:
+            spec: Aggregated attestation specification.
+            block_registry: Labeled blocks for target resolution.
+            state: State for source checkpoint lookup.
 
         Returns:
-        -------
-        AttestationData
-            The attestation data shared by all validators in this aggregation.
+            Attestation data shared by all validators in the aggregation.
+
+        Raises:
+            ValueError: If target label not found in registry.
         """
-        # Resolve target checkpoint from label
+        # Resolve target from label.
+        # The label references a block that will be the target checkpoint.
         if spec.target_root_label not in block_registry:
             raise ValueError(
                 f"target_root_label '{spec.target_root_label}' not found - "
-                f"available labels: {list(block_registry.keys())}"
+                f"available: {list(block_registry.keys())}"
             )
-        target_block = block_registry[spec.target_root_label]
-        target_root = hash_tree_root(target_block)
-        target_checkpoint = Checkpoint(root=target_root, slot=spec.target_slot)
 
-        # Derive head = target
-        head_checkpoint = target_checkpoint
+        target_root = hash_tree_root(block_registry[spec.target_root_label])
+        target = Checkpoint(root=target_root, slot=spec.target_slot)
 
-        # Derive source from state's latest justified checkpoint
-        source_checkpoint = state.latest_justified
-
+        # Build the attestation data.
+        # In simplified tests, head equals target for convenience.
+        # Source is the state's last justified checkpoint (Casper FFG link).
         return AttestationData(
             slot=spec.slot,
-            head=head_checkpoint,
-            target=target_checkpoint,
-            source=source_checkpoint,
+            head=target,
+            target=target,
+            source=state.latest_justified,
         )
