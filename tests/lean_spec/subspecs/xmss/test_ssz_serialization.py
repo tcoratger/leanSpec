@@ -114,3 +114,27 @@ def test_deterministic_serialization() -> None:
     sig_bytes1 = sig1.encode_bytes()
     sig_bytes2 = sig2.encode_bytes()
     assert sig_bytes1 == sig_bytes2
+
+
+def test_signature_size_matches_config() -> None:
+    """Verify SIGNATURE_LEN_BYTES matches actual SSZ-encoded size."""
+    activation_epoch = Uint64(0)
+    num_active_epochs = Uint64(32)
+    public_key, secret_key = TEST_SIGNATURE_SCHEME.key_gen(activation_epoch, num_active_epochs)
+
+    message = bytes([42] * TEST_CONFIG.MESSAGE_LENGTH)
+    epoch = Uint64(0)
+    signature = TEST_SIGNATURE_SCHEME.sign(secret_key, epoch, message)
+
+    encoded = signature.encode_bytes()
+    assert len(encoded) == TEST_CONFIG.SIGNATURE_LEN_BYTES
+
+
+def test_public_key_size_matches_config() -> None:
+    """Verify PUBLIC_KEY_LEN_BYTES matches actual SSZ-encoded size."""
+    activation_epoch = Uint64(0)
+    num_active_epochs = Uint64(32)
+    public_key, _ = TEST_SIGNATURE_SCHEME.key_gen(activation_epoch, num_active_epochs)
+
+    encoded = public_key.encode_bytes()
+    assert len(encoded) == TEST_CONFIG.PUBLIC_KEY_LEN_BYTES
