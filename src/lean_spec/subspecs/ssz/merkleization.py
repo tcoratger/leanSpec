@@ -63,18 +63,23 @@ def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:
     - limit < len(chunks): raises ValueError
     - Empty chunks: returns ZERO_HASH (or zero-subtree root if limit provided)
     """
+    # Convert limit to int to support Uint constants from SSZ type definitions
+    limit_int = int(limit) if limit is not None else None
+
     n = len(chunks)
     if n == 0:
         # If a limit is provided, return the zero-subtree root of that width
-        return _zero_tree_root(get_power_of_two_ceil(limit)) if limit is not None else ZERO_HASH
+        if limit_int is not None:
+            return _zero_tree_root(get_power_of_two_ceil(limit_int))
+        return ZERO_HASH
 
     # Determine the width of the bottom layer after padding/limiting
-    if limit is None:
+    if limit_int is None:
         width = get_power_of_two_ceil(n)
     else:
-        if limit < n:
+        if limit_int < n:
             raise ValueError("merkleize: input exceeds limit")
-        width = get_power_of_two_ceil(limit)
+        width = get_power_of_two_ceil(limit_int)
 
     # Width of 1: the single chunk is the root
     if width == 1:
