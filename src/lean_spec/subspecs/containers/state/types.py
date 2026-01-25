@@ -11,13 +11,13 @@ from ..validator import Validator
 
 
 class HistoricalBlockHashes(SSZList[Bytes32]):
-    """List of historical block root hashes up to historical_roots_limit."""
+    """List of historical block root hashes up to historical roots limit."""
 
     LIMIT = int(HISTORICAL_ROOTS_LIMIT)
 
 
 class JustificationRoots(SSZList[Bytes32]):
-    """List of justified block roots up to historical_roots_limit."""
+    """List of justified block roots up to historical roots limit."""
 
     LIMIT = int(HISTORICAL_ROOTS_LIMIT)
 

@@ -1,0 +1,1238 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Chapter 4: Block Processing
+% Lean Consensus Book
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Block Processing}
+\label{ch:block-processing}
+
+\begin{abstract}
+This chapter explores the fundamental mechanics of block processing in Lean Consensus.
+We begin with the genesis state---the cryptographic anchor from which all trust flows---and
+progressively build toward a complete understanding of how validators propose blocks,
+how attestations accumulate into justification, and how justification eventually
+crystallizes into finalization. By the end of this chapter, you will understand not
+just \emph{what} happens during block processing, but \emph{why} each step exists
+and what security properties it provides.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Genesis and the Bootstrap Problem}
+\label{sec:genesis}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Every blockchain faces a fundamental philosophical puzzle: if trust in the chain
+derives from cryptographic proofs linking back to earlier blocks, where does that
+chain of trust begin? This is the \emph{bootstrap problem}, and its solution lies
+in the concept of \textbf{genesis}.
+
+\subsection{The Trust Anchor}
+
+The genesis state serves as an \emph{axiom} in our system of trust. Just as
+mathematical proofs eventually rest on axioms that cannot themselves be proven,
+blockchain consensus rests on a genesis state that cannot be derived from
+earlier consensus. Genesis is the point where social consensus meets
+cryptographic consensus---all participants must agree, out of band, to start
+from this particular state.
+
+\begin{infobox}{Why Genesis Cannot Be Proven}
+Consider the alternative: if we required cryptographic proof for genesis,
+we would need a block before genesis, which would need its own genesis,
+leading to infinite regress. The genesis state is necessarily a \emph{trust
+assumption}---the one place where we say ``all honest participants agree
+this is where we start.''
+\end{infobox}
+
+\subsection{Genesis State Construction}
+
+The genesis state in Lean Consensus is intentionally minimal. It contains:
+
+\begin{enumerate}
+    \item \textbf{Configuration Parameters}: The genesis timestamp and protocol rules
+    \item \textbf{Validator Registry}: The initial set of validators with their public keys
+    \item \textbf{Empty History}: No historical block hashes (the chain has just begun)
+    \item \textbf{Zero Checkpoints}: Both justified and finalized checkpoints point to nothing
+    \item \textbf{Genesis Block Header}: A placeholder header at slot 0
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    box/.style={rectangle, draw=ethblue, fill=softgray,
+                minimum width=5cm, minimum height=0.7cm,
+                text centered, font=\small},
+    label/.style={font=\small\itshape, text=gray},
+    arrow/.style={->, thick, ethblue}
+]
+    % Genesis State Box
+    \node[rectangle, draw=ethblue, fill=white, minimum width=6cm,
+          minimum height=5.5cm, rounded corners=5pt] (state) {};
+    \node[above=0.1cm of state.north, font=\bfseries\color{ethblue}] {Genesis State};
+
+    % Fields
+    \node[box] (config) at ([yshift=-0.6cm]state.north) {config: genesis\_time};
+    \node[box, below=0.3cm of config] (slot) {slot: 0};
+    \node[box, below=0.3cm of slot] (header) {latest\_block\_header: (slot=0)};
+    \node[box, below=0.3cm of header] (justified) {latest\_justified: (root=0x00, slot=0)};
+    \node[box, below=0.3cm of justified] (finalized) {latest\_finalized: (root=0x00, slot=0)};
+    \node[box, below=0.3cm of finalized] (validators) {validators: [V$_0$, V$_1$, ..., V$_{n-1}$]};
+
+    % Annotations
+    \node[label, right=0.3cm of config] {Protocol parameters};
+    \node[label, right=0.3cm of slot] {Chain begins here};
+    \node[label, right=0.3cm of header] {Placeholder header};
+    \node[label, right=0.3cm of justified] {No justification yet};
+    \node[label, right=0.3cm of finalized] {No finalization yet};
+    \node[label, right=0.3cm of validators] {Initial validator set};
+
+    % Trust anchor annotation
+    \draw[decorate, decoration={brace, amplitude=10pt, mirror}, thick, leanpurple]
+        ([xshift=-0.5cm]state.south west) -- ([xshift=-0.5cm]state.north west)
+        node[midway, left=0.5cm, align=center, font=\small\color{leanpurple}]
+        {Trust\\Anchor};
+\end{tikzpicture}
+\caption{The genesis state structure. All fields are initialized to their minimal
+values, with the validator registry being the only substantive content.}
+\label{fig:genesis-state}
+\end{figure}
+
+\subsection{The First Block Transition}
+
+Genesis itself is not a normal block---it exists before time begins. The first
+\emph{real} block, proposed at slot 1 or later, receives special treatment:
+
+\begin{itemize}
+    \item Its parent is the genesis block header
+    \item Upon processing, the genesis block is immediately marked as both
+          justified and finalized
+    \item This bootstraps the checkpoint system, giving validators something
+          to build upon
+\end{itemize}
+
+This automatic justification of genesis is not a security weakness but a
+necessity: without it, no source checkpoint would exist for attestations,
+and the consensus mechanism could never progress.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The State Container}
+\label{sec:state-container}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The \textbf{State} is the complete snapshot of everything the consensus protocol
+needs to know. When we say a block is ``valid,'' we mean it produces a valid
+state transition from its parent state. When validators agree on a block, they
+implicitly agree on the resulting state.
+
+\subsection{State Fields and Their Purpose}
+
+Let us examine each field in the State container, understanding not just what
+it stores but \emph{why} it must be stored.
+
+\subsubsection{Configuration}
+
+\begin{equation}
+\texttt{config}: \text{Config}
+\end{equation}
+
+The configuration contains immutable protocol parameters, most notably the
+\texttt{genesis\_time}. This timestamp anchors all slot calculations:
+slot $n$ begins at time $\texttt{genesis\_time} + n \times \texttt{SECONDS\_PER\_SLOT}$.
+
+\subsubsection{Temporal Tracking}
+
+\begin{equation}
+\texttt{slot}: \text{Slot}
+\end{equation}
+
+The current slot number represents the protocol's notion of ``now.'' Unlike
+wall-clock time, slots are discrete and deterministic. A state at slot $n$
+means all processing up through slot $n$ has been applied.
+
+\subsubsection{Chain Head Reference}
+
+\begin{equation}
+\texttt{latest\_block\_header}: \text{BlockHeader}
+\end{equation}
+
+This field stores the header of the most recently processed block. Crucially,
+the \texttt{state\_root} field within this header is initially empty and gets
+filled in during slot processing. This creates a commitment cycle:
+\begin{itemize}
+    \item The block commits to a state root
+    \item The state contains the block header
+    \item The header's state root must equal the state's hash
+\end{itemize}
+
+\subsubsection{Checkpoints: The Anchor Points of Consensus}
+
+\begin{align}
+\texttt{latest\_justified}&: \text{Checkpoint} \\
+\texttt{latest\_finalized}&: \text{Checkpoint}
+\end{align}
+
+These two checkpoints form the backbone of Casper FFG-style consensus:
+
+\begin{itemize}
+    \item \textbf{Justified}: A block becomes justified when $\geq 2/3$ of
+          validators have attested to it. Justified blocks are ``probably''
+          final but could theoretically be reverted.
+    \item \textbf{Finalized}: A justified block becomes finalized when there
+          is a continuous chain of justified blocks leading to it. Finalized
+          blocks are irreversible without at least $1/3$ of validators being
+          slashed.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    block/.style={rectangle, draw=ethblue, fill=softgray,
+                  minimum width=1.2cm, minimum height=0.8cm,
+                  font=\small},
+    justified/.style={rectangle, draw=leanpurple, fill=leanpurple!20,
+                      minimum width=1.2cm, minimum height=0.8cm,
+                      font=\small},
+    finalized/.style={rectangle, draw=green!60!black, fill=green!20,
+                      minimum width=1.2cm, minimum height=0.8cm,
+                      font=\small},
+    arrow/.style={->, thick, gray},
+    vote/.style={->, dashed, ethblue, thick}
+]
+    % Blocks
+    \node[finalized] (b0) at (0,0) {$B_0$};
+    \node[justified] (b1) at (2,0) {$B_1$};
+    \node[justified] (b2) at (4,0) {$B_2$};
+    \node[justified] (b3) at (6,0) {$B_3$};
+    \node[block] (b4) at (8,0) {$B_4$};
+    \node[block] (b5) at (10,0) {$B_5$};
+
+    % Chain arrows
+    \draw[arrow] (b0) -- (b1);
+    \draw[arrow] (b1) -- (b2);
+    \draw[arrow] (b2) -- (b3);
+    \draw[arrow] (b3) -- (b4);
+    \draw[arrow] (b4) -- (b5);
+
+    % Labels
+    \node[below=0.3cm of b0, font=\small\color{green!60!black}] {Finalized};
+    \node[below=0.3cm of b3, font=\small\color{leanpurple}] {Latest Justified};
+    \node[below=0.3cm of b5, font=\small] {Head};
+
+    % Vote arrows
+    \draw[vote, bend left=30] (b3.north) to node[above, font=\tiny] {2/3+ votes} (b3.north east);
+
+    % Bracket for continuous justification
+    \draw[decorate, decoration={brace, amplitude=8pt}, thick, leanpurple]
+        ([yshift=0.5cm]b1.north west) -- ([yshift=0.5cm]b3.north east)
+        node[midway, above=0.4cm, font=\small] {Continuous justified chain};
+\end{tikzpicture}
+\caption{The relationship between finalized and justified checkpoints. Block $B_0$
+is finalized because blocks $B_1$, $B_2$, $B_3$ form a continuous justified chain
+after it, with no gaps.}
+\label{fig:checkpoints}
+\end{figure}
+
+\subsubsection{Historical Data}
+
+\begin{align}
+\texttt{historical\_block\_hashes}&: \text{HistoricalBlockHashes} \\
+\texttt{justified\_slots}&: \text{JustifiedSlots}
+\end{align}
+
+The state maintains a rolling window of historical data:
+
+\begin{itemize}
+    \item \textbf{historical\_block\_hashes}: A list of block roots for each
+          slot since finalization. Empty slots contain a zero hash. This allows
+          verification that attestation targets reference actual chain history.
+    \item \textbf{justified\_slots}: A bitfield indicating which slots have
+          been justified. This enables efficient lookup during attestation
+          validation.
+\end{itemize}
+
+\subsubsection{Validator Registry}
+
+\begin{equation}
+\texttt{validators}: \text{Validators}
+\end{equation}
+
+The validator list stores each validator's public key and index. In Lean
+Consensus, this registry is static---validators do not enter or exit during
+the protocol's operation. Each validator has equal voting weight.
+
+\subsubsection{Vote Tracking}
+
+\begin{align}
+\texttt{justifications\_roots}&: \text{JustificationRoots} \\
+\texttt{justifications\_validators}&: \text{JustificationValidators}
+\end{align}
+
+These fields track in-progress justification attempts:
+
+\begin{itemize}
+    \item \textbf{justifications\_roots}: List of block roots currently receiving
+          votes
+    \item \textbf{justifications\_validators}: A flattened bitlist where each
+          segment of $n$ bits (for $n$ validators) tracks who has voted for
+          each root
+\end{itemize}
+
+This structure is optimized for SSZ serialization while still enabling
+efficient vote counting.
+
+\subsection{State Invariants}
+
+A valid state must maintain several invariants:
+
+\begin{enumerate}
+    \item $\texttt{latest\_finalized.slot} \leq \texttt{latest\_justified.slot}$
+    \item The latest block header's slot $\leq$ state slot
+    \item Historical block hashes extend from finalized slot to current slot
+    \item Justified slots bitfield is properly sized for the current window
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Block Structure}
+\label{sec:block-structure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Blocks in Lean Consensus follow a layered design, separating concerns between
+compact identification (headers), payload (bodies), and authentication
+(signatures).
+
+\subsection{BlockHeader: The Compact Summary}
+
+The BlockHeader contains just enough information to identify a block and
+verify its place in the chain:
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    field/.style={rectangle, draw=ethblue, fill=softgray,
+                  minimum width=8cm, minimum height=0.7cm,
+                  text centered, font=\small},
+    hash/.style={rectangle, draw=leanpurple, fill=leanpurple!10,
+                 minimum width=8cm, minimum height=0.7cm,
+                 text centered, font=\small},
+    label/.style={font=\small, text=gray}
+]
+    % Header box
+    \node[rectangle, draw=ethblue, fill=white, minimum width=9cm,
+          minimum height=4.5cm, rounded corners=5pt] (header) {};
+    \node[above=0.1cm of header.north, font=\bfseries\color{ethblue}] {BlockHeader};
+
+    % Fields
+    \node[field] (slot) at ([yshift=-0.6cm]header.north) {slot: Slot};
+    \node[field, below=0.2cm of slot] (proposer) {proposer\_index: Uint64};
+    \node[hash, below=0.2cm of proposer] (parent) {parent\_root: Bytes32};
+    \node[hash, below=0.2cm of parent] (state) {state\_root: Bytes32};
+    \node[hash, below=0.2cm of state] (body) {body\_root: Bytes32};
+
+    % Annotations
+    \node[label, right=0.2cm of slot.east, anchor=west] {When was this proposed?};
+    \node[label, right=0.2cm of proposer.east, anchor=west] {Who proposed it?};
+    \node[label, right=0.2cm of parent.east, anchor=west] {What does it build on?};
+    \node[label, right=0.2cm of state.east, anchor=west] {What state results?};
+    \node[label, right=0.2cm of body.east, anchor=west] {What's inside?};
+\end{tikzpicture}
+\caption{The BlockHeader structure with its five essential fields.}
+\label{fig:block-header}
+\end{figure}
+
+Each field serves a specific verification purpose:
+
+\begin{itemize}
+    \item \textbf{slot}: Determines when the block should be processed and
+          who should have proposed it
+    \item \textbf{proposer\_index}: Must match the round-robin assignment
+          for this slot
+    \item \textbf{parent\_root}: The hash of the parent block header, creating
+          the chain link
+    \item \textbf{state\_root}: Commitment to the post-state, enabling state
+          verification
+    \item \textbf{body\_root}: Hash of the block body, allowing separate
+          transmission
+\end{itemize}
+
+\begin{infobox}{Why Separate State and Body Roots?}
+The body root enables \emph{data availability verification}---nodes can verify
+a header without possessing the full body. The state root enables \emph{state
+verification}---nodes can verify execution without replaying transactions.
+Together, they allow light clients to participate in consensus with minimal data.
+\end{infobox}
+
+\subsection{BlockBody: The Payload}
+
+The block body contains the substantive content that modifies state:
+
+\begin{equation}
+\texttt{BlockBody} = \{ \texttt{attestations}: \text{AggregatedAttestations} \}
+\end{equation}
+
+In Lean Consensus, the body contains only attestations---votes from validators
+about the chain's state. Future versions may include additional fields such as
+execution payloads.
+
+\subsection{The Complete Block}
+
+A full Block combines the header fields with the body:
+
+\begin{equation}
+\texttt{Block} = \{ \texttt{slot}, \texttt{proposer\_index}, \texttt{parent\_root},
+                   \texttt{state\_root}, \texttt{body} \}
+\end{equation}
+
+Note that the Block includes the full body rather than just its hash, enabling
+direct processing without additional lookups.
+
+\subsection{The Signed Envelope}
+
+For network transmission and storage, blocks are wrapped in a signed envelope
+that bundles authentication data:
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.5cm,
+    container/.style={rectangle, draw=ethblue, fill=white,
+                      rounded corners=5pt, minimum width=10cm},
+    inner/.style={rectangle, draw=leanpurple, fill=leanpurple!5,
+                  minimum width=9cm, minimum height=0.6cm,
+                  font=\small, text centered},
+    sig/.style={rectangle, draw=green!60!black, fill=green!10,
+                minimum width=9cm, minimum height=0.6cm,
+                font=\small, text centered}
+]
+    % Outer envelope
+    \node[container, minimum height=5cm] (envelope) {};
+    \node[above=0.1cm of envelope.north, font=\bfseries\color{ethblue}]
+        {SignedBlockWithAttestation};
+
+    % Message section
+    \node[rectangle, draw=leanpurple, fill=white, minimum width=9.5cm,
+          minimum height=2cm, rounded corners=3pt] (message)
+          at ([yshift=0.8cm]envelope.center) {};
+    \node[above=-0.1cm of message.north, font=\small\bfseries\color{leanpurple}]
+        {message: BlockWithAttestation};
+
+    \node[inner] (block) at ([yshift=0.2cm]message.center) {block: Block};
+    \node[inner, below=0.2cm of block] (propatt) {proposer\_attestation: Attestation};
+
+    % Signature section
+    \node[rectangle, draw=green!60!black, fill=white, minimum width=9.5cm,
+          minimum height=1.8cm, rounded corners=3pt] (sigs)
+          at ([yshift=-1.3cm]envelope.center) {};
+    \node[above=-0.1cm of sigs.north, font=\small\bfseries\color{green!60!black}]
+        {signature: BlockSignatures};
+
+    \node[sig] (attsig) at ([yshift=0.15cm]sigs.center) {attestation\_signatures: AttestationSignatures};
+    \node[sig, below=0.2cm of attsig] (propsig) {proposer\_signature: XmssSignature};
+\end{tikzpicture}
+\caption{The signed block envelope structure. The message contains the block
+and proposer's attestation; the signature section contains cryptographic proofs.}
+\label{fig:signed-envelope}
+\end{figure}
+
+\subsection{Why Signatures Are Separate}
+
+A critical design decision: signatures are stored separately from the data
+they sign. This separation enables several important properties:
+
+\begin{enumerate}
+    \item \textbf{Aggregation}: Multiple validators signing the same
+          attestation data can have their signatures aggregated without
+          modifying the signed message
+    \item \textbf{Verification Independence}: The attestation data can be
+          validated before signature verification, failing fast on invalid votes
+    \item \textbf{Proof Flexibility}: The signature scheme can evolve
+          (e.g., from XMSS to aggregated SNARKs) without changing the
+          message format
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Slot Processing}
+\label{sec:slot-processing}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Before a block can be processed, the state must ``catch up'' to the block's
+slot. This involves advancing through any empty slots where no block was
+proposed.
+
+\subsection{The Slot Advancement Loop}
+
+The slot processing algorithm is deceptively simple but contains important
+subtleties:
+
+\begin{algorithm}[H]
+\caption{Process Slots}
+\begin{algorithmic}[1]
+\Require Current state $S$ with slot $s$, target slot $t$ where $t > s$
+\Ensure State advanced to slot $t$
+\While{$S.\texttt{slot} < t$}
+    \If{$S.\texttt{latest\_block\_header.state\_root} = \texttt{0x00...}$}
+        \State $S.\texttt{latest\_block\_header.state\_root} \gets \texttt{hash}(S)$
+    \EndIf
+    \State $S.\texttt{slot} \gets S.\texttt{slot} + 1$
+\EndWhile
+\State \Return $S$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{State Root Caching}
+
+The conditional state root update handles a subtle timing issue:
+
+\begin{enumerate}
+    \item When a block is processed, its header is stored with an \emph{empty}
+          state root
+    \item The state root cannot be computed until after block processing completes
+    \item On the \emph{next} slot transition (or next block), we fill in the
+          missing state root
+\end{enumerate}
+
+This deferred computation ensures the state root correctly captures the
+post-block state without creating circular dependencies.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=2cm,
+    state/.style={rectangle, draw=ethblue, fill=softgray,
+                  minimum width=1.5cm, minimum height=1cm,
+                  font=\small, rounded corners=3pt},
+    block/.style={rectangle, draw=leanpurple, fill=leanpurple!20,
+                  minimum width=1.5cm, minimum height=0.8cm,
+                  font=\small},
+    arrow/.style={->, thick, ethblue},
+    hash/.style={->, dashed, gray, thick}
+]
+    % States
+    \node[state] (s3) {$S_3$};
+    \node[state, right=3cm of s3] (s4) {$S_4$};
+    \node[state, right=3cm of s4] (s5) {$S_5$};
+
+    % Blocks
+    \node[block, above=0.5cm of s3] (b3) {$B_3$};
+    \node[block, above=0.5cm of s5] (b5) {$B_5$};
+
+    % Slot labels
+    \node[below=0.3cm of s3, font=\small] {Slot 3};
+    \node[below=0.3cm of s4, font=\small] {Slot 4 (empty)};
+    \node[below=0.3cm of s5, font=\small] {Slot 5};
+
+    % Arrows
+    \draw[arrow] (s3) -- node[above, font=\tiny] {process slots} (s4);
+    \draw[arrow] (s4) -- node[above, font=\tiny] {process slots} (s5);
+
+    % Block processing
+    \draw[arrow, leanpurple] (b3) -- (s3);
+    \draw[arrow, leanpurple] (b5) -- (s5);
+
+    % State root caching
+    \draw[hash] ([xshift=0.5cm]s3.east) -- node[above, font=\tiny, text=gray]
+        {cache $B_3$ state root} ([xshift=-0.5cm]s4.west);
+
+    % Annotation for empty slot
+    \node[above=0.3cm of s4, font=\small\itshape, text=gray] {No block};
+\end{tikzpicture}
+\caption{Slot processing with state root caching. Block $B_3$'s state root
+is cached during the transition to slot 4. Slot 4 has no block (missed proposal),
+but the state still advances.}
+\label{fig:slot-processing}
+\end{figure}
+
+\subsection{Handling Missed Proposals}
+
+When a validator fails to propose a block (due to network issues, being
+offline, or Byzantine behavior), the slot is ``empty.'' The protocol handles
+this gracefully:
+
+\begin{itemize}
+    \item The state slot advances past the empty slot
+    \item A zero hash is recorded in historical block hashes for that slot
+    \item Fork choice simply has no block to consider at that position
+    \item The next proposer builds on the most recent actual block
+\end{itemize}
+
+This tolerance for missed proposals is essential for liveness: the chain
+must progress even when some validators are unavailable.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Block Header Processing}
+\label{sec:header-processing}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Header processing validates the block's metadata and updates the state's
+chain-tracking fields. This happens \emph{before} processing the block body.
+
+\subsection{Validation Rules}
+
+A block header must pass four critical checks:
+
+\begin{enumerate}
+    \item \textbf{Slot Matching}: $\texttt{block.slot} = \texttt{state.slot}$
+
+    The block must be for the current slot. This is ensured by first calling
+    process\_slots to advance to the block's slot.
+
+    \item \textbf{Temporal Progress}: $\texttt{block.slot} > \texttt{parent\_header.slot}$
+
+    Blocks must move forward in time. This prevents processing duplicate
+    blocks or blocks for past slots.
+
+    \item \textbf{Proposer Authorization}:
+    $\texttt{block.proposer\_index} = \texttt{slot} \mod |\texttt{validators}|$
+
+    Lean Consensus uses simple round-robin proposer selection. Validator $i$
+    proposes at all slots where $\texttt{slot} \mod n = i$.
+
+    \item \textbf{Chain Linking}:
+    $\texttt{block.parent\_root} = \texttt{hash}(\texttt{latest\_block\_header})$
+
+    The block must build on the actual chain head, creating an unbroken chain.
+\end{enumerate}
+
+\begin{infobox}{Why Round-Robin Proposer Selection?}
+Production systems like Ethereum use RANDAO for unpredictable proposer
+selection, preventing validators from knowing future proposers and planning
+attacks. Lean Consensus uses round-robin for simplicity---it suffices for
+testing post-quantum signatures without the complexity of randomness
+generation.
+\end{infobox}
+
+\subsection{Genesis Transition Handling}
+
+The first block after genesis requires special handling:
+
+\begin{equation}
+\text{if } \texttt{parent\_header.slot} = 0 \text{ then}
+\begin{cases}
+\texttt{latest\_justified.root} \gets \texttt{parent\_root} \\
+\texttt{latest\_finalized.root} \gets \texttt{parent\_root}
+\end{cases}
+\end{equation}
+
+This bootstraps the checkpoint system by marking genesis as both justified
+and finalized. Without this, attestations would have no valid source
+checkpoint to reference.
+
+\subsection{Historical Data Updates}
+
+Header processing updates the historical tracking structures:
+
+\begin{enumerate}
+    \item \textbf{Add Parent Root}: The parent's hash is appended to
+          historical\_block\_hashes
+    \item \textbf{Handle Gaps}: For each skipped slot between parent and
+          current block, append a zero hash
+    \item \textbf{Extend Justified Slots}: Ensure the bitfield is large
+          enough to track the new slot range
+\end{enumerate}
+
+The gap handling ensures that historical\_block\_hashes maintains a complete
+record, with zero hashes marking slots where no block was produced.
+
+\subsection{New Header Construction}
+
+Finally, a new header is created for the current block:
+
+\begin{equation}
+\texttt{new\_header} = \texttt{BlockHeader} \{
+    \texttt{slot}, \texttt{proposer\_index}, \texttt{parent\_root},
+    \texttt{body\_root}, \texttt{state\_root} = \texttt{0x00...}
+\}
+\end{equation}
+
+Note the empty state root---it will be filled in during the next slot
+transition or block processing, once we know the final post-state.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Attestation Processing}
+\label{sec:attestation-processing}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Attestations are the heartbeat of consensus. They represent validators' votes
+about the chain's state, and their accumulation drives justification and
+finalization.
+
+\subsection{Attestation Structure}
+
+Each attestation contains:
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    field/.style={rectangle, draw=ethblue, fill=softgray,
+                  minimum width=7cm, minimum height=0.6cm,
+                  font=\small},
+    checkpoint/.style={rectangle, draw=leanpurple, fill=leanpurple!10,
+                       minimum width=6.5cm, minimum height=0.5cm,
+                       font=\small}
+]
+    % AttestationData box
+    \node[rectangle, draw=ethblue, fill=white, minimum width=8cm,
+          minimum height=4cm, rounded corners=5pt] (data) {};
+    \node[above=0.1cm of data.north, font=\bfseries\color{ethblue}] {AttestationData};
+
+    % Fields
+    \node[field] (slot) at ([yshift=-0.5cm]data.north) {slot: Slot};
+    \node[checkpoint, below=0.25cm of slot] (head) {head: Checkpoint (root, slot)};
+    \node[checkpoint, below=0.25cm of head] (target) {target: Checkpoint (root, slot)};
+    \node[checkpoint, below=0.25cm of target] (source) {source: Checkpoint (root, slot)};
+
+    % Annotations
+    \node[right=0.3cm of slot.east, font=\small\itshape, text=gray, anchor=west]
+        {When vote was cast};
+    \node[right=0.3cm of head.east, font=\small\itshape, text=gray, anchor=west]
+        {Chain head seen};
+    \node[right=0.3cm of target.east, font=\small\itshape, text=gray, anchor=west]
+        {Block to justify};
+    \node[right=0.3cm of source.east, font=\small\itshape, text=gray, anchor=west]
+        {Already justified};
+\end{tikzpicture}
+\caption{The AttestationData structure containing a validator's complete chain view.}
+\label{fig:attestation-data}
+\end{figure}
+
+The three checkpoints encode a complete vote:
+\begin{itemize}
+    \item \textbf{Source}: The already-justified checkpoint the validator builds from
+    \item \textbf{Target}: The checkpoint the validator wants to justify
+    \item \textbf{Head}: The validator's view of the best chain tip
+\end{itemize}
+
+\subsection{Vote Validation Rules}
+
+Not every attestation is valid. The protocol enforces five conditions:
+
+\begin{enumerate}
+    \item \textbf{Justified Source}:
+    \begin{equation}
+    \texttt{is\_slot\_justified}(\texttt{finalized\_slot}, \texttt{source.slot}) = \texttt{true}
+    \end{equation}
+
+    The source checkpoint must already be justified. Validators cannot vote
+    from an unjustified position.
+
+    \item \textbf{Unjustified Target}:
+    \begin{equation}
+    \texttt{is\_slot\_justified}(\texttt{finalized\_slot}, \texttt{target.slot}) = \texttt{false}
+    \end{equation}
+
+    The target must not already be justified. Additional votes for already-justified
+    blocks are redundant.
+
+    \item \textbf{Non-Zero References}:
+    \begin{equation}
+    \texttt{source.root} \neq \texttt{0x00...} \land \texttt{target.root} \neq \texttt{0x00...}
+    \end{equation}
+
+    Votes for empty slots (which have zero-hash roots) are meaningless.
+
+    \item \textbf{Chain Consistency}:
+    \begin{align}
+    \texttt{source.root} &= \texttt{historical\_block\_hashes}[\texttt{source.slot}] \\
+    \texttt{target.root} &= \texttt{historical\_block\_hashes}[\texttt{target.slot}]
+    \end{align}
+
+    The referenced blocks must exist on our chain and match our history.
+
+    \item \textbf{Temporal Ordering}:
+    \begin{equation}
+    \texttt{source.slot} < \texttt{target.slot}
+    \end{equation}
+
+    Time must flow forward---targets must be newer than sources.
+\end{enumerate}
+
+\subsection{Justifiability Constraints}
+
+A sixth, more subtle constraint: the target slot must be \emph{justifiable}
+relative to the finalized slot. Not every slot can become a checkpoint.
+
+\begin{definition}[Justifiable Slot]
+A slot $s$ is justifiable after finalized slot $f$ if and only if
+$\delta = s - f$ satisfies one of:
+\begin{enumerate}
+    \item $\delta \leq 5$ (first five slots after finalization)
+    \item $\delta$ is a perfect square: $\delta \in \{1, 4, 9, 16, 25, ...\}$
+    \item $\delta$ is a pronic number: $\delta \in \{2, 6, 12, 20, 30, ...\}$
+          where $\delta = n(n+1)$ for some integer $n$
+\end{enumerate}
+\end{definition}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    slot/.style={circle, minimum size=0.6cm, font=\tiny},
+    justifiable/.style={slot, draw=leanpurple, fill=leanpurple!30},
+    nonjustifiable/.style={slot, draw=gray!50, fill=gray!10},
+    finalized/.style={slot, draw=green!60!black, fill=green!30}
+]
+    % Finalized slot
+    \node[finalized] (f) at (0,0) {F};
+    \node[below=0.2cm of f, font=\tiny] {$f$};
+
+    % First 10 slots after finalization
+    \foreach \i/\j in {1/1, 2/1, 3/1, 4/1, 5/1, 6/1, 7/0, 8/0, 9/1, 10/0} {
+        \ifnum\j=1
+            \node[justifiable] (s\i) at (\i*0.8, 0) {\i};
+        \else
+            \node[nonjustifiable] (s\i) at (\i*0.8, 0) {\i};
+        \fi
+    }
+
+    % More slots
+    \node at (9.2, 0) {...};
+    \node[justifiable] (s12) at (10.4, 0) {12};
+    \node[nonjustifiable] (s13) at (11.2, 0) {13};
+    \node at (12, 0) {...};
+    \node[justifiable] (s16) at (12.8, 0) {16};
+
+    % Legend
+    \node[justifiable, label=right:{\tiny Justifiable}] at (0, -1.2) {};
+    \node[nonjustifiable, label=right:{\tiny Not justifiable}] at (3, -1.2) {};
+
+    % Annotations
+    \node[above=0.5cm of s3, font=\tiny, align=center] {$\delta \leq 5$\\(always)};
+    \draw[gray, ->] (2.4, 0.7) -- (s1.north);
+    \draw[gray, ->] (2.4, 0.7) -- (s5.north);
+
+    \node[above=0.5cm of s9, font=\tiny, align=center] {$\delta = 9$\\(square)};
+    \draw[gray, ->] (7.2, 0.7) -- (s9.north);
+
+    \node[above=0.5cm of s12, font=\tiny, align=center] {$\delta = 12$\\(pronic)};
+    \draw[gray, ->] (10.4, 0.7) -- (s12.north);
+\end{tikzpicture}
+\caption{Justifiable slots after finalization. Slots 1--5 are always justifiable.
+Beyond that, only perfect squares and pronic numbers are valid targets.}
+\label{fig:justifiable-slots}
+\end{figure}
+
+This constraint prevents the justification window from growing unboundedly,
+which would make tracking votes prohibitively expensive.
+
+\subsection{Vote Recording and Counting}
+
+For each valid attestation, the protocol:
+
+\begin{enumerate}
+    \item Checks if votes for this target are already being tracked
+    \item If not, creates a new tracking entry with all validators marked as
+          not-voted
+    \item Marks each attesting validator as having voted for this target
+    \item Counts the total votes
+\end{enumerate}
+
+\subsection{Supermajority Detection}
+
+The magic threshold for justification is $2/3$:
+
+\begin{equation}
+\text{justified} \iff 3 \times \texttt{vote\_count} \geq 2 \times |\texttt{validators}|
+\end{equation}
+
+The integer formulation avoids floating-point imprecision. When this threshold
+is crossed, the target becomes justified.
+
+\begin{infobox}{Why 2/3?}
+The $2/3$ threshold is fundamental to BFT consensus. With $n$ validators
+tolerating $f$ Byzantine faults:
+\begin{itemize}
+    \item Safety requires $n \geq 3f + 1$ (so two conflicting quorums must overlap)
+    \item A quorum is $2f + 1 = \lceil 2n/3 \rceil$ validators
+\end{itemize}
+Thus $2/3$ is the minimum threshold ensuring any two quorums share at least
+one honest validator who would detect conflicting votes.
+\end{infobox}
+
+\subsection{Finalization Conditions}
+
+Justification is not enough---finalization requires a \emph{continuous chain}
+of justified blocks:
+
+\begin{definition}[Finalization Condition]
+A justified source checkpoint at slot $s$ becomes finalized when:
+\begin{enumerate}
+    \item A target at slot $t > s$ becomes justified
+    \item There are no justifiable slots strictly between $s$ and $t$
+\end{enumerate}
+\end{definition}
+
+Intuitively, finalization requires validators to ``skip over'' any potential
+checkpoint positions, voting directly from the source to the target. This
+ensures no conflicting checkpoint can be inserted in between.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    checkpoint/.style={rectangle, draw=ethblue, fill=softgray,
+                       minimum width=1cm, minimum height=0.8cm, font=\small},
+    finalized/.style={rectangle, draw=green!60!black, fill=green!20,
+                      minimum width=1cm, minimum height=0.8cm, font=\small},
+    justified/.style={rectangle, draw=leanpurple, fill=leanpurple!20,
+                      minimum width=1cm, minimum height=0.8cm, font=\small},
+    arrow/.style={->, thick, gray},
+    vote/.style={->, thick, ethblue, dashed}
+]
+    % Before
+    \node[font=\bfseries] at (-1.5, 1.5) {Before:};
+    \node[finalized] (f1) at (0, 1.5) {$F$};
+    \node[justified] (j1) at (2, 1.5) {$J$};
+    \node[checkpoint] (t1) at (4, 1.5) {$T$};
+
+    \draw[arrow] (f1) -- (j1);
+    \draw[arrow] (j1) -- (t1);
+    \node[above=0.3cm of j1, font=\tiny] {Justifiable gap};
+
+    % After
+    \node[font=\bfseries] at (-1.5, 0) {After:};
+    \node[finalized] (f2) at (0, 0) {$F$};
+    \node[finalized] (j2) at (2, 0) {$J \to F$};
+    \node[justified] (t2) at (4, 0) {$T \to J$};
+
+    \draw[arrow] (f2) -- (j2);
+    \draw[arrow] (j2) -- (t2);
+    \draw[vote, bend left=40] (j2.north) to node[above, font=\tiny] {2/3+ votes} (t2.north);
+    \node[below=0.3cm of j2, font=\tiny, align=center] {No justifiable slots\\between $J$ and $T$};
+\end{tikzpicture}
+\caption{Finalization occurs when votes from $J$ to $T$ achieve supermajority
+and there are no justifiable slots between them.}
+\label{fig:finalization}
+\end{figure}
+
+When finalization occurs, the protocol:
+\begin{enumerate}
+    \item Updates \texttt{latest\_finalized} to the source checkpoint
+    \item Shifts the justified\_slots bitfield to drop finalized history
+    \item Prunes vote tracking for now-finalized blocks
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Full Block Processing Pipeline}
+\label{sec:full-pipeline}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+With all the pieces in place, we can now describe the complete state
+transition function.
+
+\subsection{The State Transition Function}
+
+\begin{algorithm}[H]
+\caption{State Transition}
+\begin{algorithmic}[1]
+\Require State $S$, Block $B$, signatures valid flag
+\Ensure New state $S'$ after applying block
+\If{signatures not valid}
+    \State \textbf{reject} block
+\EndIf
+\State $S' \gets S.\texttt{process\_slots}(B.\texttt{slot})$ \Comment{Advance to block's slot}
+\State $S' \gets S'.\texttt{process\_block\_header}(B)$ \Comment{Validate and apply header}
+\State $S' \gets S'.\texttt{process\_attestations}(B.\texttt{body.attestations})$ \Comment{Process votes}
+\If{$B.\texttt{state\_root} \neq \texttt{hash}(S')$}
+    \State \textbf{reject} block \Comment{State root mismatch}
+\EndIf
+\State \Return $S'$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Pipeline Visualization}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    stage/.style={rectangle, draw=ethblue, fill=softgray,
+                  minimum width=3cm, minimum height=1.2cm,
+                  font=\small, rounded corners=5pt, align=center},
+    arrow/.style={->, thick, ethblue},
+    check/.style={diamond, draw=leanpurple, fill=leanpurple!10,
+                  minimum width=1.5cm, minimum height=1cm,
+                  font=\tiny, aspect=2}
+]
+    % Stages
+    \node[stage] (input) {Input\\State + Block};
+    \node[check, right=1cm of input] (sigcheck) {Sigs\\Valid?};
+    \node[stage, right=1cm of sigcheck] (slots) {Process\\Slots};
+    \node[stage, right=1cm of slots] (header) {Process\\Header};
+    \node[stage, right=1cm of header] (atts) {Process\\Attestations};
+    \node[check, right=1cm of atts] (rootcheck) {State\\Root?};
+    \node[stage, right=1cm of rootcheck] (output) {Output\\New State};
+
+    % Arrows
+    \draw[arrow] (input) -- (sigcheck);
+    \draw[arrow] (sigcheck) -- node[above, font=\tiny] {yes} (slots);
+    \draw[arrow] (slots) -- (header);
+    \draw[arrow] (header) -- (atts);
+    \draw[arrow] (atts) -- (rootcheck);
+    \draw[arrow] (rootcheck) -- node[above, font=\tiny] {match} (output);
+
+    % Reject paths
+    \draw[arrow, red] (sigcheck.south) -- ++(0, -0.5) node[below, font=\tiny, text=red] {reject};
+    \draw[arrow, red] (rootcheck.south) -- ++(0, -0.5) node[below, font=\tiny, text=red] {reject};
+\end{tikzpicture}
+\caption{The complete block processing pipeline with validation checkpoints.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Signature Verification}
+
+Before any state changes occur, all signatures must be verified:
+
+\begin{enumerate}
+    \item \textbf{Attestation Signatures}: Each aggregated attestation in the
+          block body has an accompanying aggregated signature proof. The proof
+          must verify against the public keys of all participating validators.
+
+    \item \textbf{Proposer Signature}: The proposer's attestation (included
+          separately from the block body) must be signed by the proposer.
+\end{enumerate}
+
+Lean Consensus uses XMSS (eXtended Merkle Signature Scheme), a post-quantum
+signature scheme. Signatures are large ($\sim$3--4 KB each), making aggregation
+crucial for efficiency.
+
+\subsection{State Root Verification}
+
+The final verification step ensures determinism:
+
+\begin{equation}
+\texttt{hash\_tree\_root}(S') \stackrel{?}{=} B.\texttt{state\_root}
+\end{equation}
+
+If this check fails, the block is invalid. This could indicate:
+\begin{itemize}
+    \item A bug in the proposer's implementation
+    \item Different protocol versions between proposer and validator
+    \item Malicious block construction
+\end{itemize}
+
+This check guarantees that all honest validators arrive at exactly the same
+state after processing the same block.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Block Building}
+\label{sec:block-building}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Proposers must construct valid blocks. This is more complex than it might
+seem, due to the interplay between attestations and justification.
+
+\subsection{The Fixed-Point Attestation Collection Algorithm}
+
+The key insight: processing attestations can change the justified checkpoint,
+which can make \emph{additional} attestations valid (because their source
+now matches). This creates a feedback loop requiring iterative collection.
+
+\begin{algorithm}[H]
+\caption{Fixed-Point Attestation Collection}
+\begin{algorithmic}[1]
+\Require Parent state $S$, slot, proposer index, available attestations $A$
+\Ensure Block with maximal valid attestation set
+\State $\texttt{included} \gets \emptyset$
+\Repeat
+    \State $B \gets \texttt{create\_candidate\_block}(\texttt{included})$
+    \State $S' \gets S.\texttt{process\_slots}(\texttt{slot}).\texttt{process\_block}(B)$
+    \State $\texttt{new\_valid} \gets \emptyset$
+    \For{$a \in A \setminus \texttt{included}$}
+        \If{$a.\texttt{source} = S'.\texttt{latest\_justified}$}
+            \State $\texttt{new\_valid} \gets \texttt{new\_valid} \cup \{a\}$
+        \EndIf
+    \EndFor
+    \State $\texttt{included} \gets \texttt{included} \cup \texttt{new\_valid}$
+\Until{$\texttt{new\_valid} = \emptyset$}
+\State \Return $\texttt{finalize\_block}(\texttt{included})$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    box/.style={rectangle, draw=ethblue, fill=softgray,
+                minimum width=3.5cm, minimum height=1cm,
+                font=\small, rounded corners=5pt, align=center},
+    decision/.style={diamond, draw=leanpurple, fill=leanpurple!10,
+                     minimum width=2cm, font=\small, aspect=2},
+    arrow/.style={->, thick, ethblue}
+]
+    % Nodes
+    \node[box] (start) {Start with\\empty attestations};
+    \node[box, below=of start] (build) {Build candidate\\block};
+    \node[box, below=of build] (process) {Process block,\\get post-state};
+    \node[box, below=of process] (find) {Find newly valid\\attestations};
+    \node[decision, below=of find] (check) {Any\\new?};
+    \node[box, below left=1cm and 1cm of check] (add) {Add to\\included set};
+    \node[box, below right=1cm and 1cm of check] (done) {Build final\\block};
+
+    % Arrows
+    \draw[arrow] (start) -- (build);
+    \draw[arrow] (build) -- (process);
+    \draw[arrow] (process) -- (find);
+    \draw[arrow] (find) -- (check);
+    \draw[arrow] (check) -| node[above, font=\tiny] {yes} (add);
+    \draw[arrow] (add) |- (build);
+    \draw[arrow] (check) -| node[above, font=\tiny] {no} (done);
+\end{tikzpicture}
+\caption{The fixed-point attestation collection loop. The algorithm iterates
+until no new valid attestations can be found.}
+\label{fig:fixed-point}
+\end{figure}
+
+\subsection{Why Fixed-Point Is Necessary}
+
+Consider this scenario:
+\begin{enumerate}
+    \item Initial justified checkpoint is at slot 10
+    \item Many attestations reference slot 10 as source, slot 15 as target
+    \item Some attestations reference slot 15 as source, slot 20 as target
+    \item Initially, only the first group is valid (source matches justified)
+    \item After processing them, slot 15 becomes justified
+    \item Now the second group becomes valid (their source now matches)
+\end{enumerate}
+
+Without fixed-point iteration, we would miss the second group of attestations.
+
+\subsection{Signature Aggregation}
+
+Once attestations are collected, their signatures must be aggregated for
+efficient verification. Lean Consensus uses a two-phase approach:
+
+\begin{enumerate}
+    \item \textbf{Gossip Collection}: Individual XMSS signatures received via
+          the gossip network are aggregated into a single proof
+
+    \item \textbf{Fallback to Existing Proofs}: For validators without gossip
+          signatures, previously-seen aggregated proofs from other blocks are
+          reused using a greedy set-cover algorithm
+\end{enumerate}
+
+The greedy algorithm minimizes the number of proofs needed:
+
+\begin{algorithm}[H]
+\caption{Greedy Proof Selection}
+\begin{algorithmic}[1]
+\Require Remaining validators to cover $R$, available proofs $P$
+\Ensure Minimal set of proofs covering $R$
+\State $\texttt{selected} \gets \emptyset$
+\While{$R \neq \emptyset$}
+    \State $p^* \gets \arg\max_{p \in P} |p.\texttt{participants} \cap R|$
+    \State $\texttt{selected} \gets \texttt{selected} \cup \{p^*\}$
+    \State $R \gets R \setminus p^*.\texttt{participants}$
+\EndWhile
+\State \Return $\texttt{selected}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Final Block Assembly}
+
+The final block combines:
+\begin{itemize}
+    \item Header fields (slot, proposer, parent root, computed state root)
+    \item Body containing aggregated attestations
+    \item Signature proofs for each attestation group
+    \item Proposer's own attestation and signature
+\end{itemize}
+
+The state root is computed by actually executing the block against the parent
+state and hashing the result---there is no shortcut.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Summary: The Justification-Finalization State Machine}
+\label{sec:summary}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Block processing drives a state machine that moves checkpoints through
+three states:
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    state/.style={circle, draw=ethblue, fill=softgray,
+                  minimum size=2.5cm, font=\small, align=center},
+    arrow/.style={->, thick, ethblue, >=stealth},
+    label/.style={font=\small, align=center}
+]
+    % States
+    \node[state] (proposed) at (0, 0) {Proposed\\(Unjustified)};
+    \node[state] (justified) at (5, 0) {Justified};
+    \node[state] (finalized) at (10, 0) {Finalized};
+
+    % Transitions
+    \draw[arrow, bend left=20] (proposed) to
+        node[above, label] {$\geq 2/3$ votes\\for this target} (justified);
+
+    \draw[arrow, bend left=20] (justified) to
+        node[above, label] {Continuous chain\\+ $\geq 2/3$ votes} (finalized);
+
+    % Self loops for accumulating votes
+    \draw[arrow, loop above] (proposed) to
+        node[above, label] {Accumulate\\votes} (proposed);
+
+    % Properties
+    \node[below=0.8cm of proposed, font=\small\itshape, text=gray, align=center]
+        {Can be reverted\\No safety guarantee};
+    \node[below=0.8cm of justified, font=\small\itshape, text=gray, align=center]
+        {``Probably'' final\\Unlikely to revert};
+    \node[below=0.8cm of finalized, font=\small\itshape, text=gray, align=center]
+        {Irreversible\\Requires 1/3 slashing};
+\end{tikzpicture}
+\caption{The checkpoint state machine. Blocks progress from proposed through
+justified to finalized as attestations accumulate.}
+\label{fig:state-machine}
+\end{figure}
+
+\subsection{Key Invariants}
+
+Throughout block processing, these invariants are maintained:
+
+\begin{enumerate}
+    \item \textbf{Finality is monotonic}: Once finalized, always finalized
+    \item \textbf{Justification precedes finalization}: A block must be justified
+          before it can be finalized
+    \item \textbf{Chain continuity}: Finalization requires no gaps in the
+          justified chain
+    \item \textbf{Determinism}: Same inputs always produce same outputs
+\end{enumerate}
+
+\subsection{Security Properties}
+
+The block processing rules provide:
+
+\begin{itemize}
+    \item \textbf{Safety}: Two conflicting blocks cannot both be finalized
+          (unless $\geq 1/3$ validators are Byzantine)
+    \item \textbf{Liveness}: If $> 2/3$ validators are honest and online,
+          new blocks will eventually be finalized
+    \item \textbf{Accountability}: If safety is violated, the conflicting
+          attestations provide cryptographic evidence for slashing
+\end{itemize}
+
+\begin{infobox}{The 1/3 Bound}
+With the $2/3$ supermajority requirement, any two quorums overlap by at
+least $1/3$ of validators. For safety to be violated, this overlapping
+$1/3$ must have voted for conflicting checkpoints---which is slashable.
+Thus safety violations require $\geq 1/3$ Byzantine validators willing to
+be slashed.
+\end{infobox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Block processing in Lean Consensus transforms raw blocks into trusted state
+transitions. The process is deterministic, auditable, and secure:
+
+\begin{itemize}
+    \item \textbf{Genesis} provides the trust anchor from which all consensus flows
+    \item \textbf{State} captures everything needed for verification
+    \item \textbf{Blocks} propose changes with cryptographic linkage
+    \item \textbf{Attestations} accumulate validator agreement
+    \item \textbf{Justification} marks supermajority consensus
+    \item \textbf{Finalization} makes history irreversible
+\end{itemize}
+
+In the next chapter, we will explore how the fork choice algorithm uses this
+processed state to select the canonical chain head when multiple valid chains
+exist.
