@@ -155,8 +155,8 @@ class BaseBitlist(SSZModel):
         else:
             raise SSZTypeError(f"Expected iterable, got {type(v).__name__}")
 
-        # Check limit
-        if len(elements) > cls.LIMIT:
+        # Check limit (convert LIMIT to int to support Uint constants)
+        if len(elements) > int(cls.LIMIT):
             raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(elements)}")
 
         return tuple(Boolean(bit) for bit in elements)
@@ -270,7 +270,7 @@ class BaseBitlist(SSZModel):
 
         # Extract data bits (everything before the delimiter).
         num_bits = delimiter_pos
-        if num_bits > cls.LIMIT:
+        if num_bits > int(cls.LIMIT):
             raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {num_bits}")
 
         bits = tuple(Boolean((data[i // 8] >> (i % 8)) & 1) for i in range(num_bits))

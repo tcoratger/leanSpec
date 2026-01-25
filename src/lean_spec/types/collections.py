@@ -314,8 +314,8 @@ class SSZList(SSZModel, Generic[T]):
         else:
             raise SSZTypeError(f"Expected iterable, got {type(v).__name__}")
 
-        # Check limit
-        if len(elements) > cls.LIMIT:
+        # Check limit (convert LIMIT to int to support Uint constants)
+        if len(elements) > int(cls.LIMIT):
             raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(elements)}")
 
         # Convert and validate each element
@@ -385,7 +385,7 @@ class SSZList(SSZModel, Generic[T]):
                 )
 
             num_elements = scope // element_size
-            if num_elements > cls.LIMIT:
+            if num_elements > int(cls.LIMIT):
                 raise SSZValueError(
                     f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {num_elements}"
                 )
@@ -411,7 +411,7 @@ class SSZList(SSZModel, Generic[T]):
                 raise SSZSerializationError(f"{cls.__name__}: invalid offset {first_offset}")
 
             count = first_offset // OFFSET_BYTE_LENGTH
-            if count > cls.LIMIT:
+            if count > int(cls.LIMIT):
                 raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {count}")
 
             # Read the rest of the offsets.

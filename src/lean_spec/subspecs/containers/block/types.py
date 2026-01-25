@@ -20,7 +20,7 @@ BlockLookup = dict[Bytes32, "Block"]
 class AggregatedAttestations(SSZList[AggregatedAttestation]):
     """List of aggregated attestations included in a block."""
 
-    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
+    LIMIT = VALIDATOR_REGISTRY_LIMIT
 
 
 class AttestationSignatures(SSZList[AggregatedSignatureProof]):
@@ -34,4 +34,4 @@ class AttestationSignatures(SSZList[AggregatedSignatureProof]):
         - proof bytes from leanVM signature aggregation.
     """
 
-    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
+    LIMIT = VALIDATOR_REGISTRY_LIMIT

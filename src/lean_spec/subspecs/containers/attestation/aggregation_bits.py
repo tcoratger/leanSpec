@@ -15,7 +15,7 @@ class AggregationBits(BaseBitlist):
     in some collective action (attestation, signature aggregation, etc.).
     """
 
-    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
+    LIMIT = VALIDATOR_REGISTRY_LIMIT
 
     @classmethod
     def from_validator_indices(cls, indices: list[Uint64]) -> AggregationBits:

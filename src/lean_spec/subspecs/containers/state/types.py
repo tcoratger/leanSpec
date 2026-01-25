@@ -13,19 +13,19 @@ from ..validator import Validator
 class HistoricalBlockHashes(SSZList[Bytes32]):
     """List of historical block root hashes up to historical roots limit."""
 
-    LIMIT = int(HISTORICAL_ROOTS_LIMIT)
+    LIMIT = HISTORICAL_ROOTS_LIMIT
 
 
 class JustificationRoots(SSZList[Bytes32]):
     """List of justified block roots up to historical roots limit."""
 
-    LIMIT = int(HISTORICAL_ROOTS_LIMIT)
+    LIMIT = HISTORICAL_ROOTS_LIMIT
 
 
 class JustifiedSlots(BaseBitlist):
     """Bitlist tracking justified slots up to historical roots limit."""
 
-    LIMIT = int(HISTORICAL_ROOTS_LIMIT)
+    LIMIT = HISTORICAL_ROOTS_LIMIT
 
     def is_slot_justified(self, finalized_slot: Slot, target_slot: Slot) -> Boolean:
         """
@@ -167,10 +167,10 @@ class JustifiedSlots(BaseBitlist):
 class JustificationValidators(BaseBitlist):
     """Bitlist for tracking validator justifications per historical root."""
 
-    LIMIT = int(HISTORICAL_ROOTS_LIMIT) * int(VALIDATOR_REGISTRY_LIMIT)
+    LIMIT = HISTORICAL_ROOTS_LIMIT * VALIDATOR_REGISTRY_LIMIT
 
 
 class Validators(SSZList[Validator]):
     """Validator registry tracked in the state."""
 
-    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
+    LIMIT = VALIDATOR_REGISTRY_LIMIT
