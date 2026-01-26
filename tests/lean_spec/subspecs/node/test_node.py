@@ -27,6 +27,7 @@ from lean_spec.subspecs.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import NetworkEvent, PeerId
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.types import Bytes32, Bytes52, Uint64
@@ -74,7 +75,7 @@ class MockNetworkRequester:
 def validators() -> Validators:
     """Provide a minimal validator set for tests."""
     return Validators(
-        data=[Validator(pubkey=Bytes52(b"\x00" * 52), index=Uint64(i)) for i in range(3)]
+        data=[Validator(pubkey=Bytes52(b"\x00" * 52), index=ValidatorIndex(i)) for i in range(3)]
     )
 
 
@@ -133,7 +134,7 @@ class TestNodeFromGenesis:
 
         block = Block(
             slot=test_slot,
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
             body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -146,7 +147,7 @@ class TestNodeFromGenesis:
             slot=test_slot,
             latest_block_header=BlockHeader(
                 slot=test_slot,
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32.zero(),
                 state_root=Bytes32.zero(),
                 body_root=Bytes32.zero(),

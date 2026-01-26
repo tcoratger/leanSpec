@@ -9,7 +9,7 @@ from consensus_testing import (
 )
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Uint64
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -78,7 +78,7 @@ def test_proposer_and_attester_signatures(
             slot=Slot(1),
             attestations=[
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(0), Uint64(2)],
+                    validator_ids=[ValidatorIndex(0), ValidatorIndex(2)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",
@@ -115,7 +115,7 @@ def test_all_four_validators_attesting(
             slot=Slot(1),
             attestations=[
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(0), Uint64(2), Uint64(3)],
+                    validator_ids=[ValidatorIndex(0), ValidatorIndex(2), ValidatorIndex(3)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",
@@ -152,7 +152,7 @@ def test_single_validator_attestation(
             slot=Slot(1),
             attestations=[
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(0)],
+                    validator_ids=[ValidatorIndex(0)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",
@@ -191,13 +191,13 @@ def test_multiple_attestation_groups_same_data(
             slot=Slot(1),
             attestations=[
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(0), Uint64(2)],
+                    validator_ids=[ValidatorIndex(0), ValidatorIndex(2)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",
                 ),
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(3)],
+                    validator_ids=[ValidatorIndex(3)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",

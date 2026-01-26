@@ -17,6 +17,7 @@ from lean_spec.subspecs.containers import (
     SignedBlockWithAttestation,
     State,
     Validator,
+    ValidatorIndex,
 )
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
@@ -71,7 +72,7 @@ def mock_registry() -> ValidatorRegistry:
     registry = ValidatorRegistry()
     for i in [0, 1]:
         mock_key = MagicMock()
-        registry.add(ValidatorEntry(index=Uint64(i), secret_key=mock_key))
+        registry.add(ValidatorEntry(index=ValidatorIndex(i), secret_key=mock_key))
     return registry
 
 
@@ -126,7 +127,7 @@ class TestValidatorServiceDuties:
         # Registry with validator 2 only
         registry = ValidatorRegistry()
         mock_key = MagicMock()
-        registry.add(ValidatorEntry(index=Uint64(2), secret_key=mock_key))
+        registry.add(ValidatorEntry(index=ValidatorIndex(2), secret_key=mock_key))
 
         blocks_received: list[SignedBlockWithAttestation] = []
 
@@ -305,15 +306,15 @@ class TestProposerSkipping:
         registry = ValidatorRegistry()
         for i in [0, 1]:
             mock_key = MagicMock()
-            registry.add(ValidatorEntry(index=Uint64(i), secret_key=mock_key))
+            registry.add(ValidatorEntry(index=ValidatorIndex(i), secret_key=mock_key))
 
         # Track which validators had _sign_attestation called.
-        signed_validator_ids: list[Uint64] = []
+        signed_validator_ids: list[ValidatorIndex] = []
 
         def mock_sign_attestation(
             self: ValidatorService,  # noqa: ARG001
             attestation_data: object,  # noqa: ARG001
-            validator_index: Uint64,
+            validator_index: ValidatorIndex,
         ) -> SignedAttestation:
             signed_validator_ids.append(validator_index)
             return MagicMock(spec=SignedAttestation, validator_id=validator_index)
@@ -337,7 +338,7 @@ class TestProposerSkipping:
 
         # Only validator 1 should have signed an attestation.
         assert len(signed_validator_ids) == 1
-        assert signed_validator_ids[0] == Uint64(1)
+        assert signed_validator_ids[0] == ValidatorIndex(1)
         assert service.attestations_produced == 1
 
     def test_non_proposer_still_attests(
@@ -354,15 +355,15 @@ class TestProposerSkipping:
         # Registry with only validator 0.
         registry = ValidatorRegistry()
         mock_key = MagicMock()
-        registry.add(ValidatorEntry(index=Uint64(0), secret_key=mock_key))
+        registry.add(ValidatorEntry(index=ValidatorIndex(0), secret_key=mock_key))
 
         # Track which validators had _sign_attestation called.
-        signed_validator_ids: list[Uint64] = []
+        signed_validator_ids: list[ValidatorIndex] = []
 
         def mock_sign_attestation(
             self: ValidatorService,  # noqa: ARG001
             attestation_data: object,  # noqa: ARG001
-            validator_index: Uint64,
+            validator_index: ValidatorIndex,
         ) -> SignedAttestation:
             signed_validator_ids.append(validator_index)
             return MagicMock(spec=SignedAttestation, validator_id=validator_index)
@@ -387,7 +388,7 @@ class TestProposerSkipping:
 
         # Validator 0 should have signed an attestation.
         assert len(signed_validator_ids) == 1
-        assert signed_validator_ids[0] == Uint64(0)
+        assert signed_validator_ids[0] == ValidatorIndex(0)
         assert service.attestations_produced == 1
 
     def test_multiple_validators_only_non_proposers_attest(
@@ -405,15 +406,15 @@ class TestProposerSkipping:
         registry = ValidatorRegistry()
         for i in [0, 1, 2]:
             mock_key = MagicMock()
-            registry.add(ValidatorEntry(index=Uint64(i), secret_key=mock_key))
+            registry.add(ValidatorEntry(index=ValidatorIndex(i), secret_key=mock_key))
 
         # Track which validators had _sign_attestation called.
-        signed_validator_ids: list[Uint64] = []
+        signed_validator_ids: list[ValidatorIndex] = []
 
         def mock_sign_attestation(
             self: ValidatorService,  # noqa: ARG001
             attestation_data: object,  # noqa: ARG001
-            validator_index: Uint64,
+            validator_index: ValidatorIndex,
         ) -> SignedAttestation:
             signed_validator_ids.append(validator_index)
             return MagicMock(spec=SignedAttestation, validator_id=validator_index)
@@ -437,11 +438,11 @@ class TestProposerSkipping:
 
         # Validators 0 and 1 should have signed attestations.
         assert len(signed_validator_ids) == 2
-        assert set(signed_validator_ids) == {Uint64(0), Uint64(1)}
+        assert set(signed_validator_ids) == {ValidatorIndex(0), ValidatorIndex(1)}
         assert service.attestations_produced == 2
 
         # Verify validator 2 (proposer) did not sign.
-        assert Uint64(2) not in signed_validator_ids
+        assert ValidatorIndex(2) not in signed_validator_ids
 
 
 class TestSigningMissingValidator:
@@ -466,14 +467,14 @@ class TestSigningMissingValidator:
         # Create a minimal block
         block = Block(
             slot=Slot(1),
-            proposer_index=Uint64(99),
+            proposer_index=ValidatorIndex(99),
             parent_root=sync_service.store.head,
             state_root=sync_service.store.head,
             body=sync_service.store.blocks[sync_service.store.head].body,
         )
 
         with pytest.raises(ValueError, match="No secret key for validator 99"):
-            service._sign_block(block, Uint64(99), [])
+            service._sign_block(block, ValidatorIndex(99), [])
 
     def test_sign_attestation_missing_validator(
         self,
@@ -495,7 +496,7 @@ class TestSigningMissingValidator:
         attestation_data = sync_service.store.produce_attestation_data(Slot(1))
 
         with pytest.raises(ValueError, match="No secret key for validator 99"):
-            service._sign_attestation(attestation_data, Uint64(99))
+            service._sign_attestation(attestation_data, ValidatorIndex(99))
 
 
 class TestValidatorServiceIntegration:
@@ -517,8 +518,8 @@ class TestValidatorServiceIntegration:
         validators = Validators(
             data=[
                 Validator(
-                    pubkey=Bytes52(key_manager[Uint64(i)].public.encode_bytes()),
-                    index=Uint64(i),
+                    pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
+                    index=ValidatorIndex(i),
                 )
                 for i in range(6)
             ]
@@ -526,7 +527,7 @@ class TestValidatorServiceIntegration:
         genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
         genesis_block = Block(
             slot=Slot(0),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=hash_tree_root(genesis_state),
             body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -549,7 +550,7 @@ class TestValidatorServiceIntegration:
         """Registry populated with real secret keys from key manager."""
         registry = ValidatorRegistry()
         for i in range(6):
-            validator_index = Uint64(i)
+            validator_index = ValidatorIndex(i)
             secret_key = key_manager[validator_index].secret
             registry.add(ValidatorEntry(index=validator_index, secret_key=secret_key))
         return registry
@@ -589,7 +590,7 @@ class TestValidatorServiceIntegration:
 
         # Verify block structure
         assert signed_block.message.block.slot == Slot(1)
-        assert signed_block.message.block.proposer_index == Uint64(1)
+        assert signed_block.message.block.proposer_index == ValidatorIndex(1)
 
         # Verify proposer signature is cryptographically valid
         proposer_index = signed_block.message.block.proposer_index
@@ -772,10 +773,10 @@ class TestValidatorServiceIntegration:
         data_root = attestation_data.data_root_bytes()
 
         # Simulate gossip attestations from validators 3 and 4
-        attestation_map: dict[Uint64, AttestationData] = {}
+        attestation_map: dict[ValidatorIndex, AttestationData] = {}
         gossip_sigs: dict[SignatureKey, Signature] = {}
 
-        for validator_id in (Uint64(3), Uint64(4)):
+        for validator_id in (ValidatorIndex(3), ValidatorIndex(4)):
             attestation_map[validator_id] = attestation_data
             gossip_sigs[SignatureKey(validator_id, data_root)] = key_manager.sign_attestation_data(
                 validator_id, attestation_data
@@ -894,7 +895,7 @@ class TestValidatorServiceIntegration:
         )
 
         slot = Slot(3)
-        proposer_index = Uint64(3)  # 3 % 6 == 3
+        proposer_index = ValidatorIndex(3)  # 3 % 6 == 3
 
         async def simulate_full_slot() -> None:
             # Interval 0: block production
@@ -913,7 +914,7 @@ class TestValidatorServiceIntegration:
         assert proposer_index not in attestation_validator_ids
 
         # All other validators should have attested
-        expected_attesters = {Uint64(i) for i in range(6) if i != int(proposer_index)}
+        expected_attesters = {ValidatorIndex(i) for i in range(6) if i != int(proposer_index)}
         assert attestation_validator_ids == expected_attesters
 
     def test_block_state_root_is_valid(

@@ -4,7 +4,7 @@ from lean_spec.subspecs.containers.block import Block, BlockBody
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import State, Validators
-from lean_spec.subspecs.containers.validator import Validator
+from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Uint64
 
@@ -15,7 +15,9 @@ def test_genesis_block_hash_comparison() -> None:
     # Fill pubkeys with different values (1, 2, 3)
     pubkeys1 = [Bytes52(bytes([i + 1] * 52)) for i in range(3)]
     validators1 = Validators(
-        data=[Validator(pubkey=pubkey, index=Uint64(i)) for i, pubkey in enumerate(pubkeys1)]
+        data=[
+            Validator(pubkey=pubkey, index=ValidatorIndex(i)) for i, pubkey in enumerate(pubkeys1)
+        ]
     )
 
     genesis_state1 = State.generate_genesis(
@@ -26,7 +28,7 @@ def test_genesis_block_hash_comparison() -> None:
     # Generate genesis block from first state
     genesis_block1 = Block(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state1),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -43,7 +45,7 @@ def test_genesis_block_hash_comparison() -> None:
 
     genesis_block1_copy = Block(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state1_copy),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -58,7 +60,9 @@ def test_genesis_block_hash_comparison() -> None:
     # Fill pubkeys with different values (10, 11, 12)
     pubkeys2 = [Bytes52(bytes([i + 10] * 52)) for i in range(3)]
     validators2 = Validators(
-        data=[Validator(pubkey=pubkey, index=Uint64(i)) for i, pubkey in enumerate(pubkeys2)]
+        data=[
+            Validator(pubkey=pubkey, index=ValidatorIndex(i)) for i, pubkey in enumerate(pubkeys2)
+        ]
     )
 
     genesis_state2 = State.generate_genesis(
@@ -68,7 +72,7 @@ def test_genesis_block_hash_comparison() -> None:
 
     genesis_block2 = Block(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state2),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -83,7 +87,9 @@ def test_genesis_block_hash_comparison() -> None:
     # Same as pubkeys1
     pubkeys3 = [Bytes52(bytes([i + 1] * 52)) for i in range(3)]
     validators3 = Validators(
-        data=[Validator(pubkey=pubkey, index=Uint64(i)) for i, pubkey in enumerate(pubkeys3)]
+        data=[
+            Validator(pubkey=pubkey, index=ValidatorIndex(i)) for i, pubkey in enumerate(pubkeys3)
+        ]
     )
 
     genesis_state3 = State.generate_genesis(
@@ -93,7 +99,7 @@ def test_genesis_block_hash_comparison() -> None:
 
     genesis_block3 = Block(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(genesis_state3),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),

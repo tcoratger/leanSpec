@@ -22,6 +22,7 @@ from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking.client.event_source import (
     GossipHandler,
     GossipMessageError,
@@ -34,7 +35,7 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
     TopicKind,
 )
 from lean_spec.subspecs.networking.varint import encode_varint
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 
 # =============================================================================
@@ -110,7 +111,7 @@ def make_test_signed_block() -> SignedBlockWithAttestation:
     """Create a minimal signed block for testing."""
     return make_signed_block(
         slot=Slot(1),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=Bytes32.zero(),
     )
@@ -119,7 +120,7 @@ def make_test_signed_block() -> SignedBlockWithAttestation:
 def make_test_signed_attestation() -> SignedAttestation:
     """Create a minimal signed attestation for testing."""
     return make_signed_attestation(
-        validator=Uint64(0),
+        validator=ValidatorIndex(0),
         target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
     )
 

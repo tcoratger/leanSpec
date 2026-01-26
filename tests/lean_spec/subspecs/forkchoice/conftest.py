@@ -21,6 +21,7 @@ from lean_spec.subspecs.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 
@@ -36,7 +37,7 @@ class MockState(State):
 
         genesis_header = BlockHeader(
             slot=Slot(0),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
             body_root=hash_tree_root(BlockBody(attestations=AggregatedAttestations(data=[]))),

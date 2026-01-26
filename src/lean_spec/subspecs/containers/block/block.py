@@ -9,9 +9,10 @@ The proposer is determined by slot assignment.
 from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.xmss.aggregation import AggregationError
 from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from lean_spec.types.container import Container
 
 from ...xmss.containers import Signature as XmssSignature
@@ -43,7 +44,7 @@ class BlockHeader(Container):
     slot: Slot
     """The slot in which the block was proposed."""
 
-    proposer_index: Uint64
+    proposer_index: ValidatorIndex
     """The index of the validator that proposed the block."""
 
     parent_root: Bytes32
@@ -62,7 +63,7 @@ class Block(Container):
     slot: Slot
     """The slot in which the block was proposed."""
 
-    proposer_index: Uint64
+    proposer_index: ValidatorIndex
     """The index of the validator that proposed the block."""
 
     parent_root: Bytes32
@@ -156,7 +157,7 @@ class SignedBlockWithAttestation(Container):
 
             # Bounds check: all validators must exist in the registry.
             for validator_id in validator_ids:
-                assert validator_id < Uint64(len(validators)), "Validator index out of range"
+                assert validator_id.is_valid(len(validators)), "Validator index out of range"
 
             # Collect public keys for all participating validators.
             # Order matters: must match the order in the aggregated signature.
@@ -187,7 +188,7 @@ class SignedBlockWithAttestation(Container):
         )
 
         # Bounds check: proposer must exist in the validator registry.
-        assert proposer_attestation.validator_id < Uint64(len(validators)), (
+        assert proposer_attestation.validator_id.is_valid(len(validators)), (
             "Proposer index out of range"
         )
         proposer = validators[proposer_attestation.validator_id]

@@ -12,7 +12,7 @@ from consensus_testing import (
 )
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Uint64
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -869,12 +869,12 @@ def test_reorg_on_newly_justified_slot(
                         # towards justification
                         AggregatedAttestationSpec(
                             validator_ids=[
-                                Uint64(0),
-                                Uint64(1),
-                                Uint64(5),
-                                Uint64(6),
-                                Uint64(7),
-                                Uint64(8),
+                                ValidatorIndex(0),
+                                ValidatorIndex(1),
+                                ValidatorIndex(5),
+                                ValidatorIndex(6),
+                                ValidatorIndex(7),
+                                ValidatorIndex(8),
                             ],
                             slot=Slot(5),
                             target_slot=Slot(5),

@@ -10,13 +10,14 @@ import pytest
 
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.backfill_sync import BackfillSync
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.head_sync import HeadSync
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_signed_block
 
 
@@ -65,7 +66,7 @@ class TestGossipBlockProcessing:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -96,7 +97,7 @@ class TestGossipBlockProcessing:
         unknown_parent = Bytes32(b"\x01" * 32)
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=unknown_parent,
             state_root=Bytes32.zero(),
         )
@@ -122,7 +123,7 @@ class TestGossipBlockProcessing:
         # Add a block that's already in the store
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -160,7 +161,7 @@ class TestDescendantProcessing:
         # Create parent and child
         parent = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32(b"\x01" * 32),
         )
@@ -168,7 +169,7 @@ class TestDescendantProcessing:
 
         child = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -216,7 +217,7 @@ class TestDescendantProcessing:
         for i in range(1, 5):
             block = make_signed_block(
                 slot=Slot(i),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=parent_root,
                 state_root=Bytes32(bytes([i]) * 32),
             )
@@ -266,13 +267,13 @@ class TestProcessAllProcessable:
         # Create two independent blocks with genesis as parent
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32(b"\x01" * 32),
         )
         block2 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(1),
+            proposer_index=ValidatorIndex(1),
             parent_root=genesis_root,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -314,7 +315,7 @@ class TestProcessAllProcessable:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -360,7 +361,7 @@ class TestErrorHandling:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -385,14 +386,14 @@ class TestErrorHandling:
         # Two siblings
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32(b"\x01" * 32),
         )
 
         block2 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(1),
+            proposer_index=ValidatorIndex(1),
             parent_root=genesis_root,
             state_root=Bytes32(b"\x02" * 32),
         )

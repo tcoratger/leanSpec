@@ -32,8 +32,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, field_validator
 
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.xmss import SecretKey
-from lean_spec.types import Uint64
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +141,7 @@ class ValidatorEntry:
     Holds both the index and the secret key needed for signing.
     """
 
-    index: Uint64
+    index: ValidatorIndex
     """Validator index in the registry."""
 
     secret_key: SecretKey
@@ -157,7 +157,7 @@ class ValidatorRegistry:
     It provides lookup by validator index for signing operations.
     """
 
-    _validators: dict[Uint64, ValidatorEntry] = field(default_factory=dict)
+    _validators: dict[ValidatorIndex, ValidatorEntry] = field(default_factory=dict)
     """Map from validator index to entry."""
 
     def add(self, entry: ValidatorEntry) -> None:
@@ -169,7 +169,7 @@ class ValidatorRegistry:
         """
         self._validators[entry.index] = entry
 
-    def get(self, index: Uint64) -> ValidatorEntry | None:
+    def get(self, index: ValidatorIndex) -> ValidatorEntry | None:
         """
         Get validator entry by index.
 
@@ -181,7 +181,7 @@ class ValidatorRegistry:
         """
         return self._validators.get(index)
 
-    def has(self, index: Uint64) -> bool:
+    def has(self, index: ValidatorIndex) -> bool:
         """
         Check if we control this validator.
 
@@ -193,14 +193,14 @@ class ValidatorRegistry:
         """
         return index in self._validators
 
-    def indices(self) -> list[Uint64]:
+    def indices(self) -> ValidatorIndices:
         """
         Get all validator indices we control.
 
         Returns:
-            List of validator indices.
+            ValidatorIndices collection.
         """
-        return list(self._validators.keys())
+        return ValidatorIndices(data=list(self._validators.keys()))
 
     def __len__(self) -> int:
         """Number of validators in the registry."""
@@ -276,7 +276,7 @@ class ValidatorRegistry:
 
             registry.add(
                 ValidatorEntry(
-                    index=Uint64(index),
+                    index=ValidatorIndex(index),
                     secret_key=secret_key,
                 )
             )
@@ -298,5 +298,5 @@ class ValidatorRegistry:
         """
         registry = cls()
         for index, secret_key in keys.items():
-            registry.add(ValidatorEntry(index=Uint64(index), secret_key=secret_key))
+            registry.add(ValidatorEntry(index=ValidatorIndex(index), secret_key=secret_key))
         return registry

@@ -9,7 +9,7 @@ from consensus_testing import (
 )
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Uint64
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -80,7 +80,7 @@ def test_invalid_aggregated_attestation_signature(
             attestations=[
                 # Valid aggregated attestation
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(0)],
+                    validator_ids=[ValidatorIndex(0)],
                     slot=Slot(2),
                     target_slot=Slot(1),
                     target_root_label="genesis",
@@ -88,7 +88,7 @@ def test_invalid_aggregated_attestation_signature(
                 ),
                 # Invalid aggregated attestation (different target to force separate aggregation)
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(2)],
+                    validator_ids=[ValidatorIndex(2)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",
@@ -130,8 +130,8 @@ def test_valid_signature_wrong_validator(
             slot=Slot(1),
             attestations=[
                 AggregatedAttestationSpec(
-                    validator_ids=[Uint64(0), Uint64(1)],
-                    signer_ids=[Uint64(2), Uint64(3)],
+                    validator_ids=[ValidatorIndex(0), ValidatorIndex(1)],
+                    signer_ids=[ValidatorIndex(2), ValidatorIndex(3)],
                     slot=Slot(1),
                     target_slot=Slot(0),
                     target_root_label="genesis",

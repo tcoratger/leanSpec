@@ -29,6 +29,7 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     SignedBlockWithAttestation,
     State,
+    ValidatorIndex,
 )
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
@@ -43,7 +44,6 @@ from lean_spec.types import (
     ZERO_HASH,
     Bytes32,
     Uint64,
-    is_proposer,
 )
 from lean_spec.types.container import Container
 
@@ -124,7 +124,7 @@ class Store(Container):
     `Store`'s latest justified and latest finalized checkpoints.
     """
 
-    latest_known_attestations: dict[Uint64, AttestationData] = {}
+    latest_known_attestations: dict[ValidatorIndex, AttestationData] = {}
     """
     Latest attestation data by validator that have been processed.
 
@@ -133,7 +133,7 @@ class Store(Container):
     - Only stores the attestation data, not signatures.
     """
 
-    latest_new_attestations: dict[Uint64, AttestationData] = {}
+    latest_new_attestations: dict[ValidatorIndex, AttestationData] = {}
     """
     Latest attestation data by validator that are pending processing.
 
@@ -304,7 +304,7 @@ class Store(Container):
             f"No state available to verify attestation signature for target block "
             f"{attestation_data.target.root.hex()}"
         )
-        assert validator_id < Uint64(len(key_state.validators)), (
+        assert validator_id.is_valid(len(key_state.validators)), (
             f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
         )
         public_key = key_state.validators[validator_id].get_pubkey()
@@ -381,7 +381,7 @@ class Store(Container):
         self.validate_attestation(attestation)
 
         # Extract the validator index that produced this attestation.
-        validator_id = Uint64(attestation.validator_id)
+        validator_id = attestation.validator_id
 
         # Extract the attestation data and slot
         attestation_data = attestation.data
@@ -622,7 +622,7 @@ class Store(Container):
     def _compute_lmd_ghost_head(
         self,
         start_root: Bytes32,
-        attestations: dict[Uint64, AttestationData],
+        attestations: dict[ValidatorIndex, AttestationData],
         min_score: int = 0,
     ) -> Bytes32:
         """
@@ -1028,7 +1028,7 @@ class Store(Container):
     def produce_block_with_signatures(
         self,
         slot: Slot,
-        validator_index: Uint64,
+        validator_index: ValidatorIndex,
     ) -> tuple["Store", Block, list[AggregatedSignatureProof]]:
         """
         Produce a block and per-aggregated-attestation signature payloads for the target slot.
@@ -1072,8 +1072,8 @@ class Store(Container):
         head_state = store.states[head_root]
 
         # Validate proposer authorization for this slot
-        num_validators = Uint64(len(head_state.validators))
-        assert is_proposer(validator_index, slot, num_validators), (
+        num_validators = len(head_state.validators)
+        assert validator_index.is_proposer_for(slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )
 

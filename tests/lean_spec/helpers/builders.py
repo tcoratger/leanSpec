@@ -24,6 +24,7 @@ from lean_spec.subspecs.containers.block import BlockSignatures
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations, AttestationSignatures
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
@@ -102,7 +103,9 @@ def make_validators(count: int) -> Validators:
 
     Validators are indexed 0 through count-1.
     """
-    validators = [Validator(pubkey=Bytes52(b"\x00" * 52), index=Uint64(i)) for i in range(count)]
+    validators = [
+        Validator(pubkey=Bytes52(b"\x00" * 52), index=ValidatorIndex(i)) for i in range(count)
+    ]
     return Validators(data=validators)
 
 
@@ -113,7 +116,8 @@ def make_validators_with_keys(count: int) -> Validators:
     Each validator gets a unique key derived from their index.
     """
     validators = [
-        Validator(pubkey=Bytes52(make_public_key_bytes(i)), index=Uint64(i)) for i in range(count)
+        Validator(pubkey=Bytes52(make_public_key_bytes(i)), index=ValidatorIndex(i))
+        for i in range(count)
     ]
     return Validators(data=validators)
 
@@ -146,7 +150,7 @@ def make_genesis_block(state: State) -> Block:
     """
     return Block(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(state),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -166,7 +170,7 @@ def make_block(
     """
     body = BlockBody(attestations=AggregatedAttestations(data=attestations))
     parent_root = hash_tree_root(state.latest_block_header)
-    proposer_index = Uint64(int(slot) % len(state.validators))
+    proposer_index = ValidatorIndex(int(slot) % len(state.validators))
 
     return Block(
         slot=slot,
@@ -179,7 +183,7 @@ def make_block(
 
 def make_signed_block(
     slot: Slot,
-    proposer_index: Uint64,
+    proposer_index: ValidatorIndex,
     parent_root: Bytes32,
     state_root: Bytes32,
 ) -> SignedBlockWithAttestation:
@@ -245,14 +249,14 @@ def make_aggregated_attestation(
 
     return AggregatedAttestation(
         aggregation_bits=AggregationBits.from_validator_indices(
-            [Uint64(i) for i in participant_ids]
+            [ValidatorIndex(i) for i in participant_ids]
         ),
         data=data,
     )
 
 
 def make_signed_attestation(
-    validator: Uint64,
+    validator: ValidatorIndex,
     target: Checkpoint,
     source: Checkpoint | None = None,
 ) -> SignedAttestation:

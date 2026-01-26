@@ -11,7 +11,7 @@ from consensus_testing import (
 )
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Uint64
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -42,7 +42,7 @@ def test_single_attestation_in_block_body(
                     slot=Slot(2),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(3)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(3)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -93,13 +93,13 @@ def test_multiple_specs_same_target_merge_into_one(
                     slot=Slot(2),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(1)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
                         ),
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(2), Uint64(3)],
+                            validator_ids=[ValidatorIndex(2), ValidatorIndex(3)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -154,13 +154,13 @@ def test_different_targets_create_separate_aggregations(
                     slot=Slot(3),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(1)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
                         ),
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(2), Uint64(3)],
+                            validator_ids=[ValidatorIndex(2), ValidatorIndex(3)],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -222,7 +222,7 @@ def test_full_attestation_pipeline_across_three_blocks(
                     label="block_2",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(3)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(3)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -247,7 +247,7 @@ def test_full_attestation_pipeline_across_three_blocks(
                     slot=Slot(3),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(1)],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -301,7 +301,7 @@ def test_attestations_accumulate_across_chain(
                     label="block_2",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(3)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(3)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -326,7 +326,7 @@ def test_attestations_accumulate_across_chain(
                     label="block_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1), Uint64(3)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(1), ValidatorIndex(3)],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -350,7 +350,12 @@ def test_attestations_accumulate_across_chain(
                     slot=Slot(4),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1), Uint64(2), Uint64(3)],
+                            validator_ids=[
+                                ValidatorIndex(0),
+                                ValidatorIndex(1),
+                                ValidatorIndex(2),
+                                ValidatorIndex(3),
+                            ],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="block_3",
@@ -411,14 +416,14 @@ def test_mixed_attestations_multiple_targets_and_validators(
                     attestations=[
                         # Attestations for older block
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(1)],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
                         ),
                         # Attestations for newer block
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(2), Uint64(3)],
+                            validator_ids=[ValidatorIndex(2), ValidatorIndex(3)],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="block_3",
@@ -473,7 +478,12 @@ def test_all_validators_attest_in_single_aggregation(
                     slot=Slot(2),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(1), Uint64(2), Uint64(3)],
+                            validator_ids=[
+                                ValidatorIndex(0),
+                                ValidatorIndex(1),
+                                ValidatorIndex(2),
+                                ValidatorIndex(3),
+                            ],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -583,7 +593,7 @@ def test_auto_collect_combined_with_explicit_attestations(
                     include_store_attestations=True,
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_ids=[Uint64(0), Uint64(3)],
+                            validator_ids=[ValidatorIndex(0), ValidatorIndex(3)],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",

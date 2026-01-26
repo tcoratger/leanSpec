@@ -12,6 +12,7 @@ from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer.info import PeerInfo
@@ -143,7 +144,7 @@ class TestStateMachineTransitions:
         # Add an orphan to the cache
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32.zero(),
         )
@@ -228,7 +229,7 @@ class TestGossipBlockHandling:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -252,7 +253,7 @@ class TestGossipBlockHandling:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -273,7 +274,7 @@ class TestGossipBlockHandling:
         # Block with unknown parent
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32.zero(),
         )
@@ -335,13 +336,13 @@ class TestProgressReporting:
         # Add blocks to cache
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32(b"\x01" * 32),
         )
         block2 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x02" * 32),
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -370,7 +371,7 @@ class TestReset:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32.zero(),
         )

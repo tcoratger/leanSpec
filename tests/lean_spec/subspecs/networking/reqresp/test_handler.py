@@ -9,6 +9,7 @@ from typing import TypeVar
 
 from lean_spec.subspecs.containers import Checkpoint, SignedBlockWithAttestation
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
@@ -26,7 +27,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
     BlocksByRootRequest,
     Status,
 )
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_signed_block
 
 _T = TypeVar("_T")
@@ -125,7 +126,7 @@ def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlockWithAttestation:
     """Create a valid SignedBlockWithAttestation for testing."""
     return make_signed_block(
         slot=Slot(slot),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32(bytes([seed]) * 32),
         state_root=Bytes32(bytes([seed + 1]) * 32),
     )

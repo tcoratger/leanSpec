@@ -10,9 +10,10 @@ from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.attestation import AttestationData
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import SQLiteDatabase
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 
 
 @pytest.fixture
@@ -54,7 +55,7 @@ class TestBlockOperations:
         """Putting a block with same root overwrites previous."""
         block1 = Block(
             slot=Slot(0),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=hash_tree_root(genesis_state),
             body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -141,7 +142,7 @@ class TestAttestationOperations:
         self, db: SQLiteDatabase, attestation_data: AttestationData
     ) -> None:
         """Attestation can be stored and retrieved by validator index."""
-        validator_index = Uint64(42)
+        validator_index = ValidatorIndex(42)
         db.put_latest_attestation(validator_index, attestation_data)
 
         retrieved = db.get_latest_attestation(validator_index)
@@ -150,21 +151,21 @@ class TestAttestationOperations:
 
     def test_get_nonexistent_attestation(self, db: SQLiteDatabase) -> None:
         """Getting a nonexistent attestation returns None."""
-        assert db.get_latest_attestation(Uint64(999)) is None
+        assert db.get_latest_attestation(ValidatorIndex(999)) is None
 
     def test_get_all_latest_attestations(
         self, db: SQLiteDatabase, attestation_data: AttestationData
     ) -> None:
         """All attestations can be retrieved at once."""
-        db.put_latest_attestation(Uint64(1), attestation_data)
-        db.put_latest_attestation(Uint64(2), attestation_data)
-        db.put_latest_attestation(Uint64(3), attestation_data)
+        db.put_latest_attestation(ValidatorIndex(1), attestation_data)
+        db.put_latest_attestation(ValidatorIndex(2), attestation_data)
+        db.put_latest_attestation(ValidatorIndex(3), attestation_data)
 
         all_attestations = db.get_all_latest_attestations()
         assert len(all_attestations) == 3
-        assert Uint64(1) in all_attestations
-        assert Uint64(2) in all_attestations
-        assert Uint64(3) in all_attestations
+        assert ValidatorIndex(1) in all_attestations
+        assert ValidatorIndex(2) in all_attestations
+        assert ValidatorIndex(3) in all_attestations
 
 
 class TestHeadTracking:

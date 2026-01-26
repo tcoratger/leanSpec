@@ -25,6 +25,7 @@ from lean_spec.subspecs.containers import Block, BlockBody, State
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import NetworkEventSource, NetworkService
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -163,7 +164,7 @@ class Node:
             # State root is the hash of the genesis state.
             block = Block(
                 slot=Slot(0),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32.zero(),
                 state_root=hash_tree_root(state),
                 body=BlockBody(attestations=AggregatedAttestations(data=[])),

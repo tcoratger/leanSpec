@@ -13,7 +13,8 @@ if TYPE_CHECKING:
     from lean_spec.subspecs.containers import Block, Checkpoint, State
     from lean_spec.subspecs.containers.attestation import AttestationData
     from lean_spec.subspecs.containers.slot import Slot
-    from lean_spec.types import Bytes32, Uint64
+    from lean_spec.subspecs.containers.validator import ValidatorIndex
+    from lean_spec.types import Bytes32
 
 
 class Database(Protocol):
@@ -151,7 +152,7 @@ class Database(Protocol):
     # Attestation Operations
     # -------------------------------------------------------------------------
 
-    def get_latest_attestation(self, validator_index: Uint64) -> AttestationData | None:
+    def get_latest_attestation(self, validator_index: ValidatorIndex) -> AttestationData | None:
         """
         Retrieve the latest attestation for a validator.
 
@@ -165,7 +166,7 @@ class Database(Protocol):
 
     def put_latest_attestation(
         self,
-        validator_index: Uint64,
+        validator_index: ValidatorIndex,
         attestation: AttestationData,
     ) -> None:
         """
@@ -177,7 +178,7 @@ class Database(Protocol):
         """
         ...
 
-    def get_all_latest_attestations(self) -> dict[Uint64, AttestationData]:
+    def get_all_latest_attestations(self) -> dict[ValidatorIndex, AttestationData]:
         """
         Retrieve all latest attestations.
 

@@ -12,6 +12,7 @@ from lean_multisig_py import (
 )
 
 from lean_spec.subspecs.containers.attestation import AggregationBits
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Bytes32, Uint64
 from lean_spec.types.byte_arrays import ByteListMiB
 from lean_spec.types.container import Container
@@ -27,7 +28,7 @@ class SignatureKey(NamedTuple):
     Used to index signature caches by (validator, message) pairs.
     """
 
-    validator_id: Uint64
+    validator_id: ValidatorIndex
     """The validator who produced the signature."""
 
     data_root: Bytes32

@@ -30,6 +30,7 @@ from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.state.state import State
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
@@ -189,7 +190,9 @@ class ForkChoiceTest(BaseConsensusFixture):
         # We must replace them with the key manager's actual keys.
         # Otherwise signature verification will fail.
         updated_validators = [
-            validator.model_copy(update={"pubkey": key_manager[Uint64(i)].public.encode_bytes()})
+            validator.model_copy(
+                update={"pubkey": key_manager[ValidatorIndex(i)].public.encode_bytes()}
+            )
             for i, validator in enumerate(self.anchor_state.validators)
         ]
 
@@ -339,7 +342,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # If not specified, use round-robin based on slot.
         # Real proposer selection is more complex, but this suffices for tests.
-        proposer_index = spec.proposer_index or Uint64(
+        proposer_index = spec.proposer_index or ValidatorIndex(
             int(spec.slot) % len(store.states[store.head].validators)
         )
 

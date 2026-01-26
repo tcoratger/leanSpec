@@ -14,7 +14,6 @@ from lean_spec.types import (
     Bytes32,
     Container,
     Uint64,
-    is_proposer,
 )
 
 from ..attestation import AggregatedAttestation, AggregationBits, Attestation
@@ -23,6 +22,7 @@ from ..block.types import AggregatedAttestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
+from ..validator import ValidatorIndex
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
@@ -95,7 +95,7 @@ class State(Container):
         # Build the genesis block header for the state.
         genesis_header = BlockHeader(
             slot=Slot(0),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
             body_root=hash_tree_root(BlockBody(attestations=AggregatedAttestations(data=[]))),
@@ -237,10 +237,9 @@ class State(Container):
         # Verify the block proposer.
         #
         # Ensures the block was proposed by the assigned validator for this round.
-        assert is_proposer(
-            validator_index=block.proposer_index,
+        assert block.proposer_index.is_proposer_for(
             slot=self.slot,
-            num_validators=Uint64(len(self.validators)),
+            num_validators=len(self.validators),
         ), "Incorrect block proposer"
 
         # Verify the chain link.
@@ -652,7 +651,7 @@ class State(Container):
     def build_block(
         self,
         slot: Slot,
-        proposer_index: Uint64,
+        proposer_index: ValidatorIndex,
         parent_root: Bytes32,
         attestations: list[Attestation] | None = None,
         available_attestations: Iterable[Attestation] | None = None,
@@ -845,12 +844,12 @@ class State(Container):
             # Parallel lists for signatures, public keys, and validator IDs.
             gossip_sigs: list[Signature] = []
             gossip_keys: list[PublicKey] = []
-            gossip_ids: list[Uint64] = []
+            gossip_ids: list[ValidatorIndex] = []
 
             # Track validators we couldn't find signatures for.
             #
             # These will need to be covered by Phase 2 (existing proofs).
-            remaining: set[Uint64] = set()
+            remaining: set[ValidatorIndex] = set()
 
             # Attempt to collect each validator's signature from gossip.
             #

@@ -1,7 +1,8 @@
 """Lightweight aggregated attestation specification for test definitions."""
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import CamelModel, Uint64
+from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.types import CamelModel
 
 
 class AggregatedAttestationSpec(CamelModel):
@@ -12,7 +13,7 @@ class AggregatedAttestationSpec(CamelModel):
     Head and source are automatically derived from target.
     """
 
-    validator_ids: list[Uint64]
+    validator_ids: list[ValidatorIndex]
     """The indices of validators making the attestation (required)."""
 
     slot: Slot
@@ -39,7 +40,7 @@ class AggregatedAttestationSpec(CamelModel):
     Defaults to True (valid signatures).
     """
 
-    signer_ids: list[Uint64] | None = None
+    signer_ids: list[ValidatorIndex] | None = None
     """
     Override which validators actually sign the attestation.
 
