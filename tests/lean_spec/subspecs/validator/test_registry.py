@@ -1,16 +1,22 @@
-"""Tests for ValidatorRegistry."""
+"""Tests for Validator Registry."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 
 from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.subspecs.validator.registry import ValidatorEntry
+from lean_spec.subspecs.validator.registry import ValidatorEntry, ValidatorManifestEntry
 from lean_spec.types import Uint64
+
+
+def registry_state(registry: ValidatorRegistry) -> dict[Uint64, Any]:
+    """Extract full registry state as index → secret_key mapping."""
+    return {idx: registry.get(idx).secret_key for idx in registry.indices()}  # type: ignore[union-attr]
 
 
 class TestValidatorEntry:
@@ -29,72 +35,55 @@ class TestValidatorRegistry:
     """Tests for ValidatorRegistry."""
 
     def test_empty_registry(self) -> None:
-        """New registry is empty."""
+        """New registry has no entries."""
         registry = ValidatorRegistry()
-        assert len(registry) == 0
-        assert registry.indices() == []
 
-    def test_add_and_get(self) -> None:
-        """Entry can be added and retrieved."""
-        registry = ValidatorRegistry()
-        mock_key = MagicMock()
-        entry = ValidatorEntry(index=Uint64(42), secret_key=mock_key)
-
-        registry.add(entry)
-
-        assert len(registry) == 1
-        assert registry.get(Uint64(42)) is entry
-        assert registry.has(Uint64(42))
-
-    def test_get_nonexistent(self) -> None:
-        """Getting nonexistent entry returns None."""
-        registry = ValidatorRegistry()
+        assert registry_state(registry) == {}
         assert registry.get(Uint64(99)) is None
 
-    def test_has_nonexistent(self) -> None:
-        """has() returns False for nonexistent entry."""
+    def test_add_single_entry(self) -> None:
+        """Single entry can be added and retrieved with correct key."""
         registry = ValidatorRegistry()
-        assert not registry.has(Uint64(99))
+        key_42 = MagicMock(name="key_42")
+        registry.add(ValidatorEntry(index=Uint64(42), secret_key=key_42))
 
-    def test_indices(self) -> None:
-        """indices() returns all validator indices."""
+        assert registry_state(registry) == {Uint64(42): key_42}
+
+    def test_add_multiple_entries(self) -> None:
+        """Multiple entries maintain correct index-to-key mapping."""
         registry = ValidatorRegistry()
-        for i in [3, 1, 4]:
-            mock_key = MagicMock()
-            registry.add(ValidatorEntry(index=Uint64(i), secret_key=mock_key))
+        key_1 = MagicMock(name="key_1")
+        key_3 = MagicMock(name="key_3")
+        key_4 = MagicMock(name="key_4")
 
-        indices = registry.indices()
-        assert set(indices) == {Uint64(1), Uint64(3), Uint64(4)}
+        registry.add(ValidatorEntry(index=Uint64(3), secret_key=key_3))
+        registry.add(ValidatorEntry(index=Uint64(1), secret_key=key_1))
+        registry.add(ValidatorEntry(index=Uint64(4), secret_key=key_4))
+
+        assert registry_state(registry) == {
+            Uint64(1): key_1,
+            Uint64(3): key_3,
+            Uint64(4): key_4,
+        }
 
     def test_from_secret_keys(self) -> None:
-        """Registry can be created from dict of secret keys."""
-        mock_keys = {0: MagicMock(), 2: MagicMock()}
+        """Registry from dict preserves exact index-to-key mapping."""
+        key_0 = MagicMock(name="key_0")
+        key_2 = MagicMock(name="key_2")
 
-        registry = ValidatorRegistry.from_secret_keys(mock_keys)
+        registry = ValidatorRegistry.from_secret_keys({0: key_0, 2: key_2})
 
-        assert len(registry) == 2
-        assert registry.has(Uint64(0))
-        assert registry.has(Uint64(2))
-        assert not registry.has(Uint64(1))
+        assert registry_state(registry) == {Uint64(0): key_0, Uint64(2): key_2}
 
 
 class TestValidatorRegistryFromYaml:
     """Tests for YAML loading."""
 
-    def test_from_yaml_basic(self, tmp_path: Path) -> None:
-        """Registry loads from YAML files."""
-        # Create validators.yaml
+    def test_from_yaml_loads_assigned_validators(self, tmp_path: Path) -> None:
+        """Registry loads only validators assigned to the specified node."""
         validators_file = tmp_path / "validators.yaml"
-        validators_file.write_text(
-            yaml.dump(
-                {
-                    "node_0": [0, 1],
-                    "node_1": [2],
-                }
-            )
-        )
+        validators_file.write_text(yaml.dump({"node_0": [0, 1], "node_1": [2]}))
 
-        # Create validator-keys-manifest.yaml with all required fields
         manifest_file = tmp_path / "validator-keys-manifest.yaml"
         manifest_file.write_text(
             yaml.dump(
@@ -115,15 +104,15 @@ class TestValidatorRegistryFromYaml:
             )
         )
 
-        # Create dummy key files
         (tmp_path / "key_0.ssz").write_bytes(b"key0")
         (tmp_path / "key_1.ssz").write_bytes(b"key1")
 
-        # Mock SecretKey.decode_bytes
-        mock_key = MagicMock()
+        # Use side_effect to return different keys for each call
+        key_0 = MagicMock(name="key_0")
+        key_1 = MagicMock(name="key_1")
         with patch(
             "lean_spec.subspecs.xmss.SecretKey.decode_bytes",
-            return_value=mock_key,
+            side_effect=[key_0, key_1],
         ):
             registry = ValidatorRegistry.from_yaml(
                 node_id="node_0",
@@ -131,13 +120,10 @@ class TestValidatorRegistryFromYaml:
                 manifest_path=manifest_file,
             )
 
-        assert len(registry) == 2
-        assert registry.has(Uint64(0))
-        assert registry.has(Uint64(1))
-        assert not registry.has(Uint64(2))
+        assert registry_state(registry) == {Uint64(0): key_0, Uint64(1): key_1}
 
-    def test_from_yaml_unknown_node(self, tmp_path: Path) -> None:
-        """Unknown node returns empty registry."""
+    def test_from_yaml_unknown_node_returns_empty(self, tmp_path: Path) -> None:
+        """Unknown node ID returns empty registry."""
         validators_file = tmp_path / "validators.yaml"
         validators_file.write_text(yaml.dump({"node_0": [0]}))
 
@@ -163,10 +149,10 @@ class TestValidatorRegistryFromYaml:
             manifest_path=manifest_file,
         )
 
-        assert len(registry) == 0
+        assert registry_state(registry) == {}
 
-    def test_from_yaml_missing_validator_in_manifest(self, tmp_path: Path) -> None:
-        """Missing validator in manifest is skipped."""
+    def test_from_yaml_skips_missing_manifest_entries(self, tmp_path: Path) -> None:
+        """Validator indices not in manifest are skipped."""
         validators_file = tmp_path / "validators.yaml"
         validators_file.write_text(yaml.dump({"node_0": [0, 99]}))
 
@@ -190,10 +176,10 @@ class TestValidatorRegistryFromYaml:
 
         (tmp_path / "key_0.ssz").write_bytes(b"key0")
 
-        mock_key = MagicMock()
+        key_0 = MagicMock(name="key_0")
         with patch(
             "lean_spec.subspecs.xmss.SecretKey.decode_bytes",
-            return_value=mock_key,
+            return_value=key_0,
         ):
             registry = ValidatorRegistry.from_yaml(
                 node_id="node_0",
@@ -201,11 +187,10 @@ class TestValidatorRegistryFromYaml:
                 manifest_path=manifest_file,
             )
 
-        # Only index 0 should be loaded (99 is not in manifest)
-        assert len(registry) == 1
-        assert registry.has(Uint64(0))
+        # Only index 0 loaded (99 not in manifest)
+        assert registry_state(registry) == {Uint64(0): key_0}
 
-    def test_from_yaml_empty_validators_file(self, tmp_path: Path) -> None:
+    def test_from_yaml_empty_file_returns_empty(self, tmp_path: Path) -> None:
         """Empty validators.yaml returns empty registry."""
         validators_file = tmp_path / "validators.yaml"
         validators_file.write_text("")
@@ -232,4 +217,98 @@ class TestValidatorRegistryFromYaml:
             manifest_path=manifest_file,
         )
 
-        assert len(registry) == 0
+        assert registry_state(registry) == {}
+
+    def test_from_yaml_missing_key_file_raises(self, tmp_path: Path) -> None:
+        """Missing private key file raises ValueError."""
+        validators_file = tmp_path / "validators.yaml"
+        validators_file.write_text(yaml.dump({"node_0": [0]}))
+
+        manifest_file = tmp_path / "validator-keys-manifest.yaml"
+        manifest_file.write_text(
+            yaml.dump(
+                {
+                    "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+                    "hash_function": "Poseidon2",
+                    "encoding": "TargetSum",
+                    "lifetime": 32,
+                    "log_num_active_epochs": 5,
+                    "num_active_epochs": 32,
+                    "num_validators": 1,
+                    "validators": [
+                        {"index": 0, "pubkey_hex": "0x" + "00" * 52, "privkey_file": "missing.ssz"},
+                    ],
+                }
+            )
+        )
+
+        with pytest.raises(ValueError, match="Private key file not found"):
+            ValidatorRegistry.from_yaml(
+                node_id="node_0",
+                validators_path=validators_file,
+                manifest_path=manifest_file,
+            )
+
+    def test_from_yaml_invalid_key_file_raises(self, tmp_path: Path) -> None:
+        """Invalid key file raises ValueError."""
+        validators_file = tmp_path / "validators.yaml"
+        validators_file.write_text(yaml.dump({"node_0": [0]}))
+
+        manifest_file = tmp_path / "validator-keys-manifest.yaml"
+        manifest_file.write_text(
+            yaml.dump(
+                {
+                    "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
+                    "hash_function": "Poseidon2",
+                    "encoding": "TargetSum",
+                    "lifetime": 32,
+                    "log_num_active_epochs": 5,
+                    "num_active_epochs": 32,
+                    "num_validators": 1,
+                    "validators": [
+                        {"index": 0, "pubkey_hex": "0x" + "00" * 52, "privkey_file": "invalid.ssz"},
+                    ],
+                }
+            )
+        )
+
+        (tmp_path / "invalid.ssz").write_bytes(b"not valid ssz")
+
+        with pytest.raises(ValueError, match="Failed to load private key"):
+            ValidatorRegistry.from_yaml(
+                node_id="node_0",
+                validators_path=validators_file,
+                manifest_path=manifest_file,
+            )
+
+
+class TestValidatorManifestEntry:
+    """Tests for ValidatorManifestEntry pubkey parsing."""
+
+    def test_parse_pubkey_hex_string_passthrough(self) -> None:
+        """String pubkey_hex passes through unchanged."""
+        entry = ValidatorManifestEntry(
+            index=0,
+            pubkey_hex="0x" + "ab" * 52,
+            privkey_file="key.ssz",
+        )
+        assert entry.pubkey_hex == "0x" + "ab" * 52
+
+    def test_parse_pubkey_hex_integer_conversion(self) -> None:
+        """Integer pubkey_hex converts to padded hex string."""
+        entry = ValidatorManifestEntry(
+            index=0,
+            pubkey_hex=0x123,  # type: ignore[arg-type]
+            privkey_file="key.ssz",
+        )
+        # Padded to 104 hex characters (52 bytes)
+        assert entry.pubkey_hex == "0x" + "0" * 101 + "123"
+
+    def test_parse_pubkey_hex_zero(self) -> None:
+        """Zero integer converts to all-zeros hex string."""
+        entry = ValidatorManifestEntry(
+            index=0,
+            pubkey_hex=0,  # type: ignore[arg-type]
+            privkey_file="key.ssz",
+        )
+        assert entry.pubkey_hex == "0x" + "0" * 104

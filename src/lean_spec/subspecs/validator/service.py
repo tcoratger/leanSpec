@@ -4,8 +4,8 @@ Validator service for producing blocks and attestations.
 The Validator Problem
 ---------------------
 Ethereum consensus requires active participation from validators.
-At specific intervals within each slot, validators must:
 
+At specific intervals within each slot, validators must:
 - Interval 0: Propose blocks (if scheduled)
 - Interval 1: Create attestations
 
@@ -14,41 +14,31 @@ and triggering production at the appropriate intervals.
 
 Proposer Attestation Design
 ---------------------------
-Each validator attests exactly once per slot. However, proposers and
-non-proposers attest at different times:
+Each validator attests exactly once per slot.
 
+However, proposers and non-proposers attest at different times:
 - Proposers attest at interval 0, bundled inside their block
 - Non-proposers attest at interval 1, broadcast separately
 
 This design has two benefits:
-
 1. Proposers see their own attestation immediately (no network delay)
 2. Non-proposers can attest to a block they actually received
 
-The proposer's attestation is embedded in `BlockWithAttestation` alongside
+The proposer's attestation is embedded in a block wrapper alongside
 the block itself. At interval 1, we skip proposers because they already
 attested. This prevents double-attestation.
-
-How It Works
-------------
-1. Sleep until next interval boundary
-2. Check if any validator we control has duties
-3. For interval 0: Check proposer schedule, produce block if our turn
-4. For interval 1: Produce attestations for all non-proposer validators
-5. Emit produced blocks/attestations via callbacks
-6. Repeat forever
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from lean_spec.subspecs import metrics
-from lean_spec.subspecs.chain.clock import SlotClock
-from lean_spec.subspecs.chain.config import SECONDS_PER_INTERVAL
+from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.containers import (
     Attestation,
     AttestationData,
@@ -63,6 +53,7 @@ from lean_spec.subspecs.containers.block import (
 )
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
+from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Uint64
 from lean_spec.types.validator import is_proposer
 
@@ -71,10 +62,10 @@ from .registry import ValidatorRegistry
 if TYPE_CHECKING:
     from lean_spec.subspecs.sync import SyncService
 
+logger = logging.getLogger(__name__)
 
-# Callback types for publishing produced blocks and attestations.
 BlockPublisher = Callable[[SignedBlockWithAttestation], Awaitable[None]]
-"""Callback for publishing produced blocks."""
+"""Callback for publishing signed blocks with proposer attestations."""
 AttestationPublisher = Callable[[SignedAttestation], Awaitable[None]]
 """Callback for publishing produced attestations."""
 
@@ -92,13 +83,12 @@ class ValidatorService:
     """
     Drives validator duties based on the slot clock.
 
-    The service:
-        - monitors interval boundaries
-        - triggers block production or attestation creation when our validators are scheduled.
+    - Monitors interval boundaries
+    - Triggers block production or attestation creation when scheduled
     """
 
     sync_service: SyncService
-    """Sync service providing access to the forkchoice store."""
+    """Service providing access to the forkchoice store."""
 
     clock: SlotClock
     """Slot clock for time calculation."""
@@ -136,11 +126,11 @@ class ValidatorService:
         handle that interval immediately instead of sleeping past it.
         """
         self._running = True
-        last_handled_total_interval: int | None = None
+        last_handled_total_interval: Interval | None = None
 
         while self._running:
             # Get current total interval count (not just within-slot).
-            total_interval = int(self.clock.total_intervals())
+            total_interval = self.clock.total_intervals()
 
             # If we've already handled this interval, sleep until the next boundary.
             already_handled = (
@@ -149,7 +139,7 @@ class ValidatorService:
             )
             if already_handled:
                 await self._sleep_until_next_interval()
-                total_interval = int(self.clock.total_intervals())
+                total_interval = self.clock.total_intervals()
 
             # Skip if we have no validators to manage.
             if len(self.registry) == 0:
@@ -175,6 +165,8 @@ class ValidatorService:
                 #
                 # All validators should attest to current head.
                 await self._produce_attestations(slot)
+
+            # Intervals 2-3 have no validator duties.
 
             # Mark this interval as handled.
             last_handled_total_interval = total_interval
@@ -211,7 +203,7 @@ class ValidatorService:
             #
             # Block production includes two steps:
             # 1. Create the block with aggregated attestations from the pool
-            # 2. Sign and bundle our own attestation into BlockWithAttestation
+            # 2. Sign and bundle our own attestation into a block with attestation
             #
             # Our attestation goes in the block envelope, not the body.
             # This separates "attestations we're including" from "our own vote".
@@ -233,12 +225,12 @@ class ValidatorService:
 
                 # Process our own proposer attestation directly.
                 #
-                # The block was already stored by produce_block_with_signatures, so when
-                # this block is received via gossip, on_block will reject it as a duplicate.
+                # The block was already stored by during the block production.
+                #
+                # When this block is received via gossip, on_block will reject it as a duplicate.
                 # We must process our proposer attestation here to ensure it's counted.
-                proposer_attestation = signed_block.message.proposer_attestation
                 self.sync_service.store = self.sync_service.store.on_attestation(
-                    attestation=proposer_attestation,
+                    attestation=signed_block.message.proposer_attestation,
                     is_from_block=False,
                 )
 
@@ -248,11 +240,17 @@ class ValidatorService:
                 # Emit the block for network propagation.
                 await self.on_block(signed_block)
 
-            except AssertionError:
+            except AssertionError as e:
                 # Proposer validation failed.
                 #
                 # This can happen during slot boundary transitions.
-                pass
+                # Block production is skipped; attestation still happens at interval 1.
+                logger.debug(
+                    "Block production skipped for validator %d at slot %d: %s",
+                    validator_index,
+                    slot,
+                    e,
+                )
 
             # Only one proposer per slot.
             break
@@ -302,13 +300,13 @@ class ValidatorService:
         self,
         block: Block,
         validator_index: Uint64,
-        attestation_signatures: list,
+        attestation_signatures: list[AggregatedSignatureProof],
     ) -> SignedBlockWithAttestation:
         """
         Sign a block and wrap it for publishing.
 
         Creates the proposer attestation, signs it, and wraps everything
-        in SignedBlockWithAttestation.
+        in a signed block wrapper.
 
         Args:
             block: The block to sign.
@@ -318,12 +316,10 @@ class ValidatorService:
         Returns:
             Signed block ready for publishing.
         """
-        store = self.sync_service.store
-
         # Create the proposer's attestation for this slot.
         #
         # The proposer also attests to the chain head they see.
-        proposer_attestation_data = store.produce_attestation_data(block.slot)
+        proposer_attestation_data = self.sync_service.store.produce_attestation_data(block.slot)
         proposer_attestation = Attestation(
             validator_id=validator_index,
             data=proposer_attestation_data,
@@ -406,34 +402,17 @@ class ValidatorService:
         """
         Sleep until the next interval boundary.
 
-        Calculates the precise sleep duration to wake up at the start
-        of the next interval.
+        Uses the clock to calculate precise sleep duration.
         """
-        now = self.clock.time_fn()
-        genesis = int(self.clock.genesis_time)
-
-        elapsed = now - genesis
-
-        if elapsed < 0:
-            # Before genesis - sleep until genesis.
-            await asyncio.sleep(-elapsed)
-            return
-
-        # Current interval number.
-        current_interval = int(elapsed // int(SECONDS_PER_INTERVAL))
-
-        # Next interval boundary.
-        next_boundary = genesis + (current_interval + 1) * int(SECONDS_PER_INTERVAL)
-
-        # Sleep until boundary.
-        sleep_time = max(0.0, next_boundary - now)
-        await asyncio.sleep(sleep_time)
+        sleep_time = self.clock.seconds_until_next_interval()
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)
 
     def stop(self) -> None:
         """
         Stop the service.
 
-        Sets the running flag to False, causing the run() loop to exit
+        Sets the running flag to False, causing the main loop to exit
         after completing its current sleep cycle.
         """
         self._running = False

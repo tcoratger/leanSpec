@@ -197,8 +197,9 @@ class TestBlockProduction:
             validator_idx,
         )
 
-        # Block should include attestations from available attestations
-        assert len(block.body.attestations) >= 0  # May be filtered based on validity
+        # Block should include the attestations we added.
+        # Attestations may be aggregated, so check the count matches.
+        assert len(block.body.attestations) == len(signatures)
 
         # Verify block structure is correct
         assert block.slot == slot
