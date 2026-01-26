@@ -261,7 +261,7 @@ def make_signed_attestation(
 
     Source defaults to a zero checkpoint if not provided.
     """
-    source_checkpoint = source or Checkpoint.default()
+    source_checkpoint = source or Checkpoint(root=Bytes32.zero(), slot=Slot(0))
     attestation_data = AttestationData(
         slot=target.slot,
         head=target,
