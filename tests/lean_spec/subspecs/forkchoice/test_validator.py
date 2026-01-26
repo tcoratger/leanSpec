@@ -429,7 +429,7 @@ class TestValidatorIntegration:
         )
 
         # Create minimal state with temporary header
-        checkpoint = Checkpoint.default()
+        checkpoint = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
         state = State(
             config=config,
             slot=Slot(0),

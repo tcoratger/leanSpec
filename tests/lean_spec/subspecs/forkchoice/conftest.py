@@ -47,7 +47,7 @@ class MockState(State):
             slot=Slot(0),
             latest_block_header=genesis_header,
             latest_justified=latest_justified,
-            latest_finalized=Checkpoint.default(),
+            latest_finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
             historical_block_hashes=HistoricalBlockHashes(data=[]),
             justified_slots=JustifiedSlots(data=[]),
             validators=Validators(data=[]),
