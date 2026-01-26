@@ -3,7 +3,7 @@
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
 from lean_spec.subspecs.xmss.containers import PublicKey, Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
-from lean_spec.types import Uint64
+from lean_spec.types import Bytes32, Uint64
 
 
 def test_public_key_ssz_roundtrip() -> None:
@@ -32,7 +32,7 @@ def test_signature_ssz_roundtrip() -> None:
     num_active_epochs = Uint64(32)
     public_key, secret_key = TEST_SIGNATURE_SCHEME.key_gen(activation_epoch, num_active_epochs)
 
-    message = bytes([42] * TEST_CONFIG.MESSAGE_LENGTH)
+    message = Bytes32(bytes([42] * 32))
     epoch = Uint64(0)
     signature = TEST_SIGNATURE_SCHEME.sign(secret_key, epoch, message)
 
@@ -79,7 +79,7 @@ def test_secret_key_ssz_roundtrip() -> None:
     assert recovered_sk == secret_key
 
     # Verify the recovered secret key can still sign
-    message = bytes([99] * TEST_CONFIG.MESSAGE_LENGTH)
+    message = Bytes32(bytes([99] * 32))
     epoch = Uint64(1)
     signature = TEST_SIGNATURE_SCHEME.sign(recovered_sk, epoch, message)
     assert TEST_SIGNATURE_SCHEME.verify(public_key, epoch, message, signature)
@@ -103,7 +103,7 @@ def test_deterministic_serialization() -> None:
     assert sk_bytes1 == sk_bytes2
 
     # Sign a message multiple times with deterministic randomness
-    message = bytes([42] * TEST_CONFIG.MESSAGE_LENGTH)
+    message = Bytes32(bytes([42] * 32))
     epoch = Uint64(0)
     sig1 = TEST_SIGNATURE_SCHEME.sign(secret_key, epoch, message)
     sig2 = TEST_SIGNATURE_SCHEME.sign(secret_key, epoch, message)
@@ -122,7 +122,7 @@ def test_signature_size_matches_config() -> None:
     num_active_epochs = Uint64(32)
     public_key, secret_key = TEST_SIGNATURE_SCHEME.key_gen(activation_epoch, num_active_epochs)
 
-    message = bytes([42] * TEST_CONFIG.MESSAGE_LENGTH)
+    message = Bytes32(bytes([42] * 32))
     epoch = Uint64(0)
     signature = TEST_SIGNATURE_SCHEME.sign(secret_key, epoch, message)
 
