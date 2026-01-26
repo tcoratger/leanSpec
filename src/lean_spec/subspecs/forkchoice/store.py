@@ -1031,59 +1031,64 @@ class Store(Container):
         validator_index: ValidatorIndex,
     ) -> tuple["Store", Block, list[AggregatedSignatureProof]]:
         """
-        Produce a block and per-aggregated-attestation signature payloads for the target slot.
+        Produce a block and its aggregated signature proofs for the target slot.
 
-        The proposer returns the block and `LeanAggregatedSignature` payloads aligned
-        with `block.body.attestations` so it can craft `SignedBlockWithAttestation`.
+        Block production proceeds in four stages:
+        1. Retrieve the current chain head as the parent block
+        2. Verify proposer authorization for the target slot
+        3. Build the block with maximal valid attestations
+        4. Store the block and update checkpoints
 
-        Algorithm Overview
-        ------------------
-        1. **Validate Authorization**: Verify proposer is authorized for slot
-        2. **Get Proposal Head**: Retrieve current chain head as parent
-        3. **Iteratively Build Attestation Set**:
-            - Create candidate block with current attestations
-            - Apply state transition (slot advancement + block processing)
-            - Find new valid attestations matching post-state requirements
-            - Continue until no new attestations can be added (fixed point)
-        4. **Finalize Block**: Compute state root and store block
+        The block builder uses a fixed-point algorithm to collect attestations.
+        Each iteration may update the justified checkpoint.
+        Some attestations only become valid after this update.
+        The process repeats until no new attestations can be added.
 
-        The Fixed-Point Algorithm
-        --------------------------
-        Attestations are collected iteratively because:
-        - Block processing updates the justified checkpoint
-        - Some attestations only become valid after this update
-        - We repeat until no new valid attestations are found
-
-        This ensures the block includes the maximal valid attestation set,
-        maximizing the block's contribution to chain consensus.
+        This maximizes consensus contribution from each block.
 
         Args:
-            slot: Target slot number for block production.
-            validator_index: Index of validator authorized to propose this block.
+            slot: Target slot for block production.
+            validator_index: Proposer's validator index.
 
         Returns:
-            Tuple of (new Store with block stored, finalized Block, attestation signature payloads).
+            Tuple containing:
+
+            - Updated store with the new block
+            - The produced block
+            - Signature proofs aligned with block attestations
 
         Raises:
-            AssertionError: If validator lacks proposer authorization for slot.
+            AssertionError: If validator is not the proposer for this slot.
         """
-        # Get parent block and state to build upon
+        # Retrieve parent block.
+        #
+        # The proposal head reflects the latest chain view after processing
+        # all pending attestations. Building on stale state would orphan the block.
         store, head_root = self.get_proposal_head(slot)
         head_state = store.states[head_root]
 
-        # Validate proposer authorization for this slot
+        # Verify proposer authorization.
+        #
+        # Only one validator may propose per slot.
+        # Unauthorized proposals would be rejected by other nodes.
         num_validators = len(head_state.validators)
         assert validator_index.is_proposer_for(slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )
 
-        # Convert AttestationData to Attestation objects for build_block
+        # Gather attestations from the store.
+        #
+        # Known attestations have already influenced fork choice.
+        # Including them in the block makes them permanent on-chain.
         available_attestations = [
             Attestation(validator_id=validator_id, data=attestation_data)
             for validator_id, attestation_data in store.latest_known_attestations.items()
         ]
 
-        # Build block with fixed-point attestation collection
+        # Build the block.
+        #
+        # The builder iteratively collects valid attestations.
+        # It returns the final block, post-state, and signature proofs.
         final_block, final_post_state, _, signatures = head_state.build_block(
             slot=slot,
             proposer_index=validator_index,
@@ -1094,13 +1099,14 @@ class Store(Container):
             aggregated_payloads=store.aggregated_payloads,
         )
 
-        # Store block and state immutably
-        #
-        # Also update justified/finalized checkpoints from post-state.
-        # This is necessary because locally-produced blocks skip on_block,
-        # which normally handles checkpoint updates.
+        # Compute block hash for storage.
         block_hash = hash_tree_root(final_block)
 
+        # Update checkpoints from post-state.
+        #
+        # Locally produced blocks bypass normal block processing.
+        # We must manually propagate any checkpoint advances.
+        # Higher slots indicate more recent justified/finalized states.
         latest_justified = (
             final_post_state.latest_justified
             if final_post_state.latest_justified.slot > store.latest_justified.slot
@@ -1112,6 +1118,7 @@ class Store(Container):
             else store.latest_finalized
         )
 
+        # Persist block and state immutably.
         store = store.model_copy(
             update={
                 "blocks": {**store.blocks, block_hash: final_block},
