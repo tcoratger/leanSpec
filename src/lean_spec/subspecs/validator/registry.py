@@ -25,6 +25,7 @@ The registry supports two YAML files:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -34,7 +35,8 @@ from pydantic import BaseModel, field_validator
 from lean_spec.subspecs.xmss import SecretKey
 from lean_spec.types import Uint64
 
-# Type alias for node-to-validator mapping from validators.yaml
+logger = logging.getLogger(__name__)
+
 NodeValidatorMapping = dict[str, list[int]]
 """Mapping from node identifier to list of validator indices."""
 
@@ -116,13 +118,7 @@ def load_node_validator_mapping(path: Path) -> NodeValidatorMapping:
     """
     Load node-to-validator index mapping from validators.yaml.
 
-    The file maps node identifiers to lists of validator indices:
-
-        ream_0:
-        - 0
-        - 1
-        zeam_0:
-        - 2
+    Maps node identifiers to lists of validator indices they control.
 
     Args:
         path: Path to validators.yaml.
@@ -149,7 +145,7 @@ class ValidatorEntry:
     """Validator index in the registry."""
 
     secret_key: SecretKey
-    """XMSS secret key for signing."""
+    """Secret key for signing operations."""
 
 
 @dataclass(slots=True)
@@ -260,11 +256,23 @@ class ValidatorRegistry:
         for index in assigned_indices:
             entry = manifest_by_index.get(index)
             if entry is None:
+                # Validator index in validators.yaml but missing from manifest.
+                # This can happen if the manifest was regenerated with fewer validators.
+                logger.warning(
+                    "Validator index %d assigned to node %s but not found in manifest",
+                    index,
+                    node_id,
+                )
                 continue
 
             # Load secret key from SSZ file.
             privkey_path = manifest_dir / entry.privkey_file
-            secret_key = SecretKey.decode_bytes(privkey_path.read_bytes())
+            try:
+                secret_key = SecretKey.decode_bytes(privkey_path.read_bytes())
+            except FileNotFoundError as e:
+                raise ValueError(f"Private key file not found: {privkey_path}") from e
+            except Exception as e:
+                raise ValueError(f"Failed to load private key for validator {index}: {e}") from e
 
             registry.add(
                 ValidatorEntry(
@@ -283,7 +291,7 @@ class ValidatorRegistry:
         Convenience method for testing or programmatic key loading.
 
         Args:
-            keys: Mapping from validator index to secret key.
+            keys: Mapping from validator index to signing key.
 
         Returns:
             Registry populated with provided keys.

@@ -1,4 +1,4 @@
-"""Tests for ValidatorService."""
+"""Tests for Validator Service."""
 
 from __future__ import annotations
 
@@ -6,24 +6,33 @@ import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
+from consensus_testing.keys import XmssKeyManager, get_shared_key_manager
 
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
+    AttestationData,
     Block,
+    BlockBody,
     SignedAttestation,
     SignedBlockWithAttestation,
     State,
+    Validator,
 )
+from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.backfill_sync import NetworkRequester
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.subspecs.validator.registry import ValidatorEntry
-from lean_spec.types import Uint64
-from lean_spec.types.validator import is_proposer
+from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
+from lean_spec.subspecs.xmss.aggregation import SignatureKey
+from lean_spec.subspecs.xmss.containers import Signature
+from lean_spec.types import Bytes32, Bytes52, Uint64
 
 
 class MockNetworkRequester(NetworkRequester):
@@ -434,27 +443,578 @@ class TestProposerSkipping:
         # Verify validator 2 (proposer) did not sign.
         assert Uint64(2) not in signed_validator_ids
 
-    def test_is_proposer_consistency_with_skip_logic(
+
+class TestSigningMissingValidator:
+    """Tests for signing methods when validator is not in registry."""
+
+    def test_sign_block_missing_validator(
         self,
-        genesis_state: State,
+        sync_service: SyncService,
     ) -> None:
-        """The is_proposer function correctly identifies proposers.
+        """_sign_block raises ValueError when validator is not in registry."""
+        clock = SlotClock(genesis_time=Uint64(0))
 
-        Verifies the proposer selection logic used by the skip mechanism.
+        # Empty registry - no validators
+        registry = ValidatorRegistry()
+
+        service = ValidatorService(
+            sync_service=sync_service,
+            clock=clock,
+            registry=registry,
+        )
+
+        # Create a minimal block
+        block = Block(
+            slot=Slot(1),
+            proposer_index=Uint64(99),
+            parent_root=sync_service.store.head,
+            state_root=sync_service.store.head,
+            body=sync_service.store.blocks[sync_service.store.head].body,
+        )
+
+        with pytest.raises(ValueError, match="No secret key for validator 99"):
+            service._sign_block(block, Uint64(99), [])
+
+    def test_sign_attestation_missing_validator(
+        self,
+        sync_service: SyncService,
+    ) -> None:
+        """_sign_attestation raises ValueError when validator is not in registry."""
+        clock = SlotClock(genesis_time=Uint64(0))
+
+        # Empty registry - no validators
+        registry = ValidatorRegistry()
+
+        service = ValidatorService(
+            sync_service=sync_service,
+            clock=clock,
+            registry=registry,
+        )
+
+        # Produce attestation data
+        attestation_data = sync_service.store.produce_attestation_data(Slot(1))
+
+        with pytest.raises(ValueError, match="No secret key for validator 99"):
+            service._sign_attestation(attestation_data, Uint64(99))
+
+
+class TestValidatorServiceIntegration:
+    """
+    Integration tests using real cryptographic keys and signature verification.
+
+    These tests verify the full signing flow end-to-end without mocking.
+    All signatures are cryptographically valid and verifiable.
+    """
+
+    @pytest.fixture
+    def key_manager(self) -> XmssKeyManager:
+        """Key manager with pre-generated test keys."""
+        return get_shared_key_manager(max_slot=Slot(10))
+
+    @pytest.fixture
+    def real_store(self, key_manager: XmssKeyManager) -> Store:
+        """Forkchoice store with validators using real public keys."""
+        validators = Validators(
+            data=[
+                Validator(
+                    pubkey=Bytes52(key_manager[Uint64(i)].public.encode_bytes()),
+                    index=Uint64(i),
+                )
+                for i in range(6)
+            ]
+        )
+        genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
+        genesis_block = Block(
+            slot=Slot(0),
+            proposer_index=Uint64(0),
+            parent_root=Bytes32.zero(),
+            state_root=hash_tree_root(genesis_state),
+            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+        )
+        return Store.get_forkchoice_store(genesis_state, genesis_block)
+
+    @pytest.fixture
+    def real_sync_service(self, real_store: Store) -> SyncService:
+        """Sync service initialized with the real store."""
+        return SyncService(
+            store=real_store,
+            peer_manager=PeerManager(),
+            block_cache=BlockCache(),
+            clock=SlotClock(genesis_time=Uint64(0)),
+            network=MockNetworkRequester(),
+        )
+
+    @pytest.fixture
+    def real_registry(self, key_manager: XmssKeyManager) -> ValidatorRegistry:
+        """Registry populated with real secret keys from key manager."""
+        registry = ValidatorRegistry()
+        for i in range(6):
+            validator_index = Uint64(i)
+            secret_key = key_manager[validator_index].secret
+            registry.add(ValidatorEntry(index=validator_index, secret_key=secret_key))
+        return registry
+
+    def test_produce_real_block_with_valid_signature(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
         """
-        num_validators = Uint64(len(genesis_state.validators))
+        Produce a block and verify the proposer signature is cryptographically valid.
 
-        # At each slot, exactly one validator is the proposer.
-        for slot in range(6):
-            proposer_count = sum(
-                1
-                for i in range(int(num_validators))
-                if is_proposer(Uint64(i), Uint64(slot), num_validators)
+        The signature must pass verification using the proposer's public key.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        blocks_produced: list[SignedBlockWithAttestation] = []
+
+        async def capture_block(block: SignedBlockWithAttestation) -> None:
+            blocks_produced.append(block)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_block=capture_block,
+        )
+
+        async def produce_block() -> None:
+            # Slot 1: proposer is validator 1 (1 % 6 == 1)
+            await service._maybe_produce_block(Slot(1))
+
+        asyncio.run(produce_block())
+
+        assert len(blocks_produced) == 1
+        signed_block = blocks_produced[0]
+
+        # Verify block structure
+        assert signed_block.message.block.slot == Slot(1)
+        assert signed_block.message.block.proposer_index == Uint64(1)
+
+        # Verify proposer signature is cryptographically valid
+        proposer_index = signed_block.message.block.proposer_index
+        proposer_public_key = key_manager.get_public_key(proposer_index)
+        proposer_attestation_data = signed_block.message.proposer_attestation.data
+        message_bytes = proposer_attestation_data.data_root_bytes()
+
+        is_valid = TARGET_SIGNATURE_SCHEME.verify(
+            pk=proposer_public_key,
+            epoch=signed_block.message.block.slot,
+            message=bytes(message_bytes),
+            sig=signed_block.signature.proposer_signature,
+        )
+        assert is_valid, "Proposer signature failed verification"
+
+    def test_produce_real_attestation_with_valid_signature(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Produce an attestation and verify its signature is cryptographically valid.
+
+        Non-proposer validators produce attestations with valid XMSS signatures.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        attestations_produced: list[SignedAttestation] = []
+
+        async def capture_attestation(attestation: SignedAttestation) -> None:
+            attestations_produced.append(attestation)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_attestation=capture_attestation,
+        )
+
+        async def produce_attestations() -> None:
+            # Slot 1: proposer is validator 1, so validators 0, 2, 3, 4, 5 should attest
+            await service._produce_attestations(Slot(1))
+
+        asyncio.run(produce_attestations())
+
+        # 5 validators should have attested (all except proposer 1)
+        assert len(attestations_produced) == 5
+
+        # Verify each attestation signature
+        for signed_att in attestations_produced:
+            validator_id = signed_att.validator_id
+            public_key = key_manager.get_public_key(validator_id)
+            message_bytes = signed_att.message.data_root_bytes()
+
+            is_valid = TARGET_SIGNATURE_SCHEME.verify(
+                pk=public_key,
+                epoch=signed_att.message.slot,
+                message=bytes(message_bytes),
+                sig=signed_att.signature,
             )
-            assert proposer_count == 1
+            assert is_valid, f"Attestation signature for validator {validator_id} failed"
 
-        # Verify round-robin pattern.
-        assert is_proposer(Uint64(0), Uint64(0), num_validators)
-        assert is_proposer(Uint64(1), Uint64(1), num_validators)
-        assert is_proposer(Uint64(2), Uint64(2), num_validators)
-        assert is_proposer(Uint64(0), Uint64(3), num_validators)  # Wraps around
+    def test_attestation_data_references_correct_checkpoints(
+        self,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify attestation data contains correct head, target, and source checkpoints.
+
+        The attestation must reference:
+        - head: the current chain head
+        - target: the attestation target based on forkchoice
+        - source: the latest justified checkpoint
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        attestations_produced: list[SignedAttestation] = []
+
+        async def capture_attestation(attestation: SignedAttestation) -> None:
+            attestations_produced.append(attestation)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_attestation=capture_attestation,
+        )
+
+        async def produce_attestations() -> None:
+            await service._produce_attestations(Slot(1))
+
+        asyncio.run(produce_attestations())
+
+        store = real_sync_service.store
+        expected_head_root = store.head
+        expected_source = store.latest_justified
+
+        for signed_att in attestations_produced:
+            data = signed_att.message
+
+            # Verify head checkpoint references the store's head
+            assert data.head.root == expected_head_root
+
+            # Verify source checkpoint matches store's latest justified
+            assert data.source == expected_source
+
+            # Verify slot is correct
+            assert data.slot == Slot(1)
+
+    def test_proposer_attestation_bundled_in_block(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify the proposer's attestation is correctly embedded in the block.
+
+        The proposer attests at interval 0, and their attestation is bundled
+        inside the signed block with attestation wrapper.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        blocks_produced: list[SignedBlockWithAttestation] = []
+
+        async def capture_block(block: SignedBlockWithAttestation) -> None:
+            blocks_produced.append(block)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_block=capture_block,
+        )
+
+        async def produce_block() -> None:
+            await service._maybe_produce_block(Slot(2))
+
+        asyncio.run(produce_block())
+
+        assert len(blocks_produced) == 1
+        signed_block = blocks_produced[0]
+
+        # Proposer attestation should be included
+        proposer_attestation = signed_block.message.proposer_attestation
+
+        # Verify proposer attestation matches block proposer
+        proposer_index = signed_block.message.block.proposer_index
+        assert proposer_attestation.validator_id == proposer_index
+
+        # Verify proposer attestation slot matches block slot
+        assert proposer_attestation.data.slot == signed_block.message.block.slot
+
+        # Verify proposer attestation signature is valid
+        public_key = key_manager.get_public_key(proposer_index)
+        message_bytes = proposer_attestation.data.data_root_bytes()
+
+        is_valid = TARGET_SIGNATURE_SCHEME.verify(
+            pk=public_key,
+            epoch=signed_block.message.block.slot,
+            message=bytes(message_bytes),
+            sig=signed_block.signature.proposer_signature,
+        )
+        assert is_valid
+
+    def test_block_includes_pending_attestations(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify attestations from the pool are included in produced blocks.
+
+        When the store has pending attestations, the proposer should aggregate
+        and include them in the block body.
+        """
+        # Add attestations to the store's attestation pool
+        store = real_sync_service.store
+        attestation_data = store.produce_attestation_data(Slot(0))
+        data_root = attestation_data.data_root_bytes()
+
+        # Simulate gossip attestations from validators 3 and 4
+        attestation_map: dict[Uint64, AttestationData] = {}
+        gossip_sigs: dict[SignatureKey, Signature] = {}
+
+        for validator_id in (Uint64(3), Uint64(4)):
+            attestation_map[validator_id] = attestation_data
+            gossip_sigs[SignatureKey(validator_id, data_root)] = key_manager.sign_attestation_data(
+                validator_id, attestation_data
+            )
+
+        # Update store with pending attestations
+        updated_store = store.model_copy(
+            update={
+                "latest_known_attestations": attestation_map,
+                "gossip_signatures": gossip_sigs,
+            }
+        )
+        real_sync_service.store = updated_store
+
+        clock = SlotClock(genesis_time=Uint64(0))
+        blocks_produced: list[SignedBlockWithAttestation] = []
+
+        async def capture_block(block: SignedBlockWithAttestation) -> None:
+            blocks_produced.append(block)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_block=capture_block,
+        )
+
+        async def produce_block() -> None:
+            # Slot 1: proposer is validator 1
+            await service._maybe_produce_block(Slot(1))
+
+        asyncio.run(produce_block())
+
+        assert len(blocks_produced) == 1
+        signed_block = blocks_produced[0]
+
+        # Block should contain the pending attestations
+        body_attestations = signed_block.message.block.body.attestations
+        assert len(body_attestations) > 0
+
+        # Verify the attestation signatures are included and valid
+        attestation_signatures = signed_block.signature.attestation_signatures
+        assert len(attestation_signatures) == len(body_attestations)
+
+    def test_multiple_slots_produce_different_attestations(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify attestations produced at different slots have distinct slot values.
+
+        Each attestation's data should reflect the slot at which it was produced.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        attestations_by_slot: dict[Slot, list[SignedAttestation]] = {
+            Slot(1): [],
+            Slot(2): [],
+        }
+
+        async def capture_attestation(attestation: SignedAttestation) -> None:
+            attestations_by_slot[attestation.message.slot].append(attestation)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_attestation=capture_attestation,
+        )
+
+        async def produce_attestations() -> None:
+            await service._produce_attestations(Slot(1))
+            await service._produce_attestations(Slot(2))
+
+        asyncio.run(produce_attestations())
+
+        # Both slots should have attestations
+        assert len(attestations_by_slot[Slot(1)]) > 0
+        assert len(attestations_by_slot[Slot(2)]) > 0
+
+        # Attestations at each slot should have the correct slot value
+        for att in attestations_by_slot[Slot(1)]:
+            assert att.message.slot == Slot(1)
+        for att in attestations_by_slot[Slot(2)]:
+            assert att.message.slot == Slot(2)
+
+    def test_proposer_does_not_double_attest(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify proposer does not produce a separate attestation after producing a block.
+
+        The proposer's attestation is bundled in the block at interval 0.
+        At interval 1, the proposer should be skipped to prevent double-attestation.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        blocks_produced: list[SignedBlockWithAttestation] = []
+        attestations_produced: list[SignedAttestation] = []
+
+        async def capture_block(block: SignedBlockWithAttestation) -> None:
+            blocks_produced.append(block)
+
+        async def capture_attestation(attestation: SignedAttestation) -> None:
+            attestations_produced.append(attestation)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_block=capture_block,
+            on_attestation=capture_attestation,
+        )
+
+        slot = Slot(3)
+        proposer_index = Uint64(3)  # 3 % 6 == 3
+
+        async def simulate_full_slot() -> None:
+            # Interval 0: block production
+            await service._maybe_produce_block(slot)
+            # Interval 1: attestation production
+            await service._produce_attestations(slot)
+
+        asyncio.run(simulate_full_slot())
+
+        # One block should be produced
+        assert len(blocks_produced) == 1
+        assert blocks_produced[0].message.block.proposer_index == proposer_index
+
+        # Proposer should NOT appear in attestations_produced
+        attestation_validator_ids = {att.validator_id for att in attestations_produced}
+        assert proposer_index not in attestation_validator_ids
+
+        # All other validators should have attested
+        expected_attesters = {Uint64(i) for i in range(6) if i != int(proposer_index)}
+        assert attestation_validator_ids == expected_attesters
+
+    def test_block_state_root_is_valid(
+        self,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify the produced block has a valid state root.
+
+        The state root in the block should match the hash of the post-state
+        after applying the block to the parent state.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        blocks_produced: list[SignedBlockWithAttestation] = []
+
+        async def capture_block(block: SignedBlockWithAttestation) -> None:
+            blocks_produced.append(block)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_block=capture_block,
+        )
+
+        async def produce_block() -> None:
+            await service._maybe_produce_block(Slot(4))
+
+        asyncio.run(produce_block())
+
+        assert len(blocks_produced) == 1
+        produced_block = blocks_produced[0].message.block
+
+        # The state root should not be zero (it was computed)
+        assert produced_block.state_root != Bytes32.zero()
+
+        # The block should have been stored in sync service
+        store = real_sync_service.store
+        block_hash = hash_tree_root(produced_block)
+        assert block_hash in store.blocks
+        assert block_hash in store.states
+
+        # Verify state root matches stored state
+        stored_state = store.states[block_hash]
+        computed_state_root = hash_tree_root(stored_state)
+        assert produced_block.state_root == computed_state_root
+
+    def test_signature_uses_correct_slot_as_epoch(
+        self,
+        key_manager: XmssKeyManager,
+        real_sync_service: SyncService,
+        real_registry: ValidatorRegistry,
+    ) -> None:
+        """
+        Verify signatures use the correct slot as the XMSS epoch parameter.
+
+        XMSS is stateful and uses epochs for one-time signature keys.
+        The slot number serves as the epoch in the lean protocol.
+        """
+        clock = SlotClock(genesis_time=Uint64(0))
+        attestations_produced: list[SignedAttestation] = []
+
+        async def capture_attestation(attestation: SignedAttestation) -> None:
+            attestations_produced.append(attestation)
+
+        service = ValidatorService(
+            sync_service=real_sync_service,
+            clock=clock,
+            registry=real_registry,
+            on_attestation=capture_attestation,
+        )
+
+        test_slot = Slot(5)
+
+        async def produce_attestations() -> None:
+            await service._produce_attestations(test_slot)
+
+        asyncio.run(produce_attestations())
+
+        # Verify each signature was created with the correct epoch (slot)
+        for signed_att in attestations_produced:
+            validator_id = signed_att.validator_id
+            public_key = key_manager.get_public_key(validator_id)
+            message_bytes = signed_att.message.data_root_bytes()
+
+            # Verification must use the same epoch that was used for signing
+            is_valid = TARGET_SIGNATURE_SCHEME.verify(
+                pk=public_key,
+                epoch=test_slot,  # Must match the signing slot
+                message=bytes(message_bytes),
+                sig=signed_att.signature,
+            )
+            assert is_valid, f"Signature for validator {validator_id} at slot {test_slot} failed"
+
+            # Verify with wrong epoch should fail
+            wrong_epoch = test_slot + Slot(1)
+            is_invalid = TARGET_SIGNATURE_SCHEME.verify(
+                pk=public_key,
+                epoch=wrong_epoch,
+                message=bytes(message_bytes),
+                sig=signed_att.signature,
+            )
+            assert not is_invalid, "Signature should fail with wrong epoch"

@@ -926,9 +926,11 @@ class State(Container):
                 target_id = next(iter(remaining))
                 candidates = aggregated_payloads.get(SignatureKey(target_id, data_root), [])
 
-                # No proofs found for this validator: stop the loop.
+                # No proofs found for this validator.
+                # Remove it and try another validator.
                 if not candidates:
-                    break
+                    remaining.discard(target_id)
+                    continue
 
                 # Step 2: Pick the proof covering the most remaining validators.
                 #
