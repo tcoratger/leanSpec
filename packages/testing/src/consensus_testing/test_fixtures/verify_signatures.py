@@ -246,17 +246,48 @@ class VerifySignaturesTest(BaseConsensusFixture):
             aggregated_payloads={},
         )
 
-        # Create dummy proofs for invalid attestation specs
+        # Create proofs for invalid attestation specs
         for invalid_spec in invalid_specs:
             attestation_data = self._build_attestation_data_from_spec(invalid_spec, state)
+            data_root = attestation_data.data_root_bytes()
 
-            # Create aggregated attestation with dummy proof
+            # Create aggregated attestation claiming validator_ids as participants
             aggregation_bits = AggregationBits.from_validator_indices(invalid_spec.validator_ids)
             invalid_aggregated = AggregatedAttestation(
                 aggregation_bits=aggregation_bits,
                 data=attestation_data,
             )
-            invalid_proof = _create_dummy_aggregated_proof(invalid_spec.validator_ids)
+
+            # Determine proof type based on the invalidity scenario
+            if not invalid_spec.valid_signature:
+                # Cryptographically invalid proof (all zeros)
+                invalid_proof = _create_dummy_aggregated_proof(invalid_spec.validator_ids)
+            elif invalid_spec.signer_ids is not None:
+                # Valid proof but from wrong validators
+                # Sign with signer_ids but claim validator_ids as participants
+                signer_public_keys = [
+                    key_manager.get_public_key(vid) for vid in invalid_spec.signer_ids
+                ]
+                signer_signatures = [
+                    key_manager.sign_attestation_data(vid, attestation_data)
+                    for vid in invalid_spec.signer_ids
+                ]
+                # Create valid aggregated proof from actual signers
+                valid_proof = AggregatedSignatureProof.aggregate(
+                    participants=AggregationBits.from_validator_indices(invalid_spec.signer_ids),
+                    public_keys=signer_public_keys,
+                    signatures=signer_signatures,
+                    message=data_root,
+                    epoch=attestation_data.slot,
+                )
+                # Replace participants with claimed validator_ids (mismatch!)
+                invalid_proof = AggregatedSignatureProof(
+                    participants=aggregation_bits,
+                    proof_data=valid_proof.proof_data,
+                )
+            else:
+                # Fallback to dummy proof
+                invalid_proof = _create_dummy_aggregated_proof(invalid_spec.validator_ids)
 
             # Add to block's attestations
             final_block = final_block.model_copy(
@@ -332,8 +363,14 @@ class VerifySignaturesTest(BaseConsensusFixture):
         invalid_specs = []
 
         for aggregated_spec in spec.attestations:
-            if not aggregated_spec.valid_signature:
-                # Defer invalid specs - they'll get dummy proofs created directly
+            # Check for invalid scenarios that need special handling
+            has_signer_mismatch = (
+                aggregated_spec.signer_ids is not None
+                and aggregated_spec.signer_ids != aggregated_spec.validator_ids
+            )
+
+            if not aggregated_spec.valid_signature or has_signer_mismatch:
+                # Defer invalid specs - they'll get special proofs created directly
                 invalid_specs.append(aggregated_spec)
                 continue
 

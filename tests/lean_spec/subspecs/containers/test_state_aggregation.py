@@ -16,6 +16,7 @@ from lean_spec.subspecs.containers.state import State
 from lean_spec.subspecs.containers.state.types import Validators
 from lean_spec.subspecs.containers.validator import Validator
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.subspecs.xmss import Signature
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Bytes32, Bytes52, Uint64
 
@@ -530,3 +531,553 @@ def test_build_block_state_root_valid_when_signatures_split() -> None:
 
     # Verify validators remain unchanged (attestation processing does not modify registry).
     assert len(result_state.validators.data) == num_validators
+
+
+# =============================================================================
+# Greedy Algorithm Tests
+# =============================================================================
+
+
+def test_greedy_selects_proof_with_maximum_overlap() -> None:
+    """
+    Verify greedy algorithm selects the proof covering the most remaining validators.
+
+    Scenario
+    --------
+    - 4 validators need coverage from fallback (no gossip)
+    - Three available proofs:
+        - Proof A: {0, 1} (covers 2)
+        - Proof B: {1, 2, 3} (covers 3)
+        - Proof C: {3} (covers 1)
+
+    Expected Behavior
+    -----------------
+    - First iteration: B selected (largest overlap with remaining={0,1,2,3})
+    - After B: remaining={0}
+    - Second iteration: A selected (covers 0)
+    - Result: 2 proofs instead of 3
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(4)
+    source = Checkpoint(root=make_bytes32(60), slot=Slot(0))
+    att_data = make_attestation_data(12, make_bytes32(61), make_bytes32(62), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(4)]
+    data_root = att_data.data_root_bytes()
+
+    # No gossip signatures - all validators need fallback
+    gossip_signatures: dict[SignatureKey, Signature] = {}
+
+    # Create three proofs with different coverage
+    # Proof A: validators {0, 1}
+    proof_a = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(0), Uint64(1)]),
+        public_keys=[
+            key_manager.get_public_key(Uint64(0)),
+            key_manager.get_public_key(Uint64(1)),
+        ],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(0), att_data),
+            key_manager.sign_attestation_data(Uint64(1), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    # Proof B: validators {1, 2, 3} - largest coverage
+    proof_b = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(1), Uint64(2), Uint64(3)]),
+        public_keys=[
+            key_manager.get_public_key(Uint64(1)),
+            key_manager.get_public_key(Uint64(2)),
+            key_manager.get_public_key(Uint64(3)),
+        ],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(1), att_data),
+            key_manager.sign_attestation_data(Uint64(2), att_data),
+            key_manager.sign_attestation_data(Uint64(3), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    # Proof C: validator {3} only
+    proof_c = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(3)]),
+        public_keys=[key_manager.get_public_key(Uint64(3))],
+        signatures=[key_manager.sign_attestation_data(Uint64(3), att_data)],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    # Make all proofs available for lookup by any validator they cover
+    aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] = {
+        SignatureKey(Uint64(0), data_root): [proof_a],
+        SignatureKey(Uint64(1), data_root): [proof_a, proof_b],
+        SignatureKey(Uint64(2), data_root): [proof_b],
+        SignatureKey(Uint64(3), data_root): [proof_b, proof_c],
+    }
+
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have 2 attestations (optimal greedy selection: B + A)
+    assert len(aggregated_atts) == 2
+    assert len(aggregated_proofs) == 2
+
+    # Verify the proofs cover all 4 validators
+    all_participants: set[int] = set()
+    for proof in aggregated_proofs:
+        participants = proof.participants.to_validator_indices()
+        all_participants.update(int(v) for v in participants)
+    assert all_participants == {0, 1, 2, 3}, f"All validators should be covered: {all_participants}"
+
+
+def test_greedy_stops_when_no_useful_proofs_remain() -> None:
+    """
+    Verify algorithm terminates gracefully when no proofs can cover remaining validators.
+
+    Scenario
+    --------
+    - 5 validators need attestations
+    - Gossip covers {0, 1}
+    - Available proofs only cover {2, 3} (no proof for validator 4)
+
+    Expected Behavior
+    -----------------
+    - Gossip creates attestation for {0, 1}
+    - Fallback finds proof for {2, 3}
+    - Validator 4 remains uncovered (no infinite loop or crash)
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(5)
+    source = Checkpoint(root=make_bytes32(70), slot=Slot(0))
+    att_data = make_attestation_data(13, make_bytes32(71), make_bytes32(72), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(5)]
+    data_root = att_data.data_root_bytes()
+
+    # Gossip covers validators 0 and 1
+    gossip_signatures = {
+        SignatureKey(Uint64(0), data_root): key_manager.sign_attestation_data(Uint64(0), att_data),
+        SignatureKey(Uint64(1), data_root): key_manager.sign_attestation_data(Uint64(1), att_data),
+    }
+
+    # Proof only covers validators 2 and 3 (no proof for validator 4)
+    proof_23 = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(2), Uint64(3)]),
+        public_keys=[
+            key_manager.get_public_key(Uint64(2)),
+            key_manager.get_public_key(Uint64(3)),
+        ],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(2), att_data),
+            key_manager.sign_attestation_data(Uint64(3), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    aggregated_payloads = {
+        SignatureKey(Uint64(2), data_root): [proof_23],
+        SignatureKey(Uint64(3), data_root): [proof_23],
+        # Note: No proof available for validator 4
+    }
+
+    # This should NOT hang or crash - algorithm terminates when no useful proofs found
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have 2 attestations: gossip {0,1} and fallback {2,3}
+    assert len(aggregated_atts) == 2
+    assert len(aggregated_proofs) == 2
+
+    # Verify covered validators
+    all_participants: set[int] = set()
+    for proof in aggregated_proofs:
+        participants = proof.participants.to_validator_indices()
+        all_participants.update(int(v) for v in participants)
+
+    # Validator 4 is NOT covered (expected - no proof available)
+    assert 4 not in all_participants, "Validator 4 should not be covered"
+    assert all_participants == {0, 1, 2, 3}, f"Expected {{0,1,2,3}} covered: {all_participants}"
+
+
+def test_greedy_handles_overlapping_proof_chains() -> None:
+    """
+    Test complex scenario with overlapping proofs requiring optimal selection.
+
+    Scenario
+    --------
+    - 5 validators, gossip covers {0}
+    - Remaining: {1, 2, 3, 4}
+    - Available proofs:
+        - Proof A: {1, 2} (covers 2)
+        - Proof B: {2, 3} (covers 2, overlaps with A)
+        - Proof C: {3, 4} (covers 2, overlaps with B)
+
+    Expected Behavior
+    -----------------
+    Greedy may select: A, then C (covers {1,2,3,4} with 2 proofs)
+    OR: B first, then needs A+C (suboptimal)
+
+    The key is that all 4 remaining validators get covered.
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(5)
+    source = Checkpoint(root=make_bytes32(80), slot=Slot(0))
+    att_data = make_attestation_data(14, make_bytes32(81), make_bytes32(82), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(5)]
+    data_root = att_data.data_root_bytes()
+
+    # Gossip covers only validator 0
+    gossip_signatures = {
+        SignatureKey(Uint64(0), data_root): key_manager.sign_attestation_data(Uint64(0), att_data),
+    }
+
+    # Proof A: {1, 2}
+    proof_a = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(1), Uint64(2)]),
+        public_keys=[key_manager.get_public_key(Uint64(1)), key_manager.get_public_key(Uint64(2))],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(1), att_data),
+            key_manager.sign_attestation_data(Uint64(2), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    # Proof B: {2, 3}
+    proof_b = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(2), Uint64(3)]),
+        public_keys=[key_manager.get_public_key(Uint64(2)), key_manager.get_public_key(Uint64(3))],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(2), att_data),
+            key_manager.sign_attestation_data(Uint64(3), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    # Proof C: {3, 4}
+    proof_c = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(3), Uint64(4)]),
+        public_keys=[key_manager.get_public_key(Uint64(3)), key_manager.get_public_key(Uint64(4))],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(3), att_data),
+            key_manager.sign_attestation_data(Uint64(4), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    aggregated_payloads = {
+        SignatureKey(Uint64(1), data_root): [proof_a],
+        SignatureKey(Uint64(2), data_root): [proof_a, proof_b],
+        SignatureKey(Uint64(3), data_root): [proof_b, proof_c],
+        SignatureKey(Uint64(4), data_root): [proof_c],
+    }
+
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have at least 3 attestations (1 gossip + 2 fallback minimum)
+    assert len(aggregated_atts) >= 3
+    assert len(aggregated_proofs) >= 3
+
+    # Key check: all 5 validators should be covered
+    all_participants: set[int] = set()
+    for proof in aggregated_proofs:
+        participants = proof.participants.to_validator_indices()
+        all_participants.update(int(v) for v in participants)
+
+    assert all_participants == {0, 1, 2, 3, 4}, (
+        f"All 5 validators should be covered: {all_participants}"
+    )
+
+
+def test_greedy_single_validator_proofs() -> None:
+    """
+    Test fallback when only single-validator proofs are available.
+
+    Scenario
+    --------
+    - 3 validators need fallback coverage
+    - Only single-validator proofs available
+
+    Expected Behavior
+    -----------------
+    Each validator gets their own proof (3 proofs total).
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(3)
+    source = Checkpoint(root=make_bytes32(90), slot=Slot(0))
+    att_data = make_attestation_data(15, make_bytes32(91), make_bytes32(92), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(3)]
+    data_root = att_data.data_root_bytes()
+
+    # No gossip - all need fallback
+    gossip_signatures: dict[SignatureKey, Signature] = {}
+
+    # Single-validator proofs only
+    proofs = []
+    for i in range(3):
+        proof = AggregatedSignatureProof.aggregate(
+            participants=AggregationBits.from_validator_indices([Uint64(i)]),
+            public_keys=[key_manager.get_public_key(Uint64(i))],
+            signatures=[key_manager.sign_attestation_data(Uint64(i), att_data)],
+            message=data_root,
+            epoch=att_data.slot,
+        )
+        proofs.append(proof)
+
+    aggregated_payloads = {SignatureKey(Uint64(i), data_root): [proofs[i]] for i in range(3)}
+
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have 3 attestations (one per validator)
+    assert len(aggregated_atts) == 3
+    assert len(aggregated_proofs) == 3
+
+    # Verify each validator is covered exactly once
+    seen_validators: set[int] = set()
+    for proof in aggregated_proofs:
+        participants = [int(v) for v in proof.participants.to_validator_indices()]
+        assert len(participants) == 1, "Each proof should cover exactly 1 validator"
+        seen_validators.update(participants)
+
+    assert seen_validators == {0, 1, 2}
+
+
+# =============================================================================
+# Edge Case and Safety Tests
+# =============================================================================
+
+
+def test_validator_in_both_gossip_and_fallback_proof() -> None:
+    """
+    Test behavior when a validator appears in both gossip signatures AND fallback proof.
+
+    Scenario
+    --------
+    - Validator 0 has a gossip signature
+    - Validator 1 needs fallback coverage
+    - The only available fallback proof covers BOTH validators {0, 1}
+
+    Current Behavior
+    ----------------
+    - Gossip creates attestation for {0}
+    - Fallback uses the proof for {0, 1} to cover validator 1
+    - Both attestations are included in the block
+
+    This test documents the current behavior. Validator 0 appears in both:
+    - The gossip attestation (participants={0})
+    - The fallback attestation (participants={0, 1})
+
+    Note: This could be considered duplicate coverage, but the fallback proof
+    cannot be "split" - it must be used as-is.
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(2)
+    source = Checkpoint(root=make_bytes32(100), slot=Slot(0))
+    att_data = make_attestation_data(16, make_bytes32(101), make_bytes32(102), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(2)]
+    data_root = att_data.data_root_bytes()
+
+    # Gossip signature only for validator 0
+    gossip_signatures = {
+        SignatureKey(Uint64(0), data_root): key_manager.sign_attestation_data(Uint64(0), att_data),
+    }
+
+    # Fallback proof covers BOTH validators {0, 1}
+    fallback_proof = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(0), Uint64(1)]),
+        public_keys=[key_manager.get_public_key(Uint64(0)), key_manager.get_public_key(Uint64(1))],
+        signatures=[
+            key_manager.sign_attestation_data(Uint64(0), att_data),
+            key_manager.sign_attestation_data(Uint64(1), att_data),
+        ],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    # Make proof available for both validators
+    aggregated_payloads = {
+        SignatureKey(Uint64(0), data_root): [fallback_proof],
+        SignatureKey(Uint64(1), data_root): [fallback_proof],
+    }
+
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have 2 attestations
+    assert len(aggregated_atts) == 2
+    assert len(aggregated_proofs) == 2
+
+    # Document the expected overlap behavior
+    proof_participants = [
+        {int(v) for v in p.participants.to_validator_indices()} for p in aggregated_proofs
+    ]
+
+    # Gossip proof covers {0}
+    assert {0} in proof_participants, "Gossip attestation should cover validator 0"
+    # Fallback proof covers {0, 1} (includes validator 0 again)
+    assert {0, 1} in proof_participants, "Fallback proof should cover {0, 1}"
+
+    # Verify the proofs are valid
+    for proof in aggregated_proofs:
+        participants = proof.participants.to_validator_indices()
+        public_keys = [key_manager.get_public_key(vid) for vid in participants]
+        proof.verify(public_keys=public_keys, message=data_root, epoch=att_data.slot)
+
+
+def test_gossip_none_and_aggregated_payloads_none() -> None:
+    """
+    Test edge case where both gossip_signatures and aggregated_payloads are None.
+
+    Expected Behavior
+    -----------------
+    Returns empty results (no attestations can be aggregated without signatures).
+    """
+    state = make_state(2)
+    source = Checkpoint(root=make_bytes32(110), slot=Slot(0))
+    att_data = make_attestation_data(17, make_bytes32(111), make_bytes32(112), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(2)]
+
+    # Both sources are None
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=None,
+        aggregated_payloads=None,
+    )
+
+    # Should return empty results
+    assert aggregated_atts == []
+    assert aggregated_proofs == []
+
+
+def test_aggregated_payloads_only_no_gossip() -> None:
+    """
+    Test aggregation with aggregated_payloads only (no gossip signatures).
+
+    Scenario
+    --------
+    - 3 validators need attestation
+    - No gossip signatures available
+    - Aggregated proof available covering all 3
+
+    Expected Behavior
+    -----------------
+    Single attestation from the fallback proof.
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(3)
+    source = Checkpoint(root=make_bytes32(120), slot=Slot(0))
+    att_data = make_attestation_data(18, make_bytes32(121), make_bytes32(122), source=source)
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(3)]
+    data_root = att_data.data_root_bytes()
+
+    # No gossip signatures
+    gossip_signatures: dict[SignatureKey, Signature] = {}
+
+    # Proof covering all 3 validators
+    proof = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(0), Uint64(1), Uint64(2)]),
+        public_keys=[key_manager.get_public_key(Uint64(i)) for i in range(3)],
+        signatures=[key_manager.sign_attestation_data(Uint64(i), att_data) for i in range(3)],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    aggregated_payloads = {SignatureKey(Uint64(i), data_root): [proof] for i in range(3)}
+
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have single attestation from fallback
+    assert len(aggregated_atts) == 1
+    assert len(aggregated_proofs) == 1
+
+    participants = {int(v) for v in aggregated_proofs[0].participants.to_validator_indices()}
+    assert participants == {0, 1, 2}
+
+    # Verify the proof
+    public_keys = [key_manager.get_public_key(Uint64(i)) for i in range(3)]
+    aggregated_proofs[0].verify(public_keys=public_keys, message=data_root, epoch=att_data.slot)
+
+
+def test_proof_with_extra_validators_beyond_needed() -> None:
+    """
+    Test that fallback proof including extra validators works correctly.
+
+    Scenario
+    --------
+    - 2 validators attest (indices 0 and 1)
+    - Gossip covers validator 0
+    - Fallback proof covers {0, 1, 2, 3} (includes validators not in attestation)
+
+    Expected Behavior
+    -----------------
+    - Gossip attestation for {0}
+    - Fallback proof used as-is (includes extra validators 2, 3)
+
+    The proof cannot be "trimmed" to exclude extra validators.
+    """
+    key_manager = get_shared_key_manager()
+    state = make_state(4)
+    source = Checkpoint(root=make_bytes32(130), slot=Slot(0))
+    att_data = make_attestation_data(19, make_bytes32(131), make_bytes32(132), source=source)
+    # Only validators 0 and 1 attest
+    attestations = [Attestation(validator_id=Uint64(i), data=att_data) for i in range(2)]
+    data_root = att_data.data_root_bytes()
+
+    # Gossip covers validator 0
+    gossip_signatures = {
+        SignatureKey(Uint64(0), data_root): key_manager.sign_attestation_data(Uint64(0), att_data),
+    }
+
+    # Proof covers {0, 1, 2, 3} - more than needed
+    proof = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([Uint64(i) for i in range(4)]),
+        public_keys=[key_manager.get_public_key(Uint64(i)) for i in range(4)],
+        signatures=[key_manager.sign_attestation_data(Uint64(i), att_data) for i in range(4)],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+
+    aggregated_payloads = {
+        SignatureKey(Uint64(1), data_root): [proof],
+    }
+
+    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+        attestations,
+        gossip_signatures=gossip_signatures,
+        aggregated_payloads=aggregated_payloads,
+    )
+
+    # Should have 2 attestations
+    assert len(aggregated_atts) == 2
+    assert len(aggregated_proofs) == 2
+
+    proof_participants = [
+        {int(v) for v in p.participants.to_validator_indices()} for p in aggregated_proofs
+    ]
+    assert {0} in proof_participants  # Gossip
+    assert {0, 1, 2, 3} in proof_participants  # Fallback (includes extra validators)
