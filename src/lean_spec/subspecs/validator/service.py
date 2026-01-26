@@ -45,6 +45,7 @@ from lean_spec.subspecs.containers import (
     Block,
     SignedAttestation,
     SignedBlockWithAttestation,
+    ValidatorIndex,
 )
 from lean_spec.subspecs.containers.block import (
     AttestationSignatures,
@@ -55,7 +56,6 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Uint64
-from lean_spec.types.validator import is_proposer
 
 from .registry import ValidatorRegistry
 
@@ -190,13 +190,13 @@ class ValidatorService:
         if head_state is None:
             return
 
-        num_validators = Uint64(len(head_state.validators))
+        num_validators = len(head_state.validators)
 
         # Check each validator we control.
         #
         # Only one validator can be the proposer per slot.
         for validator_index in self.registry.indices():
-            if not is_proposer(validator_index, slot, num_validators):
+            if not validator_index.is_proposer_for(slot, num_validators):
                 continue
 
             # We are the proposer for this slot.
@@ -271,7 +271,7 @@ class ValidatorService:
         if head_state is None:
             return
 
-        num_validators = Uint64(len(head_state.validators))
+        num_validators = len(head_state.validators)
 
         for validator_index in self.registry.indices():
             # Skip proposer - they already attested within their block.
@@ -279,7 +279,7 @@ class ValidatorService:
             # The proposer signed and bundled their attestation at interval 0.
             # Creating another attestation here would violate the
             # "one attestation per validator per slot" invariant.
-            if is_proposer(validator_index, slot, num_validators):
+            if validator_index.is_proposer_for(slot, num_validators):
                 continue
 
             # Produce attestation data using Store's method.
@@ -299,7 +299,7 @@ class ValidatorService:
     def _sign_block(
         self,
         block: Block,
-        validator_index: Uint64,
+        validator_index: ValidatorIndex,
         attestation_signatures: list[AggregatedSignatureProof],
     ) -> SignedBlockWithAttestation:
         """
@@ -363,7 +363,7 @@ class ValidatorService:
     def _sign_attestation(
         self,
         attestation_data: AttestationData,
-        validator_index: Uint64,
+        validator_index: ValidatorIndex,
     ) -> SignedAttestation:
         """
         Sign an attestation for publishing.

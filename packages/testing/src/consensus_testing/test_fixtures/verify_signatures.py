@@ -23,6 +23,7 @@ from lean_spec.subspecs.containers.block.types import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.state.state import State
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
@@ -34,7 +35,7 @@ from lean_spec.subspecs.xmss.types import (
     HashTreeOpening,
     Randomness,
 )
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
 
 from ..keys import XmssKeyManager, get_shared_key_manager
@@ -65,7 +66,7 @@ def _create_dummy_signature() -> Signature:
     )
 
 
-def _create_dummy_aggregated_proof(validator_ids: list[Uint64]) -> AggregatedSignatureProof:
+def _create_dummy_aggregated_proof(validator_ids: list[ValidatorIndex]) -> AggregatedSignatureProof:
     """
     Create a dummy aggregated signature proof with invalid proof data.
 
@@ -219,7 +220,9 @@ class VerifySignaturesTest(BaseConsensusFixture):
             A complete signed block with all attestations.
         """
         # Determine proposer index
-        proposer_index = spec.proposer_index or Uint64(int(spec.slot) % len(state.validators))
+        proposer_index = spec.proposer_index or ValidatorIndex(
+            int(spec.slot) % len(state.validators)
+        )
 
         # Resolve parent root
         parent_state = state.process_slots(spec.slot)

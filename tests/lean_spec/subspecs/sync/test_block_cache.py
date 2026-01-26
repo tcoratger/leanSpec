@@ -6,11 +6,12 @@ from time import time
 from unittest.mock import MagicMock
 
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.block_cache import BlockCache, PendingBlock
 from lean_spec.subspecs.sync.config import MAX_CACHED_BLOCKS
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_signed_block
 
 
@@ -21,7 +22,7 @@ class TestPendingBlock:
         """PendingBlock can be created with required fields."""
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -47,7 +48,7 @@ class TestPendingBlock:
         before = time()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -68,7 +69,7 @@ class TestPendingBlock:
         """PendingBlock can be created with custom backfill depth."""
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -102,7 +103,7 @@ class TestBlockCacheBasicOperations:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -119,7 +120,7 @@ class TestBlockCacheBasicOperations:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -134,7 +135,7 @@ class TestBlockCacheBasicOperations:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -158,7 +159,7 @@ class TestBlockCacheBasicOperations:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -184,7 +185,7 @@ class TestBlockCacheBasicOperations:
         for i in range(5):
             block = make_signed_block(
                 slot=Slot(i + 1),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32(i.to_bytes(32, "big")),
                 state_root=Bytes32.zero(),
             )
@@ -207,7 +208,7 @@ class TestBlockCacheDeduplication:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -225,7 +226,7 @@ class TestBlockCacheDeduplication:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -245,7 +246,7 @@ class TestBlockCacheOrphanTracking:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -260,7 +261,7 @@ class TestBlockCacheOrphanTracking:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -284,7 +285,7 @@ class TestBlockCacheOrphanTracking:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -309,7 +310,7 @@ class TestBlockCacheOrphanTracking:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -329,7 +330,7 @@ class TestBlockCacheOrphanTracking:
         parent_root = Bytes32(b"\x01" * 32)
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32.zero(),
         )
@@ -350,13 +351,13 @@ class TestBlockCacheOrphanTracking:
         # Two orphan blocks with the same missing parent
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=common_parent,
             state_root=Bytes32.zero(),
         )
         block2 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(1),
+            proposer_index=ValidatorIndex(1),
             parent_root=common_parent,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -379,7 +380,7 @@ class TestBlockCacheOrphanTracking:
         # Add a parent block
         parent_block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -388,7 +389,7 @@ class TestBlockCacheOrphanTracking:
         # Add child block that references the cached parent
         child_block = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_pending.root,
             state_root=Bytes32.zero(),
         )
@@ -418,7 +419,7 @@ class TestBlockCacheParentChildIndex:
         parent_root = Bytes32(b"\x01" * 32)
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32.zero(),
         )
@@ -438,13 +439,13 @@ class TestBlockCacheParentChildIndex:
         # Two blocks with the same parent (competing blocks)
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32.zero(),
         )
         block2 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(1),
+            proposer_index=ValidatorIndex(1),
             parent_root=parent_root,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -467,19 +468,19 @@ class TestBlockCacheParentChildIndex:
         # Add blocks out of order
         block_slot3 = make_signed_block(
             slot=Slot(3),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x03" * 32),
         )
         block_slot1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x01" * 32),
         )
         block_slot2 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -501,7 +502,7 @@ class TestBlockCacheParentChildIndex:
         parent_root = Bytes32(b"\x01" * 32)
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32.zero(),
         )
@@ -525,7 +526,7 @@ class TestBlockCacheCapacityManagement:
         for i in range(MAX_CACHED_BLOCKS + 10):
             block = make_signed_block(
                 slot=Slot(i + 1),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32(i.to_bytes(32, "big")),
                 state_root=Bytes32((i + 1).to_bytes(32, "big")),
             )
@@ -542,7 +543,7 @@ class TestBlockCacheCapacityManagement:
         for i in range(MAX_CACHED_BLOCKS):
             block = make_signed_block(
                 slot=Slot(i + 1),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32(i.to_bytes(32, "big")),
                 state_root=Bytes32((i + 1).to_bytes(32, "big")),
             )
@@ -558,7 +559,7 @@ class TestBlockCacheCapacityManagement:
         for i in range(10):
             block = make_signed_block(
                 slot=Slot(MAX_CACHED_BLOCKS + i + 1),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32((MAX_CACHED_BLOCKS + i).to_bytes(32, "big")),
                 state_root=Bytes32((MAX_CACHED_BLOCKS + i + 1).to_bytes(32, "big")),
             )
@@ -577,7 +578,7 @@ class TestBlockCacheCapacityManagement:
         # Add a block and mark it as orphan
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32.zero(),
         )
@@ -590,7 +591,7 @@ class TestBlockCacheCapacityManagement:
         for i in range(MAX_CACHED_BLOCKS):
             new_block = make_signed_block(
                 slot=Slot(i + 2),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32((i + 1).to_bytes(32, "big")),
                 state_root=Bytes32((i + 2).to_bytes(32, "big")),
             )
@@ -621,7 +622,7 @@ class TestBlockCacheProcessable:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32(b"\x01" * 32),
             state_root=Bytes32.zero(),
         )
@@ -641,7 +642,7 @@ class TestBlockCacheProcessable:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32.zero(),
         )
@@ -663,19 +664,19 @@ class TestBlockCacheProcessable:
         # Add blocks out of order
         block3 = make_signed_block(
             slot=Slot(3),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x03" * 32),
         )
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x01" * 32),
         )
         block2 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -700,7 +701,7 @@ class TestBlockCacheBackfillDepth:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -714,7 +715,7 @@ class TestBlockCacheBackfillDepth:
         cache = BlockCache()
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )

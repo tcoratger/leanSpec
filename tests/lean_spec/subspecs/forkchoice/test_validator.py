@@ -14,6 +14,7 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     State,
     Validator,
+    ValidatorIndex,
 )
 from lean_spec.subspecs.containers.block import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
@@ -28,7 +29,6 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.types import Bytes32, Bytes52, Uint64
-from lean_spec.types.validator import is_proposer
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def sample_state(config: Config) -> State:
     # Create block header for testing
     block_header = BlockHeader(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=Bytes32(b"state" + b"\x00" * 27),
         body_root=Bytes32(b"body" + b"\x00" * 28),
@@ -57,8 +57,8 @@ def sample_state(config: Config) -> State:
     validators = Validators(
         data=[
             Validator(
-                pubkey=Bytes52(key_manager.get_public_key(Uint64(i)).encode_bytes()),
-                index=Uint64(i),
+                pubkey=Bytes52(key_manager.get_public_key(ValidatorIndex(i)).encode_bytes()),
+                index=ValidatorIndex(i),
             )
             for i in range(10)
         ]
@@ -84,7 +84,7 @@ def sample_store(config: Config, sample_state: State) -> Store:
     # Create genesis block
     genesis_block = Block(
         slot=Slot(0),
-        proposer_index=Uint64(0),
+        proposer_index=ValidatorIndex(0),
         parent_root=Bytes32.zero(),
         state_root=hash_tree_root(sample_state),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -130,7 +130,7 @@ class TestBlockProduction:
     def test_produce_block_basic(self, sample_store: Store) -> None:
         """Test basic block production by authorized proposer."""
         slot = Slot(1)
-        validator_idx = Uint64(1)  # Proposer for slot 1
+        validator_idx = ValidatorIndex(1)  # Proposer for slot 1
 
         store, block, _signatures = sample_store.produce_block_with_signatures(slot, validator_idx)
         # Verify block structure
@@ -148,7 +148,7 @@ class TestBlockProduction:
     def test_produce_block_unauthorized_proposer(self, sample_store: Store) -> None:
         """Test block production fails for unauthorized proposer."""
         slot = Slot(1)
-        wrong_validator = Uint64(2)  # Not proposer for slot 1
+        wrong_validator = ValidatorIndex(2)  # Not proposer for slot 1
 
         with pytest.raises(AssertionError, match="is not the proposer for slot"):
             sample_store.produce_block_with_signatures(slot, wrong_validator)
@@ -167,9 +167,9 @@ class TestBlockProduction:
             source=sample_store.latest_justified,
         )
         signed_5 = SignedAttestation(
-            validator_id=Uint64(5),
+            validator_id=ValidatorIndex(5),
             message=data_5,
-            signature=key_manager.sign_attestation_data(Uint64(5), data_5),
+            signature=key_manager.sign_attestation_data(ValidatorIndex(5), data_5),
         )
         data_6 = AttestationData(
             slot=head_block.slot,
@@ -178,19 +178,19 @@ class TestBlockProduction:
             source=sample_store.latest_justified,
         )
         signed_6 = SignedAttestation(
-            validator_id=Uint64(6),
+            validator_id=ValidatorIndex(6),
             message=data_6,
-            signature=key_manager.sign_attestation_data(Uint64(6), data_6),
+            signature=key_manager.sign_attestation_data(ValidatorIndex(6), data_6),
         )
-        sample_store.latest_known_attestations[Uint64(5)] = signed_5.message
-        sample_store.latest_known_attestations[Uint64(6)] = signed_6.message
-        sig_key_5 = SignatureKey(Uint64(5), signed_5.message.data_root_bytes())
-        sig_key_6 = SignatureKey(Uint64(6), signed_6.message.data_root_bytes())
+        sample_store.latest_known_attestations[ValidatorIndex(5)] = signed_5.message
+        sample_store.latest_known_attestations[ValidatorIndex(6)] = signed_6.message
+        sig_key_5 = SignatureKey(ValidatorIndex(5), signed_5.message.data_root_bytes())
+        sig_key_6 = SignatureKey(ValidatorIndex(6), signed_6.message.data_root_bytes())
         sample_store.gossip_signatures[sig_key_5] = signed_5.signature
         sample_store.gossip_signatures[sig_key_6] = signed_6.signature
 
         slot = Slot(2)
-        validator_idx = Uint64(2)  # Proposer for slot 2
+        validator_idx = ValidatorIndex(2)  # Proposer for slot 2
 
         store, block, signatures = sample_store.produce_block_with_signatures(
             slot,
@@ -221,13 +221,13 @@ class TestBlockProduction:
         # Produce block for slot 1
         sample_store, block1, _signatures1 = sample_store.produce_block_with_signatures(
             Slot(1),
-            Uint64(1),
+            ValidatorIndex(1),
         )
         block1_hash = hash_tree_root(block1)
 
         # Verify first block is properly created
         assert block1.slot == Slot(1)
-        assert block1.proposer_index == Uint64(1)
+        assert block1.proposer_index == ValidatorIndex(1)
         assert block1_hash in sample_store.blocks
         assert block1_hash in sample_store.states
 
@@ -238,12 +238,12 @@ class TestBlockProduction:
         # Produce block for slot 2 (will build on genesis due to forkchoice)
         sample_store, block2, _signatures2 = sample_store.produce_block_with_signatures(
             Slot(2),
-            Uint64(2),
+            ValidatorIndex(2),
         )
 
         # Verify block properties
         assert block2.slot == Slot(2)
-        assert block2.proposer_index == Uint64(2)
+        assert block2.proposer_index == ValidatorIndex(2)
 
         # The parent should be genesis (the current head), not block1
         genesis_hash = sample_store.head
@@ -258,7 +258,7 @@ class TestBlockProduction:
     def test_produce_block_empty_attestations(self, sample_store: Store) -> None:
         """Test block production with no available attestations."""
         slot = Slot(3)
-        validator_idx = Uint64(3)
+        validator_idx = ValidatorIndex(3)
 
         # Ensure no attestations in store
         sample_store.latest_known_attestations.clear()
@@ -278,7 +278,7 @@ class TestBlockProduction:
         """Test that produced block's state is consistent with block content."""
         key_manager = get_shared_key_manager()
         slot = Slot(4)
-        validator_idx = Uint64(4)
+        validator_idx = ValidatorIndex(4)
 
         # Add some attestations to test state computation
         head_block = sample_store.blocks[sample_store.head]
@@ -290,12 +290,12 @@ class TestBlockProduction:
             source=sample_store.latest_justified,
         )
         signed_7 = SignedAttestation(
-            validator_id=Uint64(7),
+            validator_id=ValidatorIndex(7),
             message=data_7,
-            signature=key_manager.sign_attestation_data(Uint64(7), data_7),
+            signature=key_manager.sign_attestation_data(ValidatorIndex(7), data_7),
         )
-        sample_store.latest_known_attestations[Uint64(7)] = signed_7.message
-        sig_key_7 = SignatureKey(Uint64(7), signed_7.message.data_root_bytes())
+        sample_store.latest_known_attestations[ValidatorIndex(7)] = signed_7.message
+        sig_key_7 = SignatureKey(ValidatorIndex(7), signed_7.message.data_root_bytes())
         sample_store.gossip_signatures[sig_key_7] = signed_7.signature
 
         store, block, signatures = sample_store.produce_block_with_signatures(
@@ -326,7 +326,7 @@ class TestValidatorIntegration:
         """Test producing a block then creating attestation for it."""
         # Proposer produces block for slot 1
         proposer_slot = Slot(1)
-        proposer_idx = Uint64(1)
+        proposer_idx = ValidatorIndex(1)
         sample_store.produce_block_with_signatures(proposer_slot, proposer_idx)
 
         # Update store state after block production
@@ -334,7 +334,7 @@ class TestValidatorIntegration:
 
         # Other validator creates attestation for slot 2
         attestor_slot = Slot(2)
-        attestor_idx = Uint64(7)
+        attestor_idx = ValidatorIndex(7)
         attestation_data = sample_store.produce_attestation_data(attestor_slot)
         attestation = Attestation(validator_id=attestor_idx, data=attestation_data)
 
@@ -350,7 +350,7 @@ class TestValidatorIntegration:
         # Validator 1 produces block for slot 1
         sample_store, block1, _signatures1 = sample_store.produce_block_with_signatures(
             Slot(1),
-            Uint64(1),
+            ValidatorIndex(1),
         )
         block1_hash = hash_tree_root(block1)
 
@@ -359,7 +359,7 @@ class TestValidatorIntegration:
         attestations = []
         for i in range(2, 6):
             attestation_data = sample_store.produce_attestation_data(Slot(2))
-            attestation = Attestation(validator_id=Uint64(i), data=attestation_data)
+            attestation = Attestation(validator_id=ValidatorIndex(i), data=attestation_data)
             attestations.append(attestation)
 
         # All attestations should be consistent
@@ -374,12 +374,12 @@ class TestValidatorIntegration:
         # So block2 will build on block1
         sample_store, block2, _signatures2 = sample_store.produce_block_with_signatures(
             Slot(2),
-            Uint64(2),
+            ValidatorIndex(2),
         )
 
         # Verify block properties
         assert block2.slot == Slot(2)
-        assert block2.proposer_index == Uint64(2)
+        assert block2.proposer_index == ValidatorIndex(2)
 
         # Both blocks should exist in the store
         block2_hash = hash_tree_root(block2)
@@ -402,7 +402,7 @@ class TestValidatorIntegration:
     def test_validator_edge_cases(self, sample_store: Store) -> None:
         """Test edge cases in validator operations."""
         # Test with validator index equal to number of validators - 1
-        max_validator = Uint64(9)  # Last validator (0-indexed, 10 total)
+        max_validator = ValidatorIndex(9)  # Last validator (0-indexed, 10 total)
         slot = Slot(9)  # This validator's slot
 
         # Should be able to produce block
@@ -426,7 +426,7 @@ class TestValidatorIntegration:
 
         # Create validators list with 3 validators
         validators = Validators(
-            data=[Validator(pubkey=Bytes52.zero(), index=Uint64(i)) for i in range(3)]
+            data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(3)]
         )
 
         # Create minimal state with temporary header
@@ -436,7 +436,7 @@ class TestValidatorIntegration:
             slot=Slot(0),
             latest_block_header=BlockHeader(
                 slot=Slot(0),
-                proposer_index=Uint64(0),
+                proposer_index=ValidatorIndex(0),
                 parent_root=Bytes32.zero(),
                 state_root=Bytes32.zero(),  # Will be updated
                 body_root=hash_tree_root(genesis_body),
@@ -456,7 +456,7 @@ class TestValidatorIntegration:
         # Create genesis block with correct state root
         genesis = Block(
             slot=Slot(0),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=state_root,
             body=genesis_body,
@@ -466,7 +466,7 @@ class TestValidatorIntegration:
         # Update state with matching header and checkpoint
         consistent_header = BlockHeader(
             slot=Slot(0),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=state_root,  # Same as block
             body_root=hash_tree_root(genesis_body),
@@ -495,10 +495,10 @@ class TestValidatorIntegration:
         # Should be able to produce block and attestation
         store, block, _signatures = store.produce_block_with_signatures(
             Slot(1),
-            Uint64(1),
+            ValidatorIndex(1),
         )
         attestation_data = store.produce_attestation_data(Slot(1))
-        attestation = Attestation(validator_id=Uint64(2), data=attestation_data)
+        attestation = Attestation(validator_id=ValidatorIndex(2), data=attestation_data)
 
         assert isinstance(block, Block)
         assert isinstance(attestation, Attestation)
@@ -510,7 +510,7 @@ class TestValidatorErrorHandling:
     def test_produce_block_wrong_proposer(self, sample_store: Store) -> None:
         """Test error when wrong validator tries to produce block."""
         slot = Slot(5)
-        wrong_proposer = Uint64(3)  # Should be validator 5 for slot 5
+        wrong_proposer = ValidatorIndex(3)  # Should be validator 5 for slot 5
 
         with pytest.raises(AssertionError) as exc_info:
             sample_store.produce_block_with_signatures(slot, wrong_proposer)
@@ -535,24 +535,21 @@ class TestValidatorErrorHandling:
         )
 
         with pytest.raises(KeyError):  # Missing head in get_proposal_head
-            store.produce_block_with_signatures(Slot(1), Uint64(1))
+            store.produce_block_with_signatures(Slot(1), ValidatorIndex(1))
 
     def test_validator_operations_invalid_parameters(self, sample_store: Store) -> None:
         """Test validator operations with invalid parameters."""
-        # These should not raise errors but work with the given types
-        # since Uint64 is just a Uint64 alias
-
         # Very large validator index (should work mathematically)
-        large_validator = Uint64(1000000)
+        large_validator = ValidatorIndex(1000000)
         large_slot = Slot(1000000)
 
         # Get the state to determine number of validators
         genesis_hash = sample_store.head
         state = sample_store.states[genesis_hash]
-        num_validators = Uint64(len(state.validators))
+        num_validators = len(state.validators)
 
-        # is_proposer should work (though likely return False)
-        result = is_proposer(large_validator, large_slot, num_validators)
+        # is_proposer_for should work (though likely return False)
+        result = large_validator.is_proposer_for(large_slot, num_validators)
         assert isinstance(result, bool)
 
         # Attestation can be created for any validator

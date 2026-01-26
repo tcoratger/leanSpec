@@ -18,10 +18,10 @@ import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from lean_spec.subspecs.containers import Block, Checkpoint, State
+from lean_spec.subspecs.containers import Block, Checkpoint, State, ValidatorIndex
 from lean_spec.subspecs.containers.attestation import AttestationData
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 
 from .namespaces import (
     ATTESTATIONS,
@@ -289,7 +289,7 @@ class SQLiteDatabase:
     # Fork choice uses the latest attestation from each validator
     # to determine which branch has the most support.
 
-    def get_latest_attestation(self, validator_index: Uint64) -> AttestationData | None:
+    def get_latest_attestation(self, validator_index: ValidatorIndex) -> AttestationData | None:
         """Retrieve the latest attestation for a validator."""
         cursor = self._conn.cursor()
 
@@ -308,7 +308,7 @@ class SQLiteDatabase:
 
     def put_latest_attestation(
         self,
-        validator_index: Uint64,
+        validator_index: ValidatorIndex,
         attestation: AttestationData,
     ) -> None:
         """Store the latest attestation for a validator."""
@@ -327,7 +327,7 @@ class SQLiteDatabase:
         )
         self._conn.commit()
 
-    def get_all_latest_attestations(self) -> dict[Uint64, AttestationData]:
+    def get_all_latest_attestations(self) -> dict[ValidatorIndex, AttestationData]:
         """Retrieve all latest attestations."""
         cursor = self._conn.cursor()
 
@@ -337,7 +337,7 @@ class SQLiteDatabase:
         # Consider streaming or batching for production use.
         cursor.execute(f"SELECT validator_index, data FROM {ATTESTATIONS.TABLE_NAME}")
         return {
-            Uint64(row["validator_index"]): AttestationData.decode_bytes(row["data"])
+            ValidatorIndex(row["validator_index"]): AttestationData.decode_bytes(row["data"])
             for row in cursor.fetchall()
         }
 

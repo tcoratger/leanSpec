@@ -2,7 +2,8 @@
 
 from lean_spec.subspecs.containers.block import BlockBody
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.types import Bytes32, CamelModel, Uint64
+from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.types import Bytes32, CamelModel
 
 from .aggregated_attestation_spec import AggregatedAttestationSpec
 
@@ -19,14 +20,14 @@ class BlockSpec(CamelModel):
 
     Usage:
     - Simple: BlockSpec(slot=Slot(1)) - framework computes everything
-    - Custom: BlockSpec(slot=Slot(1), proposer_index=Uint64(5)) - override specific fields
+    - Custom: BlockSpec(slot=Slot(1), proposer_index=ValidatorIndex(5)) - override specific fields
     - Invalid: BlockSpec(slot=Slot(1), state_root=Bytes32.zero()) - test invalid blocks
     """
 
     slot: Slot
     """The slot for this block (required)."""
 
-    proposer_index: Uint64 | None = None
+    proposer_index: ValidatorIndex | None = None
     """
     The proposer index for this block.
 

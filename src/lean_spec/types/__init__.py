@@ -18,7 +18,6 @@ from .rlp import decode as rlp_decode
 from .rlp import encode as rlp_encode
 from .ssz_base import SSZType
 from .uint import Uint64
-from .validator import is_proposer
 
 __all__ = [
     # Core types
@@ -33,7 +32,6 @@ __all__ = [
     "ZERO_HASH",
     "CamelModel",
     "StrictBaseModel",
-    "is_proposer",
     "SSZList",
     "SSZVector",
     "SSZType",

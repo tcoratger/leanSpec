@@ -20,6 +20,7 @@ from pydantic import Field, field_validator, model_validator
 
 from lean_spec.subspecs.containers import State, Validator
 from lean_spec.subspecs.containers.state import Validators
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Bytes52, StrictBaseModel, Uint64
 
 
@@ -118,7 +119,7 @@ class GenesisConfig(StrictBaseModel):
         """
         return Validators(
             data=[
-                Validator(pubkey=pk, index=Uint64(i))
+                Validator(pubkey=pk, index=ValidatorIndex(i))
                 for i, pk in enumerate(self.genesis_validators)
             ]
         )

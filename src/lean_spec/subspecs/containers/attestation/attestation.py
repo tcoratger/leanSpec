@@ -17,8 +17,9 @@ from __future__ import annotations
 from collections import defaultdict
 
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Bytes32, Container, Uint64
+from lean_spec.types import Bytes32, Container
 
 from ...xmss.containers import Signature
 from ..checkpoint import Checkpoint
@@ -48,7 +49,7 @@ class AttestationData(Container):
 class Attestation(Container):
     """Validator specific attestation wrapping shared attestation data."""
 
-    validator_id: Uint64
+    validator_id: ValidatorIndex
     """The index of the validator making the attestation."""
 
     data: AttestationData
@@ -58,7 +59,7 @@ class Attestation(Container):
 class SignedAttestation(Container):
     """Validator attestation bundled with its signature."""
 
-    validator_id: Uint64
+    validator_id: ValidatorIndex
     """The index of the validator making the attestation."""
 
     message: AttestationData
@@ -96,7 +97,7 @@ class AggregatedAttestation(Container):
             One AggregatedAttestation per unique AttestationData, with aggregation
             bits set for all participating validators.
         """
-        data_to_validator_ids: dict[AttestationData, list[Uint64]] = defaultdict(list)
+        data_to_validator_ids: dict[AttestationData, list[ValidatorIndex]] = defaultdict(list)
         for attestation in attestations:
             data_to_validator_ids[attestation.data].append(attestation.validator_id)
 

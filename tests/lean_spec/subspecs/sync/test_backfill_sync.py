@@ -8,6 +8,7 @@ import pytest
 
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer.info import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
@@ -16,7 +17,7 @@ from lean_spec.subspecs.sync.backfill_sync import BackfillSync
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
 from lean_spec.subspecs.sync.peer_manager import PeerManager
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_signed_block
 
 
@@ -78,7 +79,7 @@ class TestBackfillChainResolution:
         # Create a block that will be "on the network"
         block = make_signed_block(
             slot=Slot(10),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -104,7 +105,7 @@ class TestBackfillChainResolution:
         # Only child's root is initially requested, but we should fetch all
         grandparent = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),  # Genesis as parent (known)
             state_root=Bytes32(b"\x01" * 32),
         )
@@ -112,7 +113,7 @@ class TestBackfillChainResolution:
 
         parent = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=grandparent_root,
             state_root=Bytes32(b"\x02" * 32),
         )
@@ -120,7 +121,7 @@ class TestBackfillChainResolution:
 
         child = make_signed_block(
             slot=Slot(3),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x03" * 32),
         )
@@ -169,7 +170,7 @@ class TestBackfillChainResolution:
         """Blocks already in cache are not re-requested."""
         block = make_signed_block(
             slot=Slot(5),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -251,7 +252,7 @@ class TestOrphanHandling:
         # Create a parent block on the network
         parent = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -260,7 +261,7 @@ class TestOrphanHandling:
         # Add child as orphan (parent not in cache)
         child = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x01" * 32),
         )
@@ -285,7 +286,7 @@ class TestOrphanHandling:
         # Shared parent
         parent = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32.zero(),
         )
@@ -294,13 +295,13 @@ class TestOrphanHandling:
         # Two children with same parent
         child1 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=parent_root,
             state_root=Bytes32(b"\x01" * 32),
         )
         child2 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(1),
+            proposer_index=ValidatorIndex(1),
             parent_root=parent_root,
             state_root=Bytes32(b"\x02" * 32),
         )

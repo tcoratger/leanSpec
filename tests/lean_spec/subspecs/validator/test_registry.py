@@ -9,12 +9,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
+from lean_spec.subspecs.containers import ValidatorIndex
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry, ValidatorManifestEntry
-from lean_spec.types import Uint64
 
 
-def registry_state(registry: ValidatorRegistry) -> dict[Uint64, Any]:
+def registry_state(registry: ValidatorRegistry) -> dict[ValidatorIndex, Any]:
     """Extract full registry state as index → secret_key mapping."""
     return {idx: registry.get(idx).secret_key for idx in registry.indices()}  # type: ignore[union-attr]
 
@@ -25,10 +25,10 @@ class TestValidatorEntry:
     def test_entry_is_frozen(self) -> None:
         """ValidatorEntry is immutable."""
         mock_key = MagicMock()
-        entry = ValidatorEntry(index=Uint64(0), secret_key=mock_key)
+        entry = ValidatorEntry(index=ValidatorIndex(0), secret_key=mock_key)
 
         with pytest.raises(AttributeError):
-            entry.index = Uint64(1)  # type: ignore[misc]
+            entry.index = ValidatorIndex(1)  # type: ignore[misc]
 
 
 class TestValidatorRegistry:
@@ -39,15 +39,15 @@ class TestValidatorRegistry:
         registry = ValidatorRegistry()
 
         assert registry_state(registry) == {}
-        assert registry.get(Uint64(99)) is None
+        assert registry.get(ValidatorIndex(99)) is None
 
     def test_add_single_entry(self) -> None:
         """Single entry can be added and retrieved with correct key."""
         registry = ValidatorRegistry()
         key_42 = MagicMock(name="key_42")
-        registry.add(ValidatorEntry(index=Uint64(42), secret_key=key_42))
+        registry.add(ValidatorEntry(index=ValidatorIndex(42), secret_key=key_42))
 
-        assert registry_state(registry) == {Uint64(42): key_42}
+        assert registry_state(registry) == {ValidatorIndex(42): key_42}
 
     def test_add_multiple_entries(self) -> None:
         """Multiple entries maintain correct index-to-key mapping."""
@@ -56,14 +56,14 @@ class TestValidatorRegistry:
         key_3 = MagicMock(name="key_3")
         key_4 = MagicMock(name="key_4")
 
-        registry.add(ValidatorEntry(index=Uint64(3), secret_key=key_3))
-        registry.add(ValidatorEntry(index=Uint64(1), secret_key=key_1))
-        registry.add(ValidatorEntry(index=Uint64(4), secret_key=key_4))
+        registry.add(ValidatorEntry(index=ValidatorIndex(3), secret_key=key_3))
+        registry.add(ValidatorEntry(index=ValidatorIndex(1), secret_key=key_1))
+        registry.add(ValidatorEntry(index=ValidatorIndex(4), secret_key=key_4))
 
         assert registry_state(registry) == {
-            Uint64(1): key_1,
-            Uint64(3): key_3,
-            Uint64(4): key_4,
+            ValidatorIndex(1): key_1,
+            ValidatorIndex(3): key_3,
+            ValidatorIndex(4): key_4,
         }
 
     def test_from_secret_keys(self) -> None:
@@ -73,7 +73,7 @@ class TestValidatorRegistry:
 
         registry = ValidatorRegistry.from_secret_keys({0: key_0, 2: key_2})
 
-        assert registry_state(registry) == {Uint64(0): key_0, Uint64(2): key_2}
+        assert registry_state(registry) == {ValidatorIndex(0): key_0, ValidatorIndex(2): key_2}
 
 
 class TestValidatorRegistryFromYaml:
@@ -120,7 +120,7 @@ class TestValidatorRegistryFromYaml:
                 manifest_path=manifest_file,
             )
 
-        assert registry_state(registry) == {Uint64(0): key_0, Uint64(1): key_1}
+        assert registry_state(registry) == {ValidatorIndex(0): key_0, ValidatorIndex(1): key_1}
 
     def test_from_yaml_unknown_node_returns_empty(self, tmp_path: Path) -> None:
         """Unknown node ID returns empty registry."""
@@ -188,7 +188,7 @@ class TestValidatorRegistryFromYaml:
             )
 
         # Only index 0 loaded (99 not in manifest)
-        assert registry_state(registry) == {Uint64(0): key_0}
+        assert registry_state(registry) == {ValidatorIndex(0): key_0}
 
     def test_from_yaml_empty_file_returns_empty(self, tmp_path: Path) -> None:
         """Empty validators.yaml returns empty registry."""

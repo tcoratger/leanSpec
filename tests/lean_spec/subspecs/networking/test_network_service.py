@@ -16,6 +16,7 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
@@ -178,7 +179,7 @@ class TestBlockRoutingToForkchoice:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -213,7 +214,7 @@ class TestBlockRoutingToForkchoice:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -245,7 +246,7 @@ class TestBlockRoutingToForkchoice:
 
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -276,7 +277,7 @@ class TestAttestationRoutingToForkchoice:
         sync_service._state = SyncState.SYNCING
 
         attestation = SignedAttestation(
-            validator_id=Uint64(42),
+            validator_id=ValidatorIndex(42),
             message=AttestationData(
                 slot=Slot(1),
                 head=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
@@ -320,7 +321,7 @@ class TestAttestationRoutingToForkchoice:
         initial_count = len(mock_store._attestations_received)
 
         attestation = SignedAttestation(
-            validator_id=Uint64(99),
+            validator_id=ValidatorIndex(99),
             message=AttestationData(
                 slot=Slot(1),
                 head=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
@@ -432,7 +433,7 @@ class TestIntegrationEventSequence:
         # Block to process (slot 1 - will exceed network finalized)
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -470,7 +471,7 @@ class TestIntegrationEventSequence:
         # Block arrives BEFORE status
         block = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -509,7 +510,7 @@ class TestIntegrationEventSequence:
         # Create chain: genesis -> block1 -> block2
         block1 = make_signed_block(
             slot=Slot(1),
-            proposer_index=Uint64(0),
+            proposer_index=ValidatorIndex(0),
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
@@ -517,7 +518,7 @@ class TestIntegrationEventSequence:
 
         block2 = make_signed_block(
             slot=Slot(2),
-            proposer_index=Uint64(1),
+            proposer_index=ValidatorIndex(1),
             parent_root=block1_root,
             state_root=Bytes32.zero(),
         )
