@@ -332,11 +332,10 @@ class ValidatorService:
         if entry is None:
             raise ValueError(f"No secret key for validator {validator_index}")
 
-        message_bytes = proposer_attestation_data.data_root_bytes()
         proposer_signature = TARGET_SIGNATURE_SCHEME.sign(
             entry.secret_key,
             block.slot,
-            bytes(message_bytes),
+            proposer_attestation_data.data_root_bytes(),
         )
 
         # Create the message wrapper.
@@ -385,11 +384,10 @@ class ValidatorService:
         # Sign the attestation data root.
         #
         # Uses XMSS one-time signature for the current epoch (slot).
-        message_bytes = attestation_data.data_root_bytes()
         signature = TARGET_SIGNATURE_SCHEME.sign(
             entry.secret_key,
             attestation_data.slot,
-            bytes(message_bytes),
+            attestation_data.data_root_bytes(),
         )
 
         return SignedAttestation(

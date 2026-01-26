@@ -601,7 +601,7 @@ class TestValidatorServiceIntegration:
         is_valid = TARGET_SIGNATURE_SCHEME.verify(
             pk=proposer_public_key,
             epoch=signed_block.message.block.slot,
-            message=bytes(message_bytes),
+            message=message_bytes,
             sig=signed_block.signature.proposer_signature,
         )
         assert is_valid, "Proposer signature failed verification"
@@ -648,7 +648,7 @@ class TestValidatorServiceIntegration:
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
                 epoch=signed_att.message.slot,
-                message=bytes(message_bytes),
+                message=message_bytes,
                 sig=signed_att.signature,
             )
             assert is_valid, f"Attestation signature for validator {validator_id} failed"
@@ -750,7 +750,7 @@ class TestValidatorServiceIntegration:
         is_valid = TARGET_SIGNATURE_SCHEME.verify(
             pk=public_key,
             epoch=signed_block.message.block.slot,
-            message=bytes(message_bytes),
+            message=message_bytes,
             sig=signed_block.signature.proposer_signature,
         )
         assert is_valid
@@ -1005,7 +1005,7 @@ class TestValidatorServiceIntegration:
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
                 epoch=test_slot,  # Must match the signing slot
-                message=bytes(message_bytes),
+                message=message_bytes,
                 sig=signed_att.signature,
             )
             assert is_valid, f"Signature for validator {validator_id} at slot {test_slot} failed"
@@ -1015,7 +1015,7 @@ class TestValidatorServiceIntegration:
             is_invalid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
                 epoch=wrong_epoch,
-                message=bytes(message_bytes),
+                message=message_bytes,
                 sig=signed_att.signature,
             )
             assert not is_invalid, "Signature should fail with wrong epoch"

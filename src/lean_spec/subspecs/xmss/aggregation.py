@@ -65,7 +65,7 @@ class AggregatedSignatureProof(Container):
         participants: AggregationBits,
         public_keys: Sequence[PublicKey],
         signatures: Sequence[Signature],
-        message: bytes,
+        message: Bytes32,
         epoch: Uint64,
         mode: str | None = None,
     ) -> Self:
@@ -106,7 +106,7 @@ class AggregatedSignatureProof(Container):
     def verify(
         self,
         public_keys: Sequence[PublicKey],
-        message: bytes,
+        message: Bytes32,
         epoch: Uint64,
         mode: str | None = None,
     ) -> None:
