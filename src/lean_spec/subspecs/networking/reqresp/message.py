@@ -7,7 +7,7 @@ domain. All messages are SSZ-encoded and then compressed with Snappy frames.
 
 from typing import ClassVar
 
-from lean_spec.subspecs.containers import Checkpoint, SignedBlockWithAttestation
+from lean_spec.subspecs.containers import Checkpoint
 from lean_spec.types import Bytes32, SSZList, SSZType
 from lean_spec.types.container import Container
 
@@ -56,17 +56,4 @@ class BlocksByRootRequest(SSZList[Bytes32]):
     """
 
     ELEMENT_TYPE: ClassVar[type[SSZType]] = Bytes32
-    LIMIT: ClassVar[int] = MAX_REQUEST_BLOCKS
-
-
-class BlocksByRootResponse(SSZList[SignedBlockWithAttestation]):
-    """
-    A response containing the requested `SignedBlockWithAttestation` objects.
-
-    The length of the list may be less than the number of requested blocks if
-    the responding peer does not have all of them. Each block is sent in a
-    separate `response_chunk`.
-    """
-
-    ELEMENT_TYPE: ClassVar[type[SSZType]] = SignedBlockWithAttestation
     LIMIT: ClassVar[int] = MAX_REQUEST_BLOCKS
