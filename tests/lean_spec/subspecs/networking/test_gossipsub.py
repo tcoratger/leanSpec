@@ -10,6 +10,7 @@ from lean_spec.subspecs.networking.config import (
 from lean_spec.subspecs.networking.gossipsub import (
     ControlMessage,
     FanoutEntry,
+    ForkMismatchError,
     GossipsubMessage,
     GossipsubParameters,
     GossipTopic,
@@ -858,3 +859,51 @@ class TestRPCProtobufEncoding:
         assert len(decoded.publish) == 1
         assert len(decoded.publish[0].data) == 100_000
         assert decoded.publish[0].data == large_data
+
+
+class TestGossipHandlerForkValidation:
+    """Test suite for GossipHandler fork compatibility validation."""
+
+    def test_decode_message_rejects_wrong_fork(self) -> None:
+        """GossipHandler.decode_message() raises ForkMismatchError for wrong fork."""
+        from lean_spec.subspecs.networking.client.event_source import GossipHandler
+
+        handler = GossipHandler(fork_digest="0x12345678")
+
+        # Topic with different fork_digest
+        wrong_fork_topic = "/leanconsensus/0xdeadbeef/block/ssz_snappy"
+
+        with pytest.raises(ForkMismatchError) as exc_info:
+            handler.decode_message(wrong_fork_topic, b"dummy_data")
+
+        assert exc_info.value.expected == "0x12345678"
+        assert exc_info.value.actual == "0xdeadbeef"
+
+    def test_get_topic_rejects_wrong_fork(self) -> None:
+        """GossipHandler.get_topic() raises ForkMismatchError for wrong fork."""
+        from lean_spec.subspecs.networking.client.event_source import GossipHandler
+
+        handler = GossipHandler(fork_digest="0x12345678")
+
+        # Topic with different fork_digest
+        wrong_fork_topic = "/leanconsensus/0xdeadbeef/attestation/ssz_snappy"
+
+        with pytest.raises(ForkMismatchError) as exc_info:
+            handler.get_topic(wrong_fork_topic)
+
+        assert exc_info.value.expected == "0x12345678"
+        assert exc_info.value.actual == "0xdeadbeef"
+
+    def test_get_topic_accepts_matching_fork(self) -> None:
+        """GossipHandler.get_topic() returns topic for matching fork."""
+        from lean_spec.subspecs.networking.client.event_source import GossipHandler
+
+        handler = GossipHandler(fork_digest="0x12345678")
+
+        # Topic with matching fork_digest
+        matching_topic = "/leanconsensus/0x12345678/block/ssz_snappy"
+
+        topic = handler.get_topic(matching_topic)
+
+        assert topic.kind == TopicKind.BLOCK
+        assert topic.fork_digest == "0x12345678"

@@ -150,3 +150,38 @@ class TestPeerInfoForkDigest:
         info = PeerInfo(peer_id=peer("test"))
         assert info.enr is None
         assert info.status is None
+
+    def test_status_can_be_set(self) -> None:
+        """Test that status can be set and read back."""
+        from lean_spec.subspecs.containers.checkpoint import Checkpoint
+        from lean_spec.subspecs.containers.slot import Slot
+        from lean_spec.subspecs.networking.reqresp import Status
+        from lean_spec.types import Bytes32
+
+        info = PeerInfo(peer_id=peer("test"))
+
+        # Create a test status
+        test_checkpoint = Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(100))
+        test_status = Status(
+            finalized=test_checkpoint,
+            head=Checkpoint(root=Bytes32(b"\x01" * 32), slot=Slot(200)),
+        )
+
+        # Set status
+        info.status = test_status
+        assert info.status is not None
+        assert info.status.finalized.slot == Slot(100)
+        assert info.status.head.slot == Slot(200)
+
+    def test_update_last_seen_updates_timestamp(self) -> None:
+        """Test that update_last_seen updates the last_seen timestamp."""
+        import time
+
+        info = PeerInfo(peer_id=peer("test"))
+        original_time = info.last_seen
+
+        # Brief delay
+        time.sleep(0.01)
+
+        info.update_last_seen()
+        assert info.last_seen > original_time
