@@ -603,3 +603,120 @@ class TestSnappyFramingEdgeCases:
         encoded = encode_request(incompressible)
         decoded = decode_request(encoded)
         assert decoded == incompressible
+
+
+class TestContextBytesValidation:
+    """Tests for context bytes (fork_digest) validation in responses.
+
+    Some req/resp protocols prepend a 4-byte fork_digest to each response
+    chunk. This allows clients to verify they're receiving data for the
+    expected fork.
+
+    Reference: Ethereum P2P Interface Spec
+        https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
+    """
+
+    def test_validate_context_bytes_success(self) -> None:
+        """Valid context bytes are validated and stripped."""
+        from lean_spec.subspecs.networking.reqresp import validate_context_bytes
+
+        fork_digest = b"\x12\x34\x56\x78"
+        payload = b"block data here"
+        data = fork_digest + payload
+
+        result = validate_context_bytes(data, fork_digest)
+        assert result == payload
+
+    def test_validate_context_bytes_mismatch(self) -> None:
+        """Mismatched context bytes raise ForkDigestMismatchError."""
+        from lean_spec.subspecs.networking.reqresp import (
+            ForkDigestMismatchError,
+            validate_context_bytes,
+        )
+
+        expected_fork = b"\x12\x34\x56\x78"
+        actual_fork = b"\xde\xad\xbe\xef"
+        payload = b"block data"
+        data = actual_fork + payload
+
+        with pytest.raises(ForkDigestMismatchError) as exc_info:
+            validate_context_bytes(data, expected_fork)
+
+        assert exc_info.value.expected == expected_fork
+        assert exc_info.value.actual == actual_fork
+
+    def test_validate_context_bytes_too_short(self) -> None:
+        """Data shorter than context bytes raises CodecError."""
+        from lean_spec.subspecs.networking.reqresp import validate_context_bytes
+
+        fork_digest = b"\x12\x34\x56\x78"
+        too_short = b"\x12\x34"  # Only 2 bytes
+
+        with pytest.raises(CodecError, match="too short"):
+            validate_context_bytes(too_short, fork_digest)
+
+    def test_validate_context_bytes_exactly_4_bytes(self) -> None:
+        """Data of exactly 4 bytes (context only, no payload) works."""
+        from lean_spec.subspecs.networking.reqresp import validate_context_bytes
+
+        fork_digest = b"\x12\x34\x56\x78"
+        data = fork_digest  # No payload, just context bytes
+
+        result = validate_context_bytes(data, fork_digest)
+        assert result == b""
+
+    def test_prepend_context_bytes(self) -> None:
+        """Context bytes are correctly prepended to payload."""
+        from lean_spec.subspecs.networking.reqresp import prepend_context_bytes
+
+        fork_digest = b"\x12\x34\x56\x78"
+        payload = b"block data"
+
+        result = prepend_context_bytes(payload, fork_digest)
+        assert result == fork_digest + payload
+        assert len(result) == len(fork_digest) + len(payload)
+
+    def test_prepend_context_bytes_wrong_length(self) -> None:
+        """Prepending context bytes with wrong length raises ValueError."""
+        from lean_spec.subspecs.networking.reqresp import prepend_context_bytes
+
+        invalid_fork = b"\x12\x34\x56"  # Only 3 bytes
+        payload = b"block data"
+
+        with pytest.raises(ValueError, match="4 bytes"):
+            prepend_context_bytes(payload, invalid_fork)
+
+    def test_context_bytes_roundtrip(self) -> None:
+        """Prepend and validate context bytes roundtrip."""
+        from lean_spec.subspecs.networking.reqresp import (
+            prepend_context_bytes,
+            validate_context_bytes,
+        )
+
+        fork_digest = b"\xab\xcd\xef\x01"
+        original_payload = b"some response data"
+
+        # Prepend context bytes (sender side)
+        with_context = prepend_context_bytes(original_payload, fork_digest)
+
+        # Validate and strip context bytes (receiver side)
+        recovered_payload = validate_context_bytes(with_context, fork_digest)
+
+        assert recovered_payload == original_payload
+
+    def test_fork_digest_mismatch_error_message(self) -> None:
+        """ForkDigestMismatchError has informative message."""
+        from lean_spec.subspecs.networking.reqresp import ForkDigestMismatchError
+
+        expected = b"\x12\x34\x56\x78"
+        actual = b"\xde\xad\xbe\xef"
+
+        error = ForkDigestMismatchError(expected, actual)
+        assert "12345678" in str(error)
+        assert "deadbeef" in str(error)
+
+    def test_context_bytes_length_constant(self) -> None:
+        """CONTEXT_BYTES_LENGTH constant is 4."""
+        from lean_spec.subspecs.networking.reqresp import CONTEXT_BYTES_LENGTH
+
+        assert CONTEXT_BYTES_LENGTH == 4
