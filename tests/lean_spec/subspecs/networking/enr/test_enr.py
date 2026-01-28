@@ -27,16 +27,6 @@ from lean_spec.types import Uint64
 # Identity scheme: "v4"
 # Compressed secp256k1 public key:
 #     03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138
-
-OFFICIAL_ENR_STRING = (
-    "enr:-IS4QHCYrYZbAKWCBRlAy5zzaDZXJBGkcnh4MHcBFZntXNFrdvJjX04jRzjz"
-    "CBOO"
-    "nrkTfj499SZuOh8R33Ls8RRcy5wBgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQ"
-    "PKY0"
-    "yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOIN1ZHCCdl8"
-)
-# Note: The ENR above has the base64 split across lines for readability,
-# we need to join it.
 OFFICIAL_ENR_STRING = (
     "enr:-IS4QHCYrYZbAKWCBRlAy5zzaDZXJBGkcnh4MHcBFZntXNFrdvJjX04jRzjz"
     "CBOOnrkTfj499SZuOh8R33Ls8RRcy5wBgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQ"
@@ -121,6 +111,43 @@ class TestOfficialEIP778Vector:
         """Official ENR has no multiaddr (no TCP port)."""
         enr = ENR.from_string(OFFICIAL_ENR_STRING)
         assert enr.multiaddr() is None
+
+    def test_official_enr_node_id(self) -> None:
+        """Official ENR node ID matches keccak256(uncompressed_pubkey).
+
+        Per EIP-778 "v4" identity scheme:
+            "To derive a node address, take the keccak256 hash of the
+             uncompressed public key."
+
+        The hash is computed over the 64-byte x||y coordinates,
+        excluding the 0x04 uncompressed point prefix.
+        """
+        from Crypto.Hash import keccak
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        enr = ENR.from_string(OFFICIAL_ENR_STRING)
+
+        # Get the compressed 33-byte secp256k1 public key
+        compressed_pubkey = enr.public_key
+        assert compressed_pubkey is not None
+        assert compressed_pubkey == OFFICIAL_SECP256K1_PUBKEY
+
+        # Uncompress to 65 bytes (0x04 || x || y)
+        public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), compressed_pubkey)
+        uncompressed = public_key.public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint,
+        )
+        assert len(uncompressed) == 65
+        assert uncompressed[0] == 0x04  # Uncompressed point prefix
+
+        # Compute keccak256 of 64-byte x||y (excluding 0x04 prefix)
+        k = keccak.new(digest_bits=256)
+        k.update(uncompressed[1:])
+        computed_node_id = k.hexdigest()
+
+        assert computed_node_id == OFFICIAL_NODE_ID
 
 
 class TestTextFormatValidation:
