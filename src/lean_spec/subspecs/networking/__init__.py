@@ -15,8 +15,8 @@ from .reqresp import (
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
     BlocksByRootRequest,
-    BlocksByRootRequestRoots,
     CodecError,
+    RequestedBlockRoots,
     ResponseCode,
     Status,
     decode_request,
@@ -52,7 +52,7 @@ __all__ = [
     "STATUS_PROTOCOL_V1",
     # ReqResp - Message types
     "BlocksByRootRequest",
-    "BlocksByRootRequestRoots",
+    "RequestedBlockRoots",
     "Status",
     # ReqResp - Codec
     "CodecError",

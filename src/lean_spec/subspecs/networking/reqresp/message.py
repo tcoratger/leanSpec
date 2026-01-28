@@ -48,8 +48,8 @@ BLOCKS_BY_ROOT_PROTOCOL_V1: ProtocolId = "/leanconsensus/req/blocks_by_root/1/ss
 """The protocol ID for the BlocksByRoot v1 request/response message."""
 
 
-class BlocksByRootRequestRoots(SSZList[Bytes32]):
-    """List of requested root hashes."""
+class RequestedBlockRoots(SSZList[Bytes32]):
+    """List of block roots requested from a peer."""
 
     LIMIT: ClassVar[int] = MAX_REQUEST_BLOCKS
 
@@ -61,5 +61,5 @@ class BlocksByRootRequest(Container):
     This is primarily used to recover recent or missing blocks from a peer.
     """
 
-    roots: BlocksByRootRequestRoots
-    """List of requested root hashes."""
+    roots: RequestedBlockRoots
+    """List of block roots requested from a peer."""

@@ -19,7 +19,7 @@ from .message import (
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
     BlocksByRootRequest,
-    BlocksByRootRequestRoots,
+    RequestedBlockRoots,
     Status,
 )
 
@@ -30,7 +30,7 @@ __all__ = [
     "REQRESP_PROTOCOL_IDS",
     # Message types
     "BlocksByRootRequest",
-    "BlocksByRootRequestRoots",
+    "RequestedBlockRoots",
     "Status",
     # Codec
     "CodecError",
