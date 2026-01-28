@@ -190,6 +190,60 @@ class TestControlMessages:
         assert not non_empty.is_empty()
 
 
+class TestTopicForkValidation:
+    """Test suite for topic fork compatibility validation."""
+
+    def test_is_fork_compatible_matching(self) -> None:
+        """Test is_fork_compatible returns True for matching fork_digest."""
+        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
+        assert topic.is_fork_compatible("0x12345678")
+
+    def test_is_fork_compatible_mismatched(self) -> None:
+        """Test is_fork_compatible returns False for mismatched fork_digest."""
+        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
+        assert not topic.is_fork_compatible("0xdeadbeef")
+
+    def test_validate_fork_success(self) -> None:
+        """Test validate_fork passes for matching fork_digest."""
+        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
+        topic.validate_fork("0x12345678")  # Should not raise
+
+    def test_validate_fork_raises_on_mismatch(self) -> None:
+        """Test validate_fork raises ForkMismatchError on mismatch."""
+        from lean_spec.subspecs.networking.gossipsub import ForkMismatchError
+
+        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
+        with pytest.raises(ForkMismatchError) as exc_info:
+            topic.validate_fork("0xdeadbeef")
+
+        assert exc_info.value.expected == "0xdeadbeef"
+        assert exc_info.value.actual == "0x12345678"
+
+    def test_from_string_validated_success(self) -> None:
+        """Test from_string_validated parses and validates successfully."""
+        topic = GossipTopic.from_string_validated(
+            "/leanconsensus/0x12345678/block/ssz_snappy",
+            expected_fork_digest="0x12345678",
+        )
+        assert topic.kind == TopicKind.BLOCK
+        assert topic.fork_digest == "0x12345678"
+
+    def test_from_string_validated_raises_on_mismatch(self) -> None:
+        """Test from_string_validated raises ForkMismatchError on mismatch."""
+        from lean_spec.subspecs.networking.gossipsub import ForkMismatchError
+
+        with pytest.raises(ForkMismatchError):
+            GossipTopic.from_string_validated(
+                "/leanconsensus/0x12345678/block/ssz_snappy",
+                expected_fork_digest="0xdeadbeef",
+            )
+
+    def test_from_string_validated_raises_on_invalid_topic(self) -> None:
+        """Test from_string_validated raises ValueError for invalid topics."""
+        with pytest.raises(ValueError, match="expected 4 parts"):
+            GossipTopic.from_string_validated("/invalid/topic", "0x12345678")
+
+
 class TestTopicFormatting:
     """Test suite for topic string formatting and parsing."""
 

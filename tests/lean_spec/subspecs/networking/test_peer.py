@@ -1,8 +1,13 @@
 """Tests for minimal peer module."""
 
+from typing import TYPE_CHECKING
+
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import Direction, PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState, GoodbyeReason
+
+if TYPE_CHECKING:
+    from lean_spec.subspecs.networking.enr import ENR
 
 
 def peer(name: str) -> PeerId:
@@ -92,3 +97,56 @@ class TestPeerInfo:
 
         info.update_last_seen()
         assert info.last_seen > original_time
+
+
+class TestPeerInfoForkDigest:
+    """Tests for PeerInfo fork_digest property."""
+
+    def _make_enr_with_eth2(self, fork_digest_bytes: bytes) -> "ENR":
+        """Create a minimal ENR with eth2 data for testing."""
+        from lean_spec.subspecs.networking.enr import ENR
+        from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
+        from lean_spec.types import Uint64
+
+        # Create eth2 bytes: fork_digest(4) + next_fork_version(4) + next_fork_epoch(8)
+        eth2_bytes = (
+            fork_digest_bytes + fork_digest_bytes + int(FAR_FUTURE_EPOCH).to_bytes(8, "little")
+        )
+        return ENR(
+            signature=b"\x00" * 64,
+            seq=Uint64(1),
+            pairs={"eth2": eth2_bytes, "id": b"v4"},
+        )
+
+    def test_fork_digest_none_without_enr(self) -> None:
+        """fork_digest returns None when no ENR is set."""
+        info = PeerInfo(peer_id=peer("test"))
+        assert info.fork_digest is None
+
+    def test_fork_digest_none_without_eth2(self) -> None:
+        """fork_digest returns None when ENR has no eth2 data."""
+        from lean_spec.subspecs.networking.enr import ENR
+        from lean_spec.types import Uint64
+
+        # ENR without eth2 key
+        enr = ENR(
+            signature=b"\x00" * 64,
+            seq=Uint64(1),
+            pairs={"id": b"v4"},
+        )
+        info = PeerInfo(peer_id=peer("test"), enr=enr)
+        assert info.fork_digest is None
+
+    def test_fork_digest_returns_bytes(self) -> None:
+        """fork_digest returns 4-byte fork_digest from ENR eth2 data."""
+        fork_bytes = b"\x12\x34\x56\x78"
+        enr = self._make_enr_with_eth2(fork_bytes)
+        info = PeerInfo(peer_id=peer("test"), enr=enr)
+
+        assert info.fork_digest == fork_bytes
+
+    def test_enr_and_status_fields(self) -> None:
+        """Test that enr and status fields exist and default to None."""
+        info = PeerInfo(peer_id=peer("test"))
+        assert info.enr is None
+        assert info.status is None
