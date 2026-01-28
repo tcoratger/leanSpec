@@ -241,14 +241,6 @@ class ResponseCode(IntEnum):
         Wire format::
 
             [response_code: 1 byte][varint: uncompressed_length][snappy_framed_payload]
-
-        Example::
-
-            >>> # Success response with data
-            >>> wire = ResponseCode.SUCCESS.encode(block.to_ssz())
-            >>>
-            >>> # Error response with message
-            >>> wire = ResponseCode.RESOURCE_UNAVAILABLE.encode(b"Block not found")
         """
         # Step 1: Validate payload size.
         if len(ssz_data) > MAX_PAYLOAD_SIZE:
