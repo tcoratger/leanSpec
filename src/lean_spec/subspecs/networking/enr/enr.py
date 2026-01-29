@@ -57,7 +57,7 @@ from typing import ClassVar
 from typing_extensions import Self
 
 from lean_spec.subspecs.networking.types import Multiaddr, NodeId, SeqNumber
-from lean_spec.types import RLPDecodingError, StrictBaseModel, Uint64
+from lean_spec.types import Bytes33, Bytes64, RLPDecodingError, StrictBaseModel, Uint64
 from lean_spec.types.rlp import decode_list as rlp_decode_list
 
 from . import keys
@@ -94,7 +94,7 @@ class ENR(StrictBaseModel):
     SCHEME: ClassVar[str] = "v4"
     """Supported identity scheme."""
 
-    signature: bytes
+    signature: Bytes64
     """64-byte secp256k1 signature (r || s concatenated, no recovery id)."""
 
     seq: SeqNumber
@@ -121,9 +121,10 @@ class ENR(StrictBaseModel):
         return id_bytes.decode("utf-8") if id_bytes else None
 
     @property
-    def public_key(self) -> bytes | None:
+    def public_key(self) -> Bytes33 | None:
         """Get compressed secp256k1 public key (33 bytes)."""
-        return self.get(keys.SECP256K1)
+        raw = self.get(keys.SECP256K1)
+        return Bytes33(raw) if raw is not None and len(raw) == 33 else None
 
     @property
     def ip4(self) -> str | None:
@@ -194,15 +195,10 @@ class ENR(StrictBaseModel):
 
         A valid ENR has:
         - Identity scheme "v4"
-        - 33-byte compressed secp256k1 public key
-        - 64-byte signature
+        - 33-byte compressed secp256k1 public key (Bytes33)
+        - 64-byte signature (Bytes64, enforced by type)
         """
-        return (
-            self.identity_scheme == self.SCHEME
-            and self.public_key is not None
-            and len(self.public_key) == 33
-            and len(self.signature) == 64
-        )
+        return self.identity_scheme == self.SCHEME and self.public_key is not None
 
     def is_compatible_with(self, other: "ENR") -> bool:
         """Check fork compatibility via eth2 fork digest."""
@@ -274,7 +270,11 @@ class ENR(StrictBaseModel):
         if len(items) % 2 != 0:
             raise ValueError("ENR key/value pairs must be even")
 
-        signature = items[0]
+        signature_raw = items[0]
+        if len(signature_raw) != 64:
+            raise ValueError(f"ENR signature must be 64 bytes, got {len(signature_raw)}")
+        signature = Bytes64(signature_raw)
+
         seq_bytes = items[1]
         seq = int.from_bytes(seq_bytes, "big") if seq_bytes else 0
 

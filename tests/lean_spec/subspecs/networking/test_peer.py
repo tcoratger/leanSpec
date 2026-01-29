@@ -106,14 +106,14 @@ class TestPeerInfoForkDigest:
         """Create a minimal ENR with eth2 data for testing."""
         from lean_spec.subspecs.networking.enr import ENR
         from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
-        from lean_spec.types import Uint64
+        from lean_spec.types import Bytes64, Uint64
 
         # Create eth2 bytes: fork_digest(4) + next_fork_version(4) + next_fork_epoch(8)
         eth2_bytes = (
             fork_digest_bytes + fork_digest_bytes + int(FAR_FUTURE_EPOCH).to_bytes(8, "little")
         )
         return ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={"eth2": eth2_bytes, "id": b"v4"},
         )
@@ -126,11 +126,11 @@ class TestPeerInfoForkDigest:
     def test_fork_digest_none_without_eth2(self) -> None:
         """fork_digest returns None when ENR has no eth2 data."""
         from lean_spec.subspecs.networking.enr import ENR
-        from lean_spec.types import Uint64
+        from lean_spec.types import Bytes64, Uint64
 
         # ENR without eth2 key
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={"id": b"v4"},
         )
