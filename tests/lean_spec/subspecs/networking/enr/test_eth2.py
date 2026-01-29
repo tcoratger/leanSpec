@@ -9,6 +9,7 @@ from lean_spec.subspecs.networking.enr.eth2 import (
     AttestationSubnets,
     SyncCommitteeSubnets,
 )
+from lean_spec.subspecs.networking.enr.eth2 import AttestationSubnets, SyncCommitteeSubnets
 from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import Bytes4
 
@@ -35,6 +36,11 @@ class TestEth2Data:
         assert data.fork_digest == digest
         assert data.next_fork_version == version
         assert data.next_fork_epoch == FAR_FUTURE_EPOCH
+        data = Eth2Data.no_scheduled_fork(digest)
+
+        assert data.fork_digest == digest
+        assert data.next_fork_version == digest
+        assert data.next_fork_epoch == Uint64(2**64 - 1)
 
     def test_eth2_data_immutable(self) -> None:
         """Eth2Data is immutable (frozen)."""
@@ -90,6 +96,10 @@ class TestAttestationSubnets:
             AttestationSubnets.from_subnet_ids([64])
 
         with pytest.raises(ValueError, match="must be 0-63"):
+        with pytest.raises(ValueError):
+            AttestationSubnets.from_subnet_ids([64])
+
+        with pytest.raises(ValueError):
             AttestationSubnets.from_subnet_ids([-1])
 
     def test_invalid_subnet_id_in_is_subscribed(self) -> None:
@@ -134,6 +144,12 @@ class TestAttestationSubnets:
     def test_length_constant(self) -> None:
         """LENGTH constant is 64."""
         assert AttestationSubnets.LENGTH == 64
+
+        with pytest.raises(ValueError):
+            subnets.is_subscribed(64)
+
+        with pytest.raises(ValueError):
+            subnets.is_subscribed(-1)
 
 
 class TestSyncCommitteeSubnets:
