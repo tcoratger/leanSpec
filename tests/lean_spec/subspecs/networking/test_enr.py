@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from lean_spec.subspecs.networking.enr import ENR, Eth2Data, keys
 from lean_spec.subspecs.networking.enr.eth2 import AttestationSubnets
-from lean_spec.types import Uint64
+from lean_spec.types import Bytes64, Uint64
 from lean_spec.types.byte_arrays import Bytes4
 
 
@@ -122,7 +122,7 @@ class TestENR:
     def test_create_minimal_enr(self) -> None:
         """ENR can be created with minimal valid data."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -135,7 +135,7 @@ class TestENR:
     def test_enr_ip4_property(self) -> None:
         """ip4 property formats IPv4 address."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -148,7 +148,7 @@ class TestENR:
     def test_enr_tcp_port_property(self) -> None:
         """tcp_port property extracts port number."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -161,7 +161,7 @@ class TestENR:
     def test_enr_multiaddr_construction(self) -> None:
         """multiaddr() constructs valid multiaddress."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -175,7 +175,7 @@ class TestENR:
     def test_enr_has_key(self) -> None:
         """has() correctly checks key presence."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -190,7 +190,7 @@ class TestENR:
     def test_enr_get_key(self) -> None:
         """get() retrieves values by key."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -202,7 +202,7 @@ class TestENR:
     def test_enr_is_valid_basic(self) -> None:
         """is_valid() checks basic structure."""
         valid_enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -213,7 +213,7 @@ class TestENR:
 
         # Missing public key
         invalid_enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -226,7 +226,7 @@ class TestENR:
         eth2_bytes = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8
 
         enr1 = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
@@ -236,7 +236,7 @@ class TestENR:
         )
 
         enr2 = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(2),
             pairs={
                 "id": b"v4",
@@ -250,7 +250,7 @@ class TestENR:
     def test_enr_string_representation(self) -> None:
         """ENR has readable string representation."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(42),
             pairs={
                 "id": b"v4",

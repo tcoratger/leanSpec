@@ -13,7 +13,7 @@ import pytest
 
 from lean_spec.subspecs.networking.enr import ENR, keys
 from lean_spec.subspecs.networking.enr.enr import ENR_PREFIX
-from lean_spec.types import Uint64
+from lean_spec.types import Bytes64, Uint64
 
 # =============================================================================
 # Official EIP-778 Test Vector
@@ -275,7 +275,7 @@ class TestPropertyAccessors:
     def test_identity_scheme_returns_v4(self) -> None:
         """identity_scheme property returns 'v4' for valid ENR."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
         )
@@ -284,7 +284,7 @@ class TestPropertyAccessors:
     def test_identity_scheme_returns_none_when_missing(self) -> None:
         """identity_scheme returns None when 'id' key is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.SECP256K1: b"\x02" + b"\x00" * 32},
         )
@@ -294,7 +294,7 @@ class TestPropertyAccessors:
         """public_key returns 33-byte compressed secp256k1 key."""
         expected_key = b"\x03" + b"\xab" * 32
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.SECP256K1: expected_key},
         )
@@ -306,7 +306,7 @@ class TestPropertyAccessors:
     def test_public_key_returns_none_when_missing(self) -> None:
         """public_key returns None when secp256k1 key is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -315,7 +315,7 @@ class TestPropertyAccessors:
     def test_ip4_formats_address_correctly(self) -> None:
         """ip4 property formats IPv4 address as dotted string."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
@@ -335,7 +335,7 @@ class TestPropertyAccessors:
         ]
         for ip_bytes, expected in test_cases:
             enr = ENR(
-                signature=b"\x00" * 64,
+                signature=Bytes64(b"\x00" * 64),
                 seq=Uint64(1),
                 pairs={keys.ID: b"v4", keys.IP: ip_bytes},
             )
@@ -344,7 +344,7 @@ class TestPropertyAccessors:
     def test_ip4_returns_none_when_missing(self) -> None:
         """ip4 returns None when 'ip' key is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -353,7 +353,7 @@ class TestPropertyAccessors:
     def test_ip4_returns_none_for_wrong_length(self) -> None:
         """ip4 returns None when IP bytes are not 4 bytes."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.IP: b"\x7f\x00\x00"},  # Only 3 bytes
         )
@@ -364,7 +364,7 @@ class TestPropertyAccessors:
         # ::1 (loopback)
         ipv6_bytes = b"\x00" * 15 + b"\x01"
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.IP6: ipv6_bytes},
         )
@@ -373,7 +373,7 @@ class TestPropertyAccessors:
     def test_ip6_returns_none_when_missing(self) -> None:
         """ip6 returns None when 'ip6' key is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -382,7 +382,7 @@ class TestPropertyAccessors:
     def test_ip6_returns_none_for_wrong_length(self) -> None:
         """ip6 returns None when IP bytes are not 16 bytes."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.IP6: b"\x00" * 8},  # Only 8 bytes
         )
@@ -391,7 +391,7 @@ class TestPropertyAccessors:
     def test_udp_port_extracts_correctly(self) -> None:
         """udp_port extracts port number from big-endian bytes."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.UDP: (30303).to_bytes(2, "big")},
         )
@@ -407,7 +407,7 @@ class TestPropertyAccessors:
         ]
         for port_bytes, expected in test_cases:
             enr = ENR(
-                signature=b"\x00" * 64,
+                signature=Bytes64(b"\x00" * 64),
                 seq=Uint64(1),
                 pairs={keys.ID: b"v4", keys.UDP: port_bytes},
             )
@@ -416,7 +416,7 @@ class TestPropertyAccessors:
     def test_udp_port_returns_none_when_missing(self) -> None:
         """udp_port returns None when 'udp' key is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -425,7 +425,7 @@ class TestPropertyAccessors:
     def test_tcp_port_extracts_correctly(self) -> None:
         """tcp_port extracts port number from big-endian bytes."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.TCP: (9000).to_bytes(2, "big")},
         )
@@ -434,7 +434,7 @@ class TestPropertyAccessors:
     def test_tcp_port_returns_none_when_missing(self) -> None:
         """tcp_port returns None when 'tcp' key is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -447,7 +447,7 @@ class TestValidationMethods:
     def test_is_valid_returns_true_for_complete_v4_enr(self) -> None:
         """is_valid() returns True for complete v4 ENR."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
         )
@@ -456,7 +456,7 @@ class TestValidationMethods:
     def test_is_valid_returns_false_for_missing_public_key(self) -> None:
         """is_valid() returns False when secp256k1 key is missing."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -465,7 +465,7 @@ class TestValidationMethods:
     def test_is_valid_returns_false_for_wrong_identity_scheme(self) -> None:
         """is_valid() returns False for non-v4 identity scheme."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v5", keys.SECP256K1: b"\x02" + b"\x00" * 32},
         )
@@ -474,7 +474,7 @@ class TestValidationMethods:
     def test_is_valid_returns_false_for_missing_identity_scheme(self) -> None:
         """is_valid() returns False when 'id' key is missing."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.SECP256K1: b"\x02" + b"\x00" * 32},
         )
@@ -484,7 +484,7 @@ class TestValidationMethods:
         """is_valid() returns False for public key != 33 bytes."""
         # 32 bytes (uncompressed prefix missing)
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.SECP256K1: b"\x00" * 32},
         )
@@ -492,20 +492,25 @@ class TestValidationMethods:
 
         # 65 bytes (uncompressed format)
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.SECP256K1: b"\x04" + b"\x00" * 64},
         )
         assert not enr.is_valid()
 
-    def test_is_valid_returns_false_for_wrong_signature_length(self) -> None:
-        """is_valid() returns False for signature != 64 bytes."""
-        enr = ENR(
-            signature=b"\x00" * 63,  # 63 bytes
-            seq=Uint64(1),
-            pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
-        )
-        assert not enr.is_valid()
+    def test_construction_fails_for_wrong_signature_length(self) -> None:
+        """ENR construction fails when signature is not exactly 64 bytes."""
+        import pytest
+
+        from lean_spec.types import SSZValueError
+
+        # 63 bytes should fail - Bytes64 enforces exactly 64 bytes
+        with pytest.raises(SSZValueError, match="requires exactly 64 bytes"):
+            ENR(
+                signature=Bytes64(b"\x00" * 63),
+                seq=Uint64(1),
+                pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
+            )
 
 
 class TestMultiaddrGeneration:
@@ -514,7 +519,7 @@ class TestMultiaddrGeneration:
     def test_multiaddr_with_ipv4_and_tcp(self) -> None:
         """multiaddr() generates correct format with IPv4 and TCP."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
@@ -528,7 +533,7 @@ class TestMultiaddrGeneration:
         """multiaddr() generates correct format with IPv6 and TCP."""
         ipv6_bytes = b"\x00" * 15 + b"\x01"  # ::1
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
@@ -541,7 +546,7 @@ class TestMultiaddrGeneration:
     def test_multiaddr_returns_none_without_tcp(self) -> None:
         """multiaddr() returns None when TCP port is absent."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
@@ -554,7 +559,7 @@ class TestMultiaddrGeneration:
     def test_multiaddr_returns_none_without_ip(self) -> None:
         """multiaddr() returns None when no IP address is present."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.TCP: (9000).to_bytes(2, "big")},
         )
@@ -563,7 +568,7 @@ class TestMultiaddrGeneration:
     def test_multiaddr_prefers_ipv4_over_ipv6(self) -> None:
         """multiaddr() uses IPv4 when both IPv4 and IPv6 are present."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
@@ -581,7 +586,7 @@ class TestStringRepresentation:
     def test_str_includes_seq(self) -> None:
         """__str__() includes sequence number."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(42),
             pairs={keys.ID: b"v4"},
         )
@@ -591,7 +596,7 @@ class TestStringRepresentation:
     def test_str_includes_ip(self) -> None:
         """__str__() includes IP address when present."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.IP: b"\xc0\xa8\x01\x01"},
         )
@@ -601,7 +606,7 @@ class TestStringRepresentation:
     def test_str_includes_tcp_port(self) -> None:
         """__str__() includes TCP port when present."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.TCP: (9000).to_bytes(2, "big")},
         )
@@ -611,7 +616,7 @@ class TestStringRepresentation:
     def test_str_includes_udp_port(self) -> None:
         """__str__() includes UDP port when present."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.UDP: (30303).to_bytes(2, "big")},
         )
@@ -621,7 +626,7 @@ class TestStringRepresentation:
     def test_str_minimal_enr(self) -> None:
         """__str__() works for minimal ENR."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={},
         )
@@ -637,7 +642,7 @@ class TestKeyAccessMethods:
     def test_get_existing_key(self) -> None:
         """get() returns value for existing key."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -646,7 +651,7 @@ class TestKeyAccessMethods:
     def test_get_missing_key(self) -> None:
         """get() returns None for missing key."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )
@@ -655,7 +660,7 @@ class TestKeyAccessMethods:
     def test_has_existing_key(self) -> None:
         """has() returns True for existing key."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4", keys.IP: b"\x7f\x00\x00\x01"},
         )
@@ -665,7 +670,7 @@ class TestKeyAccessMethods:
     def test_has_missing_key(self) -> None:
         """has() returns False for missing key."""
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={keys.ID: b"v4"},
         )

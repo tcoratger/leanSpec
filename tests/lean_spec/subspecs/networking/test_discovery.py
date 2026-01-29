@@ -702,6 +702,7 @@ class TestRoutingTableForkFiltering:
         """Create a minimal ENR with eth2 data for testing."""
         from lean_spec.subspecs.networking.enr import ENR
         from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
+        from lean_spec.types import Bytes64
         from lean_spec.types.byte_arrays import Bytes4
 
         # Create eth2 bytes: fork_digest(4) + next_fork_version(4) + next_fork_epoch(8)
@@ -710,7 +711,7 @@ class TestRoutingTableForkFiltering:
             bytes(fork_digest) + bytes(fork_digest) + int(FAR_FUTURE_EPOCH).to_bytes(8, "little")
         )
         enr = ENR(
-            signature=b"\x00" * 64,
+            signature=Bytes64(b"\x00" * 64),
             seq=SeqNumber(1),
             pairs={"eth2": eth2_bytes, "id": b"v4"},
         )
