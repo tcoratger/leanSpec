@@ -161,12 +161,7 @@ class TestIsEnrString:
 
 
 class TestResolveBootnode:
-    """Tests for resolve_bootnode() resolution function.
-
-    Note: Tests use fake ENRs with zero signatures.
-    We mock verify_signature to return True since these tests
-    focus on resolution logic, not signature verification.
-    """
+    """Tests for resolve_bootnode() resolution function."""
 
     def test_resolve_multiaddr_unchanged(self) -> None:
         """Multiaddr strings are returned unchanged."""
