@@ -29,7 +29,7 @@ from lean_spec.types import Bytes64, Uint64
 #     03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138
 OFFICIAL_ENR_STRING = (
     "enr:-IS4QHCYrYZbAKWCBRlAy5zzaDZXJBGkcnh4MHcBFZntXNFrdvJjX04jRzjz"
-    "CBOOnrkTfj499SZuOh8R33Ls8RRcy5wBgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQ"
+    "CBOonrkTfj499SZuOh8R33Ls8RRcy5wBgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQ"
     "PKY0yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOIN1ZHCCdl8"
 )
 
@@ -43,7 +43,7 @@ OFFICIAL_SECP256K1_PUBKEY = bytes.fromhex(
 )
 OFFICIAL_SIGNATURE = bytes.fromhex(
     "7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b"
-    "76f2635f4e234738f308138e9eb9137e3e3df5266e3a1f11df72ecf1145ccb9c"
+    "76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c"
 )
 
 
@@ -203,10 +203,10 @@ class TestRLPStructureValidation:
         # Create RLP for just signature (missing seq)
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
         # RLP list with only signature
-        rlp_data = encode([b"\x00" * 64])
+        rlp_data = encode_rlp([b"\x00" * 64])
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         with pytest.raises(ValueError, match=r"at least signature and seq"):
@@ -216,10 +216,10 @@ class TestRLPStructureValidation:
         """ENR key/value pairs must be even count."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
         # [signature, seq, key1] - odd number after signature/seq
-        rlp_data = encode([b"\x00" * 64, b"\x01", b"id"])
+        rlp_data = encode_rlp([b"\x00" * 64, b"\x01", b"id"])
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         with pytest.raises(ValueError, match=r"key/value pairs must be even"):
@@ -249,10 +249,10 @@ class TestRLPStructureValidation:
         """Minimal valid ENR with only required fields parses."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
         # [signature(64), seq(1), "id", "v4", "secp256k1", pubkey(33)]
-        rlp_data = encode(
+        rlp_data = encode_rlp(
             [
                 b"\x00" * 64,  # signature
                 b"\x01",  # seq = 1
@@ -686,9 +686,9 @@ class TestEdgeCases:
         """ENR with minimum required fields is valid."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
-        rlp_data = encode(
+        rlp_data = encode_rlp(
             [
                 b"\x00" * 64,  # signature
                 b"\x01",  # seq
@@ -710,10 +710,10 @@ class TestEdgeCases:
         """ENR with IPv6 but no IPv4 parses correctly."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
         ipv6_bytes = bytes.fromhex("20010db8000000000000000000000001")  # 2001:db8::1
-        rlp_data = encode(
+        rlp_data = encode_rlp(
             [
                 b"\x00" * 64,
                 b"\x01",
@@ -742,9 +742,9 @@ class TestEdgeCases:
         """ENR with both TCP and UDP ports parses correctly."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
-        rlp_data = encode(
+        rlp_data = encode_rlp(
             [
                 b"\x00" * 64,
                 b"\x01",
@@ -771,9 +771,9 @@ class TestEdgeCases:
         """ENR with sequence number 0 is valid."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
-        rlp_data = encode(
+        rlp_data = encode_rlp(
             [
                 b"\x00" * 64,
                 b"",  # Empty bytes = 0
@@ -792,10 +792,10 @@ class TestEdgeCases:
         """ENR with large sequence number parses correctly."""
         import base64
 
-        from lean_spec.types.rlp import encode
+        from lean_spec.types.rlp import encode_rlp
 
         large_seq = (2**32).to_bytes(5, "big")
-        rlp_data = encode(
+        rlp_data = encode_rlp(
             [
                 b"\x00" * 64,
                 large_seq,
@@ -825,3 +825,654 @@ class TestENRConstants:
     def test_prefix_constant(self) -> None:
         """ENR_PREFIX is 'enr:' for text encoding."""
         assert ENR_PREFIX == "enr:"
+
+
+class TestEth2DataProperty:
+    """Tests for eth2_data property parsing."""
+
+    def test_eth2_data_parses_from_enr(self) -> None:
+        """eth2_data property parses 16-byte eth2 key."""
+        from lean_spec.types.byte_arrays import Bytes4
+
+        # 4 bytes fork_digest + 4 bytes next_fork_version + 8 bytes next_fork_epoch
+        eth2_bytes = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00\x00\x00\x00\x00\x00\x00\x01"
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes},
+        )
+
+        eth2 = enr.eth2_data
+        assert eth2 is not None
+        assert eth2.fork_digest == Bytes4(b"\x12\x34\x56\x78")
+        assert eth2.next_fork_version == Bytes4(b"\x02\x00\x00\x00")
+        # Epoch is little-endian
+        assert eth2.next_fork_epoch == Uint64(1 << 56)
+
+    def test_eth2_data_returns_none_when_missing(self) -> None:
+        """eth2_data returns None when eth2 key is absent."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+        assert enr.eth2_data is None
+
+    def test_eth2_data_returns_none_for_short_data(self) -> None:
+        """eth2_data returns None when eth2 key is too short."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ETH2: b"\x12\x34\x56\x78"},  # Only 4 bytes
+        )
+        assert enr.eth2_data is None
+
+
+class TestAttestationSubnetsProperty:
+    """Tests for attestation_subnets property parsing."""
+
+    def test_attestation_subnets_parses_from_enr(self) -> None:
+        """attestation_subnets property parses 8-byte attnets key."""
+        # All bits set (64 bits = 8 bytes of 0xFF)
+        attnets_bytes = b"\xff" * 8
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ATTNETS: attnets_bytes},
+        )
+
+        attnets = enr.attestation_subnets
+        assert attnets is not None
+        assert attnets.subscription_count() == 64
+
+    def test_attestation_subnets_returns_none_when_missing(self) -> None:
+        """attestation_subnets returns None when attnets key is absent."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+        assert enr.attestation_subnets is None
+
+    def test_attestation_subnets_returns_none_for_wrong_length(self) -> None:
+        """attestation_subnets returns None when attnets key is not 8 bytes."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ATTNETS: b"\xff\xff\xff\xff"},  # Only 4 bytes
+        )
+        assert enr.attestation_subnets is None
+
+
+class TestSyncCommitteeSubnetsProperty:
+    """Tests for sync_committee_subnets property parsing."""
+
+    def test_sync_committee_subnets_parses_from_enr(self) -> None:
+        """sync_committee_subnets property parses 1-byte syncnets key."""
+        # All 4 bits set (lower nibble of 0x0F)
+        syncnets_bytes = b"\x0f"
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.SYNCNETS: syncnets_bytes},
+        )
+
+        syncnets = enr.sync_committee_subnets
+        assert syncnets is not None
+        for i in range(4):
+            assert syncnets.is_subscribed(i)
+
+    def test_sync_committee_subnets_returns_none_when_missing(self) -> None:
+        """sync_committee_subnets returns None when syncnets key is absent."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+        assert enr.sync_committee_subnets is None
+
+    def test_sync_committee_subnets_returns_none_for_wrong_length(self) -> None:
+        """sync_committee_subnets returns None when syncnets key is not 1 byte."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.SYNCNETS: b"\x0f\x00"},  # 2 bytes
+        )
+        assert enr.sync_committee_subnets is None
+
+
+class TestForkCompatibility:
+    """Tests for is_compatible_with() method."""
+
+    def test_compatible_with_same_fork_digest(self) -> None:
+        """ENRs with same fork digest are compatible."""
+        eth2_bytes = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8
+
+        enr1 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes},
+        )
+        enr2 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(2),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes},
+        )
+
+        assert enr1.is_compatible_with(enr2)
+
+    def test_incompatible_with_different_fork_digest(self) -> None:
+        """ENRs with different fork digests are incompatible."""
+        eth2_bytes1 = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8
+        eth2_bytes2 = b"\xab\xcd\xef\x01" + b"\x02\x00\x00\x00" + b"\x00" * 8
+
+        enr1 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes1},
+        )
+        enr2 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(2),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes2},
+        )
+
+        assert not enr1.is_compatible_with(enr2)
+
+    def test_incompatible_when_self_missing_eth2(self) -> None:
+        """ENR is incompatible when self lacks eth2 key."""
+        eth2_bytes = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8
+
+        enr1 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},  # No eth2
+        )
+        enr2 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(2),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes},
+        )
+
+        assert not enr1.is_compatible_with(enr2)
+
+    def test_incompatible_when_other_missing_eth2(self) -> None:
+        """ENR is incompatible when other lacks eth2 key."""
+        eth2_bytes = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8
+
+        enr1 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.ETH2: eth2_bytes},
+        )
+        enr2 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(2),
+            pairs={keys.ID: b"v4"},  # No eth2
+        )
+
+        assert not enr1.is_compatible_with(enr2)
+
+    def test_incompatible_when_both_missing_eth2(self) -> None:
+        """ENRs are incompatible when both lack eth2 key."""
+        enr1 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+        enr2 = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(2),
+            pairs={keys.ID: b"v4"},
+        )
+
+        assert not enr1.is_compatible_with(enr2)
+
+
+class TestMaxSizeEnforcement:
+    """Tests for MAX_SIZE (300 bytes) enforcement."""
+
+    def test_enr_exactly_300_bytes_succeeds(self) -> None:
+        """ENR with exactly 300 bytes RLP parses successfully."""
+        import base64
+
+        from lean_spec.types.rlp import encode_rlp
+
+        # Build an ENR that is exactly 300 bytes
+        # Start with minimal structure and add padding in a value
+        signature = b"\x00" * 64
+        seq = b"\x01"
+        # Calculate how much padding we need in value
+        # RLP overhead: ~4 bytes header + items
+        # We need to carefully construct this
+
+        # Start with basic structure and measure
+        basic = encode_rlp([signature, seq, b"id", b"v4", b"secp256k1", b"\x02" + b"\x00" * 32])
+        padding_needed = 300 - len(basic)
+
+        # Add padding via a custom key with enough value bytes
+        # The key "z" + value needs to fit in remaining space
+        # Account for RLP overhead (key length byte + value length bytes)
+        if padding_needed > 3:
+            value_len = padding_needed - 3  # Approximate, may need adjustment
+            padded = encode_rlp(
+                [
+                    signature,
+                    seq,
+                    b"id",
+                    b"v4",
+                    b"secp256k1",
+                    b"\x02" + b"\x00" * 32,
+                    b"zz",
+                    b"\x00" * value_len,
+                ]
+            )
+            # Adjust if needed
+            while len(padded) < 300:
+                value_len += 1
+                padded = encode_rlp(
+                    [
+                        signature,
+                        seq,
+                        b"id",
+                        b"v4",
+                        b"secp256k1",
+                        b"\x02" + b"\x00" * 32,
+                        b"zz",
+                        b"\x00" * value_len,
+                    ]
+                )
+            while len(padded) > 300:
+                value_len -= 1
+                padded = encode_rlp(
+                    [
+                        signature,
+                        seq,
+                        b"id",
+                        b"v4",
+                        b"secp256k1",
+                        b"\x02" + b"\x00" * 32,
+                        b"zz",
+                        b"\x00" * value_len,
+                    ]
+                )
+
+            assert len(padded) == 300
+            b64 = base64.urlsafe_b64encode(padded).decode().rstrip("=")
+            enr = ENR.from_string(f"enr:{b64}")
+            assert enr is not None
+
+    def test_enr_301_bytes_rejected(self) -> None:
+        """ENR with 301 bytes RLP is rejected."""
+        import base64
+
+        from lean_spec.types.rlp import encode_rlp
+
+        # Build an ENR that is exactly 301 bytes
+        signature = b"\x00" * 64
+        seq = b"\x01"
+
+        basic = encode_rlp([signature, seq, b"id", b"v4", b"secp256k1", b"\x02" + b"\x00" * 32])
+        padding_needed = 301 - len(basic)
+
+        if padding_needed > 3:
+            value_len = padding_needed - 3
+            padded = encode_rlp(
+                [
+                    signature,
+                    seq,
+                    b"id",
+                    b"v4",
+                    b"secp256k1",
+                    b"\x02" + b"\x00" * 32,
+                    b"zz",
+                    b"\x00" * value_len,
+                ]
+            )
+            while len(padded) < 301:
+                value_len += 1
+                padded = encode_rlp(
+                    [
+                        signature,
+                        seq,
+                        b"id",
+                        b"v4",
+                        b"secp256k1",
+                        b"\x02" + b"\x00" * 32,
+                        b"zz",
+                        b"\x00" * value_len,
+                    ]
+                )
+            while len(padded) > 301:
+                value_len -= 1
+                padded = encode_rlp(
+                    [
+                        signature,
+                        seq,
+                        b"id",
+                        b"v4",
+                        b"secp256k1",
+                        b"\x02" + b"\x00" * 32,
+                        b"zz",
+                        b"\x00" * value_len,
+                    ]
+                )
+
+            assert len(padded) == 301
+            b64 = base64.urlsafe_b64encode(padded).decode().rstrip("=")
+
+            with pytest.raises(ValueError, match="exceeds max size"):
+                ENR.from_string(f"enr:{b64}")
+
+
+class TestKeyOrderingEnforcement:
+    """Tests for lexicographic key ordering enforcement."""
+
+    def test_sorted_keys_accepted(self) -> None:
+        """ENR with lexicographically sorted keys parses successfully."""
+        import base64
+
+        from lean_spec.types.rlp import encode_rlp
+
+        # Keys in sorted order: id, ip, secp256k1
+        rlp = encode_rlp(
+            [
+                b"\x00" * 64,  # signature
+                b"\x01",  # seq
+                b"id",
+                b"v4",
+                b"ip",
+                b"\x7f\x00\x00\x01",
+                b"secp256k1",
+                b"\x02" + b"\x00" * 32,
+            ]
+        )
+        b64 = base64.urlsafe_b64encode(rlp).decode().rstrip("=")
+        enr = ENR.from_string(f"enr:{b64}")
+        assert enr is not None
+
+    def test_unsorted_keys_rejected(self) -> None:
+        """ENR with unsorted keys is rejected."""
+        import base64
+
+        from lean_spec.types.rlp import encode_rlp
+
+        # Keys out of order: secp256k1 before id
+        rlp = encode_rlp(
+            [
+                b"\x00" * 64,  # signature
+                b"\x01",  # seq
+                b"secp256k1",  # Should be after "id"
+                b"\x02" + b"\x00" * 32,
+                b"id",
+                b"v4",
+            ]
+        )
+        b64 = base64.urlsafe_b64encode(rlp).decode().rstrip("=")
+
+        with pytest.raises(ValueError, match="lexicographically sorted"):
+            ENR.from_string(f"enr:{b64}")
+
+    def test_duplicate_keys_rejected(self) -> None:
+        """ENR with duplicate keys is rejected."""
+        import base64
+
+        from lean_spec.types.rlp import encode_rlp
+
+        # Duplicate "id" key
+        rlp = encode_rlp(
+            [
+                b"\x00" * 64,  # signature
+                b"\x01",  # seq
+                b"id",
+                b"v4",
+                b"id",  # Duplicate!
+                b"v5",
+            ]
+        )
+        b64 = base64.urlsafe_b64encode(rlp).decode().rstrip("=")
+
+        with pytest.raises(ValueError, match="lexicographically sorted"):
+            ENR.from_string(f"enr:{b64}")
+
+
+class TestRoundTripSerialization:
+    """Tests for ENR round-trip serialization."""
+
+    def test_roundtrip_official_enr(self) -> None:
+        """Official ENR round-trips through parse and serialize."""
+        enr1 = ENR.from_string(OFFICIAL_ENR_STRING)
+        serialized = enr1.to_string()
+        enr2 = ENR.from_string(serialized)
+
+        assert enr1.seq == enr2.seq
+        assert enr1.signature == enr2.signature
+        assert enr1.pairs == enr2.pairs
+
+    def test_roundtrip_preserves_all_fields(self) -> None:
+        """Round-trip preserves all ENR fields."""
+        import base64
+
+        from lean_spec.types.rlp import encode_rlp
+
+        rlp = encode_rlp(
+            [
+                b"\xab" * 64,  # signature
+                b"\x42",  # seq = 66
+                b"eth2",
+                b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8,
+                b"id",
+                b"v4",
+                b"ip",
+                b"\xc0\xa8\x01\x01",
+                b"secp256k1",
+                b"\x02" + b"\x00" * 32,
+                b"tcp",
+                (9000).to_bytes(2, "big"),
+            ]
+        )
+        b64 = base64.urlsafe_b64encode(rlp).decode().rstrip("=")
+
+        enr1 = ENR.from_string(f"enr:{b64}")
+        enr2 = ENR.from_string(enr1.to_string())
+
+        assert enr1.seq == enr2.seq == Uint64(0x42)
+        assert enr1.ip4 == enr2.ip4 == "192.168.1.1"
+        assert enr1.tcp_port == enr2.tcp_port == 9000
+        assert enr1.identity_scheme == enr2.identity_scheme == "v4"
+
+    def test_to_string_produces_valid_enr_format(self) -> None:
+        """to_string() produces valid 'enr:' prefixed string."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
+        )
+        result = enr.to_string()
+
+        assert result.startswith("enr:")
+        # Should not have padding
+        assert "=" not in result
+
+
+class TestSignatureVerification:
+    """Tests for verify_signature() method."""
+
+    def test_official_enr_signature_verifies(self) -> None:
+        """Official EIP-778 test vector signature verifies correctly."""
+        enr = ENR.from_string(OFFICIAL_ENR_STRING)
+        assert enr.verify_signature()
+
+    def test_self_signed_enr_verifies(self) -> None:
+        """ENR signed with cryptography library verifies correctly."""
+        from Crypto.Hash import keccak
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.asymmetric.utils import (
+            Prehashed,
+            decode_dss_signature,
+        )
+
+        from lean_spec.types.rlp import encode_rlp
+
+        # Generate a test keypair using cryptography library.
+        private_key = ec.generate_private_key(ec.SECP256K1())
+        public_key = private_key.public_key()
+        compressed_pubkey = public_key.public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.CompressedPoint,
+        )
+
+        # Create content (keys must be sorted).
+        content_items: list[bytes] = [
+            b"\x01",
+            b"id",
+            b"v4",
+            b"secp256k1",
+            compressed_pubkey,
+        ]
+        content_rlp = encode_rlp(content_items)
+
+        # Hash content.
+        k = keccak.new(digest_bits=256)
+        k.update(content_rlp)
+        digest = k.digest()
+
+        # Sign with ECDSA using Prehashed mode.
+        signature_der = private_key.sign(digest, ec.ECDSA(Prehashed(hashes.SHA256())))
+
+        # Convert DER signature to r || s format.
+        r, s = decode_dss_signature(signature_der)
+        sig_64 = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+
+        # Create ENR.
+        enr = ENR(
+            signature=Bytes64(sig_64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4", keys.SECP256K1: compressed_pubkey},
+        )
+
+        assert enr.verify_signature()
+
+    def test_tampered_signature_fails_verification(self) -> None:
+        """ENR with tampered signature fails verification."""
+        enr = ENR.from_string(OFFICIAL_ENR_STRING)
+
+        # Tamper with signature
+        tampered_sig = bytes([enr.signature[0] ^ 0xFF]) + bytes(enr.signature[1:])
+        tampered_enr = ENR(
+            signature=Bytes64(tampered_sig),
+            seq=enr.seq,
+            pairs=enr.pairs,
+        )
+
+        assert not tampered_enr.verify_signature()
+
+    def test_tampered_content_fails_verification(self) -> None:
+        """ENR with tampered content fails verification."""
+        enr = ENR.from_string(OFFICIAL_ENR_STRING)
+
+        # Create ENR with different sequence number (content mismatch)
+        tampered_enr = ENR(
+            signature=enr.signature,
+            seq=Uint64(int(enr.seq) + 1),  # Different sequence
+            pairs=enr.pairs,
+        )
+
+        assert not tampered_enr.verify_signature()
+
+    def test_missing_public_key_fails_verification(self) -> None:
+        """ENR without public key fails verification."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},  # No secp256k1 key
+        )
+
+        assert not enr.verify_signature()
+
+
+class TestNodeIdComputation:
+    """Tests for compute_node_id() method."""
+
+    def test_official_enr_node_id(self) -> None:
+        """compute_node_id() returns correct node ID for official ENR."""
+        enr = ENR.from_string(OFFICIAL_ENR_STRING)
+        node_id = enr.compute_node_id()
+
+        assert node_id is not None
+        assert node_id.hex() == OFFICIAL_NODE_ID
+
+    def test_node_id_none_without_public_key(self) -> None:
+        """compute_node_id() returns None when public key is missing."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+
+        assert enr.compute_node_id() is None
+
+
+class TestIPv6Ports:
+    """Tests for tcp6_port and udp6_port properties."""
+
+    def test_tcp6_port_extracts_correctly(self) -> None:
+        """tcp6_port extracts IPv6-specific TCP port."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={
+                keys.ID: b"v4",
+                keys.TCP6: (9001).to_bytes(2, "big"),
+            },
+        )
+        assert enr.tcp6_port == 9001
+
+    def test_tcp6_port_returns_none_when_missing(self) -> None:
+        """tcp6_port returns None when tcp6 key is absent."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+        assert enr.tcp6_port is None
+
+    def test_udp6_port_extracts_correctly(self) -> None:
+        """udp6_port extracts IPv6-specific UDP port."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={
+                keys.ID: b"v4",
+                keys.UDP6: (30304).to_bytes(2, "big"),
+            },
+        )
+        assert enr.udp6_port == 30304
+
+    def test_udp6_port_returns_none_when_missing(self) -> None:
+        """udp6_port returns None when udp6 key is absent."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={keys.ID: b"v4"},
+        )
+        assert enr.udp6_port is None
+
+    def test_ipv6_ports_independent_of_ipv4(self) -> None:
+        """IPv6 ports are independent from IPv4 ports."""
+        enr = ENR(
+            signature=Bytes64(b"\x00" * 64),
+            seq=Uint64(1),
+            pairs={
+                keys.ID: b"v4",
+                keys.TCP: (9000).to_bytes(2, "big"),
+                keys.TCP6: (9001).to_bytes(2, "big"),
+                keys.UDP: (30303).to_bytes(2, "big"),
+                keys.UDP6: (30304).to_bytes(2, "big"),
+            },
+        )
+        assert enr.tcp_port == 9000
+        assert enr.tcp6_port == 9001
+        assert enr.udp_port == 30303
+        assert enr.udp6_port == 30304

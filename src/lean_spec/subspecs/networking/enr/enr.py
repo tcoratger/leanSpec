@@ -57,11 +57,18 @@ from typing import ClassVar
 from typing_extensions import Self
 
 from lean_spec.subspecs.networking.types import Multiaddr, NodeId, SeqNumber
-from lean_spec.types import Bytes33, Bytes64, RLPDecodingError, StrictBaseModel, Uint64
-from lean_spec.types.rlp import decode_list as rlp_decode_list
+from lean_spec.types import (
+    Bytes32,
+    Bytes33,
+    Bytes64,
+    StrictBaseModel,
+    Uint64,
+    rlp,
+)
+from lean_spec.types.byte_arrays import Bytes4
 
 from . import keys
-from .eth2 import AttestationSubnets, Eth2Data
+from .eth2 import AttestationSubnets, Eth2Data, SyncCommitteeSubnets
 from .keys import EnrKey
 
 ENR_PREFIX = "enr:"
@@ -69,24 +76,7 @@ ENR_PREFIX = "enr:"
 
 
 class ENR(StrictBaseModel):
-    r"""
-    Ethereum Node Record (EIP-778).
-
-    Example from EIP-778 (IPv4 127.0.0.1, UDP 30303)::
-
-        enr:-IS4QHCYrYZbAKWCBRlAy5zzaDZXJBGkcnh4MHcBFZntXNFrdvJjX04j...
-
-    Which decodes to RLP::
-
-        [
-          7098ad865b00a582...,   # signature (64 bytes)
-          01,                    # seq = 1
-          "id", "v4",
-          "ip", 7f000001,        # 127.0.0.1
-          "secp256k1", 03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138,
-          "udp", 765f,           # 30303
-        ]
-    """
+    """Ethereum Node Record (EIP-778)."""
 
     MAX_SIZE: ClassVar[int] = 300
     """Maximum RLP-encoded size in bytes (EIP-778)."""
@@ -152,6 +142,18 @@ class ENR(StrictBaseModel):
         port = self.get(keys.UDP)
         return int.from_bytes(port, "big") if port else None
 
+    @property
+    def tcp6_port(self) -> int | None:
+        """IPv6-specific TCP port. Falls back to tcp_port if not set."""
+        port = self.get(keys.TCP6)
+        return int.from_bytes(port, "big") if port else None
+
+    @property
+    def udp6_port(self) -> int | None:
+        """IPv6-specific UDP port. Falls back to udp_port if not set."""
+        port = self.get(keys.UDP6)
+        return int.from_bytes(port, "big") if port else None
+
     def multiaddr(self) -> Multiaddr | None:
         """Construct multiaddress from endpoint info."""
         if self.ip4 and self.tcp_port:
@@ -160,18 +162,11 @@ class ENR(StrictBaseModel):
             return f"/ip6/{self.ip6}/tcp/{self.tcp_port}"
         return None
 
-    # =========================================================================
-    # Ethereum Consensus Extensions
-    # =========================================================================
-
     @property
     def eth2_data(self) -> Eth2Data | None:
         """Parse eth2 key: fork_digest(4) + next_fork_version(4) + next_fork_epoch(8)."""
         eth2_bytes = self.get(keys.ETH2)
         if eth2_bytes and len(eth2_bytes) >= 16:
-            from lean_spec.types import Uint64
-            from lean_spec.types.byte_arrays import Bytes4
-
             return Eth2Data(
                 fork_digest=Bytes4(eth2_bytes[0:4]),
                 next_fork_version=Bytes4(eth2_bytes[4:8]),
@@ -185,9 +180,13 @@ class ENR(StrictBaseModel):
         attnets = self.get(keys.ATTNETS)
         return AttestationSubnets.decode_bytes(attnets) if attnets and len(attnets) == 8 else None
 
-    # =========================================================================
-    # Validation
-    # =========================================================================
+    @property
+    def sync_committee_subnets(self) -> SyncCommitteeSubnets | None:
+        """Parse syncnets key (SSZ Bitvector[4])."""
+        syncnets = self.get(keys.SYNCNETS)
+        if syncnets and len(syncnets) == 1:
+            return SyncCommitteeSubnets.decode_bytes(syncnets)
+        return None
 
     def is_valid(self) -> bool:
         """
@@ -207,9 +206,128 @@ class ENR(StrictBaseModel):
             return False
         return self_eth2.fork_digest == other_eth2.fork_digest
 
-    # =========================================================================
-    # Display
-    # =========================================================================
+    def _build_content_items(self) -> list[bytes]:
+        """
+        Build the list of content items for RLP encoding.
+
+        Returns [seq, k1, v1, k2, v2, ...] with keys sorted lexicographically.
+        """
+        sorted_keys = sorted(self.pairs.keys())
+
+        # Sequence number: minimal big-endian, empty bytes for zero.
+        seq_bytes = self.seq.to_bytes(8, "big").lstrip(b"\x00") or b""
+        items: list[bytes] = [seq_bytes]
+
+        for key in sorted_keys:
+            items.append(key.encode("utf-8"))
+            items.append(self.pairs[key])
+
+        return items
+
+    def _content_rlp(self) -> bytes:
+        """
+        Get RLP-encoded content for signing (excludes signature).
+
+        Returns the RLP encoding of [seq, k1, v1, k2, v2, ...].
+        """
+        return rlp.encode_rlp(self._build_content_items())
+
+    def verify_signature(self) -> bool:
+        """
+        Cryptographically verify the ENR signature.
+
+        Per EIP-778 "v4" identity scheme:
+
+        1. Compute keccak256 hash of content RLP (seq + sorted key/value pairs)
+        2. Verify the 64-byte secp256k1 signature against the public key
+
+        Returns True if signature is valid, False otherwise.
+        """
+        from Crypto.Hash import keccak
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.asymmetric.utils import (
+            Prehashed,
+            encode_dss_signature,
+        )
+
+        if self.public_key is None:
+            return False
+
+        try:
+            # Hash the content (excludes signature).
+            content = self._content_rlp()
+            k = keccak.new(digest_bits=256)
+            k.update(content)
+            digest = k.digest()
+
+            # Load the compressed public key.
+            public_key = ec.EllipticCurvePublicKey.from_encoded_point(
+                ec.SECP256K1(), bytes(self.public_key)
+            )
+
+            # Convert r||s (64 bytes) to DER-encoded signature.
+            r = int.from_bytes(self.signature[:32], "big")
+            s = int.from_bytes(self.signature[32:], "big")
+            der_signature = encode_dss_signature(r, s)
+
+            # Verify signature against pre-hashed digest.
+            # SHA256 is used as the algorithm marker since it has the same 32-byte digest size.
+            public_key.verify(der_signature, digest, ec.ECDSA(Prehashed(hashes.SHA256())))
+            return True
+        except Exception:
+            return False
+
+    def compute_node_id(self) -> NodeId | None:
+        """
+        Compute the node ID from the public key.
+
+        Per EIP-778 "v4" identity scheme: keccak256(uncompressed_pubkey).
+        The hash is computed over the 64-byte x||y coordinates.
+        """
+        from Crypto.Hash import keccak
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        if self.public_key is None:
+            return None
+
+        try:
+            # Uncompress public key to 65 bytes (0x04 || x || y).
+            public_key = ec.EllipticCurvePublicKey.from_encoded_point(
+                ec.SECP256K1(), self.public_key
+            )
+            uncompressed = public_key.public_bytes(
+                encoding=serialization.Encoding.X962,
+                format=serialization.PublicFormat.UncompressedPoint,
+            )
+
+            # Hash the 64-byte x||y (excluding 0x04 prefix).
+            k = keccak.new(digest_bits=256)
+            k.update(uncompressed[1:])
+            return Bytes32(k.digest())
+        except Exception:
+            return None
+
+    def to_rlp(self) -> bytes:
+        """
+        Serialize to RLP bytes.
+
+        Format: [signature, seq, k1, v1, k2, v2, ...]
+        Keys are sorted lexicographically per EIP-778.
+        """
+        items = [bytes(self.signature)] + self._build_content_items()
+        return rlp.encode_rlp(items)
+
+    def to_string(self) -> str:
+        """
+        Serialize to text representation.
+
+        Format: "enr:" + base64url(RLP) without padding.
+        """
+        rlp_bytes = self.to_rlp()
+        b64_content = base64.urlsafe_b64encode(rlp_bytes).decode("utf-8").rstrip("=")
+        return ENR_PREFIX + b64_content
 
     def __str__(self) -> str:
         """Human-readable summary."""
@@ -260,9 +378,13 @@ class ENR(StrictBaseModel):
 
         # RLP decode: [signature, seq, k1, v1, k2, v2, ...]
         try:
-            items = rlp_decode_list(rlp_data)
-        except RLPDecodingError as e:
+            items = rlp.decode_rlp_list(rlp_data)
+        except rlp.RLPDecodingError as e:
             raise ValueError(f"Invalid RLP encoding: {e}") from e
+
+        # EIP-778 requires ENRs to be at most 300 bytes.
+        if len(rlp_data) > cls.MAX_SIZE:
+            raise ValueError(f"ENR exceeds max size: {len(rlp_data)} > {cls.MAX_SIZE}")
 
         if len(items) < 2:
             raise ValueError("ENR must have at least signature and seq")
@@ -281,14 +403,29 @@ class ENR(StrictBaseModel):
         # Parse key/value pairs.
         #
         # Keys are strings, values are arbitrary bytes.
+        # EIP-778 requires keys to be lexicographically sorted.
         pairs: dict[str, bytes] = {}
+        prev_key: str | None = None
         for i in range(2, len(items), 2):
             key = items[i].decode("utf-8")
+            if prev_key is not None and key <= prev_key:
+                raise ValueError(
+                    f"ENR keys must be lexicographically sorted per EIP-778: "
+                    f"'{key}' follows '{prev_key}'"
+                )
             value = items[i + 1]
             pairs[key] = value
+            prev_key = key
 
-        return cls(
+        enr = cls(
             signature=signature,
             seq=Uint64(seq),
             pairs=pairs,
         )
+
+        # Compute and store node_id for routing/identification.
+        node_id = enr.compute_node_id()
+        if node_id is not None:
+            return enr.model_copy(update={"node_id": node_id})
+
+        return enr

@@ -13,9 +13,7 @@ from .exceptions import (
     SSZTypeError,
     SSZValueError,
 )
-from .rlp import RLPDecodingError, RLPItem
-from .rlp import decode as rlp_decode
-from .rlp import encode as rlp_encode
+from .rlp import RLPDecodingError, RLPItem, decode_rlp, decode_rlp_list, encode_rlp
 from .ssz_base import SSZType
 from .uint import Uint64
 
@@ -40,8 +38,9 @@ __all__ = [
     "Boolean",
     "Container",
     # RLP encoding/decoding
-    "rlp_encode",
-    "rlp_decode",
+    "encode_rlp",
+    "decode_rlp",
+    "decode_rlp_list",
     "RLPItem",
     "RLPDecodingError",
     # Exceptions
