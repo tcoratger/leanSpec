@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -18,7 +18,7 @@ from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
-from lean_spec.types.rlp import encode as rlp_encode
+from lean_spec.types.rlp import encode_rlp
 from tests.lean_spec.helpers import make_genesis_state
 
 
@@ -26,7 +26,7 @@ from tests.lean_spec.helpers import make_genesis_state
 # This ENR has: ip=192.168.1.1, tcp=9000
 def _make_enr_with_tcp(ip_bytes: bytes, tcp_port: int) -> str:
     """Create a minimal ENR string with IPv4 and TCP port."""
-    rlp_data = rlp_encode(
+    rlp_data = encode_rlp(
         [
             b"\x00" * 64,  # signature
             b"\x01",  # seq = 1
@@ -46,7 +46,7 @@ def _make_enr_with_tcp(ip_bytes: bytes, tcp_port: int) -> str:
 
 def _make_enr_with_ipv6_tcp(ip6_bytes: bytes, tcp_port: int) -> str:
     """Create a minimal ENR string with IPv6 and TCP port."""
-    rlp_data = rlp_encode(
+    rlp_data = encode_rlp(
         [
             b"\x00" * 64,  # signature
             b"\x01",  # seq = 1
@@ -66,7 +66,7 @@ def _make_enr_with_ipv6_tcp(ip6_bytes: bytes, tcp_port: int) -> str:
 
 def _make_enr_without_tcp(ip_bytes: bytes) -> str:
     """Create an ENR string with IPv4 but no TCP port (UDP only)."""
-    rlp_data = rlp_encode(
+    rlp_data = encode_rlp(
         [
             b"\x00" * 64,  # signature
             b"\x01",  # seq = 1
@@ -137,7 +137,12 @@ class TestIsEnrString:
 
 
 class TestResolveBootnode:
-    """Tests for resolve_bootnode() resolution function."""
+    """Tests for resolve_bootnode() resolution function.
+
+    Note: Tests use fake ENRs with zero signatures.
+    We mock verify_signature to return True since these tests
+    focus on resolution logic, not signature verification.
+    """
 
     def test_resolve_multiaddr_unchanged(self) -> None:
         """Multiaddr strings are returned unchanged."""
@@ -150,19 +155,22 @@ class TestResolveBootnode:
         arbitrary = "/some/arbitrary/path"
         assert resolve_bootnode(arbitrary) == arbitrary
 
-    def test_resolve_valid_enr_with_tcp(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_resolve_valid_enr_with_tcp(self, mock_verify: AsyncMock) -> None:
         """ENR with IPv4+TCP extracts multiaddr correctly."""
         result = resolve_bootnode(ENR_WITH_TCP)
         assert result == "/ip4/192.168.1.1/tcp/9000"
 
-    def test_resolve_enr_ipv6(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_resolve_enr_ipv6(self, mock_verify: AsyncMock) -> None:
         """ENR with IPv6+TCP extracts multiaddr correctly."""
         result = resolve_bootnode(ENR_WITH_IPV6_TCP)
         # IPv6 loopback ::1 formatted as full hex
         assert "/ip6/" in result
         assert "/tcp/9000" in result
 
-    def test_resolve_enr_without_tcp_raises(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_resolve_enr_without_tcp_raises(self, mock_verify: AsyncMock) -> None:
         """ENR without TCP port raises ValueError."""
         with pytest.raises(ValueError, match=r"no TCP connection info"):
             resolve_bootnode(ENR_WITHOUT_TCP)
@@ -182,7 +190,8 @@ class TestResolveBootnode:
         with pytest.raises(ValueError):
             resolve_bootnode("enr:")
 
-    def test_resolve_enr_with_different_ports(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_resolve_enr_with_different_ports(self, mock_verify: AsyncMock) -> None:
         """ENR resolution handles various port numbers."""
         # Port 30303
         enr_30303 = _make_enr_with_tcp(b"\x7f\x00\x00\x01", 30303)
@@ -199,7 +208,8 @@ class TestResolveBootnode:
         result = resolve_bootnode(enr_max)
         assert result == "/ip4/127.0.0.1/tcp/65535"
 
-    def test_resolve_enr_with_different_ips(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_resolve_enr_with_different_ips(self, mock_verify: Mock) -> None:
         """ENR resolution handles various IPv4 addresses."""
         test_cases = [
             (b"\x00\x00\x00\x00", "0.0.0.0"),
@@ -215,7 +225,8 @@ class TestResolveBootnode:
 class TestMixedBootnodes:
     """Integration tests for mixed bootnode types."""
 
-    def test_mixed_bootnodes_list(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_mixed_bootnodes_list(self, mock_verify: Mock) -> None:
         """Process a list containing both ENR and multiaddr."""
         bootnodes = [
             MULTIADDR_IPV4,
@@ -229,7 +240,8 @@ class TestMixedBootnodes:
         assert resolved[1] == "/ip4/192.168.1.1/tcp/9000"
         assert resolved[2] == "/ip4/10.0.0.1/tcp/8000"
 
-    def test_filter_invalid_enrs(self) -> None:
+    @patch("lean_spec.subspecs.networking.enr.enr.ENR.verify_signature", return_value=True)
+    def test_filter_invalid_enrs(self, mock_verify: Mock) -> None:
         """Demonstrate filtering out invalid ENRs from a bootnode list."""
         bootnodes = [
             MULTIADDR_IPV4,

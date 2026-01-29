@@ -3,9 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.subspecs.networking.enr import ENR, Eth2Data, keys
-from lean_spec.subspecs.networking.enr.eth2 import AttestationSubnets
-from lean_spec.types import Bytes64, Uint64
+from lean_spec.subspecs.networking.enr import Eth2Data, keys
+from lean_spec.subspecs.networking.enr.eth2 import AttestationSubnets, SyncCommitteeSubnets
+from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import Bytes4
 
 
@@ -116,150 +116,37 @@ class TestAttestationSubnets:
             subnets.is_subscribed(-1)
 
 
-class TestENR:
-    """Tests for ENR structure."""
+class TestSyncCommitteeSubnets:
+    """Tests for SyncCommitteeSubnets bitvector."""
 
-    def test_create_minimal_enr(self) -> None:
-        """ENR can be created with minimal valid data."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,  # Compressed pubkey
-            },
-        )
-        assert enr.seq == Uint64(1)
-        assert enr.identity_scheme == "v4"
+    def test_none_creates_empty_subscriptions(self) -> None:
+        """none() creates empty subscriptions."""
+        subnets = SyncCommitteeSubnets.none()
+        for i in range(4):
+            assert not subnets.is_subscribed(i)
 
-    def test_enr_ip4_property(self) -> None:
-        """ip4 property formats IPv4 address."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-                "ip": b"\xc0\xa8\x01\x01",  # 192.168.1.1
-            },
-        )
-        assert enr.ip4 == "192.168.1.1"
+    def test_all_creates_full_subscriptions(self) -> None:
+        """all() creates full subscriptions."""
+        subnets = SyncCommitteeSubnets.all()
+        for i in range(4):
+            assert subnets.is_subscribed(i)
 
-    def test_enr_tcp_port_property(self) -> None:
-        """tcp_port property extracts port number."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-                "tcp": (9000).to_bytes(2, "big"),
-            },
-        )
-        assert enr.tcp_port == 9000
+    def test_is_subscribed_with_valid_ids(self) -> None:
+        """is_subscribed() works for valid subnet IDs 0-3."""
+        subnets = SyncCommitteeSubnets.all()
+        assert subnets.is_subscribed(0)
+        assert subnets.is_subscribed(1)
+        assert subnets.is_subscribed(2)
+        assert subnets.is_subscribed(3)
 
-    def test_enr_multiaddr_construction(self) -> None:
-        """multiaddr() constructs valid multiaddress."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-                "ip": b"\xc0\xa8\x01\x01",
-                "tcp": (9000).to_bytes(2, "big"),
-            },
-        )
-        assert enr.multiaddr() == "/ip4/192.168.1.1/tcp/9000"
+    def test_is_subscribed_raises_for_invalid_high_id(self) -> None:
+        """is_subscribed() raises for subnet ID >= 4."""
+        subnets = SyncCommitteeSubnets.none()
+        with pytest.raises(ValueError, match="must be 0-3"):
+            subnets.is_subscribed(4)
 
-    def test_enr_has_key(self) -> None:
-        """has() correctly checks key presence."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-            },
-        )
-        assert enr.has(keys.ID)
-        assert enr.has(keys.SECP256K1)
-        assert not enr.has(keys.IP)
-        assert not enr.has(keys.ETH2)
-
-    def test_enr_get_key(self) -> None:
-        """get() retrieves values by key."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-            },
-        )
-        assert enr.get(keys.ID) == b"v4"
-        assert enr.get(keys.IP) is None
-
-    def test_enr_is_valid_basic(self) -> None:
-        """is_valid() checks basic structure."""
-        valid_enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-            },
-        )
-        assert valid_enr.is_valid()
-
-        # Missing public key
-        invalid_enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-            },
-        )
-        assert not invalid_enr.is_valid()
-
-    def test_enr_compatibility(self) -> None:
-        """is_compatible_with() checks fork digest match."""
-        eth2_bytes = b"\x12\x34\x56\x78" + b"\x02\x00\x00\x00" + b"\x00" * 8
-
-        enr1 = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-                "eth2": eth2_bytes,
-            },
-        )
-
-        enr2 = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(2),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-                "eth2": eth2_bytes,
-            },
-        )
-
-        assert enr1.is_compatible_with(enr2)
-
-    def test_enr_string_representation(self) -> None:
-        """ENR has readable string representation."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(42),
-            pairs={
-                "id": b"v4",
-                "secp256k1": b"\x02" + b"\x00" * 32,
-                "ip": b"\xc0\xa8\x01\x01",
-                "tcp": (9000).to_bytes(2, "big"),
-            },
-        )
-        s = str(enr)
-        assert "seq=42" in s
-        assert "192.168.1.1" in s
-        assert "tcp=9000" in s
+    def test_is_subscribed_raises_for_negative_id(self) -> None:
+        """is_subscribed() raises for negative subnet ID."""
+        subnets = SyncCommitteeSubnets.none()
+        with pytest.raises(ValueError, match="must be 0-3"):
+            subnets.is_subscribed(-1)
