@@ -1,34 +1,12 @@
-"""Tests for Ethereum Node Record (ENR) specification."""
+"""Tests for Ethereum 2.0 ENR types (Eth2Data, AttestationSubnets, SyncCommitteeSubnets)."""
 
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.subspecs.networking.enr import Eth2Data, keys
+from lean_spec.subspecs.networking.enr import Eth2Data
 from lean_spec.subspecs.networking.enr.eth2 import AttestationSubnets, SyncCommitteeSubnets
 from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import Bytes4
-
-
-class TestEnrKeys:
-    """Tests for ENR key constants."""
-
-    def test_identity_keys(self) -> None:
-        """Identity keys have correct values."""
-        assert keys.ID == "id"
-        assert keys.SECP256K1 == "secp256k1"
-
-    def test_network_keys(self) -> None:
-        """Network keys have correct values."""
-        assert keys.IP == "ip"
-        assert keys.IP6 == "ip6"
-        assert keys.TCP == "tcp"
-        assert keys.UDP == "udp"
-
-    def test_ethereum_keys(self) -> None:
-        """Ethereum-specific keys have correct values."""
-        assert keys.ETH2 == "eth2"
-        assert keys.ATTNETS == "attnets"
-        assert keys.SYNCNETS == "syncnets"
 
 
 class TestEth2Data:
