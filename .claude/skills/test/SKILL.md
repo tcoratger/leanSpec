@@ -5,23 +5,23 @@ description: Run unit tests with coverage
 
 # /test - Run Unit Tests
 
-Run pytest with coverage reporting.
+Run pytest unit tests.
 
 ## Default
 
 ```bash
-uv run pytest
+uvx tox -e pytest
 ```
 
 ## Options
 
-- `/test -v` - Verbose output
-- `/test -k <pattern>` - Run matching tests
-- `/test <path>` - Run specific test file/directory
-- `/test --cov` - With coverage report
+Pass additional arguments after `--`:
+
+- `/test -- -v` - Verbose output
+- `/test -- -k "test_serialize"` - Run matching tests
+- `/test -- tests/lean_spec/subspecs/ssz/` - Run specific test directory
 
 ## Examples
 
 - `/test` - Run all unit tests
-- `/test tests/lean_spec/subspecs/ssz/` - Run SSZ tests only
-- `/test -k "test_serialize"` - Run tests matching pattern
+- `/test -- --cov` - Run with coverage report

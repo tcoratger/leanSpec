@@ -10,18 +10,20 @@ Run the test filler to generate consensus layer test fixtures.
 ## Default Usage
 
 ```bash
-uv run fill --fork=Devnet --clean -n auto
+uvx tox -e fill
 ```
 
 ## Options
 
-- `--fork=<name>` - Target fork (default: Devnet)
-- `--clean` - Clean existing fixtures before generating
-- `-n auto` - Auto-detect parallelization
-- `--layer=<layer>` - Target layer (consensus is default, execution for future)
+Pass additional arguments after `--`:
 
-## Examples
+- `/fill -- --fork=Electra` - Generate for Electra fork
+- `/fill -- path/to/test.py` - Generate fixtures for specific test file
 
-- `/fill` - Run with defaults
-- `/fill --fork=Electra` - Generate for Electra fork
-- `/fill path/to/test.py` - Generate fixtures for specific test file
+## What It Does
+
+Runs `fill --fork=Devnet --clean -n auto` via tox, which:
+
+1. Discovers tests in `tests/consensus/`
+2. Executes spec tests to generate fixtures
+3. Outputs JSON fixtures to `fixtures/consensus/`
