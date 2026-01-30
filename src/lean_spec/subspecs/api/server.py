@@ -28,21 +28,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _no_store() -> Store | None:
-    """Default store getter that returns None."""
-    return None
-
-
 async def _handle_health(_request: web.Request) -> web.Response:
-    """Handle health check endpoint."""
-    return web.json_response({"status": "healthy", "service": "lean-spec-api"})
+    """
+    Handle health check endpoint.
+
+    Response format:
+    - status: The status of the API server. Always return "healthy" when the API endpoint is served.
+    - service: The API service name. Fixed to "lean-rpc-api".
+    """
+    return web.json_response({"status": "healthy", "service": "lean-rpc-api"})
 
 
 async def _handle_metrics(_request: web.Request) -> web.Response:
     """Handle Prometheus metrics endpoint."""
     return web.Response(
         body=generate_metrics(),
-        content_type="text/plain; version=0.0.4; charset=utf-8",
+        content_type="text/plain; version=0.0.4",
+        charset="utf-8",
     )
 
 
@@ -75,7 +77,7 @@ class ApiServer:
     config: ApiServerConfig
     """Server configuration."""
 
-    store_getter: Callable[[], Store | None] = _no_store
+    store_getter: Callable[[], Store | None] | None = None
     """Callable that returns the current Store instance."""
 
     _runner: web.AppRunner | None = field(default=None, init=False)
@@ -87,7 +89,7 @@ class ApiServer:
     @property
     def store(self) -> Store | None:
         """Get the current Store instance."""
-        return self.store_getter()
+        return self.store_getter() if self.store_getter else None
 
     async def start(self) -> None:
         """Start the API server in the background."""
@@ -188,6 +190,6 @@ class ApiServer:
         return web.json_response(
             {
                 "slot": justified.slot,
-                "root": justified.root.hex(),
+                "root": "0x" + justified.root.hex(),
             }
         )
