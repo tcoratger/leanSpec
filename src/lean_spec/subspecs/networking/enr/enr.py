@@ -343,39 +343,22 @@ class ENR(StrictBaseModel):
         return ", ".join(parts) + ")"
 
     @classmethod
-    def from_string(cls, enr_text: str) -> Self:
+    def from_rlp(cls, rlp_data: bytes) -> Self:
         """
-        Parse an ENR from its text representation.
+        Parse an ENR from RLP-encoded bytes.
 
-        Text format is URL-safe base64 with `enr:` prefix.
+        Used when parsing ENRs from Discovery v5 NODES responses
+        or handshake packets.
 
         Args:
-            enr_text: ENR string (e.g., "enr:-IS4Q...")
+            rlp_data: RLP-encoded ENR bytes.
 
         Returns:
-            Parsed ENR instance.
+            Parsed ENR instance with computed node_id.
 
         Raises:
-            ValueError: If the string is malformed or RLP decoding fails.
+            ValueError: If the RLP data is malformed.
         """
-        if not enr_text.startswith(ENR_PREFIX):
-            raise ValueError(f"ENR must start with '{ENR_PREFIX}'")
-
-        # Extract base64url content after prefix.
-        b64_content = enr_text[len(ENR_PREFIX) :]
-
-        # Base64url decode (add padding if needed).
-        #
-        # Python's base64.urlsafe_b64decode requires proper padding.
-        padding = 4 - (len(b64_content) % 4)
-        if padding != 4:
-            b64_content += "=" * padding
-
-        try:
-            rlp_data = base64.urlsafe_b64decode(b64_content)
-        except Exception as e:
-            raise ValueError(f"Invalid base64 encoding: {e}") from e
-
         # RLP decode: [signature, seq, k1, v1, k2, v2, ...]
         try:
             items = rlp.decode_rlp_list(rlp_data)
@@ -429,3 +412,39 @@ class ENR(StrictBaseModel):
             return enr.model_copy(update={"node_id": node_id})
 
         return enr
+
+    @classmethod
+    def from_string(cls, enr_text: str) -> Self:
+        """
+        Parse an ENR from its text representation.
+
+        Text format is URL-safe base64 with `enr:` prefix.
+
+        Args:
+            enr_text: ENR string (e.g., "enr:-IS4Q...")
+
+        Returns:
+            Parsed ENR instance.
+
+        Raises:
+            ValueError: If the string is malformed or RLP decoding fails.
+        """
+        if not enr_text.startswith(ENR_PREFIX):
+            raise ValueError(f"ENR must start with '{ENR_PREFIX}'")
+
+        # Extract base64url content after prefix.
+        b64_content = enr_text[len(ENR_PREFIX) :]
+
+        # Base64url decode (add padding if needed).
+        #
+        # Python's base64.urlsafe_b64decode requires proper padding.
+        padding = 4 - (len(b64_content) % 4)
+        if padding != 4:
+            b64_content += "=" * padding
+
+        try:
+            rlp_data = base64.urlsafe_b64decode(b64_content)
+        except Exception as e:
+            raise ValueError(f"Invalid base64 encoding: {e}") from e
+
+        return cls.from_rlp(rlp_data)
