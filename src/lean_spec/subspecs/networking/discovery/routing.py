@@ -253,31 +253,35 @@ class RoutingTable:
     """
     Kademlia routing table for Discovery v5.
 
-    Organizes nodes into 256 k-buckets by XOR distance from the local node.
+    Organizes nodes into 256 k-buckets by XOR distance.
     Bucket i contains nodes with log2(distance) == i + 1.
 
     Fork Filtering
     --------------
-    When local_fork_digest is set, only peers with matching fork_digest
-    in their eth2 ENR data are accepted. This prevents storing peers
-    on different forks.
+
+    When local_fork_digest is set:
+
+    - Only peers with matching fork_digest are accepted
+    - Prevents storing peers on incompatible forks
+    - Requires eth2 ENR data to be present
 
     Lookup Algorithm
     ----------------
-    A 'lookup' locates the k closest nodes to a target ID. The initiator
-    starts by picking alpha (typically 3) closest nodes from the local table.
-    It then sends FINDNODE requests to those nodes. As NODES responses are
-    received, the initiator resends FINDNODE to nodes learned from previous
-    queries, progressively approaching the target.
 
-    The lookup terminates when the initiator has queried and gotten responses
-    from the k closest nodes it has seen.
+    Locates the k closest nodes to a target ID:
+
+    1. Pick alpha (3) closest nodes from local table
+    2. Send FINDNODE to each
+    3. Add responses to routing table
+    4. Repeat with next closest unqueried nodes
+    5. Stop when k closest have been queried
 
     Table Maintenance
     -----------------
-    Nodes are expected to keep track of their close neighbors and regularly
-    refresh their information. A lookup targeting the least recently refreshed
-    bucket should be performed at regular intervals.
+
+    - Track close neighbors
+    - Regularly refresh stale buckets
+    - Perform lookup for least-recently-refreshed bucket
     """
 
     local_id: NodeId
