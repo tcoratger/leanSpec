@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Coroutine
 from dataclasses import dataclass, field
-from typing import TypeVar
 
 from lean_spec.subspecs.containers import Checkpoint, SignedBlockWithAttestation
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
@@ -29,9 +26,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
     Status,
 )
 from lean_spec.types import Bytes32
-from tests.lean_spec.helpers import make_signed_block
-
-_T = TypeVar("_T")
+from tests.lean_spec.helpers import make_test_block, make_test_status, run_async
 
 # -----------------------------------------------------------------------------
 # Mock Classes
@@ -108,34 +103,6 @@ class MockResponseStream:
     async def finish(self) -> None:
         """Mark stream as finished."""
         self.finished = True
-
-
-# -----------------------------------------------------------------------------
-# Test Helpers
-# -----------------------------------------------------------------------------
-
-
-def make_test_status() -> Status:
-    """Create a valid Status message for testing."""
-    return Status(
-        finalized=Checkpoint(root=Bytes32(b"\x01" * 32), slot=Slot(100)),
-        head=Checkpoint(root=Bytes32(b"\x02" * 32), slot=Slot(200)),
-    )
-
-
-def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlockWithAttestation:
-    """Create a valid SignedBlockWithAttestation for testing."""
-    return make_signed_block(
-        slot=Slot(slot),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32(bytes([seed]) * 32),
-        state_root=Bytes32(bytes([seed + 1]) * 32),
-    )
-
-
-def run_async(coro: Coroutine[object, object, _T]) -> _T:
-    """Run an async coroutine synchronously."""
-    return asyncio.run(coro)
 
 
 # -----------------------------------------------------------------------------
