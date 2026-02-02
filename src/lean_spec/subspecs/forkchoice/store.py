@@ -12,7 +12,6 @@ __all__ = [
 ]
 
 import copy
-import logging
 from collections import defaultdict
 
 from lean_spec.subspecs.chain.config import (
@@ -47,8 +46,6 @@ from lean_spec.types import (
     Uint64,
 )
 from lean_spec.types.container import Container
-
-logger = logging.getLogger(__name__)
 
 
 class Store(Container):
@@ -998,14 +995,6 @@ class Store(Container):
 
         # Create checkpoint from selected target block
         target_block = self.blocks[target_block_root]
-
-        logger.debug(
-            "get_attestation_target: head=%s safe=%s after_walkback=%s final_target=%s",
-            head_slot,
-            safe_target_slot,
-            after_walkback_slot,
-            target_block.slot,
-        )
 
         return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)
 
