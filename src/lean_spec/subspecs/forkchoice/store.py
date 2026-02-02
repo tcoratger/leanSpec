@@ -964,18 +964,16 @@ class Store(Container):
         """
         # Start from current head
         target_block_root = self.head
-        safe_target_slot = self.blocks[self.safe_target].slot
 
         # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
         #
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
-            current_slot = self.blocks[target_block_root].slot
-            # Stop if we've reached safe_target
-            if current_slot <= safe_target_slot:
+            if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
+                target_block_root = self.blocks[target_block_root].parent_root
+            else:
                 break
-            target_block_root = self.blocks[target_block_root].parent_root
 
         # Ensure target is in justifiable slot range
         #
