@@ -795,10 +795,6 @@ class Store(Container):
         3. Run fork choice with minimum score requirement
         4. Return new Store with updated safe_target
 
-        Uses known attestations (from processed blocks) rather than new attestations
-        to ensure consistency across nodes in distributed networks. Known attestations
-        propagate via blocks and are more reliably consistent across nodes.
-
         Returns:
             New Store with updated safe_target.
         """
