@@ -964,7 +964,6 @@ class Store(Container):
         """
         # Start from current head
         target_block_root = self.head
-        head_slot = self.blocks[target_block_root].slot
         safe_target_slot = self.blocks[self.safe_target].slot
 
         # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
@@ -977,8 +976,6 @@ class Store(Container):
             if current_slot <= safe_target_slot:
                 break
             target_block_root = self.blocks[target_block_root].parent_root
-
-        after_walkback_slot = self.blocks[target_block_root].slot
 
         # Ensure target is in justifiable slot range
         #
