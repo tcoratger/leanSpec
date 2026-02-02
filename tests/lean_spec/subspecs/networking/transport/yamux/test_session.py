@@ -31,8 +31,8 @@ class TestSessionConstants:
         assert BUFFER_SIZE == 256
 
     def test_initial_window(self) -> None:
-        """Initial window is 256KB."""
-        assert YAMUX_INITIAL_WINDOW == 256 * 1024
+        """Initial window is 1MB."""
+        assert YAMUX_INITIAL_WINDOW == 1024 * 1024
 
 
 class TestYamuxStreamWrite:

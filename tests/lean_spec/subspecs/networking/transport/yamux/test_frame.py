@@ -177,7 +177,7 @@ class TestYamuxFrameEncoding:
         assert ftype == 1  # WINDOW_UPDATE
         assert flags == 0x01  # SYN
         assert stream_id == 7
-        assert length == 256 * 1024
+        assert length == YAMUX_INITIAL_WINDOW
 
     def test_encode_ping_request(self) -> None:
         """Encode PING request (no ACK)."""
@@ -528,9 +528,9 @@ class TestConstants:
         assert YAMUX_VERSION == 0
 
     def test_initial_window(self) -> None:
-        """Initial window is 256KB."""
-        assert YAMUX_INITIAL_WINDOW == 256 * 1024
-        assert YAMUX_INITIAL_WINDOW == 262144
+        """Initial window is 1MB."""
+        assert YAMUX_INITIAL_WINDOW == 1024 * 1024
+        assert YAMUX_INITIAL_WINDOW == 1048576
 
 
 class TestBigEndianEncoding:

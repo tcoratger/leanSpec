@@ -442,14 +442,14 @@ class TestSecurityConstants:
         assert YAMUX_MAX_FRAME_SIZE == 1048576
 
     def test_max_buffer_bytes_equals_initial_window(self) -> None:
-        """MAX_BUFFER_BYTES equals YAMUX_INITIAL_WINDOW (256KB)."""
+        """MAX_BUFFER_BYTES equals YAMUX_INITIAL_WINDOW (1MB)."""
         assert MAX_BUFFER_BYTES == YAMUX_INITIAL_WINDOW
-        assert MAX_BUFFER_BYTES == 256 * 1024
+        assert MAX_BUFFER_BYTES == 1024 * 1024
 
-    def test_initial_window_is_256kb(self) -> None:
-        """YAMUX_INITIAL_WINDOW is 256KB."""
-        assert YAMUX_INITIAL_WINDOW == 256 * 1024
-        assert YAMUX_INITIAL_WINDOW == 262144
+    def test_initial_window_is_1mb(self) -> None:
+        """YAMUX_INITIAL_WINDOW is 1MB."""
+        assert YAMUX_INITIAL_WINDOW == 1024 * 1024
+        assert YAMUX_INITIAL_WINDOW == 1048576
 
     def test_header_size_is_12_bytes(self) -> None:
         """YAMUX_HEADER_SIZE is 12 bytes."""

@@ -308,7 +308,7 @@ def window_update_frame(stream_id: int, delta: int) -> YamuxFrame:
         WINDOW_UPDATE frame ready to encode and send
 
     Flow control prevents fast senders from overwhelming slow receivers:
-    1. Each stream starts with YAMUX_INITIAL_WINDOW (256KB) receive capacity.
+    1. Each stream starts with YAMUX_INITIAL_WINDOW (1MB) receive capacity.
     2. As we receive data, the sender's view of our window decreases.
     3. When we process received data, we send WINDOW_UPDATE to restore capacity.
     4. If the sender exhausts our window, it must pause until we update.
