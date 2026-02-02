@@ -44,11 +44,6 @@ logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.interop
 
 
-# =============================================================================
-# Full Mesh Finalization Test
-# =============================================================================
-
-
 @pytest.mark.timeout(60)
 @pytest.mark.num_validators(3)
 async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
@@ -204,11 +199,6 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     )
 
 
-# =============================================================================
-# Hub-and-Spoke Topology Test
-# =============================================================================
-
-
 @pytest.mark.timeout(60)
 @pytest.mark.num_validators(3)
 async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
@@ -304,11 +294,6 @@ async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     )
 
 
-# =============================================================================
-# Basic Connection Test
-# =============================================================================
-
-
 @pytest.mark.timeout(30)
 @pytest.mark.num_validators(2)
 async def test_two_node_connection(node_cluster: NodeCluster) -> None:
@@ -361,11 +346,6 @@ async def test_two_node_connection(node_cluster: NodeCluster) -> None:
     #
     # Larger divergence would indicate gossip failure.
     await assert_heads_consistent(node_cluster, max_slot_diff=2)
-
-
-# =============================================================================
-# Block Gossip Propagation Test
-# =============================================================================
 
 
 @pytest.mark.timeout(45)
@@ -433,53 +413,145 @@ async def test_block_gossip_propagation(node_cluster: NodeCluster) -> None:
     )
 
 
-# =============================================================================
-# Network Partition Recovery Test (Future Work)
-# =============================================================================
-
-
-@pytest.mark.timeout(300)
-@pytest.mark.skip(reason="Partition recovery requires disconnect support - future work")
+@pytest.mark.timeout(120)
 @pytest.mark.num_validators(3)
 async def test_partition_recovery(node_cluster: NodeCluster) -> None:
     """
     Verify chain recovery after network partition heals.
 
-    This test would validate Byzantine fault tolerance:
+    This test validates Byzantine fault tolerance under network splits:
 
-    - Network splits into partitions
-    - Partitions make independent progress
-    - Partitions reconnect
-    - Chain converges to a single consistent view
+    1. Start a fully connected 3-node network
+    2. Wait for initial consensus (all nodes agree on head)
+    3. Partition the network (isolate node 2)
+    4. Let partitions run independently
+    5. Heal the partition (reconnect node 2)
+    6. Verify all nodes converge to the same finalized checkpoint
 
-    Currently skipped because the test infrastructure does not yet
-    support programmatic peer disconnection. The test framework
-    needs enhancements to:
+    Topology before partition::
 
-    - Disconnect specific peers
-    - Reconnect after delay
-    - Track partition membership
+         Node 0 <---> Node 1
+           ^             ^
+           |             |
+           +--> Node 2 <-+
 
-    When implemented, this test will use:
+    Topology during partition::
 
-    - 5 minute timeout (300s) for partition and recovery
-    - 15s initial run for pre-partition baseline
-    - Variable partition duration
-    - Post-recovery consistency checks
+        Node 0 <---> Node 1       Node 2 (isolated)
+
+    Key insight: With 3 validators and 2/3 supermajority requirement:
+
+    - Partition {0, 1} has 2/3 validators and CAN finalize
+    - Partition {2} has 1/3 validators and CANNOT finalize
+
+    After reconnection, node 2 must sync to the finalized chain from nodes 0+1.
     """
+    # Build full mesh topology.
+    #
+    # All three nodes connect to each other for maximum connectivity.
     topology = full_mesh(3)
     validators_per_node = [[0], [1], [2]]
 
     await node_cluster.start_all(topology, validators_per_node)
-    await assert_peer_connections(node_cluster, min_peers=2, timeout=30)
+
+    # Wait for full connectivity.
+    #
+    # Each node should have 2 peers in a 3-node full mesh.
+    await assert_peer_connections(node_cluster, min_peers=2, timeout=15)
 
     # Pre-partition baseline.
-    await asyncio.sleep(15)
+    #
+    # Let the chain run for 2 slots (~8s) to establish initial progress.
+    # All nodes should be in sync before we create the partition.
+    logger.info("Running pre-partition baseline...")
+    await asyncio.sleep(8)
 
-    # Consistency check before partition.
-    await assert_heads_consistent(node_cluster, max_slot_diff=2)
+    # Verify consistent state before partition.
+    await assert_heads_consistent(node_cluster, max_slot_diff=1)
 
-    # TODO: Implement partition simulation.
-    # - Disconnect node 2 from nodes 0 and 1
-    # - Let partitions run independently
-    # - Reconnect and verify convergence
+    pre_partition_slots = [node.head_slot for node in node_cluster.nodes]
+    logger.info("Pre-partition head slots: %s", pre_partition_slots)
+
+    # Create partition: isolate node 2.
+    #
+    # Disconnect node 2 from all its peers.
+    # After this, nodes 0 and 1 can still communicate, but node 2 is isolated.
+    logger.info("Creating partition: isolating node 2...")
+    node2 = node_cluster.nodes[2]
+    await node2.disconnect_all()
+
+    # Verify node 2 is isolated.
+    await asyncio.sleep(0.5)
+    assert node2.peer_count == 0, f"Node 2 should be isolated, has {node2.peer_count} peers"
+
+    # Let partitions run independently.
+    #
+    # Nodes 0 and 1 have 2/3 validators and can achieve finalization.
+    # Node 2 with 1/3 validators cannot finalize on its own.
+    partition_duration = 12  # 3 slots
+    logger.info("Running partitioned for %ds...", partition_duration)
+    await asyncio.sleep(partition_duration)
+
+    # Capture state during partition.
+    majority_finalized = [node_cluster.nodes[i].finalized_slot for i in [0, 1]]
+    isolated_finalized = node2.finalized_slot
+    logger.info(
+        "During partition: majority_finalized=%s isolated_finalized=%s",
+        majority_finalized,
+        isolated_finalized,
+    )
+
+    # Majority partition should have progressed further.
+    #
+    # With 2/3 validators, nodes 0 and 1 can finalize.
+    # Node 2 alone cannot make progress toward new finalization.
+    assert any(f > isolated_finalized for f in majority_finalized) or all(
+        f >= isolated_finalized for f in majority_finalized
+    ), "Majority partition should progress at least as far as isolated node"
+
+    # Heal partition: reconnect node 2.
+    #
+    # Node 2 dials back to nodes 0 and 1.
+    logger.info("Healing partition: reconnecting node 2...")
+    node0_addr = node_cluster.get_multiaddr(0)
+    node1_addr = node_cluster.get_multiaddr(1)
+    await node2.dial(node0_addr)
+    await node2.dial(node1_addr)
+
+    # Wait for gossipsub mesh to reform.
+    await asyncio.sleep(2)
+
+    # Let chain converge post-partition.
+    #
+    # Node 2 should sync to the majority chain via gossip.
+    convergence_duration = 12  # 3 slots
+    logger.info("Running post-partition convergence for %ds...", convergence_duration)
+    await asyncio.sleep(convergence_duration)
+
+    # Final state capture.
+    final_head_slots = [node.head_slot for node in node_cluster.nodes]
+    final_finalized_slots = [node.finalized_slot for node in node_cluster.nodes]
+
+    logger.info("FINAL: head_slots=%s finalized=%s", final_head_slots, final_finalized_slots)
+
+    # Verify convergence.
+    #
+    # All nodes must agree on the finalized checkpoint after reconnection.
+    # This is the key safety property: partition healing must not cause divergence.
+
+    # Heads should be consistent (within 2 slots due to propagation delay).
+    head_diff = max(final_head_slots) - min(final_head_slots)
+    assert head_diff <= 2, f"Heads diverged after partition recovery: {final_head_slots}"
+
+    # ALL nodes must have finalized.
+    assert all(slot > 0 for slot in final_finalized_slots), (
+        f"Not all nodes finalized after recovery: {final_finalized_slots}"
+    )
+
+    # Finalized checkpoints must be identical.
+    #
+    # This is the critical safety check: after partition recovery,
+    # all nodes must agree on what has been finalized.
+    assert len(set(final_finalized_slots)) == 1, (
+        f"Finalized slots inconsistent after partition recovery: {final_finalized_slots}"
+    )

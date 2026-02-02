@@ -145,6 +145,26 @@ class TestNode:
             logger.warning("Dial to %s timed out after %.1fs", addr, timeout)
             return False
 
+    @property
+    def connected_peers(self) -> list[PeerId]:
+        """List of currently connected peer IDs."""
+        return list(self.event_source._connections.keys())
+
+    async def disconnect_peer(self, peer_id: PeerId) -> None:
+        """
+        Disconnect from a specific peer.
+
+        Args:
+            peer_id: Peer to disconnect.
+        """
+        await self.event_source.disconnect(peer_id)
+        logger.info("Node %d disconnected from peer %s", self.index, peer_id)
+
+    async def disconnect_all(self) -> None:
+        """Disconnect from all peers."""
+        for peer_id in list(self.connected_peers):
+            await self.disconnect_peer(peer_id)
+
 
 @dataclass(slots=True)
 class NodeCluster:

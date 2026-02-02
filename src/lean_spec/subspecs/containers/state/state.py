@@ -460,6 +460,7 @@ class State(Container):
             # Ignore votes for targets that have already reached consensus.
             #
             # If a block is already justified, additional votes do not change anything.
+            # We simply skip them.
             if justified_slots.is_slot_justified(finalized_slot, target.slot):
                 continue
 
@@ -500,6 +501,7 @@ class State(Container):
             # Ensure the target falls on a slot that can be justified after the finalized one.
             #
             # In 3SF-mini, justification does not advance freely through time.
+            #
             # Only certain positions beyond the finalized slot are allowed to
             # receive new votes. These positions form a small, structured set:
             #
