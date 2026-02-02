@@ -493,6 +493,7 @@ class State(Container):
             # Ensure time flows forward.
             #
             # A target must always lie strictly after its source slot.
+            # Otherwise the vote makes no chronological sense.
             if target.slot <= source.slot:
                 continue
 
@@ -500,7 +501,14 @@ class State(Container):
             #
             # In 3SF-mini, justification does not advance freely through time.
             # Only certain positions beyond the finalized slot are allowed to
-            # receive new votes.
+            # receive new votes. These positions form a small, structured set:
+            #
+            #   - the immediate steps right after finalization,
+            #   - the square-number distances,
+            #   - and the pronic-number distances.
+            #
+            # Any target outside this pattern is not eligible for justification,
+            # so votes for it are simply ignored.
             if not target.slot.is_justifiable_after(self.latest_finalized.slot):
                 continue
 
@@ -514,6 +522,7 @@ class State(Container):
             # Mark that each validator in this aggregation has voted for the target.
             #
             # A vote is represented as a boolean flag.
+            # If it was previously absent, flip it to True.
             for validator_id in attestation.aggregation_bits.to_validator_indices():
                 if not justifications[target.root][validator_id]:
                     justifications[target.root][validator_id] = Boolean(True)
@@ -524,7 +533,8 @@ class State(Container):
             # have voted for it.
             #
             # We compare integers to avoid floating-point division:
-            # 3 * (number of votes) >= 2 * (total validators)
+            #
+            # 3 * (number of votes) ≥ 2 * (total validators)
             count = sum(bool(justified) for justified in justifications[target.root])
 
             if 3 * count >= (2 * len(self.validators)):
