@@ -40,6 +40,7 @@ from typing import Final, Protocol
 from .frame import (
     YAMUX_HEADER_SIZE,
     YAMUX_INITIAL_WINDOW,
+    YAMUX_MAX_NOISE_PAYLOAD,
     YamuxError,
     YamuxFlags,
     YamuxFrame,
@@ -167,6 +168,15 @@ class YamuxStream:
     _send_window_event: asyncio.Event = field(default_factory=asyncio.Event)
     """Event signaled when send window increases (after receiving WINDOW_UPDATE)."""
 
+    _write_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    """Lock for serializing writes to this stream.
+
+    Prevents concurrent writes from causing flow control violations.
+    Without this lock, two concurrent writers could both read _send_window,
+    both decide they have enough window, and both send data - exceeding the
+    receiver's actual window.
+    """
+
     def __post_init__(self) -> None:
         """Initialize event in signaled state (initial window > 0)."""
         if self._send_window > 0:
@@ -179,10 +189,17 @@ class YamuxStream:
 
     async def write(self, data: bytes) -> None:
         """
-        Write data to the stream, respecting flow control.
+        Write data to the stream, respecting flow control and Noise frame limits.
+
+        Data is chunked to fit within two constraints:
+        1. Flow control: Cannot exceed peer's receive window.
+        2. Noise limit: Each frame must fit in a Noise message (65507 bytes payload).
 
         If the send window is exhausted, this method will block until the peer
         sends a WINDOW_UPDATE.
+
+        Thread safety: Uses a per-stream lock to prevent concurrent writers from
+        causing flow control violations.
 
         Args:
             data: Data to send
@@ -190,42 +207,54 @@ class YamuxStream:
         Raises:
             YamuxError: If stream is closed or reset
         """
-        if self._reset:
-            raise YamuxError(f"Stream {self.stream_id} was reset")
-        if self._write_closed:
-            raise YamuxError(f"Stream {self.stream_id} write side closed")
-
-        # Send data in chunks that fit within our send window.
+        # Acquire the write lock to prevent concurrent writes.
         #
-        # This respects flow control: we never send more than the peer's
-        # advertised receive window.
-        #
-        # If window exhausted, we wait for WINDOW_UPDATE before continuing.
-        offset = 0
-        while offset < len(data):
-            # Wait for send window to be available.
-            await self._send_window_event.wait()
-
+        # Without this, two concurrent writers could both check _send_window,
+        # both decide they have enough window, and both send - causing the
+        # combined sends to exceed the receiver's actual window.
+        async with self._write_lock:
             if self._reset:
-                raise YamuxError(f"Stream {self.stream_id} was reset while writing")
+                raise YamuxError(f"Stream {self.stream_id} was reset")
+            if self._write_closed:
+                raise YamuxError(f"Stream {self.stream_id} write side closed")
 
-            # Calculate how much we can send.
-            chunk_size = min(len(data) - offset, self._send_window)
-            if chunk_size == 0:
-                # Window exhausted, clear event and wait for update.
-                self._send_window_event.clear()
-                continue
+            # Send data in chunks that fit within constraints.
+            #
+            # Two limits apply:
+            # 1. Flow control (send_window): Cannot exceed peer's advertised receive window.
+            # 2. Noise framing: Each Yamux frame must fit in a single Noise message.
+            #
+            # We use the minimum of both limits for each chunk.
+            offset = 0
+            while offset < len(data):
+                # Wait for send window to be available.
+                await self._send_window_event.wait()
 
-            chunk = data[offset : offset + chunk_size]
-            frame = data_frame(self.stream_id, chunk)
-            await self.session._send_frame(frame)
+                if self._reset:
+                    raise YamuxError(f"Stream {self.stream_id} was reset while writing")
 
-            # Update our view of the send window.
-            self._send_window -= chunk_size
-            if self._send_window == 0:
-                self._send_window_event.clear()
+                # Calculate how much we can send.
+                #
+                # Take the minimum of:
+                # - Remaining data
+                # - Available send window (flow control)
+                # - Max Noise payload (transport limit)
+                chunk_size = min(len(data) - offset, self._send_window, YAMUX_MAX_NOISE_PAYLOAD)
+                if chunk_size == 0:
+                    # Window exhausted, clear event and wait for update.
+                    self._send_window_event.clear()
+                    continue
 
-            offset += chunk_size
+                chunk = data[offset : offset + chunk_size]
+                frame = data_frame(self.stream_id, chunk)
+                await self.session._send_frame(frame)
+
+                # Update our view of the send window.
+                self._send_window -= chunk_size
+                if self._send_window == 0:
+                    self._send_window_event.clear()
+
+                offset += chunk_size
 
     async def read(self, n: int = -1) -> bytes:
         """
@@ -274,11 +303,12 @@ class YamuxStream:
 
             # Send window update if we've consumed a significant amount.
             #
-            # Threshold: 50% of initial window or 64KB, whichever is larger.
+            # Threshold: 25% of initial window or 16KB, whichever is larger.
             #
-            # This balances responsiveness (peer doesn't stall waiting for update)
-            # against overhead (fewer update frames).
-            threshold = max(YAMUX_INITIAL_WINDOW // 2, 64 * 1024)
+            # A lower threshold reduces the risk of flow control violations
+            # during heavy traffic. The overhead of window update frames is
+            # minimal (12 bytes) compared to the data being transferred.
+            threshold = max(YAMUX_INITIAL_WINDOW // 4, 16 * 1024)
             if self._recv_consumed >= threshold:
                 await self._send_window_update()
 
@@ -289,10 +319,22 @@ class YamuxStream:
     async def _send_window_update(self) -> None:
         """Send WINDOW_UPDATE to increase peer's send window."""
         if self._recv_consumed > 0 and not self._reset and not self._read_closed:
-            frame = window_update_frame(self.stream_id, self._recv_consumed)
-            await self.session._send_frame(frame)
-            self._recv_window += self._recv_consumed
+            # Capture delta and update local state BEFORE sending.
+            #
+            # Race condition: `await _send_frame()` can context-switch.
+            # During that switch, the peer might receive our WINDOW_UPDATE,
+            # increase its send window, and send data immediately.
+            # If we update _recv_window AFTER the await, the incoming data
+            # could arrive while _recv_window is still at the old (lower) value,
+            # causing a false flow control violation.
+            #
+            # By updating _recv_window BEFORE the await, we ensure our local
+            # accounting matches what we're advertising to the peer.
+            delta = self._recv_consumed
             self._recv_consumed = 0
+            self._recv_window += delta
+            frame = window_update_frame(self.stream_id, delta)
+            await self.session._send_frame(frame)
 
     async def close(self) -> None:
         """

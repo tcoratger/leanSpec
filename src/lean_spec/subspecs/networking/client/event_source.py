@@ -104,7 +104,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.snappy import SnappyDecompressionError, decompress
+from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.networking.config import (
@@ -154,6 +154,7 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicStream,
     is_quic_multiaddr,
 )
+from lean_spec.subspecs.networking.transport.yamux.session import YamuxStream
 from lean_spec.subspecs.networking.varint import (
     VarintError,
     decode_varint,
@@ -366,16 +367,17 @@ class GossipHandler:
 
         # Step 2: Decompress Snappy-framed data.
         #
-        # Gossipsub uses raw Snappy compression (not framed).
+        # Ethereum uses Snappy framing format for gossip (same as req/resp).
+        # Framed Snappy includes stream identifier and CRC32C checksums.
         #
-        # Raw Snappy has no stream identifier or CRC checksums.
         # Decompression fails if:
-        #   - Compressed data is corrupted or truncated.
-        #   - Copy offsets reference data beyond buffer bounds.
+        #   - Stream identifier is missing or invalid.
+        #   - CRC checksum mismatch (data corruption).
+        #   - Compressed data is truncated.
         #
         # Failed decompression indicates network corruption or a malicious peer.
         try:
-            ssz_bytes = decompress(compressed_data)
+            ssz_bytes = frame_decompress(compressed_data)
         except SnappyDecompressionError as e:
             raise GossipMessageError(f"Snappy decompression failed: {e}") from e
 
@@ -1235,11 +1237,13 @@ class LiveNetworkEventSource:
                     logger.debug("Stream accept failed for %s: %s", peer_id, e)
                     break
 
-                # For QUIC streams, we need to negotiate the protocol.
+                # Both QUIC and Yamux streams need protocol negotiation.
                 #
-                # QUIC provides the transport but not the application protocol.
                 # Multistream-select runs on top to agree on what protocol to use.
-                # Yamux streams have protocol_id set during negotiation.
+                # We create a wrapper for buffered I/O during negotiation, and
+                # preserve it for later use (to avoid losing buffered data).
+                wrapper: _QuicStreamReaderWriter | None = None
+
                 if isinstance(stream, QuicStream):
                     try:
                         wrapper = _QuicStreamReaderWriter(stream)
@@ -1292,9 +1296,69 @@ class LiveNetworkEventSource:
                         )
                         await stream.close()
                         continue
+                elif isinstance(stream, YamuxStream):
+                    # Yamux streams also need protocol negotiation.
+                    #
+                    # When a client opens a stream, they use negotiate_lazy_client
+                    # to send their protocol choice. The server must run negotiate_server
+                    # to agree on the protocol.
+                    try:
+                        wrapper = _QuicStreamReaderWriter(stream)
+                        logger.debug(
+                            "Accepting Yamux stream %d from %s, attempting protocol negotiation",
+                            stream.stream_id,
+                            peer_id,
+                        )
+                        protocol_id = await asyncio.wait_for(
+                            negotiate_server(
+                                wrapper,
+                                wrapper,  # type: ignore[arg-type]
+                                set(SUPPORTED_PROTOCOLS),
+                            ),
+                            timeout=RESP_TIMEOUT,
+                        )
+                        stream._protocol_id = protocol_id
+                        logger.debug("Negotiated protocol %s with %s", protocol_id, peer_id)
+                    except asyncio.TimeoutError:
+                        logger.debug(
+                            "Protocol negotiation timeout for %s Yamux stream %d",
+                            peer_id,
+                            stream.stream_id,
+                        )
+                        await stream.close()
+                        continue
+                    except NegotiationError as e:
+                        logger.debug(
+                            "Protocol negotiation failed for %s Yamux stream %d: %s",
+                            peer_id,
+                            stream.stream_id,
+                            e,
+                        )
+                        await stream.close()
+                        continue
+                    except EOFError:
+                        logger.debug(
+                            "Yamux stream %d closed by peer %s during negotiation",
+                            stream.stream_id,
+                            peer_id,
+                        )
+                        await stream.close()
+                        continue
+                    except Exception as e:
+                        logger.warning(
+                            "Unexpected negotiation error for %s Yamux stream %d: %s",
+                            peer_id,
+                            stream.stream_id,
+                            e,
+                        )
+                        await stream.close()
+                        continue
                 else:
-                    # Yamux streams have protocol_id set during accept.
-                    protocol_id = stream.protocol_id
+                    # Unknown stream type - use existing protocol_id if set.
+                    #
+                    # Create a wrapper for buffered I/O in case it's needed.
+                    protocol_id = getattr(stream, "protocol_id", "")
+                    wrapper = _QuicStreamReaderWriter(stream)
 
                 if protocol_id in (GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12):
                     # GossipSub stream: persistent RPC channel for protocol messages.
@@ -1312,11 +1376,16 @@ class LiveNetworkEventSource:
                     logger.debug(
                         "Received inbound gossipsub stream (%s) from %s", protocol_id, peer_id
                     )
-                    # Wrap in reader/writer for buffered I/O.
-                    wrapped_stream = _QuicStreamReaderWriter(stream)
-                    asyncio.create_task(
-                        self._gossipsub_behavior.add_peer(peer_id, wrapped_stream, inbound=True)
-                    )
+                    # Use the wrapper from negotiation to preserve any buffered data.
+                    #
+                    # During multistream negotiation, the peer may send additional
+                    # data (like subscription RPCs) that gets buffered in the wrapper.
+                    # Using the raw stream would lose this data.
+                    #
+                    # Wrapper is always set after negotiation (see above branches).
+                    assert wrapper is not None
+                    # Await directly to ensure peer is registered before setting up outbound.
+                    await self._gossipsub_behavior.add_peer(peer_id, wrapper, inbound=True)
 
                     # Now that we've received the peer's inbound stream, set up our
                     # outbound stream if we don't have one yet.
@@ -1327,10 +1396,18 @@ class LiveNetworkEventSource:
                     # For listeners: They don't set up an outbound stream immediately
                     # (to avoid interfering with the dialer's status exchange), so this
                     # is where their outbound stream gets set up.
+                    #
+                    # IMPORTANT: We add a small delay before setting up the outbound
+                    # stream to allow the dialer to complete their operations first.
+                    # This prevents deadlock while still ensuring the outbound stream
+                    # is set up quickly enough for mesh formation.
                     if not self._gossipsub_behavior.has_outbound_stream(peer_id):
-                        gossip_task = asyncio.create_task(
-                            self._setup_gossipsub_stream(peer_id, conn)
-                        )
+
+                        async def setup_outbound_with_delay() -> None:
+                            await asyncio.sleep(0.1)  # Small delay to avoid contention
+                            await self._setup_gossipsub_stream(peer_id, conn)
+
+                        gossip_task = asyncio.create_task(setup_outbound_with_delay())
                         self._gossip_tasks.add(gossip_task)
                         gossip_task.add_done_callback(self._gossip_tasks.discard)
 
@@ -1340,13 +1417,15 @@ class LiveNetworkEventSource:
                     # Handle in a separate task to allow concurrent request processing.
                     # The ReqRespServer handles decoding, dispatching, and responding.
                     #
-                    # IMPORTANT: For QUIC streams, pass the wrapper (not raw stream).
+                    # IMPORTANT: Use the wrapper from negotiation (not raw stream).
                     # The wrapper may have buffered data read during protocol negotiation.
                     # Passing the raw stream would lose that buffered data.
-                    stream_for_handler = wrapper if isinstance(stream, QuicStream) else stream
+                    #
+                    # Wrapper is always set after negotiation (see above branches).
+                    assert wrapper is not None
                     task = asyncio.create_task(
                         self._reqresp_server.handle_stream(
-                            stream_for_handler,  # type: ignore[arg-type]
+                            wrapper,  # type: ignore[arg-type]
                             protocol_id,
                         )
                     )

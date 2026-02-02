@@ -46,19 +46,35 @@ YAMUX_HEADER_SIZE: Final[int] = 12
 YAMUX_PROTOCOL_ID: Final[str] = "/yamux/1.0.0"
 """Protocol identifier for multistream-select negotiation."""
 
-YAMUX_INITIAL_WINDOW: Final[int] = 256 * 1024  # 256KB
-"""Initial receive window size per stream (matching ream/zeam defaults)."""
+YAMUX_INITIAL_WINDOW: Final[int] = 1024 * 1024  # 1MB
+"""Initial receive window size per stream.
+
+Larger window reduces risk of flow control violations during burst traffic.
+The sender can transmit more data before needing a window update from receiver.
+This helps when the receiver's read loop has variable latency (e.g., slow RPC handling).
+"""
 
 YAMUX_MAX_STREAM_WINDOW: Final[int] = 16 * 1024 * 1024  # 16MB
 """Maximum window size to prevent unbounded growth."""
 
 YAMUX_MAX_FRAME_SIZE: Final[int] = 1 * 1024 * 1024  # 1MB
 """
-Maximum frame payload size.
+Maximum frame payload size for decoding.
 
 Security: Without this limit, a malicious peer could claim a massive length in the
 header, causing us to allocate gigabytes of memory. This limit caps allocations
 at a reasonable size while still allowing large data transfers (in multiple frames).
+"""
+
+YAMUX_MAX_NOISE_PAYLOAD: Final[int] = 65519 - YAMUX_HEADER_SIZE  # 65507 bytes
+"""
+Maximum DATA payload that fits in a single Noise message.
+
+Noise protocol limits messages to 65519 bytes (65535 - 16 byte auth tag).
+After accounting for the 12-byte Yamux header, we can send 65507 bytes of
+data payload per frame over a Noise-encrypted connection.
+
+This is the chunking limit for YamuxStream.write() when running over Noise.
 """
 
 

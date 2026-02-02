@@ -12,6 +12,7 @@ __all__ = [
 ]
 
 import copy
+import logging
 from collections import defaultdict
 
 from lean_spec.subspecs.chain.config import (
@@ -46,6 +47,8 @@ from lean_spec.types import (
     Uint64,
 )
 from lean_spec.types.container import Container
+
+logger = logging.getLogger(__name__)
 
 
 class Store(Container):
@@ -795,6 +798,10 @@ class Store(Container):
         3. Run fork choice with minimum score requirement
         4. Return new Store with updated safe_target
 
+        Uses known attestations (from processed blocks) rather than new attestations
+        to ensure consistency across nodes in distributed networks. Known attestations
+        propagate via blocks and are more reliably consistent across nodes.
+
         Returns:
             New Store with updated safe_target.
         """
@@ -806,9 +813,14 @@ class Store(Container):
         min_target_score = -(-num_validators * 2 // 3)
 
         # Find head with minimum attestation threshold
+        #
+        # Use known attestations instead of new attestations for safe_target.
+        # Known attestations come from processed blocks and are consistent
+        # across nodes, whereas new attestations may differ between nodes
+        # due to gossip timing, causing safe_target divergence.
         safe_target = self._compute_lmd_ghost_head(
             start_root=self.latest_justified.root,
-            attestations=self.latest_new_attestations,
+            attestations=self.latest_known_attestations,
             min_score=min_target_score,
         )
 
@@ -964,16 +976,28 @@ class Store(Container):
         """
         # Start from current head
         target_block_root = self.head
+        head_slot = self.blocks[target_block_root].slot
+        safe_target_slot = self.blocks[self.safe_target].slot
 
         # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
         #
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
+        #
+        # IMPORTANT: Never walk back to the finalized slot itself, as attestations
+        # targeting an already-finalized slot are useless for justification.
+        # We need at least slot finalized+1 to make progress.
+        finalized_slot = self.latest_finalized.slot
+        min_target_slot = finalized_slot + Slot(1)
+
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
-            if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
-                target_block_root = self.blocks[target_block_root].parent_root
-            else:
+            current_slot = self.blocks[target_block_root].slot
+            # Stop if we've reached safe_target or the minimum target slot
+            if current_slot <= safe_target_slot or current_slot <= min_target_slot:
                 break
+            target_block_root = self.blocks[target_block_root].parent_root
+
+        after_walkback_slot = self.blocks[target_block_root].slot
 
         # Ensure target is in justifiable slot range
         #
@@ -986,6 +1010,15 @@ class Store(Container):
 
         # Create checkpoint from selected target block
         target_block = self.blocks[target_block_root]
+
+        logger.debug(
+            "get_attestation_target: head=%s safe=%s after_walkback=%s final_target=%s",
+            head_slot,
+            safe_target_slot,
+            after_walkback_slot,
+            target_block.slot,
+        )
+
         return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)
 
     def produce_attestation_data(self, slot: Slot) -> AttestationData:

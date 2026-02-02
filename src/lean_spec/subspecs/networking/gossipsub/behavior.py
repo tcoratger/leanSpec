@@ -323,6 +323,10 @@ class GossipsubBehavior:
 
             # Start receiving RPCs on the inbound stream.
             asyncio.create_task(self._receive_loop(peer_id, stream))
+            # Yield to allow the receive loop task to start before we return.
+            # This ensures the listener is ready to receive subscription RPCs
+            # that the dialer sends immediately after connecting.
+            await asyncio.sleep(0)
 
         else:
             # We opened an outbound stream - use for sending.
