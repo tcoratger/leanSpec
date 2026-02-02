@@ -812,15 +812,10 @@ class Store(Container):
         # Calculate 2/3 majority threshold (ceiling division)
         min_target_score = -(-num_validators * 2 // 3)
 
-        # Find head with minimum attestation threshold
-        #
-        # Use known attestations instead of new attestations for safe_target.
-        # Known attestations come from processed blocks and are consistent
-        # across nodes, whereas new attestations may differ between nodes
-        # due to gossip timing, causing safe_target divergence.
+        # Find head with minimum attestation threshold.
         safe_target = self._compute_lmd_ghost_head(
             start_root=self.latest_justified.root,
-            attestations=self.latest_known_attestations,
+            attestations=self.latest_new_attestations,
             min_score=min_target_score,
         )
 
@@ -983,17 +978,10 @@ class Store(Container):
         #
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
-        #
-        # IMPORTANT: Never walk back to the finalized slot itself, as attestations
-        # targeting an already-finalized slot are useless for justification.
-        # We need at least slot finalized+1 to make progress.
-        finalized_slot = self.latest_finalized.slot
-        min_target_slot = finalized_slot + Slot(1)
-
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             current_slot = self.blocks[target_block_root].slot
-            # Stop if we've reached safe_target or the minimum target slot
-            if current_slot <= safe_target_slot or current_slot <= min_target_slot:
+            # Stop if we've reached safe_target
+            if current_slot <= safe_target_slot:
                 break
             target_block_root = self.blocks[target_block_root].parent_root
 
