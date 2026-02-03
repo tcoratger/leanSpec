@@ -805,7 +805,7 @@ class Store(Container):
         # Calculate 2/3 majority threshold (ceiling division)
         min_target_score = -(-num_validators * 2 // 3)
 
-        # Find head with minimum attestation threshold
+        # Find head with minimum attestation threshold.
         safe_target = self._compute_lmd_ghost_head(
             start_root=self.latest_justified.root,
             attestations=self.latest_new_attestations,
@@ -986,6 +986,7 @@ class Store(Container):
 
         # Create checkpoint from selected target block
         target_block = self.blocks[target_block_root]
+
         return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)
 
     def produce_attestation_data(self, slot: Slot) -> AttestationData:
