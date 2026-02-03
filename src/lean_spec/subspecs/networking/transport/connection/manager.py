@@ -418,6 +418,11 @@ class ConnectionManager:
         self._server = await asyncio.start_server(handle_client, host, port)
         await self._server.serve_forever()
 
+    def stop_server(self) -> None:
+        """Stop the TCP server if running."""
+        if self._server is not None:
+            self._server.close()
+
     async def _establish_outbound(
         self,
         reader: asyncio.StreamReader,

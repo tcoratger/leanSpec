@@ -799,7 +799,11 @@ class LiveNetworkEventSource:
     async def _forward_gossipsub_events(self) -> None:
         """Forward events from GossipsubBehavior to our event queue."""
         try:
-            async for event in self._gossipsub_behavior.events():
+            while self._running:
+                event = await self._gossipsub_behavior.get_next_event()
+                if event is None:
+                    # Stopped or no event.
+                    break
                 if isinstance(event, GossipsubMessageEvent):
                     # Decode the message and emit appropriate event.
                     await self._handle_gossipsub_message(event)
@@ -848,7 +852,7 @@ class LiveNetworkEventSource:
         """
         Yield the next network event.
 
-        Blocks until an event is available.
+        Blocks until an event is available or stopped.
 
         Returns:
             Next event from the network.
@@ -856,10 +860,14 @@ class LiveNetworkEventSource:
         Raises:
             StopAsyncIteration: When no more events will arrive.
         """
-        if not self._running:
-            raise StopAsyncIteration
+        while self._running:
+            try:
+                return await asyncio.wait_for(self._events.get(), timeout=0.5)
+            except asyncio.TimeoutError:
+                # Check running flag and loop.
+                continue
 
-        return await self._events.get()
+        raise StopAsyncIteration
 
     async def dial(self, multiaddr: str) -> PeerId | None:
         """
@@ -1134,15 +1142,26 @@ class LiveNetworkEventSource:
             await self._events.put(PeerDisconnectedEvent(peer_id=peer_id))
             logger.info("Disconnected from peer %s", peer_id)
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         """Stop the event source and cancel background tasks."""
         self._running = False
 
-        # Stop the gossipsub behavior.
-        asyncio.create_task(self._gossipsub_behavior.stop())
-
+        # Cancel gossip tasks first (including event forwarding task).
+        # This must happen BEFORE stopping gossipsub behavior to avoid
+        # async generator cleanup race conditions.
         for task in self._gossip_tasks:
             task.cancel()
+
+        # Wait for gossip tasks to complete.
+        for task in self._gossip_tasks:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self._gossip_tasks.clear()
+
+        # Now stop the gossipsub behavior.
+        await self._gossipsub_behavior.stop()
 
     async def _emit_gossip_block(
         self,

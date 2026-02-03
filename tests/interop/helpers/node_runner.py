@@ -104,27 +104,33 @@ class TestNode:
 
     async def stop(self) -> None:
         """Stop the node gracefully."""
+        # Signal the node and event source to stop.
         self.node.stop()
-        self.event_source.stop()
+        self.event_source._running = False
 
-        # Stop the node task.
-        if self._task is not None:
-            try:
-                await asyncio.wait_for(self._task, timeout=5.0)
-            except asyncio.TimeoutError:
-                logger.warning("Node %d did not stop gracefully, cancelling", self.index)
-                self._task.cancel()
-                try:
-                    await self._task
-                except asyncio.CancelledError:
-                    pass
+        # Set the stop event on gossipsub to release waiting tasks.
+        self.event_source._gossipsub_behavior._stop_event.set()
 
-        # Cancel the listener task with timeout.
-        if self._listener_task is not None:
+        # Close the TCP server first (causes serve_forever to exit).
+        self.event_source.connection_manager.stop_server()
+
+        # Cancel the listener task (it blocks on serve_forever).
+        if self._listener_task is not None and not self._listener_task.done():
             self._listener_task.cancel()
             try:
                 await asyncio.wait_for(self._listener_task, timeout=2.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                pass
+
+        # Stop the event source (cancels gossip tasks).
+        await self.event_source.stop()
+
+        # Cancel the node task (it contains the TaskGroup with services).
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
+            try:
+                await asyncio.wait_for(self._task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
                 pass
 
     async def dial(self, addr: str, timeout: float = 10.0) -> bool:

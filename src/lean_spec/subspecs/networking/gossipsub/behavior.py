@@ -139,6 +139,9 @@ class PeerState:
     inbound_stream: Any | None = None
     """Inbound RPC stream (they opened this to receive)."""
 
+    receive_task: asyncio.Task[None] | None = None
+    """Task running the receive loop for this peer."""
+
     last_rpc_time: float = 0.0
     """Timestamp of last RPC exchange."""
 
@@ -175,7 +178,10 @@ class GossipsubBehavior:
         await behavior.publish(topic, data)
 
         # Process events
-        async for event in behavior.events():
+        while True:
+            event = await behavior.get_next_event()
+            if event is None:
+                break
             if isinstance(event, GossipsubMessageEvent):
                 # Handle received message
                 pass
@@ -212,6 +218,9 @@ class GossipsubBehavior:
 
     _message_handler: Callable[[GossipsubMessageEvent], None] | None = None
     """Optional callback for received messages."""
+
+    _stop_event: asyncio.Event = field(default_factory=asyncio.Event)
+    """Event to signal stop to the events generator."""
 
     def __post_init__(self) -> None:
         """Initialize fields that depend on other fields."""
@@ -281,6 +290,10 @@ class GossipsubBehavior:
         """Stop the gossipsub behavior."""
         self._running = False
 
+        # Signal events() generator to stop.
+        self._stop_event.set()
+
+        # Cancel heartbeat task.
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
             try:
@@ -288,6 +301,20 @@ class GossipsubBehavior:
             except asyncio.CancelledError:
                 pass
             self._heartbeat_task = None
+
+        # Cancel all receive loop tasks.
+        receive_tasks = []
+        for state in self._peers.values():
+            if state.receive_task is not None and not state.receive_task.done():
+                state.receive_task.cancel()
+                receive_tasks.append(state.receive_task)
+
+        # Wait for all receive tasks to complete.
+        for task in receive_tasks:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
         logger.info("GossipsubBehavior stopped")
 
@@ -319,10 +346,14 @@ class GossipsubBehavior:
                     logger.debug("Peer %s already has inbound stream, ignoring", peer_id)
                     return
                 existing.inbound_stream = stream
+                state = existing
                 logger.debug("Added inbound stream for peer %s", peer_id)
 
             # Start receiving RPCs on the inbound stream.
-            asyncio.create_task(self._receive_loop(peer_id, stream))
+            # Track the task so we can cancel it on stop().
+            receive_task = asyncio.create_task(self._receive_loop(peer_id, stream))
+            state.receive_task = receive_task
+
             # Yield to allow the receive loop task to start before we return.
             # This ensures the listener is ready to receive subscription RPCs
             # that the dialer sends immediately after connecting.
@@ -426,19 +457,61 @@ class GossipsubBehavior:
 
         logger.debug("Published message to %d peers on topic %s", len(peers), topic)
 
-    async def events(self):
+    async def get_next_event(
+        self,
+    ) -> GossipsubMessageEvent | GossipsubPeerEvent | None:
         """
-        Async generator yielding gossipsub events.
+        Get the next event from the queue.
 
-        Yields GossipsubMessageEvent for received messages
-        and GossipsubPeerEvent for subscription changes.
+        Returns None when stopped or no event available.
+
+        Returns:
+            The next event, or None if stopped.
         """
-        while self._running:
+        if not self._running:
+            return None
+
+        # Create tasks for both queue get and stop event.
+        queue_task = asyncio.create_task(self._event_queue.get())
+        stop_task = asyncio.create_task(self._stop_event.wait())
+
+        try:
+            done, pending = await asyncio.wait(
+                [queue_task, stop_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            # Cancel pending tasks.
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+            # Check if stop was signaled.
+            if stop_task in done:
+                return None
+
+            # Return the event from the queue.
+            if queue_task in done:
+                return queue_task.result()
+
+            return None
+
+        except asyncio.CancelledError:
+            # Cancel pending tasks on external cancellation.
+            queue_task.cancel()
+            stop_task.cancel()
             try:
-                event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)
-                yield event
-            except asyncio.TimeoutError:
-                continue
+                await queue_task
+            except asyncio.CancelledError:
+                pass
+            try:
+                await stop_task
+            except asyncio.CancelledError:
+                pass
+            return None
 
     # =========================================================================
     # Internal Methods
