@@ -1,5 +1,7 @@
 """State Container for the Lean Ethereum consensus specification."""
 
+from __future__ import annotations
+
 from typing import AbstractSet, Iterable
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
