@@ -19,7 +19,6 @@ from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.peer.info import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.transport.connection.manager import ConnectionManager
 from lean_spec.subspecs.networking.types import ConnectionState
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.validator import ValidatorRegistry
@@ -111,10 +110,7 @@ class TestNode:
         # Set the stop event on gossipsub to release waiting tasks.
         self.event_source._gossipsub_behavior._stop_event.set()
 
-        # Close the TCP server first (causes serve_forever to exit).
-        self.event_source.connection_manager.stop_server()
-
-        # Cancel the listener task (it blocks on serve_forever).
+        # Cancel the listener task.
         if self._listener_task is not None and not self._listener_task.done():
             self._listener_task.cancel()
             try:
@@ -257,8 +253,7 @@ class NodeCluster:
         # TODO: Complete QUIC integration and switch to UDP transport.
         listen_addr = f"/ip4/127.0.0.1/tcp/{p2p_port}"
 
-        connection_manager = ConnectionManager.create()
-        event_source = LiveNetworkEventSource.create(connection_manager)
+        event_source = await LiveNetworkEventSource.create()
         event_source.set_fork_digest(self.fork_digest)
 
         validator_registry: ValidatorRegistry | None = None

@@ -3,14 +3,14 @@ Network event source bridging transport to sync service.
 
 This module implements NetworkEventSource, producing events from real
 network connections. It bridges the gap between the low-level transport
-layer (ConnectionManager + yamux) and the high-level sync service.
+layer (QUIC ConnectionManager) and the high-level sync service.
 
 
 WHY THIS MODULE EXISTS
 ----------------------
 The sync service operates at a high level of abstraction. It thinks in
 terms of "block arrived" or "peer connected" events. The transport layer
-operates at the byte level: TCP streams, encrypted frames, multiplexed
+operates at the byte level: QUIC streams, encrypted frames, multiplexed
 channels. This module translates between these worlds.
 
 
@@ -18,7 +18,7 @@ EVENT FLOW
 ----------
 Messages flow through the system in stages:
 
-1. ConnectionManager establishes connections (Noise + yamux).
+1. ConnectionManager establishes QUIC connections.
 2. LiveNetworkEventSource monitors connections for activity.
 3. Incoming messages are parsed and converted to NetworkEvent objects.
 4. NetworkService consumes events via async iteration.
@@ -28,7 +28,7 @@ GOSSIP MESSAGE FLOW
 -------------------
 When a peer publishes a block or attestation, it arrives as follows:
 
-1. Peer opens a yamux stream with protocol ID "/meshsub/1.1.0".
+1. Peer opens a QUIC stream with protocol ID "/meshsub/1.1.0".
 2. Peer sends: [topic_length][topic][data_length][compressed_data].
 3. We parse the topic to determine message type (block vs attestation).
 4. We decompress the raw Snappy payload.
@@ -38,7 +38,7 @@ When a peer publishes a block or attestation, it arrives as follows:
 
 GOSSIP MESSAGE FORMAT
 ---------------------
-Incoming gossip messages arrive on yamux streams with the gossipsub protocol ID.
+Incoming gossip messages arrive on QUIC streams with the gossipsub protocol ID.
 The message format is:
 
 +------------------+---------------------------------------------+
@@ -139,11 +139,7 @@ from lean_spec.subspecs.networking.service.events import (
     PeerStatusEvent,
 )
 from lean_spec.subspecs.networking.transport import PeerId
-from lean_spec.subspecs.networking.transport.connection.manager import (
-    ConnectionManager,
-    YamuxConnection,
-)
-from lean_spec.subspecs.networking.transport.connection.types import Stream
+from lean_spec.subspecs.networking.transport.connection import ConnectionManager, Stream
 from lean_spec.subspecs.networking.transport.multistream import (
     NegotiationError,
     negotiate_server,
@@ -154,7 +150,6 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicStream,
     is_quic_multiaddr,
 )
-from lean_spec.subspecs.networking.transport.yamux.session import YamuxStream
 from lean_spec.subspecs.networking.varint import (
     VarintError,
     decode_varint,
@@ -187,7 +182,7 @@ class _QuicStreamReaderWriter:
     """Adapts QuicStream for multistream-select negotiation.
 
     Provides buffered read/write interface matching asyncio StreamReader/Writer.
-    Used during protocol negotiation on both TCP and QUIC streams.
+    Used during protocol negotiation on QUIC streams.
     """
 
     def __init__(self, stream: QuicStream | Stream) -> None:
@@ -421,14 +416,14 @@ class GossipHandler:
 
 async def read_gossip_message(stream: Stream) -> tuple[str, bytes]:
     """
-    Read a gossip message from a yamux stream.
+    Read a gossip message from a QUIC stream.
 
     Gossip message wire format::
 
         [topic_len: varint][topic: UTF-8][data_len: varint][data: bytes]
 
     Args:
-        stream: Yamux stream to read from.
+        stream: QUIC stream to read from.
 
     Returns:
         Tuple of (topic_string, compressed_data).
@@ -458,7 +453,7 @@ async def read_gossip_message(stream: Stream) -> tuple[str, bytes]:
     4. Repeat for data length and data payload.
 
     This handles network fragmentation gracefully. Data may arrive in
-    arbitrary chunks due to TCP buffering and yamux framing.
+    arbitrary chunks due to QUIC framing.
 
 
     EDGE CASES HANDLED
@@ -598,9 +593,9 @@ class LiveNetworkEventSource:
     """
 
     connection_manager: ConnectionManager
-    """Underlying transport manager for TCP connections.
+    """Underlying transport manager for QUIC connections.
 
-    Handles the full connection stack: TCP, Noise encryption, yamux multiplexing.
+    Handles the full connection stack: QUIC transport with TLS 1.3 encryption.
     """
 
     reqresp_client: ReqRespClient
@@ -622,11 +617,10 @@ class LiveNetworkEventSource:
     Events are produced by background tasks and consumed via async iteration.
     """
 
-    _connections: dict[PeerId, YamuxConnection | QuicConnection] = field(default_factory=dict)
+    _connections: dict[PeerId, QuicConnection] = field(default_factory=dict)
     """Active connections by peer ID.
 
     Used to route outbound messages and track peer state.
-    Supports both yamux (TCP) and QUIC connection types.
     """
 
     _peer_info: dict[PeerId, PeerInfo] = field(default_factory=dict)
@@ -698,7 +692,7 @@ class LiveNetworkEventSource:
         )
 
     @classmethod
-    def create(
+    async def create(
         cls,
         connection_manager: ConnectionManager | None = None,
     ) -> LiveNetworkEventSource:
@@ -712,7 +706,10 @@ class LiveNetworkEventSource:
             Initialized event source.
         """
         if connection_manager is None:
-            connection_manager = ConnectionManager.create()
+            from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
+
+            identity_key = IdentityKeypair.generate()
+            connection_manager = await ConnectionManager.create(identity_key)
 
         reqresp_client = ReqRespClient(connection_manager=connection_manager)
 
@@ -925,13 +922,13 @@ class LiveNetworkEventSource:
         """Initialize QUIC manager lazily on first use.
 
         Reuses the identity key from the connection manager for consistency.
-        This ensures the same peer ID is used for both TCP and QUIC connections.
+        This ensures the same peer ID is used across all connections.
         Called automatically before any QUIC operation.
         """
         if self.quic_manager is None:
-            # Reuse the same identity key from the TCP connection manager.
-            # This ensures our peer ID is consistent across all transports.
-            identity_key = self.connection_manager.identity_key
+            # Reuse the same identity key from the connection manager.
+            # This ensures our peer ID is consistent across all connections.
+            identity_key = self.connection_manager._identity_key
             self.quic_manager = await QuicConnectionManager.create(identity_key)
 
     async def _dial_quic(self, multiaddr: str) -> QuicConnection:
@@ -1031,7 +1028,7 @@ class LiveNetworkEventSource:
 
         logger.info("Accepted QUIC connection from peer %s", peer_id)
 
-    async def _handle_inbound_connection(self, conn: YamuxConnection) -> None:
+    async def _handle_inbound_connection(self, conn: QuicConnection) -> None:
         """
         Handle a new inbound connection.
 
@@ -1064,14 +1061,14 @@ class LiveNetworkEventSource:
     async def _exchange_status(
         self,
         peer_id: PeerId,
-        conn: YamuxConnection | QuicConnection,
+        conn: QuicConnection,
     ) -> None:
         """
         Exchange Status messages with a peer.
 
         Args:
             peer_id: Peer identifier.
-            conn: Connection to use.
+            conn: QuicConnection to use.
         """
         if self._our_status is None:
             logger.debug("No status set, skipping status exchange")
@@ -1100,7 +1097,7 @@ class LiveNetworkEventSource:
     async def _setup_gossipsub_stream(
         self,
         peer_id: PeerId,
-        conn: YamuxConnection | QuicConnection,
+        conn: QuicConnection,
     ) -> None:
         """
         Set up the GossipSub stream for a peer.
@@ -1110,7 +1107,7 @@ class LiveNetworkEventSource:
 
         Args:
             peer_id: Peer identifier.
-            conn: Connection to use.
+            conn: QuicConnection to use.
         """
         try:
             # Open the gossipsub stream.
@@ -1195,9 +1192,7 @@ class LiveNetworkEventSource:
             GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic)
         )
 
-    async def _accept_streams(
-        self, peer_id: PeerId, conn: YamuxConnection | QuicConnection
-    ) -> None:
+    async def _accept_streams(self, peer_id: PeerId, conn: QuicConnection) -> None:
         """
         Accept incoming streams from a connection.
 
@@ -1206,12 +1201,12 @@ class LiveNetworkEventSource:
 
         Args:
             peer_id: Peer that owns the connection.
-            conn: Yamux connection to accept streams from.
+            conn: QUIC connection to accept streams from.
 
 
         WHY BACKGROUND STREAM ACCEPTANCE?
         ---------------------------------
-        Yamux multiplexing allows peers to open many streams concurrently.
+        QUIC multiplexing allows peers to open many streams concurrently.
         Each stream is an independent request/response conversation.
 
         Running stream acceptance in the background allows:
@@ -1246,7 +1241,7 @@ class LiveNetworkEventSource:
                     # Accept the next incoming stream.
                     #
                     # This blocks until a peer opens a stream or the connection closes.
-                    # Yamux handles the low-level multiplexing.
+                    # QUIC handles the low-level multiplexing.
                     stream = await conn.accept_stream()
                 except Exception as e:
                     # Connection closed or other transport error.
@@ -1256,128 +1251,64 @@ class LiveNetworkEventSource:
                     logger.debug("Stream accept failed for %s: %s", peer_id, e)
                     break
 
-                # Both QUIC and Yamux streams need protocol negotiation.
+                # QUIC streams need protocol negotiation.
                 #
                 # Multistream-select runs on top to agree on what protocol to use.
                 # We create a wrapper for buffered I/O during negotiation, and
                 # preserve it for later use (to avoid losing buffered data).
                 wrapper: _QuicStreamReaderWriter | None = None
 
-                if isinstance(stream, QuicStream):
-                    try:
-                        wrapper = _QuicStreamReaderWriter(stream)
-                        logger.debug(
-                            "Accepting stream %d from %s, attempting protocol negotiation",
-                            stream.stream_id,
-                            peer_id,
-                        )
-                        protocol_id = await asyncio.wait_for(
-                            negotiate_server(
-                                wrapper,
-                                wrapper,  # type: ignore[arg-type]
-                                set(SUPPORTED_PROTOCOLS),
-                            ),
-                            timeout=RESP_TIMEOUT,
-                        )
-                        stream._protocol_id = protocol_id
-                        logger.debug("Negotiated protocol %s with %s", protocol_id, peer_id)
-                    except asyncio.TimeoutError:
-                        logger.debug(
-                            "Protocol negotiation timeout for %s stream %d",
-                            peer_id,
-                            stream.stream_id,
-                        )
-                        await stream.close()
-                        continue
-                    except NegotiationError as e:
-                        logger.debug(
-                            "Protocol negotiation failed for %s stream %d: %s",
-                            peer_id,
-                            stream.stream_id,
-                            e,
-                        )
-                        await stream.close()
-                        continue
-                    except EOFError:
-                        logger.debug(
-                            "Stream %d closed by peer %s during negotiation",
-                            stream.stream_id,
-                            peer_id,
-                        )
-                        await stream.close()
-                        continue
-                    except Exception as e:
-                        logger.warning(
-                            "Unexpected negotiation error for %s stream %d: %s",
-                            peer_id,
-                            stream.stream_id,
-                            e,
-                        )
-                        await stream.close()
-                        continue
-                elif isinstance(stream, YamuxStream):
-                    # Yamux streams also need protocol negotiation.
-                    #
-                    # When a client opens a stream, they use negotiate_lazy_client
-                    # to send their protocol choice. The server must run negotiate_server
-                    # to agree on the protocol.
-                    try:
-                        wrapper = _QuicStreamReaderWriter(stream)
-                        logger.debug(
-                            "Accepting Yamux stream %d from %s, attempting protocol negotiation",
-                            stream.stream_id,
-                            peer_id,
-                        )
-                        protocol_id = await asyncio.wait_for(
-                            negotiate_server(
-                                wrapper,
-                                wrapper,  # type: ignore[arg-type]
-                                set(SUPPORTED_PROTOCOLS),
-                            ),
-                            timeout=RESP_TIMEOUT,
-                        )
-                        stream._protocol_id = protocol_id
-                        logger.debug("Negotiated protocol %s with %s", protocol_id, peer_id)
-                    except asyncio.TimeoutError:
-                        logger.debug(
-                            "Protocol negotiation timeout for %s Yamux stream %d",
-                            peer_id,
-                            stream.stream_id,
-                        )
-                        await stream.close()
-                        continue
-                    except NegotiationError as e:
-                        logger.debug(
-                            "Protocol negotiation failed for %s Yamux stream %d: %s",
-                            peer_id,
-                            stream.stream_id,
-                            e,
-                        )
-                        await stream.close()
-                        continue
-                    except EOFError:
-                        logger.debug(
-                            "Yamux stream %d closed by peer %s during negotiation",
-                            stream.stream_id,
-                            peer_id,
-                        )
-                        await stream.close()
-                        continue
-                    except Exception as e:
-                        logger.warning(
-                            "Unexpected negotiation error for %s Yamux stream %d: %s",
-                            peer_id,
-                            stream.stream_id,
-                            e,
-                        )
-                        await stream.close()
-                        continue
-                else:
-                    # Unknown stream type - use existing protocol_id if set.
-                    #
-                    # Create a wrapper for buffered I/O in case it's needed.
-                    protocol_id = getattr(stream, "protocol_id", "")
+                try:
                     wrapper = _QuicStreamReaderWriter(stream)
+                    logger.debug(
+                        "Accepting stream %d from %s, attempting protocol negotiation",
+                        stream.stream_id,
+                        peer_id,
+                    )
+                    protocol_id = await asyncio.wait_for(
+                        negotiate_server(
+                            wrapper,
+                            wrapper,  # type: ignore[arg-type]
+                            set(SUPPORTED_PROTOCOLS),
+                        ),
+                        timeout=RESP_TIMEOUT,
+                    )
+                    stream._protocol_id = protocol_id
+                    logger.debug("Negotiated protocol %s with %s", protocol_id, peer_id)
+                except asyncio.TimeoutError:
+                    logger.debug(
+                        "Protocol negotiation timeout for %s stream %d",
+                        peer_id,
+                        stream.stream_id,
+                    )
+                    await stream.close()
+                    continue
+                except NegotiationError as e:
+                    logger.debug(
+                        "Protocol negotiation failed for %s stream %d: %s",
+                        peer_id,
+                        stream.stream_id,
+                        e,
+                    )
+                    await stream.close()
+                    continue
+                except EOFError:
+                    logger.debug(
+                        "Stream %d closed by peer %s during negotiation",
+                        stream.stream_id,
+                        peer_id,
+                    )
+                    await stream.close()
+                    continue
+                except Exception as e:
+                    logger.warning(
+                        "Unexpected negotiation error for %s stream %d: %s",
+                        peer_id,
+                        stream.stream_id,
+                        e,
+                    )
+                    await stream.close()
+                    continue
 
                 if protocol_id in (GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12):
                     # GossipSub stream: persistent RPC channel for protocol messages.
@@ -1483,14 +1414,14 @@ class LiveNetworkEventSource:
 
         Args:
             peer_id: Peer that sent the message.
-            stream: Yamux stream containing the gossip message.
+            stream: QUIC stream containing the gossip message.
 
 
         COMPLETE FLOW
         -------------
         A gossip message goes through these stages:
 
-        1. Read raw bytes from yamux stream.
+        1. Read raw bytes from QUIC stream.
         2. Parse topic string and data length (varints).
         3. Decompress Snappy-framed data.
         4. Decode SSZ bytes into typed object.
@@ -1514,7 +1445,7 @@ class LiveNetworkEventSource:
         RESOURCE CLEANUP
         ----------------
         The stream MUST be closed in finally, even if errors occur.
-        Unclosed streams leak yamux resources and can cause deadlocks.
+        Unclosed streams leak QUIC resources and can cause deadlocks.
         """
         try:
             # Step 1: Read the gossip message from the stream.
@@ -1567,7 +1498,7 @@ class LiveNetworkEventSource:
             logger.warning("Unexpected error handling gossip from %s: %s", peer_id, e)
 
         finally:
-            # Always close the stream to release yamux resources.
+            # Always close the stream to release QUIC resources.
             #
             # Unclosed streams cause resource leaks and can deadlock
             # the connection if too many accumulate.
@@ -1606,7 +1537,7 @@ class LiveNetworkEventSource:
 
     async def _send_gossip_message(
         self,
-        conn: YamuxConnection | QuicConnection,
+        conn: QuicConnection,
         topic: str,
         data: bytes,
     ) -> None:
@@ -1616,7 +1547,7 @@ class LiveNetworkEventSource:
         Opens a new stream for the gossip message and sends the data.
 
         Args:
-            conn: Connection to the peer.
+            conn: QuicConnection to the peer.
             topic: Topic string for the message.
             data: Message bytes to send.
         """

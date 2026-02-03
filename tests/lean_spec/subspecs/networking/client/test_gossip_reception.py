@@ -47,7 +47,7 @@ class MockStream:
     """
     A mock stream for testing read_gossip_message.
 
-    Simulates a yamux stream by returning data in chunks.
+    Simulates a QUIC stream by returning data in chunks.
     """
 
     def __init__(self, data: bytes, chunk_size: int = 1024) -> None:
@@ -61,6 +61,12 @@ class MockStream:
         self.data = data
         self.chunk_size = chunk_size
         self.offset = 0
+        self._stream_id = 0
+
+    @property
+    def stream_id(self) -> int:
+        """Return a mock stream ID."""
+        return self._stream_id
 
     @property
     def protocol_id(self) -> str:
