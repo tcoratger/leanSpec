@@ -1026,7 +1026,8 @@ class LiveNetworkEventSource:
         # Instead, we set up our outbound stream AFTER receiving their inbound
         # gossipsub stream - see _accept_streams where this is triggered.
 
-        logger.info("Accepted QUIC connection from peer %s", peer_id)
+        gs_id = self._gossipsub_behavior._instance_id % 0xFFFF
+        logger.info("[GS %x] Accepted QUIC connection from peer %s", gs_id, peer_id)
 
     async def _handle_inbound_connection(self, conn: QuicConnection) -> None:
         """
@@ -1146,11 +1147,14 @@ class LiveNetworkEventSource:
         # Cancel gossip tasks first (including event forwarding task).
         # This must happen BEFORE stopping gossipsub behavior to avoid
         # async generator cleanup race conditions.
-        for task in self._gossip_tasks:
+        #
+        # Copy the set because done callbacks may modify it during iteration.
+        tasks_to_cancel = list(self._gossip_tasks)
+        for task in tasks_to_cancel:
             task.cancel()
 
         # Wait for gossip tasks to complete.
-        for task in self._gossip_tasks:
+        for task in tasks_to_cancel:
             try:
                 await task
             except asyncio.CancelledError:
@@ -1260,8 +1264,10 @@ class LiveNetworkEventSource:
 
                 try:
                     wrapper = _QuicStreamReaderWriter(stream)
+                    gs_id = self._gossipsub_behavior._instance_id % 0xFFFF
                     logger.debug(
-                        "Accepting stream %d from %s, attempting protocol negotiation",
+                        "[GS %x] Accepting stream %d from %s, attempting protocol negotiation",
+                        gs_id,
                         stream.stream_id,
                         peer_id,
                     )
@@ -1323,8 +1329,12 @@ class LiveNetworkEventSource:
                     #
                     # We support both v1.1 and v1.2 - the difference is IDONTWANT
                     # messages which we can handle gracefully.
+                    gs_id = self._gossipsub_behavior._instance_id % 0xFFFF
                     logger.debug(
-                        "Received inbound gossipsub stream (%s) from %s", protocol_id, peer_id
+                        "[GS %x] Received inbound gossipsub stream (%s) from %s",
+                        gs_id,
+                        protocol_id,
+                        peer_id,
                     )
                     # Use the wrapper from negotiation to preserve any buffered data.
                     #

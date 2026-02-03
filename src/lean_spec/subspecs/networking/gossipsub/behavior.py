@@ -190,6 +190,9 @@ class GossipsubBehavior:
     params: GossipsubParameters = field(default_factory=GossipsubParameters)
     """Protocol parameters."""
 
+    _instance_id: int = field(default_factory=lambda: id(object()))
+    """Unique instance ID for debugging."""
+
     mesh: MeshState = field(init=False)
     """Mesh topology state."""
 
@@ -284,7 +287,7 @@ class GossipsubBehavior:
 
         self._running = True
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-        logger.info("GossipsubBehavior started")
+        logger.info("[GS %x] GossipsubBehavior started", self._instance_id % 0xFFFF)
 
     async def stop(self) -> None:
         """Stop the gossipsub behavior."""
@@ -339,7 +342,8 @@ class GossipsubBehavior:
                 # Peer not yet known, create state with inbound stream.
                 state = PeerState(peer_id=peer_id, inbound_stream=stream)
                 self._peers[peer_id] = state
-                logger.info("Added gossipsub peer %s (inbound first)", peer_id)
+                gs_id = self._instance_id % 0xFFFF
+                logger.info("[GS %x] Added gossipsub peer %s (inbound first)", gs_id, peer_id)
             else:
                 # Peer already exists, set the inbound stream.
                 if existing.inbound_stream is not None:
@@ -365,7 +369,8 @@ class GossipsubBehavior:
                 # Peer not yet known, create state with outbound stream.
                 state = PeerState(peer_id=peer_id, outbound_stream=stream)
                 self._peers[peer_id] = state
-                logger.info("Added gossipsub peer %s (outbound first)", peer_id)
+                gs_id = self._instance_id % 0xFFFF
+                logger.info("[GS %x] Added gossipsub peer %s (outbound first)", gs_id, peer_id)
             else:
                 # Peer already exists, set the outbound stream.
                 if existing.outbound_stream is not None:
@@ -447,6 +452,19 @@ class GossipsubBehavior:
             peers = self.mesh.get_mesh_peers(topic)
         else:
             peers = self.mesh.get_fanout_peers(topic)
+
+        # Log mesh state when empty (helps debug mesh formation issues).
+        if not peers:
+            subscribed_peers = [p for p, s in self._peers.items() if topic in s.subscriptions]
+            outbound_peers = [p for p, s in self._peers.items() if s.outbound_stream]
+            logger.warning(
+                "[GS %x] Empty mesh for %s: total_peers=%d subscribed=%d outbound=%d",
+                self._instance_id % 0xFFFF,  # Short hex ID
+                topic.split("/")[-2],  # Just "block" or "attestation"
+                len(self._peers),
+                len(subscribed_peers),
+                len(outbound_peers),
+            )
 
         # Create RPC with message
         rpc = RPC(publish=[msg])

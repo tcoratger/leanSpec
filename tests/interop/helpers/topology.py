@@ -66,11 +66,20 @@ def mesh_2_2_2() -> list[tuple[int, int]]:
     """
     Ream-compatible mesh topology.
 
-    Nodes 1 and 2 connect to node 0::
+    Mirrors Ream's topology: vec![vec![], vec![0], vec![0, 1]]
 
-        Node 1 ---> Node 0 <--- Node 2
+    - Node 0: bootnode (accepts connections)
+    - Node 1: connects to node 0
+    - Node 2: connects to both node 0 AND node 1
+
+    This creates a full mesh::
+
+        Node 0 <---> Node 1
+          ^           ^
+          |           |
+          +---> Node 2 <---+
 
     Returns:
         List of (dialer, listener) index pairs.
     """
-    return [(1, 0), (2, 0)]
+    return [(1, 0), (2, 0), (2, 1)]

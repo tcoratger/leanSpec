@@ -24,14 +24,22 @@ logging.basicConfig(
 )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def port_allocator() -> PortAllocator:
-    """Provide a fresh port allocator for each test."""
+    """
+    Provide a shared port allocator across all tests.
+
+    Session-scoped to prevent port conflicts from TIME_WAIT state.
+    Each test gets unique ports that don't overlap.
+    """
     return PortAllocator()
 
 
 @pytest.fixture
-async def node_cluster(request: pytest.FixtureRequest) -> AsyncGenerator[NodeCluster, None]:
+async def node_cluster(
+    request: pytest.FixtureRequest,
+    port_allocator: PortAllocator,
+) -> AsyncGenerator[NodeCluster, None]:
     """
     Provide a node cluster with automatic cleanup.
 
@@ -45,7 +53,7 @@ async def node_cluster(request: pytest.FixtureRequest) -> AsyncGenerator[NodeClu
     marker = request.node.get_closest_marker("num_validators")
     num_validators = marker.args[0] if marker else 3
 
-    cluster = NodeCluster(num_validators=num_validators)
+    cluster = NodeCluster(num_validators=num_validators, port_allocator=port_allocator)
 
     try:
         yield cluster
@@ -54,9 +62,11 @@ async def node_cluster(request: pytest.FixtureRequest) -> AsyncGenerator[NodeClu
 
 
 @pytest.fixture
-async def two_node_cluster() -> AsyncGenerator[NodeCluster, None]:
+async def two_node_cluster(
+    port_allocator: PortAllocator,
+) -> AsyncGenerator[NodeCluster, None]:
     """Provide a two-node cluster with one validator each."""
-    cluster = NodeCluster(num_validators=2)
+    cluster = NodeCluster(num_validators=2, port_allocator=port_allocator)
 
     try:
         yield cluster
@@ -65,9 +75,11 @@ async def two_node_cluster() -> AsyncGenerator[NodeCluster, None]:
 
 
 @pytest.fixture
-async def three_node_cluster() -> AsyncGenerator[NodeCluster, None]:
+async def three_node_cluster(
+    port_allocator: PortAllocator,
+) -> AsyncGenerator[NodeCluster, None]:
     """Provide a three-node cluster with one validator each."""
-    cluster = NodeCluster(num_validators=3)
+    cluster = NodeCluster(num_validators=3, port_allocator=port_allocator)
 
     try:
         yield cluster

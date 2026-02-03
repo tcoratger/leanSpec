@@ -49,7 +49,7 @@ class TestNode:
     """Network event source for connection management."""
 
     listen_addr: str
-    """P2P listen address (e.g., '/ip4/127.0.0.1/tcp/20600')."""
+    """P2P listen address (e.g., '/ip4/127.0.0.1/udp/20600/quic-v1')."""
 
     api_port: int
     """HTTP API port."""
@@ -61,7 +61,7 @@ class TestNode:
     """Background task running the node."""
 
     _listener_task: asyncio.Task[None] | None = field(default=None, repr=False)
-    """Background task for the TCP listener."""
+    """Background task for the QUIC listener."""
 
     @property
     def _store(self):
@@ -86,8 +86,12 @@ class TestNode:
 
     @property
     def peer_count(self) -> int:
-        """Number of connected peers."""
-        return len(self.node.sync_service.peer_manager)
+        """Number of connected peers.
+
+        Uses event_source._connections for consistency with disconnect_all().
+        The peer_manager is updated asynchronously and may lag behind.
+        """
+        return len(self.event_source._connections)
 
     @property
     def head_root(self) -> Bytes32:
@@ -234,6 +238,8 @@ class NodeCluster:
         node_index: int,
         validator_indices: list[int] | None = None,
         bootnodes: list[str] | None = None,
+        *,
+        start_services: bool = True,
     ) -> TestNode:
         """
         Start a new node.
@@ -242,16 +248,16 @@ class NodeCluster:
             node_index: Index for this node (for logging/identification).
             validator_indices: Which validators this node controls.
             bootnodes: Addresses to connect to on startup.
+            start_services: If True, start the node's services immediately.
+                If False, call test_node.start() manually after mesh is stable.
 
         Returns:
             Started TestNode.
         """
         p2p_port, api_port = self.port_allocator.allocate_ports()
-        # NOTE: Ream/Zeam use QUIC over UDP as the primary transport.
-        # QUIC has native multiplexing and flow control.
-        # However, our QUIC integration isn't fully working with gossipsub yet.
-        # TODO: Complete QUIC integration and switch to UDP transport.
-        listen_addr = f"/ip4/127.0.0.1/tcp/{p2p_port}"
+        # QUIC over UDP is the only supported transport.
+        # QUIC provides native multiplexing, flow control, and TLS 1.3 encryption.
+        listen_addr = f"/ip4/127.0.0.1/udp/{p2p_port}/quic-v1"
 
         event_source = await LiveNetworkEventSource.create()
         event_source.set_fork_digest(self.fork_digest)
@@ -351,19 +357,29 @@ class NodeCluster:
         event_source.subscribe_gossip_topic(block_topic)
         event_source.subscribe_gossip_topic(attestation_topic)
 
-        await test_node.start()
+        # Optionally start the node's services.
+        #
+        # When start_services=False, the node networking is ready but validators
+        # won't produce blocks/attestations until start() is called explicitly.
+        # This allows the mesh to form before block production begins.
+        if start_services:
+            await test_node.start()
 
         if bootnodes:
             for addr in bootnodes:
                 await test_node.dial(addr)
 
         self.nodes.append(test_node)
+        # Log node startup with gossipsub instance ID for debugging.
+        gs_id = event_source._gossipsub_behavior._instance_id % 0xFFFF
         logger.info(
-            "Started node %d on %s (API: %d, validators: %s)",
+            "Started node %d on %s (API: %d, validators: %s, services=%s, GS=%x)",
             node_index,
             listen_addr,
             api_port,
             validator_indices,
+            "running" if start_services else "pending",
+            gs_id,
         )
 
         return test_node
@@ -390,12 +406,26 @@ class NodeCluster:
         if validators_per_node is None:
             validators_per_node = self._distribute_validators(num_nodes)
 
+        # Phase 1: Create nodes with networking ready but services not running.
+        #
+        # This allows the gossipsub mesh to form before validators start
+        # producing blocks and attestations. Otherwise, early blocks/attestations
+        # would be "Published message to 0 peers" because the mesh is empty.
         for i in range(num_nodes):
             validator_indices = validators_per_node[i] if i < len(validators_per_node) else []
-            await self.start_node(i, validator_indices)
+            await self.start_node(i, validator_indices, start_services=False)
+
+            # Stagger node startup like Ream does.
+            #
+            # The bootnode (node 0) needs time to fully initialize its QUIC listener
+            # and gossipsub behavior before other nodes connect. Without this delay,
+            # the mesh may not form properly.
+            if i == 0:
+                await asyncio.sleep(2.0)
 
         await asyncio.sleep(0.5)
 
+        # Phase 2: Establish peer connections.
         for dialer_idx, listener_idx in topology:
             dialer = self.nodes[dialer_idx]
             listener = self.nodes[listener_idx]
@@ -405,9 +435,23 @@ class NodeCluster:
             else:
                 logger.warning("Failed to connect node %d -> node %d", dialer_idx, listener_idx)
 
-        # Wait for gossipsub mesh to stabilize.
-        # Heartbeats run every 0.7s and mesh formation takes a few heartbeats.
-        await asyncio.sleep(2.0)
+        # Phase 3: Wait for gossipsub mesh to stabilize.
+        #
+        # Gossipsub mesh formation requires:
+        # 1. Heartbeats to run (every 0.7s)
+        # 2. Subscription RPCs to be exchanged
+        # 3. GRAFT messages to be sent and processed
+        #
+        # A longer delay ensures proper mesh formation before block production.
+        await asyncio.sleep(5.0)
+
+        # Phase 4: Start node services (validators, chain service, etc).
+        #
+        # Now that the mesh is formed, validators can publish blocks/attestations
+        # and they will propagate to all mesh peers.
+        logger.info("Mesh stable, starting node services...")
+        for node in self.nodes:
+            await node.start()
 
     def _distribute_validators(self, num_nodes: int) -> list[list[int]]:
         """
