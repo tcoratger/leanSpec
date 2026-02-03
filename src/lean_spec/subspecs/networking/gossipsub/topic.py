@@ -194,10 +194,6 @@ class GossipTopic:
 
         Raises:
             ValueError: If the topic string is malformed.
-
-        Example::
-
-            topic = GossipTopic.from_string("/leanconsensus/0x12345678/block/ssz_snappy")
         """
         parts = topic_str.lstrip("/").split("/")
 
@@ -285,11 +281,6 @@ def format_topic_string(
 
     Returns:
         Formatted topic string.
-
-    Example::
-
-        topic_str = format_topic_string("block", "0x12345678")
-        assert topic_str == "/leanconsensus/0x12345678/block/ssz_snappy"
     """
     return f"/{prefix}/{fork_digest}/{topic_name}/{encoding}"
 
@@ -308,14 +299,6 @@ def parse_topic_string(topic_str: str) -> tuple[str, str, str, str]:
 
     Raises:
         ValueError: If the topic string is malformed.
-
-    Example::
-
-        prefix, fork, name, enc = parse_topic_string("/leanconsensus/0x12345678/block/ssz_snappy")
-        assert prefix == "leanconsensus"
-        assert fork == "0x12345678"
-        assert name == "block"
-        assert enc == "ssz_snappy"
     """
     parts = topic_str.lstrip("/").split("/")
 
