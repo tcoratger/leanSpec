@@ -15,6 +15,7 @@ doesn't do this yet.
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
@@ -42,6 +43,7 @@ class AttestationData(Container):
     source: Checkpoint
     """The checkpoint representing the source block as observed by the validator."""
 
+    @lru_cache(maxsize=None)  # noqa: B019
     def data_root_bytes(self) -> Bytes32:
         """The root of the attestation data."""
         return hash_tree_root(self)
