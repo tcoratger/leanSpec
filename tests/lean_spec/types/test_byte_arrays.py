@@ -8,14 +8,9 @@ from pydantic import BaseModel
 from typing import Any, Type
 
 from lean_spec.types.byte_arrays import (
-    ByteList64,
-    ByteList256,
     Bytes1,
     Bytes4,
-    Bytes8,
     Bytes32,
-    Bytes48,
-    Bytes96,
     BaseBytes,
     BaseByteList,
 )
@@ -38,6 +33,9 @@ def test_bytes_inheritance_ok() -> None:
 
 def test_bytelist_inheritance_ok() -> None:
     # Test that our concrete ByteList types properly inherit from BaseByteList
+    class ByteList64(BaseByteList):
+        LIMIT = 64
+
     assert issubclass(ByteList64, BaseByteList)
     assert ByteList64.LIMIT == 64
     v = ByteList64(data=b"\x01\x02")
@@ -89,12 +87,19 @@ def test_bytelist_coercion(value: Any, expected: bytes) -> None:
 
 
 def test_bytelist_over_limit_raises() -> None:
+    # Create test-local ByteList64 type
+    class ByteList64(BaseByteList):
+        LIMIT = 64
+
     # Test with ByteList64 that has limit 64
     with pytest.raises(SSZValueError):
         ByteList64(data=b"\x00" * 65)  # Over the limit
 
 
 def test_is_fixed_size_flags() -> None:
+    class ByteList64(BaseByteList):
+        LIMIT = 64
+
     assert Bytes32.is_fixed_size() is True
     assert ByteList64.is_fixed_size() is False
 
@@ -148,10 +153,7 @@ def test_hashlib_accepts_bytes32_via_add() -> None:
     [
         (Bytes1, b"\xaa"),
         (Bytes4, b"\x00\x01\x02\x03"),
-        (Bytes8, b"\x00\x01\x02\x03\x04\x05\x06\x07"),
         (Bytes32, b"\x11" * 32),
-        (Bytes48, bytes(range(48))),
-        (Bytes96, bytes(range(96))),
     ],
 )
 def test_encode_decode_roundtrip_vector(Typ: Type[BaseBytes], payload: bytes) -> None:
@@ -304,9 +306,12 @@ def test_sorted_bytes32_list_is_lexicographic_on_bytes() -> None:
 
 
 def test_json_like_dump_of_vectors_lists() -> None:
-    # Create test ByteList5 for this test
+    # Create test ByteList types for this test
     class ByteList5(BaseByteList):
         LIMIT = 5
+
+    class Bytes96(BaseBytes):
+        LENGTH = 96
 
     # Ensure users can dump simple object structures to JSON by pre-encoding to hex.
     obj = {

@@ -91,20 +91,8 @@ Rarely used since most matches are within 64KB.
 MIN_HASH_TABLE_BITS: int = 8
 """Minimum hash table size exponent (2^8 = 256 entries)."""
 
-MIN_HASH_TABLE_SIZE: int = 1 << MIN_HASH_TABLE_BITS
-"""Minimum hash table size (256 entries).
-
-Used for very small inputs where a larger table would waste memory.
-"""
-
 MAX_HASH_TABLE_BITS: int = 15
 """Maximum hash table size exponent (2^15 = 32768 entries)."""
-
-MAX_HASH_TABLE_SIZE: int = 1 << MAX_HASH_TABLE_BITS
-"""Maximum hash table size (32768 entries).
-
-Larger tables improve compression but increase memory usage.
-"""
 
 HASH_MULTIPLIER: int = 0x1E35A7BD
 """Magic constant for the hash function.
@@ -170,14 +158,8 @@ MIN_COPY_1_LENGTH: int = 4
 MAX_COPY_1_OFFSET: int = 2047
 """Maximum offset for 1-byte offset encoding (11 bits)."""
 
-MAX_COPY_2_LENGTH: int = 64
-"""Maximum copy length for 2-byte offset encoding (1-64 bytes)."""
-
 MAX_COPY_2_OFFSET: int = 65535
 """Maximum offset for 2-byte offset encoding (16 bits)."""
-
-MAX_COPY_4_LENGTH: int = 64
-"""Maximum copy length for 4-byte offset encoding (1-64 bytes)."""
 
 # ===========================================================================
 # Varint Encoding

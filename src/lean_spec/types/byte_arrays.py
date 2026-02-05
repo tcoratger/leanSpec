@@ -202,12 +202,6 @@ class Bytes4(BaseBytes):
     LENGTH = 4
 
 
-class Bytes8(BaseBytes):
-    """Fixed-size byte array of exactly 8 bytes."""
-
-    LENGTH = 8
-
-
 class Bytes16(BaseBytes):
     """Fixed-size byte array of exactly 16 bytes (Poly1305 authentication tag)."""
 
@@ -236,12 +230,6 @@ ZERO_HASH: Bytes32 = Bytes32.zero()
 """All-zero hash (32 bytes of zeros)."""
 
 
-class Bytes48(BaseBytes):
-    """Fixed-size byte array of exactly 48 bytes."""
-
-    LENGTH = 48
-
-
 class Bytes52(BaseBytes):
     """Fixed-size byte array of exactly 52 bytes."""
 
@@ -252,12 +240,6 @@ class Bytes64(BaseBytes):
     """Fixed-size byte array of exactly 64 bytes (secp256k1 signature)."""
 
     LENGTH = 64
-
-
-class Bytes96(BaseBytes):
-    """Fixed-size byte array of exactly 96 bytes."""
-
-    LENGTH = 96
 
 
 class BaseByteList(SSZModel):
@@ -378,31 +360,6 @@ class BaseByteList(SSZModel):
     def hex(self) -> str:
         """Return the hexadecimal string representation of the underlying bytes."""
         return self.data.hex()
-
-
-# Common ByteList types with explicit classes
-class ByteList64(BaseByteList):
-    """Variable-length byte list with a limit of 64 bytes."""
-
-    LIMIT = 64
-
-
-class ByteList256(BaseByteList):
-    """Variable-length byte list with a limit of 256 bytes."""
-
-    LIMIT = 256
-
-
-class ByteList1024(BaseByteList):
-    """Variable-length byte list with a limit of 1024 bytes."""
-
-    LIMIT = 1024
-
-
-class ByteList2048(BaseByteList):
-    """Variable-length byte list with a limit of 2048 bytes."""
-
-    LIMIT = 2048
 
 
 class ByteListMiB(BaseByteList):
