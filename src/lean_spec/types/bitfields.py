@@ -173,12 +173,6 @@ class BaseBitlist(SSZModel):
             return list(self.data[key])
         return self.data[key]
 
-    def __setitem__(self, key: int, value: bool | Boolean) -> None:
-        """Set a bit by index."""
-        new_data = list(self.data)
-        new_data[key] = Boolean(value)
-        object.__setattr__(self, "data", tuple(new_data))
-
     def __add__(self, other: Any) -> Self:
         """Concatenate this bitlist with another sequence."""
         if isinstance(other, BaseBitlist):

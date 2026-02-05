@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from functools import total_ordering
-
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.types import Bytes52, Container, SSZList, Uint64
 
@@ -11,7 +9,6 @@ from ..xmss.containers import PublicKey
 from .slot import Slot
 
 
-@total_ordering
 class ValidatorIndex(Uint64):
     """Represents a validator's unique index as a 64-bit unsigned integer."""
 

@@ -7,7 +7,7 @@ See https://eprint.iacr.org/2023/323.
 Uses numpy arrays for vectorized field operations.
 """
 
-from typing import Final, Self, TypeAlias
+from typing import Final, Self
 
 import numpy as np
 from numpy.typing import NDArray
@@ -24,7 +24,7 @@ from .constants import (
 # Constants & Type Definitions
 # =================================================================
 
-State: TypeAlias = NDArray[np.int64]
+type State = NDArray[np.int64]
 """State vector as signed 64-bit integers."""
 
 
