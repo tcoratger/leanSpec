@@ -20,15 +20,17 @@ from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
-from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
+from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT, INTERVALS_PER_SLOT
 from lean_spec.subspecs.chain.service import ChainService
 from lean_spec.subspecs.containers import Block, BlockBody, State
+from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import NetworkEventSource, NetworkService
+from lean_spec.subspecs.networking.subnet import compute_subnet_id
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
@@ -93,6 +95,20 @@ class NodeConfig:
     """
 
 
+def get_local_validator_id(registry: ValidatorRegistry | None) -> ValidatorIndex | None:
+    """
+    Get the validator index for this node.
+
+    For now, returns None as a default for passive nodes or simple setups.
+    Future implementations will look up keys in the registry.
+    """
+    if registry is None or len(registry) == 0:
+        return None
+
+    # For simplicity, use the first validator in the registry.
+    return registry.indices()[0]
+
+
 @dataclass(slots=True)
 class Node:
     """
@@ -147,11 +163,11 @@ class Node:
         if config.database_path is not None:
             database = cls._create_database(config.database_path)
 
-        # Try to load existing state from database.
         #
         # If database contains valid state, resume from there.
         # Otherwise, fall through to genesis initialization.
-        store = cls._try_load_from_database(database)
+        validator_id = get_local_validator_id(config.validator_registry)
+        store = cls._try_load_from_database(database, validator_id)
 
         if store is None:
             # Generate genesis state from validators.
@@ -174,7 +190,7 @@ class Node:
             # Initialize forkchoice store.
             #
             # Genesis block is both justified and finalized.
-            store = Store.get_forkchoice_store(state, block)
+            store = Store.get_forkchoice_store(state, block, validator_id)
 
             # Persist genesis to database if available.
             if database is not None:
@@ -228,12 +244,18 @@ class Node:
         # Wire callbacks to publish produced blocks/attestations to the network.
         validator_service: ValidatorService | None = None
         if config.validator_registry is not None:
+            # Create a wrapper for publish_attestation that computes the subnet_id
+            # from the validator_id in the attestation
+            async def publish_attestation_wrapper(attestation: SignedAttestation) -> None:
+                subnet_id = compute_subnet_id(attestation.validator_id, ATTESTATION_COMMITTEE_COUNT)
+                await network_service.publish_attestation(attestation, subnet_id)
+
             validator_service = ValidatorService(
                 sync_service=sync_service,
                 clock=clock,
                 registry=config.validator_registry,
                 on_block=network_service.publish_block,
-                on_attestation=network_service.publish_attestation,
+                on_attestation=publish_attestation_wrapper,
             )
 
         return cls(
@@ -263,7 +285,10 @@ class Node:
         return SQLiteDatabase(path)
 
     @staticmethod
-    def _try_load_from_database(database: Database | None) -> Store | None:
+    def _try_load_from_database(
+        database: Database | None,
+        validator_id: ValidatorIndex | None,
+    ) -> Store | None:
         """
         Try to load forkchoice store from existing database state.
 
@@ -271,6 +296,7 @@ class Node:
 
         Args:
             database: Database to load from.
+            validator_id: Validator index for the store instance.
 
         Returns:
             Loaded Store or None if no valid state exists.
@@ -310,6 +336,7 @@ class Node:
             latest_finalized=finalized,
             blocks={head_root: head_block},
             states={head_root: head_state},
+            validator_id=validator_id,
         )
 
     async def run(self, *, install_signal_handlers: bool = True) -> None:

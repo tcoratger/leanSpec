@@ -16,7 +16,6 @@ from lean_spec.subspecs.containers.state import State
 from lean_spec.subspecs.containers.state.types import Validators
 from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss import Signature
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Bytes32, Bytes52, Uint64
 
@@ -103,9 +102,13 @@ def test_aggregated_signatures_prefers_full_gossip_payload() -> None:
         for i in range(2)
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    aggregated_atts, aggregated_proofs = (
+        [att for att, _ in results],
+        [proof for _, proof in results],
     )
 
     assert len(aggregated_atts) == 1
@@ -124,7 +127,8 @@ def test_aggregated_signatures_prefers_full_gossip_payload() -> None:
     )
 
 
-def test_compute_aggregated_signatures_splits_when_needed() -> None:
+def test_aggregate_signatures_splits_when_needed() -> None:
+    """Test that gossip and aggregated proofs are kept separate."""
     key_manager = get_shared_key_manager()
     state = make_state(3)
     source = Checkpoint(root=make_bytes32(2), slot=Slot(0))
@@ -156,11 +160,17 @@ def test_compute_aggregated_signatures_splits_when_needed() -> None:
         SignatureKey(ValidatorIndex(2), data_root): [block_proof],
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Combine gossip and aggregated proofs manually
+    gossip_results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    payload_atts, payload_proofs = state.select_aggregated_proofs(
+        attestations,
         aggregated_payloads=aggregated_payloads,
     )
+    aggregated_atts = [att for att, _ in gossip_results] + payload_atts
+    aggregated_proofs = [proof for _, proof in gossip_results] + payload_proofs
 
     seen_participants = [
         tuple(int(v) for v in att.aggregation_bits.to_validator_indices())
@@ -207,11 +217,16 @@ def test_build_block_collects_valid_available_attestations() -> None:
     attestation = Attestation(validator_id=ValidatorIndex(0), data=att_data)
     data_root = att_data.data_root_bytes()
 
-    gossip_signatures = {
-        SignatureKey(ValidatorIndex(0), data_root): key_manager.sign_attestation_data(
-            ValidatorIndex(0), att_data
-        )
-    }
+    # Calculate aggregated proof directly
+    signature = key_manager.sign_attestation_data(ValidatorIndex(0), att_data)
+    proof = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([ValidatorIndex(0)]),
+        public_keys=[key_manager.get_public_key(ValidatorIndex(0))],
+        signatures=[signature],
+        message=data_root,
+        epoch=att_data.slot,
+    )
+    aggregated_payloads = {SignatureKey(ValidatorIndex(0), data_root): [proof]}
 
     # Proposer for slot 1 with 2 validators: slot % num_validators = 1 % 2 = 1
     block, post_state, aggregated_atts, aggregated_proofs = state.build_block(
@@ -221,8 +236,7 @@ def test_build_block_collects_valid_available_attestations() -> None:
         attestations=[],
         available_attestations=[attestation],
         known_block_roots={head_root},
-        gossip_signatures=gossip_signatures,
-        aggregated_payloads={},
+        aggregated_payloads=aggregated_payloads,
     )
 
     assert post_state.latest_block_header.slot == Slot(1)
@@ -270,7 +284,6 @@ def test_build_block_skips_attestations_without_signatures() -> None:
         attestations=[],
         available_attestations=[attestation],
         known_block_roots={head_root},
-        gossip_signatures={},
         aggregated_payloads={},
     )
 
@@ -280,18 +293,16 @@ def test_build_block_skips_attestations_without_signatures() -> None:
     assert list(block.body.attestations.data) == []
 
 
-def test_compute_aggregated_signatures_with_empty_attestations() -> None:
+def test_aggregate_gossip_signatures_with_empty_attestations() -> None:
     """Empty attestations list should return empty results."""
     state = make_state(2)
 
-    aggregated_atts, aggregated_sigs = state.compute_aggregated_signatures(
+    results = state.aggregate_gossip_signatures(
         [],  # empty attestations
         gossip_signatures={},
-        aggregated_payloads={},
     )
 
-    assert aggregated_atts == []
-    assert aggregated_sigs == []
+    assert results == []
 
 
 def test_aggregated_signatures_with_multiple_data_groups() -> None:
@@ -327,9 +338,13 @@ def test_aggregated_signatures_with_multiple_data_groups() -> None:
         ),
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    aggregated_atts, aggregated_proofs = (
+        [att for att, _ in results],
+        [proof for _, proof in results],
     )
 
     # Should have 2 aggregated attestations (one per data group)
@@ -383,11 +398,17 @@ def test_aggregated_signatures_falls_back_to_block_payload() -> None:
         SignatureKey(ValidatorIndex(1), data_root): [block_proof],
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Combine gossip and aggregated proofs manually
+    gossip_results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    payload_atts, payload_proofs = state.select_aggregated_proofs(
+        attestations,
         aggregated_payloads=aggregated_payloads,
     )
+    aggregated_atts = [att for att, _ in gossip_results] + payload_atts
+    aggregated_proofs = [proof for _, proof in gossip_results] + payload_proofs
 
     # Should include both gossip-covered and fallback payload attestations/proofs
     assert len(aggregated_atts) == 2
@@ -468,15 +489,15 @@ def test_build_block_state_root_valid_when_signatures_split() -> None:
     # Three validators attest to identical data.
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(3)]
 
-    # Simulate partial gossip coverage.
-    #
-    # Only one signature arrived via the gossip network.
-    # This happens when network partitions delay some messages.
-    gossip_signatures = {
-        SignatureKey(ValidatorIndex(0), data_root): key_manager.sign_attestation_data(
-            ValidatorIndex(0), att_data
-        )
-    }
+    # Use a second aggregated proof for Validator 0 instead of gossip.
+    # This simulates receiving an aggregated signature for this validator from another source.
+    proof_0 = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices([ValidatorIndex(0)]),
+        public_keys=[key_manager.get_public_key(ValidatorIndex(0))],
+        signatures=[key_manager.sign_attestation_data(ValidatorIndex(0), att_data)],
+        message=data_root,
+        epoch=att_data.slot,
+    )
 
     # Simulate the remaining signatures arriving via aggregated proof.
     #
@@ -496,6 +517,7 @@ def test_build_block_state_root_valid_when_signatures_split() -> None:
         epoch=att_data.slot,
     )
     aggregated_payloads = {
+        SignatureKey(ValidatorIndex(0), data_root): [proof_0],
         SignatureKey(ValidatorIndex(1), data_root): [fallback_proof],
         SignatureKey(ValidatorIndex(2), data_root): [fallback_proof],
     }
@@ -508,7 +530,6 @@ def test_build_block_state_root_valid_when_signatures_split() -> None:
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
         attestations=attestations,
-        gossip_signatures=gossip_signatures,
         aggregated_payloads=aggregated_payloads,
     )
 
@@ -520,7 +541,7 @@ def test_build_block_state_root_valid_when_signatures_split() -> None:
 
     # Confirm each attestation covers the expected validators.
     actual_bits = [set(att.aggregation_bits.to_validator_indices()) for att in aggregated_atts]
-    assert {ValidatorIndex(0)} in actual_bits, "Gossip attestation should cover only validator 0"
+    assert {ValidatorIndex(0)} in actual_bits, "First attestation should cover only validator 0"
     assert {ValidatorIndex(1), ValidatorIndex(2)} in actual_bits, (
         "Fallback should cover validators 1,2"
     )
@@ -584,7 +605,6 @@ def test_greedy_selects_proof_with_maximum_overlap() -> None:
     data_root = att_data.data_root_bytes()
 
     # No gossip signatures - all validators need fallback
-    gossip_signatures: dict[SignatureKey, Signature] = {}
 
     # Create three proofs with different coverage
     # Proof A: validators {0, 1}
@@ -638,9 +658,8 @@ def test_greedy_selects_proof_with_maximum_overlap() -> None:
         SignatureKey(ValidatorIndex(3), data_root): [proof_b, proof_c],
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.select_aggregated_proofs(
         attestations,
-        gossip_signatures=gossip_signatures,
         aggregated_payloads=aggregated_payloads,
     )
 
@@ -710,12 +729,17 @@ def test_greedy_stops_when_no_useful_proofs_remain() -> None:
         # Note: No proof available for validator 4
     }
 
-    # This should NOT hang or crash - algorithm terminates when no useful proofs found
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Combine gossip and aggregated proofs manually
+    gossip_results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    payload_atts, payload_proofs = state.select_aggregated_proofs(
+        attestations,
         aggregated_payloads=aggregated_payloads,
     )
+    aggregated_atts = [att for att, _ in gossip_results] + payload_atts
+    aggregated_proofs = [proof for _, proof in gossip_results] + payload_proofs
 
     # Should have 2 attestations: gossip {0,1} and fallback {2,3}
     assert len(aggregated_atts) == 2
@@ -818,11 +842,17 @@ def test_greedy_handles_overlapping_proof_chains() -> None:
         SignatureKey(ValidatorIndex(4), data_root): [proof_c],
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Combine gossip and aggregated proofs manually
+    gossip_results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    payload_atts, payload_proofs = state.select_aggregated_proofs(
+        attestations,
         aggregated_payloads=aggregated_payloads,
     )
+    aggregated_atts = [att for att, _ in gossip_results] + payload_atts
+    aggregated_proofs = [proof for _, proof in gossip_results] + payload_proofs
 
     # Should have at least 3 attestations (1 gossip + 2 fallback minimum)
     assert len(aggregated_atts) >= 3
@@ -860,7 +890,6 @@ def test_greedy_single_validator_proofs() -> None:
     data_root = att_data.data_root_bytes()
 
     # No gossip - all need fallback
-    gossip_signatures: dict[SignatureKey, Signature] = {}
 
     # Single-validator proofs only
     proofs = []
@@ -878,9 +907,8 @@ def test_greedy_single_validator_proofs() -> None:
         SignatureKey(ValidatorIndex(i), data_root): [proofs[i]] for i in range(3)
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.select_aggregated_proofs(
         attestations,
-        gossip_signatures=gossip_signatures,
         aggregated_payloads=aggregated_payloads,
     )
 
@@ -961,11 +989,17 @@ def test_validator_in_both_gossip_and_fallback_proof() -> None:
         SignatureKey(ValidatorIndex(1), data_root): [fallback_proof],
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Combine gossip and aggregated proofs manually
+    gossip_results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    payload_atts, payload_proofs = state.select_aggregated_proofs(
+        attestations,
         aggregated_payloads=aggregated_payloads,
     )
+    aggregated_atts = [att for att, _ in gossip_results] + payload_atts
+    aggregated_proofs = [proof for _, proof in gossip_results] + payload_proofs
 
     # Should have 2 attestations
     assert len(aggregated_atts) == 2
@@ -1001,16 +1035,14 @@ def test_gossip_none_and_aggregated_payloads_none() -> None:
     att_data = make_attestation_data(17, make_bytes32(111), make_bytes32(112), source=source)
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(2)]
 
-    # Both sources are None
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Both sources are None - test that empty results are returned
+    results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=None,
-        aggregated_payloads=None,
     )
 
     # Should return empty results
-    assert aggregated_atts == []
-    assert aggregated_proofs == []
+    assert results == []
 
 
 def test_aggregated_payloads_only_no_gossip() -> None:
@@ -1035,7 +1067,6 @@ def test_aggregated_payloads_only_no_gossip() -> None:
     data_root = att_data.data_root_bytes()
 
     # No gossip signatures
-    gossip_signatures: dict[SignatureKey, Signature] = {}
 
     # Proof covering all 3 validators
     proof = AggregatedSignatureProof.aggregate(
@@ -1052,9 +1083,8 @@ def test_aggregated_payloads_only_no_gossip() -> None:
 
     aggregated_payloads = {SignatureKey(ValidatorIndex(i), data_root): [proof] for i in range(3)}
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    aggregated_atts, aggregated_proofs = state.select_aggregated_proofs(
         attestations,
-        gossip_signatures=gossip_signatures,
         aggregated_payloads=aggregated_payloads,
     )
 
@@ -1117,11 +1147,17 @@ def test_proof_with_extra_validators_beyond_needed() -> None:
         SignatureKey(ValidatorIndex(1), data_root): [proof],
     }
 
-    aggregated_atts, aggregated_proofs = state.compute_aggregated_signatures(
+    # Combine gossip and aggregated proofs manually
+    gossip_results = state.aggregate_gossip_signatures(
         attestations,
         gossip_signatures=gossip_signatures,
+    )
+    payload_atts, payload_proofs = state.select_aggregated_proofs(
+        attestations,
         aggregated_payloads=aggregated_payloads,
     )
+    aggregated_atts = [att for att, _ in gossip_results] + payload_atts
+    aggregated_proofs = [proof for _, proof in gossip_results] + payload_proofs
 
     # Should have 2 attestations
     assert len(aggregated_atts) == 2

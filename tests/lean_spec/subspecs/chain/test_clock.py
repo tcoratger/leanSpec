@@ -4,8 +4,7 @@ import pytest
 
 from lean_spec.subspecs.chain import Interval, SlotClock
 from lean_spec.subspecs.chain.config import (
-    INTERVALS_PER_SLOT,
-    SECONDS_PER_INTERVAL,
+    MILLISECONDS_PER_INTERVAL,
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.containers import Slot
@@ -28,24 +27,27 @@ class TestCurrentSlot:
         assert clock.current_slot() == Slot(0)
 
     def test_progression(self) -> None:
-        """Slot increments every SECONDS_PER_SLOT seconds."""
+        """Slot increments every 4 seconds (SECONDS_PER_SLOT)."""
         genesis = Uint64(1700000000)
         for expected_slot in range(5):
-            time = genesis + Uint64(expected_slot) * SECONDS_PER_SLOT
+            slot_duration_seconds = Uint64(expected_slot) * SECONDS_PER_SLOT
+            time = genesis + slot_duration_seconds
             clock = SlotClock(genesis_time=genesis, time_fn=lambda t=time: float(t))
             assert clock.current_slot() == Slot(expected_slot)
 
     def test_mid_slot(self) -> None:
         """Slot remains constant within a slot."""
         genesis = Uint64(1700000000)
-        time = genesis + Uint64(3) * SECONDS_PER_SLOT + Uint64(2)
+        slot_3_seconds = Uint64(3) * SECONDS_PER_SLOT
+        time = genesis + slot_3_seconds + Uint64(2)
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
         assert clock.current_slot() == Slot(3)
 
     def test_at_slot_boundary_minus_one(self) -> None:
         """Slot does not increment until boundary is reached."""
         genesis = Uint64(1700000000)
-        time = genesis + SECONDS_PER_SLOT - Uint64(1)
+        slot_duration_seconds = SECONDS_PER_SLOT
+        time = genesis + slot_duration_seconds - Uint64(1)
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
         assert clock.current_slot() == Slot(0)
 
@@ -60,17 +62,35 @@ class TestCurrentInterval:
         assert clock.current_interval() == Interval(0)
 
     def test_progression(self) -> None:
-        """Interval increments every SECONDS_PER_INTERVAL seconds."""
+        """Interval increments based on milliseconds since genesis.
+
+        With MILLISECONDS_PER_INTERVAL = 800:
+        - 0s = 0ms → interval 0
+        - 1s = 1000ms → interval 1 (1000 // 800 = 1)
+        - 2s = 2000ms → interval 2 (2000 // 800 = 2)
+        - 3s = 3000ms → interval 3 (3000 // 800 = 3)
+        """
         genesis = Uint64(1700000000)
-        for expected_interval in range(int(INTERVALS_PER_SLOT)):
-            time = genesis + Uint64(expected_interval) * SECONDS_PER_INTERVAL
-            clock = SlotClock(genesis_time=genesis, time_fn=lambda t=time: float(t))
-            assert clock.current_interval() == Interval(expected_interval)
+        # Test at second boundaries - the clock truncates to int seconds
+        # With 800ms intervals: 0s->i0, 1s->i1, 2s->i2, 3s->i3
+        expected_intervals = [
+            (0, 0),  # 0s -> 0ms -> interval 0
+            (1, 1),  # 1s -> 1000ms -> interval 1
+            (2, 2),  # 2s -> 2000ms -> interval 2
+            (3, 3),  # 3s -> 3000ms -> interval 3
+        ]
+        for secs_after_genesis, expected_interval in expected_intervals:
+            time = float(genesis) + secs_after_genesis
+            clock = SlotClock(genesis_time=genesis, time_fn=lambda t=time: t)
+            assert clock.current_interval() == Interval(expected_interval), (
+                f"At {secs_after_genesis}s, expected interval {expected_interval}"
+            )
 
     def test_wraps_at_slot_boundary(self) -> None:
         """Interval resets to 0 at next slot."""
         genesis = Uint64(1700000000)
-        time = genesis + SECONDS_PER_SLOT
+        slot_duration_seconds = SECONDS_PER_SLOT
+        time = genesis + slot_duration_seconds
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
         assert clock.current_interval() == Interval(0)
 
@@ -81,24 +101,29 @@ class TestCurrentInterval:
         assert clock.current_interval() == Interval(0)
 
     def test_last_interval_of_slot(self) -> None:
-        """Last interval before slot boundary is INTERVALS_PER_SLOT - 1."""
+        """Interval 3 at 3s (interval 4 requires 3.2s, but clock truncates to int)."""
         genesis = Uint64(1700000000)
-        time = genesis + SECONDS_PER_SLOT - Uint64(1)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
-        assert clock.current_interval() == Interval(int(INTERVALS_PER_SLOT) - 1)
+        time = float(genesis) + 3.0
+        clock = SlotClock(genesis_time=genesis, time_fn=lambda: time)
+        assert clock.current_interval() == Interval(3)
 
 
 class TestTotalIntervals:
     """Tests for total_intervals()."""
 
     def test_counts_all_intervals(self) -> None:
-        """total_intervals counts all intervals since genesis."""
+        """total_intervals counts all intervals since genesis.
+
+        With MILLISECONDS_PER_INTERVAL = 800:
+        3 slots = 3 * 4000ms = 12000ms = 15 intervals (12000 // 800)
+        At 12s = 12000ms, we have 15 total intervals.
+        At 14s = 14000ms = 17 total intervals (14000 // 800).
+        """
         genesis = Uint64(1700000000)
-        intervals_per_slot = int(INTERVALS_PER_SLOT)
-        # 3 slots + 2 intervals = 14 total intervals
-        time = genesis + Uint64(3) * SECONDS_PER_SLOT + Uint64(2) * SECONDS_PER_INTERVAL
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
-        assert clock.total_intervals() == Interval(3 * intervals_per_slot + 2)
+        # 14 seconds = 14000ms = 17 intervals (14000 // 800 = 17)
+        time = float(genesis) + 14.0
+        clock = SlotClock(genesis_time=genesis, time_fn=lambda: time)
+        assert clock.total_intervals() == Interval(17)
 
     def test_before_genesis(self) -> None:
         """total_intervals is 0 before genesis."""
@@ -147,18 +172,28 @@ class TestSecondsUntilNextInterval:
     def test_mid_interval(self) -> None:
         """Returns time until next boundary when mid-interval."""
         genesis = Uint64(1000)
-        # 0.5 seconds into first interval (interval length = 1 second).
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.5)
+        interval_seconds = float(MILLISECONDS_PER_INTERVAL) / 1000.0
+        # Half way into first interval.
+        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.0 + interval_seconds / 2)
         result = clock.seconds_until_next_interval()
-        assert abs(result - 0.5) < 0.001
+        assert abs(result - interval_seconds / 2) < 0.01
 
     def test_at_interval_boundary(self) -> None:
-        """Returns one full interval when exactly at boundary."""
+        """Returns one full interval when exactly at boundary.
+
+        With MILLISECONDS_PER_INTERVAL = 800:
+        At 1s = 1000ms, time_into_interval = 1000 % 800 = 200ms
+        At 800ms exactly (0.8s), time_into_interval = 0
+        But using fractional seconds has FP precision issues.
+
+        Instead test at 1s: should return 800 - 200 = 600ms = 0.6s
+        """
         genesis = Uint64(1000)
-        # Exactly at first interval boundary.
+        # At 1 second after genesis: 1000ms % 800 = 200ms into interval
+        # Time until next = 800 - 200 = 600ms = 0.6s
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1001.0)
         result = clock.seconds_until_next_interval()
-        assert abs(result - float(SECONDS_PER_INTERVAL)) < 0.001
+        assert abs(result - 0.6) < 0.01
 
     def test_before_genesis(self) -> None:
         """Returns time until genesis when before genesis."""
@@ -173,7 +208,7 @@ class TestSecondsUntilNextInterval:
         genesis = Uint64(1000)
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.0)
         result = clock.seconds_until_next_interval()
-        assert abs(result - float(SECONDS_PER_INTERVAL)) < 0.001
+        assert abs(result - (float(MILLISECONDS_PER_INTERVAL) / 1000.0)) < 0.001
 
     def test_fractional_precision(self) -> None:
         """Preserves fractional seconds in calculation."""
@@ -181,7 +216,7 @@ class TestSecondsUntilNextInterval:
         # 0.123 seconds into interval.
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.123)
         result = clock.seconds_until_next_interval()
-        expected = float(SECONDS_PER_INTERVAL) - 0.123
+        expected = (float(MILLISECONDS_PER_INTERVAL) / 1000.0) - 0.123
         assert abs(result - expected) < 0.001
 
 

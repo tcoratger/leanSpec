@@ -122,7 +122,6 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
     GossipTopic,
     TopicKind,
 )
-from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
     BlockLookup,
@@ -325,18 +324,20 @@ class GossipHandler:
         self,
         topic_str: str,
         compressed_data: bytes,
-    ) -> SignedBlockWithAttestation | SignedAttestation:
+    ) -> SignedBlockWithAttestation | SignedAttestation | None:
         """
         Decode a gossip message from topic and compressed data.
 
         Processing proceeds in order:
 
         1. Parse topic to determine message type.
-        2. Decompress Snappy-framed data.
-        3. Decode SSZ bytes using the appropriate schema.
+        2. Validate fork digest.
+        3. Decompress Snappy-framed data.
+        4. Decode SSZ bytes using the appropriate schema.
 
         Each step can fail independently. Failures are wrapped in
-        GossipMessageError for uniform handling.
+        GossipMessageError for uniform handling. Fork mismatches raise
+        ForkMismatchError.
 
         Args:
             topic_str: Full topic string (e.g., "/leanconsensus/0x.../block/ssz_snappy").
@@ -346,18 +347,20 @@ class GossipHandler:
             Decoded block or attestation.
 
         Raises:
+            ForkMismatchError: If fork_digest does not match.
             GossipMessageError: If the message cannot be decoded.
         """
-        # Step 1: Parse topic and validate fork compatibility.
+        # Step 1: Parse topic to determine message type and validate fork.
         #
         # The topic string contains the fork digest and message kind.
-        # Invalid topics and wrong-fork messages are rejected before decompression.
-        # This prevents wasting CPU on malformed or incompatible messages.
+        # Invalid topics are rejected before any decompression work.
+        # Fork mismatch is checked early to prevent cross-fork attacks.
+        # This prevents wasting CPU on malformed or cross-fork messages.
         try:
             topic = GossipTopic.from_string_validated(topic_str, self.fork_digest)
-        except ForkMismatchError:
-            raise  # Re-raise ForkMismatchError without wrapping
-        except ValueError as e:
+        except (ValueError, ForkMismatchError) as e:
+            if isinstance(e, ForkMismatchError):
+                raise
             raise GossipMessageError(f"Invalid topic: {e}") from e
 
         # Step 2: Decompress Snappy-framed data.
@@ -387,7 +390,7 @@ class GossipHandler:
             match topic.kind:
                 case TopicKind.BLOCK:
                     return SignedBlockWithAttestation.decode_bytes(ssz_bytes)
-                case TopicKind.ATTESTATION:
+                case TopicKind.ATTESTATION_SUBNET:
                     return SignedAttestation.decode_bytes(ssz_bytes)
         except SSZSerializationError as e:
             raise GossipMessageError(f"SSZ decode failed: {e}") from e
@@ -403,14 +406,14 @@ class GossipHandler:
             Parsed GossipTopic.
 
         Raises:
-            ForkMismatchError: If the topic's fork_digest doesn't match.
+            ForkMismatchError: If fork_digest does not match.
             GossipMessageError: If the topic is invalid.
         """
         try:
             return GossipTopic.from_string_validated(topic_str, self.fork_digest)
-        except ForkMismatchError:
-            raise  # Re-raise ForkMismatchError without wrapping
-        except ValueError as e:
+        except (ValueError, ForkMismatchError) as e:
+            if isinstance(e, ForkMismatchError):
+                raise
             raise GossipMessageError(f"Invalid topic: {e}") from e
 
 
@@ -623,12 +626,6 @@ class LiveNetworkEventSource:
     Used to route outbound messages and track peer state.
     """
 
-    _peer_info: dict[PeerId, PeerInfo] = field(default_factory=dict)
-    """Cache of peer information including status and ENR.
-
-    Populated after status exchange. Used for fork compatibility checks.
-    """
-
     _our_status: Status | None = None
     """Our current chain status for handshakes.
 
@@ -752,18 +749,6 @@ class LiveNetworkEventSource:
         """
         self._reqresp_handler.block_lookup = lookup
 
-    def get_peer_info(self, peer_id: PeerId) -> PeerInfo | None:
-        """
-        Get cached peer info.
-
-        Args:
-            peer_id: Peer identifier.
-
-        Returns:
-            PeerInfo if cached, None otherwise.
-        """
-        return self._peer_info.get(peer_id)
-
     def subscribe_gossip_topic(self, topic: str) -> None:
         """
         Subscribe to a gossip topic.
@@ -830,14 +815,12 @@ class LiveNetworkEventSource:
                 case TopicKind.BLOCK:
                     if isinstance(message, SignedBlockWithAttestation):
                         await self._emit_gossip_block(message, event.peer_id)
-                case TopicKind.ATTESTATION:
+                case TopicKind.ATTESTATION_SUBNET:
                     if isinstance(message, SignedAttestation):
                         await self._emit_gossip_attestation(message, event.peer_id)
 
             logger.debug("Processed gossipsub message %s from %s", topic.kind.value, event.peer_id)
 
-        except ForkMismatchError as e:
-            logger.warning("Rejected gossip from wrong fork: %s", e)
         except GossipMessageError as e:
             logger.warning("Failed to process gossipsub message: %s", e)
 
@@ -1079,12 +1062,6 @@ class LiveNetworkEventSource:
             peer_status = await self.reqresp_client.send_status(peer_id, self._our_status)
 
             if peer_status is not None:
-                # Cache peer's status for fork compatibility checks.
-                if peer_id not in self._peer_info:
-                    self._peer_info[peer_id] = PeerInfo(peer_id=peer_id)
-                self._peer_info[peer_id].status = peer_status
-                self._peer_info[peer_id].update_last_seen()
-
                 await self._events.put(PeerStatusEvent(peer_id=peer_id, status=peer_status))
                 logger.debug(
                     "Received status from %s: head=%s",
@@ -1133,7 +1110,6 @@ class LiveNetworkEventSource:
             peer_id: Peer to disconnect.
         """
         conn = self._connections.pop(peer_id, None)
-        self._peer_info.pop(peer_id, None)  # Clean up peer info cache
         if conn is not None:
             self.reqresp_client.unregister_connection(peer_id)
             await conn.close()
@@ -1191,7 +1167,7 @@ class LiveNetworkEventSource:
             attestation: Attestation received from gossip.
             peer_id: Peer that sent it.
         """
-        topic = GossipTopic(kind=TopicKind.ATTESTATION, fork_digest=self._fork_digest)
+        topic = GossipTopic(kind=TopicKind.ATTESTATION_SUBNET, fork_digest=self._fork_digest)
         await self._events.put(
             GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic)
         )
@@ -1485,7 +1461,7 @@ class LiveNetworkEventSource:
                         # Type mismatch indicates a bug in decode_message.
                         logger.warning("Block topic but got %s", type(message).__name__)
 
-                case TopicKind.ATTESTATION:
+                case TopicKind.ATTESTATION_SUBNET:
                     if isinstance(message, SignedAttestation):
                         await self._emit_gossip_attestation(message, peer_id)
                     else:

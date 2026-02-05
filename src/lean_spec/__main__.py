@@ -26,15 +26,17 @@ import asyncio
 import logging
 from pathlib import Path
 
+from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.genesis import GenesisConfig
+from lean_spec.subspecs.networking import compute_subnet_id
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.node import Node, NodeConfig, get_local_validator_id
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.types import Bytes32, Uint64
@@ -273,7 +275,8 @@ async def _init_from_checkpoint(
         #
         # The store treats this as the new "genesis" for fork choice purposes.
         # All blocks before the checkpoint are effectively pruned.
-        store = Store.get_forkchoice_store(state, anchor_block)
+        validator_id = get_local_validator_id(validator_registry)
+        store = Store.get_forkchoice_store(state, anchor_block, validator_id)
         logger.info(
             "Initialized from checkpoint at slot %d (finalized=%s)",
             state.slot,
@@ -471,10 +474,17 @@ async def run_node(
     # we establish connections, we can immediately announce our
     # subscriptions to peers.
     block_topic = str(GossipTopic.block(GOSSIP_FORK_DIGEST))
-    attestation_topic = str(GossipTopic.attestation(GOSSIP_FORK_DIGEST))
     event_source.subscribe_gossip_topic(block_topic)
-    event_source.subscribe_gossip_topic(attestation_topic)
-    logger.info("Subscribed to gossip topics: %s, %s", block_topic, attestation_topic)
+    # Subscribe to attestation subnet topics based on local validator id.
+    validator_id = get_local_validator_id(validator_registry)
+    if validator_id is None:
+        subnet_id = 0
+        logger.info("No local validator id; subscribing to attestation subnet %d", subnet_id)
+    else:
+        subnet_id = compute_subnet_id(validator_id, ATTESTATION_COMMITTEE_COUNT)
+    attestation_subnet_topic = str(GossipTopic.attestation_subnet(GOSSIP_FORK_DIGEST, subnet_id))
+    event_source.subscribe_gossip_topic(attestation_subnet_topic)
+    logger.info("Subscribed to gossip topics: %s, %s", block_topic, attestation_subnet_topic)
 
     # Two initialization paths: checkpoint sync or genesis sync.
     #

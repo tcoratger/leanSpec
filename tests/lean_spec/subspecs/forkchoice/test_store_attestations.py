@@ -25,6 +25,7 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.types import Bytes32, Bytes52, Uint64
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID
 
 
 def test_on_block_processes_multi_validator_aggregations() -> None:
@@ -48,31 +49,44 @@ def test_on_block_processes_multi_validator_aggregations() -> None:
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
 
-    base_store = Store.get_forkchoice_store(genesis_state, genesis_block)
+    base_store = Store.get_forkchoice_store(
+        genesis_state,
+        genesis_block,
+        validator_id=TEST_VALIDATOR_ID,
+    )
     consumer_store = base_store
 
     # Producer view knows about attestations from validators 1 and 2
     attestation_slot = Slot(1)
     attestation_data = base_store.produce_attestation_data(attestation_slot)
 
-    # Store attestation data in latest_known_attestations
-    attestation_data_map = {
-        validator_id: attestation_data for validator_id in (ValidatorIndex(1), ValidatorIndex(2))
-    }
-
-    # Store signatures in gossip_signatures
+    # Aggregate signatures manually for aggregated_payloads
     data_root = attestation_data.data_root_bytes()
-    gossip_sigs = {
-        SignatureKey(validator_id, data_root): key_manager.sign_attestation_data(
-            validator_id, attestation_data
-        )
-        for validator_id in (ValidatorIndex(1), ValidatorIndex(2))
-    }
+    signatures_list = [
+        key_manager.sign_attestation_data(vid, attestation_data)
+        for vid in (ValidatorIndex(1), ValidatorIndex(2))
+    ]
+    participants = [ValidatorIndex(1), ValidatorIndex(2)]
+
+    from lean_spec.subspecs.containers.attestation import AggregationBits
+    from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+
+    proof = AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices(participants),
+        public_keys=[key_manager.get_public_key(vid) for vid in participants],
+        signatures=signatures_list,
+        message=data_root,
+        epoch=attestation_data.slot,
+    )
+
+    aggregated_payloads = {SignatureKey(vid, data_root): [proof] for vid in participants}
 
     producer_store = base_store.model_copy(
         update={
-            "latest_known_attestations": attestation_data_map,
-            "gossip_signatures": gossip_sigs,
+            # Store attestation data for later extraction
+            "attestation_data_by_root": {data_root: attestation_data},
+            # No gossip signatures needed for block production now
+            "latest_known_aggregated_payloads": aggregated_payloads,
         }
     )
 
@@ -113,19 +127,24 @@ def test_on_block_processes_multi_validator_aggregations() -> None:
     )
 
     # Advance consumer store time to block's slot before processing
-    block_time = consumer_store.config.genesis_time + block.slot * Uint64(SECONDS_PER_SLOT)
+    slot_duration_seconds = block.slot * SECONDS_PER_SLOT
+    block_time = consumer_store.config.genesis_time + slot_duration_seconds
     consumer_store = consumer_store.on_tick(block_time, has_proposal=True)
 
     updated_store = consumer_store.on_block(signed_block)
 
-    assert ValidatorIndex(1) in updated_store.latest_known_attestations
-    assert ValidatorIndex(2) in updated_store.latest_known_attestations
-    assert updated_store.latest_known_attestations[ValidatorIndex(1)] == attestation_data
-    assert updated_store.latest_known_attestations[ValidatorIndex(2)] == attestation_data
+    # Verify attestations can be extracted from aggregated payloads
+    extracted_attestations = updated_store._extract_attestations_from_aggregated_payloads(
+        updated_store.latest_known_aggregated_payloads
+    )
+    assert ValidatorIndex(1) in extracted_attestations
+    assert ValidatorIndex(2) in extracted_attestations
+    assert extracted_attestations[ValidatorIndex(1)] == attestation_data
+    assert extracted_attestations[ValidatorIndex(2)] == attestation_data
 
 
 def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
-    """Verify that Store.on_block doesn't mutate previous store's aggregated_payloads."""
+    """Verify that Store.on_block doesn't mutate previous store's latest_new_aggregated_payloads."""
     key_manager = XmssKeyManager(max_slot=Slot(10))
     validators = Validators(
         data=[
@@ -145,17 +164,19 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
 
-    base_store = Store.get_forkchoice_store(genesis_state, genesis_block)
+    base_store = Store.get_forkchoice_store(
+        genesis_state,
+        genesis_block,
+        validator_id=TEST_VALIDATOR_ID,
+    )
 
     # First block: create and process a block with attestations to populate
-    # `aggregated_payloads`.
+    # `latest_new_aggregated_payloads`.
     attestation_slot_1 = Slot(1)
     attestation_data_1 = base_store.produce_attestation_data(attestation_slot_1)
     data_root_1 = attestation_data_1.data_root_bytes()
 
-    attestation_data_map_1 = {
-        validator_id: attestation_data_1 for validator_id in (ValidatorIndex(1), ValidatorIndex(2))
-    }
+    attestation_data_map_1 = {data_root_1: attestation_data_1}
     gossip_sigs_1 = {
         SignatureKey(validator_id, data_root_1): key_manager.sign_attestation_data(
             validator_id, attestation_data_1
@@ -165,7 +186,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
 
     producer_store_1 = base_store.model_copy(
         update={
-            "latest_known_attestations": attestation_data_map_1,
+            "attestation_data_by_root": attestation_data_map_1,
             "gossip_signatures": gossip_sigs_1,
         }
     )
@@ -209,19 +230,18 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
     )
 
     # Process first block
-    block_time_1 = base_store.config.genesis_time + block_1.slot * Uint64(SECONDS_PER_SLOT)
+    slot_duration_seconds_1 = block_1.slot * SECONDS_PER_SLOT
+    block_time_1 = base_store.config.genesis_time + slot_duration_seconds_1
     consumer_store = base_store.on_tick(block_time_1, has_proposal=True)
     store_after_block_1 = consumer_store.on_block(signed_block_1)
 
     # Now process a second block that includes attestations for the SAME validators
-    # This tests the case where we append to existing lists in aggregated_payloads
+    # This tests the case where we append to existing lists in latest_new_aggregated_payloads
     attestation_slot_2 = Slot(2)
     attestation_data_2 = store_after_block_1.produce_attestation_data(attestation_slot_2)
     data_root_2 = attestation_data_2.data_root_bytes()
 
-    attestation_data_map_2 = {
-        validator_id: attestation_data_2 for validator_id in (ValidatorIndex(1), ValidatorIndex(2))
-    }
+    attestation_data_map_2 = {data_root_2: attestation_data_2}
     gossip_sigs_2 = {
         SignatureKey(validator_id, data_root_2): key_manager.sign_attestation_data(
             validator_id, attestation_data_2
@@ -231,7 +251,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
 
     producer_store_2 = store_after_block_1.model_copy(
         update={
-            "latest_known_attestations": attestation_data_map_2,
+            "attestation_data_by_root": attestation_data_map_2,
             "gossip_signatures": gossip_sigs_2,
         }
     )
@@ -275,18 +295,21 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
     )
 
     # Advance time and capture state before processing second block
-    block_time_2 = store_after_block_1.config.genesis_time + block_2.slot * Uint64(SECONDS_PER_SLOT)
+    slot_duration_seconds_2 = block_2.slot * SECONDS_PER_SLOT
+    block_time_2 = store_after_block_1.config.genesis_time + slot_duration_seconds_2
     store_before_block_2 = store_after_block_1.on_tick(block_time_2, has_proposal=True)
 
     # Capture the original list lengths for keys that already exist
-    original_sig_lengths = {k: len(v) for k, v in store_before_block_2.aggregated_payloads.items()}
+    original_sig_lengths = {
+        k: len(v) for k, v in store_before_block_2.latest_new_aggregated_payloads.items()
+    }
 
     # Process the second block
     store_after_block_2 = store_before_block_2.on_block(signed_block_2)
 
     # Verify immutability: the list lengths in store_before_block_2 should not have changed
     for key, original_length in original_sig_lengths.items():
-        current_length = len(store_before_block_2.aggregated_payloads[key])
+        current_length = len(store_before_block_2.latest_new_aggregated_payloads[key])
         assert current_length == original_length, (
             f"Immutability violated: list for key {key} grew from {original_length} to "
             f"{current_length}"
@@ -294,6 +317,6 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
 
     # Verify that the updated store has new keys (different attestation data in block 2)
     # The key point is that store_before_block_2 wasn't mutated
-    assert len(store_after_block_2.aggregated_payloads) >= len(
-        store_before_block_2.aggregated_payloads
+    assert len(store_after_block_2.latest_new_aggregated_payloads) >= len(
+        store_before_block_2.latest_new_aggregated_payloads
     )

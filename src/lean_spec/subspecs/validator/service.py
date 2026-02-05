@@ -7,7 +7,7 @@ Ethereum consensus requires active participation from validators.
 
 At specific intervals within each slot, validators must:
 - Interval 0: Propose blocks (if scheduled)
-- Interval 1: Create attestations
+- Interval 1: Create attestations (broadcast to subnet topics only)
 
 This service drives validator duties by monitoring the slot clock
 and triggering production at the appropriate intervals.
@@ -212,7 +212,7 @@ class ValidatorService:
                 prune_threshold = max(0, slot_int - 4)
                 self._attested_slots = {s for s in self._attested_slots if s >= prune_threshold}
 
-            # Intervals 2-3 have no additional validator duties.
+            # Intervals 2-4 have no additional validator duties.
 
             # Mark this interval as handled.
             #
@@ -286,16 +286,10 @@ class ValidatorService:
                 # This adds our attestation and signatures to the block.
                 signed_block = self._sign_block(block, validator_index, signatures)
 
-                # Process our own proposer attestation directly.
-                #
-                # The block was already stored by during the block production.
-                #
-                # When this block is received via gossip, on_block will reject it as a duplicate.
-                # We must process our proposer attestation here to ensure it's counted.
-                self.sync_service.store = self.sync_service.store.on_attestation(
-                    attestation=signed_block.message.proposer_attestation,
-                    is_from_block=False,
-                )
+                # The proposer's attestation is already stored in the block.
+                # When the block is broadcast, the proposer signature is tracked
+                # in gossip_signatures for future aggregation.
+                # No need to separately process the proposer attestation.
 
                 self._blocks_produced += 1
                 metrics.blocks_proposed.inc()

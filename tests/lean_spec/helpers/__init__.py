@@ -6,6 +6,8 @@ import asyncio
 from collections.abc import Coroutine
 from typing import TypeVar
 
+from lean_spec.subspecs.containers.validator import ValidatorIndex
+
 from .builders import (
     make_aggregated_attestation,
     make_block,
@@ -23,6 +25,9 @@ from .builders import (
     make_validators_with_keys,
 )
 from .mocks import MockNoiseSession
+
+TEST_VALIDATOR_ID = ValidatorIndex(0)
+
 
 _T = TypeVar("_T")
 
@@ -50,6 +55,8 @@ __all__ = [
     "make_validators_with_keys",
     # Mocks
     "MockNoiseSession",
+    # Constants
+    "TEST_VALIDATOR_ID",
     # Async utilities
     "run_async",
 ]
