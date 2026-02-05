@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TypeAlias
-
 from lean_spec.types import Bytes20
 
-MessageId: TypeAlias = Bytes20
+type MessageId = Bytes20
 """20-byte message identifier.
 
 Computed from message contents using SHA256::
@@ -17,7 +15,7 @@ The domain byte distinguishes valid/invalid snappy compression.
 """
 
 
-TopicId: TypeAlias = str
+type TopicId = str
 """Topic string identifier.
 
 Follows the Ethereum consensus format::
@@ -26,7 +24,7 @@ Follows the Ethereum consensus format::
 """
 
 
-Timestamp: TypeAlias = float
+type Timestamp = float
 """Unix timestamp in seconds since epoch.
 
 Used for:

@@ -9,7 +9,6 @@ Ethereum's serialization format.
 
 from __future__ import annotations
 
-import inspect
 import io
 from typing import IO, Any, Self
 
@@ -33,7 +32,7 @@ def _get_ssz_field_type(annotation: Any) -> type[SSZType]:
         SSZTypeCoercionError: If the annotation is not a valid SSZType class.
     """
     # Check if it's a class and is a subclass of SSZType
-    if not (inspect.isclass(annotation) and issubclass(annotation, SSZType)):
+    if not (isinstance(annotation, type) and issubclass(annotation, SSZType)):
         raise SSZTypeError(f"Expected SSZType subclass, got {annotation}")
     return annotation
 
@@ -56,13 +55,6 @@ class Container(SSZModel):
     - Fixed-size fields are packed directly
     - Variable-size fields use offset pointers
     - Field iteration via inherited __iter__ method
-
-    Example:
-        >>> class Block(Container):
-        ...     slot: Uint64
-        ...     parent_root: Bytes32
-        ...     state_root: Bytes32
-        ...     body: Attestations  # Variable-size field
 
     Serialization format:
         [fixed_field_1][fixed_field_2]...[offset_1][offset_2]...[variable_data_1][variable_data_2]...

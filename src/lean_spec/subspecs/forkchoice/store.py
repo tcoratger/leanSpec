@@ -4,12 +4,7 @@ Forkchoice store for tracking chain state and attestations.
 The Store tracks all information required for the LMD GHOST forkchoice algorithm.
 """
 
-__all__ = [
-    "Store",
-    "MILLISECONDS_PER_SLOT",
-    "MILLISECONDS_PER_INTERVAL",
-    "INTERVALS_PER_SLOT",
-]
+__all__ = ["Store"]
 
 import copy
 from collections import defaultdict
@@ -19,7 +14,6 @@ from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
     JUSTIFICATION_LOOKBACK_SLOTS,
     MILLISECONDS_PER_INTERVAL,
-    MILLISECONDS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.containers import (

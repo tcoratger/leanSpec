@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import math
-from functools import total_ordering
 
 from lean_spec.types import Uint64
 
+IMMEDIATE_JUSTIFICATION_WINDOW = 5
+"""First N slots after finalization are always justifiable."""
 
-@total_ordering
+
 class Slot(Uint64):
     """Represents a slot number as a 64-bit unsigned integer."""
 
@@ -52,10 +53,10 @@ class Slot(Uint64):
         delta = int(self - finalized_slot)
 
         return (
-            # Rule 1: The first 5 slots after finalization are always justifiable.
+            # Rule 1: The first N slots after finalization are always justifiable.
             #
             # Examples: delta = 0, 1, 2, 3, 4, 5
-            delta <= 5
+            delta <= IMMEDIATE_JUSTIFICATION_WINDOW
             # Rule 2: Slots at perfect square distances are justifiable.
             #
             # Examples: delta = 1, 4, 9, 16, 25, 36, 49, 64, ...

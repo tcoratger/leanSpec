@@ -46,13 +46,12 @@ def _extract_element_type_from_generic(cls: type, origin_class: type) -> type[SS
 
 def _serialize_ssz_elements_to_json(value: Sequence[Any]) -> list[Any]:
     """Serialize SSZ collection elements to JSON-compatible format."""
-    from lean_spec.subspecs.koalabear import Fp
-
     result: list[Any] = []
     for item in value:
         if isinstance(item, BaseBytes):
             result.append("0x" + item.hex())
-        elif isinstance(item, Fp):
+        elif hasattr(item, "value") and isinstance(item.value, int):
+            # Handle field elements (Fp and similar) via duck typing
             result.append(item.value)
         else:
             result.append(item)
