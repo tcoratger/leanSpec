@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
@@ -64,6 +65,7 @@ class AggregationBits(BaseBitlist):
         # - False elsewhere.
         return cls(data=[Boolean(i in ids) for i in range(max_id + 1)])
 
+    @lru_cache(maxsize=None)  # noqa: B019
     def to_validator_indices(self) -> "ValidatorIndices":
         """
         Extract all validator indices encoded in these aggregation bits.
