@@ -1,6 +1,6 @@
 """Chain and Consensus Configuration Specification"""
 
-from typing_extensions import Final
+from typing import Final
 
 from lean_spec.types.uint import Uint64
 

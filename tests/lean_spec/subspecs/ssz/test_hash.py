@@ -10,7 +10,7 @@ import pytest
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean
-from lean_spec.types.byte_arrays import BaseByteList, Bytes32, Bytes48
+from lean_spec.types.byte_arrays import BaseByteList, BaseBytes, Bytes32
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
 from lean_spec.types.uint import (
@@ -21,6 +21,12 @@ from lean_spec.types.uint import (
     Uint64,
 )
 from lean_spec.types.union import SSZUnion
+
+
+class Bytes48(BaseBytes):
+    """Fixed-size byte array of exactly 48 bytes (test-local definition)."""
+
+    LENGTH = 48
 
 
 # Concrete SSZList classes for tests

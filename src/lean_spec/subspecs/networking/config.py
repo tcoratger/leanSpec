@@ -1,6 +1,6 @@
 """Networking Configuration Constants."""
 
-from typing_extensions import Final
+from typing import Final
 
 from lean_spec.types.byte_arrays import Bytes1
 

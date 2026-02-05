@@ -9,7 +9,7 @@ instantiation from the canonical Rust implementation
 We also provide a test instantiation for testing purposes.
 """
 
-from typing_extensions import Final
+from typing import Final
 
 from lean_spec.config import LEAN_ENV
 from lean_spec.types import StrictBaseModel, Uint64
