@@ -30,7 +30,6 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.networking import compute_subnet_id
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
@@ -403,10 +402,10 @@ class Store(Container):
 
         if is_aggregator:
             assert self.validator_id is not None, "Current validator ID must be set for aggregation"
-            current_validator_subnet = compute_subnet_id(
-                self.validator_id, ATTESTATION_COMMITTEE_COUNT
+            current_validator_subnet = self.validator_id.compute_subnet_id(
+                ATTESTATION_COMMITTEE_COUNT
             )
-            attester_subnet = compute_subnet_id(validator_id, ATTESTATION_COMMITTEE_COUNT)
+            attester_subnet = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
             if current_validator_subnet != attester_subnet:
                 # Not part of our committee; ignore for committee aggregation.
                 pass
@@ -661,11 +660,11 @@ class Store(Container):
         # as the current validator.
         if self.validator_id is not None:
             proposer_validator_id = proposer_attestation.validator_id
-            proposer_subnet_id = compute_subnet_id(
-                proposer_validator_id, ATTESTATION_COMMITTEE_COUNT
+            proposer_subnet_id = proposer_validator_id.compute_subnet_id(
+                ATTESTATION_COMMITTEE_COUNT
             )
-            current_validator_subnet_id = compute_subnet_id(
-                self.validator_id, ATTESTATION_COMMITTEE_COUNT
+            current_validator_subnet_id = self.validator_id.compute_subnet_id(
+                ATTESTATION_COMMITTEE_COUNT
             )
             if proposer_subnet_id == current_validator_subnet_id:
                 proposer_sig_key = SignatureKey(
