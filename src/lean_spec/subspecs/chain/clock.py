@@ -45,8 +45,11 @@ class SlotClock:
 
     def _milliseconds_since_genesis(self) -> Uint64:
         """Milliseconds elapsed since genesis (0 if before genesis)."""
-        # TODO(kamilsa): #360, return the actual milliseconds instead of converting from seconds
-        return self._seconds_since_genesis() * Uint64(1000)
+        now_ms = int(self.time_fn() * 1000)
+        genesis_ms = int(self.genesis_time) * 1000
+        if now_ms < genesis_ms:
+            return Uint64(0)
+        return Uint64(now_ms - genesis_ms)
 
     def current_slot(self) -> Slot:
         """Get the current slot number (0 if before genesis)."""

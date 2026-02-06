@@ -65,19 +65,24 @@ class TestCurrentInterval:
         """Interval increments based on milliseconds since genesis.
 
         With MILLISECONDS_PER_INTERVAL = 800:
-        - 0s = 0ms → interval 0
-        - 1s = 1000ms → interval 1 (1000 // 800 = 1)
-        - 2s = 2000ms → interval 2 (2000 // 800 = 2)
-        - 3s = 3000ms → interval 3 (3000 // 800 = 3)
+        - 0ms → interval 0
+        - 800ms → interval 1
+        - 1600ms → interval 2
+        - 2400ms → interval 3
+        - 3200ms → interval 4
         """
         genesis = Uint64(1700000000)
-        # Test at second boundaries - the clock truncates to int seconds
-        # With 800ms intervals: 0s->i0, 1s->i1, 2s->i2, 3s->i3
+        # Test with sub-second precision
         expected_intervals = [
-            (0, 0),  # 0s -> 0ms -> interval 0
-            (1, 1),  # 1s -> 1000ms -> interval 1
-            (2, 2),  # 2s -> 2000ms -> interval 2
-            (3, 3),  # 3s -> 3000ms -> interval 3
+            (0.0, 0),  # 0ms -> interval 0
+            (0.8, 1),  # 800ms -> interval 1 (exactly at boundary)
+            (1.0, 1),  # 1000ms -> interval 1
+            (1.6, 2),  # 1600ms -> interval 2
+            (2.0, 2),  # 2000ms -> interval 2
+            (2.4, 3),  # 2400ms -> interval 3
+            (3.0, 3),  # 3000ms -> interval 3
+            (3.2, 4),  # 3200ms -> interval 4 (previously unreachable)
+            (3.9, 4),  # 3900ms -> interval 4
         ]
         for secs_after_genesis, expected_interval in expected_intervals:
             time = float(genesis) + secs_after_genesis
@@ -101,29 +106,38 @@ class TestCurrentInterval:
         assert clock.current_interval() == Interval(0)
 
     def test_last_interval_of_slot(self) -> None:
-        """Interval 3 at 3s (interval 4 requires 3.2s, but clock truncates to int)."""
+        """Interval 4 at 3.2s (3200ms // 800 = 4)."""
         genesis = Uint64(1700000000)
-        time = float(genesis) + 3.0
+        time = float(genesis) + 3.2
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: time)
-        assert clock.current_interval() == Interval(3)
+        assert clock.current_interval() == Interval(4)
+
+    def test_subsecond_precision(self) -> None:
+        """Verifies sub-second timing affects interval calculation."""
+        genesis = Uint64(1700000000)
+        # 750ms into genesis should give interval 0 (not 1)
+        clock_750ms = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis) + 0.75)
+        assert clock_750ms.current_interval() == Interval(0)
+
+        # 850ms into genesis should give interval 1
+        clock_850ms = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis) + 0.85)
+        assert clock_850ms.current_interval() == Interval(1)
 
 
 class TestTotalIntervals:
     """Tests for total_intervals()."""
 
     def test_counts_all_intervals(self) -> None:
-        """total_intervals counts all intervals since genesis.
+        """total_intervals counts all intervals since genesis with sub-second precision.
 
         With MILLISECONDS_PER_INTERVAL = 800:
-        3 slots = 3 * 4000ms = 12000ms = 15 intervals (12000 // 800)
-        At 12s = 12000ms, we have 15 total intervals.
-        At 14s = 14000ms = 17 total intervals (14000 // 800).
+        14.4 seconds = 14400ms = 18 intervals (14400 // 800)
         """
         genesis = Uint64(1700000000)
-        # 14 seconds = 14000ms = 17 intervals (14000 // 800 = 17)
-        time = float(genesis) + 14.0
+        # 14.4 seconds = 14400ms = 18 intervals (14400 // 800)
+        time = float(genesis) + 14.4
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: time)
-        assert clock.total_intervals() == Interval(17)
+        assert clock.total_intervals() == Interval(18)
 
     def test_before_genesis(self) -> None:
         """total_intervals is 0 before genesis."""
