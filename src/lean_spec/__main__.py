@@ -97,13 +97,12 @@ def resolve_bootnode(bootnode: str) -> str:
         if not enr.verify_signature():
             raise ValueError(f"ENR signature verification failed: {enr}")
 
-        # ENR.multiaddr() returns None when the record lacks IP or TCP port.
+        # ENR.multiaddr() returns None when the record lacks IP or UDP port.
         #
-        # This happens with discovery-only ENRs that only contain UDP info.
-        # We require TCP for libp2p connections.
+        # We require UDP for QUIC connections.
         multiaddr = enr.multiaddr()
         if multiaddr is None:
-            raise ValueError(f"ENR has no TCP connection info: {enr}")
+            raise ValueError(f"ENR has no UDP connection info: {enr}")
         return multiaddr
 
     # Already a multiaddr string. Pass through without validation.
