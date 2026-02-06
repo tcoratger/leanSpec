@@ -23,17 +23,11 @@ SECP256K1: Final[EnrKey] = "secp256k1"
 IP: Final[EnrKey] = "ip"
 """IPv4 address (4 bytes)."""
 
-TCP: Final[EnrKey] = "tcp"
-"""TCP port (big-endian integer)."""
-
 UDP: Final[EnrKey] = "udp"
 """UDP port for discovery (big-endian integer)."""
 
 IP6: Final[EnrKey] = "ip6"
 """IPv6 address (16 bytes)."""
-
-TCP6: Final[EnrKey] = "tcp6"
-"""IPv6-specific TCP port."""
 
 UDP6: Final[EnrKey] = "udp6"
 """IPv6-specific UDP port."""

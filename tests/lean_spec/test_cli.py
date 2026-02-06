@@ -47,8 +47,8 @@ def _sign_enr_content(content_items: list[bytes]) -> bytes:
     return r.to_bytes(32, "big") + s.to_bytes(32, "big")
 
 
-def _make_enr_with_tcp(ip_bytes: bytes, tcp_port: int) -> str:
-    """Create a properly signed ENR string with IPv4 and TCP port."""
+def _make_enr_with_udp(ip_bytes: bytes, udp_port: int) -> str:
+    """Create a properly signed ENR string with IPv4 and UDP port."""
     # Content items (keys must be sorted).
     content_items: list[bytes] = [
         b"\x01",  # seq = 1
@@ -58,8 +58,8 @@ def _make_enr_with_tcp(ip_bytes: bytes, tcp_port: int) -> str:
         ip_bytes,
         b"secp256k1",
         _TEST_COMPRESSED_PUBKEY,
-        b"tcp",
-        tcp_port.to_bytes(2, "big"),
+        b"udp",
+        udp_port.to_bytes(2, "big"),
     ]
     signature = _sign_enr_content(content_items)
 
@@ -68,8 +68,8 @@ def _make_enr_with_tcp(ip_bytes: bytes, tcp_port: int) -> str:
     return f"enr:{b64_content}"
 
 
-def _make_enr_with_ipv6_tcp(ip6_bytes: bytes, tcp_port: int) -> str:
-    """Create a properly signed ENR string with IPv6 and TCP port."""
+def _make_enr_with_ipv6_udp(ip6_bytes: bytes, udp_port: int) -> str:
+    """Create a properly signed ENR string with IPv6 and UDP port."""
     content_items: list[bytes] = [
         b"\x01",  # seq = 1
         b"id",
@@ -78,8 +78,8 @@ def _make_enr_with_ipv6_tcp(ip6_bytes: bytes, tcp_port: int) -> str:
         ip6_bytes,
         b"secp256k1",
         _TEST_COMPRESSED_PUBKEY,
-        b"tcp",
-        tcp_port.to_bytes(2, "big"),
+        b"udp",
+        udp_port.to_bytes(2, "big"),
     ]
     signature = _sign_enr_content(content_items)
 
@@ -88,8 +88,8 @@ def _make_enr_with_ipv6_tcp(ip6_bytes: bytes, tcp_port: int) -> str:
     return f"enr:{b64_content}"
 
 
-def _make_enr_without_tcp(ip_bytes: bytes) -> str:
-    """Create a properly signed ENR string with IPv4 but no TCP port (UDP only)."""
+def _make_enr_without_udp(ip_bytes: bytes) -> str:
+    """Create a properly signed ENR string with IPv4 but no UDP port."""
     content_items: list[bytes] = [
         b"\x01",  # seq = 1
         b"id",
@@ -98,8 +98,6 @@ def _make_enr_without_tcp(ip_bytes: bytes) -> str:
         ip_bytes,
         b"secp256k1",
         _TEST_COMPRESSED_PUBKEY,
-        b"udp",
-        (30303).to_bytes(2, "big"),  # UDP only, no TCP
     ]
     signature = _sign_enr_content(content_items)
 
@@ -109,13 +107,13 @@ def _make_enr_without_tcp(ip_bytes: bytes) -> str:
 
 
 # Pre-built test ENRs
-ENR_WITH_TCP = _make_enr_with_tcp(b"\xc0\xa8\x01\x01", 9000)  # 192.168.1.1:9000
-ENR_WITH_IPV6_TCP = _make_enr_with_ipv6_tcp(b"\x00" * 15 + b"\x01", 9000)  # ::1:9000
-ENR_WITHOUT_TCP = _make_enr_without_tcp(b"\xc0\xa8\x01\x01")  # 192.168.1.1, UDP only
+ENR_WITH_UDP = _make_enr_with_udp(b"\xc0\xa8\x01\x01", 9000)  # 192.168.1.1:9000
+ENR_WITH_IPV6_UDP = _make_enr_with_ipv6_udp(b"\x00" * 15 + b"\x01", 9000)  # ::1:9000
+ENR_WITHOUT_UDP = _make_enr_without_udp(b"\xc0\xa8\x01\x01")  # 192.168.1.1, no UDP
 
-# Valid multiaddr strings
-MULTIADDR_IPV4 = "/ip4/127.0.0.1/tcp/9000"
-MULTIADDR_IPV6 = "/ip6/::1/tcp/9000"
+# Valid multiaddr strings (QUIC format)
+MULTIADDR_IPV4 = "/ip4/127.0.0.1/udp/9000/quic-v1"
+MULTIADDR_IPV6 = "/ip6/::1/udp/9000/quic-v1"
 
 
 class TestIsEnrString:
@@ -131,7 +129,7 @@ class TestIsEnrString:
 
     def test_enr_with_valid_content(self) -> None:
         """Full valid ENR string returns True."""
-        assert is_enr_string(ENR_WITH_TCP) is True
+        assert is_enr_string(ENR_WITH_UDP) is True
 
     def test_multiaddr_not_detected(self) -> None:
         """Multiaddr string returns False."""
@@ -174,22 +172,22 @@ class TestResolveBootnode:
         arbitrary = "/some/arbitrary/path"
         assert resolve_bootnode(arbitrary) == arbitrary
 
-    def test_resolve_valid_enr_with_tcp(self) -> None:
-        """ENR with IPv4+TCP extracts multiaddr correctly."""
-        result = resolve_bootnode(ENR_WITH_TCP)
-        assert result == "/ip4/192.168.1.1/tcp/9000"
+    def test_resolve_valid_enr_with_udp(self) -> None:
+        """ENR with IPv4+UDP extracts QUIC multiaddr correctly."""
+        result = resolve_bootnode(ENR_WITH_UDP)
+        assert result == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
     def test_resolve_enr_ipv6(self) -> None:
-        """ENR with IPv6+TCP extracts multiaddr correctly."""
-        result = resolve_bootnode(ENR_WITH_IPV6_TCP)
+        """ENR with IPv6+UDP extracts QUIC multiaddr correctly."""
+        result = resolve_bootnode(ENR_WITH_IPV6_UDP)
         # IPv6 loopback ::1 formatted as full hex
         assert "/ip6/" in result
-        assert "/tcp/9000" in result
+        assert "/udp/9000/quic-v1" in result
 
-    def test_resolve_enr_without_tcp_raises(self) -> None:
-        """ENR without TCP port raises ValueError."""
-        with pytest.raises(ValueError, match=r"no TCP connection info"):
-            resolve_bootnode(ENR_WITHOUT_TCP)
+    def test_resolve_enr_without_udp_raises(self) -> None:
+        """ENR without UDP port raises ValueError."""
+        with pytest.raises(ValueError, match=r"no UDP connection info"):
+            resolve_bootnode(ENR_WITHOUT_UDP)
 
     def test_resolve_invalid_enr_raises(self) -> None:
         """Malformed ENR raises ValueError."""
@@ -209,19 +207,19 @@ class TestResolveBootnode:
     def test_resolve_enr_with_different_ports(self) -> None:
         """ENR resolution handles various port numbers."""
         # Port 30303
-        enr_30303 = _make_enr_with_tcp(b"\x7f\x00\x00\x01", 30303)
+        enr_30303 = _make_enr_with_udp(b"\x7f\x00\x00\x01", 30303)
         result = resolve_bootnode(enr_30303)
-        assert result == "/ip4/127.0.0.1/tcp/30303"
+        assert result == "/ip4/127.0.0.1/udp/30303/quic-v1"
 
         # Port 1 (minimum valid)
-        enr_1 = _make_enr_with_tcp(b"\x7f\x00\x00\x01", 1)
+        enr_1 = _make_enr_with_udp(b"\x7f\x00\x00\x01", 1)
         result = resolve_bootnode(enr_1)
-        assert result == "/ip4/127.0.0.1/tcp/1"
+        assert result == "/ip4/127.0.0.1/udp/1/quic-v1"
 
         # Port 65535 (maximum)
-        enr_max = _make_enr_with_tcp(b"\x7f\x00\x00\x01", 65535)
+        enr_max = _make_enr_with_udp(b"\x7f\x00\x00\x01", 65535)
         result = resolve_bootnode(enr_max)
-        assert result == "/ip4/127.0.0.1/tcp/65535"
+        assert result == "/ip4/127.0.0.1/udp/65535/quic-v1"
 
     def test_resolve_enr_with_different_ips(self) -> None:
         """ENR resolution handles various IPv4 addresses."""
@@ -231,9 +229,9 @@ class TestResolveBootnode:
             (b"\x0a\x00\x00\x01", "10.0.0.1"),
         ]
         for ip_bytes, expected_ip in test_cases:
-            enr = _make_enr_with_tcp(ip_bytes, 9000)
+            enr = _make_enr_with_udp(ip_bytes, 9000)
             result = resolve_bootnode(enr)
-            assert result == f"/ip4/{expected_ip}/tcp/9000"
+            assert result == f"/ip4/{expected_ip}/udp/9000/quic-v1"
 
 
 class TestMixedBootnodes:
@@ -243,22 +241,22 @@ class TestMixedBootnodes:
         """Process a list containing both ENR and multiaddr."""
         bootnodes = [
             MULTIADDR_IPV4,
-            ENR_WITH_TCP,
-            "/ip4/10.0.0.1/tcp/8000",
+            ENR_WITH_UDP,
+            "/ip4/10.0.0.1/udp/8000/quic-v1",
         ]
 
         resolved = [resolve_bootnode(b) for b in bootnodes]
 
         assert resolved[0] == MULTIADDR_IPV4
-        assert resolved[1] == "/ip4/192.168.1.1/tcp/9000"
-        assert resolved[2] == "/ip4/10.0.0.1/tcp/8000"
+        assert resolved[1] == "/ip4/192.168.1.1/udp/9000/quic-v1"
+        assert resolved[2] == "/ip4/10.0.0.1/udp/8000/quic-v1"
 
     def test_filter_invalid_enrs(self) -> None:
         """Demonstrate filtering out invalid ENRs from a bootnode list."""
         bootnodes = [
             MULTIADDR_IPV4,
-            ENR_WITHOUT_TCP,  # Invalid - no TCP
-            ENR_WITH_TCP,
+            ENR_WITHOUT_UDP,  # Invalid - no UDP
+            ENR_WITH_UDP,
         ]
 
         resolved = []
@@ -270,7 +268,7 @@ class TestMixedBootnodes:
 
         assert len(resolved) == 2
         assert resolved[0] == MULTIADDR_IPV4
-        assert resolved[1] == "/ip4/192.168.1.1/tcp/9000"
+        assert resolved[1] == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
 
 # =============================================================================

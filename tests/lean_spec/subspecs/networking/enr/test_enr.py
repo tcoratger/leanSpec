@@ -97,20 +97,17 @@ class TestOfficialEIP778Vector:
         enr = ENR.from_string(OFFICIAL_ENR_STRING)
         assert enr.is_valid()
 
-    def test_official_enr_no_tcp_port(self) -> None:
-        """Official ENR does not have TCP port."""
-        enr = ENR.from_string(OFFICIAL_ENR_STRING)
-        assert enr.tcp_port is None
-
     def test_official_enr_no_ipv6(self) -> None:
         """Official ENR does not have IPv6 address."""
         enr = ENR.from_string(OFFICIAL_ENR_STRING)
         assert enr.ip6 is None
 
-    def test_official_enr_no_multiaddr(self) -> None:
-        """Official ENR has no multiaddr (no TCP port)."""
+    def test_official_enr_has_quic_multiaddr(self) -> None:
+        """Official ENR has QUIC multiaddr (has UDP port)."""
         enr = ENR.from_string(OFFICIAL_ENR_STRING)
-        assert enr.multiaddr() is None
+        multiaddr = enr.multiaddr()
+        assert multiaddr is not None
+        assert multiaddr == f"/ip4/{OFFICIAL_IPV4}/udp/{OFFICIAL_UDP_PORT}/quic-v1"
 
     def test_official_enr_node_id(self) -> None:
         """Official ENR node ID matches keccak256(uncompressed_pubkey).
@@ -422,24 +419,6 @@ class TestPropertyAccessors:
         )
         assert enr.udp_port is None
 
-    def test_tcp_port_extracts_correctly(self) -> None:
-        """tcp_port extracts port number from big-endian bytes."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={keys.ID: b"v4", keys.TCP: (9000).to_bytes(2, "big")},
-        )
-        assert enr.tcp_port == 9000
-
-    def test_tcp_port_returns_none_when_missing(self) -> None:
-        """tcp_port returns None when 'tcp' key is absent."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={keys.ID: b"v4"},
-        )
-        assert enr.tcp_port is None
-
 
 class TestValidationMethods:
     """Tests for ENR validation methods."""
@@ -516,21 +495,21 @@ class TestValidationMethods:
 class TestMultiaddrGeneration:
     """Tests for multiaddr() method."""
 
-    def test_multiaddr_with_ipv4_and_tcp(self) -> None:
-        """multiaddr() generates correct format with IPv4 and TCP."""
+    def test_multiaddr_with_ipv4_and_udp(self) -> None:
+        """multiaddr() generates QUIC format with IPv4 and UDP."""
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
                 keys.IP: b"\xc0\xa8\x01\x01",  # 192.168.1.1
-                keys.TCP: (9000).to_bytes(2, "big"),
+                keys.UDP: (9000).to_bytes(2, "big"),
             },
         )
-        assert enr.multiaddr() == "/ip4/192.168.1.1/tcp/9000"
+        assert enr.multiaddr() == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
-    def test_multiaddr_with_ipv6_and_tcp(self) -> None:
-        """multiaddr() generates correct format with IPv6 and TCP."""
+    def test_multiaddr_with_ipv6_and_udp(self) -> None:
+        """multiaddr() generates QUIC format with IPv6 and UDP."""
         ipv6_bytes = b"\x00" * 15 + b"\x01"  # ::1
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
@@ -538,20 +517,19 @@ class TestMultiaddrGeneration:
             pairs={
                 keys.ID: b"v4",
                 keys.IP6: ipv6_bytes,
-                keys.TCP: (9000).to_bytes(2, "big"),
+                keys.UDP: (9000).to_bytes(2, "big"),
             },
         )
-        assert enr.multiaddr() == "/ip6/0000:0000:0000:0000:0000:0000:0000:0001/tcp/9000"
+        assert enr.multiaddr() == "/ip6/0000:0000:0000:0000:0000:0000:0000:0001/udp/9000/quic-v1"
 
-    def test_multiaddr_returns_none_without_tcp(self) -> None:
-        """multiaddr() returns None when TCP port is absent."""
+    def test_multiaddr_returns_none_without_udp(self) -> None:
+        """multiaddr() returns None when UDP port is absent."""
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
                 keys.IP: b"\xc0\xa8\x01\x01",
-                keys.UDP: (30303).to_bytes(2, "big"),  # UDP, not TCP
             },
         )
         assert enr.multiaddr() is None
@@ -561,7 +539,7 @@ class TestMultiaddrGeneration:
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
-            pairs={keys.ID: b"v4", keys.TCP: (9000).to_bytes(2, "big")},
+            pairs={keys.ID: b"v4", keys.UDP: (9000).to_bytes(2, "big")},
         )
         assert enr.multiaddr() is None
 
@@ -574,10 +552,10 @@ class TestMultiaddrGeneration:
                 keys.ID: b"v4",
                 keys.IP: b"\xc0\xa8\x01\x01",  # 192.168.1.1
                 keys.IP6: b"\x00" * 15 + b"\x01",  # ::1
-                keys.TCP: (9000).to_bytes(2, "big"),
+                keys.UDP: (9000).to_bytes(2, "big"),
             },
         )
-        assert enr.multiaddr() == "/ip4/192.168.1.1/tcp/9000"
+        assert enr.multiaddr() == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
 
 class TestStringRepresentation:
@@ -602,16 +580,6 @@ class TestStringRepresentation:
         )
         result = str(enr)
         assert "192.168.1.1" in result
-
-    def test_str_includes_tcp_port(self) -> None:
-        """__str__() includes TCP port when present."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={keys.ID: b"v4", keys.TCP: (9000).to_bytes(2, "big")},
-        )
-        result = str(enr)
-        assert "tcp=9000" in result
 
     def test_str_includes_udp_port(self) -> None:
         """__str__() includes UDP port when present."""
@@ -675,7 +643,7 @@ class TestKeyAccessMethods:
             pairs={keys.ID: b"v4"},
         )
         assert not enr.has(keys.IP)
-        assert not enr.has(keys.TCP)
+        assert not enr.has(keys.UDP)
         assert not enr.has(keys.ETH2)
 
 
@@ -703,7 +671,6 @@ class TestEdgeCases:
         enr = ENR.from_string(f"enr:{b64_content}")
         assert enr.is_valid()
         assert enr.ip4 is None
-        assert enr.tcp_port is None
         assert enr.udp_port is None
 
     def test_enr_with_ipv6_only(self) -> None:
@@ -723,7 +690,7 @@ class TestEdgeCases:
                 ipv6_bytes,
                 b"secp256k1",
                 b"\x02" + b"\x00" * 32,
-                b"tcp",
+                b"udp",
                 (9000).to_bytes(2, "big"),
             ]
         )
@@ -732,14 +699,15 @@ class TestEdgeCases:
         enr = ENR.from_string(f"enr:{b64_content}")
         assert enr.ip4 is None
         assert enr.ip6 is not None
-        assert enr.tcp_port == 9000
-        # multiaddr should use IPv6
+        assert enr.udp_port == 9000
+        # multiaddr should use IPv6 with QUIC
         multiaddr = enr.multiaddr()
         assert multiaddr is not None
         assert "/ip6/" in multiaddr
+        assert "/quic-v1" in multiaddr
 
-    def test_enr_with_both_tcp_and_udp(self) -> None:
-        """ENR with both TCP and UDP ports parses correctly."""
+    def test_enr_with_udp_port(self) -> None:
+        """ENR with UDP port generates QUIC multiaddr correctly."""
         import base64
 
         from lean_spec.types.rlp import encode_rlp
@@ -754,8 +722,6 @@ class TestEdgeCases:
                 b"\xc0\xa8\x01\x01",
                 b"secp256k1",
                 b"\x02" + b"\x00" * 32,
-                b"tcp",
-                (9000).to_bytes(2, "big"),
                 b"udp",
                 (30303).to_bytes(2, "big"),
             ]
@@ -763,9 +729,8 @@ class TestEdgeCases:
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         enr = ENR.from_string(f"enr:{b64_content}")
-        assert enr.tcp_port == 9000
         assert enr.udp_port == 30303
-        assert enr.multiaddr() == "/ip4/192.168.1.1/tcp/9000"
+        assert enr.multiaddr() == "/ip4/192.168.1.1/udp/30303/quic-v1"
 
     def test_sequence_number_zero(self) -> None:
         """ENR with sequence number 0 is valid."""
@@ -1267,7 +1232,7 @@ class TestRoundTripSerialization:
                 b"\xc0\xa8\x01\x01",
                 b"secp256k1",
                 b"\x02" + b"\x00" * 32,
-                b"tcp",
+                b"udp",
                 (9000).to_bytes(2, "big"),
             ]
         )
@@ -1278,7 +1243,7 @@ class TestRoundTripSerialization:
 
         assert enr1.seq == enr2.seq == Uint64(0x42)
         assert enr1.ip4 == enr2.ip4 == "192.168.1.1"
-        assert enr1.tcp_port == enr2.tcp_port == 9000
+        assert enr1.udp_port == enr2.udp_port == 9000
         assert enr1.identity_scheme == enr2.identity_scheme == "v4"
 
     def test_to_string_produces_valid_enr_format(self) -> None:
@@ -1415,28 +1380,7 @@ class TestNodeIdComputation:
 
 
 class TestIPv6Ports:
-    """Tests for tcp6_port and udp6_port properties."""
-
-    def test_tcp6_port_extracts_correctly(self) -> None:
-        """tcp6_port extracts IPv6-specific TCP port."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={
-                keys.ID: b"v4",
-                keys.TCP6: (9001).to_bytes(2, "big"),
-            },
-        )
-        assert enr.tcp6_port == 9001
-
-    def test_tcp6_port_returns_none_when_missing(self) -> None:
-        """tcp6_port returns None when tcp6 key is absent."""
-        enr = ENR(
-            signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
-            pairs={keys.ID: b"v4"},
-        )
-        assert enr.tcp6_port is None
+    """Tests for udp6_port property."""
 
     def test_udp6_port_extracts_correctly(self) -> None:
         """udp6_port extracts IPv6-specific UDP port."""
@@ -1459,20 +1403,16 @@ class TestIPv6Ports:
         )
         assert enr.udp6_port is None
 
-    def test_ipv6_ports_independent_of_ipv4(self) -> None:
-        """IPv6 ports are independent from IPv4 ports."""
+    def test_ipv6_udp_port_independent_of_ipv4(self) -> None:
+        """IPv6 UDP port is independent from IPv4 UDP port."""
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
             seq=Uint64(1),
             pairs={
                 keys.ID: b"v4",
-                keys.TCP: (9000).to_bytes(2, "big"),
-                keys.TCP6: (9001).to_bytes(2, "big"),
                 keys.UDP: (30303).to_bytes(2, "big"),
                 keys.UDP6: (30304).to_bytes(2, "big"),
             },
         )
-        assert enr.tcp_port == 9000
-        assert enr.tcp6_port == 9001
         assert enr.udp_port == 30303
         assert enr.udp6_port == 30304
