@@ -24,7 +24,7 @@ class ValidatorIndex(Uint64):
         """Check if this index is within valid bounds for a registry of given size."""
         return int(self) < num_validators
 
-    def compute_subnet_id(self, num_committees: int) -> int:
+    def compute_subnet_id(self, num_committees: "int | Uint64") -> int:
         """Compute the attestation subnet id for this validator.
 
         Args:
@@ -33,7 +33,7 @@ class ValidatorIndex(Uint64):
         Returns:
             An integer subnet id in 0..(num_committees-1).
         """
-        return int(self) % num_committees
+        return int(self) % int(num_committees)
 
 
 class ValidatorIndices(SSZList[ValidatorIndex]):
