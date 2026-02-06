@@ -138,32 +138,24 @@ class Store(Container):
     Mapping from attestation data root to full AttestationData.
 
     This allows reconstructing attestations from aggregated payloads.
-    Keyed by data_root_bytes() of AttestationData.
-
-    # TODO(kamilsa): #361 Consider pruning old entries based on justification/finalization.
+    Entries are pruned once their target checkpoint falls at or before finalization.
     """
 
     latest_new_aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] = {}
     """
-    Aggregated signature proofs that are pending processing.
+    Aggregated signature proofs pending processing.
 
-    - These payloads are "new" and do not yet contribute to fork choice.
-    - They migrate to `latest_known_aggregated_payloads` via interval ticks.
-    - Keyed by SignatureKey(validator_id, attestation_data_root).
-    - Values are lists of AggregatedSignatureProof, each containing the participants
-      bitfield indicating which validators signed.
-    - Populated from blocks (on_block) or gossip (on_gossip_aggregated_attestation).
+    These payloads are "new" and do not yet contribute to fork choice.
+    They migrate to known payloads via interval ticks.
+    Populated from blocks or gossip aggregated attestations.
     """
 
     latest_known_aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] = {}
     """
     Aggregated signature proofs that have been processed.
 
-    - These payloads are "known" and contribute to fork choice weights.
-    - Keyed by SignatureKey(validator_id, attestation_data_root).
-    - Values are lists of AggregatedSignatureProof, each containing the participants
-      bitfield indicating which validators signed.
-    - Used for recursive signature aggregation when building blocks.
+    These payloads are "known" and contribute to fork choice weights.
+    Used for recursive signature aggregation when building blocks.
     """
 
     @classmethod
@@ -234,6 +226,80 @@ class Store(Container):
             blocks={anchor_root: anchor_block},
             states={anchor_root: anchor_state},
             validator_id=validator_id,
+        )
+
+    def prune_stale_attestation_data(self) -> "Store":
+        """
+        Remove attestation data that can no longer influence fork choice.
+
+        An attestation becomes stale when its target checkpoint falls at or before
+        the finalized slot. Such attestations cannot affect chain selection since
+        the target is already finalized.
+
+        Pruning removes all attestation-related data:
+
+        - Attestation data entries
+        - Gossip signatures
+        - Pending aggregated payloads
+        - Processed aggregated payloads
+
+        Returns:
+            New Store with stale attestation data removed.
+        """
+        finalized_slot = self.latest_finalized.slot
+
+        # Identify which attestations are stale.
+        #
+        # An attestation is stale if its target slot is at or before finalization.
+        # We collect all such roots in one pass to avoid repeated lookups.
+        stale_roots: set[Bytes32] = {
+            data_root
+            for data_root, data in self.attestation_data_by_root.items()
+            if data.target.slot <= finalized_slot
+        }
+
+        # Early return if nothing to prune.
+        #
+        # Return the same instance to avoid unnecessary object creation.
+        if not stale_roots:
+            return self
+
+        # Filter out stale entries from all attestation-related mappings.
+        #
+        # Each mapping is keyed by attestation data root, so we check membership
+        # against the stale set we computed above.
+
+        new_attestation_data = {
+            root: data
+            for root, data in self.attestation_data_by_root.items()
+            if root not in stale_roots
+        }
+
+        new_gossip_sigs = {
+            key: sig
+            for key, sig in self.gossip_signatures.items()
+            if key.data_root not in stale_roots
+        }
+
+        new_aggregated_new = {
+            key: proofs
+            for key, proofs in self.latest_new_aggregated_payloads.items()
+            if key.data_root not in stale_roots
+        }
+
+        new_aggregated_known = {
+            key: proofs
+            for key, proofs in self.latest_known_aggregated_payloads.items()
+            if key.data_root not in stale_roots
+        }
+
+        return self.model_copy(
+            update={
+                "attestation_data_by_root": new_attestation_data,
+                "gossip_signatures": new_gossip_sigs,
+                "latest_new_aggregated_payloads": new_aggregated_new,
+                "latest_known_aggregated_payloads": new_aggregated_known,
+            }
         )
 
     def validate_attestation(self, attestation: Attestation) -> None:
@@ -612,6 +678,10 @@ class Store(Container):
 
         # Update store with proposer signature
         store = store.model_copy(update={"gossip_signatures": new_gossip_sigs})
+
+        # Prune stale attestation data when finalization advances
+        if store.latest_finalized.slot > self.latest_finalized.slot:
+            store = store.prune_stale_attestation_data()
 
         return store
 
@@ -1242,7 +1312,7 @@ class Store(Container):
         )
 
         # Persist block and state immutably.
-        store = store.model_copy(
+        new_store = store.model_copy(
             update={
                 "blocks": {**store.blocks, block_hash: final_block},
                 "states": {**store.states, block_hash: final_post_state},
@@ -1251,4 +1321,8 @@ class Store(Container):
             }
         )
 
-        return store, final_block, signatures
+        # Prune stale attestation data when finalization advances
+        if new_store.latest_finalized.slot > store.latest_finalized.slot:
+            new_store = new_store.prune_stale_attestation_data()
+
+        return new_store, final_block, signatures
