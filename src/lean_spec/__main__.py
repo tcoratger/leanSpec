@@ -34,7 +34,6 @@ from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.genesis import GenesisConfig
-from lean_spec.subspecs.networking import compute_subnet_id
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
@@ -495,7 +494,7 @@ async def run_node(
         subnet_id = 0
         logger.info("No local validator id; subscribing to attestation subnet %d", subnet_id)
     else:
-        subnet_id = compute_subnet_id(validator_id, ATTESTATION_COMMITTEE_COUNT)
+        subnet_id = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
     attestation_subnet_topic = str(GossipTopic.attestation_subnet(GOSSIP_FORK_DIGEST, subnet_id))
     event_source.subscribe_gossip_topic(attestation_subnet_topic)
     logger.info("Subscribed to gossip topics: %s, %s", block_topic, attestation_subnet_topic)

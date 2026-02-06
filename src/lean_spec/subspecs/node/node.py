@@ -30,7 +30,6 @@ from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import NetworkEventSource, NetworkService
-from lean_spec.subspecs.networking.subnet import compute_subnet_id
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
@@ -261,7 +260,7 @@ class Node:
             # Create a wrapper for publish_attestation that computes the subnet_id
             # from the validator_id in the attestation
             async def publish_attestation_wrapper(attestation: SignedAttestation) -> None:
-                subnet_id = compute_subnet_id(attestation.validator_id, ATTESTATION_COMMITTEE_COUNT)
+                subnet_id = attestation.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
                 await network_service.publish_attestation(attestation, subnet_id)
 
             validator_service = ValidatorService(
