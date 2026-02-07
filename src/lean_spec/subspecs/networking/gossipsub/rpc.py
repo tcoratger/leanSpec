@@ -41,13 +41,8 @@ References:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
-
-if TYPE_CHECKING:
-    pass
-
 
 # =============================================================================
 # Protobuf Wire Type Constants
@@ -56,8 +51,14 @@ if TYPE_CHECKING:
 WIRE_TYPE_VARINT = 0
 """Varint wire type for int32, int64, uint32, uint64, sint32, sint64, bool, enum."""
 
+WIRE_TYPE_64BIT = 1
+"""64-bit wire type for fixed64, sfixed64, double."""
+
 WIRE_TYPE_LENGTH_DELIMITED = 2
 """Length-delimited wire type for string, bytes, embedded messages, packed repeated fields."""
+
+WIRE_TYPE_32BIT = 5
+"""32-bit wire type for fixed32, sfixed32, float."""
 
 
 # =============================================================================
@@ -621,9 +622,9 @@ def _skip_field(data: bytes, pos: int, wire_type: int) -> int:
     elif wire_type == WIRE_TYPE_LENGTH_DELIMITED:
         length, pos = _decode_varint_at(data, pos)
         pos += length
-    elif wire_type == 5:  # 32-bit fixed
+    elif wire_type == WIRE_TYPE_32BIT:
         pos += 4
-    elif wire_type == 1:  # 64-bit fixed
+    elif wire_type == WIRE_TYPE_64BIT:
         pos += 8
     else:
         raise ValueError(f"Unknown wire type: {wire_type}")

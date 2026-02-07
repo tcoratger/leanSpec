@@ -154,24 +154,14 @@ class MeshState:
     """Set of topics we are subscribed to."""
 
     @property
-    def d(self) -> int:
-        """Target mesh size per topic."""
-        return self.params.d
+    def subscriptions(self) -> set[TopicId]:
+        """Read-only view of subscribed topics."""
+        return self._subscriptions
 
     @property
-    def d_low(self) -> int:
-        """Low watermark - graft when mesh is smaller."""
-        return self.params.d_low
-
-    @property
-    def d_high(self) -> int:
-        """High watermark - prune when mesh is larger."""
-        return self.params.d_high
-
-    @property
-    def d_lazy(self) -> int:
-        """Number of peers for IHAVE gossip."""
-        return self.params.d_lazy
+    def fanout_topics(self) -> set[TopicId]:
+        """Topics with active fanout entries (publish-only, not subscribed)."""
+        return set(self._fanouts)
 
     def subscribe(self, topic: TopicId) -> None:
         """Subscribe to a topic, initializing its mesh.
@@ -297,9 +287,9 @@ class MeshState:
         fanout.last_published = time.time()
 
         # Fill fanout up to D peers
-        if len(fanout.peers) < self.d:
+        if len(fanout.peers) < self.params.d:
             candidates = available_peers - fanout.peers
-            needed = self.d - len(fanout.peers)
+            needed = self.params.d - len(fanout.peers)
             new_peers = random.sample(list(candidates), min(needed, len(candidates)))
             fanout.peers.update(new_peers)
 
@@ -336,7 +326,7 @@ class MeshState:
         mesh_peers = self.get_mesh_peers(topic)
         candidates = list(all_topic_peers - mesh_peers)
 
-        if len(candidates) <= self.d_lazy:
+        if len(candidates) <= self.params.d_lazy:
             return candidates
 
-        return random.sample(candidates, self.d_lazy)
+        return random.sample(candidates, self.params.d_lazy)

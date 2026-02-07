@@ -22,21 +22,30 @@ References:
 - Ethereum P2P: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
 """
 
-from ..transport import PeerId
 from .behavior import (
     GossipsubBehavior,
-)
-from .control import (
-    ControlMessage,
-    Graft,
-    IDontWant,
-    IHave,
-    IWant,
-    Prune,
 )
 from .message import GossipsubMessage
 from .parameters import (
     GossipsubParameters,
+)
+from .rpc import (
+    ControlGraft as Graft,
+)
+from .rpc import (
+    ControlIDontWant as IDontWant,
+)
+from .rpc import (
+    ControlIHave as IHave,
+)
+from .rpc import (
+    ControlIWant as IWant,
+)
+from .rpc import (
+    ControlMessage,
+)
+from .rpc import (
+    ControlPrune as Prune,
 )
 from .topic import (
     ForkMismatchError,
@@ -65,7 +74,6 @@ __all__ = [
     # Types
     "MessageId",
     "TopicId",
-    "PeerId",
     # Control messages (for custom handlers)
     "ControlMessage",
     "Graft",
