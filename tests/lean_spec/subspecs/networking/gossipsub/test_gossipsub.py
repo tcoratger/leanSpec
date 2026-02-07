@@ -8,16 +8,16 @@ from lean_spec.subspecs.networking.config import (
     MESSAGE_DOMAIN_VALID_SNAPPY,
 )
 from lean_spec.subspecs.networking.gossipsub import (
+    ControlGraft,
+    ControlIDontWant,
+    ControlIHave,
+    ControlIWant,
     ControlMessage,
+    ControlPrune,
     ForkMismatchError,
     GossipsubMessage,
     GossipsubParameters,
     GossipTopic,
-    Graft,
-    IDontWant,
-    IHave,
-    IWant,
-    Prune,
     TopicKind,
     format_topic_string,
     parse_topic_string,
@@ -132,12 +132,12 @@ class TestControlMessages:
 
     def test_graft_creation(self) -> None:
         """Test GRAFT message creation."""
-        graft = Graft(topic_id="test_topic")
+        graft = ControlGraft(topic_id="test_topic")
         assert graft.topic_id == "test_topic"
 
     def test_prune_creation(self) -> None:
         """Test PRUNE message creation."""
-        prune = Prune(topic_id="test_topic")
+        prune = ControlPrune(topic_id="test_topic")
         assert prune.topic_id == "test_topic"
 
     def test_ihave_creation(self) -> None:
@@ -145,7 +145,7 @@ class TestControlMessages:
         from lean_spec.types import Bytes20
 
         msg_ids = [Bytes20(b"12345678901234567890"), Bytes20(b"abcdefghijklmnopqrst")]
-        ihave = IHave(topic_id="test_topic", message_ids=msg_ids)
+        ihave = ControlIHave(topic_id="test_topic", message_ids=msg_ids)
 
         assert ihave.topic_id == "test_topic"
         assert len(ihave.message_ids) == 2
@@ -155,7 +155,7 @@ class TestControlMessages:
         from lean_spec.types import Bytes20
 
         msg_ids = [Bytes20(b"12345678901234567890")]
-        iwant = IWant(message_ids=msg_ids)
+        iwant = ControlIWant(message_ids=msg_ids)
 
         assert len(iwant.message_ids) == 1
 
@@ -164,14 +164,14 @@ class TestControlMessages:
         from lean_spec.types import Bytes20
 
         msg_ids = [Bytes20(b"12345678901234567890")]
-        idontwant = IDontWant(message_ids=msg_ids)
+        idontwant = ControlIDontWant(message_ids=msg_ids)
 
         assert len(idontwant.message_ids) == 1
 
     def test_control_message_aggregation(self) -> None:
         """Test aggregated control message container."""
-        graft = Graft(topic_id="topic1")
-        prune = Prune(topic_id="topic2")
+        graft = ControlGraft(topic_id="topic1")
+        prune = ControlPrune(topic_id="topic2")
 
         control = ControlMessage(graft=[graft], prune=[prune])
 
@@ -184,7 +184,7 @@ class TestControlMessages:
         empty_control = ControlMessage()
         assert empty_control.is_empty()
 
-        non_empty = ControlMessage(graft=[Graft(topic_id="topic")])
+        non_empty = ControlMessage(graft=[ControlGraft(topic_id="topic")])
         assert not non_empty.is_empty()
 
 

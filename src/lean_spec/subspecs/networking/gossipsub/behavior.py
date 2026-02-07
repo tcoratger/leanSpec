@@ -82,13 +82,14 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     create_graft_rpc,
     create_subscription_rpc,
 )
+from lean_spec.subspecs.networking.gossipsub.types import MessageId
 from lean_spec.subspecs.networking.transport import (
     PeerId,
     StreamReaderProtocol,
     StreamWriterProtocol,
 )
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
-from lean_spec.types import Bytes20
+from lean_spec.types import Bytes20, Uint16
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ class PeerState:
     backoff: dict[str, float] = field(default_factory=dict)
     """Per-topic backoff expiry times (from PRUNE)."""
 
-    dont_want_ids: set[bytes] = field(default_factory=set)
+    dont_want_ids: set[MessageId] = field(default_factory=set)
     """Message IDs this peer does not want.
 
     Populated from incoming IDONTWANT control messages.
@@ -186,23 +187,23 @@ class GossipsubBehavior:
     _instance_id: int = field(init=False)
     """Unique instance ID for debugging."""
 
-    _short_id: int = field(init=False, repr=False)
+    _short_id: Uint16 = field(init=False, repr=False)
     """Truncated instance ID for log messages (lower 16 bits)."""
 
     mesh: MeshState = field(init=False)
     """Mesh topology state."""
 
-    message_cache: MessageCache = field(default_factory=MessageCache)
+    message_cache: MessageCache = field(init=False)
     """Cache of recent messages for IHAVE/IWANT."""
 
-    seen_cache: SeenCache = field(default_factory=SeenCache)
+    seen_cache: SeenCache = field(init=False)
     """Cache of seen message IDs for deduplication."""
 
     _peers: dict[PeerId, PeerState] = field(default_factory=dict)
     """Connected peer states."""
 
     _event_queue: asyncio.Queue[GossipsubMessageEvent | GossipsubPeerEvent] = field(
-        default_factory=asyncio.Queue
+        default_factory=lambda: asyncio.Queue(maxsize=4096)
     )
     """Queue of events for the application."""
 
@@ -229,10 +230,15 @@ class GossipsubBehavior:
     _id_counter: ClassVar[count] = count()
 
     def __post_init__(self) -> None:
-        """Initialize derived fields and mesh state."""
+        """Initialize derived fields, mesh state, and caches from params."""
         self._instance_id = next(GossipsubBehavior._id_counter)
-        self._short_id = self._instance_id % 0xFFFF
+        self._short_id = Uint16(self._instance_id % 0x10000)
         self.mesh = MeshState(params=self.params)
+        self.message_cache = MessageCache(
+            mcache_len=self.params.mcache_len,
+            mcache_gossip=self.params.mcache_gossip,
+        )
+        self.seen_cache = SeenCache(ttl_seconds=self.params.seen_ttl_secs)
 
     def subscribe(self, topic: str) -> None:
         """Subscribe to a topic.
@@ -448,7 +454,7 @@ class GossipsubBehavior:
             logger.warning(
                 "[GS %x] Empty mesh for %s: total_peers=%d subscribed=%d outbound=%d",
                 self._short_id,
-                topic.split("/")[-2],
+                topic,
                 len(self._peers),
                 len(subscribed_peers),
                 len(outbound_peers),
@@ -571,7 +577,7 @@ class GossipsubBehavior:
                     continue
                 # Skip peers that told us they already have this message.
                 peer_state = self._peers.get(mesh_peer)
-                if peer_state is not None and bytes(msg_id) in peer_state.dont_want_ids:
+                if peer_state is not None and msg_id in peer_state.dont_want_ids:
                     continue
                 await self._send_rpc(mesh_peer, forward_rpc)
 
@@ -631,9 +637,10 @@ class GossipsubBehavior:
         """Handle a GRAFT request from a peer."""
         topic = graft.topic_id
 
-        # Reject if we don't participate in this topic.
+        # Silently ignore GRAFTs for unknown topics (v1.1).
+        # Responding with PRUNE would enable bandwidth amplification
+        # attacks (GRAFT/PRUNE storms on fake topics).
         if topic not in self.mesh.subscriptions:
-            await self._reject_graft(peer_id, topic)
             return
 
         # Reject peers that re-GRAFT too soon after PRUNE.
@@ -716,7 +723,9 @@ class GossipsubBehavior:
             return
 
         for msg_id in idontwant.message_ids:
-            state.dont_want_ids.add(msg_id)
+            if len(msg_id) != 20:
+                continue
+            state.dont_want_ids.add(Bytes20(msg_id))
 
     async def _heartbeat_loop(self) -> None:
         """Background heartbeat for mesh maintenance."""
@@ -743,13 +752,24 @@ class GossipsubBehavior:
         for topic in self.mesh.subscriptions:
             await self._maintain_mesh(topic, now)
 
+        # Maintain fanout: fill entries that dropped below D.
+        for topic in list(self.mesh.fanout_topics):
+            fanout_peers = self.mesh.get_fanout_peers(topic)
+            if len(fanout_peers) < self.params.d:
+                available = {
+                    p
+                    for p, s in self._peers.items()
+                    if topic in s.subscriptions and s.outbound_stream is not None
+                }
+                self.mesh.fill_fanout(topic, available)
+
         # Gossip covers both subscribed and fanout topics so that
         # IHAVE reaches peers even for topics we only publish to.
         gossip_topics = self.mesh.subscriptions | self.mesh.fanout_topics
         for topic in gossip_topics:
             await self._emit_gossip(topic)
 
-        self.mesh.cleanup_fanouts(self.params.fanout_ttl_secs)
+        self.mesh.cleanup_fanouts(self.params.fanout_ttl_secs, now)
         self.message_cache.shift()
         self.seen_cache.cleanup(now)
 
@@ -824,10 +844,7 @@ class GossipsubBehavior:
         if not gossip_peers:
             return
 
-        msg_id_bytes = [
-            msg_id if isinstance(msg_id, bytes) else bytes(msg_id) for msg_id in msg_ids
-        ]
-        ihave = ControlIHave(topic_id=topic, message_ids=msg_id_bytes)
+        ihave = ControlIHave(topic_id=topic, message_ids=cast(list[bytes], msg_ids))
         rpc = RPC(control=ControlMessage(ihave=[ihave]))
 
         for peer_id in gossip_peers:
@@ -897,25 +914,25 @@ class GossipsubBehavior:
                     while buffer:
                         try:
                             length, varint_size = decode_varint(bytes(buffer), 0)
+                        except Exception:
+                            # Incomplete varint -- wait for more data.
+                            break
 
-                            # Not enough bytes yet -- wait for the next read.
-                            if len(buffer) < varint_size + length:
-                                break
+                        # Not enough bytes yet -- wait for the next read.
+                        if len(buffer) < varint_size + length:
+                            break
 
-                            rpc_data = bytes(buffer[varint_size : varint_size + length])
-                            buffer = buffer[varint_size + length :]
+                        rpc_data = bytes(buffer[varint_size : varint_size + length])
+                        buffer = buffer[varint_size + length :]
 
+                        try:
                             rpc = RPC.decode(rpc_data)
                             await self._handle_rpc(peer_id, rpc)
-
                         except Exception as e:
-                            logger.warning("Error parsing RPC from %s: %s", peer_id, e)
-
-                            # Discard the buffer on corruption.
-                            # Without a resync mechanism, partial data
-                            # would cause every subsequent parse to fail.
-                            buffer.clear()
-                            break
+                            # Frame was already extracted; skip this RPC
+                            # but continue parsing subsequent frames.
+                            logger.warning("Error decoding RPC from %s: %s", peer_id, e)
+                            continue
 
                 except asyncio.CancelledError:
                     break
@@ -951,19 +968,25 @@ class GossipsubBehavior:
 
         if subscribe:
             # Seed the mesh with up to D peers that already know the topic.
-            # Without an initial GRAFT, we would have to wait for a
-            # heartbeat cycle before receiving any messages.
-            eligible = [
-                p
-                for p, s in self._peers.items()
-                if topic in s.subscriptions and s.outbound_stream is not None
-            ][: self.params.d]
+            # Fanout peers were already promoted to mesh by subscribe(),
+            # so only GRAFT enough additional peers to reach D.
+            current_mesh = self.mesh.get_mesh_peers(topic)
+            needed = self.params.d - len(current_mesh)
 
-            if eligible:
-                graft_rpc = create_graft_rpc([topic])
-                for peer_id in eligible:
-                    self.mesh.add_to_mesh(topic, peer_id)
-                    await self._send_rpc(peer_id, graft_rpc)
+            if needed > 0:
+                eligible = [
+                    p
+                    for p, s in self._peers.items()
+                    if topic in s.subscriptions
+                    and s.outbound_stream is not None
+                    and p not in current_mesh
+                ][:needed]
+
+                if eligible:
+                    graft_rpc = create_graft_rpc([topic])
+                    for peer_id in eligible:
+                        self.mesh.add_to_mesh(topic, peer_id)
+                        await self._send_rpc(peer_id, graft_rpc)
         else:
             # Former mesh peers must learn we left so they stop
             # forwarding messages and free our slot for another peer.

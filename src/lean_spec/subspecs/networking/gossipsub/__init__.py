@@ -30,22 +30,13 @@ from .parameters import (
     GossipsubParameters,
 )
 from .rpc import (
-    ControlGraft as Graft,
-)
-from .rpc import (
-    ControlIDontWant as IDontWant,
-)
-from .rpc import (
-    ControlIHave as IHave,
-)
-from .rpc import (
-    ControlIWant as IWant,
-)
-from .rpc import (
+    ControlGraft,
+    ControlIDontWant,
+    ControlIHave,
+    ControlIWant,
     ControlMessage,
-)
-from .rpc import (
-    ControlPrune as Prune,
+    ControlPrune,
+    ProtobufDecodeError,
 )
 from .topic import (
     ForkMismatchError,
@@ -76,9 +67,11 @@ __all__ = [
     "TopicId",
     # Control messages (for custom handlers)
     "ControlMessage",
-    "Graft",
-    "Prune",
-    "IHave",
-    "IWant",
-    "IDontWant",
+    "ControlGraft",
+    "ControlPrune",
+    "ControlIHave",
+    "ControlIWant",
+    "ControlIDontWant",
+    # Errors
+    "ProtobufDecodeError",
 ]

@@ -73,11 +73,6 @@ Should raise an exception if decompression fails.
 """
 
 
-# =============================================================================
-# Gossipsub Message
-# =============================================================================
-
-
 @dataclass(slots=True)
 class GossipsubMessage:
     r"""A gossipsub message with lazy ID computation.

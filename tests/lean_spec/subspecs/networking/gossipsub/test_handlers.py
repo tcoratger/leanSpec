@@ -7,20 +7,15 @@ subscription handling, message forwarding, and full RPC dispatch.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
 
 import pytest
 
-from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.behavior import (
     IDONTWANT_SIZE_THRESHOLD,
-    GossipsubBehavior,
     GossipsubMessageEvent,
     GossipsubPeerEvent,
-    PeerState,
 )
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
 from lean_spec.subspecs.networking.gossipsub.rpc import (
     RPC,
     ControlGraft,
@@ -34,65 +29,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
 )
 from lean_spec.types import Bytes20
 
-
-def _peer(name: str) -> PeerId:
-    """Create a PeerId from a test name."""
-    return PeerId.from_base58(name)
-
-
-@dataclass
-class MockSendCapture:
-    """Captures RPCs sent via _send_rpc for assertion."""
-
-    sent: list[tuple[PeerId, RPC]] = field(default_factory=list)
-
-    async def __call__(self, peer_id: PeerId, rpc: RPC) -> None:
-        self.sent.append((peer_id, rpc))
-
-
-class MockOutboundStream:
-    """Minimal mock that satisfies outbound stream checks."""
-
-    def write(self, data: bytes) -> None:
-        pass
-
-    async def drain(self) -> None:
-        pass
-
-    def close(self) -> None:
-        pass
-
-    async def wait_closed(self) -> None:
-        pass
-
-
-def _make_behavior(
-    d: int = 8, d_low: int = 6, d_high: int = 12
-) -> tuple[GossipsubBehavior, MockSendCapture]:
-    """Create a behavior with mock send and return (behavior, capture)."""
-    params = GossipsubParameters(d=d, d_low=d_low, d_high=d_high)
-    behavior = GossipsubBehavior(params=params)
-    capture = MockSendCapture()
-    behavior._send_rpc = capture  # type: ignore[assignment]
-    return behavior, capture
-
-
-def _add_peer(
-    behavior: GossipsubBehavior,
-    name: str,
-    subscriptions: set[str] | None = None,
-    with_stream: bool = True,
-) -> PeerId:
-    """Add a peer directly to behavior state."""
-    peer_id = _peer(name)
-    state = PeerState(
-        peer_id=peer_id,
-        subscriptions=subscriptions or set(),
-        outbound_stream=MockOutboundStream() if with_stream else None,
-    )
-    behavior._peers[peer_id] = state
-    return peer_id
-
+from .conftest import _add_peer, _make_behavior, _peer
 
 # =============================================================================
 # GRAFT Handling
@@ -120,20 +57,16 @@ class TestHandleGraft:
         assert len(capture.sent) == 0
 
     @pytest.mark.asyncio
-    async def test_reject_graft_not_subscribed(self) -> None:
-        """Reject GRAFT with PRUNE when we are not subscribed."""
+    async def test_ignore_graft_not_subscribed(self) -> None:
+        """Silently ignore GRAFT for unknown topics (v1.1 spec)."""
         behavior, capture = _make_behavior()
         peer_id = _add_peer(behavior, "peer1")
         graft = ControlGraft(topic_id="unknown_topic")
 
         await behavior._handle_graft(peer_id, graft)
 
-        # PRUNE should be sent
-        assert len(capture.sent) == 1
-        _, rpc = capture.sent[0]
-        assert rpc.control is not None
-        assert len(rpc.control.prune) == 1
-        assert rpc.control.prune[0].topic_id == "unknown_topic"
+        # No PRUNE sent -- silent ignore prevents amplification attacks.
+        assert len(capture.sent) == 0
 
     @pytest.mark.asyncio
     async def test_reject_graft_mesh_full(self) -> None:
@@ -589,7 +522,7 @@ class TestHandleMessage:
         msg_id = GossipsubMessage.compute_id(topic.encode("utf-8"), b"hello")
 
         # peer_ax says it doesn't want this message
-        behavior._peers[peer_ax].dont_want_ids.add(bytes(msg_id))
+        behavior._peers[peer_ax].dont_want_ids.add(msg_id)
 
         msg = Message(topic=topic, data=b"hello")
         await behavior._handle_message(sender, msg)
@@ -612,13 +545,13 @@ class TestHandleIDontWant:
         behavior, _ = _make_behavior()
         peer_id = _add_peer(behavior, "peer1")
 
-        msg_ids = [b"msg_id_1" * 3, b"msg_id_2" * 3]
+        msg_ids = [b"12345678901234567890", b"abcdefghijklmnopqrst"]
         idontwant = ControlIDontWant(message_ids=msg_ids)
         behavior._handle_idontwant(peer_id, idontwant)
 
         state = behavior._peers[peer_id]
         for mid in msg_ids:
-            assert mid in state.dont_want_ids
+            assert Bytes20(mid) in state.dont_want_ids
 
     def test_idontwant_unknown_peer(self) -> None:
         """IDONTWANT for unknown peer is silently ignored."""

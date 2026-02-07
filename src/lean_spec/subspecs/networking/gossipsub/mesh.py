@@ -154,9 +154,9 @@ class MeshState:
     """Set of topics we are subscribed to."""
 
     @property
-    def subscriptions(self) -> set[TopicId]:
+    def subscriptions(self) -> frozenset[TopicId]:
         """Read-only view of subscribed topics."""
-        return self._subscriptions
+        return frozenset(self._subscriptions)
 
     @property
     def fanout_topics(self) -> set[TopicId]:
@@ -264,6 +264,25 @@ class MeshState:
         fanout = self._fanouts.get(topic)
         return fanout.peers.copy() if fanout else set()
 
+    def fill_fanout(self, topic: TopicId, available_peers: set[PeerId]) -> None:
+        """Fill fanout for a topic up to D peers without updating last_published.
+
+        Used during heartbeat to maintain fanout sizes.
+
+        Args:
+            topic: Topic identifier.
+            available_peers: All known peers for this topic.
+        """
+        fanout = self._fanouts.get(topic)
+        if fanout is None:
+            return
+
+        if len(fanout.peers) < self.params.d:
+            candidates = available_peers - fanout.peers
+            needed = self.params.d - len(fanout.peers)
+            new_peers = random.sample(list(candidates), min(needed, len(candidates)))
+            fanout.peers.update(new_peers)
+
     def update_fanout(self, topic: TopicId, available_peers: set[PeerId]) -> set[PeerId]:
         """Update fanout for publishing to a non-subscribed topic.
 
@@ -295,16 +314,17 @@ class MeshState:
 
         return fanout.peers.copy()
 
-    def cleanup_fanouts(self, ttl: float) -> int:
+    def cleanup_fanouts(self, ttl: float, now: float | None = None) -> int:
         """Remove expired fanout entries.
 
         Args:
             ttl: Time-to-live in seconds.
+            now: Current timestamp. Uses time.time() if not provided.
 
         Returns:
             Number of entries removed.
         """
-        current_time = time.time()
+        current_time = now if now is not None else time.time()
         stale = [t for t, f in self._fanouts.items() if f.is_stale(current_time, ttl)]
         for topic in stale:
             del self._fanouts[topic]

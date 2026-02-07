@@ -57,6 +57,10 @@ WIRE_TYPE_32BIT = 5
 """32-bit wire type for fixed32, sfixed32, float."""
 
 
+class ProtobufDecodeError(ValueError):
+    """Raised when protobuf data cannot be decoded."""
+
+
 def _decode_varint_at(data: bytes, pos: int) -> tuple[int, int]:
     """
     Decode varint returning (value, new_position).
@@ -65,6 +69,23 @@ def _decode_varint_at(data: bytes, pos: int) -> tuple[int, int]:
     """
     value, consumed = decode_varint(data, pos)
     return value, pos + consumed
+
+
+def _decode_length_at(data: bytes, pos: int) -> tuple[int, int]:
+    """Decode a length varint and validate bounds.
+
+    Returns:
+        (length, new_position) tuple.
+
+    Raises:
+        ProtobufDecodeError: If the length exceeds available data.
+    """
+    length, new_pos = _decode_varint_at(data, pos)
+    if new_pos + length > len(data):
+        raise ProtobufDecodeError(
+            f"Length field {length} at position {pos} exceeds data size {len(data)}"
+        )
+    return length, new_pos
 
 
 def encode_tag(field_number: int, wire_type: int) -> bytes:
@@ -139,11 +160,10 @@ class SubOpts:
                 value, pos = _decode_varint_at(data, pos)
                 subscribe = value != 0
             elif field_num == 2 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 topic_id = data[pos : pos + length].decode("utf-8")
                 pos += length
             else:
-                # Skip unknown field
                 pos = _skip_field(data, pos, wire_type)
 
         return cls(subscribe=subscribe, topic_id=topic_id)
@@ -198,7 +218,7 @@ class Message:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 field_data = data[pos : pos + length]
                 pos += length
 
@@ -250,7 +270,7 @@ class ControlIHave:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 field_data = data[pos : pos + length]
                 pos += length
 
@@ -288,7 +308,7 @@ class ControlIWant:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if field_num == 1 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 message_ids.append(data[pos : pos + length])
                 pos += length
             else:
@@ -321,7 +341,7 @@ class ControlGraft:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if field_num == 1 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 topic_id = data[pos : pos + length].decode("utf-8")
                 pos += length
             else:
@@ -360,7 +380,7 @@ class PeerInfo:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 field_data = data[pos : pos + length]
                 pos += length
 
@@ -410,11 +430,11 @@ class ControlPrune:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if field_num == 1 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 topic_id = data[pos : pos + length].decode("utf-8")
                 pos += length
             elif field_num == 2 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 peers.append(PeerInfo.decode(data[pos : pos + length]))
                 pos += length
             elif field_num == 3 and wire_type == WIRE_TYPE_VARINT:
@@ -449,7 +469,7 @@ class ControlIDontWant:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if field_num == 1 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 message_ids.append(data[pos : pos + length])
                 pos += length
             else:
@@ -502,7 +522,7 @@ class ControlMessage:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 field_data = data[pos : pos + length]
                 pos += length
 
@@ -577,7 +597,7 @@ class RPC:
             field_num, wire_type, pos = decode_tag(data, pos)
 
             if wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-                length, pos = _decode_varint_at(data, pos)
+                length, pos = _decode_length_at(data, pos)
                 field_data = data[pos : pos + length]
                 pos += length
 
@@ -602,18 +622,23 @@ class RPC:
 
 
 def _skip_field(data: bytes, pos: int, wire_type: int) -> int:
-    """Skip an unknown field based on wire type."""
+    """Skip an unknown field based on wire type.
+
+    Raises:
+        ProtobufDecodeError: If the wire type is unrecognized (e.g. deprecated
+            group types 3/4) and cannot be skipped.
+    """
     if wire_type == WIRE_TYPE_VARINT:
         _, pos = _decode_varint_at(data, pos)
     elif wire_type == WIRE_TYPE_LENGTH_DELIMITED:
-        length, pos = _decode_varint_at(data, pos)
+        length, pos = _decode_length_at(data, pos)
         pos += length
     elif wire_type == WIRE_TYPE_32BIT:
         pos += 4
     elif wire_type == WIRE_TYPE_64BIT:
         pos += 8
     else:
-        raise ValueError(f"Unknown wire type: {wire_type}")
+        raise ProtobufDecodeError(f"Unknown wire type: {wire_type}")
     return pos
 
 
