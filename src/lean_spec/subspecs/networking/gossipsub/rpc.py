@@ -44,10 +44,6 @@ from dataclasses import dataclass, field
 
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
-# =============================================================================
-# Protobuf Wire Type Constants
-# =============================================================================
-
 WIRE_TYPE_VARINT = 0
 """Varint wire type for int32, int64, uint32, uint64, sint32, sint64, bool, enum."""
 
@@ -59,11 +55,6 @@ WIRE_TYPE_LENGTH_DELIMITED = 2
 
 WIRE_TYPE_32BIT = 5
 """32-bit wire type for fixed32, sfixed32, float."""
-
-
-# =============================================================================
-# Internal Helpers
-# =============================================================================
 
 
 def _decode_varint_at(data: bytes, pos: int) -> tuple[int, int]:
@@ -115,11 +106,6 @@ def encode_bool(field_number: int, value: bool) -> bytes:
 def encode_uint64(field_number: int, value: int) -> bytes:
     """Encode a uint64 field."""
     return encode_tag(field_number, WIRE_TYPE_VARINT) + encode_varint(value)
-
-
-# =============================================================================
-# Gossipsub Message Types
-# =============================================================================
 
 
 @dataclass(slots=True)
@@ -629,11 +615,6 @@ def _skip_field(data: bytes, pos: int, wire_type: int) -> int:
     else:
         raise ValueError(f"Unknown wire type: {wire_type}")
     return pos
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
 
 
 def create_subscription_rpc(topics: list[str], subscribe: bool = True) -> RPC:

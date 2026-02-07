@@ -234,10 +234,6 @@ class GossipsubBehavior:
         self._short_id = self._instance_id % 0xFFFF
         self.mesh = MeshState(params=self.params)
 
-    # =========================================================================
-    # Public API
-    # =========================================================================
-
     def subscribe(self, topic: str) -> None:
         """Subscribe to a topic.
 
@@ -515,10 +511,6 @@ class GossipsubBehavior:
         """Set a callback for received messages."""
         self._message_handler = handler
 
-    # =========================================================================
-    # RPC Handling
-    # =========================================================================
-
     async def _handle_rpc(self, peer_id: PeerId, rpc: RPC) -> None:
         """Dispatch an incoming RPC to the appropriate handlers."""
         state = self._peers.get(peer_id)
@@ -726,10 +718,6 @@ class GossipsubBehavior:
         for msg_id in idontwant.message_ids:
             state.dont_want_ids.add(msg_id)
 
-    # =========================================================================
-    # Heartbeat
-    # =========================================================================
-
     async def _heartbeat_loop(self) -> None:
         """Background heartbeat for mesh maintenance."""
         interval = self.params.heartbeat_interval_secs
@@ -848,10 +836,6 @@ class GossipsubBehavior:
         logger.debug(
             "IHAVE %d messages to %d peers for topic %s", len(msg_ids), len(gossip_peers), topic
         )
-
-    # =========================================================================
-    # Stream I/O
-    # =========================================================================
 
     async def _send_rpc(self, peer_id: PeerId, rpc: RPC) -> None:
         """Deliver an RPC to a peer using length-prefixed framing.
