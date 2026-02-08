@@ -3,26 +3,20 @@
 import pytest
 
 from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.config import (
-    MESSAGE_DOMAIN_INVALID_SNAPPY,
-    MESSAGE_DOMAIN_VALID_SNAPPY,
-)
 from lean_spec.subspecs.networking.gossipsub import (
+    ControlGraft,
+    ControlIDontWant,
+    ControlIHave,
+    ControlIWant,
     ControlMessage,
+    ControlPrune,
     ForkMismatchError,
-    GossipsubMessage,
     GossipsubParameters,
     GossipTopic,
-    Graft,
-    IDontWant,
-    IHave,
-    IWant,
-    Prune,
     TopicKind,
     format_topic_string,
     parse_topic_string,
 )
-from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
 from lean_spec.subspecs.networking.gossipsub.mesh import FanoutEntry, MeshState, TopicMesh
 
 
@@ -54,90 +48,17 @@ class TestGossipsubParameters:
         assert params.mcache_gossip <= params.mcache_len
 
 
-class TestGossipsubMessage:
-    """Test suite for GossipSub message handling and ID computation."""
-
-    @pytest.mark.parametrize(
-        "has_snappy,decompress_succeeds,expected_domain",
-        [
-            (False, False, MESSAGE_DOMAIN_INVALID_SNAPPY),
-            (True, True, MESSAGE_DOMAIN_VALID_SNAPPY),
-            (True, False, MESSAGE_DOMAIN_INVALID_SNAPPY),
-        ],
-    )
-    def test_message_id_computation(
-        self, has_snappy: bool, decompress_succeeds: bool, expected_domain: bytes
-    ) -> None:
-        """Test message ID computation across different snappy scenarios."""
-        topic = b"test_topic"
-        raw_data = b"raw_test_data"
-        decompressed_data = b"decompressed_test_data"
-
-        snappy_decompress = None
-        if has_snappy:
-            if decompress_succeeds:
-
-                def snappy_decompress(data: bytes) -> bytes:
-                    return decompressed_data
-            else:
-
-                def snappy_decompress(data: bytes) -> bytes:
-                    raise Exception("Decompression failed")
-
-        message = GossipsubMessage(topic, raw_data, snappy_decompress)
-        message_id = message.id
-
-        assert len(message_id) == 20
-        assert isinstance(message_id, bytes)
-
-        # Test determinism
-        message2 = GossipsubMessage(topic, raw_data, snappy_decompress)
-        assert message_id == message2.id
-
-    def test_message_id_caching(self) -> None:
-        """Test that message IDs are cached."""
-        topic = b"test_topic"
-        data = b"test_data"
-        decompress_calls = 0
-
-        def counting_decompress(data: bytes) -> bytes:
-            nonlocal decompress_calls
-            decompress_calls += 1
-            return b"decompressed"
-
-        message = GossipsubMessage(topic, data, counting_decompress)
-        first_id = message.id
-        second_id = message.id
-
-        assert decompress_calls == 1  # Called only once
-        assert first_id is second_id
-
-    def test_message_uniqueness(self) -> None:
-        """Test message ID uniqueness."""
-        test_cases = [
-            (b"topic1", b"data"),
-            (b"topic2", b"data"),
-            (b"topic", b"data1"),
-            (b"topic", b"data2"),
-        ]
-
-        messages = [GossipsubMessage(topic, data) for topic, data in test_cases]
-        ids = [msg.id for msg in messages]
-
-        assert len(ids) == len(set(ids))
-
-
 class TestControlMessages:
     """Test suite for gossipsub control messages."""
 
     def test_graft_creation(self) -> None:
         """Test GRAFT message creation."""
-        graft = Graft(topic_id="test_topic")
+        graft = ControlGraft(topic_id="test_topic")
         assert graft.topic_id == "test_topic"
 
     def test_prune_creation(self) -> None:
         """Test PRUNE message creation."""
-        prune = Prune(topic_id="test_topic")
+        prune = ControlPrune(topic_id="test_topic")
         assert prune.topic_id == "test_topic"
 
     def test_ihave_creation(self) -> None:
@@ -145,7 +66,7 @@ class TestControlMessages:
         from lean_spec.types import Bytes20
 
         msg_ids = [Bytes20(b"12345678901234567890"), Bytes20(b"abcdefghijklmnopqrst")]
-        ihave = IHave(topic_id="test_topic", message_ids=msg_ids)
+        ihave = ControlIHave(topic_id="test_topic", message_ids=msg_ids)
 
         assert ihave.topic_id == "test_topic"
         assert len(ihave.message_ids) == 2
@@ -155,7 +76,7 @@ class TestControlMessages:
         from lean_spec.types import Bytes20
 
         msg_ids = [Bytes20(b"12345678901234567890")]
-        iwant = IWant(message_ids=msg_ids)
+        iwant = ControlIWant(message_ids=msg_ids)
 
         assert len(iwant.message_ids) == 1
 
@@ -164,19 +85,19 @@ class TestControlMessages:
         from lean_spec.types import Bytes20
 
         msg_ids = [Bytes20(b"12345678901234567890")]
-        idontwant = IDontWant(message_ids=msg_ids)
+        idontwant = ControlIDontWant(message_ids=msg_ids)
 
         assert len(idontwant.message_ids) == 1
 
     def test_control_message_aggregation(self) -> None:
         """Test aggregated control message container."""
-        graft = Graft(topic_id="topic1")
-        prune = Prune(topic_id="topic2")
+        graft = ControlGraft(topic_id="topic1")
+        prune = ControlPrune(topic_id="topic2")
 
-        control = ControlMessage(grafts=[graft], prunes=[prune])
+        control = ControlMessage(graft=[graft], prune=[prune])
 
-        assert len(control.grafts) == 1
-        assert len(control.prunes) == 1
+        assert len(control.graft) == 1
+        assert len(control.prune) == 1
         assert not control.is_empty()
 
     def test_control_message_empty_check(self) -> None:
@@ -184,7 +105,7 @@ class TestControlMessages:
         empty_control = ControlMessage()
         assert empty_control.is_empty()
 
-        non_empty = ControlMessage(grafts=[Graft(topic_id="topic")])
+        non_empty = ControlMessage(graft=[ControlGraft(topic_id="topic")])
         assert not non_empty.is_empty()
 
 
@@ -307,10 +228,10 @@ class TestMeshState:
         params = GossipsubParameters(d=8, d_low=6, d_high=12, d_lazy=6)
         mesh = MeshState(params=params)
 
-        assert mesh.d == 8
-        assert mesh.d_low == 6
-        assert mesh.d_high == 12
-        assert mesh.d_lazy == 6
+        assert mesh.params.d == 8
+        assert mesh.params.d_low == 6
+        assert mesh.params.d_high == 12
+        assert mesh.params.d_lazy == 6
 
     def test_subscribe_and_unsubscribe(self) -> None:
         """Test topic subscription."""
@@ -390,94 +311,6 @@ class TestTopicMesh:
         assert peer1 not in topic_mesh.peers
 
 
-class TestMessageCache:
-    """Test suite for message cache."""
-
-    def test_cache_put_and_get(self) -> None:
-        """Test putting and retrieving messages."""
-        cache = MessageCache(mcache_len=6, mcache_gossip=3)
-        message = GossipsubMessage(topic=b"topic", raw_data=b"data")
-
-        assert cache.put("topic", message)
-        assert not cache.put("topic", message)  # Duplicate
-
-        retrieved = cache.get(message.id)
-        assert retrieved is not None
-        assert retrieved.id == message.id
-
-    def test_cache_has(self) -> None:
-        """Test checking if message is in cache."""
-        cache = MessageCache()
-        message = GossipsubMessage(topic=b"topic", raw_data=b"data")
-
-        assert not cache.has(message.id)
-        cache.put("topic", message)
-        assert cache.has(message.id)
-
-    def test_cache_shift(self) -> None:
-        """Test cache window shifting."""
-        cache = MessageCache(mcache_len=3, mcache_gossip=2)
-
-        messages = []
-        for i in range(5):
-            msg = GossipsubMessage(topic=b"topic", raw_data=f"data{i}".encode())
-            cache.put("topic", msg)
-            messages.append(msg)
-            cache.shift()
-
-        # Old messages should be evicted
-        assert not cache.has(messages[0].id)
-        assert not cache.has(messages[1].id)
-
-    def test_get_gossip_ids(self) -> None:
-        """Test getting message IDs for IHAVE gossip."""
-        cache = MessageCache(mcache_len=6, mcache_gossip=3)
-
-        msg1 = GossipsubMessage(topic=b"topic1", raw_data=b"data1")
-        msg2 = GossipsubMessage(topic=b"topic2", raw_data=b"data2")
-        msg3 = GossipsubMessage(topic=b"topic1", raw_data=b"data3")
-
-        cache.put("topic1", msg1)
-        cache.put("topic2", msg2)
-        cache.put("topic1", msg3)
-
-        gossip_ids = cache.get_gossip_ids("topic1")
-
-        assert msg1.id in gossip_ids
-        assert msg2.id not in gossip_ids
-        assert msg3.id in gossip_ids
-
-
-class TestSeenCache:
-    """Test suite for seen message cache."""
-
-    def test_seen_cache_add_and_check(self) -> None:
-        """Test adding and checking seen messages."""
-        from lean_spec.types import Bytes20
-
-        cache = SeenCache(ttl_seconds=60)
-        msg_id = Bytes20(b"12345678901234567890")
-
-        assert not cache.has(msg_id)
-        assert cache.add(msg_id, timestamp=1000.0)
-        assert cache.has(msg_id)
-        assert not cache.add(msg_id, timestamp=1001.0)  # Duplicate
-
-    def test_seen_cache_cleanup(self) -> None:
-        """Test cleanup of expired entries."""
-        from lean_spec.types import Bytes20
-
-        cache = SeenCache(ttl_seconds=10)
-        msg_id = Bytes20(b"12345678901234567890")
-
-        cache.add(msg_id, timestamp=1000.0)
-        assert cache.has(msg_id)
-
-        removed = cache.cleanup(current_time=1015.0)
-        assert removed == 1
-        assert not cache.has(msg_id)
-
-
 class TestFanoutEntry:
     """Test suite for FanoutEntry dataclass."""
 
@@ -488,6 +321,124 @@ class TestFanoutEntry:
 
         assert not entry.is_stale(current_time=1050.0, ttl=60.0)
         assert entry.is_stale(current_time=1070.0, ttl=60.0)
+
+
+class TestFanoutOperations:
+    """Tests for fanout management in MeshState."""
+
+    def test_update_fanout_creates_entry(self) -> None:
+        """update_fanout creates a new fanout entry if none exists."""
+        mesh = MeshState(params=GossipsubParameters(d=3))
+        topic = "fanout_topic"
+
+        available = {peer("p1"), peer("p2"), peer("p3"), peer("p4")}
+        result = mesh.update_fanout(topic, available)
+
+        assert len(result) <= 3  # Up to D peers
+        assert len(result) > 0
+
+    def test_update_fanout_returns_mesh_if_subscribed(self) -> None:
+        """update_fanout returns mesh peers for subscribed topics."""
+        mesh = MeshState(params=GossipsubParameters(d=3))
+        topic = "sub_topic"
+
+        mesh.subscribe(topic)
+        p1 = peer("p1")
+        mesh.add_to_mesh(topic, p1)
+
+        result = mesh.update_fanout(topic, {p1, peer("p2")})
+        assert p1 in result
+
+    def test_update_fanout_fills_to_d(self) -> None:
+        """update_fanout fills fanout up to D peers."""
+        mesh = MeshState(params=GossipsubParameters(d=4))
+        topic = "fanout_topic"
+
+        names = ["pA", "pB", "pC", "pD", "pE", "pF", "pG", "pH", "pJ", "pK"]
+        available = {peer(n) for n in names}
+        result = mesh.update_fanout(topic, available)
+
+        assert len(result) == 4
+
+    def test_cleanup_fanouts_removes_stale(self) -> None:
+        """cleanup_fanouts removes stale entries."""
+        mesh = MeshState(params=GossipsubParameters())
+        topic = "old_topic"
+
+        mesh.update_fanout(topic, {peer("p1")})
+        # Make it stale
+        mesh._fanouts[topic].last_published = 0.0
+
+        removed = mesh.cleanup_fanouts(ttl=60.0)
+        assert removed == 1
+        assert topic not in mesh._fanouts
+
+    def test_cleanup_fanouts_keeps_fresh(self) -> None:
+        """cleanup_fanouts keeps recent entries."""
+        mesh = MeshState(params=GossipsubParameters())
+        topic = "fresh_topic"
+
+        mesh.update_fanout(topic, {peer("p1")})
+        # last_published is set to time.time() by update_fanout
+
+        removed = mesh.cleanup_fanouts(ttl=60.0)
+        assert removed == 0
+        assert topic in mesh._fanouts
+
+    def test_subscribe_promotes_fanout_to_mesh(self) -> None:
+        """Subscribing to a topic promotes fanout peers to mesh."""
+        mesh = MeshState(params=GossipsubParameters())
+        topic = "promote_topic"
+
+        p1 = peer("p1")
+        mesh.update_fanout(topic, {p1})
+        assert topic in mesh._fanouts
+
+        mesh.subscribe(topic)
+
+        # Fanout should be removed, peers promoted to mesh
+        assert topic not in mesh._fanouts
+        assert p1 in mesh.get_mesh_peers(topic)
+
+    def test_unsubscribe_returns_mesh_peers(self) -> None:
+        """Unsubscribing returns the set of mesh peers (for PRUNE)."""
+        mesh = MeshState(params=GossipsubParameters())
+        topic = "unsub_topic"
+
+        mesh.subscribe(topic)
+        p1 = peer("p1")
+        p2 = peer("p2")
+        mesh.add_to_mesh(topic, p1)
+        mesh.add_to_mesh(topic, p2)
+
+        result = mesh.unsubscribe(topic)
+        assert result == {p1, p2}
+
+    def test_select_peers_for_gossip_respects_d_lazy(self) -> None:
+        """Gossip peer selection returns at most d_lazy peers."""
+        params = GossipsubParameters(d_lazy=2)
+        mesh = MeshState(params=params)
+        mesh.subscribe("topic")
+
+        names = ["gA", "gB", "gC", "gD", "gE", "gF", "gG", "gH", "gJ", "gK"]
+        all_peers = {peer(n) for n in names}
+        result = mesh.select_peers_for_gossip("topic", all_peers)
+
+        assert len(result) <= 2
+
+    def test_select_peers_for_gossip_excludes_mesh(self) -> None:
+        """Gossip peer selection excludes mesh peers."""
+        params = GossipsubParameters(d_lazy=5)
+        mesh = MeshState(params=params)
+        mesh.subscribe("topic")
+
+        mesh_peer = peer("mesh1")
+        mesh.add_to_mesh("topic", mesh_peer)
+
+        all_peers = {mesh_peer, peer("p1"), peer("p2")}
+        result = mesh.select_peers_for_gossip("topic", all_peers)
+
+        assert mesh_peer not in result
 
 
 class TestRPCProtobufEncoding:
