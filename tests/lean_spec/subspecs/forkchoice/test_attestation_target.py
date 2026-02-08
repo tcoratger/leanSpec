@@ -466,7 +466,7 @@ class TestAttestationTargetEdgeCases:
         key_manager: XmssKeyManager,
     ) -> None:
         """Attestation target computation should work with single validator."""
-        store, _, _ = make_store(num_validators=1, key_manager=key_manager, validator_id=None)
+        store = make_store(num_validators=1, key_manager=key_manager, validator_id=None)
 
         # Should be able to get attestation target
         target = store.get_attestation_target()

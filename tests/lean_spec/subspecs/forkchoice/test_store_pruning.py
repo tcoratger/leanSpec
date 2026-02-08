@@ -18,7 +18,7 @@ from tests.lean_spec.helpers import (
 
 def test_prunes_entries_with_target_at_finalized() -> None:
     """Verify entries with target.slot == finalized slot are pruned."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 5
     attestation_data = make_attestation_data(
@@ -53,7 +53,7 @@ def test_prunes_entries_with_target_at_finalized() -> None:
 
 def test_prunes_entries_with_target_before_finalized() -> None:
     """Verify entries with target.slot < finalized slot are pruned."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 3
     attestation_data = make_attestation_data(
@@ -88,7 +88,7 @@ def test_prunes_entries_with_target_before_finalized() -> None:
 
 def test_keeps_entries_with_target_after_finalized() -> None:
     """Verify entries with target.slot > finalized slot are kept."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 10
     attestation_data = make_attestation_data(
@@ -124,7 +124,7 @@ def test_keeps_entries_with_target_after_finalized() -> None:
 
 def test_prunes_related_structures_together() -> None:
     """Verify all four data structures are pruned atomically."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create stale attestation data
     stale_attestation = make_attestation_data(
@@ -204,7 +204,7 @@ def test_prunes_related_structures_together() -> None:
 
 def test_returns_self_when_nothing_to_prune() -> None:
     """Verify optimization returns same instance when no pruning needed."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create fresh attestation data (target.slot > finalized.slot)
     fresh_attestation = make_attestation_data(
@@ -238,7 +238,7 @@ def test_returns_self_when_nothing_to_prune() -> None:
 
 def test_handles_empty_attestation_data() -> None:
     """Verify pruning works correctly when attestation_data_by_root is empty."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Ensure store has empty attestation data
     assert len(store.attestation_data_by_root) == 0
@@ -252,7 +252,7 @@ def test_handles_empty_attestation_data() -> None:
 
 def test_prunes_multiple_validators_same_data_root() -> None:
     """Verify pruning removes entries for multiple validators with same data root."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create stale attestation data
     stale_attestation = make_attestation_data(
@@ -294,7 +294,7 @@ def test_prunes_multiple_validators_same_data_root() -> None:
 
 def test_mixed_stale_and_fresh_entries() -> None:
     """Verify correct pruning behavior with a mix of stale and fresh entries."""
-    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create multiple attestations at different slots
     attestations = [

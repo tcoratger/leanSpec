@@ -14,6 +14,7 @@ from lean_spec.subspecs.networking.discovery.crypto import (
     sign_id_nonce,
     verify_id_nonce_signature,
 )
+from tests.lean_spec.helpers import make_challenge_data
 
 
 class TestAesCtr:
@@ -201,20 +202,6 @@ class TestPubkeyConversion:
         uncompressed = pubkey_to_uncompressed(compressed)
 
         assert uncompressed[0] == 0x04
-
-
-def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
-    """Build mock challenge_data for testing.
-
-    Format: masking-iv (16) + static-header (23) + authdata (24) = 63 bytes.
-    The authdata contains the id_nonce (16) + enr_seq (8).
-    """
-    masking_iv = bytes(16)
-    # static-header: protocol-id (6) + version (2) + flag (1) + nonce (12) + authdata-size (2)
-    static_header = b"discv5" + b"\x00\x01\x01" + bytes(12) + b"\x00\x18"
-    # authdata: id-nonce (16) + enr-seq (8)
-    authdata = id_nonce + bytes(8)
-    return masking_iv + static_header + authdata
 
 
 class TestIdNonceSignature:

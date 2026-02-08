@@ -10,7 +10,7 @@ import pytest
 
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 
-from .conftest import _add_peer, _make_behavior
+from .conftest import add_peer, make_behavior
 
 # =============================================================================
 # Publish
@@ -23,12 +23,12 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_to_subscribed_topic(self) -> None:
         """Published message reaches mesh peers for a subscribed topic."""
-        behavior, capture = _make_behavior(d=3, d_low=2, d_high=6)
+        behavior, capture = make_behavior(d=3, d_low=2, d_high=6)
         topic = "testTopic"
         behavior.subscribe(topic)
 
-        p1 = _add_peer(behavior, "peerA", {topic})
-        p2 = _add_peer(behavior, "peerB", {topic})
+        p1 = add_peer(behavior, "peerA", {topic})
+        p2 = add_peer(behavior, "peerB", {topic})
         behavior.mesh.add_to_mesh(topic, p1)
         behavior.mesh.add_to_mesh(topic, p2)
 
@@ -41,11 +41,11 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_to_unsubscribed_topic_uses_fanout(self) -> None:
         """Publishing to an unsubscribed topic uses fanout peers."""
-        behavior, capture = _make_behavior(d=2, d_low=1, d_high=4)
+        behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
 
         topic = "fanoutTopic"
-        _add_peer(behavior, "peerA", {topic})
-        _add_peer(behavior, "peerB", {topic})
+        add_peer(behavior, "peerA", {topic})
+        add_peer(behavior, "peerB", {topic})
 
         await behavior.publish(topic, b"fanoutMsg")
 
@@ -58,11 +58,11 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_duplicate_skipped(self) -> None:
         """Publishing the same message twice is a no-op the second time."""
-        behavior, capture = _make_behavior()
+        behavior, capture = make_behavior()
         topic = "testTopic"
         behavior.subscribe(topic)
 
-        p1 = _add_peer(behavior, "peerA", {topic})
+        p1 = add_peer(behavior, "peerA", {topic})
         behavior.mesh.add_to_mesh(topic, p1)
 
         await behavior.publish(topic, b"payload")
@@ -74,7 +74,7 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_caches_message(self) -> None:
         """Published messages are added to the message cache."""
-        behavior, _ = _make_behavior()
+        behavior, _ = make_behavior()
         topic = "testTopic"
         behavior.subscribe(topic)
 
@@ -87,7 +87,7 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_empty_mesh_no_crash(self) -> None:
         """Publishing to an empty mesh does not crash."""
-        behavior, capture = _make_behavior()
+        behavior, capture = make_behavior()
         topic = "emptyTopic"
         behavior.subscribe(topic)
 
@@ -108,11 +108,11 @@ class TestBroadcastSubscription:
     @pytest.mark.asyncio
     async def test_subscribe_sends_subscription_to_all_peers(self) -> None:
         """Subscribing broadcasts a subscription RPC to all peers."""
-        behavior, capture = _make_behavior(d=2, d_low=1, d_high=4)
+        behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
         behavior._running = True
 
-        p1 = _add_peer(behavior, "peerA", set())
-        p2 = _add_peer(behavior, "peerB", set())
+        p1 = add_peer(behavior, "peerA", set())
+        p2 = add_peer(behavior, "peerB", set())
 
         behavior.subscribe("newTopic")
 
@@ -128,14 +128,14 @@ class TestBroadcastSubscription:
     @pytest.mark.asyncio
     async def test_subscribe_grafts_eligible_peers(self) -> None:
         """Subscribing GRAFTs eligible peers into the mesh."""
-        behavior, capture = _make_behavior(d=2, d_low=1, d_high=4)
+        behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
         behavior._running = True
 
         topic = "graftTopic"
         # These peers are already subscribed to the topic.
-        _add_peer(behavior, "peerA", {topic})
-        _add_peer(behavior, "peerB", {topic})
-        _add_peer(behavior, "peerC", {topic})
+        add_peer(behavior, "peerA", {topic})
+        add_peer(behavior, "peerB", {topic})
+        add_peer(behavior, "peerC", {topic})
 
         behavior.subscribe(topic)
 
@@ -150,19 +150,19 @@ class TestBroadcastSubscription:
     @pytest.mark.asyncio
     async def test_subscribe_respects_fanout_promotion(self) -> None:
         """When subscribing, fanout peers are promoted and GRAFT fills to D."""
-        behavior, capture = _make_behavior(d=3, d_low=2, d_high=6)
+        behavior, capture = make_behavior(d=3, d_low=2, d_high=6)
         behavior._running = True
 
         topic = "promoteTopic"
-        p1 = _add_peer(behavior, "peerA", {topic})
+        p1 = add_peer(behavior, "peerA", {topic})
 
         # Create fanout first.
         behavior.mesh.update_fanout(topic, {p1})
         assert p1 in behavior.mesh.get_fanout_peers(topic)
 
         # Add more eligible peers.
-        _add_peer(behavior, "peerB", {topic})
-        _add_peer(behavior, "peerC", {topic})
+        add_peer(behavior, "peerB", {topic})
+        add_peer(behavior, "peerC", {topic})
 
         behavior.subscribe(topic)
 
@@ -178,14 +178,14 @@ class TestBroadcastSubscription:
     @pytest.mark.asyncio
     async def test_unsubscribe_prunes_mesh_peers(self) -> None:
         """Unsubscribing sends PRUNE to former mesh peers."""
-        behavior, capture = _make_behavior()
+        behavior, capture = make_behavior()
         behavior._running = True
 
         topic = "pruneTopic"
         behavior.subscribe(topic)
 
-        p1 = _add_peer(behavior, "peerA", {topic})
-        p2 = _add_peer(behavior, "peerB", {topic})
+        p1 = add_peer(behavior, "peerA", {topic})
+        p2 = add_peer(behavior, "peerB", {topic})
         behavior.mesh.add_to_mesh(topic, p1)
         behavior.mesh.add_to_mesh(topic, p2)
 

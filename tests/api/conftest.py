@@ -50,7 +50,7 @@ class _ServerThread(threading.Thread):
         from lean_spec.subspecs.api import ApiServer, ApiServerConfig
         from tests.lean_spec.helpers import make_store
 
-        store, _, _ = make_store(num_validators=3, validator_id=None, genesis_time=int(time.time()))
+        store = make_store(num_validators=3, validator_id=None, genesis_time=int(time.time()))
 
         config = ApiServerConfig(host="127.0.0.1", port=self.port)
         return ApiServer(config=config, store_getter=lambda: store)

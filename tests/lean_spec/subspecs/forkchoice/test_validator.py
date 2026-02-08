@@ -21,13 +21,6 @@ from lean_spec.types import Bytes32, Uint64
 from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_store
 
 
-@pytest.fixture
-def sample_store(key_manager: XmssKeyManager) -> Store:
-    """Forkchoice store with 10 validators and real XMSS keys."""
-    store, _, _ = make_store(num_validators=10, key_manager=key_manager, genesis_time=1000)
-    return store.model_copy(update={"time": Uint64(100)})
-
-
 class TestBlockProduction:
     """Test validator block production functionality."""
 
@@ -388,7 +381,7 @@ class TestValidatorIntegration:
 
     def test_validator_operations_empty_store(self) -> None:
         """Test validator operations with minimal store state."""
-        store, _, _ = make_store(num_validators=3)
+        store = make_store(num_validators=3)
 
         # Should be able to produce block and attestation
         store, block, _signatures = store.produce_block_with_signatures(

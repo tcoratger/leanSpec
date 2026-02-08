@@ -36,7 +36,7 @@ from tests.lean_spec.helpers import (
 
 def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyManager) -> None:
     """Ensure Store.on_block handles aggregated attestations with many validators."""
-    base_store, _, _ = make_store(num_validators=3, key_manager=key_manager)
+    base_store = make_store(num_validators=3, key_manager=key_manager)
     consumer_store = base_store
 
     # Producer view knows about attestations from validators 1 and 2
@@ -127,7 +127,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     key_manager: XmssKeyManager,
 ) -> None:
     """Verify that Store.on_block doesn't mutate previous store's latest_new_aggregated_payloads."""
-    base_store, _, _ = make_store(
+    base_store = make_store(
         num_validators=3, key_manager=key_manager, validator_id=TEST_VALIDATOR_ID
     )
 
@@ -304,7 +304,7 @@ class TestOnGossipAttestationSubnetFiltering:
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(4)
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=8, validator_id=current_validator
         )
 
@@ -347,7 +347,7 @@ class TestOnGossipAttestationSubnetFiltering:
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=8, validator_id=current_validator
         )
 
@@ -382,7 +382,7 @@ class TestOnGossipAttestationSubnetFiltering:
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(4)  # Same subnet
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=8, validator_id=current_validator
         )
 
@@ -417,7 +417,7 @@ class TestOnGossipAttestationSubnetFiltering:
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)  # Different subnet
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=8, validator_id=current_validator
         )
 
@@ -465,7 +465,7 @@ class TestOnGossipAggregatedAttestation:
         """
         participants = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
@@ -507,7 +507,7 @@ class TestOnGossipAggregatedAttestation:
         """
         participants = [ValidatorIndex(1)]
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
@@ -542,7 +542,7 @@ class TestOnGossipAggregatedAttestation:
         claimed_participants = [ValidatorIndex(1), ValidatorIndex(2)]
         actual_signers = [ValidatorIndex(1), ValidatorIndex(3)]  # Different!
 
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
@@ -574,7 +574,7 @@ class TestOnGossipAggregatedAttestation:
         When a validator appears in multiple aggregated attestations,
         all proofs should be stored in the list.
         """
-        store, _, _, attestation_data = make_store_with_attestation_data(
+        store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
@@ -717,7 +717,7 @@ class TestAggregateCommitteeSignatures:
 
         Each unique AttestationData should produce its own aggregated proof.
         """
-        base_store, _, _ = make_store(
+        base_store = make_store(
             num_validators=4, key_manager=key_manager, validator_id=ValidatorIndex(0)
         )
 
@@ -883,7 +883,7 @@ class TestTickIntervalAggregation:
         This tests that interval 0 performs its own action (accepting attestations)
         rather than aggregation.
         """
-        store, _, _ = make_store(
+        store = make_store(
             num_validators=4, key_manager=key_manager, validator_id=ValidatorIndex(0)
         )
 
@@ -920,7 +920,7 @@ class TestEndToEndAggregationFlow:
         num_validators = 4
         aggregator_id = ValidatorIndex(0)
 
-        store, _, _ = make_store(
+        store = make_store(
             num_validators=num_validators, key_manager=key_manager, validator_id=aggregator_id
         )
 

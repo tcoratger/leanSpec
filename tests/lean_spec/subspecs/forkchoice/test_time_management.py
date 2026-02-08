@@ -1,6 +1,5 @@
 """Tests for time advancement, intervals, and slot management."""
 
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -12,14 +11,7 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_empty_block_body, make_store
-
-
-@pytest.fixture
-def sample_store() -> Store:
-    """Forkchoice store with 10 validators and genesis_time=1000."""
-    store, _, _ = make_store(num_validators=10, genesis_time=1000)
-    return store.model_copy(update={"time": Uint64(100)})
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_empty_block_body
 
 
 class TestGetForkchoiceStore:

@@ -7,7 +7,7 @@ Each function creates minimal valid instances suitable for unit tests.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from lean_spec.subspecs.containers import (
     Attestation,
@@ -358,6 +358,25 @@ def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlockWithAttestation:
 
 
 # -----------------------------------------------------------------------------
+# Discovery Builders
+# -----------------------------------------------------------------------------
+
+
+def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
+    """Build mock Discovery v5 challenge_data for testing.
+
+    Format: masking-iv (16) + static-header (23) + authdata (24) = 63 bytes.
+    The authdata contains the id_nonce (16) + enr_seq (8).
+    """
+    masking_iv = bytes(16)
+    # static-header: protocol-id (6) + version (2) + flag (1) + nonce (12) + authdata-size (2)
+    static_header = b"discv5" + b"\x00\x01\x01" + bytes(12) + b"\x00\x18"
+    # authdata: id-nonce (16) + enr-seq (8)
+    authdata = id_nonce + bytes(8)
+    return masking_iv + static_header + authdata
+
+
+# -----------------------------------------------------------------------------
 # Store Builders
 # -----------------------------------------------------------------------------
 
@@ -365,13 +384,21 @@ _DEFAULT_VALIDATOR_ID = ValidatorIndex(0)
 _DEFAULT_ATTESTATION_SLOT = Slot(1)
 
 
-def make_store(
+class GenesisData(NamedTuple):
+    """All three genesis artifacts for tests that need more than just the store."""
+
+    store: Store
+    state: State
+    block: Block
+
+
+def make_genesis_data(
     num_validators: int = 3,
-    validator_id: ValidatorIndex | None = _DEFAULT_VALIDATOR_ID,
     genesis_time: int = 0,
     key_manager: XmssKeyManager | None = None,
-) -> tuple[Store, State, Block]:
-    """Create a forkchoice store with genesis state and block."""
+    validator_id: ValidatorIndex | None = _DEFAULT_VALIDATOR_ID,
+) -> GenesisData:
+    """Create a forkchoice store with genesis state and block, returning all three."""
     from lean_spec.subspecs.forkchoice import Store
 
     if key_manager is not None:
@@ -381,7 +408,22 @@ def make_store(
     genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
     genesis_block = make_genesis_block(genesis_state)
     store = Store.get_forkchoice_store(genesis_state, genesis_block, validator_id=validator_id)
-    return store, genesis_state, genesis_block
+    return GenesisData(store, genesis_state, genesis_block)
+
+
+def make_store(
+    num_validators: int = 3,
+    validator_id: ValidatorIndex | None = _DEFAULT_VALIDATOR_ID,
+    genesis_time: int = 0,
+    key_manager: XmssKeyManager | None = None,
+) -> Store:
+    """Create a forkchoice store initialized with genesis."""
+    return make_genesis_data(
+        num_validators=num_validators,
+        genesis_time=genesis_time,
+        key_manager=key_manager,
+        validator_id=validator_id,
+    ).store
 
 
 def make_store_with_attestation_data(
@@ -389,15 +431,15 @@ def make_store_with_attestation_data(
     num_validators: int,
     validator_id: ValidatorIndex,
     attestation_slot: Slot = _DEFAULT_ATTESTATION_SLOT,
-) -> tuple[Store, State, Block, AttestationData]:
+) -> tuple[Store, AttestationData]:
     """Create a store with validators and produce attestation data for testing."""
-    store, genesis_state, genesis_block = make_store(
+    store = make_store(
         num_validators=num_validators,
         validator_id=validator_id,
         key_manager=key_manager,
     )
     attestation_data = store.produce_attestation_data(attestation_slot)
-    return store, genesis_state, genesis_block, attestation_data
+    return store, attestation_data
 
 
 def make_store_with_gossip_signatures(
@@ -410,7 +452,7 @@ def make_store_with_gossip_signatures(
     """Create a store pre-populated with gossip signatures for testing aggregation."""
     from lean_spec.subspecs.xmss.aggregation import SignatureKey
 
-    store, _, _, attestation_data = make_store_with_attestation_data(
+    store, attestation_data = make_store_with_attestation_data(
         key_manager,
         num_validators,
         validator_id,

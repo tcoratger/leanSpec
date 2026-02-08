@@ -23,18 +23,6 @@ from lean_spec.types import Bytes64, Uint64
 from lean_spec.types.byte_arrays import Bytes4
 
 
-@pytest.fixture
-def local_node_id():
-    """Local node ID for testing."""
-    return NodeId(bytes.fromhex("bbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9"))
-
-
-@pytest.fixture
-def remote_node_id():
-    """Remote node ID for testing."""
-    return NodeId(bytes.fromhex("aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb"))
-
-
 class TestXorDistance:
     """Tests for XOR distance calculation."""
 

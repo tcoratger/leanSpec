@@ -31,6 +31,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
     encode_packet,
     encode_whoareyou_authdata,
 )
+from tests.lean_spec.helpers import make_challenge_data
 
 # ==============================================================================
 # Test Node Keys (from devp2p spec)
@@ -43,20 +44,6 @@ NODE_B_ID = bytes.fromhex("bbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d
 
 # Node A's ID (from devp2p spec, private key not provided)
 NODE_A_ID = bytes.fromhex("aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb")
-
-
-def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
-    """Build mock challenge_data for testing.
-
-    Format: masking-iv (16) + static-header (23) + authdata (24) = 63 bytes.
-    The authdata contains the id_nonce (16) + enr_seq (8).
-    """
-    masking_iv = bytes(16)
-    # static-header: protocol-id (6) + version (2) + flag (1) + nonce (12) + authdata-size (2)
-    static_header = b"discv5" + b"\x00\x01\x01" + bytes(12) + b"\x00\x18"
-    # authdata: id-nonce (16) + enr-seq (8)
-    authdata = id_nonce + bytes(8)
-    return masking_iv + static_header + authdata
 
 
 class TestOfficialNodeIdVectors:
