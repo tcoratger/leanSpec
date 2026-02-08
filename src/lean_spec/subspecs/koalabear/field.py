@@ -5,7 +5,11 @@ from typing import IO, Self
 from lean_spec.types import SSZType
 
 P: int = 2**31 - 2**24 + 1
-"""The KoalaBear Prime: P = 2^31 - 2^24 + 1"""
+"""
+The KoalaBear Prime: P = 2^31 - 2^24 + 1
+
+The prime is chosen because the cube map (x -> x^3) is an automorphism of the multiplicative group.
+"""
 
 P_BITS: int = 31
 """The number of bits in the prime P."""
