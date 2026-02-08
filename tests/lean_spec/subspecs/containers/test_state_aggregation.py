@@ -13,11 +13,15 @@ from lean_spec.subspecs.containers.attestation import (
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import State
-from lean_spec.subspecs.containers.state.types import Validators
-from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
-from lean_spec.types import Bytes32, Bytes52, Uint64
+from lean_spec.types import Bytes32
+from tests.lean_spec.helpers import (
+    make_bytes32,
+    make_genesis_state,
+    make_validators_from_key_manager,
+)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -36,28 +40,10 @@ def monkeypatch_module():
     mp.undo()
 
 
-def make_bytes32(seed: int) -> Bytes32:
-    """Create a deterministic Bytes32 value for tests."""
-    return Bytes32(bytes([seed % 256]) * 32)
-
-
-def make_validators(count: int) -> Validators:
-    """Build a validator registry using public keys from the key manager."""
-    key_manager = get_shared_key_manager()
-    validators = [
-        Validator(
-            pubkey=Bytes52(key_manager.get_public_key(ValidatorIndex(i)).encode_bytes()),
-            index=ValidatorIndex(i),
-        )
-        for i in range(count)
-    ]
-    return Validators(data=validators)
-
-
 def make_state(num_validators: int) -> State:
-    """Create a genesis state with the requested number of validators."""
-    validators = make_validators(num_validators)
-    return State.generate_genesis(Uint64(0), validators=validators)
+    """Create a genesis state with real XMSS keys."""
+    validators = make_validators_from_key_manager(get_shared_key_manager(), num_validators)
+    return make_genesis_state(validators=validators)
 
 
 def make_attestation_data(

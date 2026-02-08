@@ -19,9 +19,13 @@ from .builders import (
     make_signature,
     make_signed_attestation,
     make_signed_block,
+    make_store,
+    make_store_with_attestation_data,
+    make_store_with_gossip_signatures,
     make_test_block,
     make_test_status,
     make_validators,
+    make_validators_from_key_manager,
     make_validators_with_keys,
 )
 from .mocks import MockNoiseSession
@@ -49,9 +53,13 @@ __all__ = [
     "make_signature",
     "make_signed_attestation",
     "make_signed_block",
+    "make_store",
+    "make_store_with_attestation_data",
+    "make_store_with_gossip_signatures",
     "make_test_block",
     "make_test_status",
     "make_validators",
+    "make_validators_from_key_manager",
     "make_validators_with_keys",
     # Mocks
     "MockNoiseSession",

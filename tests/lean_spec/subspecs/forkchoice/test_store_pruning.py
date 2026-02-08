@@ -2,22 +2,15 @@
 
 from lean_spec.subspecs.containers import (
     AttestationData,
-    Block,
-    BlockBody,
     Checkpoint,
-    State,
 )
 from lean_spec.subspecs.containers.attestation import AggregationBits
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex
-from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
-from lean_spec.types import Bytes32, Bytes52, Uint64
+from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_mock_signature
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_mock_signature, make_store
 
 
 def _make_attestation_data(
@@ -36,37 +29,9 @@ def _make_attestation_data(
     )
 
 
-def _create_test_store() -> tuple[Store, Block, State]:
-    """Create a basic store with genesis state for testing."""
-    validators = Validators(
-        data=[
-            Validator(
-                pubkey=Bytes52(b"\x00" * 52),
-                index=ValidatorIndex(i),
-            )
-            for i in range(3)
-        ]
-    )
-    genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=hash_tree_root(genesis_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-
-    store = Store.get_forkchoice_store(
-        genesis_state,
-        genesis_block,
-        validator_id=TEST_VALIDATOR_ID,
-    )
-    return store, genesis_block, genesis_state
-
-
 def test_prunes_entries_with_target_at_finalized() -> None:
     """Verify entries with target.slot == finalized slot are pruned."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 5
     attestation_data = _make_attestation_data(
@@ -101,7 +66,7 @@ def test_prunes_entries_with_target_at_finalized() -> None:
 
 def test_prunes_entries_with_target_before_finalized() -> None:
     """Verify entries with target.slot < finalized slot are pruned."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 3
     attestation_data = _make_attestation_data(
@@ -136,7 +101,7 @@ def test_prunes_entries_with_target_before_finalized() -> None:
 
 def test_keeps_entries_with_target_after_finalized() -> None:
     """Verify entries with target.slot > finalized slot are kept."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 10
     attestation_data = _make_attestation_data(
@@ -172,7 +137,7 @@ def test_keeps_entries_with_target_after_finalized() -> None:
 
 def test_prunes_related_structures_together() -> None:
     """Verify all four data structures are pruned atomically."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create stale attestation data
     stale_attestation = _make_attestation_data(
@@ -252,7 +217,7 @@ def test_prunes_related_structures_together() -> None:
 
 def test_returns_self_when_nothing_to_prune() -> None:
     """Verify optimization returns same instance when no pruning needed."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create fresh attestation data (target.slot > finalized.slot)
     fresh_attestation = _make_attestation_data(
@@ -286,7 +251,7 @@ def test_returns_self_when_nothing_to_prune() -> None:
 
 def test_handles_empty_attestation_data() -> None:
     """Verify pruning works correctly when attestation_data_by_root is empty."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Ensure store has empty attestation data
     assert len(store.attestation_data_by_root) == 0
@@ -300,7 +265,7 @@ def test_handles_empty_attestation_data() -> None:
 
 def test_prunes_multiple_validators_same_data_root() -> None:
     """Verify pruning removes entries for multiple validators with same data root."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create stale attestation data
     stale_attestation = _make_attestation_data(
@@ -342,7 +307,7 @@ def test_prunes_multiple_validators_same_data_root() -> None:
 
 def test_mixed_stale_and_fresh_entries() -> None:
     """Verify correct pruning behavior with a mix of stale and fresh entries."""
-    store, _, _ = _create_test_store()
+    store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create multiple attestations at different slots
     attestations = [

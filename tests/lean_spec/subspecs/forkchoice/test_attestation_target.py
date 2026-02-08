@@ -31,12 +31,6 @@ from lean_spec.types import Bytes32, Bytes52, Uint64
 
 
 @pytest.fixture
-def key_manager() -> XmssKeyManager:
-    """Create an XMSS key manager for signing attestations."""
-    return XmssKeyManager(max_slot=Slot(20))
-
-
-@pytest.fixture
 def validators(key_manager: XmssKeyManager) -> Validators:
     """Create validators with real public keys from the key manager."""
     return Validators(
