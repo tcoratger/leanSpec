@@ -109,13 +109,24 @@ class TestMessageCacheGetGossipIds:
         assert msg_new.id in ids
         assert msg_old.id not in ids
 
-    def test_returns_empty_for_unrelated_topic(self) -> None:
-        """get_gossip_ids() returns empty for topics with no messages."""
-        cache = MessageCache()
-        msg = GossipsubMessage(topic=b"topicA", raw_data=b"data")
-        cache.put("topicA", msg)
+    def test_filters_by_topic(self) -> None:
+        """get_gossip_ids() only returns IDs for the requested topic."""
+        cache = MessageCache(mcache_len=6, mcache_gossip=3)
 
-        assert cache.get_gossip_ids("topicB") == []
+        msg1 = GossipsubMessage(topic=b"topic1", raw_data=b"data1")
+        msg2 = GossipsubMessage(topic=b"topic2", raw_data=b"data2")
+        msg3 = GossipsubMessage(topic=b"topic1", raw_data=b"data3")
+
+        cache.put("topic1", msg1)
+        cache.put("topic2", msg2)
+        cache.put("topic1", msg3)
+
+        gossip_ids = cache.get_gossip_ids("topic1")
+        assert msg1.id in gossip_ids
+        assert msg3.id in gossip_ids
+        assert msg2.id not in gossip_ids
+
+        assert cache.get_gossip_ids("topicUnknown") == []
 
     def test_iwant_after_gossip_window(self) -> None:
         """Messages outside gossip window are still retrievable via get()."""
@@ -134,8 +145,23 @@ class TestMessageCacheGetGossipIds:
         assert cache.get(msg.id) is not None
 
 
-class TestMessageCacheDuplicate:
-    """Tests for duplicate detection."""
+class TestMessageCachePutAndGet:
+    """Tests for put, get, and duplicate detection."""
+
+    def test_get_retrieves_cached_message(self) -> None:
+        """get() retrieves a message by ID after put()."""
+        cache = MessageCache()
+        msg = GossipsubMessage(topic=b"t", raw_data=b"data")
+        cache.put("t", msg)
+
+        retrieved = cache.get(msg.id)
+        assert retrieved is not None
+        assert retrieved.id == msg.id
+
+    def test_get_returns_none_for_unknown(self) -> None:
+        """get() returns None for an unknown message ID."""
+        cache = MessageCache()
+        assert cache.get(Bytes20(b"\x00" * 20)) is None
 
     def test_put_duplicate_returns_false(self) -> None:
         """Putting the same message twice returns False on second call."""
@@ -245,11 +271,20 @@ class TestGossipsubMessageId:
         assert isinstance(msg.id, Bytes20)
 
     def test_id_is_cached(self) -> None:
-        """The ID is computed once and cached."""
-        msg = GossipsubMessage(topic=b"t", raw_data=b"d")
-        id1 = msg.id
-        id2 = msg.id
-        assert id1 is id2
+        """The ID is computed once and reused on subsequent accesses."""
+        decompress_calls = 0
+
+        def counting_decompress(data: bytes) -> bytes:
+            nonlocal decompress_calls
+            decompress_calls += 1
+            return b"decompressed"
+
+        msg = GossipsubMessage(topic=b"t", raw_data=b"d", snappy_decompress=counting_decompress)
+        first_id = msg.id
+        second_id = msg.id
+
+        assert decompress_calls == 1
+        assert first_id is second_id
 
     def test_compute_id_with_snappy(self) -> None:
         """compute_id uses decompressed data when snappy succeeds."""

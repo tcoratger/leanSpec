@@ -3,10 +3,6 @@
 import pytest
 
 from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.config import (
-    MESSAGE_DOMAIN_INVALID_SNAPPY,
-    MESSAGE_DOMAIN_VALID_SNAPPY,
-)
 from lean_spec.subspecs.networking.gossipsub import (
     ControlGraft,
     ControlIDontWant,
@@ -15,14 +11,12 @@ from lean_spec.subspecs.networking.gossipsub import (
     ControlMessage,
     ControlPrune,
     ForkMismatchError,
-    GossipsubMessage,
     GossipsubParameters,
     GossipTopic,
     TopicKind,
     format_topic_string,
     parse_topic_string,
 )
-from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
 from lean_spec.subspecs.networking.gossipsub.mesh import FanoutEntry, MeshState, TopicMesh
 
 
@@ -52,79 +46,6 @@ class TestGossipsubParameters:
         assert params.d_low < params.d < params.d_high
         assert params.d_lazy <= params.d
         assert params.mcache_gossip <= params.mcache_len
-
-
-class TestGossipsubMessage:
-    """Test suite for GossipSub message handling and ID computation."""
-
-    @pytest.mark.parametrize(
-        "has_snappy,decompress_succeeds,expected_domain",
-        [
-            (False, False, MESSAGE_DOMAIN_INVALID_SNAPPY),
-            (True, True, MESSAGE_DOMAIN_VALID_SNAPPY),
-            (True, False, MESSAGE_DOMAIN_INVALID_SNAPPY),
-        ],
-    )
-    def test_message_id_computation(
-        self, has_snappy: bool, decompress_succeeds: bool, expected_domain: bytes
-    ) -> None:
-        """Test message ID computation across different snappy scenarios."""
-        topic = b"test_topic"
-        raw_data = b"raw_test_data"
-        decompressed_data = b"decompressed_test_data"
-
-        snappy_decompress = None
-        if has_snappy:
-            if decompress_succeeds:
-
-                def snappy_decompress(data: bytes) -> bytes:
-                    return decompressed_data
-            else:
-
-                def snappy_decompress(data: bytes) -> bytes:
-                    raise Exception("Decompression failed")
-
-        message = GossipsubMessage(topic, raw_data, snappy_decompress)
-        message_id = message.id
-
-        assert len(message_id) == 20
-        assert isinstance(message_id, bytes)
-
-        # Test determinism
-        message2 = GossipsubMessage(topic, raw_data, snappy_decompress)
-        assert message_id == message2.id
-
-    def test_message_id_caching(self) -> None:
-        """Test that message IDs are cached."""
-        topic = b"test_topic"
-        data = b"test_data"
-        decompress_calls = 0
-
-        def counting_decompress(data: bytes) -> bytes:
-            nonlocal decompress_calls
-            decompress_calls += 1
-            return b"decompressed"
-
-        message = GossipsubMessage(topic, data, counting_decompress)
-        first_id = message.id
-        second_id = message.id
-
-        assert decompress_calls == 1  # Called only once
-        assert first_id is second_id
-
-    def test_message_uniqueness(self) -> None:
-        """Test message ID uniqueness."""
-        test_cases = [
-            (b"topic1", b"data"),
-            (b"topic2", b"data"),
-            (b"topic", b"data1"),
-            (b"topic", b"data2"),
-        ]
-
-        messages = [GossipsubMessage(topic, data) for topic, data in test_cases]
-        ids = [msg.id for msg in messages]
-
-        assert len(ids) == len(set(ids))
 
 
 class TestControlMessages:
@@ -388,94 +309,6 @@ class TestTopicMesh:
         assert topic_mesh.remove_peer(peer1)
         assert not topic_mesh.remove_peer(peer1)  # Already removed
         assert peer1 not in topic_mesh.peers
-
-
-class TestMessageCache:
-    """Test suite for message cache."""
-
-    def test_cache_put_and_get(self) -> None:
-        """Test putting and retrieving messages."""
-        cache = MessageCache(mcache_len=6, mcache_gossip=3)
-        message = GossipsubMessage(topic=b"topic", raw_data=b"data")
-
-        assert cache.put("topic", message)
-        assert not cache.put("topic", message)  # Duplicate
-
-        retrieved = cache.get(message.id)
-        assert retrieved is not None
-        assert retrieved.id == message.id
-
-    def test_cache_has(self) -> None:
-        """Test checking if message is in cache."""
-        cache = MessageCache()
-        message = GossipsubMessage(topic=b"topic", raw_data=b"data")
-
-        assert not cache.has(message.id)
-        cache.put("topic", message)
-        assert cache.has(message.id)
-
-    def test_cache_shift(self) -> None:
-        """Test cache window shifting."""
-        cache = MessageCache(mcache_len=3, mcache_gossip=2)
-
-        messages = []
-        for i in range(5):
-            msg = GossipsubMessage(topic=b"topic", raw_data=f"data{i}".encode())
-            cache.put("topic", msg)
-            messages.append(msg)
-            cache.shift()
-
-        # Old messages should be evicted
-        assert not cache.has(messages[0].id)
-        assert not cache.has(messages[1].id)
-
-    def test_get_gossip_ids(self) -> None:
-        """Test getting message IDs for IHAVE gossip."""
-        cache = MessageCache(mcache_len=6, mcache_gossip=3)
-
-        msg1 = GossipsubMessage(topic=b"topic1", raw_data=b"data1")
-        msg2 = GossipsubMessage(topic=b"topic2", raw_data=b"data2")
-        msg3 = GossipsubMessage(topic=b"topic1", raw_data=b"data3")
-
-        cache.put("topic1", msg1)
-        cache.put("topic2", msg2)
-        cache.put("topic1", msg3)
-
-        gossip_ids = cache.get_gossip_ids("topic1")
-
-        assert msg1.id in gossip_ids
-        assert msg2.id not in gossip_ids
-        assert msg3.id in gossip_ids
-
-
-class TestSeenCache:
-    """Test suite for seen message cache."""
-
-    def test_seen_cache_add_and_check(self) -> None:
-        """Test adding and checking seen messages."""
-        from lean_spec.types import Bytes20
-
-        cache = SeenCache(ttl_seconds=60)
-        msg_id = Bytes20(b"12345678901234567890")
-
-        assert not cache.has(msg_id)
-        assert cache.add(msg_id, timestamp=1000.0)
-        assert cache.has(msg_id)
-        assert not cache.add(msg_id, timestamp=1001.0)  # Duplicate
-
-    def test_seen_cache_cleanup(self) -> None:
-        """Test cleanup of expired entries."""
-        from lean_spec.types import Bytes20
-
-        cache = SeenCache(ttl_seconds=10)
-        msg_id = Bytes20(b"12345678901234567890")
-
-        cache.add(msg_id, timestamp=1000.0)
-        assert cache.has(msg_id)
-
-        removed = cache.cleanup(current_time=1015.0)
-        assert removed == 1
-        assert not cache.has(msg_id)
 
 
 class TestFanoutEntry:
