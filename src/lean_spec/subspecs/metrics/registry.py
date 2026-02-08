@@ -20,10 +20,6 @@ from prometheus_client import (
 # Using a dedicated registry avoids pollution from default Python process metrics.
 REGISTRY = CollectorRegistry()
 
-# -----------------------------------------------------------------------------
-# Node Information
-# -----------------------------------------------------------------------------
-
 head_slot = Gauge(
     "lean_head_slot",
     "Current head slot",
@@ -48,10 +44,6 @@ validators_count = Gauge(
     registry=REGISTRY,
 )
 
-# -----------------------------------------------------------------------------
-# Block Processing
-# -----------------------------------------------------------------------------
-
 blocks_processed = Counter(
     "lean_blocks_processed_total",
     "Total blocks processed",
@@ -64,10 +56,6 @@ block_processing_time = Histogram(
     buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
     registry=REGISTRY,
 )
-
-# -----------------------------------------------------------------------------
-# Validator Production
-# -----------------------------------------------------------------------------
 
 blocks_proposed = Counter(
     "lean_blocks_proposed_total",

@@ -38,10 +38,6 @@ from lean_spec.subspecs.networking.varint import encode_varint
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 
-# =============================================================================
-# Test Fixtures and Helpers
-# =============================================================================
-
 
 class MockStream:
     """
@@ -151,11 +147,6 @@ def build_gossip_message(topic: str, ssz_data: bytes) -> bytes:
     return bytes(message)
 
 
-# =============================================================================
-# Tests for GossipMessageError
-# =============================================================================
-
-
 class TestGossipMessageError:
     """Tests for the GossipMessageError exception."""
 
@@ -173,11 +164,6 @@ class TestGossipMessageError:
         """Can be raised and caught properly."""
         with pytest.raises(GossipMessageError, match="specific error"):
             raise GossipMessageError("specific error")
-
-
-# =============================================================================
-# Tests for GossipHandler.get_topic()
-# =============================================================================
 
 
 class TestGossipHandlerGetTopic:
@@ -239,11 +225,6 @@ class TestGossipHandlerGetTopic:
 
         with pytest.raises(GossipMessageError, match="Invalid topic"):
             handler.get_topic("")
-
-
-# =============================================================================
-# Tests for GossipHandler.decode_message()
-# =============================================================================
 
 
 class TestGossipHandlerDecodeMessage:
@@ -321,11 +302,6 @@ class TestGossipHandlerDecodeMessage:
 
         with pytest.raises(GossipMessageError, match="SSZ decode failed"):
             handler.decode_message(topic_str, compressed)
-
-
-# =============================================================================
-# Tests for read_gossip_message()
-# =============================================================================
 
 
 class TestReadGossipMessage:
@@ -508,11 +484,6 @@ class TestReadGossipMessage:
         assert topic == topic_str
 
 
-# =============================================================================
-# Integration Tests
-# =============================================================================
-
-
 class TestGossipReceptionIntegration:
     """Integration tests for the complete gossip reception flow."""
 
@@ -605,11 +576,6 @@ class TestGossipReceptionIntegration:
 
         # Verify exact match
         assert decoded_bytes == original_bytes
-
-
-# =============================================================================
-# Edge Case Tests
-# =============================================================================
 
 
 class TestGossipReceptionEdgeCases:

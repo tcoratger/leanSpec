@@ -49,6 +49,7 @@ uvx tox                  # Everything (checks + tests + docs)
 - Google docstring style
 - Test files/functions must start with `test_`
 - **No example code in docstrings**: Do not include `Example:` sections with code blocks in docstrings. Keep documentation concise and focused on explaining *what* and *why*, not *how to use*. Unit tests serve as usage examples.
+- **No section separator comments**: Never use banner-style separator comments (`# ====...`, `# ----...`, or similar). They add visual clutter with no value. Use blank lines to separate logical sections. If a section needs a heading, a single `#` comment line is enough.
 
 ### Import Style
 

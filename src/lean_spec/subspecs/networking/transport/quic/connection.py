@@ -630,11 +630,6 @@ class QuicConnectionManager:
         await shutdown_event.wait()
 
 
-# =============================================================================
-# Stream Wrapper for multistream-select
-# =============================================================================
-
-
 class _QuicStreamWrapper:
     """Wrapper to use QuicStream with multistream negotiation."""
 

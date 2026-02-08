@@ -1,7 +1,7 @@
 """
-Shared pytest fixtures for networking tests.
+Shared pytest fixtures for subspecs tests.
 
-Provides peer ID and connection state fixtures.
+Provides peer ID and connection state fixtures used by both networking and sync tests.
 """
 
 from __future__ import annotations
@@ -11,10 +11,6 @@ import pytest
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer.info import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
-
-# -----------------------------------------------------------------------------
-# Peer ID Fixtures
-# -----------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -33,11 +29,6 @@ def peer_id_2() -> PeerId:
 def peer_id_3() -> PeerId:
     """Tertiary test peer ID."""
     return PeerId.from_base58("16Uiu2HAmTestPeer789")
-
-
-# -----------------------------------------------------------------------------
-# Peer Info Fixtures
-# -----------------------------------------------------------------------------
 
 
 @pytest.fixture

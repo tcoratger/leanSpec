@@ -1,129 +1,24 @@
 """Tests for validator block production and attestation functionality."""
 
 import pytest
-from consensus_testing.keys import get_shared_key_manager
+from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.containers import (
     Attestation,
     AttestationData,
     Block,
     BlockBody,
-    BlockHeader,
     Checkpoint,
     Config,
     SignedAttestation,
-    State,
-    Validator,
     ValidatorIndex,
 )
-from lean_spec.subspecs.containers.block import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import (
-    HistoricalBlockHashes,
-    JustificationRoots,
-    JustificationValidators,
-    JustifiedSlots,
-    Validators,
-)
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
-from lean_spec.types import Bytes32, Bytes52, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID
-
-
-@pytest.fixture
-def config() -> Config:
-    """Sample configuration for validator testing."""
-    return Config(genesis_time=Uint64(1000))
-
-
-@pytest.fixture
-def sample_state(config: Config) -> State:
-    """Create a sample state for validator testing."""
-    key_manager = get_shared_key_manager()
-    # Create block header for testing
-    block_header = BlockHeader(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=Bytes32(b"state" + b"\x00" * 27),
-        body_root=Bytes32(b"body" + b"\x00" * 28),
-    )
-
-    # Use a placeholder for genesis - will be updated in store fixture
-    temp_finalized = Checkpoint(root=Bytes32(b"genesis" + b"\x00" * 25), slot=Slot(0))
-
-    # Create validators list with 10 validators using real public keys from key manager
-    validators = Validators(
-        data=[
-            Validator(
-                pubkey=Bytes52(key_manager.get_public_key(ValidatorIndex(i)).encode_bytes()),
-                index=ValidatorIndex(i),
-            )
-            for i in range(10)
-        ]
-    )
-
-    return State(
-        config=config,
-        slot=Slot(0),
-        latest_block_header=block_header,
-        latest_justified=temp_finalized,
-        latest_finalized=temp_finalized,
-        historical_block_hashes=HistoricalBlockHashes(data=[]),
-        justified_slots=JustifiedSlots(data=[]),
-        justifications_roots=JustificationRoots(data=[]),
-        justifications_validators=JustificationValidators(data=[]),
-        validators=validators,
-    )
-
-
-@pytest.fixture
-def sample_store(config: Config, sample_state: State) -> Store:
-    """Create a sample forkchoice store with genesis block for validator testing."""
-    # Create genesis block
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=hash_tree_root(sample_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-    genesis_hash = hash_tree_root(genesis_block)
-
-    # Create the corresponding genesis block header
-    genesis_header = BlockHeader(
-        slot=genesis_block.slot,
-        proposer_index=genesis_block.proposer_index,
-        parent_root=genesis_block.parent_root,
-        state_root=genesis_block.state_root,
-        body_root=hash_tree_root(genesis_block.body),
-    )
-
-    # Create consistent checkpoint that references the genesis block
-    finalized = Checkpoint(root=genesis_hash, slot=Slot(0))
-
-    # Update the state to have consistent justified/finalized checkpoints and header
-    consistent_state = sample_state.model_copy(
-        update={
-            "latest_justified": finalized,
-            "latest_finalized": finalized,
-            "latest_block_header": genesis_header,
-        }
-    )
-
-    return Store(
-        time=Uint64(100),
-        config=config,
-        head=genesis_hash,
-        safe_target=genesis_hash,
-        latest_justified=finalized,
-        latest_finalized=finalized,
-        blocks={genesis_hash: genesis_block},
-        states={genesis_hash: consistent_state},  # States are indexed by block hash
-        validator_id=TEST_VALIDATOR_ID,
-    )
+from lean_spec.types import Bytes32, Uint64
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_store
 
 
 class TestBlockProduction:
@@ -155,9 +50,10 @@ class TestBlockProduction:
         with pytest.raises(AssertionError, match="is not the proposer for slot"):
             sample_store.produce_block_with_signatures(slot, wrong_validator)
 
-    def test_produce_block_with_attestations(self, sample_store: Store) -> None:
+    def test_produce_block_with_attestations(
+        self, sample_store: Store, key_manager: XmssKeyManager
+    ) -> None:
         """Test block production includes available attestations."""
-        key_manager = get_shared_key_manager()
         head_block = sample_store.blocks[sample_store.head]
 
         # Add some attestations to the store
@@ -320,9 +216,10 @@ class TestBlockProduction:
         assert block.proposer_index == validator_idx
         assert block.state_root != Bytes32.zero()
 
-    def test_produce_block_state_consistency(self, sample_store: Store) -> None:
+    def test_produce_block_state_consistency(
+        self, sample_store: Store, key_manager: XmssKeyManager
+    ) -> None:
         """Test that produced block's state is consistent with block content."""
-        key_manager = get_shared_key_manager()
         slot = Slot(4)
         validator_idx = ValidatorIndex(4)
 
@@ -484,79 +381,7 @@ class TestValidatorIntegration:
 
     def test_validator_operations_empty_store(self) -> None:
         """Test validator operations with minimal store state."""
-        config = Config(genesis_time=Uint64(1000))
-
-        # Create minimal genesis block first
-        genesis_body = BlockBody(attestations=AggregatedAttestations(data=[]))
-
-        # Create validators list with 3 validators
-        validators = Validators(
-            data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(3)]
-        )
-
-        # Create minimal state with temporary header
-        checkpoint = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
-        state = State(
-            config=config,
-            slot=Slot(0),
-            latest_block_header=BlockHeader(
-                slot=Slot(0),
-                proposer_index=ValidatorIndex(0),
-                parent_root=Bytes32.zero(),
-                state_root=Bytes32.zero(),  # Will be updated
-                body_root=hash_tree_root(genesis_body),
-            ),
-            latest_justified=checkpoint,
-            latest_finalized=checkpoint,
-            historical_block_hashes=HistoricalBlockHashes(data=[]),
-            justified_slots=JustifiedSlots(data=[]),
-            justifications_roots=JustificationRoots(data=[]),
-            justifications_validators=JustificationValidators(data=[]),
-            validators=validators,
-        )
-
-        # Compute consistent state root
-        state_root = hash_tree_root(state)
-
-        # Create genesis block with correct state root
-        genesis = Block(
-            slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32.zero(),
-            state_root=state_root,
-            body=genesis_body,
-        )
-        genesis_hash = hash_tree_root(genesis)
-
-        # Update state with matching header and checkpoint
-        consistent_header = BlockHeader(
-            slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32.zero(),
-            state_root=state_root,  # Same as block
-            body_root=hash_tree_root(genesis_body),
-        )
-
-        final_checkpoint = Checkpoint(root=genesis_hash, slot=Slot(0))
-        state = state.model_copy(
-            update={
-                "latest_block_header": consistent_header,
-                "latest_justified": final_checkpoint,
-                "latest_finalized": final_checkpoint,
-            }
-        )
-
-        store = Store(
-            time=Uint64(100),
-            config=config,
-            head=genesis_hash,
-            safe_target=genesis_hash,
-            latest_justified=final_checkpoint,
-            latest_finalized=final_checkpoint,
-            blocks={genesis_hash: genesis},
-            states={genesis_hash: state},
-            validator_id=TEST_VALIDATOR_ID,
-        )
+        store = make_store(num_validators=3)
 
         # Should be able to produce block and attestation
         store, block, _signatures = store.produce_block_with_signatures(

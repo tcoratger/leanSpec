@@ -215,11 +215,6 @@ class TestHandshakeState:
         assert len(set(states)) == 4
 
 
-# ==============================================================================
-# Phase 2: Handshake State Machine Tests
-# ==============================================================================
-
-
 class TestHandshakeStateTransitions:
     """Verify all state machine transitions."""
 

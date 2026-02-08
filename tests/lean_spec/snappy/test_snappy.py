@@ -27,11 +27,6 @@ from lean_spec.snappy.encoding import (
 TESTDATA_DIR = Path(__file__).parent / "testdata"
 
 
-# ===========================================================================
-# Test Data File Fixtures
-# ===========================================================================
-
-
 def load_test_file(filename: str, size_limit: int = 0) -> bytes:
     """Load a test data file, optionally truncated to size_limit."""
     path = TESTDATA_DIR / filename
@@ -62,11 +57,6 @@ def iter_test_files() -> Iterator[tuple[str, bytes]]:
     """Iterate over all test data files."""
     for label, filename, size_limit in TEST_DATA_FILES:
         yield label, load_test_file(filename, size_limit)
-
-
-# ===========================================================================
-# Varint Encoding Tests
-# ===========================================================================
 
 
 class TestVarintEncoding:
@@ -123,11 +113,6 @@ class TestVarintEncoding:
         value, consumed = decode_varint32(data, offset=6)
         assert value == 300
         assert consumed == 2
-
-
-# ===========================================================================
-# Tag Encoding Tests
-# ===========================================================================
 
 
 class TestTagEncoding:
@@ -202,11 +187,6 @@ class TestTagEncoding:
             encode_copy_tag(4, 0)
 
 
-# ===========================================================================
-# Simple Compression Tests (mirrors C++ SimpleTests)
-# ===========================================================================
-
-
 class TestSimpleCompression:
     """Simple compression tests from C++ test suite."""
 
@@ -239,11 +219,6 @@ class TestSimpleCompression:
         for pattern in patterns:
             compressed = compress(pattern)
             assert decompress(compressed) == pattern
-
-
-# ===========================================================================
-# Self Pattern Extension Tests (mirrors C++ AppendSelfPatternExtensionEdgeCases)
-# ===========================================================================
 
 
 class TestSelfPatternExtension:
@@ -289,11 +264,6 @@ class TestSelfPatternExtension:
                     assert decompress(compressed) == bytes(data)
 
 
-# ===========================================================================
-# Max Blowup Test (mirrors C++ MaxBlowup test)
-# ===========================================================================
-
-
 class TestMaxBlowup:
     """Test maximum compression blowup scenario."""
 
@@ -316,11 +286,6 @@ class TestMaxBlowup:
 
         # Verify max_compressed_length bound
         assert len(compressed) <= max_compressed_length(len(data))
-
-
-# ===========================================================================
-# Real Data File Tests
-# ===========================================================================
 
 
 class TestRealDataFiles:
@@ -374,11 +339,6 @@ class TestRealDataFiles:
         # JPEG shouldn't compress much (already compressed)
         # Allow up to 5% expansion or minimal compression
         assert ratio > 0.95, f"JPEG compressed too much: {ratio:.2%}"
-
-
-# ===========================================================================
-# Corrupted Data Tests (mirrors C++ CorruptedTest)
-# ===========================================================================
 
 
 class TestCorruptedData:
@@ -472,11 +432,6 @@ class TestCorruptedData:
             decompress(malformed)
 
 
-# ===========================================================================
-# Decompression Edge Cases
-# ===========================================================================
-
-
 class TestDecompressionEdgeCases:
     """Tests for decompression edge cases and errors."""
 
@@ -489,11 +444,6 @@ class TestDecompressionEdgeCases:
         """Invalid varint in header raises an error."""
         with pytest.raises(SnappyDecompressionError, match="varint"):
             decompress(b"\xff\xff\xff\xff\xff\xff")
-
-
-# ===========================================================================
-# Utility Function Tests
-# ===========================================================================
 
 
 class TestUtilities:
@@ -522,11 +472,6 @@ class TestUtilities:
             data = data[:size]
             compressed = compress(data)
             assert len(compressed) <= max_len
-
-
-# ===========================================================================
-# Specific Pattern Tests
-# ===========================================================================
 
 
 class TestSpecificPatterns:
@@ -585,11 +530,6 @@ class TestSpecificPatterns:
         assert decompress(compressed) == data
 
 
-# ===========================================================================
-# Multi-block Tests
-# ===========================================================================
-
-
 class TestMultiBlock:
     """Tests for multi-block compression (inputs > 64KB)."""
 
@@ -610,11 +550,6 @@ class TestMultiBlock:
         data = b"Y" * (65536 * 3 + 1000)  # 3+ blocks
         compressed = compress(data)
         assert decompress(compressed) == data
-
-
-# ===========================================================================
-# Expanded Data Tests (mirrors C++ Expand function)
-# ===========================================================================
 
 
 class TestExpandedData:

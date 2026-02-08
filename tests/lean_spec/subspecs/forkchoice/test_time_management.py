@@ -1,69 +1,17 @@
 """Tests for time advancement, intervals, and slot management."""
 
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
-from lean_spec.subspecs.containers import (
-    Block,
-    BlockBody,
-    Checkpoint,
-    Config,
-    State,
-    Validator,
-)
-from lean_spec.subspecs.containers.block import AggregatedAttestations
+from lean_spec.subspecs.containers import Block, State
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Bytes52, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID
-
-
-@pytest.fixture
-def sample_config() -> Config:
-    """Sample configuration for testing."""
-    return Config(genesis_time=Uint64(1000))
-
-
-@pytest.fixture
-def sample_store(sample_config: Config) -> Store:
-    """Create a sample forkchoice store."""
-    # Create a genesis block with empty body
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=Bytes32(b"state" + b"\x00" * 27),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-    genesis_hash = hash_tree_root(genesis_block)
-
-    checkpoint = Checkpoint(root=genesis_hash, slot=Slot(0))
-
-    # Create genesis state with 10 validators for testing
-    validators = Validators(
-        data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(i)) for i in range(10)]
-    )
-    state = State.generate_genesis(
-        genesis_time=sample_config.genesis_time,
-        validators=validators,
-    )
-
-    return Store(
-        time=Uint64(100),
-        config=sample_config,
-        head=genesis_hash,
-        safe_target=genesis_hash,
-        latest_justified=checkpoint,
-        latest_finalized=checkpoint,
-        blocks={genesis_hash: genesis_block},
-        states={genesis_hash: state},
-        validator_id=TEST_VALIDATOR_ID,
-    )
+from lean_spec.types import Bytes32, Uint64
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_empty_block_body
 
 
 class TestGetForkchoiceStore:
@@ -81,13 +29,12 @@ class TestGetForkchoiceStore:
         )
         state_root = hash_tree_root(state)
 
-        # Create anchor block with matching state root
         anchor_block = Block(
             slot=Slot(anchor_slot),
             proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=state_root,
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+            body=make_empty_block_body(),
         )
 
         store = Store.get_forkchoice_store(
@@ -244,7 +191,7 @@ class TestProposalHeadTiming:
             proposer_index=ValidatorIndex(0),
             parent_root=Bytes32.zero(),
             state_root=Bytes32(b"genesis" + b"\x00" * 25),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+            body=make_empty_block_body(),
         )
         genesis_hash = hash_tree_root(genesis_block)
 

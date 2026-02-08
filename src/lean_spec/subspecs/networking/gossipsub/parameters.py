@@ -75,9 +75,7 @@ class GossipsubParameters(StrictBaseModel):
     protocol_id: str = GOSSIPSUB_DEFAULT_PROTOCOL_ID
     """The protocol ID for gossip messages."""
 
-    # -------------------------------------------------------------------------
     # Mesh Degree Parameters
-    # -------------------------------------------------------------------------
 
     d: int = 8
     """Target number of mesh peers per topic.
@@ -110,9 +108,7 @@ class GossipsubParameters(StrictBaseModel):
     the lazy pull protocol for reliability.
     """
 
-    # -------------------------------------------------------------------------
     # Timing Parameters
-    # -------------------------------------------------------------------------
 
     heartbeat_interval_secs: float = 0.7
     """Interval between heartbeat ticks in seconds.
@@ -133,9 +129,7 @@ class GossipsubParameters(StrictBaseModel):
     inactivity to free resources.
     """
 
-    # -------------------------------------------------------------------------
     # Message Cache Parameters
-    # -------------------------------------------------------------------------
 
     mcache_len: int = 6
     """Total number of history windows in the message cache.

@@ -6,20 +6,11 @@ import json
 
 from aiohttp import web
 
-# =============================================================================
-# SPEC CONSTANTS
-# =============================================================================
-
 STATUS_HEALTHY = "healthy"
 """Fixed healthy status returned by the health endpoint."""
 
 SERVICE_NAME = "lean-rpc-api"
 """Fixed service identifier returned by the health endpoint."""
-
-
-# =============================================================================
-# HANDLER
-# =============================================================================
 
 
 async def handle(_request: web.Request) -> web.Response:

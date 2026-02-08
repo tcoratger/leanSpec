@@ -101,11 +101,6 @@ class PacketFlag(IntEnum):
     """Handshake message packet. authdata = variable size."""
 
 
-# =============================================================================
-# Message Type Identifiers
-# =============================================================================
-
-
 class MessageType(IntEnum):
     """
     Message type identifiers in the encrypted message payload.
@@ -143,11 +138,6 @@ class MessageType(IntEnum):
 
     TOPICQUERY = 0x0A
     """Topic query request (experimental)."""
-
-
-# =============================================================================
-# Protocol Messages
-# =============================================================================
 
 
 class Ping(StrictBaseModel):

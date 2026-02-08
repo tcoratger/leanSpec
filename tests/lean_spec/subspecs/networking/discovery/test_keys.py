@@ -10,21 +10,7 @@ from lean_spec.subspecs.networking.discovery.keys import (
     derive_keys,
     derive_keys_from_pubkey,
 )
-
-
-def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
-    """
-    Build mock challenge_data for testing.
-
-    Challenge data format: masking-iv (16) + static-header (23) + authdata (24)
-    Authdata for WHOAREYOU: id-nonce (16) + enr-seq (8)
-    """
-    masking_iv = bytes(16)  # Mock IV
-    # Static header: protocol-id (6) + version (2) + flag (1) + nonce (12) + authdata-size (2)
-    static_header = b"discv5" + b"\x00\x01" + b"\x01" + bytes(12) + b"\x00\x18"
-    # Authdata: id-nonce (16) + enr-seq (8)
-    authdata = id_nonce + bytes(8)
-    return masking_iv + static_header + authdata
+from tests.lean_spec.helpers import make_challenge_data
 
 
 class TestDeriveKeys:

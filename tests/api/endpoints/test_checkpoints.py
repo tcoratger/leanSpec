@@ -2,10 +2,6 @@
 
 import httpx
 
-# =============================================================================
-# HELPERS
-# =============================================================================
-
 
 def get_justified_checkpoint(server_url: str) -> httpx.Response:
     """Fetch justified checkpoint from the server."""
@@ -13,11 +9,6 @@ def get_justified_checkpoint(server_url: str) -> httpx.Response:
         f"{server_url}/lean/v0/checkpoints/justified",
         headers={"Accept": "application/json"},
     )
-
-
-# =============================================================================
-# TESTS
-# =============================================================================
 
 
 class TestJustifiedCheckpoint:

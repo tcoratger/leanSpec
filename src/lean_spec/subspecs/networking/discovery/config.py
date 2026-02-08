@@ -12,7 +12,7 @@ from typing import Final
 from lean_spec.types import StrictBaseModel
 
 # Protocol Constants
-# ------------------
+
 # Values derived from the Discovery v5 specification and Kademlia design.
 
 K_BUCKET_SIZE: Final = 16

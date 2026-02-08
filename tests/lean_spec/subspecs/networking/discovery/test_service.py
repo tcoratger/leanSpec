@@ -21,35 +21,6 @@ from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes64, Uint64
 
 
-@pytest.fixture
-def local_private_key():
-    """Private key for testing."""
-    return bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
-
-
-@pytest.fixture
-def local_enr():
-    """Create a minimal local ENR for testing."""
-    return ENR(
-        signature=Bytes64(bytes(64)),
-        seq=Uint64(1),
-        pairs={
-            "id": b"v4",
-            "secp256k1": bytes.fromhex(
-                "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-            ),
-            "ip": bytes([127, 0, 0, 1]),
-            "udp": (9000).to_bytes(2, "big"),
-        },
-    )
-
-
-@pytest.fixture
-def remote_node_id():
-    """Remote node ID for testing."""
-    return bytes.fromhex("aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb")
-
-
 class TestDiscoveryServiceInit:
     """Tests for DiscoveryService initialization."""
 
@@ -317,11 +288,6 @@ class TestFindNode:
         assert result.queried == 0
 
 
-# ==============================================================================
-# Phase 5: Address Handling Tests - ENR Address Extraction
-# ==============================================================================
-
-
 class TestENRAddressExtraction:
     """Extract endpoints from ENR."""
 
@@ -409,27 +375,6 @@ class TestENRAddressExtraction:
 class TestServiceIPAddressEncoding:
     """Tests for IP address encoding in service layer."""
 
-    @pytest.fixture
-    def local_enr(self):
-        """Create a minimal local ENR for testing."""
-        return ENR(
-            signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
-                "ip": bytes([127, 0, 0, 1]),
-                "udp": (9000).to_bytes(2, "big"),
-            },
-        )
-
-    @pytest.fixture
-    def local_private_key(self):
-        """Private key for testing."""
-        return bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
-
     def test_encode_ipv4_loopback(self, local_enr, local_private_key):
         """Encode IPv4 loopback address."""
         service = DiscoveryService(
@@ -490,34 +435,8 @@ class TestServiceIPAddressEncoding:
         assert encoded_loopback == bytes(15) + b"\x01"
 
 
-# ==============================================================================
-# Phase 8: Service Lookup Operations Tests
-# ==============================================================================
-
-
 class TestLookupAlgorithm:
     """Iterative Kademlia lookup tests."""
-
-    @pytest.fixture
-    def local_enr(self):
-        """Create a minimal local ENR for testing."""
-        return ENR(
-            signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
-                "ip": bytes([127, 0, 0, 1]),
-                "udp": (9000).to_bytes(2, "big"),
-            },
-        )
-
-    @pytest.fixture
-    def local_private_key(self):
-        """Private key for testing."""
-        return bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
 
     @pytest.mark.anyio
     async def test_lookup_with_no_seeds_returns_empty(self, local_enr, local_private_key):
@@ -561,27 +480,6 @@ class TestLookupAlgorithm:
 
 class TestBootstrap:
     """Bootnode initialization tests."""
-
-    @pytest.fixture
-    def local_enr(self):
-        """Create a minimal local ENR for testing."""
-        return ENR(
-            signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
-            pairs={
-                "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
-                "ip": bytes([127, 0, 0, 1]),
-                "udp": (9000).to_bytes(2, "big"),
-            },
-        )
-
-    @pytest.fixture
-    def local_private_key(self):
-        """Private key for testing."""
-        return bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
 
     def test_service_accepts_bootnodes(self, local_enr, local_private_key):
         """Service accepts bootnodes in constructor."""

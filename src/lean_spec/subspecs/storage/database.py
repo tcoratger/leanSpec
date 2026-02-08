@@ -32,9 +32,7 @@ class Database(Protocol):
     - Attestations: Latest attestation per validator
     """
 
-    # -------------------------------------------------------------------------
     # Block Operations
-    # -------------------------------------------------------------------------
 
     def get_block(self, root: Bytes32) -> Block | None:
         """
@@ -70,9 +68,7 @@ class Database(Protocol):
         """
         ...
 
-    # -------------------------------------------------------------------------
     # State Operations
-    # -------------------------------------------------------------------------
 
     def get_state(self, root: Bytes32) -> State | None:
         """
@@ -108,9 +104,7 @@ class Database(Protocol):
         """
         ...
 
-    # -------------------------------------------------------------------------
     # Checkpoint Operations
-    # -------------------------------------------------------------------------
 
     def get_justified_checkpoint(self) -> Checkpoint | None:
         """
@@ -148,9 +142,7 @@ class Database(Protocol):
         """
         ...
 
-    # -------------------------------------------------------------------------
     # Attestation Operations
-    # -------------------------------------------------------------------------
 
     def get_latest_attestation(self, validator_index: ValidatorIndex) -> AttestationData | None:
         """
@@ -187,9 +179,7 @@ class Database(Protocol):
         """
         ...
 
-    # -------------------------------------------------------------------------
     # Head Tracking
-    # -------------------------------------------------------------------------
 
     def get_head_root(self) -> Bytes32 | None:
         """
@@ -209,9 +199,7 @@ class Database(Protocol):
         """
         ...
 
-    # -------------------------------------------------------------------------
     # Slot Index Operations
-    # -------------------------------------------------------------------------
 
     def get_block_root_by_slot(self, slot: Slot) -> Bytes32 | None:
         """
@@ -235,9 +223,7 @@ class Database(Protocol):
         """
         ...
 
-    # -------------------------------------------------------------------------
     # Lifecycle
-    # -------------------------------------------------------------------------
 
     def close(self) -> None:
         """Close database connection and release resources."""

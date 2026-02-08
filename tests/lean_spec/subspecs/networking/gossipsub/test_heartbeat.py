@@ -15,11 +15,7 @@ from lean_spec.subspecs.networking.gossipsub.mcache import SeenCache
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 from lean_spec.types import Bytes20
 
-from .conftest import _add_peer, _make_behavior, _peer
-
-# =============================================================================
-# Mesh Maintenance
-# =============================================================================
+from .conftest import add_peer, make_behavior, make_peer
 
 
 class TestMaintainMesh:
@@ -28,14 +24,14 @@ class TestMaintainMesh:
     @pytest.mark.asyncio
     async def test_grafts_when_below_d_low(self) -> None:
         """GRAFT peers when mesh is below d_low."""
-        behavior, capture = _make_behavior(d=4, d_low=3, d_high=6)
+        behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
         topic = "test_topic"
         behavior.subscribe(topic)
 
         # Add 5 eligible peers (subscribed, with outbound stream)
         names = ["peerA", "peerB", "peerC", "peerD", "peerE"]
         for name in names:
-            _add_peer(behavior, name, {topic})
+            add_peer(behavior, name, {topic})
 
         # Mesh is empty (0 < d_low=3), should graft up to d=4
         now = time.time()
@@ -51,14 +47,14 @@ class TestMaintainMesh:
     @pytest.mark.asyncio
     async def test_prunes_when_above_d_high(self) -> None:
         """PRUNE excess peers when mesh exceeds d_high."""
-        behavior, capture = _make_behavior(d=3, d_low=2, d_high=4)
+        behavior, capture = make_behavior(d=3, d_low=2, d_high=4)
         topic = "test_topic"
         behavior.subscribe(topic)
 
         # Add 6 peers and put them all in mesh (exceeds d_high=4)
         names = ["peerA", "peerB", "peerC", "peerD", "peerE", "peerF"]
         for name in names:
-            pid = _add_peer(behavior, name, {topic})
+            pid = add_peer(behavior, name, {topic})
             behavior.mesh.add_to_mesh(topic, pid)
 
         now = time.time()
@@ -75,16 +71,16 @@ class TestMaintainMesh:
     @pytest.mark.asyncio
     async def test_respects_backoff(self) -> None:
         """Mesh maintenance does not GRAFT peers in backoff."""
-        behavior, capture = _make_behavior(d=4, d_low=3, d_high=6)
+        behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
         topic = "test_topic"
         behavior.subscribe(topic)
 
         # Add peer with backoff set
-        pid = _add_peer(behavior, "peerA", {topic})
+        pid = add_peer(behavior, "peerA", {topic})
         behavior._peers[pid].backoff[topic] = time.time() + 999
 
         # Add another peer without backoff
-        pid2 = _add_peer(behavior, "peerB", {topic})
+        pid2 = add_peer(behavior, "peerB", {topic})
 
         now = time.time()
         await behavior._maintain_mesh(topic, now)
@@ -97,33 +93,33 @@ class TestMaintainMesh:
     @pytest.mark.asyncio
     async def test_skips_peers_without_outbound_stream(self) -> None:
         """Mesh maintenance skips peers without outbound streams."""
-        behavior, capture = _make_behavior(d=4, d_low=3, d_high=6)
+        behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
         topic = "test_topic"
         behavior.subscribe(topic)
 
         # Add peer without outbound stream
-        _add_peer(behavior, "noStrm", {topic}, with_stream=False)
+        add_peer(behavior, "noStrm", {topic}, with_stream=False)
         # Add peer with outbound stream
-        pid_ok = _add_peer(behavior, "hasStrm", {topic}, with_stream=True)
+        pid_ok = add_peer(behavior, "hasStrm", {topic}, with_stream=True)
 
         now = time.time()
         await behavior._maintain_mesh(topic, now)
 
         mesh = behavior.mesh.get_mesh_peers(topic)
-        assert _peer("noStrm") not in mesh
+        assert make_peer("noStrm") not in mesh
         assert pid_ok in mesh
 
     @pytest.mark.asyncio
     async def test_noop_when_within_bounds(self) -> None:
         """No GRAFT or PRUNE when mesh is within [d_low, d_high]."""
-        behavior, capture = _make_behavior(d=4, d_low=3, d_high=6)
+        behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
         topic = "test_topic"
         behavior.subscribe(topic)
 
         # Put exactly 4 peers in mesh (== d, within [d_low=3, d_high=6])
         names = ["peerA", "peerB", "peerC", "peerD"]
         for name in names:
-            pid = _add_peer(behavior, name, {topic})
+            pid = add_peer(behavior, name, {topic})
             behavior.mesh.add_to_mesh(topic, pid)
 
         now = time.time()
@@ -136,7 +132,7 @@ class TestMaintainMesh:
     @pytest.mark.asyncio
     async def test_prune_sets_bidirectional_backoff(self) -> None:
         """When we PRUNE peers, we also set our own backoff for them."""
-        behavior, capture = _make_behavior(d=2, d_low=1, d_high=3)
+        behavior, capture = make_behavior(d=2, d_low=1, d_high=3)
         topic = "test_topic"
         behavior.subscribe(topic)
 
@@ -144,7 +140,7 @@ class TestMaintainMesh:
         peers = []
         names = ["peerA", "peerB", "peerC", "peerD", "peerE"]
         for name in names:
-            pid = _add_peer(behavior, name, {topic})
+            pid = add_peer(behavior, name, {topic})
             behavior.mesh.add_to_mesh(topic, pid)
             peers.append(pid)
 
@@ -160,18 +156,13 @@ class TestMaintainMesh:
                 assert state.backoff[topic] >= now + PRUNE_BACKOFF
 
 
-# =============================================================================
-# Gossip Emission
-# =============================================================================
-
-
 class TestEmitGossip:
     """Tests for IHAVE gossip emission."""
 
     @pytest.mark.asyncio
     async def test_sends_ihave_to_non_mesh_peers(self) -> None:
         """IHAVE is sent to non-mesh peers that are subscribed."""
-        behavior, capture = _make_behavior(d=2, d_low=1, d_high=4, d_lazy=2)
+        behavior, capture = make_behavior(d=2, d_low=1, d_high=4, d_lazy=2)
         topic = "test_topic"
         behavior.subscribe(topic)
 
@@ -180,9 +171,9 @@ class TestEmitGossip:
         behavior.message_cache.put(topic, msg)
 
         # Add mesh peer and non-mesh peer
-        mesh_pid = _add_peer(behavior, "meshPx", {topic})
+        mesh_pid = add_peer(behavior, "meshPx", {topic})
         behavior.mesh.add_to_mesh(topic, mesh_pid)
-        non_mesh_pid = _add_peer(behavior, "nonMeshPx", {topic})
+        non_mesh_pid = add_peer(behavior, "nonMeshPx", {topic})
 
         await behavior._emit_gossip(topic)
 
@@ -196,11 +187,11 @@ class TestEmitGossip:
     @pytest.mark.asyncio
     async def test_skips_when_no_cached_messages(self) -> None:
         """No IHAVE sent when cache is empty."""
-        behavior, capture = _make_behavior()
+        behavior, capture = make_behavior()
         topic = "test_topic"
         behavior.subscribe(topic)
 
-        _add_peer(behavior, "peer1", {topic})
+        add_peer(behavior, "peer1", {topic})
 
         await behavior._emit_gossip(topic)
 
@@ -209,7 +200,7 @@ class TestEmitGossip:
     @pytest.mark.asyncio
     async def test_skips_peers_without_outbound_stream(self) -> None:
         """Gossip skips peers without outbound streams."""
-        behavior, capture = _make_behavior(d_lazy=2)
+        behavior, capture = make_behavior(d_lazy=2)
         topic = "test_topic"
         behavior.subscribe(topic)
 
@@ -217,16 +208,11 @@ class TestEmitGossip:
         behavior.message_cache.put(topic, msg)
 
         # Only add peer without stream (no mesh peers either)
-        _add_peer(behavior, "noStrm", {topic}, with_stream=False)
+        add_peer(behavior, "noStrm", {topic}, with_stream=False)
 
         await behavior._emit_gossip(topic)
 
         assert len(capture.sent) == 0
-
-
-# =============================================================================
-# Full Heartbeat Integration
-# =============================================================================
 
 
 class TestHeartbeatIntegration:
@@ -235,7 +221,7 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_shifts_message_cache(self) -> None:
         """Heartbeat shifts the message cache window."""
-        behavior, _ = _make_behavior()
+        behavior, _ = make_behavior()
 
         msg = GossipsubMessage(topic=b"topic", raw_data=b"data")
         behavior.message_cache.put("topic", msg)
@@ -253,7 +239,7 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_cleans_seen_cache(self) -> None:
         """Heartbeat cleans expired entries from seen cache."""
-        behavior, _ = _make_behavior()
+        behavior, _ = make_behavior()
         behavior.seen_cache = SeenCache(ttl_seconds=1)
 
         msg_id = Bytes20(b"12345678901234567890")
@@ -266,7 +252,7 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_iterates_all_subscribed_topics(self) -> None:
         """Heartbeat processes all subscribed topics."""
-        behavior, capture = _make_behavior(d=2, d_low=1, d_high=4)
+        behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
 
         topic1 = "topic1"
         topic2 = "topic2"
@@ -274,9 +260,9 @@ class TestHeartbeatIntegration:
         behavior.subscribe(topic2)
 
         # Add peers for both topics
-        _add_peer(behavior, "peer1", {topic1, topic2})
-        _add_peer(behavior, "peer2", {topic1, topic2})
-        _add_peer(behavior, "peer3", {topic1, topic2})
+        add_peer(behavior, "peer1", {topic1, topic2})
+        add_peer(behavior, "peer2", {topic1, topic2})
+        add_peer(behavior, "peer3", {topic1, topic2})
 
         await behavior._heartbeat()
 
@@ -289,12 +275,12 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_cleans_fanout_entries(self) -> None:
         """Heartbeat removes stale fanout entries."""
-        behavior, _ = _make_behavior()
+        behavior, _ = make_behavior()
 
         # Create a stale fanout entry by publishing to an unsubscribed topic
         # Then manually make it stale
         topic = "unsubscribed_topic"
-        available = {_add_peer(behavior, "peer1", {topic})}
+        available = {add_peer(behavior, "peer1", {topic})}
         behavior.mesh.update_fanout(topic, available)
 
         # Make the fanout entry stale
@@ -309,8 +295,8 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_clears_idontwant_sets(self) -> None:
         """Heartbeat clears per-peer IDONTWANT sets."""
-        behavior, _ = _make_behavior()
-        pid = _add_peer(behavior, "peer1")
+        behavior, _ = make_behavior()
+        pid = add_peer(behavior, "peer1")
         behavior._peers[pid].dont_want_ids.add(Bytes20(b"12345678901234567890"))
 
         assert len(behavior._peers[pid].dont_want_ids) == 1
@@ -322,7 +308,7 @@ class TestHeartbeatIntegration:
     @pytest.mark.asyncio
     async def test_gossip_includes_fanout_topics(self) -> None:
         """Heartbeat emits gossip for fanout topics, not just subscribed ones."""
-        behavior, capture = _make_behavior(d_lazy=2)
+        behavior, capture = make_behavior(d_lazy=2)
 
         # Subscribe to one topic
         sub_topic = "subscribed_topic"
@@ -330,7 +316,7 @@ class TestHeartbeatIntegration:
 
         # Create a fanout entry for an unsubscribed topic with cached messages
         fan_topic = "fanout_topic"
-        fan_peer = _add_peer(behavior, "fanPeer", {fan_topic})
+        fan_peer = add_peer(behavior, "fanPeer", {fan_topic})
         behavior.mesh.update_fanout(fan_topic, {fan_peer})
 
         # Add a message to cache for the fanout topic

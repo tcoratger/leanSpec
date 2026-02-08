@@ -271,11 +271,6 @@ class TestMixedBootnodes:
         assert resolved[1] == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
 
-# =============================================================================
-# Checkpoint Sync Tests
-# =============================================================================
-
-
 class TestCreateAnchorBlock:
     """Tests for create_anchor_block() function."""
 

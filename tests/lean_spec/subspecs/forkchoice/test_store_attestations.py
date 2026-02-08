@@ -16,52 +16,27 @@ from lean_spec.subspecs.containers.attestation import (
     SignedAttestation,
 )
 from lean_spec.subspecs.containers.block import (
-    Block,
-    BlockBody,
     BlockSignatures,
     BlockWithAttestation,
     SignedBlockWithAttestation,
 )
-from lean_spec.subspecs.containers.block.types import (
-    AggregatedAttestations,
-)
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import State, Validators
-from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex
-from lean_spec.subspecs.forkchoice import Store
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
-from lean_spec.types import Bytes32, Bytes52, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID
+from lean_spec.types import Bytes32, Uint64
+from tests.lean_spec.helpers import (
+    TEST_VALIDATOR_ID,
+    make_store,
+    make_store_with_attestation_data,
+    make_store_with_gossip_signatures,
+)
 
 
-def test_on_block_processes_multi_validator_aggregations() -> None:
+def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyManager) -> None:
     """Ensure Store.on_block handles aggregated attestations with many validators."""
-    key_manager = XmssKeyManager(max_slot=Slot(10))
-    validators = Validators(
-        data=[
-            Validator(
-                pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                index=ValidatorIndex(i),
-            )
-            for i in range(3)
-        ]
-    )
-    genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=hash_tree_root(genesis_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-
-    base_store = Store.get_forkchoice_store(
-        genesis_state,
-        genesis_block,
-        validator_id=TEST_VALIDATOR_ID,
-    )
+    base_store = make_store(num_validators=3, key_manager=key_manager)
     consumer_store = base_store
 
     # Producer view knows about attestations from validators 1 and 2
@@ -148,31 +123,12 @@ def test_on_block_processes_multi_validator_aggregations() -> None:
     assert extracted_attestations[ValidatorIndex(2)] == attestation_data
 
 
-def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
+def test_on_block_preserves_immutability_of_aggregated_payloads(
+    key_manager: XmssKeyManager,
+) -> None:
     """Verify that Store.on_block doesn't mutate previous store's latest_new_aggregated_payloads."""
-    key_manager = XmssKeyManager(max_slot=Slot(10))
-    validators = Validators(
-        data=[
-            Validator(
-                pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                index=ValidatorIndex(i),
-            )
-            for i in range(3)
-        ]
-    )
-    genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=hash_tree_root(genesis_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-
-    base_store = Store.get_forkchoice_store(
-        genesis_state,
-        genesis_block,
-        validator_id=TEST_VALIDATOR_ID,
+    base_store = make_store(
+        num_validators=3, key_manager=key_manager, validator_id=TEST_VALIDATOR_ID
     )
 
     # First block: create and process a block with attestations to populate
@@ -327,44 +283,6 @@ def test_on_block_preserves_immutability_of_aggregated_payloads() -> None:
     )
 
 
-def _create_store_with_validators(
-    key_manager: XmssKeyManager,
-    num_validators: int,
-    current_validator_id: ValidatorIndex,
-) -> tuple[Store, State, Block, AttestationData]:
-    """
-    Create a Store with validators and produce attestation data for testing.
-
-    Returns a tuple of (store, genesis_state, genesis_block, attestation_data).
-    """
-    validators = Validators(
-        data=[
-            Validator(
-                pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                index=ValidatorIndex(i),
-            )
-            for i in range(num_validators)
-        ]
-    )
-    genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=hash_tree_root(genesis_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-
-    store = Store.get_forkchoice_store(
-        genesis_state,
-        genesis_block,
-        validator_id=current_validator_id,
-    )
-
-    attestation_data = store.produce_attestation_data(Slot(1))
-    return store, genesis_state, genesis_block, attestation_data
-
-
 class TestOnGossipAttestationSubnetFiltering:
     """
     Unit tests for on_gossip_attestation with is_aggregator=True.
@@ -374,7 +292,7 @@ class TestOnGossipAttestationSubnetFiltering:
     attesting validator is in the same subnet as the current validator.
     """
 
-    def test_same_subnet_stores_signature(self) -> None:
+    def test_same_subnet_stores_signature(self, key_manager: XmssKeyManager) -> None:
         """
         Aggregator stores signature when attester is in same subnet.
 
@@ -383,12 +301,11 @@ class TestOnGossipAttestationSubnetFiltering:
         - Validator 4 is in subnet 0 (4 % 4 = 0)
         - Current validator (0) should store signature from validator 4.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(4)
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=8, current_validator_id=current_validator
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=current_validator
         )
 
         signed_attestation = SignedAttestation(
@@ -418,7 +335,7 @@ class TestOnGossipAttestationSubnetFiltering:
             "Signature from same-subnet validator should be stored"
         )
 
-    def test_cross_subnet_ignores_signature(self) -> None:
+    def test_cross_subnet_ignores_signature(self, key_manager: XmssKeyManager) -> None:
         """
         Aggregator ignores signature when attester is in different subnet.
 
@@ -427,12 +344,11 @@ class TestOnGossipAttestationSubnetFiltering:
         - Validator 1 is in subnet 1 (1 % 4 = 1)
         - Current validator (0) should NOT store signature from validator 1.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=8, current_validator_id=current_validator
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=current_validator
         )
 
         signed_attestation = SignedAttestation(
@@ -456,19 +372,18 @@ class TestOnGossipAttestationSubnetFiltering:
             "Signature from different-subnet validator should NOT be stored"
         )
 
-    def test_non_aggregator_never_stores_signature(self) -> None:
+    def test_non_aggregator_never_stores_signature(self, key_manager: XmssKeyManager) -> None:
         """
         Non-aggregator nodes never store gossip signatures.
 
         When is_aggregator=False, the signature storage path is skipped
         regardless of subnet membership.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(4)  # Same subnet
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=8, current_validator_id=current_validator
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=current_validator
         )
 
         signed_attestation = SignedAttestation(
@@ -492,19 +407,18 @@ class TestOnGossipAttestationSubnetFiltering:
             "Non-aggregator should never store gossip signatures"
         )
 
-    def test_attestation_data_always_stored(self) -> None:
+    def test_attestation_data_always_stored(self, key_manager: XmssKeyManager) -> None:
         """
         Attestation data is stored regardless of aggregator status or subnet.
 
         The attestation_data_by_root map is always updated for later reference,
         even when the signature itself is filtered out.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)  # Different subnet
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=8, current_validator_id=current_validator
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=current_validator
         )
 
         signed_attestation = SignedAttestation(
@@ -542,18 +456,17 @@ class TestOnGossipAggregatedAttestation:
     Tests aggregated proof verification and storage in latest_new_aggregated_payloads.
     """
 
-    def test_valid_proof_stored_correctly(self) -> None:
+    def test_valid_proof_stored_correctly(self, key_manager: XmssKeyManager) -> None:
         """
         Valid aggregated attestation is verified and stored.
 
         The proof should be stored in latest_new_aggregated_payloads
         keyed by each participating validator's SignatureKey.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         participants = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=4, current_validator_id=ValidatorIndex(0)
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
         data_root = attestation_data.data_root_bytes()
@@ -586,17 +499,16 @@ class TestOnGossipAggregatedAttestation:
             assert len(proofs) == 1
             assert proofs[0] == proof
 
-    def test_attestation_data_stored_by_root(self) -> None:
+    def test_attestation_data_stored_by_root(self, key_manager: XmssKeyManager) -> None:
         """
         Attestation data is stored in attestation_data_by_root.
 
         This allows later reconstruction of attestations from proofs.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         participants = [ValidatorIndex(1)]
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=4, current_validator_id=ValidatorIndex(0)
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
         data_root = attestation_data.data_root_bytes()
@@ -621,18 +533,17 @@ class TestOnGossipAggregatedAttestation:
         assert data_root in updated_store.attestation_data_by_root
         assert updated_store.attestation_data_by_root[data_root] == attestation_data
 
-    def test_invalid_proof_rejected(self) -> None:
+    def test_invalid_proof_rejected(self, key_manager: XmssKeyManager) -> None:
         """
         Invalid aggregated proof is rejected with AssertionError.
 
         A proof signed by different validators than claimed should fail verification.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         claimed_participants = [ValidatorIndex(1), ValidatorIndex(2)]
         actual_signers = [ValidatorIndex(1), ValidatorIndex(3)]  # Different!
 
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=4, current_validator_id=ValidatorIndex(0)
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
         data_root = attestation_data.data_root_bytes()
@@ -656,17 +567,15 @@ class TestOnGossipAggregatedAttestation:
         with pytest.raises(AssertionError, match="signature verification failed"):
             store.on_gossip_aggregated_attestation(signed_aggregated)
 
-    def test_multiple_proofs_accumulate(self) -> None:
+    def test_multiple_proofs_accumulate(self, key_manager: XmssKeyManager) -> None:
         """
         Multiple aggregated proofs for same validator accumulate.
 
         When a validator appears in multiple aggregated attestations,
         all proofs should be stored in the list.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
-
-        store, _, _, attestation_data = _create_store_with_validators(
-            key_manager, num_validators=4, current_validator_id=ValidatorIndex(0)
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=4, validator_id=ValidatorIndex(0)
         )
 
         data_root = attestation_data.data_root_bytes()
@@ -710,63 +619,6 @@ class TestOnGossipAggregatedAttestation:
         assert proof_2 in stored_proofs, "Second proof should be stored"
 
 
-def _create_store_with_gossip_signatures(
-    key_manager: XmssKeyManager,
-    num_validators: int,
-    current_validator_id: ValidatorIndex,
-    attesting_validators: list[ValidatorIndex],
-) -> tuple[Store, AttestationData]:
-    """
-    Create a Store pre-populated with gossip signatures for testing aggregation.
-
-    Returns (store_with_signatures, attestation_data).
-    """
-    validators = Validators(
-        data=[
-            Validator(
-                pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                index=ValidatorIndex(i),
-            )
-            for i in range(num_validators)
-        ]
-    )
-    genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-    genesis_block = Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=hash_tree_root(genesis_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-
-    base_store = Store.get_forkchoice_store(
-        genesis_state,
-        genesis_block,
-        validator_id=current_validator_id,
-    )
-
-    attestation_data = base_store.produce_attestation_data(Slot(1))
-    data_root = attestation_data.data_root_bytes()
-
-    # Build gossip signatures for attesting validators
-    gossip_signatures = {
-        SignatureKey(vid, data_root): key_manager.sign_attestation_data(vid, attestation_data)
-        for vid in attesting_validators
-    }
-
-    # Populate attestation_data_by_root so aggregation can reconstruct attestations
-    attestation_data_by_root = {data_root: attestation_data}
-
-    store = base_store.model_copy(
-        update={
-            "gossip_signatures": gossip_signatures,
-            "attestation_data_by_root": attestation_data_by_root,
-        }
-    )
-
-    return store, attestation_data
-
-
 class TestAggregateCommitteeSignatures:
     """
     Integration tests for committee signature aggregation.
@@ -775,7 +627,7 @@ class TestAggregateCommitteeSignatures:
     and stored for later use.
     """
 
-    def test_aggregates_gossip_signatures_into_proof(self) -> None:
+    def test_aggregates_gossip_signatures_into_proof(self, key_manager: XmssKeyManager) -> None:
         """
         Aggregation creates proofs from collected gossip signatures.
 
@@ -784,13 +636,12 @@ class TestAggregateCommitteeSignatures:
         2. Aggregate signatures into a single proof
         3. Store resulting proofs for later use
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         attesting_validators = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, attestation_data = _create_store_with_gossip_signatures(
+        store, attestation_data = make_store_with_gossip_signatures(
             key_manager,
             num_validators=4,
-            current_validator_id=ValidatorIndex(0),
+            validator_id=ValidatorIndex(0),
             attesting_validators=attesting_validators,
         )
 
@@ -807,20 +658,19 @@ class TestAggregateCommitteeSignatures:
             proofs = updated_store.latest_new_aggregated_payloads[sig_key]
             assert len(proofs) >= 1, "At least one proof should exist"
 
-    def test_aggregated_proof_is_valid(self) -> None:
+    def test_aggregated_proof_is_valid(self, key_manager: XmssKeyManager) -> None:
         """
         Created aggregated proof passes verification.
 
         The proof should be cryptographically valid and verifiable
         against the original public keys.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         attesting_validators = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, attestation_data = _create_store_with_gossip_signatures(
+        store, attestation_data = make_store_with_gossip_signatures(
             key_manager,
             num_validators=4,
-            current_validator_id=ValidatorIndex(0),
+            validator_id=ValidatorIndex(0),
             attesting_validators=attesting_validators,
         )
 
@@ -841,18 +691,16 @@ class TestAggregateCommitteeSignatures:
             epoch=attestation_data.slot,
         )
 
-    def test_empty_gossip_signatures_produces_no_proofs(self) -> None:
+    def test_empty_gossip_signatures_produces_no_proofs(self, key_manager: XmssKeyManager) -> None:
         """
         No proofs created when gossip_signatures is empty.
 
         This is the expected behavior when no attestations have been received.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
-
-        store, _ = _create_store_with_gossip_signatures(
+        store, _ = make_store_with_gossip_signatures(
             key_manager,
             num_validators=4,
-            current_validator_id=ValidatorIndex(0),
+            validator_id=ValidatorIndex(0),
             attesting_validators=[],  # No attesters
         )
 
@@ -861,35 +709,16 @@ class TestAggregateCommitteeSignatures:
         # Verify no proofs were created
         assert len(updated_store.latest_new_aggregated_payloads) == 0
 
-    def test_multiple_attestation_data_grouped_separately(self) -> None:
+    def test_multiple_attestation_data_grouped_separately(
+        self, key_manager: XmssKeyManager
+    ) -> None:
         """
         Signatures for different attestation data are aggregated separately.
 
         Each unique AttestationData should produce its own aggregated proof.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
-        validators = Validators(
-            data=[
-                Validator(
-                    pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                    index=ValidatorIndex(i),
-                )
-                for i in range(4)
-            ]
-        )
-        genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-        genesis_block = Block(
-            slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32.zero(),
-            state_root=hash_tree_root(genesis_state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
-
-        base_store = Store.get_forkchoice_store(
-            genesis_state,
-            genesis_block,
-            validator_id=ValidatorIndex(0),
+        base_store = make_store(
+            num_validators=4, key_manager=key_manager, validator_id=ValidatorIndex(0)
         )
 
         # Create two different attestation data (different slots)
@@ -945,20 +774,21 @@ class TestTickIntervalAggregation:
     signature aggregation for aggregator nodes.
     """
 
-    def test_interval_2_triggers_aggregation_for_aggregator(self) -> None:
+    def test_interval_2_triggers_aggregation_for_aggregator(
+        self, key_manager: XmssKeyManager
+    ) -> None:
         """
         Aggregation is triggered at interval 2 when is_aggregator=True.
 
         At interval 2, aggregator nodes collect and aggregate signatures.
         Non-aggregators skip this step.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         attesting_validators = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, attestation_data = _create_store_with_gossip_signatures(
+        store, attestation_data = make_store_with_gossip_signatures(
             key_manager,
             num_validators=4,
-            current_validator_id=ValidatorIndex(0),
+            validator_id=ValidatorIndex(0),
             attesting_validators=attesting_validators,
         )
 
@@ -978,19 +808,20 @@ class TestTickIntervalAggregation:
             "Aggregation should occur at interval 2 for aggregators"
         )
 
-    def test_interval_2_skips_aggregation_for_non_aggregator(self) -> None:
+    def test_interval_2_skips_aggregation_for_non_aggregator(
+        self, key_manager: XmssKeyManager
+    ) -> None:
         """
         Aggregation is NOT triggered at interval 2 when is_aggregator=False.
 
         Non-aggregator nodes should not perform aggregation even at interval 2.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         attesting_validators = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, attestation_data = _create_store_with_gossip_signatures(
+        store, attestation_data = make_store_with_gossip_signatures(
             key_manager,
             num_validators=4,
-            current_validator_id=ValidatorIndex(0),
+            validator_id=ValidatorIndex(0),
             attesting_validators=attesting_validators,
         )
 
@@ -1008,19 +839,18 @@ class TestTickIntervalAggregation:
             "Aggregation should NOT occur for non-aggregators"
         )
 
-    def test_other_intervals_do_not_trigger_aggregation(self) -> None:
+    def test_other_intervals_do_not_trigger_aggregation(self, key_manager: XmssKeyManager) -> None:
         """
         Aggregation is NOT triggered at intervals other than 2.
 
         Only interval 2 should trigger aggregation, even for aggregators.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         attesting_validators = [ValidatorIndex(1), ValidatorIndex(2)]
 
-        store, attestation_data = _create_store_with_gossip_signatures(
+        store, attestation_data = make_store_with_gossip_signatures(
             key_manager,
             num_validators=4,
-            current_validator_id=ValidatorIndex(0),
+            validator_id=ValidatorIndex(0),
             attesting_validators=attesting_validators,
         )
 
@@ -1044,36 +874,17 @@ class TestTickIntervalAggregation:
                 f"Aggregation should NOT occur at interval {target_interval}"
             )
 
-    def test_interval_0_accepts_attestations_with_proposal(self) -> None:
+    def test_interval_0_accepts_attestations_with_proposal(
+        self, key_manager: XmssKeyManager
+    ) -> None:
         """
         Interval 0 accepts new attestations when has_proposal=True.
 
         This tests that interval 0 performs its own action (accepting attestations)
         rather than aggregation.
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
-        validators = Validators(
-            data=[
-                Validator(
-                    pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                    index=ValidatorIndex(i),
-                )
-                for i in range(4)
-            ]
-        )
-        genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-        genesis_block = Block(
-            slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32.zero(),
-            state_root=hash_tree_root(genesis_state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
-
-        store = Store.get_forkchoice_store(
-            genesis_state,
-            genesis_block,
-            validator_id=ValidatorIndex(0),
+        store = make_store(
+            num_validators=4, key_manager=key_manager, validator_id=ValidatorIndex(0)
         )
 
         # Set time to interval 4 (so next tick wraps to interval 0)
@@ -1096,7 +907,7 @@ class TestEndToEndAggregationFlow:
     interval-triggered aggregation to proof storage.
     """
 
-    def test_gossip_to_aggregation_to_storage(self) -> None:
+    def test_gossip_to_aggregation_to_storage(self, key_manager: XmssKeyManager) -> None:
         """
         Complete flow: gossip attestation -> aggregation -> proof storage.
 
@@ -1106,33 +917,11 @@ class TestEndToEndAggregationFlow:
         3. At interval 2, aggregator creates aggregated proof
         4. Proof is stored in latest_new_aggregated_payloads
         """
-        key_manager = XmssKeyManager(max_slot=Slot(10))
         num_validators = 4
-
-        validators = Validators(
-            data=[
-                Validator(
-                    pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                    index=ValidatorIndex(i),
-                )
-                for i in range(num_validators)
-            ]
-        )
-        genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-        genesis_block = Block(
-            slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32.zero(),
-            state_root=hash_tree_root(genesis_state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
-
-        # Aggregator is validator 0
         aggregator_id = ValidatorIndex(0)
-        store = Store.get_forkchoice_store(
-            genesis_state,
-            genesis_block,
-            validator_id=aggregator_id,
+
+        store = make_store(
+            num_validators=num_validators, key_manager=key_manager, validator_id=aggregator_id
         )
 
         attestation_data = store.produce_attestation_data(Slot(1))

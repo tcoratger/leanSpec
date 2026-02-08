@@ -7,7 +7,7 @@ Each function creates minimal valid instances suitable for unit tests.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from lean_spec.subspecs.containers import (
     Attestation,
@@ -41,11 +41,10 @@ from lean_spec.subspecs.xmss.types import (
 from lean_spec.types import Bytes32, Bytes52, Uint64
 
 if TYPE_CHECKING:
-    from lean_spec.subspecs.networking.reqresp.message import Status
+    from consensus_testing.keys import XmssKeyManager
 
-# -----------------------------------------------------------------------------
-# Primitive Builders
-# -----------------------------------------------------------------------------
+    from lean_spec.subspecs.forkchoice import Store
+    from lean_spec.subspecs.networking.reqresp.message import Status
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -63,11 +62,6 @@ def make_public_key_bytes(seed: int) -> bytes:
     parameter = Parameter(data=[Fp(seed + 100 + i) for i in range(Parameter.LENGTH)])
     public_key = PublicKey(root=root, parameter=parameter)
     return public_key.encode_bytes()
-
-
-# -----------------------------------------------------------------------------
-# Signature Builders
-# -----------------------------------------------------------------------------
 
 
 def make_mock_signature() -> Signature:
@@ -97,11 +91,6 @@ def make_signature(seed: int) -> Signature:
     )
 
 
-# -----------------------------------------------------------------------------
-# Validator Builders
-# -----------------------------------------------------------------------------
-
-
 def make_validators(count: int) -> Validators:
     """
     Build a validator registry with null public keys.
@@ -127,24 +116,59 @@ def make_validators_with_keys(count: int) -> Validators:
     return Validators(data=validators)
 
 
-# -----------------------------------------------------------------------------
-# State Builders
-# -----------------------------------------------------------------------------
+def make_validators_from_key_manager(key_manager: XmssKeyManager, count: int) -> Validators:
+    """Build a validator registry with real XMSS keys from a key manager."""
+    return Validators(
+        data=[
+            Validator(
+                pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
+                index=ValidatorIndex(i),
+            )
+            for i in range(count)
+        ]
+    )
 
 
-def make_genesis_state(num_validators: int = 3, genesis_time: int = 0) -> State:
+def make_genesis_state(
+    num_validators: int = 3,
+    genesis_time: int = 0,
+    validators: Validators | None = None,
+) -> State:
     """
     Create a genesis state with the specified validator count.
 
     Uses null public keys by default for simplicity.
+    If validators is provided, uses them directly.
     """
-    validators = make_validators(num_validators)
+    if validators is None:
+        validators = make_validators(num_validators)
     return State.generate_genesis(genesis_time=Uint64(genesis_time), validators=validators)
 
 
-# -----------------------------------------------------------------------------
-# Block Builders
-# -----------------------------------------------------------------------------
+def make_empty_block_body() -> BlockBody:
+    """Create an empty block body with no attestations."""
+    return BlockBody(attestations=AggregatedAttestations(data=[]))
+
+
+def make_checkpoint(root_seed: int = 0, slot: int = 0) -> Checkpoint:
+    """Create a checkpoint from a seed integer and slot."""
+    return Checkpoint(root=make_bytes32(root_seed), slot=Slot(slot))
+
+
+def make_attestation_data(
+    slot: Slot,
+    target_slot: Slot,
+    target_root: Bytes32,
+    source_slot: Slot,
+    source_root: Bytes32,
+) -> AttestationData:
+    """Create attestation data with specific target and source checkpoints."""
+    return AttestationData(
+        slot=slot,
+        head=Checkpoint(root=target_root, slot=target_slot),
+        target=Checkpoint(root=target_root, slot=target_slot),
+        source=Checkpoint(root=source_root, slot=source_slot),
+    )
 
 
 def make_genesis_block(state: State) -> Block:
@@ -229,11 +253,6 @@ def make_signed_block(
     )
 
 
-# -----------------------------------------------------------------------------
-# Attestation Builders
-# -----------------------------------------------------------------------------
-
-
 def make_aggregated_attestation(
     participant_ids: list[int],
     attestation_slot: Slot,
@@ -284,11 +303,6 @@ def make_signed_attestation(
     )
 
 
-# -----------------------------------------------------------------------------
-# Networking Test Builders
-# -----------------------------------------------------------------------------
-
-
 def make_test_status() -> Status:
     """Create a valid Status message for testing."""
     from lean_spec.subspecs.networking.reqresp.message import Status
@@ -307,3 +321,109 @@ def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlockWithAttestation:
         parent_root=Bytes32(bytes([seed]) * 32),
         state_root=Bytes32(bytes([seed + 1]) * 32),
     )
+
+
+def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
+    """Build mock Discovery v5 challenge_data for testing.
+
+    Format: masking-iv (16) + static-header (23) + authdata (24) = 63 bytes.
+    The authdata contains the id_nonce (16) + enr_seq (8).
+    """
+    masking_iv = bytes(16)
+    # static-header: protocol-id (6) + version (2) + flag (1) + nonce (12) + authdata-size (2)
+    static_header = b"discv5" + b"\x00\x01\x01" + bytes(12) + b"\x00\x18"
+    # authdata: id-nonce (16) + enr-seq (8)
+    authdata = id_nonce + bytes(8)
+    return masking_iv + static_header + authdata
+
+
+_DEFAULT_VALIDATOR_ID = ValidatorIndex(0)
+_DEFAULT_ATTESTATION_SLOT = Slot(1)
+
+
+class GenesisData(NamedTuple):
+    """All three genesis artifacts for tests that need more than just the store."""
+
+    store: Store
+    state: State
+    block: Block
+
+
+def make_genesis_data(
+    num_validators: int = 3,
+    genesis_time: int = 0,
+    key_manager: XmssKeyManager | None = None,
+    validator_id: ValidatorIndex | None = _DEFAULT_VALIDATOR_ID,
+) -> GenesisData:
+    """Create a forkchoice store with genesis state and block, returning all three."""
+    from lean_spec.subspecs.forkchoice import Store
+
+    if key_manager is not None:
+        validators = make_validators_from_key_manager(key_manager, num_validators)
+    else:
+        validators = make_validators(num_validators)
+    genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
+    genesis_block = make_genesis_block(genesis_state)
+    store = Store.get_forkchoice_store(genesis_state, genesis_block, validator_id=validator_id)
+    return GenesisData(store, genesis_state, genesis_block)
+
+
+def make_store(
+    num_validators: int = 3,
+    validator_id: ValidatorIndex | None = _DEFAULT_VALIDATOR_ID,
+    genesis_time: int = 0,
+    key_manager: XmssKeyManager | None = None,
+) -> Store:
+    """Create a forkchoice store initialized with genesis."""
+    return make_genesis_data(
+        num_validators=num_validators,
+        genesis_time=genesis_time,
+        key_manager=key_manager,
+        validator_id=validator_id,
+    ).store
+
+
+def make_store_with_attestation_data(
+    key_manager: XmssKeyManager,
+    num_validators: int,
+    validator_id: ValidatorIndex,
+    attestation_slot: Slot = _DEFAULT_ATTESTATION_SLOT,
+) -> tuple[Store, AttestationData]:
+    """Create a store with validators and produce attestation data for testing."""
+    store = make_store(
+        num_validators=num_validators,
+        validator_id=validator_id,
+        key_manager=key_manager,
+    )
+    attestation_data = store.produce_attestation_data(attestation_slot)
+    return store, attestation_data
+
+
+def make_store_with_gossip_signatures(
+    key_manager: XmssKeyManager,
+    num_validators: int,
+    validator_id: ValidatorIndex,
+    attesting_validators: list[ValidatorIndex],
+    attestation_slot: Slot = _DEFAULT_ATTESTATION_SLOT,
+) -> tuple[Store, AttestationData]:
+    """Create a store pre-populated with gossip signatures for testing aggregation."""
+    from lean_spec.subspecs.xmss.aggregation import SignatureKey
+
+    store, attestation_data = make_store_with_attestation_data(
+        key_manager,
+        num_validators,
+        validator_id,
+        attestation_slot,
+    )
+    data_root = attestation_data.data_root_bytes()
+    gossip_signatures = {
+        SignatureKey(vid, data_root): key_manager.sign_attestation_data(vid, attestation_data)
+        for vid in attesting_validators
+    }
+    store = store.model_copy(
+        update={
+            "gossip_signatures": gossip_signatures,
+            "attestation_data_by_root": {data_root: attestation_data},
+        }
+    )
+    return store, attestation_data

@@ -10,7 +10,7 @@ from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParamete
 from lean_spec.subspecs.networking.gossipsub.rpc import RPC
 
 
-def _peer(name: str) -> PeerId:
+def make_peer(name: str) -> PeerId:
     """Create a PeerId from a test name."""
     return PeerId.from_base58(name)
 
@@ -41,7 +41,7 @@ class MockOutboundStream:
         pass
 
 
-def _make_behavior(
+def make_behavior(
     d: int = 8, d_low: int = 6, d_high: int = 12, d_lazy: int = 6
 ) -> tuple[GossipsubBehavior, MockSendCapture]:
     """Create a behavior with mock send and return (behavior, capture)."""
@@ -52,14 +52,14 @@ def _make_behavior(
     return behavior, capture
 
 
-def _add_peer(
+def add_peer(
     behavior: GossipsubBehavior,
     name: str,
     subscriptions: set[str] | None = None,
     with_stream: bool = True,
 ) -> PeerId:
     """Add a peer directly to behavior state."""
-    peer_id = _peer(name)
+    peer_id = make_peer(name)
     state = PeerState(
         peer_id=peer_id,
         subscriptions=subscriptions or set(),

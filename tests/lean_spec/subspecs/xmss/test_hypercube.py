@@ -216,10 +216,6 @@ def test_big_map() -> None:
     assert vertex_a == vertex_b
 
 
-# ---------------------------
-# Hypothesis property tests
-# ---------------------------
-
 DrawFn = Callable[[Any], Any]
 
 
