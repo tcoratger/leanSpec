@@ -6,9 +6,6 @@ Reference: https://github.com/google/snappy
 
 from __future__ import annotations
 
-# ===========================================================================
-# Block Processing Constants
-# ===========================================================================
 #
 # Snappy processes data in fixed-size blocks to bound memory usage and
 # enable streaming. Each block is compressed independently.
@@ -30,9 +27,6 @@ The compressor reads up to 8 bytes at a time for efficiency. This margin
 ensures we don't read past the buffer when near the end.
 """
 
-# ===========================================================================
-# Tag Type Identifiers
-# ===========================================================================
 #
 # Each compressed element starts with a tag byte. The lower 2 bits identify
 # the element type:
@@ -81,9 +75,6 @@ Total encoding: 5 bytes (tag + 4 offset bytes).
 Rarely used since most matches are within 64KB.
 """
 
-# ===========================================================================
-# Hash Table Constants
-# ===========================================================================
 #
 # The compressor uses a hash table to find matching sequences in previously
 # seen data. The hash table maps 4-byte sequences to their positions.
@@ -101,9 +92,6 @@ This is a prime-like constant that spreads input bits well across
 the hash output. The formula is: hash = (input * HASH_MULTIPLIER) >> shift
 """
 
-# ===========================================================================
-# Literal Length Encoding
-# ===========================================================================
 #
 # Literal lengths are encoded differently based on size:
 #
@@ -145,10 +133,6 @@ The actual length is stored as little-endian uint32 following the tag.
 Supports literals up to 4294967296 bytes.
 """
 
-# ===========================================================================
-# Copy Constraints
-# ===========================================================================
-
 MAX_COPY_1_LENGTH: int = 11
 """Maximum copy length for 1-byte offset encoding (4-11 bytes)."""
 
@@ -161,9 +145,6 @@ MAX_COPY_1_OFFSET: int = 2047
 MAX_COPY_2_OFFSET: int = 65535
 """Maximum offset for 2-byte offset encoding (16 bits)."""
 
-# ===========================================================================
-# Varint Encoding
-# ===========================================================================
 #
 # The uncompressed length is encoded as a varint at the start of the
 # compressed data. Varints use 7 bits per byte, with the high bit

@@ -128,10 +128,6 @@ From the spec: "Rotate right by 15 bits, then add 0xa282ead8."
 This value is from Apache Hadoop's CRC masking scheme.
 """
 
-
-# =============================================================================
-# CRC32C Implementation
-# =============================================================================
 #
 # CRC32C uses the Castagnoli polynomial (0x1EDC6F41), which has better error
 # detection properties than the standard CRC32 polynomial.

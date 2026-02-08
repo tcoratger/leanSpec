@@ -33,9 +33,6 @@ from .constants import (
     VARINT_DATA_MASK,
 )
 
-# ===========================================================================
-# Varint Encoding
-# ===========================================================================
 #
 # Varints encode integers using as few bytes as possible.
 #   - Small values use fewer bytes.
@@ -184,9 +181,6 @@ def decode_varint32(data: bytes, offset: int = 0) -> tuple[int, int]:
     return result, bytes_read
 
 
-# ===========================================================================
-# Tag Byte Encoding - Literals
-# ===========================================================================
 #
 # Literals are raw bytes that couldn't be compressed (no match found).
 # A literal tag tells the decoder: "copy the next N bytes as-is".
@@ -296,9 +290,6 @@ def encode_literal_tag(length: int) -> bytes:
         raise ValueError(f"Literal length too large: {length}")
 
 
-# ===========================================================================
-# Tag Byte Encoding - Copies
-# ===========================================================================
 #
 # Copies are backreferences to already-decompressed data.
 # A copy tag tells the decoder: "go back OFFSET bytes, copy LENGTH bytes".
@@ -313,120 +304,7 @@ def encode_literal_tag(length: int) -> bytes:
 #
 #
 # COPY TYPE 1 (2 bytes total)
-# ---------------------------
-# Most compact. For short offsets and small lengths.
-#   - Offset: 1 to 2048 (11 bits: 3 in tag, 8 in next byte)
-#   - Length: 4 to 11 (3 bits store length - 4)
-#
-# Tag byte layout:
-#   - Bits 0-1: 01 (copy type 1)
-#   - Bits 2-4: length - 4 (values 0-7, meaning lengths 4-11)
-#   - Bits 5-7: offset high bits (bits 8-10 of offset)
-# Next byte: offset low bits (bits 0-7 of offset)
-#
-# Bit Position:  7   6   5   4   3   2   1   0
-#              +---+---+---+---+---+---+---+---+
-# Function:    | O   O   O | L   L   L | 0   1 |
-#              +---+---+---+---+---+---+---+---+
-#                ^           ^           ^
-#                |           |           Type ID (Fixed 01)
-#                |           |
-#                |           Length Component (3 bits)
-#                |           Value = Length - 4
-#                |
-#                Offset Component (High 3 bits)
-#                Bits 8, 9, 10 of the Offset
-#
-# Example: copy 6 bytes from offset 300 (0x12C)
-#
-# 1. PREPARE THE VALUES
-#    We use Copy Type 1 because:
-#       - the offset (300) is small (< 2048),
-#       - the length (6) is small (< 12).
-#
-#    A. Length Code:
-#       Format stores (Length - 4).
-#       6 - 4 = 2.
-#       Binary: 010
-#
-#    B. Offset Split:
-#       Offset 300 is 0x12C (binary: 001 0010 1100).
-#       It requires 11 bits. We split it into two parts:
-#       - High (Top 3 bits):    001 (Decimal 1) -> Goes into Tag Byte
-#       - Low  (Bottom 8 bits): 0010 1100 (Hex 0x2C) -> Goes into Next Byte
-#
-# 2. BUILD THE TAG BYTE
-#    We pack three components into one byte using bit shifts:
-#    - Bits 0-1: Type ID (01)       -> 01
-#    - Bits 2-4: Length Code (2)    -> 010 << 2  = 00001000
-#    - Bits 5-7: Offset High (1)    -> 001 << 5  = 00100000
-#
-#    Combine (OR): 00100000 | 00001000 | 01 = 00101001
-#    Result Hex:   0x29
-#
-# 3. FINAL OUTPUT
-#    Byte 1: Tag (0x29)
-#    Byte 2: Offset Low (0x2C)
-#    Output: [0x29, 0x2C]
-#
-#
-# COPY TYPE 2 (3 bytes total)
-# ---------------------------
-# For medium offsets. More flexible length range.
-#   - Offset: 1 to 65535 (16 bits in next 2 bytes)
-#   - Length: 1 to 64 (6 bits store length - 1)
-#
-# Tag byte layout:
-#   - Bits 0-1: 10 (copy type 2)
-#   - Bits 2-7: length - 1 (values 0-63, meaning lengths 1-64)
-# Next 2 bytes: offset as little-endian uint16
-#
-# Bit Position:  7   6   5   4   3   2   1   0
-#              +---+---+---+---+---+---+---+---+
-# Function:    | L   L   L   L   L   L | 1   0 |
-#              +---+---+---+---+---+---+---+---+
-#                ^                       ^
-#                |                       Type ID (Fixed 10)
-#                |
-#                Length Component (6 bits)
-#                Value = Length - 1
-#
-# Example: copy 20 bytes from offset 1000 (0x03E8)
-#
-# 1. PREPARE THE VALUES
-#    We use Copy Type 2 here. Even though the offset (1000) fits in Type 1,
-#    the length (20) is too large (Type 1 max length is 11).
-#
-#    A. Length Code:
-#       Format stores (Length - 1).
-#       20 - 1 = 19.
-#       Binary: 010011
-#
-#    B. Offset (Little Endian):
-#       Offset 1000 is 0x03E8 in Hexadecimal.
-#       Copy Type 2 uses a standard 2-byte integer for the offset.
-#       Snappy uses "Little Endian" order (Least Significant Byte first).
-#       - Low Byte (00xx):  0xE8
-#       - High Byte (xx00): 0x03
-#
-# 2. BUILD THE TAG BYTE
-#    We pack the Length and Type ID into the first byte:
-#    - Bits 0-1: Type ID (10)       -> 10 (Binary)
-#    - Bits 2-7: Length Code (19)   -> 19 in binary is 010011
-#                                      Shift left by 2: 01001100
-#
-#    Combine (OR): 01001100 | 10 = 01001110
-#    Result Hex:   0x4E
-#
-# 3. FINAL OUTPUT
-#    Byte 1: Tag (0x4E)
-#    Byte 2: Offset Low  (0xE8)
-#    Byte 3: Offset High (0x03)
-#    Output: [0x4E, 0xE8, 0x03]
-#
-#
-# COPY TYPE 4 (5 bytes total)
-# ---------------------------
+
 # For long offsets (large files).
 #   - Offset: 1 to 2^32 - 1 (32 bits in next 4 bytes)
 #   - Length: 1 to 64 (6 bits store length - 1)
@@ -540,9 +418,6 @@ def _encode_copy_4(length: int, offset: int) -> bytes:
     )
 
 
-# ===========================================================================
-# Tag Decoding
-# ===========================================================================
 #
 # Decoding is the inverse of encoding.
 # Given a compressed stream, we parse tags to reconstruct the original data.
@@ -560,49 +435,7 @@ def _encode_copy_4(length: int, offset: int) -> bytes:
 #
 #
 # DECODING A LITERAL
-# ------------------
-# 1. Read bits 2-7 of the tag byte (the "length indicator").
-# 2. If indicator < 60: length = indicator + 1. Done.
-# 3. If indicator >= 60: read (indicator - 59) extra bytes as length - 1.
-#
-# Example: decode tag byte 0x24
-#   Tag = 0x24 = 0b00100100
-#   Bits 0-1 = 00 -> Literal
-#   Bits 2-7 = 001001 = 9 -> length indicator
-#   Since 9 < 60: length = 9 + 1 = 10 bytes
-#   Result: read 10 literal bytes from the stream.
-#
-#
-# DECODING COPY TYPE 1
-# --------------------
-# 1. Extract length: bits 2-4 of tag, add 4.
-# 2. Extract offset: bits 5-7 of tag (high), next byte (low).
-#
-# Example: decode [0x29, 0x2C]
-#   Tag = 0x29 = 0b00101001
-#   Bits 0-1 = 01 -> Copy Type 1
-#   Bits 2-4 = 010 = 2 -> length = 2 + 4 = 6
-#   Bits 5-7 = 001 = 1 -> offset high
-#   Next byte = 0x2C = 44 -> offset low
-#   Offset = (1 << 8) | 44 = 256 + 44 = 300
-#   Result: copy 6 bytes from 300 bytes back.
-#
-#
-# DECODING COPY TYPE 2
-# --------------------
-# 1. Extract length: bits 2-7 of tag, add 1.
-# 2. Read next 2 bytes as little-endian offset.
-#
-# Example: decode [0x4E, 0xE8, 0x03]
-#   Tag = 0x4E = 0b01001110
-#   Bits 0-1 = 10 -> Copy Type 2
-#   Bits 2-7 = 010011 = 19 -> length = 19 + 1 = 20
-#   Next 2 bytes = [0xE8, 0x03] -> offset = 0xE8 | (0x03 << 8) = 1000
-#   Result: copy 20 bytes from 1000 bytes back.
-#
-#
-# DECODING COPY TYPE 4
-# --------------------
+
 # 1. Extract length: bits 2-7 of tag, add 1.
 # 2. Read next 4 bytes as little-endian offset.
 #

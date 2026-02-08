@@ -4,10 +4,6 @@ from aiohttp import web
 
 from lean_spec.subspecs.metrics import generate_metrics
 
-# =============================================================================
-# SPEC CONSTANTS
-# =============================================================================
-
 CHARSET = "utf-8"
 """Character encoding for Prometheus metrics."""
 

@@ -26,10 +26,6 @@ logger = logging.getLogger(__name__)
 _routes = [web.get(path, handler) for path, handler in ROUTES.items()]
 """aiohttp route definitions generated from ROUTES."""
 
-
-# =============================================================================
-# IMPLEMENTATION-SPECIFIC
-# =============================================================================
 # The following classes are implementation details.
 # Other implementations may structure their code differently.
 

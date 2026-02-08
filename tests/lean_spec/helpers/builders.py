@@ -46,10 +46,6 @@ if TYPE_CHECKING:
     from lean_spec.subspecs.forkchoice import Store
     from lean_spec.subspecs.networking.reqresp.message import Status
 
-# -----------------------------------------------------------------------------
-# Primitive Builders
-# -----------------------------------------------------------------------------
-
 
 def make_bytes32(seed: int) -> Bytes32:
     """Create a deterministic 32-byte value from a seed."""
@@ -66,11 +62,6 @@ def make_public_key_bytes(seed: int) -> bytes:
     parameter = Parameter(data=[Fp(seed + 100 + i) for i in range(Parameter.LENGTH)])
     public_key = PublicKey(root=root, parameter=parameter)
     return public_key.encode_bytes()
-
-
-# -----------------------------------------------------------------------------
-# Signature Builders
-# -----------------------------------------------------------------------------
 
 
 def make_mock_signature() -> Signature:
@@ -100,11 +91,6 @@ def make_signature(seed: int) -> Signature:
     )
 
 
-# -----------------------------------------------------------------------------
-# Validator Builders
-# -----------------------------------------------------------------------------
-
-
 def make_validators(count: int) -> Validators:
     """
     Build a validator registry with null public keys.
@@ -128,11 +114,6 @@ def make_validators_with_keys(count: int) -> Validators:
         for i in range(count)
     ]
     return Validators(data=validators)
-
-
-# -----------------------------------------------------------------------------
-# State Builders
-# -----------------------------------------------------------------------------
 
 
 def make_validators_from_key_manager(key_manager: XmssKeyManager, count: int) -> Validators:
@@ -162,11 +143,6 @@ def make_genesis_state(
     if validators is None:
         validators = make_validators(num_validators)
     return State.generate_genesis(genesis_time=Uint64(genesis_time), validators=validators)
-
-
-# -----------------------------------------------------------------------------
-# Block Builders
-# -----------------------------------------------------------------------------
 
 
 def make_empty_block_body() -> BlockBody:
@@ -277,11 +253,6 @@ def make_signed_block(
     )
 
 
-# -----------------------------------------------------------------------------
-# Attestation Builders
-# -----------------------------------------------------------------------------
-
-
 def make_aggregated_attestation(
     participant_ids: list[int],
     attestation_slot: Slot,
@@ -332,11 +303,6 @@ def make_signed_attestation(
     )
 
 
-# -----------------------------------------------------------------------------
-# Networking Test Builders
-# -----------------------------------------------------------------------------
-
-
 def make_test_status() -> Status:
     """Create a valid Status message for testing."""
     from lean_spec.subspecs.networking.reqresp.message import Status
@@ -357,11 +323,6 @@ def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlockWithAttestation:
     )
 
 
-# -----------------------------------------------------------------------------
-# Discovery Builders
-# -----------------------------------------------------------------------------
-
-
 def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
     """Build mock Discovery v5 challenge_data for testing.
 
@@ -375,10 +336,6 @@ def make_challenge_data(id_nonce: bytes = bytes(16)) -> bytes:
     authdata = id_nonce + bytes(8)
     return masking_iv + static_header + authdata
 
-
-# -----------------------------------------------------------------------------
-# Store Builders
-# -----------------------------------------------------------------------------
 
 _DEFAULT_VALIDATOR_ID = ValidatorIndex(0)
 _DEFAULT_ATTESTATION_SLOT = Slot(1)

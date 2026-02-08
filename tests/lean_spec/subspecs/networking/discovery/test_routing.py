@@ -469,11 +469,6 @@ class TestForkCompatibility:
         assert not table.is_fork_compatible(entry)
 
 
-# ==============================================================================
-# Phase 7: Routing Table IP Limits Tests
-# ==============================================================================
-
-
 class TestIPDensityTracking:
     """Tests for tracking IP address density.
 

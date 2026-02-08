@@ -386,11 +386,6 @@ class TestSendResponse:
         assert result is False
 
 
-# ==============================================================================
-# Phase 3: Multi-Packet NODES Collection Tests
-# ==============================================================================
-
-
 class TestMultiPacketNodesCollection:
     """FINDNODE response collection with total > 1.
 
@@ -563,11 +558,6 @@ class TestNodesResponseAccumulation:
         # Accumulate all ENRs.
         all_enrs = nodes1.enrs + nodes2.enrs + nodes3.enrs
         assert len(all_enrs) == 5
-
-
-# ==============================================================================
-# Phase 4: Request-Response Correlation Tests
-# ==============================================================================
 
 
 class TestRequestResponseCorrelation:

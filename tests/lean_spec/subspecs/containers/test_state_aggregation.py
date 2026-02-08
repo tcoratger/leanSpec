@@ -559,11 +559,6 @@ def test_build_block_state_root_valid_when_signatures_split() -> None:
     assert len(result_state.validators.data) == num_validators
 
 
-# =============================================================================
-# Greedy Algorithm Tests
-# =============================================================================
-
-
 def test_greedy_selects_proof_with_maximum_overlap() -> None:
     """
     Verify greedy algorithm selects the proof covering the most remaining validators.
@@ -910,11 +905,6 @@ def test_greedy_single_validator_proofs() -> None:
         seen_validators.update(participants)
 
     assert seen_validators == {0, 1, 2}
-
-
-# =============================================================================
-# Edge Case and Safety Tests
-# =============================================================================
 
 
 def test_validator_in_both_gossip_and_fallback_proof() -> None:

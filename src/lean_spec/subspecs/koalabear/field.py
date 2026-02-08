@@ -4,13 +4,6 @@ from typing import IO, Self
 
 from lean_spec.types import SSZType
 
-# =================================================================
-# Field Constants
-#
-# The prime is chosen because the cube map (x -> x^3) is an
-# automorphism of the multiplicative group.
-# =================================================================
-
 P: int = 2**31 - 2**24 + 1
 """The KoalaBear Prime: P = 2^31 - 2^24 + 1"""
 
@@ -60,14 +53,6 @@ A pre-computed list of 2^n-th roots of unity.
 The element at index `n` is a generator for
 the multiplicative subgroup of order 2^n.
 """
-
-
-# =================================================================
-# Base Field Fp
-#
-# This class implements the finite field F_p where p is the KoalaBear prime.
-# All arithmetic is performed modulo P.
-# =================================================================
 
 
 class Fp(SSZType):

@@ -31,10 +31,6 @@ from lean_spec.types import Bytes20
 
 from .conftest import add_peer, make_behavior, make_peer
 
-# =============================================================================
-# GRAFT Handling
-# =============================================================================
-
 
 class TestHandleGraft:
     """Tests for GRAFT request handling."""
@@ -127,11 +123,6 @@ class TestHandleGraft:
         assert len(capture.sent) == 0
 
 
-# =============================================================================
-# PRUNE Handling
-# =============================================================================
-
-
 class TestHandlePrune:
     """Tests for PRUNE notification handling."""
 
@@ -195,11 +186,6 @@ class TestHandlePrune:
         # No crash expected
         prune = ControlPrune(topic_id=topic, backoff=60)
         await behavior._handle_prune(unknown_peer, prune)
-
-
-# =============================================================================
-# IHAVE / IWANT Handling
-# =============================================================================
 
 
 class TestHandleIHave:
@@ -315,11 +301,6 @@ class TestHandleIWant:
         assert len(capture.sent) == 0
 
 
-# =============================================================================
-# Subscription Handling
-# =============================================================================
-
-
 class TestHandleSubscription:
     """Tests for subscription change handling."""
 
@@ -364,11 +345,6 @@ class TestHandleSubscription:
         assert event.peer_id == peer_id
         assert event.topic == "topic1"
         assert event.subscribed is True
-
-
-# =============================================================================
-# Message Handling
-# =============================================================================
 
 
 class TestHandleMessage:
@@ -532,11 +508,6 @@ class TestHandleMessage:
         assert peer_ax not in forward_peers
 
 
-# =============================================================================
-# IDONTWANT Handling
-# =============================================================================
-
-
 class TestHandleIDontWant:
     """Tests for IDONTWANT handling."""
 
@@ -561,11 +532,6 @@ class TestHandleIDontWant:
         idontwant = ControlIDontWant(message_ids=[b"msg"])
         # Should not raise
         behavior._handle_idontwant(unknown, idontwant)
-
-
-# =============================================================================
-# Full RPC Dispatch
-# =============================================================================
 
 
 class TestHandleRPC:

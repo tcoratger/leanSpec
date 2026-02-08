@@ -287,11 +287,6 @@ class TestConstants:
         assert HANDSHAKE_HEADER_SIZE == 34
 
 
-# ==============================================================================
-# Phase 6: Packet Size Validation Tests
-# ==============================================================================
-
-
 class TestPacketSizeLimits:
     """Packet size boundary validation.
 

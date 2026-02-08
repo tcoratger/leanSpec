@@ -28,10 +28,6 @@ from lean_spec.subspecs.networking.reqresp.message import (
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_test_block, make_test_status, run_async
 
-# -----------------------------------------------------------------------------
-# Mock Classes
-# -----------------------------------------------------------------------------
-
 
 @dataclass
 class MockStream:
@@ -111,11 +107,6 @@ class MockResponseStream:
     async def finish(self) -> None:
         """Mark stream as finished."""
         self.finished = True
-
-
-# -----------------------------------------------------------------------------
-# TestYamuxResponseStream
-# -----------------------------------------------------------------------------
 
 
 class TestYamuxResponseStream:
@@ -221,11 +212,6 @@ class TestYamuxResponseStream:
         assert closed is True
 
 
-# -----------------------------------------------------------------------------
-# TestDefaultRequestHandler - Status
-# -----------------------------------------------------------------------------
-
-
 class TestDefaultRequestHandlerStatus:
     """Tests for DefaultRequestHandler.handle_status."""
 
@@ -299,11 +285,6 @@ class TestDefaultRequestHandlerStatus:
         returned_status = Status.decode_bytes(ssz_data)
         assert returned_status.head.slot == Slot(200)
         assert returned_status.finalized.slot == Slot(100)
-
-
-# -----------------------------------------------------------------------------
-# TestDefaultRequestHandler - BlocksByRoot
-# -----------------------------------------------------------------------------
 
 
 class TestDefaultRequestHandlerBlocksByRoot:
@@ -457,11 +438,6 @@ class TestDefaultRequestHandlerBlocksByRoot:
 
         decoded = SignedBlockWithAttestation.decode_bytes(successes[0])
         assert decoded.message.block.slot == Slot(2)
-
-
-# -----------------------------------------------------------------------------
-# TestReqRespServer
-# -----------------------------------------------------------------------------
 
 
 class TestReqRespServer:
@@ -672,11 +648,6 @@ class TestReqRespServer:
         assert closed is True
 
 
-# -----------------------------------------------------------------------------
-# TestReqRespProtocolConstants
-# -----------------------------------------------------------------------------
-
-
 class TestReqRespProtocolConstants:
     """Tests for protocol ID constants."""
 
@@ -703,11 +674,6 @@ class TestReqRespProtocolConstants:
         assert BLOCKS_BY_ROOT_PROTOCOL_V1.startswith("/leanconsensus/req/")
         assert BLOCKS_BY_ROOT_PROTOCOL_V1.endswith("/ssz_snappy")
         assert "blocks_by_root" in BLOCKS_BY_ROOT_PROTOCOL_V1
-
-
-# -----------------------------------------------------------------------------
-# TestIntegration - Roundtrip Tests
-# -----------------------------------------------------------------------------
 
 
 class TestIntegration:
@@ -829,11 +795,6 @@ class TestIntegration:
         assert blocks[0].message.block.slot == Slot(10)
 
 
-# -----------------------------------------------------------------------------
-# TestResponseStreamProtocol
-# -----------------------------------------------------------------------------
-
-
 class TestResponseStreamProtocol:
     """Tests verifying ResponseStream protocol compliance."""
 
@@ -860,11 +821,6 @@ class TestResponseStreamProtocol:
         assert hasattr(yamux, "send_success")
         assert hasattr(yamux, "send_error")
         assert hasattr(yamux, "finish")
-
-
-# -----------------------------------------------------------------------------
-# TestBlockLookupTypeAlias
-# -----------------------------------------------------------------------------
 
 
 class TestBlockLookupTypeAlias:
@@ -898,11 +854,6 @@ class TestBlockLookupTypeAlias:
         result = run_async(run_test())
         assert result is not None
         assert result.message.block.slot == Slot(42)
-
-
-# -----------------------------------------------------------------------------
-# TestYamuxResponseStreamMultipleResponses
-# -----------------------------------------------------------------------------
 
 
 class TestYamuxResponseStreamMultipleResponses:
@@ -973,11 +924,6 @@ class TestYamuxResponseStreamMultipleResponses:
         code, decoded = ResponseCode.decode(written[0])
         assert code == ResponseCode.SUCCESS
         assert decoded == b""
-
-
-# -----------------------------------------------------------------------------
-# TestMockStreamChunkedRead
-# -----------------------------------------------------------------------------
 
 
 class MockChunkedStream:
@@ -1084,11 +1030,6 @@ class TestReqRespServerChunkedRead:
         assert code == ResponseCode.SUCCESS
 
 
-# -----------------------------------------------------------------------------
-# TestReqRespServerEdgeCases
-# -----------------------------------------------------------------------------
-
-
 class TestReqRespServerEdgeCases:
     """Edge cases for ReqRespServer."""
 
@@ -1142,11 +1083,6 @@ class TestReqRespServerEdgeCases:
 
         code, _ = ResponseCode.decode(written[0])
         assert code == ResponseCode.INVALID_REQUEST
-
-
-# -----------------------------------------------------------------------------
-# TestDefaultRequestHandlerEdgeCases
-# -----------------------------------------------------------------------------
 
 
 class TestDefaultRequestHandlerEdgeCases:
@@ -1282,11 +1218,6 @@ class TestDefaultRequestHandlerEdgeCases:
         assert len(successes2) == 1
 
 
-# -----------------------------------------------------------------------------
-# TestConcurrentRequestHandling
-# -----------------------------------------------------------------------------
-
-
 class TestConcurrentRequestHandling:
     """Tests for concurrent request handling."""
 
@@ -1380,11 +1311,6 @@ class TestConcurrentRequestHandling:
 
         assert len(blocks) == 1
         assert blocks[0].message.block.slot == Slot(42)
-
-
-# -----------------------------------------------------------------------------
-# TestHandlerExceptionRecovery
-# -----------------------------------------------------------------------------
 
 
 class MockFailingStream:
@@ -1492,11 +1418,6 @@ class TestHandlerExceptionRecovery:
         assert close_attempts >= 1
 
 
-# -----------------------------------------------------------------------------
-# TestRequestHandlerConstant
-# -----------------------------------------------------------------------------
-
-
 class TestRequestTimeoutConstant:
     """Tests for REQUEST_TIMEOUT_SECONDS constant."""
 
@@ -1514,11 +1435,6 @@ class TestRequestTimeoutConstant:
         assert REQUEST_TIMEOUT_SECONDS >= 1.0
         # Should not be excessively long
         assert REQUEST_TIMEOUT_SECONDS <= 60.0
-
-
-# -----------------------------------------------------------------------------
-# TestMockStreamProtocolCompliance
-# -----------------------------------------------------------------------------
 
 
 class TestMockStreamProtocolCompliance:

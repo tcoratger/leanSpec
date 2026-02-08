@@ -13,10 +13,6 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.types import Bytes32
 
-# -----------------------------------------------------------------------------
-# Sync-Specific Fixtures
-# -----------------------------------------------------------------------------
-
 
 @pytest.fixture
 def sample_checkpoint() -> Checkpoint:

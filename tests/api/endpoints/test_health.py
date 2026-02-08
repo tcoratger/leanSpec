@@ -4,10 +4,6 @@ import httpx
 
 from lean_spec.subspecs.api.endpoints import health
 
-# =============================================================================
-# HELPERS
-# =============================================================================
-
 
 def get_health(server_url: str) -> httpx.Response:
     """Fetch health status from the server."""
@@ -15,11 +11,6 @@ def get_health(server_url: str) -> httpx.Response:
         f"{server_url}/lean/v0/health",
         headers={"Accept": "application/json"},
     )
-
-
-# =============================================================================
-# TESTS
-# =============================================================================
 
 
 def test_health_returns_200(server_url: str) -> None:

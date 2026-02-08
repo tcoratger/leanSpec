@@ -15,9 +15,6 @@ from lean_spec.subspecs.networking.enr import ENR, keys
 from lean_spec.subspecs.networking.enr.enr import ENR_PREFIX
 from lean_spec.types import Bytes64, Uint64
 
-# =============================================================================
-# Official EIP-778 Test Vector
-# =============================================================================
 # From: https://eips.ethereum.org/EIPS/eip-778
 #
 # Node ID: a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7

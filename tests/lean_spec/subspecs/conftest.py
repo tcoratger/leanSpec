@@ -12,10 +12,6 @@ from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer.info import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
 
-# -----------------------------------------------------------------------------
-# Peer ID Fixtures
-# -----------------------------------------------------------------------------
-
 
 @pytest.fixture
 def peer_id() -> PeerId:
@@ -33,11 +29,6 @@ def peer_id_2() -> PeerId:
 def peer_id_3() -> PeerId:
     """Tertiary test peer ID."""
     return PeerId.from_base58("16Uiu2HAmTestPeer789")
-
-
-# -----------------------------------------------------------------------------
-# Peer Info Fixtures
-# -----------------------------------------------------------------------------
 
 
 @pytest.fixture

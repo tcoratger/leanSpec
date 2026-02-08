@@ -17,10 +17,6 @@ from lean_spec.types import Bytes20
 
 from .conftest import add_peer, make_behavior, make_peer
 
-# =============================================================================
-# Mesh Maintenance
-# =============================================================================
-
 
 class TestMaintainMesh:
     """Tests for mesh size maintenance."""
@@ -160,11 +156,6 @@ class TestMaintainMesh:
                 assert state.backoff[topic] >= now + PRUNE_BACKOFF
 
 
-# =============================================================================
-# Gossip Emission
-# =============================================================================
-
-
 class TestEmitGossip:
     """Tests for IHAVE gossip emission."""
 
@@ -222,11 +213,6 @@ class TestEmitGossip:
         await behavior._emit_gossip(topic)
 
         assert len(capture.sent) == 0
-
-
-# =============================================================================
-# Full Heartbeat Integration
-# =============================================================================
 
 
 class TestHeartbeatIntegration:

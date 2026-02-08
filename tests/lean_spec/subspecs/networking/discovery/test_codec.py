@@ -325,11 +325,6 @@ class TestRequestIdGeneration:
         assert id1 != id2
 
 
-# ==============================================================================
-# Phase 5: Address Handling Tests
-# ==============================================================================
-
-
 class TestAddressEncoding:
     """IPv4 and IPv6 address handling in PONG messages."""
 

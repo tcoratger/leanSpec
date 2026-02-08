@@ -12,10 +12,6 @@ from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 
 from .conftest import add_peer, make_behavior
 
-# =============================================================================
-# Publish
-# =============================================================================
-
 
 class TestPublish:
     """Tests for the publish() method."""
@@ -95,11 +91,6 @@ class TestPublish:
         await behavior.publish(topic, b"data")
 
         assert len(capture.sent) == 0
-
-
-# =============================================================================
-# Broadcast Subscription
-# =============================================================================
 
 
 class TestBroadcastSubscription:

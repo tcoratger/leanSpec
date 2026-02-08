@@ -288,11 +288,6 @@ class TestFindNode:
         assert result.queried == 0
 
 
-# ==============================================================================
-# Phase 5: Address Handling Tests - ENR Address Extraction
-# ==============================================================================
-
-
 class TestENRAddressExtraction:
     """Extract endpoints from ENR."""
 
@@ -438,11 +433,6 @@ class TestServiceIPAddressEncoding:
         # ::1 (loopback)
         encoded_loopback = service._encode_ip_address("::1")
         assert encoded_loopback == bytes(15) + b"\x01"
-
-
-# ==============================================================================
-# Phase 8: Service Lookup Operations Tests
-# ==============================================================================
 
 
 class TestLookupAlgorithm:

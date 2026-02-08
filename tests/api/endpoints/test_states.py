@@ -4,10 +4,6 @@ import httpx
 
 from lean_spec.subspecs.containers import State
 
-# =============================================================================
-# HELPERS
-# =============================================================================
-
 
 def get_finalized_state(server_url: str) -> httpx.Response:
     """Fetch finalized state from the server."""
@@ -15,11 +11,6 @@ def get_finalized_state(server_url: str) -> httpx.Response:
         f"{server_url}/lean/v0/states/finalized",
         headers={"Accept": "application/octet-stream"},
     )
-
-
-# =============================================================================
-# TESTS
-# =============================================================================
 
 
 class TestFinalizedState:

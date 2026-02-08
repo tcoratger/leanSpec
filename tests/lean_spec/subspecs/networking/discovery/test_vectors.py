@@ -33,10 +33,6 @@ from lean_spec.subspecs.networking.discovery.packet import (
 )
 from tests.lean_spec.helpers import make_challenge_data
 
-# ==============================================================================
-# Test Node Keys (from devp2p spec)
-# ==============================================================================
-
 # Node B's secp256k1 keypair (from devp2p spec)
 # Node B's private key is provided in the test vectors.
 NODE_B_PRIVKEY = bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
@@ -491,11 +487,6 @@ class TestKeyDerivationEdgeCases:
         keys2 = derive_keys(secret, initiator_id, recipient_id, challenge_data2)
 
         assert keys1 != keys2
-
-
-# ==============================================================================
-# Phase 1: Official Spec Test Vectors (devp2p wire test vectors)
-# ==============================================================================
 
 
 class TestOfficialPacketEncoding:
