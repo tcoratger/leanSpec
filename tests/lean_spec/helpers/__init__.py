@@ -10,8 +10,11 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 from .builders import (
     make_aggregated_attestation,
+    make_attestation_data,
     make_block,
     make_bytes32,
+    make_checkpoint,
+    make_empty_block_body,
     make_genesis_block,
     make_genesis_state,
     make_mock_signature,
@@ -44,8 +47,11 @@ def run_async(coro: Coroutine[object, object, _T]) -> _T:
 __all__ = [
     # Builders
     "make_aggregated_attestation",
+    "make_attestation_data",
     "make_block",
     "make_bytes32",
+    "make_checkpoint",
+    "make_empty_block_body",
     "make_genesis_block",
     "make_genesis_state",
     "make_mock_signature",

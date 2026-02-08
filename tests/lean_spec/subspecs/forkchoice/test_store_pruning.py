@@ -1,32 +1,19 @@
 """Tests for Store attestation data pruning."""
 
-from lean_spec.subspecs.containers import (
-    AttestationData,
-    Checkpoint,
-)
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_mock_signature, make_store
-
-
-def _make_attestation_data(
-    slot: Slot,
-    target_slot: Slot,
-    target_root: Bytes32,
-    source_slot: Slot,
-    source_root: Bytes32,
-) -> AttestationData:
-    """Create attestation data with specific target and source checkpoints."""
-    return AttestationData(
-        slot=slot,
-        head=Checkpoint(root=target_root, slot=target_slot),
-        target=Checkpoint(root=target_root, slot=target_slot),
-        source=Checkpoint(root=source_root, slot=source_slot),
-    )
+from tests.lean_spec.helpers import (
+    TEST_VALIDATOR_ID,
+    make_attestation_data,
+    make_bytes32,
+    make_checkpoint,
+    make_mock_signature,
+    make_store,
+)
 
 
 def test_prunes_entries_with_target_at_finalized() -> None:
@@ -34,10 +21,10 @@ def test_prunes_entries_with_target_at_finalized() -> None:
     store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 5
-    attestation_data = _make_attestation_data(
+    attestation_data = make_attestation_data(
         slot=Slot(5),
         target_slot=Slot(5),
-        target_root=Bytes32(b"\x01" * 32),
+        target_root=make_bytes32(1),
         source_slot=Slot(0),
         source_root=Bytes32.zero(),
     )
@@ -49,7 +36,7 @@ def test_prunes_entries_with_target_at_finalized() -> None:
         update={
             "attestation_data_by_root": {data_root: attestation_data},
             "gossip_signatures": {sig_key: make_mock_signature()},
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 
@@ -69,10 +56,10 @@ def test_prunes_entries_with_target_before_finalized() -> None:
     store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 3
-    attestation_data = _make_attestation_data(
+    attestation_data = make_attestation_data(
         slot=Slot(3),
         target_slot=Slot(3),
-        target_root=Bytes32(b"\x01" * 32),
+        target_root=make_bytes32(1),
         source_slot=Slot(0),
         source_root=Bytes32.zero(),
     )
@@ -84,7 +71,7 @@ def test_prunes_entries_with_target_before_finalized() -> None:
         update={
             "attestation_data_by_root": {data_root: attestation_data},
             "gossip_signatures": {sig_key: make_mock_signature()},
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 
@@ -104,12 +91,12 @@ def test_keeps_entries_with_target_after_finalized() -> None:
     store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create attestation data with target.slot == 10
-    attestation_data = _make_attestation_data(
+    attestation_data = make_attestation_data(
         slot=Slot(10),
         target_slot=Slot(10),
-        target_root=Bytes32(b"\x01" * 32),
+        target_root=make_bytes32(1),
         source_slot=Slot(5),
-        source_root=Bytes32(b"\x02" * 32),
+        source_root=make_bytes32(2),
     )
     data_root = attestation_data.data_root_bytes()
     sig_key = SignatureKey(ValidatorIndex(1), data_root)
@@ -119,7 +106,7 @@ def test_keeps_entries_with_target_after_finalized() -> None:
         update={
             "attestation_data_by_root": {data_root: attestation_data},
             "gossip_signatures": {sig_key: make_mock_signature()},
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 
@@ -140,10 +127,10 @@ def test_prunes_related_structures_together() -> None:
     store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create stale attestation data
-    stale_attestation = _make_attestation_data(
+    stale_attestation = make_attestation_data(
         slot=Slot(3),
         target_slot=Slot(3),
-        target_root=Bytes32(b"\x01" * 32),
+        target_root=make_bytes32(1),
         source_slot=Slot(0),
         source_root=Bytes32.zero(),
     )
@@ -151,12 +138,12 @@ def test_prunes_related_structures_together() -> None:
     stale_key = SignatureKey(ValidatorIndex(1), stale_root)
 
     # Create fresh attestation data
-    fresh_attestation = _make_attestation_data(
+    fresh_attestation = make_attestation_data(
         slot=Slot(10),
         target_slot=Slot(10),
-        target_root=Bytes32(b"\x02" * 32),
+        target_root=make_bytes32(2),
         source_slot=Slot(5),
-        source_root=Bytes32(b"\xff" * 32),
+        source_root=make_bytes32(255),
     )
     fresh_root = fresh_attestation.data_root_bytes()
     fresh_key = SignatureKey(ValidatorIndex(2), fresh_root)
@@ -186,7 +173,7 @@ def test_prunes_related_structures_together() -> None:
                 stale_key: [mock_proof],
                 fresh_key: [mock_proof],
             },
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 
@@ -220,12 +207,12 @@ def test_returns_self_when_nothing_to_prune() -> None:
     store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create fresh attestation data (target.slot > finalized.slot)
-    fresh_attestation = _make_attestation_data(
+    fresh_attestation = make_attestation_data(
         slot=Slot(10),
         target_slot=Slot(10),
-        target_root=Bytes32(b"\x01" * 32),
+        target_root=make_bytes32(1),
         source_slot=Slot(5),
-        source_root=Bytes32(b"\x02" * 32),
+        source_root=make_bytes32(2),
     )
     data_root = fresh_attestation.data_root_bytes()
     sig_key = SignatureKey(ValidatorIndex(1), data_root)
@@ -235,7 +222,7 @@ def test_returns_self_when_nothing_to_prune() -> None:
         update={
             "attestation_data_by_root": {data_root: fresh_attestation},
             "gossip_signatures": {sig_key: make_mock_signature()},
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 
@@ -268,10 +255,10 @@ def test_prunes_multiple_validators_same_data_root() -> None:
     store, _, _ = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
     # Create stale attestation data
-    stale_attestation = _make_attestation_data(
+    stale_attestation = make_attestation_data(
         slot=Slot(3),
         target_slot=Slot(3),
-        target_root=Bytes32(b"\x01" * 32),
+        target_root=make_bytes32(1),
         source_slot=Slot(0),
         source_root=Bytes32.zero(),
     )
@@ -288,7 +275,7 @@ def test_prunes_multiple_validators_same_data_root() -> None:
                 sig_key_1: make_mock_signature(),
                 sig_key_2: make_mock_signature(),
             },
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 
@@ -311,7 +298,7 @@ def test_mixed_stale_and_fresh_entries() -> None:
 
     # Create multiple attestations at different slots
     attestations = [
-        _make_attestation_data(
+        make_attestation_data(
             slot=Slot(i),
             target_slot=Slot(i),
             target_root=Bytes32(bytes([i]) * 32),
@@ -332,7 +319,7 @@ def test_mixed_stale_and_fresh_entries() -> None:
         update={
             "attestation_data_by_root": attestation_data_map,
             "gossip_signatures": gossip_sigs,
-            "latest_finalized": Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(5)),
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
         }
     )
 

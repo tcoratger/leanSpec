@@ -169,6 +169,32 @@ def make_genesis_state(
 # -----------------------------------------------------------------------------
 
 
+def make_empty_block_body() -> BlockBody:
+    """Create an empty block body with no attestations."""
+    return BlockBody(attestations=AggregatedAttestations(data=[]))
+
+
+def make_checkpoint(root_seed: int = 0, slot: int = 0) -> Checkpoint:
+    """Create a checkpoint from a seed integer and slot."""
+    return Checkpoint(root=make_bytes32(root_seed), slot=Slot(slot))
+
+
+def make_attestation_data(
+    slot: Slot,
+    target_slot: Slot,
+    target_root: Bytes32,
+    source_slot: Slot,
+    source_root: Bytes32,
+) -> AttestationData:
+    """Create attestation data with specific target and source checkpoints."""
+    return AttestationData(
+        slot=slot,
+        head=Checkpoint(root=target_root, slot=target_slot),
+        target=Checkpoint(root=target_root, slot=target_slot),
+        source=Checkpoint(root=source_root, slot=source_slot),
+    )
+
+
 def make_genesis_block(state: State) -> Block:
     """
     Create a genesis block matching the given state.

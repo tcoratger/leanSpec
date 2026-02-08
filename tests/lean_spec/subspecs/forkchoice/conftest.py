@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Type
 
 import pytest
-from consensus_testing.keys import XmssKeyManager, get_shared_key_manager
 
 from lean_spec.subspecs.containers import BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.block import AggregatedAttestations, BlockHeader
@@ -62,9 +61,3 @@ class MockState(State):
 def mock_state_factory() -> Type[MockState]:
     """Factory fixture for creating MockState instances."""
     return MockState
-
-
-@pytest.fixture
-def key_manager() -> XmssKeyManager:
-    """XMSS key manager for signing attestations."""
-    return get_shared_key_manager(max_slot=Slot(20))
