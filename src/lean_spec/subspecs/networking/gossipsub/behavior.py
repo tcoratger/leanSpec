@@ -26,7 +26,7 @@ Protocol Flow
 
 **On Connection:**
 
-1. Peer connects via QUIC/TCP
+1. Peer connects via QUIC
 2. Open gossipsub stream (negotiate /meshsub/1.1.0)
 3. Send subscription RPC for our topics
 4. Receive peer's subscriptions
