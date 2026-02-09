@@ -854,10 +854,10 @@ class LiveNetworkEventSource:
         Connect to a peer at the given multiaddr.
 
         Establishes connection, exchanges Status, and emits events.
-        Automatically detects transport type (TCP or QUIC) from multiaddr.
+        Establishes a QUIC connection to the peer.
 
         Args:
-            multiaddr: Address like "/ip4/127.0.0.1/tcp/9000" or
+            multiaddr: Address like "/ip4/127.0.0.1/udp/9000/quic-v1" or
                       "/ip4/127.0.0.1/udp/9000/quic-v1/p2p/16Uiu2HAm..."
 
         Returns:
@@ -937,10 +937,8 @@ class LiveNetworkEventSource:
         Automatically detects transport type from multiaddr:
 
         - QUIC: Routes to QUIC listener
-        - TCP: Routes to TCP listener
-
         Args:
-            multiaddr: TCP or QUIC address to listen on.
+            multiaddr: QUIC address to listen on.
         """
         self._running = True
 

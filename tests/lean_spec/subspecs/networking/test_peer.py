@@ -63,11 +63,11 @@ class TestPeerInfo:
             peer_id=peer("16Uiu2HAk"),
             state=ConnectionState.CONNECTED,
             direction=Direction.INBOUND,
-            address="/ip4/192.168.1.1/tcp/9000",
+            address="/ip4/192.168.1.1/udp/9000/quic-v1",
         )
         assert info.state == ConnectionState.CONNECTED
         assert info.direction == Direction.INBOUND
-        assert info.address == "/ip4/192.168.1.1/tcp/9000"
+        assert info.address == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
     def test_is_connected(self) -> None:
         """is_connected() returns True only when connected."""

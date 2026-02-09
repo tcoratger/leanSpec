@@ -37,7 +37,7 @@ def connected_peer_info(peer_id: PeerId) -> PeerInfo:
     return PeerInfo(
         peer_id=peer_id,
         state=ConnectionState.CONNECTED,
-        address="/ip4/192.168.1.1/tcp/9000",
+        address="/ip4/192.168.1.1/udp/9000/quic-v1",
     )
 
 
@@ -47,5 +47,5 @@ def disconnected_peer_info(peer_id: PeerId) -> PeerInfo:
     return PeerInfo(
         peer_id=peer_id,
         state=ConnectionState.DISCONNECTED,
-        address="/ip4/192.168.1.2/tcp/9000",
+        address="/ip4/192.168.1.2/udp/9000/quic-v1",
     )

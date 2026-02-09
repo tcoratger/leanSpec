@@ -541,7 +541,7 @@ class HandshakeManager:
 
             # Extract key-value pairs.
             #
-            # Common keys: "id", "secp256k1", "ip", "udp", "tcp".
+            # Common keys: "id", "secp256k1", "ip", "udp".
             # Keys are UTF-8 strings; values are raw bytes.
             pairs: dict[str, bytes] = {}
             for i in range(2, len(items), 2):

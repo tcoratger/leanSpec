@@ -16,7 +16,7 @@ Components:
     - identity/: secp256k1 keypairs and identity proofs
 
 QUIC provides encryption and multiplexing natively, eliminating the need
-for separate Noise and yamux layers that TCP would require. This results
+for separate Noise and yamux layers. This results
 in fewer round-trips and simpler connection establishment.
 
 References:

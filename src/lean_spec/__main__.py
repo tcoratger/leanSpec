@@ -5,7 +5,7 @@ Run a minimal lean consensus client that can sync with other lean consensus node
 
 Usage::
 
-    python -m lean_spec --genesis config.yaml --bootnode /ip4/127.0.0.1/tcp/9000
+    python -m lean_spec --genesis config.yaml --bootnode /ip4/127.0.0.1/udp/9000/quic-v1
     python -m lean_spec --genesis config.yaml --bootnode enr:-IS4QHCYrYZbAKW...
     python -m lean_spec --genesis config.yaml --checkpoint-sync-url http://localhost:5052
     python -m lean_spec --genesis config.yaml --validator-keys ./keys --node-id lean_spec_0
@@ -14,7 +14,7 @@ Usage::
 Options:
     --genesis              Path to genesis YAML file (required)
     --bootnode             Bootnode address (multiaddr or ENR string, can be repeated)
-    --listen               Address to listen on (default: /ip4/0.0.0.0/tcp/9001)
+    --listen               Address to listen on (default: /ip4/0.0.0.0/udp/9001/quic-v1)
     --checkpoint-sync-url  URL to fetch finalized checkpoint state for fast sync
     --validator-keys       Path to validator keys directory
     --node-id              Node identifier for validator assignment (default: lean_spec_0)
@@ -74,13 +74,13 @@ def resolve_bootnode(bootnode: str) -> str:
     - libp2p tools: Usually provide multiaddrs directly
 
     Args:
-        bootnode: Either an ENR string (enr:-IS4Q...) or multiaddr (/ip4/.../tcp/...).
+        bootnode: Either an ENR string (enr:-IS4Q...) or multiaddr (/ip4/.../udp/.../quic-v1).
 
     Returns:
         Multiaddr string suitable for dialing.
 
     Raises:
-        ValueError: If ENR is malformed or has no TCP connection info.
+        ValueError: If ENR is malformed or has no UDP connection info.
     """
     if is_enr_string(bootnode):
         from lean_spec.subspecs.networking.enr import ENR
@@ -623,8 +623,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--listen",
-        default="/ip4/0.0.0.0/tcp/9001",
-        help="Address to listen on (default: /ip4/0.0.0.0/tcp/9001)",
+        default="/ip4/0.0.0.0/udp/9001/quic-v1",
+        help="Address to listen on (default: /ip4/0.0.0.0/udp/9001/quic-v1)",
     )
     parser.add_argument(
         "--checkpoint-sync-url",

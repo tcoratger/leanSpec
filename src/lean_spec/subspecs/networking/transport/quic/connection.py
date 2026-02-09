@@ -2,7 +2,7 @@
 QUIC connection implementation for libp2p.
 
 QUIC provides native encryption (TLS 1.3) and multiplexing, eliminating the need
-for Noise and yamux layers that TCP requires. This results in fewer round-trips
+for Noise and yamux layers. This results in fewer round-trips
 and simpler connection establishment.
 
 Connection flow:
@@ -11,7 +11,7 @@ Connection flow:
     3. Ready for streams (QUIC native multiplexing)
 
 Each stream uses multistream-select to negotiate application protocols,
-same as TCP connections.
+same as any libp2p connection.
 
 References:
     - aioquic documentation: https://aioquic.readthedocs.io/
@@ -57,9 +57,9 @@ class QuicStream:
     """
     A single QUIC stream for application data.
 
-    QUIC streams are lighter than TCP connections - opening a stream is just
-    sending a frame, no handshake required. Flow control is per-stream,
-    preventing head-of-line blocking.
+    QUIC streams are lightweight - opening a stream is just sending a frame,
+    no handshake required. Flow control is per-stream, preventing
+    head-of-line blocking.
     """
 
     _protocol: QuicConnectionProtocol
@@ -178,7 +178,7 @@ class QuicConnection:
     A QUIC connection to a peer.
 
     Wraps aioquic's protocol and provides the Connection interface.
-    Unlike TCP connections, no Noise or yamux layers are needed.
+    No Noise or yamux layers are needed; QUIC handles encryption and multiplexing natively.
     """
 
     _protocol: QuicConnectionProtocol
@@ -358,7 +358,7 @@ def is_quic_multiaddr(multiaddr: str) -> bool:
         multiaddr: Address string to check.
 
     Returns:
-        True if the multiaddr uses QUIC, False for TCP.
+        True if the multiaddr uses QUIC, False otherwise.
     """
     parts = multiaddr.lower().split("/")
     return "quic" in parts or "quic-v1" in parts
@@ -373,23 +373,19 @@ def parse_multiaddr(multiaddr: str) -> tuple[str, int, str | None, PeerId | None
 
     Returns:
         (host, port, transport, peer_id) tuple.
-        transport is "quic" or "tcp", peer_id may be None.
+        transport is "quic", peer_id may be None.
     """
     parts = multiaddr.strip("/").split("/")
 
     host = None
     port = None
-    transport = "tcp"  # Default
+    transport = "quic"  # Default
     peer_id = None
 
     i = 0
     while i < len(parts):
         if parts[i] == "ip4" and i + 1 < len(parts):
             host = parts[i + 1]
-            i += 2
-        elif parts[i] == "tcp" and i + 1 < len(parts):
-            port = int(parts[i + 1])
-            transport = "tcp"
             i += 2
         elif parts[i] == "udp" and i + 1 < len(parts):
             port = int(parts[i + 1])
@@ -416,7 +412,7 @@ class QuicConnectionManager:
     """
     Manages QUIC connections with libp2p-tls authentication.
 
-    Unlike TCP's ConnectionManager, no Noise or yamux layers are needed.
+    No Noise or yamux layers are needed.
     QUIC provides encryption and multiplexing natively.
 
     Usage:

@@ -33,7 +33,7 @@ ProtocolId = str
 """Libp2p protocol identifier, e.g. ``/eth2/beacon_chain/req/status/1/ssz_snappy``."""
 
 Multiaddr = str
-"""Multiaddress string, e.g. ``/ip4/192.168.1.1/tcp/9000``."""
+"""Multiaddress string, e.g. ``/ip4/192.168.1.1/udp/9000/quic-v1``."""
 
 
 class ConnectionState(IntEnum):
@@ -51,7 +51,7 @@ class ConnectionState(IntEnum):
     """No active connection to this peer."""
 
     CONNECTING = auto()
-    """TCP/QUIC connection in progress."""
+    """QUIC connection in progress."""
 
     CONNECTED = auto()
     """Transport established, can exchange protocol messages."""

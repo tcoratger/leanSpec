@@ -67,7 +67,7 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
 
     - 60s timeout: allows ~15 slots at 4s each, plenty for finalization
     - 30s run duration: ~7-8 slots, enough for 2 epochs of justification
-    - 15s peer timeout: sufficient for TCP handshake + noise protocol
+    - 15s peer timeout: sufficient for QUIC handshake
 
     The Ream project uses similar parameters for compatibility testing.
     """
