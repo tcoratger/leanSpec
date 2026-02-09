@@ -11,17 +11,16 @@ import pytest
 
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import State
 from lean_spec.subspecs.containers.state.types import (
     JustificationRoots,
     JustificationValidators,
 )
-from lean_spec.types import Boolean, Uint64
-from tests.lean_spec.helpers import make_aggregated_attestation, make_block, make_validators
+from lean_spec.types import Boolean
+from tests.lean_spec.helpers import make_aggregated_attestation, make_block, make_genesis_state
 
 
 def test_justified_slots_do_not_include_finalized_boundary() -> None:
-    state = State.generate_genesis(genesis_time=Uint64(0), validators=make_validators(4))
+    state = make_genesis_state(num_validators=4)
 
     # First post-genesis block at slot 1.
     state_slot_1 = state.process_slots(Slot(1))
@@ -43,7 +42,7 @@ def test_justified_slots_do_not_include_finalized_boundary() -> None:
 
 def test_justified_slots_rebases_when_finalization_advances() -> None:
     # Use 3 validators so a 2-of-3 aggregation is a supermajority.
-    state = State.generate_genesis(genesis_time=Uint64(0), validators=make_validators(3))
+    state = make_genesis_state(num_validators=3)
 
     # Block 1 (slot 1): initializes history (stores slot 0 root), but no justified_slots bits yet.
     state = state.process_slots(Slot(1))
@@ -98,9 +97,7 @@ def test_is_slot_justified_raises_on_out_of_bounds() -> None:
     # For slots > finalized_slot, the bitfield must be long enough to cover the slot.
     # If it is not, this indicates an inconsistent state and should fail fast.
     with pytest.raises(IndexError):
-        State.generate_genesis(Uint64(0), make_validators(1)).justified_slots.is_slot_justified(
-            Slot(0), Slot(1)
-        )
+        make_genesis_state(num_validators=1).justified_slots.is_slot_justified(Slot(0), Slot(1))
 
 
 def test_pruning_keeps_pending_justifications() -> None:
@@ -115,7 +112,7 @@ def test_pruning_keeps_pending_justifications() -> None:
     4. Verify the pending justification survives correctly
     """
     # Two of three validators form a supermajority.
-    state = State.generate_genesis(genesis_time=Uint64(0), validators=make_validators(3))
+    state = make_genesis_state(num_validators=3)
 
     # Phase 1: Build a chain and justify slot 1.
     #

@@ -46,14 +46,13 @@ from lean_spec.subspecs.containers.attestation import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import State
 from lean_spec.subspecs.containers.state.types import (
     HistoricalBlockHashes,
     JustifiedSlots,
 )
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.types import Boolean, Uint64
-from tests.lean_spec.helpers import make_bytes32, make_validators
+from lean_spec.types import Boolean
+from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
 
 class TestProcessAttestationsBoundsCheck:
@@ -79,7 +78,7 @@ class TestProcessAttestationsBoundsCheck:
         - Checkpoints unchanged
         """
         # Create a minimal genesis state with 3 validators.
-        state = State.generate_genesis(genesis_time=Uint64(0), validators=make_validators(3))
+        state = make_genesis_state(num_validators=3)
 
         # Build a controlled state with limited history.
         #
@@ -176,7 +175,7 @@ class TestProcessAttestationsBoundsCheck:
         would also fail. This test primarily verifies the target bounds check.
         """
         # Create a minimal genesis state with 3 validators.
-        state = State.generate_genesis(genesis_time=Uint64(0), validators=make_validators(3))
+        state = make_genesis_state(num_validators=3)
 
         # Build a state with very limited history.
         #

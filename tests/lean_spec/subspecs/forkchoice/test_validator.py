@@ -18,7 +18,7 @@ from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.types import Bytes32, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_store
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_aggregated_proof, make_store
 
 
 class TestBlockProduction:
@@ -81,31 +81,12 @@ class TestBlockProduction:
             signature=key_manager.sign_attestation_data(ValidatorIndex(6), data_6),
         )
 
-        # Create aggregated payloads for the attestations
-        from lean_spec.subspecs.containers.attestation import AggregationBits
-        from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-
-        # Build aggregated proofs
         data_root_5 = signed_5.message.data_root_bytes()
         data_root_6 = signed_6.message.data_root_bytes()
 
-        proof_5 = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices([ValidatorIndex(5)]),
-            public_keys=[key_manager.get_public_key(ValidatorIndex(5))],
-            signatures=[signed_5.signature],
-            message=data_root_5,
-            epoch=signed_5.message.slot,
-        )
+        proof_5 = make_aggregated_proof(key_manager, [ValidatorIndex(5)], signed_5.message)
+        proof_6 = make_aggregated_proof(key_manager, [ValidatorIndex(6)], signed_6.message)
 
-        proof_6 = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices([ValidatorIndex(6)]),
-            public_keys=[key_manager.get_public_key(ValidatorIndex(6))],
-            signatures=[signed_6.signature],
-            message=data_root_6,
-            epoch=signed_6.message.slot,
-        )
-
-        # Update sample_store with aggregated payloads and attestation data
         sig_key_5 = SignatureKey(ValidatorIndex(5), data_root_5)
         sig_key_6 = SignatureKey(ValidatorIndex(6), data_root_6)
 
@@ -238,18 +219,8 @@ class TestBlockProduction:
             signature=key_manager.sign_attestation_data(ValidatorIndex(7), data_7),
         )
 
-        # Create aggregated payload for validator 7
-        from lean_spec.subspecs.containers.attestation import AggregationBits
-        from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-
         data_root_7 = signed_7.message.data_root_bytes()
-        proof_7 = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices([ValidatorIndex(7)]),
-            public_keys=[key_manager.get_public_key(ValidatorIndex(7))],
-            signatures=[signed_7.signature],
-            message=data_root_7,
-            epoch=signed_7.message.slot,
-        )
+        proof_7 = make_aggregated_proof(key_manager, [ValidatorIndex(7)], signed_7.message)
 
         sig_key_7 = SignatureKey(ValidatorIndex(7), data_root_7)
         sample_store = sample_store.model_copy(

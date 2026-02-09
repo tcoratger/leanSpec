@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from lean_spec.subspecs.networking import PeerId
     from lean_spec.subspecs.networking.reqresp.message import Status
     from lean_spec.subspecs.sync.service import SyncService
+    from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -429,6 +430,105 @@ def make_store_with_gossip_signatures(
         }
     )
     return store, attestation_data
+
+
+def make_attestation_data_simple(
+    slot: int,
+    head_root: Bytes32,
+    target_root: Bytes32,
+    source: Checkpoint,
+) -> AttestationData:
+    """Create attestation data with head/target roots and a source checkpoint."""
+    return AttestationData(
+        slot=Slot(slot),
+        head=Checkpoint(root=head_root, slot=Slot(slot)),
+        target=Checkpoint(root=target_root, slot=Slot(slot)),
+        source=source,
+    )
+
+
+def make_keyed_genesis_state(
+    num_validators: int,
+    key_manager: XmssKeyManager | None = None,
+) -> State:
+    """Create a genesis state with real XMSS keys from the shared key manager."""
+    if key_manager is None:
+        from consensus_testing.keys import get_shared_key_manager
+
+        key_manager = get_shared_key_manager()
+    validators = make_validators_from_key_manager(key_manager, num_validators)
+    return make_genesis_state(validators=validators)
+
+
+def make_aggregated_proof(
+    key_manager: XmssKeyManager,
+    participants: list[ValidatorIndex],
+    attestation_data: AttestationData,
+) -> AggregatedSignatureProof:
+    """Create a valid aggregated signature proof for the given participants."""
+    from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+
+    data_root = attestation_data.data_root_bytes()
+    return AggregatedSignatureProof.aggregate(
+        participants=AggregationBits.from_validator_indices(participants),
+        public_keys=[key_manager.get_public_key(vid) for vid in participants],
+        signatures=[
+            key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
+        ],
+        message=data_root,
+        epoch=attestation_data.slot,
+    )
+
+
+def make_signed_block_from_store(
+    store: Store,
+    key_manager: XmssKeyManager,
+    slot: Slot,
+    proposer_index: ValidatorIndex,
+) -> tuple[Store, SignedBlockWithAttestation]:
+    """Produce a signed block and advance the consumer store to accept it.
+
+    Returns the updated store (with time advanced) and the signed block.
+    """
+    from lean_spec.subspecs.chain.config import SECONDS_PER_SLOT
+
+    _, block, _ = store.produce_block_with_signatures(slot, proposer_index)
+    block_root = hash_tree_root(block)
+    parent_state = store.states[block.parent_root]
+
+    proposer_attestation = Attestation(
+        validator_id=proposer_index,
+        data=AttestationData(
+            slot=slot,
+            head=Checkpoint(root=block_root, slot=slot),
+            target=Checkpoint(root=block_root, slot=slot),
+            source=Checkpoint(
+                root=block.parent_root,
+                slot=parent_state.latest_block_header.slot,
+            ),
+        ),
+    )
+    proposer_signature = key_manager.sign_attestation_data(
+        proposer_index, proposer_attestation.data
+    )
+    attestation_signatures = key_manager.build_attestation_signatures(block.body.attestations)
+
+    signed_block = SignedBlockWithAttestation(
+        message=BlockWithAttestation(
+            block=block,
+            proposer_attestation=proposer_attestation,
+        ),
+        signature=BlockSignatures(
+            attestation_signatures=attestation_signatures,
+            proposer_signature=proposer_signature,
+        ),
+    )
+
+    slot_duration = block.slot * SECONDS_PER_SLOT
+    block_time = store.config.genesis_time + slot_duration
+    advanced_store = store.on_tick(block_time, has_proposal=True)
+
+    return advanced_store, signed_block
 
 
 def create_mock_sync_service(peer_id: PeerId) -> SyncService:

@@ -11,16 +11,11 @@ from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
     AttestationData,
     Block,
-    BlockBody,
     SignedAttestation,
     SignedBlockWithAttestation,
-    State,
-    Validator,
     ValidatorIndex,
 )
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.block_cache import BlockCache
@@ -30,8 +25,8 @@ from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
-from lean_spec.types import Bytes32, Bytes52, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID, MockNetworkRequester
+from lean_spec.types import Bytes32, Uint64
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, MockNetworkRequester, make_store
 
 
 @pytest.fixture
@@ -476,28 +471,7 @@ class TestValidatorServiceIntegration:
     @pytest.fixture
     def real_store(self, key_manager: XmssKeyManager) -> Store:
         """Forkchoice store with validators using real public keys."""
-        validators = Validators(
-            data=[
-                Validator(
-                    pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
-                    index=ValidatorIndex(i),
-                )
-                for i in range(6)
-            ]
-        )
-        genesis_state = State.generate_genesis(genesis_time=Uint64(0), validators=validators)
-        genesis_block = Block(
-            slot=Slot(0),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32.zero(),
-            state_root=hash_tree_root(genesis_state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
-        return Store.get_forkchoice_store(
-            genesis_state,
-            genesis_block,
-            validator_id=TEST_VALIDATOR_ID,
-        )
+        return make_store(num_validators=6, key_manager=key_manager, validator_id=TEST_VALIDATOR_ID)
 
     @pytest.fixture
     def real_sync_service(self, real_store: Store) -> SyncService:
