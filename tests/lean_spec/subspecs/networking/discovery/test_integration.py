@@ -44,7 +44,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
 from lean_spec.subspecs.networking.discovery.session import Session, SessionCache
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes64, Uint64
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes64, Uint64
 
 
 @pytest.fixture
@@ -151,10 +151,10 @@ class TestEncryptedPacketRoundtrip:
         # Create session keys (derived from ECDH).
         # Node A is initiator.
         send_key, recv_key = derive_keys_from_pubkey(
-            local_private_key=node_a_keys["private_key"],
+            local_private_key=Bytes32(node_a_keys["private_key"]),
             remote_public_key=node_b_keys["public_key"],
-            local_node_id=node_a_keys["node_id"],
-            remote_node_id=node_b_keys["node_id"],
+            local_node_id=Bytes32(node_a_keys["node_id"]),
+            remote_node_id=Bytes32(node_b_keys["node_id"]),
             challenge_data=challenge_data,
             is_initiator=True,
         )
@@ -192,10 +192,10 @@ class TestEncryptedPacketRoundtrip:
 
         # Node B derives keys as recipient (using same challenge_data).
         b_send_key, b_recv_key = derive_keys_from_pubkey(
-            local_private_key=node_b_keys["private_key"],
+            local_private_key=Bytes32(node_b_keys["private_key"]),
             remote_public_key=node_a_keys["public_key"],
-            local_node_id=node_b_keys["node_id"],
-            remote_node_id=node_a_keys["node_id"],
+            local_node_id=Bytes32(node_b_keys["node_id"]),
+            remote_node_id=Bytes32(node_a_keys["node_id"]),
             challenge_data=challenge_data,
             is_initiator=False,
         )
@@ -204,7 +204,9 @@ class TestEncryptedPacketRoundtrip:
         masked_header = packet[16 : 16 + 23 + len(header.authdata)]
 
         # Node B uses recv_key to decrypt (which equals Node A's send_key).
-        plaintext = aes_gcm_decrypt(b_recv_key, bytes(header.nonce), ciphertext, masked_header)
+        plaintext = aes_gcm_decrypt(
+            Bytes16(b_recv_key), Bytes12(header.nonce), ciphertext, masked_header
+        )
 
         # Decode message.
         decoded_ping = decode_message(plaintext)

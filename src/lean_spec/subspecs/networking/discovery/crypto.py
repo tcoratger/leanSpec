@@ -19,14 +19,21 @@ References:
 
 from __future__ import annotations
 
-from cryptography.hazmat.primitives import serialization
+import hashlib
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import (
+    Prehashed,
+    decode_dss_signature,
+    encode_dss_signature,
+)
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64, Bytes65
 
-# Constants for secp256k1
 COMPRESSED_PUBKEY_SIZE = 33
 """Compressed secp256k1 public key: 0x02/0x03 + 32-byte x coordinate."""
 
@@ -48,8 +55,91 @@ CTR_IV_SIZE = 16
 ID_SIGNATURE_SIZE = 64
 """secp256k1 signature size (r || s, each 32 bytes)."""
 
+_P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+"""secp256k1 field prime."""
 
-def aes_ctr_encrypt(key: bytes, iv: bytes, plaintext: bytes) -> bytes:
+_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+"""secp256k1 curve order."""
+
+_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
+"""secp256k1 generator x-coordinate."""
+
+_Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+"""secp256k1 generator y-coordinate."""
+
+_POINT_AT_INFINITY: tuple[int, int] | None = None
+"""Represents the identity element for EC point arithmetic."""
+
+
+def _modinv(a: int, m: int) -> int:
+    """Compute modular inverse using Fermat's little theorem (m must be prime)."""
+    return pow(a, m - 2, m)
+
+
+def _point_add(p1: tuple[int, int] | None, p2: tuple[int, int] | None) -> tuple[int, int] | None:
+    """Add two secp256k1 curve points."""
+    if p1 is None:
+        return p2
+    if p2 is None:
+        return p1
+
+    x1, y1 = p1
+    x2, y2 = p2
+
+    if x1 == x2 and y1 != y2:
+        return _POINT_AT_INFINITY
+
+    if x1 == x2:
+        # Point doubling.
+        lam = (3 * x1 * x1 * _modinv(2 * y1, _P)) % _P
+    else:
+        lam = ((y2 - y1) * _modinv(x2 - x1, _P)) % _P
+
+    x3 = (lam * lam - x1 - x2) % _P
+    y3 = (lam * (x1 - x3) - y1) % _P
+    return (x3, y3)
+
+
+def _point_mul(k: int, point: tuple[int, int] | None) -> tuple[int, int] | None:
+    """Scalar multiplication using double-and-add."""
+    result = _POINT_AT_INFINITY
+    addend = point
+    while k:
+        if k & 1:
+            result = _point_add(result, addend)
+        addend = _point_add(addend, addend)
+        k >>= 1
+    return result
+
+
+def _decompress_pubkey(data: bytes) -> tuple[int, int]:
+    """Parse a compressed or uncompressed secp256k1 public key to (x, y)."""
+    if len(data) == UNCOMPRESSED_PUBKEY_SIZE and data[0] == 0x04:
+        x = int.from_bytes(data[1:33], "big")
+        y = int.from_bytes(data[33:65], "big")
+        return (x, y)
+
+    if len(data) == COMPRESSED_PUBKEY_SIZE and data[0] in (0x02, 0x03):
+        x = int.from_bytes(data[1:], "big")
+        # Solve y^2 = x^3 + 7 (mod p).
+        y_sq = (pow(x, 3, _P) + 7) % _P
+        y = pow(y_sq, (_P + 1) // 4, _P)
+        # Choose the correct parity.
+        if (y & 1) != (data[0] & 1):
+            y = _P - y
+        return (x, y)
+
+    raise ValueError(f"Invalid public key encoding: length={len(data)}")
+
+
+def _compress_point(point: tuple[int, int]) -> Bytes33:
+    """Encode a curve point as 33-byte compressed format."""
+    x, y = point
+    prefix = 0x02 if y % 2 == 0 else 0x03
+    return Bytes33(bytes([prefix]) + x.to_bytes(32, "big"))
+
+
+def aes_ctr_encrypt(key: Bytes16, iv: Bytes16, plaintext: bytes) -> bytes:
     """
     Encrypt using AES-128-CTR.
 
@@ -74,7 +164,7 @@ def aes_ctr_encrypt(key: bytes, iv: bytes, plaintext: bytes) -> bytes:
     return encryptor.update(plaintext) + encryptor.finalize()
 
 
-def aes_ctr_decrypt(key: bytes, iv: bytes, ciphertext: bytes) -> bytes:
+def aes_ctr_decrypt(key: Bytes16, iv: Bytes16, ciphertext: bytes) -> bytes:
     """
     Decrypt using AES-128-CTR.
 
@@ -91,7 +181,7 @@ def aes_ctr_decrypt(key: bytes, iv: bytes, ciphertext: bytes) -> bytes:
     return aes_ctr_encrypt(key, iv, ciphertext)
 
 
-def aes_gcm_encrypt(key: bytes, nonce: bytes, plaintext: bytes, aad: bytes) -> bytes:
+def aes_gcm_encrypt(key: Bytes16, nonce: Bytes12, plaintext: bytes, aad: bytes) -> bytes:
     """
     Encrypt using AES-128-GCM.
 
@@ -116,7 +206,7 @@ def aes_gcm_encrypt(key: bytes, nonce: bytes, plaintext: bytes, aad: bytes) -> b
     return aesgcm.encrypt(nonce, plaintext, aad)
 
 
-def aes_gcm_decrypt(key: bytes, nonce: bytes, ciphertext: bytes, aad: bytes) -> bytes:
+def aes_gcm_decrypt(key: Bytes16, nonce: Bytes12, ciphertext: bytes, aad: bytes) -> bytes:
     """
     Decrypt using AES-128-GCM.
 
@@ -143,38 +233,38 @@ def aes_gcm_decrypt(key: bytes, nonce: bytes, ciphertext: bytes, aad: bytes) -> 
     return aesgcm.decrypt(nonce, ciphertext, aad)
 
 
-def ecdh_agree(private_key_bytes: bytes, public_key_bytes: bytes) -> Bytes32:
+def ecdh_agree(private_key_bytes: Bytes32, public_key_bytes: bytes) -> Bytes33:
     """
     Perform secp256k1 ECDH key agreement.
 
     Both parties compute the same shared secret from their private key
     and the other party's public key.
 
+    Per Discovery v5 spec, the shared secret is the 33-byte compressed
+    point resulting from scalar multiplication of the private key with
+    the public key.
+
     Args:
         private_key_bytes: 32-byte secp256k1 private key scalar.
         public_key_bytes: 33-byte compressed or 65-byte uncompressed public key.
 
     Returns:
-        32-byte shared secret (x-coordinate of the resulting point).
+        33-byte shared secret (compressed point from ECDH).
     """
     if len(private_key_bytes) != 32:
         raise ValueError(f"Private key must be 32 bytes, got {len(private_key_bytes)}")
 
-    private_key = ec.derive_private_key(
-        int.from_bytes(private_key_bytes, "big"),
-        ec.SECP256K1(),
-    )
+    scalar = int.from_bytes(private_key_bytes, "big")
+    point = _decompress_pubkey(public_key_bytes)
+    result = _point_mul(scalar, point)
 
-    public_key = ec.EllipticCurvePublicKey.from_encoded_point(
-        ec.SECP256K1(),
-        public_key_bytes,
-    )
+    if result is None:
+        raise ValueError("ECDH produced point at infinity")
 
-    shared_key = private_key.exchange(ec.ECDH(), public_key)
-    return Bytes32(shared_key)
+    return _compress_point(result)
 
 
-def generate_secp256k1_keypair() -> tuple[bytes, bytes]:
+def generate_secp256k1_keypair() -> tuple[Bytes32, Bytes33]:
     """
     Generate a new secp256k1 keypair.
 
@@ -193,33 +283,10 @@ def generate_secp256k1_keypair() -> tuple[bytes, bytes]:
         format=serialization.PublicFormat.CompressedPoint,
     )
 
-    return private_bytes, public_bytes
+    return Bytes32(private_bytes), Bytes33(public_bytes)
 
 
-def pubkey_to_compressed(public_key_bytes: bytes) -> bytes:
-    """
-    Convert any secp256k1 public key to compressed format.
-
-    Args:
-        public_key_bytes: 33-byte compressed or 65-byte uncompressed public key.
-
-    Returns:
-        33-byte compressed public key.
-    """
-    if len(public_key_bytes) == COMPRESSED_PUBKEY_SIZE:
-        return public_key_bytes
-
-    public_key = ec.EllipticCurvePublicKey.from_encoded_point(
-        ec.SECP256K1(),
-        public_key_bytes,
-    )
-    return public_key.public_bytes(
-        encoding=serialization.Encoding.X962,
-        format=serialization.PublicFormat.CompressedPoint,
-    )
-
-
-def pubkey_to_uncompressed(public_key_bytes: bytes) -> bytes:
+def pubkey_to_uncompressed(public_key_bytes: bytes) -> Bytes65:
     """
     Convert any secp256k1 public key to uncompressed format.
 
@@ -230,24 +297,26 @@ def pubkey_to_uncompressed(public_key_bytes: bytes) -> bytes:
         65-byte uncompressed public key (0x04 || x || y).
     """
     if len(public_key_bytes) == UNCOMPRESSED_PUBKEY_SIZE:
-        return public_key_bytes
+        return Bytes65(public_key_bytes)
 
     public_key = ec.EllipticCurvePublicKey.from_encoded_point(
         ec.SECP256K1(),
         public_key_bytes,
     )
-    return public_key.public_bytes(
-        encoding=serialization.Encoding.X962,
-        format=serialization.PublicFormat.UncompressedPoint,
+    return Bytes65(
+        public_key.public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint,
+        )
     )
 
 
 def sign_id_nonce(
-    private_key_bytes: bytes,
+    private_key_bytes: Bytes32,
     challenge_data: bytes,
-    ephemeral_pubkey: bytes,
-    dest_node_id: bytes,
-) -> bytes:
+    ephemeral_pubkey: Bytes33,
+    dest_node_id: Bytes32,
+) -> Bytes64:
     """
     Sign for handshake authentication.
 
@@ -267,10 +336,6 @@ def sign_id_nonce(
     Returns:
         64-byte signature (r || s, each 32 bytes).
     """
-    import hashlib
-
-    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
-
     if len(private_key_bytes) != 32:
         raise ValueError(f"Private key must be 32 bytes, got {len(private_key_bytes)}")
     if len(dest_node_id) != 32:
@@ -299,25 +364,24 @@ def sign_id_nonce(
         ec.SECP256K1(),
     )
 
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
-
-    der_signature = private_key.sign(digest, ec.ECDSA(Prehashed(hashes.SHA256())))
+    der_signature = private_key.sign(
+        digest, ec.ECDSA(Prehashed(hashes.SHA256()), deterministic_signing=True)
+    )
 
     # Convert DER-encoded signature to fixed-size r||s format.
     #
     # ECDSA signatures in DER are variable length.
     # Discovery v5 uses fixed 64-byte r||s for consistency.
     r, s = decode_dss_signature(der_signature)
-    return r.to_bytes(32, "big") + s.to_bytes(32, "big")
+    return Bytes64(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
 
 
 def verify_id_nonce_signature(
-    signature: bytes,
+    signature: Bytes64,
     challenge_data: bytes,
-    ephemeral_pubkey: bytes,
-    dest_node_id: bytes,
-    public_key_bytes: bytes,
+    ephemeral_pubkey: Bytes33,
+    dest_node_id: Bytes32,
+    public_key_bytes: Bytes33,
 ) -> bool:
     """
     Verify an ID nonce signature.
@@ -340,15 +404,6 @@ def verify_id_nonce_signature(
     Returns:
         True if signature is valid, False otherwise.
     """
-    import hashlib
-
-    from cryptography.exceptions import InvalidSignature
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric.utils import (
-        Prehashed,
-        encode_dss_signature,
-    )
-
     if len(signature) != ID_SIGNATURE_SIZE:
         return False
     if len(dest_node_id) != 32:
