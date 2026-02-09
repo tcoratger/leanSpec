@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -43,7 +42,7 @@ class TestGossipBlockProcessing:
         mock_store.blocks[genesis_root] = genesis_block
         return genesis_root, cast(Store, mock_store)
 
-    def test_block_with_known_parent_processed_immediately(
+    async def test_block_with_known_parent_processed_immediately(
         self,
         genesis_setup: tuple[Bytes32, Store],
         peer_id: PeerId,
@@ -72,14 +71,14 @@ class TestGossipBlockProcessing:
         )
         block_root = hash_tree_root(block.message.block)
 
-        result, new_store = asyncio.run(head_sync.on_gossip_block(block, peer_id, store))
+        result, new_store = await head_sync.on_gossip_block(block, peer_id, store)
 
         assert result.processed is True
         assert result.cached is False
         assert result.backfill_triggered is False
         assert block_root in processed_blocks
 
-    def test_block_with_unknown_parent_cached_and_triggers_backfill(
+    async def test_block_with_unknown_parent_cached_and_triggers_backfill(
         self,
         peer_id: PeerId,
     ) -> None:
@@ -103,7 +102,7 @@ class TestGossipBlockProcessing:
         )
         block_root = hash_tree_root(block.message.block)
 
-        result, _ = asyncio.run(head_sync.on_gossip_block(block, peer_id, store))
+        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
         assert result.processed is False
         assert result.cached is True
@@ -112,7 +111,7 @@ class TestGossipBlockProcessing:
         assert head_sync.block_cache.orphan_count == 1
         backfill.fill_missing.assert_called_once_with([unknown_parent])
 
-    def test_duplicate_block_skipped(
+    async def test_duplicate_block_skipped(
         self,
         genesis_setup: tuple[Bytes32, Store],
         peer_id: PeerId,
@@ -137,7 +136,7 @@ class TestGossipBlockProcessing:
             process_block=process_block,
         )
 
-        result, _ = asyncio.run(head_sync.on_gossip_block(block, peer_id, store))
+        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
         assert result.processed is False
         assert result.cached is False
@@ -147,7 +146,7 @@ class TestGossipBlockProcessing:
 class TestDescendantProcessing:
     """Tests for processing cached descendants when parent arrives."""
 
-    def test_cached_children_processed_when_parent_arrives(
+    async def test_cached_children_processed_when_parent_arrives(
         self,
         genesis_block,
         peer_id: PeerId,
@@ -193,14 +192,14 @@ class TestDescendantProcessing:
         )
 
         # Process parent - should trigger child processing
-        result, _ = asyncio.run(head_sync.on_gossip_block(parent, peer_id, store))
+        result, _ = await head_sync.on_gossip_block(parent, peer_id, store)
 
         assert result.processed is True
         assert result.descendants_processed == 1
         assert processing_order == [parent_root, child_root]
         assert child_root not in block_cache  # Removed after processing
 
-    def test_chain_of_descendants_processed_in_slot_order(
+    async def test_chain_of_descendants_processed_in_slot_order(
         self,
         genesis_block,
         peer_id: PeerId,
@@ -243,7 +242,7 @@ class TestDescendantProcessing:
         )
 
         # Process first block - should cascade to all descendants
-        result, _ = asyncio.run(head_sync.on_gossip_block(blocks[0], peer_id, store))
+        result, _ = await head_sync.on_gossip_block(blocks[0], peer_id, store)
 
         assert result.processed is True
         assert result.descendants_processed == 3
@@ -253,7 +252,7 @@ class TestDescendantProcessing:
 class TestProcessAllProcessable:
     """Tests for batch processing of processable blocks."""
 
-    def test_processes_all_blocks_with_known_parents(
+    async def test_processes_all_blocks_with_known_parents(
         self,
         genesis_block,
         peer_id: PeerId,
@@ -296,13 +295,13 @@ class TestProcessAllProcessable:
             process_block=count_processing,
         )
 
-        count, _ = asyncio.run(head_sync.process_all_processable(store))
+        count, _ = await head_sync.process_all_processable(store)
 
         assert count == 2
         assert processed_count == 2
         assert len(block_cache) == 0  # Both removed
 
-    def test_processing_failure_removes_block_from_cache(
+    async def test_processing_failure_removes_block_from_cache(
         self,
         genesis_block,
         peer_id: PeerId,
@@ -331,7 +330,7 @@ class TestProcessAllProcessable:
             process_block=fail_processing,
         )
 
-        count, _ = asyncio.run(head_sync.process_all_processable(store))
+        count, _ = await head_sync.process_all_processable(store)
 
         assert count == 0
         assert block_root not in block_cache  # Removed despite failure
@@ -340,7 +339,7 @@ class TestProcessAllProcessable:
 class TestErrorHandling:
     """Tests for error handling during block processing."""
 
-    def test_processing_error_captured_in_result(
+    async def test_processing_error_captured_in_result(
         self,
         genesis_block,
         peer_id: PeerId,
@@ -366,13 +365,13 @@ class TestErrorHandling:
             state_root=Bytes32.zero(),
         )
 
-        result, returned_store = asyncio.run(head_sync.on_gossip_block(block, peer_id, store))
+        result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
 
         assert result.processed is False
         assert result.error == "State transition failed"
         assert returned_store is store  # Original store returned on error
 
-    def test_sibling_error_does_not_block_other_siblings(
+    async def test_sibling_error_does_not_block_other_siblings(
         self,
         genesis_block,
         peer_id: PeerId,
@@ -420,7 +419,7 @@ class TestErrorHandling:
             process_block=fail_first,
         )
 
-        count, _ = asyncio.run(head_sync.process_all_processable(store))
+        count, _ = await head_sync.process_all_processable(store)
 
         assert call_count == 2  # Both attempted
         assert count == 1  # One succeeded

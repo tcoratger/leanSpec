@@ -53,7 +53,7 @@ def store_factory(key_manager: XmssKeyManager) -> Callable[..., Store]:
     return _create
 
 
-# ---- Plain genesis (null public keys, no key_manager) ----
+# Plain genesis (null public keys, no key_manager)
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def base_store(genesis_state: State, genesis_block: Block) -> Store:
     )
 
 
-# ---- Keyed genesis (real XMSS keys, 12 validators) ----
+# Keyed genesis (real XMSS keys, 12 validators)
 
 
 @pytest.fixture

@@ -13,8 +13,6 @@ Gossip message format:
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from lean_spec.snappy import compress, frame_compress, frame_decompress
@@ -307,179 +305,133 @@ class TestGossipHandlerDecodeMessage:
 class TestReadGossipMessage:
     """Tests for the read_gossip_message async function."""
 
-    def test_read_valid_block_message(self) -> None:
+    async def test_read_valid_block_message(self) -> None:
         """Reads valid block message from stream."""
-
-        async def run() -> tuple[str, bytes]:
-            block = make_test_signed_block()
-            ssz_bytes = block.encode_bytes()
-            topic_str = make_block_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
-
-            stream = MockStream(message_data)
-            return await read_gossip_message(stream)
-
-        topic, compressed = asyncio.run(run())
+        block = make_test_signed_block()
+        ssz_bytes = block.encode_bytes()
         topic_str = make_block_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
+
+        stream = MockStream(message_data)
+        topic, compressed = await read_gossip_message(stream)
 
         assert topic == topic_str
         assert len(compressed) > 0
 
-    def test_read_valid_attestation_message(self) -> None:
+    async def test_read_valid_attestation_message(self) -> None:
         """Reads valid attestation message from stream."""
-
-        async def run() -> tuple[str, bytes]:
-            attestation = make_test_signed_attestation()
-            ssz_bytes = attestation.encode_bytes()
-            topic_str = make_attestation_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
-
-            stream = MockStream(message_data)
-            return await read_gossip_message(stream)
-
-        topic, compressed = asyncio.run(run())
+        attestation = make_test_signed_attestation()
+        ssz_bytes = attestation.encode_bytes()
         topic_str = make_attestation_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
+
+        stream = MockStream(message_data)
+        topic, compressed = await read_gossip_message(stream)
 
         assert topic == topic_str
         assert len(compressed) > 0
 
-    def test_read_empty_stream(self) -> None:
+    async def test_read_empty_stream(self) -> None:
         """Raises GossipMessageError for empty stream."""
-
-        async def run() -> tuple[str, bytes]:
-            stream = MockStream(b"")
-            return await read_gossip_message(stream)
+        stream = MockStream(b"")
 
         with pytest.raises(GossipMessageError, match="Empty gossip message"):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_read_truncated_topic_length(self) -> None:
+    async def test_read_truncated_topic_length(self) -> None:
         """Raises GossipMessageError for incomplete topic length varint."""
-
-        async def run() -> tuple[str, bytes]:
-            # A varint byte with continuation bit set but no following bytes
-            incomplete_varint = b"\x80"  # Continuation bit set, needs more bytes
-            stream = MockStream(incomplete_varint)
-            return await read_gossip_message(stream)
+        # A varint byte with continuation bit set but no following bytes
+        incomplete_varint = b"\x80"  # Continuation bit set, needs more bytes
+        stream = MockStream(incomplete_varint)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_read_truncated_topic_string(self) -> None:
+    async def test_read_truncated_topic_string(self) -> None:
         """Raises GossipMessageError for truncated topic string."""
-
-        async def run() -> tuple[str, bytes]:
-            topic = make_block_topic()
-            topic_bytes = topic.encode("utf-8")
-            # Claim topic is 100 bytes but only provide partial data
-            truncated = encode_varint(100) + topic_bytes[:10]
-            stream = MockStream(truncated)
-            return await read_gossip_message(stream)
+        topic = make_block_topic()
+        topic_bytes = topic.encode("utf-8")
+        # Claim topic is 100 bytes but only provide partial data
+        truncated = encode_varint(100) + topic_bytes[:10]
+        stream = MockStream(truncated)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_read_truncated_data_length(self) -> None:
+    async def test_read_truncated_data_length(self) -> None:
         """Raises GossipMessageError for truncated data length varint."""
-
-        async def run() -> tuple[str, bytes]:
-            topic = make_block_topic()
-            topic_bytes = topic.encode("utf-8")
-            # Complete topic but incomplete data length varint
-            data = encode_varint(len(topic_bytes)) + topic_bytes + b"\x80"
-            stream = MockStream(data)
-            return await read_gossip_message(stream)
+        topic = make_block_topic()
+        topic_bytes = topic.encode("utf-8")
+        # Complete topic but incomplete data length varint
+        data = encode_varint(len(topic_bytes)) + topic_bytes + b"\x80"
+        stream = MockStream(data)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_read_truncated_data(self) -> None:
+    async def test_read_truncated_data(self) -> None:
         """Raises GossipMessageError for truncated message data."""
-
-        async def run() -> tuple[str, bytes]:
-            topic = make_block_topic()
-            topic_bytes = topic.encode("utf-8")
-            compressed = compress(b"test data")
-            # Claim data is 1000 bytes but only provide partial
-            data = (
-                encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(1000) + compressed[:5]
-            )
-            stream = MockStream(data)
-            return await read_gossip_message(stream)
+        topic = make_block_topic()
+        topic_bytes = topic.encode("utf-8")
+        compressed = compress(b"test data")
+        # Claim data is 1000 bytes but only provide partial
+        data = encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(1000) + compressed[:5]
+        stream = MockStream(data)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_read_invalid_utf8_topic(self) -> None:
+    async def test_read_invalid_utf8_topic(self) -> None:
         """Raises GossipMessageError for invalid UTF-8 in topic."""
-
-        async def run() -> tuple[str, bytes]:
-            # Invalid UTF-8 sequence
-            invalid_utf8 = b"\xff\xfe"
-            data = encode_varint(len(invalid_utf8)) + invalid_utf8
-            # Add data portion
-            data += encode_varint(4) + b"test"
-            stream = MockStream(data)
-            return await read_gossip_message(stream)
+        # Invalid UTF-8 sequence
+        invalid_utf8 = b"\xff\xfe"
+        data = encode_varint(len(invalid_utf8)) + invalid_utf8
+        # Add data portion
+        data += encode_varint(4) + b"test"
+        stream = MockStream(data)
 
         with pytest.raises(GossipMessageError, match="Invalid topic encoding"):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_read_small_chunks(self) -> None:
+    async def test_read_small_chunks(self) -> None:
         """Successfully reads message delivered in small chunks."""
-
-        async def run() -> tuple[str, bytes]:
-            block = make_test_signed_block()
-            ssz_bytes = block.encode_bytes()
-            topic_str = make_block_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
-
-            # Use tiny chunks to test incremental parsing
-            stream = MockStream(message_data, chunk_size=5)
-            return await read_gossip_message(stream)
-
-        topic, compressed = asyncio.run(run())
+        block = make_test_signed_block()
+        ssz_bytes = block.encode_bytes()
         topic_str = make_block_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
+
+        # Use tiny chunks to test incremental parsing
+        stream = MockStream(message_data, chunk_size=5)
+        topic, compressed = await read_gossip_message(stream)
 
         assert topic == topic_str
         assert len(compressed) > 0
 
-    def test_read_large_message(self) -> None:
+    async def test_read_large_message(self) -> None:
         """Successfully reads larger gossip message."""
-
-        async def run() -> tuple[str, bytes, bytes]:
-            block = make_test_signed_block()
-            ssz_bytes = block.encode_bytes()
-            topic_str = make_block_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
-
-            stream = MockStream(message_data)
-            topic, compressed = await read_gossip_message(stream)
-            return topic, compressed, ssz_bytes
-
-        topic, compressed, ssz_bytes = asyncio.run(run())
+        block = make_test_signed_block()
+        ssz_bytes = block.encode_bytes()
         topic_str = make_block_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
+
+        stream = MockStream(message_data)
+        topic, compressed = await read_gossip_message(stream)
 
         assert topic == topic_str
         # Verify the compressed data can be decompressed (framed format)
         decompressed = frame_decompress(compressed)
         assert decompressed == ssz_bytes
 
-    def test_read_single_byte_chunks(self) -> None:
+    async def test_read_single_byte_chunks(self) -> None:
         """Successfully reads message with single-byte chunks."""
-
-        async def run() -> tuple[str, bytes]:
-            attestation = make_test_signed_attestation()
-            ssz_bytes = attestation.encode_bytes()
-            topic_str = make_attestation_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
-
-            # Single byte at a time - stress test incremental parsing
-            stream = MockStream(message_data, chunk_size=1)
-            return await read_gossip_message(stream)
-
-        topic, _ = asyncio.run(run())
+        attestation = make_test_signed_attestation()
+        ssz_bytes = attestation.encode_bytes()
         topic_str = make_attestation_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
+
+        # Single byte at a time - stress test incremental parsing
+        stream = MockStream(message_data, chunk_size=1)
+        topic, _ = await read_gossip_message(stream)
 
         assert topic == topic_str
 
@@ -487,61 +439,47 @@ class TestReadGossipMessage:
 class TestGossipReceptionIntegration:
     """Integration tests for the complete gossip reception flow."""
 
-    def test_full_block_reception_flow(self) -> None:
+    async def test_full_block_reception_flow(self) -> None:
         """Tests complete flow: stream -> parse -> decompress -> decode."""
+        handler = GossipHandler(fork_digest="0x00000000")
+        original_block = make_test_signed_block()
+        ssz_bytes = original_block.encode_bytes()
+        topic_str = make_block_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
 
-        async def run() -> tuple[SignedBlockWithAttestation | SignedAttestation | None, bytes]:
-            handler = GossipHandler(fork_digest="0x00000000")
-            original_block = make_test_signed_block()
-            ssz_bytes = original_block.encode_bytes()
-            topic_str = make_block_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
+        # Step 1: Read from stream
+        stream = MockStream(message_data)
+        parsed_topic, compressed = await read_gossip_message(stream)
 
-            # Step 1: Read from stream
-            stream = MockStream(message_data)
-            parsed_topic, compressed = await read_gossip_message(stream)
-
-            # Step 2: Decode message
-            decoded = handler.decode_message(parsed_topic, compressed)
-
-            return decoded, original_block.encode_bytes()
-
-        decoded, original_bytes = asyncio.run(run())
+        # Step 2: Decode message
+        decoded = handler.decode_message(parsed_topic, compressed)
 
         # Step 3: Verify result
         assert isinstance(decoded, SignedBlockWithAttestation)
-        assert decoded.encode_bytes() == original_bytes
+        assert decoded.encode_bytes() == original_block.encode_bytes()
 
-    def test_full_attestation_reception_flow(self) -> None:
+    async def test_full_attestation_reception_flow(self) -> None:
         """Tests complete flow for attestation messages."""
+        handler = GossipHandler(fork_digest="0x00000000")
+        original_attestation = make_test_signed_attestation()
+        ssz_bytes = original_attestation.encode_bytes()
+        topic_str = make_attestation_topic()
+        message_data = build_gossip_message(topic_str, ssz_bytes)
 
-        async def run() -> tuple[
-            SignedBlockWithAttestation | SignedAttestation | None, bytes, TopicKind
-        ]:
-            handler = GossipHandler(fork_digest="0x00000000")
-            original_attestation = make_test_signed_attestation()
-            ssz_bytes = original_attestation.encode_bytes()
-            topic_str = make_attestation_topic()
-            message_data = build_gossip_message(topic_str, ssz_bytes)
+        # Step 1: Read from stream
+        stream = MockStream(message_data)
+        parsed_topic, compressed = await read_gossip_message(stream)
 
-            # Step 1: Read from stream
-            stream = MockStream(message_data)
-            parsed_topic, compressed = await read_gossip_message(stream)
+        # Step 2: Get topic info
+        topic = handler.get_topic(parsed_topic)
 
-            # Step 2: Get topic info
-            topic = handler.get_topic(parsed_topic)
-
-            # Step 3: Decode message
-            decoded = handler.decode_message(parsed_topic, compressed)
-
-            return decoded, original_attestation.encode_bytes(), topic.kind
-
-        decoded, original_bytes, topic_kind = asyncio.run(run())
+        # Step 3: Decode message
+        decoded = handler.decode_message(parsed_topic, compressed)
 
         # Step 4: Verify result
-        assert topic_kind == TopicKind.ATTESTATION_SUBNET
+        assert topic.kind == TopicKind.ATTESTATION_SUBNET
         assert isinstance(decoded, SignedAttestation)
-        assert decoded.encode_bytes() == original_bytes
+        assert decoded.encode_bytes() == original_attestation.encode_bytes()
 
     def test_handler_fork_digest_stored(self) -> None:
         """Handler stores fork digest for topic validation."""
@@ -549,30 +487,24 @@ class TestGossipReceptionIntegration:
         handler = GossipHandler(fork_digest=digest)
         assert handler.fork_digest == digest
 
-    def test_roundtrip_preserves_data_integrity(self) -> None:
+    async def test_roundtrip_preserves_data_integrity(self) -> None:
         """Data integrity preserved through encode-compress-stream-decompress-decode."""
+        handler = GossipHandler(fork_digest="0x00000000")
+        original = make_test_signed_block()
+        original_bytes = original.encode_bytes()
 
-        async def run() -> tuple[bytes, bytes]:
-            handler = GossipHandler(fork_digest="0x00000000")
-            original = make_test_signed_block()
-            original_bytes = original.encode_bytes()
+        # Encode and compress
+        topic_str = make_block_topic()
+        message_data = build_gossip_message(topic_str, original_bytes)
 
-            # Encode and compress
-            topic_str = make_block_topic()
-            message_data = build_gossip_message(topic_str, original_bytes)
+        # Simulate network transfer via stream
+        stream = MockStream(message_data)
+        _, compressed = await read_gossip_message(stream)
 
-            # Simulate network transfer via stream
-            stream = MockStream(message_data)
-            _, compressed = await read_gossip_message(stream)
-
-            # Decode
-            decoded = handler.decode_message(topic_str, compressed)
-            assert decoded is not None, "decode_message should not return None for valid input"
-            decoded_bytes = decoded.encode_bytes()
-
-            return decoded_bytes, original_bytes
-
-        decoded_bytes, original_bytes = asyncio.run(run())
+        # Decode
+        decoded = handler.decode_message(topic_str, compressed)
+        assert decoded is not None, "decode_message should not return None for valid input"
+        decoded_bytes = decoded.encode_bytes()
 
         # Verify exact match
         assert decoded_bytes == original_bytes
@@ -589,19 +521,16 @@ class TestGossipReceptionEdgeCases:
             topic = handler.get_topic(topic_str)
             assert topic.fork_digest == digest
 
-    def test_zero_length_compressed_data(self) -> None:
+    async def test_zero_length_compressed_data(self) -> None:
         """Handles message with zero-length data field."""
-
-        async def run() -> tuple[str, bytes]:
-            topic = make_block_topic()
-            topic_bytes = topic.encode("utf-8")
-            # Zero-length data
-            data = encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(0)
-            stream = MockStream(data)
-            return await read_gossip_message(stream)
-
-        topic_result, compressed = asyncio.run(run())
         topic = make_block_topic()
+        topic_bytes = topic.encode("utf-8")
+        # Zero-length data
+        data = encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(0)
+        stream = MockStream(data)
+
+        topic_result, compressed = await read_gossip_message(stream)
+
         assert topic_result == topic
         assert compressed == b""
 
@@ -617,27 +546,21 @@ class TestGossipReceptionEdgeCases:
         with pytest.raises(GossipMessageError, match="Snappy decompression failed"):
             handler.decode_message(topic_str, corrupted)
 
-    def test_very_long_topic_string(self) -> None:
+    async def test_very_long_topic_string(self) -> None:
         """Handles messages with unusually long topic strings."""
-
-        async def run() -> str:
-            # Create a long but valid-format topic
-            long_digest = "0x" + "a" * 100
-            topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
-            topic_bytes = topic.encode("utf-8")
-            compressed = compress(b"test")
-
-            data = encode_varint(len(topic_bytes)) + topic_bytes
-            data += encode_varint(len(compressed)) + compressed
-
-            stream = MockStream(data)
-            parsed_topic, _ = await read_gossip_message(stream)
-            return parsed_topic
-
-        parsed_topic = asyncio.run(run())
+        # Create a long but valid-format topic
         long_digest = "0x" + "a" * 100
-        expected_topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
+        topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
+        topic_bytes = topic.encode("utf-8")
+        compressed = compress(b"test")
 
+        data = encode_varint(len(topic_bytes)) + topic_bytes
+        data += encode_varint(len(compressed)) + compressed
+
+        stream = MockStream(data)
+        parsed_topic, _ = await read_gossip_message(stream)
+
+        expected_topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
         assert parsed_topic == expected_topic
 
     @pytest.mark.parametrize(
@@ -648,26 +571,20 @@ class TestGossipReceptionEdgeCases:
         ],
         ids=["zero_byte_topic_length", "overlong_varint"],
     )
-    def test_malformed_varint_data(self, invalid_data: bytes) -> None:
+    async def test_malformed_varint_data(self, invalid_data: bytes) -> None:
         """Handles various malformed varint patterns."""
-
-        async def run() -> tuple[str, bytes]:
-            stream = MockStream(invalid_data)
-            return await read_gossip_message(stream)
+        stream = MockStream(invalid_data)
 
         with pytest.raises(GossipMessageError):
-            asyncio.run(run())
+            await read_gossip_message(stream)
 
-    def test_topic_only_message_missing_data(self) -> None:
+    async def test_topic_only_message_missing_data(self) -> None:
         """Raises error when message has topic but no data section."""
-
-        async def run() -> tuple[str, bytes]:
-            topic = make_block_topic()
-            topic_bytes = topic.encode("utf-8")
-            # Only topic, no data length or data
-            data = encode_varint(len(topic_bytes)) + topic_bytes
-            stream = MockStream(data)
-            return await read_gossip_message(stream)
+        topic = make_block_topic()
+        topic_bytes = topic.encode("utf-8")
+        # Only topic, no data length or data
+        data = encode_varint(len(topic_bytes)) + topic_bytes
+        stream = MockStream(data)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
-            asyncio.run(run())
+            await read_gossip_message(stream)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,7 +23,6 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.sync.backfill_sync import NetworkRequester
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService
@@ -33,36 +31,14 @@ from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.types import Bytes32, Bytes52, Uint64
-from tests.lean_spec.helpers import TEST_VALIDATOR_ID
-
-
-class MockNetworkRequester(NetworkRequester):
-    """Mock network requester for testing."""
-
-    async def request_block_by_root(
-        self,
-        peer_id: str,  # noqa: ARG002
-        root: bytes,  # noqa: ARG002
-    ) -> SignedBlockWithAttestation | None:
-        """Return None - no blocks available."""
-        return None
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, MockNetworkRequester
 
 
 @pytest.fixture
-def store(genesis_state: State, genesis_block: Block) -> Store:
-    """Forkchoice store initialized with genesis."""
-    return Store.get_forkchoice_store(
-        genesis_state,
-        genesis_block,
-        validator_id=TEST_VALIDATOR_ID,
-    )
-
-
-@pytest.fixture
-def sync_service(store: Store) -> SyncService:
+def sync_service(base_store: Store) -> SyncService:
     """Sync service with store."""
     return SyncService(
-        store=store,
+        store=base_store,
         peer_manager=PeerManager(),
         block_cache=BlockCache(),
         clock=SlotClock(genesis_time=Uint64(0)),
@@ -121,7 +97,7 @@ class TestValidatorServiceBasic:
 class TestValidatorServiceDuties:
     """Tests for duty execution."""
 
-    def test_no_block_when_not_proposer(
+    async def test_no_block_when_not_proposer(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -145,17 +121,14 @@ class TestValidatorServiceDuties:
             on_block=capture_block,
         )
 
-        async def check_no_blocks() -> None:
-            # Slot 0 proposer is validator 0, slot 1 is validator 1
-            # Validator 2 is proposer for slot 2
-            await service._maybe_produce_block(Slot(0))
-            await service._maybe_produce_block(Slot(1))
-
-        asyncio.run(check_no_blocks())
+        # Slot 0 proposer is validator 0, slot 1 is validator 1
+        # Validator 2 is proposer for slot 2
+        await service._maybe_produce_block(Slot(0))
+        await service._maybe_produce_block(Slot(1))
 
         assert len(blocks_received) == 0
 
-    def test_empty_registry_skips_duties(
+    async def test_empty_registry_skips_duties(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -175,10 +148,7 @@ class TestValidatorServiceDuties:
             on_attestation=capture_attestation,
         )
 
-        async def produce() -> None:
-            await service._produce_attestations(Slot(0))
-
-        asyncio.run(produce())
+        await service._produce_attestations(Slot(0))
 
         assert len(attestations_received) == 0
         assert service.attestations_produced == 0
@@ -187,7 +157,7 @@ class TestValidatorServiceDuties:
 class TestValidatorServiceRun:
     """Tests for the main run loop."""
 
-    def test_run_loop_can_be_stopped(
+    async def test_run_loop_can_be_stopped(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -211,18 +181,16 @@ class TestValidatorServiceRun:
             if call_count >= 2:
                 service.stop()
 
-        async def run_briefly() -> None:
-            with patch("asyncio.sleep", new=stop_on_second_call):
-                await service.run()
+        with patch("asyncio.sleep", new=stop_on_second_call):
+            await service.run()
 
-        asyncio.run(run_briefly())
         assert not service.is_running
 
 
 class TestIntervalSleep:
     """Tests for interval sleep calculation."""
 
-    def test_sleep_until_next_interval_mid_interval(
+    async def test_sleep_until_next_interval_mid_interval(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -249,18 +217,15 @@ class TestIntervalSleep:
             nonlocal captured_duration
             captured_duration = duration
 
-        async def check_sleep() -> None:
-            with patch("asyncio.sleep", new=capture_sleep):
-                await service._sleep_until_next_interval()
-
-        asyncio.run(check_sleep())
+        with patch("asyncio.sleep", new=capture_sleep):
+            await service._sleep_until_next_interval()
 
         # Should sleep until next interval boundary
         expected = interval_seconds / 2
         assert captured_duration is not None
         assert abs(captured_duration - expected) < 0.01
 
-    def test_sleep_before_genesis(
+    async def test_sleep_before_genesis(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -283,11 +248,8 @@ class TestIntervalSleep:
             nonlocal captured_duration
             captured_duration = duration
 
-        async def check_sleep() -> None:
-            with patch("asyncio.sleep", new=capture_sleep):
-                await service._sleep_until_next_interval()
-
-        asyncio.run(check_sleep())
+        with patch("asyncio.sleep", new=capture_sleep):
+            await service._sleep_until_next_interval()
 
         # Should sleep until genesis
         expected = float(genesis) - current_time  # 100 seconds
@@ -298,7 +260,7 @@ class TestIntervalSleep:
 class TestProposerSkipping:
     """Tests for proposer skipping during attestation production."""
 
-    def test_proposer_skipped_in_attestation_production(
+    async def test_proposer_skipped_in_attestation_production(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -333,23 +295,20 @@ class TestProposerSkipping:
             registry=registry,
         )
 
-        async def produce() -> None:
-            # Slot 0: validator 0 is proposer (0 % 3 == 0).
-            with patch.object(
-                ValidatorService,
-                "_sign_attestation",
-                mock_sign_attestation,
-            ):
-                await service._produce_attestations(Slot(0))
-
-        asyncio.run(produce())
+        # Slot 0: validator 0 is proposer (0 % 3 == 0).
+        with patch.object(
+            ValidatorService,
+            "_sign_attestation",
+            mock_sign_attestation,
+        ):
+            await service._produce_attestations(Slot(0))
 
         # Only validator 1 should have signed an attestation.
         assert len(signed_validator_ids) == 1
         assert signed_validator_ids[0] == ValidatorIndex(1)
         assert service.attestations_produced == 1
 
-    def test_non_proposer_still_attests(
+    async def test_non_proposer_still_attests(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -382,24 +341,21 @@ class TestProposerSkipping:
             registry=registry,
         )
 
-        async def produce() -> None:
-            # Slot 1: validator 1 is proposer (1 % 3 == 1).
-            # Validator 0 is not proposer, should attest.
-            with patch.object(
-                ValidatorService,
-                "_sign_attestation",
-                mock_sign_attestation,
-            ):
-                await service._produce_attestations(Slot(1))
-
-        asyncio.run(produce())
+        # Slot 1: validator 1 is proposer (1 % 3 == 1).
+        # Validator 0 is not proposer, should attest.
+        with patch.object(
+            ValidatorService,
+            "_sign_attestation",
+            mock_sign_attestation,
+        ):
+            await service._produce_attestations(Slot(1))
 
         # Validator 0 should have signed an attestation.
         assert len(signed_validator_ids) == 1
         assert signed_validator_ids[0] == ValidatorIndex(0)
         assert service.attestations_produced == 1
 
-    def test_multiple_validators_only_non_proposers_attest(
+    async def test_multiple_validators_only_non_proposers_attest(
         self,
         sync_service: SyncService,
     ) -> None:
@@ -433,16 +389,13 @@ class TestProposerSkipping:
             registry=registry,
         )
 
-        async def produce() -> None:
-            # Slot 2: validator 2 is proposer (2 % 3 == 2).
-            with patch.object(
-                ValidatorService,
-                "_sign_attestation",
-                mock_sign_attestation,
-            ):
-                await service._produce_attestations(Slot(2))
-
-        asyncio.run(produce())
+        # Slot 2: validator 2 is proposer (2 % 3 == 2).
+        with patch.object(
+            ValidatorService,
+            "_sign_attestation",
+            mock_sign_attestation,
+        ):
+            await service._produce_attestations(Slot(2))
 
         # Validators 0 and 1 should have signed attestations.
         assert len(signed_validator_ids) == 2
@@ -567,7 +520,7 @@ class TestValidatorServiceIntegration:
             registry.add(ValidatorEntry(index=validator_index, secret_key=secret_key))
         return registry
 
-    def test_produce_real_block_with_valid_signature(
+    async def test_produce_real_block_with_valid_signature(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -591,11 +544,8 @@ class TestValidatorServiceIntegration:
             on_block=capture_block,
         )
 
-        async def produce_block() -> None:
-            # Slot 1: proposer is validator 1 (1 % 6 == 1)
-            await service._maybe_produce_block(Slot(1))
-
-        asyncio.run(produce_block())
+        # Slot 1: proposer is validator 1 (1 % 6 == 1)
+        await service._maybe_produce_block(Slot(1))
 
         assert len(blocks_produced) == 1
         signed_block = blocks_produced[0]
@@ -618,7 +568,7 @@ class TestValidatorServiceIntegration:
         )
         assert is_valid, "Proposer signature failed verification"
 
-    def test_produce_real_attestation_with_valid_signature(
+    async def test_produce_real_attestation_with_valid_signature(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -642,11 +592,8 @@ class TestValidatorServiceIntegration:
             on_attestation=capture_attestation,
         )
 
-        async def produce_attestations() -> None:
-            # Slot 1: proposer is validator 1, so validators 0, 2, 3, 4, 5 should attest
-            await service._produce_attestations(Slot(1))
-
-        asyncio.run(produce_attestations())
+        # Slot 1: proposer is validator 1, so validators 0, 2, 3, 4, 5 should attest
+        await service._produce_attestations(Slot(1))
 
         # 5 validators should have attested (all except proposer 1)
         assert len(attestations_produced) == 5
@@ -665,7 +612,7 @@ class TestValidatorServiceIntegration:
             )
             assert is_valid, f"Attestation signature for validator {validator_id} failed"
 
-    def test_attestation_data_references_correct_checkpoints(
+    async def test_attestation_data_references_correct_checkpoints(
         self,
         real_sync_service: SyncService,
         real_registry: ValidatorRegistry,
@@ -691,10 +638,7 @@ class TestValidatorServiceIntegration:
             on_attestation=capture_attestation,
         )
 
-        async def produce_attestations() -> None:
-            await service._produce_attestations(Slot(1))
-
-        asyncio.run(produce_attestations())
+        await service._produce_attestations(Slot(1))
 
         store = real_sync_service.store
         expected_head_root = store.head
@@ -712,7 +656,7 @@ class TestValidatorServiceIntegration:
             # Verify slot is correct
             assert data.slot == Slot(1)
 
-    def test_proposer_attestation_bundled_in_block(
+    async def test_proposer_attestation_bundled_in_block(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -737,10 +681,7 @@ class TestValidatorServiceIntegration:
             on_block=capture_block,
         )
 
-        async def produce_block() -> None:
-            await service._maybe_produce_block(Slot(2))
-
-        asyncio.run(produce_block())
+        await service._maybe_produce_block(Slot(2))
 
         assert len(blocks_produced) == 1
         signed_block = blocks_produced[0]
@@ -767,7 +708,7 @@ class TestValidatorServiceIntegration:
         )
         assert is_valid
 
-    def test_block_includes_pending_attestations(
+    async def test_block_includes_pending_attestations(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -831,11 +772,8 @@ class TestValidatorServiceIntegration:
             on_block=capture_block,
         )
 
-        async def produce_block() -> None:
-            # Slot 1: proposer is validator 1
-            await service._maybe_produce_block(Slot(1))
-
-        asyncio.run(produce_block())
+        # Slot 1: proposer is validator 1
+        await service._maybe_produce_block(Slot(1))
 
         assert len(blocks_produced) == 1
         signed_block = blocks_produced[0]
@@ -848,7 +786,7 @@ class TestValidatorServiceIntegration:
         attestation_signatures = signed_block.signature.attestation_signatures
         assert len(attestation_signatures) == len(body_attestations)
 
-    def test_multiple_slots_produce_different_attestations(
+    async def test_multiple_slots_produce_different_attestations(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -875,11 +813,8 @@ class TestValidatorServiceIntegration:
             on_attestation=capture_attestation,
         )
 
-        async def produce_attestations() -> None:
-            await service._produce_attestations(Slot(1))
-            await service._produce_attestations(Slot(2))
-
-        asyncio.run(produce_attestations())
+        await service._produce_attestations(Slot(1))
+        await service._produce_attestations(Slot(2))
 
         # Both slots should have attestations
         assert len(attestations_by_slot[Slot(1)]) > 0
@@ -891,7 +826,7 @@ class TestValidatorServiceIntegration:
         for att in attestations_by_slot[Slot(2)]:
             assert att.message.slot == Slot(2)
 
-    def test_proposer_does_not_double_attest(
+    async def test_proposer_does_not_double_attest(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -924,13 +859,10 @@ class TestValidatorServiceIntegration:
         slot = Slot(3)
         proposer_index = ValidatorIndex(3)  # 3 % 6 == 3
 
-        async def simulate_full_slot() -> None:
-            # Interval 0: block production
-            await service._maybe_produce_block(slot)
-            # Interval 1: attestation production
-            await service._produce_attestations(slot)
-
-        asyncio.run(simulate_full_slot())
+        # Interval 0: block production
+        await service._maybe_produce_block(slot)
+        # Interval 1: attestation production
+        await service._produce_attestations(slot)
 
         # One block should be produced
         assert len(blocks_produced) == 1
@@ -944,7 +876,7 @@ class TestValidatorServiceIntegration:
         expected_attesters = {ValidatorIndex(i) for i in range(6) if i != int(proposer_index)}
         assert attestation_validator_ids == expected_attesters
 
-    def test_block_state_root_is_valid(
+    async def test_block_state_root_is_valid(
         self,
         real_sync_service: SyncService,
         real_registry: ValidatorRegistry,
@@ -968,10 +900,7 @@ class TestValidatorServiceIntegration:
             on_block=capture_block,
         )
 
-        async def produce_block() -> None:
-            await service._maybe_produce_block(Slot(4))
-
-        asyncio.run(produce_block())
+        await service._maybe_produce_block(Slot(4))
 
         assert len(blocks_produced) == 1
         produced_block = blocks_produced[0].message.block
@@ -990,7 +919,7 @@ class TestValidatorServiceIntegration:
         computed_state_root = hash_tree_root(stored_state)
         assert produced_block.state_root == computed_state_root
 
-    def test_signature_uses_correct_slot_as_epoch(
+    async def test_signature_uses_correct_slot_as_epoch(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
@@ -1017,10 +946,7 @@ class TestValidatorServiceIntegration:
 
         test_slot = Slot(5)
 
-        async def produce_attestations() -> None:
-            await service._produce_attestations(test_slot)
-
-        asyncio.run(produce_attestations())
+        await service._produce_attestations(test_slot)
 
         # Verify each signature was created with the correct epoch (slot)
         for signed_att in attestations_produced:

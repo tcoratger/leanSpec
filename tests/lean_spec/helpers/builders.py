@@ -44,7 +44,9 @@ if TYPE_CHECKING:
     from consensus_testing.keys import XmssKeyManager
 
     from lean_spec.subspecs.forkchoice import Store
+    from lean_spec.subspecs.networking import PeerId
     from lean_spec.subspecs.networking.reqresp.message import Status
+    from lean_spec.subspecs.sync.service import SyncService
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -427,3 +429,32 @@ def make_store_with_gossip_signatures(
         }
     )
     return store, attestation_data
+
+
+def create_mock_sync_service(peer_id: PeerId) -> SyncService:
+    """Create a SyncService with mock dependencies for integration testing."""
+    from typing import cast
+
+    from lean_spec.subspecs.chain.clock import SlotClock
+    from lean_spec.subspecs.forkchoice import Store
+    from lean_spec.subspecs.networking.peer.info import PeerInfo
+    from lean_spec.subspecs.networking.types import ConnectionState
+    from lean_spec.subspecs.sync.block_cache import BlockCache
+    from lean_spec.subspecs.sync.peer_manager import PeerManager
+    from lean_spec.subspecs.sync.service import SyncService
+    from lean_spec.types import Uint64
+
+    from .mocks import MockForkchoiceStore, MockNetworkRequester
+
+    mock_store = MockForkchoiceStore(head_slot=0)
+    peer_manager = PeerManager()
+    peer_manager.add_peer(PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED))
+
+    return SyncService(
+        store=cast(Store, mock_store),
+        peer_manager=peer_manager,
+        block_cache=BlockCache(),
+        clock=SlotClock(genesis_time=Uint64(0), time_fn=lambda: 1000.0),
+        network=MockNetworkRequester(),
+        process_block=lambda s, b: s.on_block(b),
+    )
