@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes16, Bytes32, Bytes33
 
 DISCV5_KEY_AGREEMENT_INFO = b"discovery v5 key agreement"
 """Info string used in HKDF expansion for Discovery v5 key derivation."""
@@ -38,11 +38,11 @@ SESSION_KEY_SIZE = 16
 
 
 def derive_keys(
-    secret: bytes,
-    initiator_id: bytes,
-    recipient_id: bytes,
+    secret: Bytes33,
+    initiator_id: Bytes32,
+    recipient_id: Bytes32,
     challenge_data: bytes,
-) -> tuple[bytes, bytes]:
+) -> tuple[Bytes16, Bytes16]:
     """
     Derive session keys per Discovery v5 specification.
 
@@ -59,7 +59,7 @@ def derive_keys(
         recipient_key = keys[16:32]
 
     Args:
-        secret: 32-byte ECDH shared secret.
+        secret: 33-byte ECDH shared secret (compressed point).
         initiator_id: 32-byte node ID of the handshake initiator.
         recipient_id: 32-byte node ID of the handshake recipient.
         challenge_data: WHOAREYOU packet data (masking-iv || static-header || authdata).
@@ -71,8 +71,8 @@ def derive_keys(
     The initiator uses initiator_key to encrypt and recipient_key to decrypt.
     The recipient uses recipient_key to encrypt and initiator_key to decrypt.
     """
-    if len(secret) != 32:
-        raise ValueError(f"Secret must be 32 bytes, got {len(secret)}")
+    if len(secret) != 33:
+        raise ValueError(f"Secret must be 33 bytes, got {len(secret)}")
     if len(initiator_id) != 32:
         raise ValueError(f"Initiator ID must be 32 bytes, got {len(initiator_id)}")
     if len(recipient_id) != 32:
@@ -101,20 +101,20 @@ def derive_keys(
 
     keys = t1[:32]
 
-    initiator_key = keys[:SESSION_KEY_SIZE]
-    recipient_key = keys[SESSION_KEY_SIZE : SESSION_KEY_SIZE * 2]
+    initiator_key = Bytes16(keys[:SESSION_KEY_SIZE])
+    recipient_key = Bytes16(keys[SESSION_KEY_SIZE : SESSION_KEY_SIZE * 2])
 
     return initiator_key, recipient_key
 
 
 def derive_keys_from_pubkey(
-    local_private_key: bytes,
+    local_private_key: Bytes32,
     remote_public_key: bytes,
-    local_node_id: bytes,
-    remote_node_id: bytes,
+    local_node_id: Bytes32,
+    remote_node_id: Bytes32,
     challenge_data: bytes,
     is_initiator: bool,
-) -> tuple[bytes, bytes]:
+) -> tuple[Bytes16, Bytes16]:
     """
     Derive session keys from ECDH with automatic key ordering.
 
@@ -142,13 +142,13 @@ def derive_keys_from_pubkey(
     # Determine key ordering based on who initiated.
     if is_initiator:
         initiator_key, recipient_key = derive_keys(
-            bytes(secret), local_node_id, remote_node_id, challenge_data
+            secret, local_node_id, remote_node_id, challenge_data
         )
         # We are initiator: use initiator_key to send, recipient_key to receive.
         return initiator_key, recipient_key
     else:
         initiator_key, recipient_key = derive_keys(
-            bytes(secret), remote_node_id, local_node_id, challenge_data
+            secret, remote_node_id, local_node_id, challenge_data
         )
         # We are recipient: use recipient_key to send, initiator_key to receive.
         return recipient_key, initiator_key

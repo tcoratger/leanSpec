@@ -19,6 +19,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
     generate_id_nonce,
     generate_nonce,
 )
+from lean_spec.types import Bytes16
 
 
 class TestNonceGeneration:
@@ -382,7 +383,7 @@ class TestPacketSizeLimits:
 
         # Encrypt/mask the header.
         masking_key = local_node_id[:16]
-        masked_header = aes_ctr_encrypt(masking_key, masking_iv, static_header)
+        masked_header = aes_ctr_encrypt(Bytes16(masking_key), Bytes16(masking_iv), static_header)
 
         # Create packet: masking-iv + masked-header + only 10 bytes (not 100).
         # This will be rejected because total size < MIN_PACKET_SIZE (63 bytes)
@@ -410,7 +411,7 @@ class TestPacketProtocolValidation:
         # Authdata for WHOAREYOU = 24 bytes.
         full_content = wrong_protocol_header + bytes(24)
         masking_key = local_node_id[:16]
-        masked_content = aes_ctr_encrypt(masking_key, masking_iv, full_content)
+        masked_content = aes_ctr_encrypt(Bytes16(masking_key), Bytes16(masking_iv), full_content)
 
         # Packet = masking-iv + masked-content
         packet = masking_iv + masked_content
@@ -431,7 +432,7 @@ class TestPacketProtocolValidation:
         # Full masked content.
         full_content = wrong_version_header + bytes(24)
         masking_key = local_node_id[:16]
-        masked_content = aes_ctr_encrypt(masking_key, masking_iv, full_content)
+        masked_content = aes_ctr_encrypt(Bytes16(masking_key), Bytes16(masking_iv), full_content)
 
         packet = masking_iv + masked_content
 

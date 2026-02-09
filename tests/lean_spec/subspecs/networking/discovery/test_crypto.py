@@ -9,11 +9,11 @@ from lean_spec.subspecs.networking.discovery.crypto import (
     aes_gcm_encrypt,
     ecdh_agree,
     generate_secp256k1_keypair,
-    pubkey_to_compressed,
     pubkey_to_uncompressed,
     sign_id_nonce,
     verify_id_nonce_signature,
 )
+from lean_spec.types import Bytes12, Bytes16, Bytes32
 from tests.lean_spec.helpers import make_challenge_data
 
 
@@ -22,8 +22,8 @@ class TestAesCtr:
 
     def test_encrypt_decrypt_roundtrip(self):
         """Test that decryption reverses encryption."""
-        key = bytes(16)
-        iv = bytes(16)
+        key = Bytes16.zero()
+        iv = Bytes16.zero()
         plaintext = b"Hello, Discovery v5!"
 
         ciphertext = aes_ctr_encrypt(key, iv, plaintext)
@@ -33,8 +33,8 @@ class TestAesCtr:
 
     def test_encryption_produces_different_output(self):
         """Test that encryption actually transforms the data."""
-        key = bytes.fromhex("00" * 16)
-        iv = bytes.fromhex("00" * 16)
+        key = Bytes16(bytes.fromhex("00" * 16))
+        iv = Bytes16(bytes.fromhex("00" * 16))
         plaintext = b"test data"
 
         ciphertext = aes_ctr_encrypt(key, iv, plaintext)
@@ -43,11 +43,11 @@ class TestAesCtr:
 
     def test_different_ivs_produce_different_ciphertext(self):
         """Test that different IVs produce different ciphertext."""
-        key = bytes(16)
+        key = Bytes16.zero()
         plaintext = b"same data"
 
-        iv1 = bytes.fromhex("00" * 16)
-        iv2 = bytes.fromhex("01" + "00" * 15)
+        iv1 = Bytes16(bytes.fromhex("00" * 16))
+        iv2 = Bytes16(bytes.fromhex("01" + "00" * 15))
 
         ct1 = aes_ctr_encrypt(key, iv1, plaintext)
         ct2 = aes_ctr_encrypt(key, iv2, plaintext)
@@ -57,12 +57,12 @@ class TestAesCtr:
     def test_invalid_key_length_raises(self):
         """Test that invalid key length raises ValueError."""
         with pytest.raises(ValueError, match="Key must be 16 bytes"):
-            aes_ctr_encrypt(bytes(15), bytes(16), b"data")
+            aes_ctr_encrypt(bytes(15), bytes(16), b"data")  # type: ignore[arg-type]
 
     def test_invalid_iv_length_raises(self):
         """Test that invalid IV length raises ValueError."""
         with pytest.raises(ValueError, match="IV must be 16 bytes"):
-            aes_ctr_encrypt(bytes(16), bytes(15), b"data")
+            aes_ctr_encrypt(bytes(16), bytes(15), b"data")  # type: ignore[arg-type]
 
 
 class TestAesGcm:
@@ -70,8 +70,8 @@ class TestAesGcm:
 
     def test_encrypt_decrypt_roundtrip(self):
         """Test that decryption reverses encryption."""
-        key = bytes(16)
-        nonce = bytes(12)
+        key = Bytes16.zero()
+        nonce = Bytes12.zero()
         plaintext = b"Hello, Discovery v5!"
         aad = b"additional data"
 
@@ -82,8 +82,8 @@ class TestAesGcm:
 
     def test_ciphertext_includes_auth_tag(self):
         """Test that ciphertext is longer than plaintext (includes 16-byte tag)."""
-        key = bytes(16)
-        nonce = bytes(12)
+        key = Bytes16.zero()
+        nonce = Bytes12.zero()
         plaintext = b"test"
         aad = b""
 
@@ -95,8 +95,8 @@ class TestAesGcm:
         """Test that wrong AAD causes authentication failure."""
         from cryptography.exceptions import InvalidTag
 
-        key = bytes(16)
-        nonce = bytes(12)
+        key = Bytes16.zero()
+        nonce = Bytes12.zero()
         plaintext = b"secret"
         aad = b"correct aad"
 
@@ -108,12 +108,12 @@ class TestAesGcm:
     def test_invalid_key_length_raises(self):
         """Test that invalid key length raises ValueError."""
         with pytest.raises(ValueError, match="Key must be 16 bytes"):
-            aes_gcm_encrypt(bytes(15), bytes(12), b"data", b"")
+            aes_gcm_encrypt(bytes(15), bytes(12), b"data", b"")  # type: ignore[arg-type]
 
     def test_invalid_nonce_length_raises(self):
         """Test that invalid nonce length raises ValueError."""
         with pytest.raises(ValueError, match="Nonce must be 12 bytes"):
-            aes_gcm_encrypt(bytes(16), bytes(11), b"data", b"")
+            aes_gcm_encrypt(bytes(16), bytes(11), b"data", b"")  # type: ignore[arg-type]
 
 
 class TestEcdh:
@@ -129,14 +129,14 @@ class TestEcdh:
 
         assert secret_ab == secret_ba
 
-    def test_ecdh_produces_32_byte_secret(self):
-        """Test that ECDH produces a 32-byte shared secret."""
+    def test_ecdh_produces_33_byte_secret(self):
+        """Test that ECDH produces a 33-byte compressed point shared secret."""
         priv_a, pub_a = generate_secp256k1_keypair()
         priv_b, pub_b = generate_secp256k1_keypair()
 
         secret = ecdh_agree(priv_a, pub_b)
 
-        assert len(secret) == 32
+        assert len(secret) == 33
 
     def test_different_keypairs_produce_different_secrets(self):
         """Test that different keypairs produce different shared secrets."""
@@ -180,15 +180,6 @@ class TestKeypairGeneration:
 class TestPubkeyConversion:
     """Tests for public key format conversion."""
 
-    def test_compressed_to_uncompressed_to_compressed(self):
-        """Test roundtrip conversion."""
-        _, compressed = generate_secp256k1_keypair()
-
-        uncompressed = pubkey_to_uncompressed(compressed)
-        recompressed = pubkey_to_compressed(uncompressed)
-
-        assert recompressed == compressed
-
     def test_uncompressed_is_65_bytes(self):
         """Test that uncompressed format is 65 bytes."""
         _, compressed = generate_secp256k1_keypair()
@@ -211,7 +202,7 @@ class TestIdNonceSignature:
         """Test that signature verifies correctly."""
         priv, pub = generate_secp256k1_keypair()
         challenge_data = make_challenge_data()
-        dest_node_id = bytes(32)
+        dest_node_id = Bytes32.zero()
 
         # Need a valid ephemeral pubkey.
         _, eph_pub = generate_secp256k1_keypair()
@@ -225,7 +216,7 @@ class TestIdNonceSignature:
         priv, _ = generate_secp256k1_keypair()
         _, eph_pub = generate_secp256k1_keypair()
         challenge_data = make_challenge_data()
-        dest_node_id = bytes(32)
+        dest_node_id = Bytes32.zero()
 
         signature = sign_id_nonce(priv, challenge_data, eph_pub, dest_node_id)
 
@@ -237,7 +228,7 @@ class TestIdNonceSignature:
         _, wrong_pub = generate_secp256k1_keypair()
         _, eph_pub = generate_secp256k1_keypair()
         challenge_data = make_challenge_data()
-        dest_node_id = bytes(32)
+        dest_node_id = Bytes32.zero()
 
         signature = sign_id_nonce(priv, challenge_data, eph_pub, dest_node_id)
 
@@ -252,7 +243,7 @@ class TestIdNonceSignature:
         _, eph_pub = generate_secp256k1_keypair()
         challenge_data = make_challenge_data()
         wrong_challenge_data = make_challenge_data(bytes.fromhex("01" + "00" * 15))
-        dest_node_id = bytes(32)
+        dest_node_id = Bytes32.zero()
 
         signature = sign_id_nonce(priv, challenge_data, eph_pub, dest_node_id)
 

@@ -34,7 +34,7 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
-from lean_spec.types import Uint64
+from lean_spec.types import Bytes12, Bytes16, Uint64
 
 from .config import MAX_PACKET_SIZE, MIN_PACKET_SIZE
 from .crypto import (
@@ -162,7 +162,7 @@ def encode_packet(
     # so the IV MUST be random to prevent ciphertext patterns.
     # Without randomness, identical packets would produce
     # identical masked headers, enabling traffic analysis.
-    masking_iv = os.urandom(CTR_IV_SIZE)
+    masking_iv = Bytes16(os.urandom(CTR_IV_SIZE))
 
     static_header = _encode_static_header(flag, nonce, len(authdata))
     header = static_header + authdata
@@ -172,7 +172,7 @@ def encode_packet(
     # The masking key is derived from the destination node ID.
     # Only the intended recipient can unmask the header.
     # This provides privacy without requiring key exchange.
-    masking_key = dest_node_id[:AES_KEY_SIZE]
+    masking_key = Bytes16(dest_node_id[:AES_KEY_SIZE])
     masked_header = aes_ctr_encrypt(masking_key, masking_iv, header)
 
     if flag == PacketFlag.WHOAREYOU:
@@ -186,7 +186,9 @@ def encode_packet(
         #
         # The recipient verifies the header wasn't modified
         # without having to decrypt the payload first.
-        encrypted_message = aes_gcm_encrypt(encryption_key, nonce, message, masked_header)
+        encrypted_message = aes_gcm_encrypt(
+            Bytes16(encryption_key), Bytes12(nonce), message, masked_header
+        )
 
     # Assemble packet.
     packet = masking_iv + masked_header + encrypted_message
@@ -215,10 +217,10 @@ def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeade
         raise ValueError(f"Packet too small: {len(data)} < {MIN_PACKET_SIZE}")
 
     # Extract masking IV.
-    masking_iv = data[:CTR_IV_SIZE]
+    masking_iv = Bytes16(data[:CTR_IV_SIZE])
 
     # Unmask enough to read the static header.
-    masking_key = local_node_id[:AES_KEY_SIZE]
+    masking_key = Bytes16(local_node_id[:AES_KEY_SIZE])
     masked_data = data[CTR_IV_SIZE:]
 
     # Decrypt static header first to get authdata size.
@@ -322,7 +324,7 @@ def decrypt_message(
     Returns:
         Decrypted message plaintext.
     """
-    return aes_gcm_decrypt(encryption_key, bytes(nonce), ciphertext, masked_header)
+    return aes_gcm_decrypt(Bytes16(encryption_key), Bytes12(nonce), ciphertext, masked_header)
 
 
 def encode_message_authdata(src_id: bytes) -> bytes:

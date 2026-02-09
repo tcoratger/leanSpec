@@ -25,11 +25,14 @@ References:
 
 from __future__ import annotations
 
+import struct
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from threading import Lock
 from typing import TYPE_CHECKING
+
+from lean_spec.types import Bytes32, Bytes33, Bytes64
 
 from .config import HANDSHAKE_TIMEOUT_SECS
 from .crypto import (
@@ -222,8 +225,6 @@ class HandshakeManager:
         #
         # This data becomes the HKDF salt for session key derivation.
         # Both sides must use identical challenge_data to derive matching keys.
-        import struct
-
         static_header = (
             PROTOCOL_ID
             + struct.pack(">H", PROTOCOL_VERSION)
@@ -279,10 +280,10 @@ class HandshakeManager:
         # Per spec, the signature input includes the full challenge_data (not just id_nonce)
         # to bind the signature to this specific WHOAREYOU exchange.
         id_signature = sign_id_nonce(
-            self._local_private_key,
+            Bytes32(self._local_private_key),
             challenge_data,
             eph_pubkey,
-            remote_node_id,
+            Bytes32(remote_node_id),
         )
 
         # Include our ENR if the remote's known seq is stale.
@@ -305,8 +306,8 @@ class HandshakeManager:
         send_key, recv_key = derive_keys_from_pubkey(
             local_private_key=eph_privkey,
             remote_public_key=remote_pubkey,
-            local_node_id=self._local_node_id,
-            remote_node_id=remote_node_id,
+            local_node_id=Bytes32(self._local_node_id),
+            remote_node_id=Bytes32(remote_node_id),
             challenge_data=challenge_data,
             is_initiator=True,
         )
@@ -387,11 +388,11 @@ class HandshakeManager:
         # The signature was computed over challenge_data (not just id_nonce),
         # and includes our node_id as the WHOAREYOU sender (node-id-B).
         if not verify_id_nonce_signature(
-            signature=handshake.id_signature,
+            signature=Bytes64(handshake.id_signature),
             challenge_data=challenge_data,
-            ephemeral_pubkey=handshake.eph_pubkey,
-            dest_node_id=self._local_node_id,
-            public_key_bytes=remote_pubkey,
+            ephemeral_pubkey=Bytes33(handshake.eph_pubkey),
+            dest_node_id=Bytes32(self._local_node_id),
+            public_key_bytes=Bytes33(remote_pubkey),
         ):
             raise HandshakeError("Invalid ID signature")
 
@@ -400,10 +401,10 @@ class HandshakeManager:
         # The challenge_data was saved when we sent WHOAREYOU.
         # Using the same data ensures both sides derive identical keys.
         recv_key, send_key = derive_keys_from_pubkey(
-            local_private_key=self._local_private_key,
+            local_private_key=Bytes32(self._local_private_key),
             remote_public_key=handshake.eph_pubkey,
-            local_node_id=self._local_node_id,
-            remote_node_id=remote_node_id,
+            local_node_id=Bytes32(self._local_node_id),
+            remote_node_id=Bytes32(remote_node_id),
             challenge_data=challenge_data,
             is_initiator=False,
         )
@@ -487,7 +488,7 @@ class HandshakeManager:
                     computed_id = enr.compute_node_id()
                     if computed_id is not None and bytes(computed_id) == node_id:
                         return bytes(enr.public_key)
-            except Exception:
+            except (ValueError, KeyError, IndexError):
                 pass
 
         # Fall back to our ENR cache.
@@ -564,7 +565,7 @@ class HandshakeManager:
                 return enr.model_copy(update={"node_id": node_id})
 
             return enr
-        except Exception:
+        except (ValueError, KeyError, IndexError, UnicodeDecodeError):
             return None
 
     def register_enr(self, node_id: bytes, enr: "ENR") -> None:

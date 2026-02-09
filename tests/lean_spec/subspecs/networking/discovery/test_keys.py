@@ -10,6 +10,7 @@ from lean_spec.subspecs.networking.discovery.keys import (
     derive_keys,
     derive_keys_from_pubkey,
 )
+from lean_spec.types import Bytes32, Bytes33
 from tests.lean_spec.helpers import make_challenge_data
 
 
@@ -18,9 +19,9 @@ class TestDeriveKeys:
 
     def test_derives_two_16_byte_keys(self):
         """Test that key derivation produces two 16-byte keys."""
-        secret = bytes(32)
-        initiator_id = bytes(32)
-        recipient_id = bytes(32)
+        secret = Bytes33(bytes(33))
+        initiator_id = Bytes32(bytes(32))
+        recipient_id = Bytes32(bytes(32))
         challenge_data = make_challenge_data()
 
         init_key, recv_key = derive_keys(secret, initiator_id, recipient_id, challenge_data)
@@ -30,10 +31,10 @@ class TestDeriveKeys:
 
     def test_different_secrets_produce_different_keys(self):
         """Test that different secrets produce different keys."""
-        secret1 = bytes.fromhex("00" * 32)
-        secret2 = bytes.fromhex("01" + "00" * 31)
-        initiator_id = bytes(32)
-        recipient_id = bytes(32)
+        secret1 = Bytes33(bytes.fromhex("00" * 33))
+        secret2 = Bytes33(bytes.fromhex("01" + "00" * 32))
+        initiator_id = Bytes32(bytes(32))
+        recipient_id = Bytes32(bytes(32))
         challenge_data = make_challenge_data()
 
         keys1 = derive_keys(secret1, initiator_id, recipient_id, challenge_data)
@@ -43,10 +44,10 @@ class TestDeriveKeys:
 
     def test_different_node_ids_produce_different_keys(self):
         """Test that different node IDs produce different keys."""
-        secret = bytes(32)
-        initiator_id1 = bytes.fromhex("00" * 32)
-        initiator_id2 = bytes.fromhex("01" + "00" * 31)
-        recipient_id = bytes(32)
+        secret = Bytes33(bytes(33))
+        initiator_id1 = Bytes32(bytes.fromhex("00" * 32))
+        initiator_id2 = Bytes32(bytes.fromhex("01" + "00" * 31))
+        recipient_id = Bytes32(bytes(32))
         challenge_data = make_challenge_data()
 
         keys1 = derive_keys(secret, initiator_id1, recipient_id, challenge_data)
@@ -56,9 +57,9 @@ class TestDeriveKeys:
 
     def test_different_challenge_data_produce_different_keys(self):
         """Test that different challenge data produces different keys."""
-        secret = bytes(32)
-        initiator_id = bytes(32)
-        recipient_id = bytes(32)
+        secret = Bytes33(bytes(33))
+        initiator_id = Bytes32(bytes(32))
+        recipient_id = Bytes32(bytes(32))
         challenge_data1 = make_challenge_data(bytes.fromhex("00" * 16))
         challenge_data2 = make_challenge_data(bytes.fromhex("01" + "00" * 15))
 
@@ -69,9 +70,9 @@ class TestDeriveKeys:
 
     def test_order_matters(self):
         """Test that initiator and recipient order matters."""
-        secret = bytes(32)
-        node_a = bytes.fromhex("aa" * 32)
-        node_b = bytes.fromhex("bb" * 32)
+        secret = Bytes33(bytes(33))
+        node_a = Bytes32(bytes.fromhex("aa" * 32))
+        node_b = Bytes32(bytes.fromhex("bb" * 32))
         challenge_data = make_challenge_data()
 
         keys_ab = derive_keys(secret, node_a, node_b, challenge_data)
@@ -81,18 +82,18 @@ class TestDeriveKeys:
 
     def test_invalid_secret_length_raises(self):
         """Test that invalid secret length raises ValueError."""
-        with pytest.raises(ValueError, match="Secret must be 32 bytes"):
-            derive_keys(bytes(31), bytes(32), bytes(32), make_challenge_data())
+        with pytest.raises(ValueError, match="Secret must be 33 bytes"):
+            derive_keys(bytes(32), bytes(32), bytes(32), make_challenge_data())  # type: ignore[arg-type]
 
     def test_invalid_initiator_id_length_raises(self):
         """Test that invalid initiator ID length raises ValueError."""
         with pytest.raises(ValueError, match="Initiator ID must be 32 bytes"):
-            derive_keys(bytes(32), bytes(31), bytes(32), make_challenge_data())
+            derive_keys(bytes(33), bytes(31), bytes(32), make_challenge_data())  # type: ignore[arg-type]
 
     def test_invalid_recipient_id_length_raises(self):
         """Test that invalid recipient ID length raises ValueError."""
         with pytest.raises(ValueError, match="Recipient ID must be 32 bytes"):
-            derive_keys(bytes(32), bytes(32), bytes(31), make_challenge_data())
+            derive_keys(bytes(33), bytes(32), bytes(31), make_challenge_data())  # type: ignore[arg-type]
 
 
 class TestDeriveKeysFromPubkey:
@@ -108,12 +109,12 @@ class TestDeriveKeysFromPubkey:
 
         # A initiates to B
         send_a, recv_a = derive_keys_from_pubkey(
-            priv_a, pub_b, bytes(node_a), bytes(node_b), challenge_data, is_initiator=True
+            priv_a, pub_b, node_a, node_b, challenge_data, is_initiator=True
         )
 
         # B responds to A
         send_b, recv_b = derive_keys_from_pubkey(
-            priv_b, pub_a, bytes(node_b), bytes(node_a), challenge_data, is_initiator=False
+            priv_b, pub_a, node_b, node_a, challenge_data, is_initiator=False
         )
 
         # A's send key should be B's recv key and vice versa
