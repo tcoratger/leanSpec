@@ -6,7 +6,6 @@ used by the CLI.
 
 from __future__ import annotations
 
-import asyncio
 import base64
 from unittest.mock import AsyncMock, patch
 
@@ -352,210 +351,190 @@ class TestCreateAnchorBlock:
 class TestInitFromCheckpoint:
     """Tests for _init_from_checkpoint() async function."""
 
-    def test_checkpoint_sync_genesis_time_mismatch_returns_none(self) -> None:
+    async def test_checkpoint_sync_genesis_time_mismatch_returns_none(self) -> None:
         """Returns None when checkpoint state genesis time differs from local config."""
+        from lean_spec.__main__ import _init_from_checkpoint
+        from lean_spec.subspecs.genesis import GenesisConfig
 
-        async def run_test() -> None:
-            from lean_spec.__main__ import _init_from_checkpoint
-            from lean_spec.subspecs.genesis import GenesisConfig
+        # Arrange: Create checkpoint state with genesis_time=1000
+        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
 
-            # Arrange: Create checkpoint state with genesis_time=1000
-            checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
+        # Local genesis config with different genesis_time=2000
+        local_genesis = GenesisConfig.model_validate(
+            {
+                "GENESIS_TIME": 2000,
+                "GENESIS_VALIDATORS": [],
+            }
+        )
 
-            # Local genesis config with different genesis_time=2000
-            local_genesis = GenesisConfig.model_validate(
-                {
-                    "GENESIS_TIME": 2000,
-                    "GENESIS_VALIDATORS": [],
-                }
+        # Mock the checkpoint sync client functions
+        mock_event_source = AsyncMock()
+
+        with (
+            patch(
+                "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
+                new_callable=AsyncMock,
+                return_value=checkpoint_state,
+            ),
+            patch(
+                "lean_spec.subspecs.sync.checkpoint_sync.verify_checkpoint_state",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            # Act
+            result = await _init_from_checkpoint(
+                checkpoint_sync_url="http://localhost:5052",
+                genesis=local_genesis,
+                event_source=mock_event_source,
             )
 
-            # Mock the checkpoint sync client functions
-            mock_event_source = AsyncMock()
+        # Assert: Returns None due to genesis time mismatch
+        assert result is None
 
-            with (
-                patch(
-                    "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
-                    new_callable=AsyncMock,
-                    return_value=checkpoint_state,
-                ),
-                patch(
-                    "lean_spec.subspecs.sync.checkpoint_sync.verify_checkpoint_state",
-                    new_callable=AsyncMock,
-                    return_value=True,
-                ),
-            ):
-                # Act
-                result = await _init_from_checkpoint(
-                    checkpoint_sync_url="http://localhost:5052",
-                    genesis=local_genesis,
-                    event_source=mock_event_source,
-                )
-
-            # Assert: Returns None due to genesis time mismatch
-            assert result is None
-
-        asyncio.run(run_test())
-
-    def test_checkpoint_sync_verification_failure_returns_none(self) -> None:
+    async def test_checkpoint_sync_verification_failure_returns_none(self) -> None:
         """Returns None when checkpoint state verification fails."""
+        from lean_spec.__main__ import _init_from_checkpoint
+        from lean_spec.subspecs.genesis import GenesisConfig
 
-        async def run_test() -> None:
-            from lean_spec.__main__ import _init_from_checkpoint
-            from lean_spec.subspecs.genesis import GenesisConfig
+        # Arrange
+        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
+        local_genesis = GenesisConfig.model_validate(
+            {
+                "GENESIS_TIME": 1000,
+                "GENESIS_VALIDATORS": [],
+            }
+        )
 
-            # Arrange
-            checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
-            local_genesis = GenesisConfig.model_validate(
-                {
-                    "GENESIS_TIME": 1000,
-                    "GENESIS_VALIDATORS": [],
-                }
+        mock_event_source = AsyncMock()
+
+        with (
+            patch(
+                "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
+                new_callable=AsyncMock,
+                return_value=checkpoint_state,
+            ),
+            patch(
+                "lean_spec.subspecs.sync.checkpoint_sync.verify_checkpoint_state",
+                new_callable=AsyncMock,
+                return_value=False,  # Verification fails
+            ),
+        ):
+            # Act
+            result = await _init_from_checkpoint(
+                checkpoint_sync_url="http://localhost:5052",
+                genesis=local_genesis,
+                event_source=mock_event_source,
             )
 
-            mock_event_source = AsyncMock()
+        # Assert
+        assert result is None
 
-            with (
-                patch(
-                    "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
-                    new_callable=AsyncMock,
-                    return_value=checkpoint_state,
-                ),
-                patch(
-                    "lean_spec.subspecs.sync.checkpoint_sync.verify_checkpoint_state",
-                    new_callable=AsyncMock,
-                    return_value=False,  # Verification fails
-                ),
-            ):
-                # Act
-                result = await _init_from_checkpoint(
-                    checkpoint_sync_url="http://localhost:5052",
-                    genesis=local_genesis,
-                    event_source=mock_event_source,
-                )
-
-            # Assert
-            assert result is None
-
-        asyncio.run(run_test())
-
-    def test_checkpoint_sync_network_error_returns_none(self) -> None:
+    async def test_checkpoint_sync_network_error_returns_none(self) -> None:
         """Returns None when network error occurs during fetch."""
+        from lean_spec.__main__ import _init_from_checkpoint
+        from lean_spec.subspecs.genesis import GenesisConfig
+        from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
 
-        async def run_test() -> None:
-            from lean_spec.__main__ import _init_from_checkpoint
-            from lean_spec.subspecs.genesis import GenesisConfig
-            from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
+        # Arrange
+        local_genesis = GenesisConfig.model_validate(
+            {
+                "GENESIS_TIME": 1000,
+                "GENESIS_VALIDATORS": [],
+            }
+        )
 
-            # Arrange
-            local_genesis = GenesisConfig.model_validate(
-                {
-                    "GENESIS_TIME": 1000,
-                    "GENESIS_VALIDATORS": [],
-                }
+        mock_event_source = AsyncMock()
+
+        with patch(
+            "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
+            new_callable=AsyncMock,
+            side_effect=CheckpointSyncError("Network error: connection refused"),
+        ):
+            # Act
+            result = await _init_from_checkpoint(
+                checkpoint_sync_url="http://localhost:5052",
+                genesis=local_genesis,
+                event_source=mock_event_source,
             )
 
-            mock_event_source = AsyncMock()
+        # Assert
+        assert result is None
 
-            with patch(
-                "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
-                new_callable=AsyncMock,
-                side_effect=CheckpointSyncError("Network error: connection refused"),
-            ):
-                # Act
-                result = await _init_from_checkpoint(
-                    checkpoint_sync_url="http://localhost:5052",
-                    genesis=local_genesis,
-                    event_source=mock_event_source,
-                )
-
-            # Assert
-            assert result is None
-
-        asyncio.run(run_test())
-
-    def test_checkpoint_sync_success_returns_node(self) -> None:
+    async def test_checkpoint_sync_success_returns_node(self) -> None:
         """Successful checkpoint sync returns initialized Node."""
+        from lean_spec.__main__ import _init_from_checkpoint
+        from lean_spec.subspecs.genesis import GenesisConfig
+        from lean_spec.subspecs.node import Node
 
-        async def run_test() -> None:
-            from lean_spec.__main__ import _init_from_checkpoint
-            from lean_spec.subspecs.genesis import GenesisConfig
-            from lean_spec.subspecs.node import Node
+        # Arrange: Create matching genesis times
+        genesis_time = 1000
+        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=genesis_time)
 
-            # Arrange: Create matching genesis times
-            genesis_time = 1000
-            checkpoint_state = make_genesis_state(num_validators=3, genesis_time=genesis_time)
+        local_genesis = GenesisConfig.model_validate(
+            {
+                "GENESIS_TIME": genesis_time,
+                "GENESIS_VALIDATORS": [],
+            }
+        )
 
-            local_genesis = GenesisConfig.model_validate(
-                {
-                    "GENESIS_TIME": genesis_time,
-                    "GENESIS_VALIDATORS": [],
-                }
-            )
+        # Create a mock event source with required attributes
+        mock_event_source = AsyncMock()
+        mock_event_source.reqresp_client = AsyncMock()
 
-            # Create a mock event source with required attributes
-            mock_event_source = AsyncMock()
-            mock_event_source.reqresp_client = AsyncMock()
-
-            with (
-                patch(
-                    "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
-                    new_callable=AsyncMock,
-                    return_value=checkpoint_state,
-                ),
-                patch(
-                    "lean_spec.subspecs.sync.checkpoint_sync.verify_checkpoint_state",
-                    new_callable=AsyncMock,
-                    return_value=True,
-                ),
-            ):
-                # Act
-                result = await _init_from_checkpoint(
-                    checkpoint_sync_url="http://localhost:5052",
-                    genesis=local_genesis,
-                    event_source=mock_event_source,
-                )
-
-            # Assert: Returns a Node instance
-            assert result is not None
-            assert isinstance(result, Node)
-
-            # Verify the node's store was initialized
-            assert result.store is not None
-
-        asyncio.run(run_test())
-
-    def test_checkpoint_sync_http_status_error_returns_none(self) -> None:
-        """Returns None when HTTP status error occurs."""
-
-        async def run_test() -> None:
-            from lean_spec.__main__ import _init_from_checkpoint
-            from lean_spec.subspecs.genesis import GenesisConfig
-            from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
-
-            # Arrange
-            local_genesis = GenesisConfig.model_validate(
-                {
-                    "GENESIS_TIME": 1000,
-                    "GENESIS_VALIDATORS": [],
-                }
-            )
-
-            mock_event_source = AsyncMock()
-
-            with patch(
+        with (
+            patch(
                 "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
                 new_callable=AsyncMock,
-                side_effect=CheckpointSyncError("HTTP error 404: Not Found"),
-            ):
-                # Act
-                result = await _init_from_checkpoint(
-                    checkpoint_sync_url="http://localhost:5052",
-                    genesis=local_genesis,
-                    event_source=mock_event_source,
-                )
+                return_value=checkpoint_state,
+            ),
+            patch(
+                "lean_spec.subspecs.sync.checkpoint_sync.verify_checkpoint_state",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
+            # Act
+            result = await _init_from_checkpoint(
+                checkpoint_sync_url="http://localhost:5052",
+                genesis=local_genesis,
+                event_source=mock_event_source,
+            )
 
-            # Assert
-            assert result is None
+        # Assert: Returns a Node instance
+        assert result is not None
+        assert isinstance(result, Node)
 
-        asyncio.run(run_test())
+        # Verify the node's store was initialized
+        assert result.store is not None
+
+    async def test_checkpoint_sync_http_status_error_returns_none(self) -> None:
+        """Returns None when HTTP status error occurs."""
+        from lean_spec.__main__ import _init_from_checkpoint
+        from lean_spec.subspecs.genesis import GenesisConfig
+        from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
+
+        # Arrange
+        local_genesis = GenesisConfig.model_validate(
+            {
+                "GENESIS_TIME": 1000,
+                "GENESIS_VALIDATORS": [],
+            }
+        )
+
+        mock_event_source = AsyncMock()
+
+        with patch(
+            "lean_spec.subspecs.sync.checkpoint_sync.fetch_finalized_state",
+            new_callable=AsyncMock,
+            side_effect=CheckpointSyncError("HTTP error 404: Not Found"),
+        ):
+            # Act
+            result = await _init_from_checkpoint(
+                checkpoint_sync_url="http://localhost:5052",
+                genesis=local_genesis,
+                event_source=mock_event_source,
+            )
+
+        # Assert
+        assert result is None

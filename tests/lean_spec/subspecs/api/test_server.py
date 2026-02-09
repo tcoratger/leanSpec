@@ -63,52 +63,44 @@ class TestApiServerStoreIntegration:
 class TestFinalizedStateEndpoint:
     """Tests for the /lean/v0/states/finalized endpoint error handling."""
 
-    def test_returns_503_when_store_not_initialized(self) -> None:
+    async def test_returns_503_when_store_not_initialized(self) -> None:
         """Endpoint returns 503 Service Unavailable when store is not set."""
         import httpx
 
-        async def run_test() -> None:
-            config = ApiServerConfig(port=15054)
-            server = ApiServer(config=config)
+        config = ApiServerConfig(port=15054)
+        server = ApiServer(config=config)
 
-            await server.start()
+        await server.start()
 
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get("http://127.0.0.1:15054/lean/v0/states/finalized")
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://127.0.0.1:15054/lean/v0/states/finalized")
 
-                    assert response.status_code == 503
+                assert response.status_code == 503
 
-            finally:
-                server.stop()
-                await asyncio.sleep(0.1)
-
-        asyncio.run(run_test())
+        finally:
+            server.stop()
+            await asyncio.sleep(0.1)
 
 
 class TestJustifiedCheckpointEndpoint:
     """Tests for the /lean/v0/checkpoints/justified endpoint error handling."""
 
-    def test_returns_503_when_store_not_initialized(self) -> None:
+    async def test_returns_503_when_store_not_initialized(self) -> None:
         """Endpoint returns 503 Service Unavailable when store is not set."""
         import httpx
 
-        async def run_test() -> None:
-            config = ApiServerConfig(port=15057)
-            server = ApiServer(config=config)
+        config = ApiServerConfig(port=15057)
+        server = ApiServer(config=config)
 
-            await server.start()
+        await server.start()
 
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(
-                        "http://127.0.0.1:15057/lean/v0/checkpoints/justified"
-                    )
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://127.0.0.1:15057/lean/v0/checkpoints/justified")
 
-                    assert response.status_code == 503
+                assert response.status_code == 503
 
-            finally:
-                server.stop()
-                await asyncio.sleep(0.1)
-
-        asyncio.run(run_test())
+        finally:
+            server.stop()
+            await asyncio.sleep(0.1)

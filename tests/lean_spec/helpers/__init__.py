@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Coroutine
-from typing import TypeVar
-
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 from .builders import (
     GenesisData,
+    create_mock_sync_service,
     make_aggregated_attestation,
     make_attestation_data,
     make_block,
@@ -34,22 +31,15 @@ from .builders import (
     make_validators_from_key_manager,
     make_validators_with_keys,
 )
-from .mocks import MockNoiseSession
+from .mocks import MockEventSource, MockForkchoiceStore, MockNetworkRequester, MockNoiseSession
 
 TEST_VALIDATOR_ID = ValidatorIndex(0)
-
-
-_T = TypeVar("_T")
-
-
-def run_async(coro: Coroutine[object, object, _T]) -> _T:
-    """Run an async coroutine synchronously."""
-    return asyncio.run(coro)
 
 
 __all__ = [
     # Builders
     "GenesisData",
+    "create_mock_sync_service",
     "make_aggregated_attestation",
     "make_attestation_data",
     "make_block",
@@ -74,9 +64,10 @@ __all__ = [
     "make_validators_from_key_manager",
     "make_validators_with_keys",
     # Mocks
+    "MockEventSource",
+    "MockForkchoiceStore",
+    "MockNetworkRequester",
     "MockNoiseSession",
     # Constants
     "TEST_VALIDATOR_ID",
-    # Async utilities
-    "run_async",
 ]

@@ -26,7 +26,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
     Status,
 )
 from lean_spec.types import Bytes32
-from tests.lean_spec.helpers import make_test_block, make_test_status, run_async
+from tests.lean_spec.helpers import make_test_block, make_test_status
 
 
 @dataclass
@@ -112,19 +112,15 @@ class MockResponseStream:
 class TestYamuxResponseStream:
     """Tests for YamuxResponseStream wire format encoding."""
 
-    def test_send_success_encodes_correctly(self) -> None:
+    async def test_send_success_encodes_correctly(self) -> None:
         """Success response uses SUCCESS code and encodes SSZ data."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        ssz_data = b"\x01\x02\x03\x04"
+        await response.send_success(ssz_data)
 
-            ssz_data = b"\x01\x02\x03\x04"
-            await response.send_success(ssz_data)
-
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
+        written = stream.written
 
         assert len(written) == 1
         encoded = written[0]
@@ -137,18 +133,14 @@ class TestYamuxResponseStream:
         assert code == ResponseCode.SUCCESS
         assert decoded == b"\x01\x02\x03\x04"
 
-    def test_send_error_encodes_correctly(self) -> None:
+    async def test_send_error_encodes_correctly(self) -> None:
         """Error response uses specified code and UTF-8 message."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> list[bytes]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        await response.send_error(ResponseCode.INVALID_REQUEST, "Bad request")
 
-            await response.send_error(ResponseCode.INVALID_REQUEST, "Bad request")
-
-            return stream.written
-
-        written = run_async(run_test())
+        written = stream.written
 
         assert len(written) == 1
         encoded = written[0]
@@ -161,128 +153,95 @@ class TestYamuxResponseStream:
         assert code == ResponseCode.INVALID_REQUEST
         assert decoded == b"Bad request"
 
-    def test_send_error_server_error(self) -> None:
+    async def test_send_error_server_error(self) -> None:
         """SERVER_ERROR code encodes correctly."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> list[bytes]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        await response.send_error(ResponseCode.SERVER_ERROR, "Internal error")
 
-            await response.send_error(ResponseCode.SERVER_ERROR, "Internal error")
-
-            return stream.written
-
-        written = run_async(run_test())
-        encoded = written[0]
+        encoded = stream.written[0]
 
         code, decoded = ResponseCode.decode(encoded)
         assert code == ResponseCode.SERVER_ERROR
         assert decoded == b"Internal error"
 
-    def test_send_error_resource_unavailable(self) -> None:
+    async def test_send_error_resource_unavailable(self) -> None:
         """RESOURCE_UNAVAILABLE code encodes correctly."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> list[bytes]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        await response.send_error(ResponseCode.RESOURCE_UNAVAILABLE, "Block not found")
 
-            await response.send_error(ResponseCode.RESOURCE_UNAVAILABLE, "Block not found")
-
-            return stream.written
-
-        written = run_async(run_test())
-        encoded = written[0]
+        encoded = stream.written[0]
 
         code, decoded = ResponseCode.decode(encoded)
         assert code == ResponseCode.RESOURCE_UNAVAILABLE
         assert decoded == b"Block not found"
 
-    def test_finish_closes_stream(self) -> None:
+    async def test_finish_closes_stream(self) -> None:
         """Finish closes the underlying stream."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> bool:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
-
-            assert not stream.closed
-            await response.finish()
-            return stream.closed
-
-        closed = run_async(run_test())
-        assert closed is True
+        assert not stream.closed
+        await response.finish()
+        assert stream.closed is True
 
 
 class TestDefaultRequestHandlerStatus:
     """Tests for DefaultRequestHandler.handle_status."""
 
-    def test_handle_status_returns_our_status(self) -> None:
+    async def test_handle_status_returns_our_status(self) -> None:
         """Returns our configured status on valid request."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        response = MockResponseStream()
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            response = MockResponseStream()
+        peer_status = Status(
+            finalized=Checkpoint(root=Bytes32(b"\xaa" * 32), slot=Slot(50)),
+            head=Checkpoint(root=Bytes32(b"\xbb" * 32), slot=Slot(150)),
+        )
 
-            peer_status = Status(
-                finalized=Checkpoint(root=Bytes32(b"\xaa" * 32), slot=Slot(50)),
-                head=Checkpoint(root=Bytes32(b"\xbb" * 32), slot=Slot(150)),
-            )
+        await handler.handle_status(peer_status, response)
 
-            await handler.handle_status(peer_status, response)
-
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
-
-        assert len(errors) == 0
-        assert len(successes) == 1
+        assert len(response.errors) == 0
+        assert len(response.successes) == 1
 
         # Decode the SSZ response
-        returned_status = Status.decode_bytes(successes[0])
+        returned_status = Status.decode_bytes(response.successes[0])
         assert returned_status.head.slot == Slot(200)
         assert returned_status.finalized.slot == Slot(100)
 
-    def test_handle_status_no_status_returns_error(self) -> None:
+    async def test_handle_status_no_status_returns_error(self) -> None:
         """Returns SERVER_ERROR when no status is configured."""
+        handler = DefaultRequestHandler()  # No our_status set
+        response = MockResponseStream()
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            handler = DefaultRequestHandler()  # No our_status set
-            response = MockResponseStream()
+        peer_status = make_test_status()
+        await handler.handle_status(peer_status, response)
 
-            peer_status = make_test_status()
-            await handler.handle_status(peer_status, response)
+        assert len(response.successes) == 0
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.SERVER_ERROR
+        assert "not available" in response.errors[0][1]
 
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
-
-        assert len(successes) == 0
-        assert len(errors) == 1
-        assert errors[0][0] == ResponseCode.SERVER_ERROR
-        assert "not available" in errors[0][1]
-
-    def test_handle_status_ignores_peer_status(self) -> None:
+    async def test_handle_status_ignores_peer_status(self) -> None:
         """Peer's status does not affect our response."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        response = MockResponseStream()
 
-        async def run_test() -> bytes:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            response = MockResponseStream()
+        # Peer claims different chain state
+        peer_status = Status(
+            finalized=Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(9999)),
+            head=Checkpoint(root=Bytes32(b"\xee" * 32), slot=Slot(10000)),
+        )
 
-            # Peer claims different chain state
-            peer_status = Status(
-                finalized=Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(9999)),
-                head=Checkpoint(root=Bytes32(b"\xee" * 32), slot=Slot(10000)),
-            )
-
-            await handler.handle_status(peer_status, response)
-
-            return response.successes[0]
-
-        ssz_data = run_async(run_test())
+        await handler.handle_status(peer_status, response)
 
         # Our response is independent of peer's status
-        returned_status = Status.decode_bytes(ssz_data)
+        returned_status = Status.decode_bytes(response.successes[0])
         assert returned_status.head.slot == Slot(200)
         assert returned_status.finalized.slot == Slot(100)
 
@@ -290,362 +249,287 @@ class TestDefaultRequestHandlerStatus:
 class TestDefaultRequestHandlerBlocksByRoot:
     """Tests for DefaultRequestHandler.handle_blocks_by_root."""
 
-    def test_handle_blocks_by_root_returns_found_blocks(self) -> None:
+    async def test_handle_blocks_by_root_returns_found_blocks(self) -> None:
         """Sends SUCCESS response for each found block."""
+        block1 = make_test_block(slot=1, seed=1)
+        block2 = make_test_block(slot=2, seed=2)
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            block1 = make_test_block(slot=1, seed=1)
-            block2 = make_test_block(slot=2, seed=2)
+        # Create lookup that returns blocks for specific roots
+        block_roots: dict[bytes, SignedBlockWithAttestation] = {
+            b"\x11" * 32: block1,
+            b"\x22" * 32: block2,
+        }
 
-            # Create lookup that returns blocks for specific roots
-            block_roots: dict[bytes, SignedBlockWithAttestation] = {
-                b"\x11" * 32: block1,
-                b"\x22" * 32: block2,
-            }
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            return block_roots.get(bytes(root))
 
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                return block_roots.get(bytes(root))
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
+        request = BlocksByRootRequest(
+            roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32), Bytes32(b"\x22" * 32)])
+        )
 
-            request = BlocksByRootRequest(
-                roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32), Bytes32(b"\x22" * 32)])
-            )
+        await handler.handle_blocks_by_root(request, response)
 
-            await handler.handle_blocks_by_root(request, response)
-
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
-
-        assert len(errors) == 0
-        assert len(successes) == 2
+        assert len(response.errors) == 0
+        assert len(response.successes) == 2
 
         # Both blocks should be decodable
-        decoded1 = SignedBlockWithAttestation.decode_bytes(successes[0])
-        decoded2 = SignedBlockWithAttestation.decode_bytes(successes[1])
+        decoded1 = SignedBlockWithAttestation.decode_bytes(response.successes[0])
+        decoded2 = SignedBlockWithAttestation.decode_bytes(response.successes[1])
 
         assert decoded1.message.block.slot == Slot(1)
         assert decoded2.message.block.slot == Slot(2)
 
-    def test_handle_blocks_by_root_skips_missing_blocks(self) -> None:
+    async def test_handle_blocks_by_root_skips_missing_blocks(self) -> None:
         """Missing blocks are silently skipped."""
+        block1 = make_test_block(slot=1, seed=1)
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            block1 = make_test_block(slot=1, seed=1)
+        # Only block1 exists
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            if bytes(root) == b"\x11" * 32:
+                return block1
+            return None
 
-            # Only block1 exists
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                if bytes(root) == b"\x11" * 32:
-                    return block1
-                return None
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
-
-            # Request two blocks, only one exists
-            request = BlocksByRootRequest(
-                roots=RequestedBlockRoots(
-                    data=[
-                        Bytes32(b"\x11" * 32),  # exists
-                        Bytes32(b"\x99" * 32),  # missing
-                    ]
-                )
+        # Request two blocks, only one exists
+        request = BlocksByRootRequest(
+            roots=RequestedBlockRoots(
+                data=[
+                    Bytes32(b"\x11" * 32),  # exists
+                    Bytes32(b"\x99" * 32),  # missing
+                ]
             )
+        )
 
-            await handler.handle_blocks_by_root(request, response)
-
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
+        await handler.handle_blocks_by_root(request, response)
 
         # Only one block returned, no errors
-        assert len(errors) == 0
-        assert len(successes) == 1
+        assert len(response.errors) == 0
+        assert len(response.successes) == 1
 
-    def test_handle_blocks_by_root_no_lookup_returns_error(self) -> None:
+    async def test_handle_blocks_by_root_no_lookup_returns_error(self) -> None:
         """Returns SERVER_ERROR when no lookup callback is configured."""
+        handler = DefaultRequestHandler()  # No block_lookup set
+        response = MockResponseStream()
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            handler = DefaultRequestHandler()  # No block_lookup set
-            response = MockResponseStream()
+        request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32)]))
 
-            request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32)]))
+        await handler.handle_blocks_by_root(request, response)
 
-            await handler.handle_blocks_by_root(request, response)
+        assert len(response.successes) == 0
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.SERVER_ERROR
+        assert "not available" in response.errors[0][1]
 
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
-
-        assert len(successes) == 0
-        assert len(errors) == 1
-        assert errors[0][0] == ResponseCode.SERVER_ERROR
-        assert "not available" in errors[0][1]
-
-    def test_handle_blocks_by_root_empty_request(self) -> None:
+    async def test_handle_blocks_by_root_empty_request(self) -> None:
         """Empty request returns no blocks and no errors."""
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                return None
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            return None
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[]))
+        request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[]))
 
-            await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)
 
-            return response.successes, response.errors
+        assert len(response.errors) == 0
+        assert len(response.successes) == 0
 
-        successes, errors = run_async(run_test())
-
-        assert len(errors) == 0
-        assert len(successes) == 0
-
-    def test_handle_blocks_by_root_lookup_error_continues(self) -> None:
+    async def test_handle_blocks_by_root_lookup_error_continues(self) -> None:
         """Lookup exceptions are caught and processing continues."""
+        block2 = make_test_block(slot=2, seed=2)
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            block2 = make_test_block(slot=2, seed=2)
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            if bytes(root) == b"\x11" * 32:
+                raise RuntimeError("Database error")
+            if bytes(root) == b"\x22" * 32:
+                return block2
+            return None
 
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                if bytes(root) == b"\x11" * 32:
-                    raise RuntimeError("Database error")
-                if bytes(root) == b"\x22" * 32:
-                    return block2
-                return None
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
+        # First block causes error, second succeeds
+        request = BlocksByRootRequest(
+            roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32), Bytes32(b"\x22" * 32)])
+        )
 
-            # First block causes error, second succeeds
-            request = BlocksByRootRequest(
-                roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32), Bytes32(b"\x22" * 32)])
-            )
-
-            await handler.handle_blocks_by_root(request, response)
-
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
+        await handler.handle_blocks_by_root(request, response)
 
         # Second block still returned despite first lookup failing
-        assert len(errors) == 0
-        assert len(successes) == 1
+        assert len(response.errors) == 0
+        assert len(response.successes) == 1
 
-        decoded = SignedBlockWithAttestation.decode_bytes(successes[0])
+        decoded = SignedBlockWithAttestation.decode_bytes(response.successes[0])
         assert decoded.message.block.slot == Slot(2)
 
 
 class TestReqRespServer:
     """Tests for ReqRespServer request handling."""
 
-    def test_handle_status_request(self) -> None:
+    async def test_handle_status_request(self) -> None:
         """Full Status request/response flow through ReqRespServer."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            server = ReqRespServer(handler=handler)
+        # Build wire-format request
+        peer_status = Status(
+            finalized=Checkpoint(root=Bytes32(b"\xaa" * 32), slot=Slot(50)),
+            head=Checkpoint(root=Bytes32(b"\xbb" * 32), slot=Slot(150)),
+        )
+        request_bytes = encode_request(peer_status.encode_bytes())
 
-            # Build wire-format request
-            peer_status = Status(
-                finalized=Checkpoint(root=Bytes32(b"\xaa" * 32), slot=Slot(50)),
-                head=Checkpoint(root=Bytes32(b"\xbb" * 32), slot=Slot(150)),
-            )
-            request_bytes = encode_request(peer_status.encode_bytes())
+        stream = MockStream(request_data=request_bytes)
 
-            stream = MockStream(request_data=request_bytes)
-
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
-
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
         # Stream should be closed after handling
-        assert closed is True
+        assert stream.closed is True
 
         # Should have received a success response
-        assert len(written) >= 1
+        assert len(stream.written) >= 1
 
         # Decode the response
-        code, ssz_data = ResponseCode.decode(written[0])
+        code, ssz_data = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.SUCCESS
 
         returned_status = Status.decode_bytes(ssz_data)
         assert returned_status.head.slot == Slot(200)
 
-    def test_handle_blocks_by_root_request(self) -> None:
+    async def test_handle_blocks_by_root_request(self) -> None:
         """Full BlocksByRoot request/response flow through ReqRespServer."""
+        block1 = make_test_block(slot=1, seed=1)
+        root1 = Bytes32(b"\x11" * 32)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            block1 = make_test_block(slot=1, seed=1)
-            root1 = Bytes32(b"\x11" * 32)
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            if bytes(root) == bytes(root1):
+                return block1
+            return None
 
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                if bytes(root) == bytes(root1):
-                    return block1
-                return None
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        server = ReqRespServer(handler=handler)
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            server = ReqRespServer(handler=handler)
+        # Build wire-format request
+        request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root1]))
+        request_bytes = encode_request(request.encode_bytes())
 
-            # Build wire-format request
-            request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root1]))
-            request_bytes = encode_request(request.encode_bytes())
+        stream = MockStream(request_data=request_bytes)
 
-            stream = MockStream(request_data=request_bytes)
+        await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
 
-            await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, ssz_data = ResponseCode.decode(written[0])
+        code, ssz_data = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.SUCCESS
 
         returned_block = SignedBlockWithAttestation.decode_bytes(ssz_data)
         assert returned_block.message.block.slot == Slot(1)
 
-    def test_empty_request_returns_error(self) -> None:
+    async def test_empty_request_returns_error(self) -> None:
         """Empty request data returns INVALID_REQUEST error."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        stream = MockStream(request_data=b"")
 
-            stream = MockStream(request_data=b"")
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, message = ResponseCode.decode(written[0])
+        code, message = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
         assert b"Empty" in message
 
-    def test_decode_error_returns_invalid_request(self) -> None:
+    async def test_decode_error_returns_invalid_request(self) -> None:
         """Malformed wire data returns INVALID_REQUEST error."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        # Invalid snappy data after length prefix
+        malformed_data = b"\x10\x00\x00\x00invalid snappy data here"
+        stream = MockStream(request_data=malformed_data)
 
-            # Invalid snappy data after length prefix
-            malformed_data = b"\x10\x00\x00\x00invalid snappy data here"
-            stream = MockStream(request_data=malformed_data)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, _ = ResponseCode.decode(written[0])
+        code, _ = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
 
-    def test_invalid_ssz_returns_invalid_request(self) -> None:
+    async def test_invalid_ssz_returns_invalid_request(self) -> None:
         """Valid wire format but invalid SSZ returns INVALID_REQUEST."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        # Valid wire format but SSZ is too short for Status (needs 80 bytes)
+        invalid_ssz = b"\x01\x02\x03\x04"
+        request_bytes = encode_request(invalid_ssz)
+        stream = MockStream(request_data=request_bytes)
 
-            # Valid wire format but SSZ is too short for Status (needs 80 bytes)
-            invalid_ssz = b"\x01\x02\x03\x04"
-            request_bytes = encode_request(invalid_ssz)
-            stream = MockStream(request_data=request_bytes)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, message = ResponseCode.decode(written[0])
+        code, message = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
         assert b"Invalid Status" in message or b"Status" in message
 
-    def test_unknown_protocol_returns_error(self) -> None:
+    async def test_unknown_protocol_returns_error(self) -> None:
         """Unknown protocol ID returns SERVER_ERROR."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        # Valid request data but unknown protocol
+        status = make_test_status()
+        request_bytes = encode_request(status.encode_bytes())
+        stream = MockStream(request_data=request_bytes)
 
-            # Valid request data but unknown protocol
-            status = make_test_status()
-            request_bytes = encode_request(status.encode_bytes())
-            stream = MockStream(request_data=request_bytes)
+        unknown_protocol = "/unknown/protocol/1/ssz_snappy"
+        await server.handle_stream(stream, unknown_protocol)
 
-            unknown_protocol = "/unknown/protocol/1/ssz_snappy"
-            await server.handle_stream(stream, unknown_protocol)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, message = ResponseCode.decode(written[0])
+        code, message = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.SERVER_ERROR
         assert b"Unknown" in message or b"protocol" in message.lower()
 
-    def test_stream_closed_on_completion(self) -> None:
+    async def test_stream_closed_on_completion(self) -> None:
         """Stream is always closed after handling, even on success."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> bool:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        status = make_test_status()
+        request_bytes = encode_request(status.encode_bytes())
+        stream = MockStream(request_data=request_bytes)
 
-            status = make_test_status()
-            request_bytes = encode_request(status.encode_bytes())
-            stream = MockStream(request_data=request_bytes)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
 
-            return stream.closed
-
-        closed = run_async(run_test())
-        assert closed is True
-
-    def test_stream_closed_on_error(self) -> None:
+    async def test_stream_closed_on_error(self) -> None:
         """Stream is closed even when handling fails."""
+        handler = DefaultRequestHandler()  # No status configured
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> bool:
-            handler = DefaultRequestHandler()  # No status configured
-            server = ReqRespServer(handler=handler)
+        status = make_test_status()
+        request_bytes = encode_request(status.encode_bytes())
+        stream = MockStream(request_data=request_bytes)
 
-            status = make_test_status()
-            request_bytes = encode_request(status.encode_bytes())
-            stream = MockStream(request_data=request_bytes)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
-
-            return stream.closed
-
-        closed = run_async(run_test())
-        assert closed is True
+        assert stream.closed is True
 
 
 class TestReqRespProtocolConstants:
@@ -679,116 +563,100 @@ class TestReqRespProtocolConstants:
 class TestIntegration:
     """Integration tests for full request/response roundtrips."""
 
-    def test_roundtrip_status_request(self) -> None:
+    async def test_roundtrip_status_request(self) -> None:
         """Full encode -> server -> decode roundtrip for Status."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> Status:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            server = ReqRespServer(handler=handler)
+        # Client side: encode request
+        peer_status = Status(
+            finalized=Checkpoint(root=Bytes32(b"\xcc" * 32), slot=Slot(300)),
+            head=Checkpoint(root=Bytes32(b"\xdd" * 32), slot=Slot(400)),
+        )
+        request_wire = encode_request(peer_status.encode_bytes())
 
-            # Client side: encode request
-            peer_status = Status(
-                finalized=Checkpoint(root=Bytes32(b"\xcc" * 32), slot=Slot(300)),
-                head=Checkpoint(root=Bytes32(b"\xdd" * 32), slot=Slot(400)),
-            )
-            request_wire = encode_request(peer_status.encode_bytes())
+        # Server side: handle request
+        stream = MockStream(request_data=request_wire)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            # Server side: handle request
-            stream = MockStream(request_data=request_wire)
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        # Client side: decode response
+        response_wire = stream.written[0]
+        code, ssz_bytes = ResponseCode.decode(response_wire)
 
-            # Client side: decode response
-            response_wire = stream.written[0]
-            code, ssz_bytes = ResponseCode.decode(response_wire)
-
-            assert code == ResponseCode.SUCCESS
-            return Status.decode_bytes(ssz_bytes)
-
-        returned = run_async(run_test())
+        assert code == ResponseCode.SUCCESS
+        returned = Status.decode_bytes(ssz_bytes)
 
         # Verify we got our status back
         assert returned.head.slot == Slot(200)
         assert returned.finalized.slot == Slot(100)
 
-    def test_roundtrip_blocks_by_root_request(self) -> None:
+    async def test_roundtrip_blocks_by_root_request(self) -> None:
         """Full encode -> server -> decode roundtrip for BlocksByRoot."""
+        block1 = make_test_block(slot=10, seed=10)
+        block2 = make_test_block(slot=20, seed=20)
 
-        async def run_test() -> list[SignedBlockWithAttestation]:
-            block1 = make_test_block(slot=10, seed=10)
-            block2 = make_test_block(slot=20, seed=20)
+        root1 = Bytes32(b"\xaa" * 32)
+        root2 = Bytes32(b"\xbb" * 32)
 
-            root1 = Bytes32(b"\xaa" * 32)
-            root2 = Bytes32(b"\xbb" * 32)
+        blocks_by_root: dict[bytes, SignedBlockWithAttestation] = {
+            bytes(root1): block1,
+            bytes(root2): block2,
+        }
 
-            blocks_by_root: dict[bytes, SignedBlockWithAttestation] = {
-                bytes(root1): block1,
-                bytes(root2): block2,
-            }
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            return blocks_by_root.get(bytes(root))
 
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                return blocks_by_root.get(bytes(root))
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        server = ReqRespServer(handler=handler)
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            server = ReqRespServer(handler=handler)
+        # Client side: encode request
+        request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root1, root2]))
+        request_wire = encode_request(request.encode_bytes())
 
-            # Client side: encode request
-            request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root1, root2]))
-            request_wire = encode_request(request.encode_bytes())
+        # Server side: handle request
+        stream = MockStream(request_data=request_wire)
+        await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
 
-            # Server side: handle request
-            stream = MockStream(request_data=request_wire)
-            await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
-
-            # Client side: decode responses
-            results = []
-            for response_wire in stream.written:
-                code, ssz_bytes = ResponseCode.decode(response_wire)
-                if code == ResponseCode.SUCCESS:
-                    results.append(SignedBlockWithAttestation.decode_bytes(ssz_bytes))
-
-            return results
-
-        blocks = run_async(run_test())
+        # Client side: decode responses
+        blocks = []
+        for response_wire in stream.written:
+            code, ssz_bytes = ResponseCode.decode(response_wire)
+            if code == ResponseCode.SUCCESS:
+                blocks.append(SignedBlockWithAttestation.decode_bytes(ssz_bytes))
 
         assert len(blocks) == 2
         slots = {b.message.block.slot for b in blocks}
         assert Slot(10) in slots
         assert Slot(20) in slots
 
-    def test_roundtrip_blocks_by_root_partial_response(self) -> None:
+    async def test_roundtrip_blocks_by_root_partial_response(self) -> None:
         """BlocksByRoot returns only available blocks."""
+        block1 = make_test_block(slot=10, seed=10)
 
-        async def run_test() -> list[SignedBlockWithAttestation]:
-            block1 = make_test_block(slot=10, seed=10)
+        root1 = Bytes32(b"\xaa" * 32)
+        root_missing = Bytes32(b"\x00" * 32)
 
-            root1 = Bytes32(b"\xaa" * 32)
-            root_missing = Bytes32(b"\x00" * 32)
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            if bytes(root) == bytes(root1):
+                return block1
+            return None
 
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                if bytes(root) == bytes(root1):
-                    return block1
-                return None
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        server = ReqRespServer(handler=handler)
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            server = ReqRespServer(handler=handler)
+        # Request two blocks, only one exists
+        request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root1, root_missing]))
+        request_wire = encode_request(request.encode_bytes())
 
-            # Request two blocks, only one exists
-            request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root1, root_missing]))
-            request_wire = encode_request(request.encode_bytes())
+        stream = MockStream(request_data=request_wire)
+        await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
 
-            stream = MockStream(request_data=request_wire)
-            await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
-
-            results = []
-            for response_wire in stream.written:
-                code, ssz_bytes = ResponseCode.decode(response_wire)
-                if code == ResponseCode.SUCCESS:
-                    results.append(SignedBlockWithAttestation.decode_bytes(ssz_bytes))
-
-            return results
-
-        blocks = run_async(run_test())
+        blocks = []
+        for response_wire in stream.written:
+            code, ssz_bytes = ResponseCode.decode(response_wire)
+            if code == ResponseCode.SUCCESS:
+                blocks.append(SignedBlockWithAttestation.decode_bytes(ssz_bytes))
 
         # Only one block returned
         assert len(blocks) == 1
@@ -826,7 +694,7 @@ class TestResponseStreamProtocol:
 class TestBlockLookupTypeAlias:
     """Tests for BlockLookup type alias usage."""
 
-    def test_async_function_matches_block_lookup_signature(self) -> None:
+    async def test_async_function_matches_block_lookup_signature(self) -> None:
         """Verify async function can be used as BlockLookup."""
 
         async def my_lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
@@ -835,23 +703,17 @@ class TestBlockLookupTypeAlias:
         # Should type-check as BlockLookup
         lookup: BlockLookup = my_lookup
 
-        async def run_test() -> SignedBlockWithAttestation | None:
-            return await lookup(Bytes32(b"\x00" * 32))
-
-        result = run_async(run_test())
+        result = await lookup(Bytes32(b"\x00" * 32))
         assert result is None
 
-    def test_block_lookup_returning_block(self) -> None:
+    async def test_block_lookup_returning_block(self) -> None:
         """BlockLookup returning a block works correctly."""
         block = make_test_block(slot=42, seed=42)
 
         async def my_lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return block
 
-        async def run_test() -> SignedBlockWithAttestation | None:
-            return await my_lookup(Bytes32(b"\x00" * 32))
-
-        result = run_async(run_test())
+        result = await my_lookup(Bytes32(b"\x00" * 32))
         assert result is not None
         assert result.message.block.slot == Slot(42)
 
@@ -859,20 +721,16 @@ class TestBlockLookupTypeAlias:
 class TestYamuxResponseStreamMultipleResponses:
     """Tests for YamuxResponseStream with multiple responses in sequence."""
 
-    def test_send_multiple_success_responses(self) -> None:
+    async def test_send_multiple_success_responses(self) -> None:
         """Multiple SUCCESS responses are written independently."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> list[bytes]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        await response.send_success(b"\x01\x02")
+        await response.send_success(b"\x03\x04")
+        await response.send_success(b"\x05\x06")
 
-            await response.send_success(b"\x01\x02")
-            await response.send_success(b"\x03\x04")
-            await response.send_success(b"\x05\x06")
-
-            return stream.written
-
-        written = run_async(run_test())
+        written = stream.written
 
         assert len(written) == 3
 
@@ -883,19 +741,15 @@ class TestYamuxResponseStreamMultipleResponses:
             expected = bytes([i * 2 + 1, i * 2 + 2])
             assert decoded == expected
 
-    def test_send_success_then_error(self) -> None:
+    async def test_send_success_then_error(self) -> None:
         """Success response followed by error response."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> list[bytes]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        await response.send_success(b"\xaa\xbb")
+        await response.send_error(ResponseCode.RESOURCE_UNAVAILABLE, "Done")
 
-            await response.send_success(b"\xaa\xbb")
-            await response.send_error(ResponseCode.RESOURCE_UNAVAILABLE, "Done")
-
-            return stream.written
-
-        written = run_async(run_test())
+        written = stream.written
 
         assert len(written) == 2
 
@@ -907,18 +761,14 @@ class TestYamuxResponseStreamMultipleResponses:
         assert code2 == ResponseCode.RESOURCE_UNAVAILABLE
         assert data2 == b"Done"
 
-    def test_send_empty_success_response(self) -> None:
+    async def test_send_empty_success_response(self) -> None:
         """Empty SUCCESS response payload is handled."""
+        stream = MockStream()
+        response = YamuxResponseStream(_stream=stream)
 
-        async def run_test() -> list[bytes]:
-            stream = MockStream()
-            response = YamuxResponseStream(_stream=stream)
+        await response.send_success(b"")
 
-            await response.send_success(b"")
-
-            return stream.written
-
-        written = run_async(run_test())
+        written = stream.written
 
         assert len(written) == 1
         code, decoded = ResponseCode.decode(written[0])
@@ -971,346 +821,285 @@ class MockChunkedStream:
 class TestReqRespServerChunkedRead:
     """Tests for ReqRespServer handling chunked request data."""
 
-    def test_handle_chunked_status_request(self) -> None:
+    async def test_handle_chunked_status_request(self) -> None:
         """Request data arriving in multiple chunks is assembled correctly."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            server = ReqRespServer(handler=handler)
+        # Build wire-format request
+        peer_status = make_test_status()
+        request_bytes = encode_request(peer_status.encode_bytes())
 
-            # Build wire-format request
-            peer_status = make_test_status()
-            request_bytes = encode_request(peer_status.encode_bytes())
+        # Split into multiple chunks
+        mid = len(request_bytes) // 2
+        chunks = [request_bytes[:mid], request_bytes[mid:]]
 
-            # Split into multiple chunks
-            mid = len(request_bytes) // 2
-            chunks = [request_bytes[:mid], request_bytes[mid:]]
+        stream = MockChunkedStream(chunks=chunks)
 
-            stream = MockChunkedStream(chunks=chunks)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, ssz_data = ResponseCode.decode(written[0])
+        code, ssz_data = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.SUCCESS
 
-    def test_handle_single_byte_chunks(self) -> None:
+    async def test_handle_single_byte_chunks(self) -> None:
         """Request data arriving one byte at a time is handled."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            server = ReqRespServer(handler=handler)
+        peer_status = make_test_status()
+        request_bytes = encode_request(peer_status.encode_bytes())
 
-            peer_status = make_test_status()
-            request_bytes = encode_request(peer_status.encode_bytes())
+        # Split into single-byte chunks
+        chunks = [bytes([b]) for b in request_bytes]
 
-            # Split into single-byte chunks
-            chunks = [bytes([b]) for b in request_bytes]
+        stream = MockChunkedStream(chunks=chunks)
 
-            stream = MockChunkedStream(chunks=chunks)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, _ = ResponseCode.decode(written[0])
+        code, _ = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.SUCCESS
 
 
 class TestReqRespServerEdgeCases:
     """Edge cases for ReqRespServer."""
 
-    def test_invalid_blocks_by_root_ssz(self) -> None:
+    async def test_invalid_blocks_by_root_ssz(self) -> None:
         """Invalid SSZ for BlocksByRoot returns INVALID_REQUEST."""
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                return None
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            return None
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            server = ReqRespServer(handler=handler)
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        server = ReqRespServer(handler=handler)
 
-            # Valid wire format but wrong SSZ structure for BlocksByRootRequest
-            # BlocksByRootRequest expects list of Bytes32, not arbitrary bytes
-            invalid_ssz = b"\xff" * 10
-            request_bytes = encode_request(invalid_ssz)
-            stream = MockStream(request_data=request_bytes)
+        # Valid wire format but wrong SSZ structure for BlocksByRootRequest
+        # BlocksByRootRequest expects list of Bytes32, not arbitrary bytes
+        invalid_ssz = b"\xff" * 10
+        request_bytes = encode_request(invalid_ssz)
+        stream = MockStream(request_data=request_bytes)
 
-            await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
+        await server.handle_stream(stream, BLOCKS_BY_ROOT_PROTOCOL_V1)
 
-            return stream.written, stream.closed
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, message = ResponseCode.decode(written[0])
+        code, message = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
 
-    def test_truncated_varint_returns_error(self) -> None:
+    async def test_truncated_varint_returns_error(self) -> None:
         """Truncated varint in request returns INVALID_REQUEST."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> tuple[list[bytes], bool]:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        # Varint with continuation bit set but no following byte
+        truncated_varint = b"\x80"
+        stream = MockStream(request_data=truncated_varint)
 
-            # Varint with continuation bit set but no following byte
-            truncated_varint = b"\x80"
-            stream = MockStream(request_data=truncated_varint)
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+        assert stream.closed is True
+        assert len(stream.written) >= 1
 
-            return stream.written, stream.closed
-
-        written, closed = run_async(run_test())
-
-        assert closed is True
-        assert len(written) >= 1
-
-        code, _ = ResponseCode.decode(written[0])
+        code, _ = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
 
 
 class TestDefaultRequestHandlerEdgeCases:
     """Edge cases for DefaultRequestHandler."""
 
-    def test_blocks_by_root_single_block(self) -> None:
+    async def test_blocks_by_root_single_block(self) -> None:
         """Single block request returns correctly."""
+        block = make_test_block(slot=999, seed=99)
+        root = Bytes32(b"\x99" * 32)
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            block = make_test_block(slot=999, seed=99)
-            root = Bytes32(b"\x99" * 32)
+        async def lookup(r: Bytes32) -> SignedBlockWithAttestation | None:
+            if bytes(r) == bytes(root):
+                return block
+            return None
 
-            async def lookup(r: Bytes32) -> SignedBlockWithAttestation | None:
-                if bytes(r) == bytes(root):
-                    return block
-                return None
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
+        request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root]))
 
-            request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root]))
+        await handler.handle_blocks_by_root(request, response)
 
-            await handler.handle_blocks_by_root(request, response)
+        assert len(response.errors) == 0
+        assert len(response.successes) == 1
 
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
-
-        assert len(errors) == 0
-        assert len(successes) == 1
-
-        decoded = SignedBlockWithAttestation.decode_bytes(successes[0])
+        decoded = SignedBlockWithAttestation.decode_bytes(response.successes[0])
         assert decoded.message.block.slot == Slot(999)
 
-    def test_blocks_by_root_all_missing(self) -> None:
+    async def test_blocks_by_root_all_missing(self) -> None:
         """Request where all blocks are missing returns no success responses."""
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                return None
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            return None
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            request = BlocksByRootRequest(
-                roots=RequestedBlockRoots(
-                    data=[
-                        Bytes32(b"\x11" * 32),
-                        Bytes32(b"\x22" * 32),
-                        Bytes32(b"\x33" * 32),
-                    ]
-                )
+        request = BlocksByRootRequest(
+            roots=RequestedBlockRoots(
+                data=[
+                    Bytes32(b"\x11" * 32),
+                    Bytes32(b"\x22" * 32),
+                    Bytes32(b"\x33" * 32),
+                ]
             )
+        )
 
-            await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)
 
-            return response.successes, response.errors
+        assert len(response.errors) == 0
+        assert len(response.successes) == 0
 
-        successes, errors = run_async(run_test())
-
-        assert len(errors) == 0
-        assert len(successes) == 0
-
-    def test_blocks_by_root_mixed_found_missing(self) -> None:
+    async def test_blocks_by_root_mixed_found_missing(self) -> None:
         """Mixed found/missing blocks returns only found blocks."""
+        block1 = make_test_block(slot=1, seed=1)
+        block3 = make_test_block(slot=3, seed=3)
 
-        async def run_test() -> tuple[list[bytes], list[tuple[ResponseCode, str]]]:
-            block1 = make_test_block(slot=1, seed=1)
-            block3 = make_test_block(slot=3, seed=3)
+        blocks: dict[bytes, SignedBlockWithAttestation] = {
+            b"\x11" * 32: block1,
+            # \x22 missing
+            b"\x33" * 32: block3,
+        }
 
-            blocks: dict[bytes, SignedBlockWithAttestation] = {
-                b"\x11" * 32: block1,
-                # \x22 missing
-                b"\x33" * 32: block3,
-            }
+        async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
+            return blocks.get(bytes(root))
 
-            async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-                return blocks.get(bytes(root))
+        handler = DefaultRequestHandler(block_lookup=lookup)
+        response = MockResponseStream()
 
-            handler = DefaultRequestHandler(block_lookup=lookup)
-            response = MockResponseStream()
-
-            request = BlocksByRootRequest(
-                roots=RequestedBlockRoots(
-                    data=[
-                        Bytes32(b"\x11" * 32),
-                        Bytes32(b"\x22" * 32),
-                        Bytes32(b"\x33" * 32),
-                    ]
-                )
+        request = BlocksByRootRequest(
+            roots=RequestedBlockRoots(
+                data=[
+                    Bytes32(b"\x11" * 32),
+                    Bytes32(b"\x22" * 32),
+                    Bytes32(b"\x33" * 32),
+                ]
             )
+        )
 
-            await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)
 
-            return response.successes, response.errors
-
-        successes, errors = run_async(run_test())
-
-        assert len(errors) == 0
-        assert len(successes) == 2
+        assert len(response.errors) == 0
+        assert len(response.successes) == 2
 
         # Verify order is preserved
-        decoded1 = SignedBlockWithAttestation.decode_bytes(successes[0])
-        decoded2 = SignedBlockWithAttestation.decode_bytes(successes[1])
+        decoded1 = SignedBlockWithAttestation.decode_bytes(response.successes[0])
+        decoded2 = SignedBlockWithAttestation.decode_bytes(response.successes[1])
 
         assert decoded1.message.block.slot == Slot(1)
         assert decoded2.message.block.slot == Slot(3)
 
-    def test_status_update_after_initialization(self) -> None:
+    async def test_status_update_after_initialization(self) -> None:
         """Status can be updated after handler creation."""
+        handler = DefaultRequestHandler()
+        response1 = MockResponseStream()
 
-        async def run_test() -> tuple[list[bytes], list[bytes]]:
-            handler = DefaultRequestHandler()
-            response1 = MockResponseStream()
+        # First request with no status
+        await handler.handle_status(make_test_status(), response1)
 
-            # First request with no status
-            await handler.handle_status(make_test_status(), response1)
+        # Update status
+        handler.our_status = make_test_status()
 
-            # Update status
-            handler.our_status = make_test_status()
-
-            response2 = MockResponseStream()
-            await handler.handle_status(make_test_status(), response2)
-
-            return response1.successes, response2.successes
-
-        successes1, successes2 = run_async(run_test())
+        response2 = MockResponseStream()
+        await handler.handle_status(make_test_status(), response2)
 
         # First request should fail
-        assert len(successes1) == 0
+        assert len(response1.successes) == 0
 
         # Second request should succeed
-        assert len(successes2) == 1
+        assert len(response2.successes) == 1
 
 
 class TestConcurrentRequestHandling:
     """Tests for concurrent request handling."""
 
-    def test_concurrent_status_requests(self) -> None:
+    async def test_concurrent_status_requests(self) -> None:
         """Multiple concurrent status requests are handled independently."""
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status)
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> list[Status]:
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status)
-            server = ReqRespServer(handler=handler)
+        # Create multiple streams with requests
+        streams: list[MockStream] = []
+        for i in range(3):
+            peer_status = Status(
+                finalized=Checkpoint(root=Bytes32(bytes([i]) * 32), slot=Slot(i * 10)),
+                head=Checkpoint(root=Bytes32(bytes([i + 10]) * 32), slot=Slot(i * 20)),
+            )
+            request_bytes = encode_request(peer_status.encode_bytes())
+            streams.append(MockStream(request_data=request_bytes))
 
-            # Create multiple streams with requests
-            streams: list[MockStream] = []
-            for i in range(3):
-                peer_status = Status(
-                    finalized=Checkpoint(root=Bytes32(bytes([i]) * 32), slot=Slot(i * 10)),
-                    head=Checkpoint(root=Bytes32(bytes([i + 10]) * 32), slot=Slot(i * 20)),
-                )
-                request_bytes = encode_request(peer_status.encode_bytes())
-                streams.append(MockStream(request_data=request_bytes))
+        # Handle all requests concurrently
+        await asyncio.gather(*[server.handle_stream(s, STATUS_PROTOCOL_V1) for s in streams])
 
-            # Handle all requests concurrently
-            await asyncio.gather(*[server.handle_stream(s, STATUS_PROTOCOL_V1) for s in streams])
-
-            # Decode all responses
-            results = []
-            for stream in streams:
-                assert stream.closed
-                assert len(stream.written) >= 1
-                code, ssz_data = ResponseCode.decode(stream.written[0])
-                assert code == ResponseCode.SUCCESS
-                results.append(Status.decode_bytes(ssz_data))
-
-            return results
-
-        results = run_async(run_test())
+        # Decode all responses
+        results = []
+        for stream in streams:
+            assert stream.closed
+            assert len(stream.written) >= 1
+            code, ssz_data = ResponseCode.decode(stream.written[0])
+            assert code == ResponseCode.SUCCESS
+            results.append(Status.decode_bytes(ssz_data))
 
         # All responses should be our status
         for status in results:
             assert status.head.slot == Slot(200)
             assert status.finalized.slot == Slot(100)
 
-    def test_concurrent_mixed_requests(self) -> None:
+    async def test_concurrent_mixed_requests(self) -> None:
         """Concurrent Status and BlocksByRoot requests."""
+        block = make_test_block(slot=42, seed=42)
+        root = Bytes32(b"\x42" * 32)
 
-        async def run_test() -> tuple[list[Status], list[SignedBlockWithAttestation]]:
-            block = make_test_block(slot=42, seed=42)
-            root = Bytes32(b"\x42" * 32)
+        async def lookup(r: Bytes32) -> SignedBlockWithAttestation | None:
+            if bytes(r) == bytes(root):
+                return block
+            return None
 
-            async def lookup(r: Bytes32) -> SignedBlockWithAttestation | None:
-                if bytes(r) == bytes(root):
-                    return block
-                return None
+        our_status = make_test_status()
+        handler = DefaultRequestHandler(our_status=our_status, block_lookup=lookup)
+        server = ReqRespServer(handler=handler)
 
-            our_status = make_test_status()
-            handler = DefaultRequestHandler(our_status=our_status, block_lookup=lookup)
-            server = ReqRespServer(handler=handler)
+        # Status request
+        status_request = encode_request(make_test_status().encode_bytes())
+        status_stream = MockStream(request_data=status_request)
 
-            # Status request
-            status_request = encode_request(make_test_status().encode_bytes())
-            status_stream = MockStream(request_data=status_request)
+        # BlocksByRoot request
+        blocks_request = encode_request(
+            BlocksByRootRequest(roots=RequestedBlockRoots(data=[root])).encode_bytes()
+        )
+        blocks_stream = MockStream(request_data=blocks_request)
 
-            # BlocksByRoot request
-            blocks_request = encode_request(
-                BlocksByRootRequest(roots=RequestedBlockRoots(data=[root])).encode_bytes()
-            )
-            blocks_stream = MockStream(request_data=blocks_request)
+        # Handle concurrently
+        await asyncio.gather(
+            server.handle_stream(status_stream, STATUS_PROTOCOL_V1),
+            server.handle_stream(blocks_stream, BLOCKS_BY_ROOT_PROTOCOL_V1),
+        )
 
-            # Handle concurrently
-            await asyncio.gather(
-                server.handle_stream(status_stream, STATUS_PROTOCOL_V1),
-                server.handle_stream(blocks_stream, BLOCKS_BY_ROOT_PROTOCOL_V1),
-            )
+        # Decode status response
+        code, ssz_data = ResponseCode.decode(status_stream.written[0])
+        assert code == ResponseCode.SUCCESS
+        status_result = Status.decode_bytes(ssz_data)
 
-            # Decode status response
-            code, ssz_data = ResponseCode.decode(status_stream.written[0])
-            assert code == ResponseCode.SUCCESS
-            status_result = Status.decode_bytes(ssz_data)
+        # Decode block response
+        code, ssz_data = ResponseCode.decode(blocks_stream.written[0])
+        assert code == ResponseCode.SUCCESS
+        block_result = SignedBlockWithAttestation.decode_bytes(ssz_data)
 
-            # Decode block response
-            code, ssz_data = ResponseCode.decode(blocks_stream.written[0])
-            assert code == ResponseCode.SUCCESS
-            block_result = SignedBlockWithAttestation.decode_bytes(ssz_data)
-
-            return [status_result], [block_result]
-
-        statuses, blocks = run_async(run_test())
-
-        assert len(statuses) == 1
-        assert statuses[0].head.slot == Slot(200)
-
-        assert len(blocks) == 1
-        assert blocks[0].message.block.slot == Slot(42)
+        assert status_result.head.slot == Slot(200)
+        assert block_result.message.block.slot == Slot(42)
 
 
 class MockFailingStream:
@@ -1371,51 +1160,39 @@ class MockFailingStream:
 class TestHandlerExceptionRecovery:
     """Tests for exception handling and recovery."""
 
-    def test_stream_closed_despite_close_exception(self) -> None:
+    async def test_stream_closed_despite_close_exception(self) -> None:
         """Stream close is attempted even if it raises an exception."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> int:
-            handler = DefaultRequestHandler(our_status=make_test_status())
-            server = ReqRespServer(handler=handler)
+        request_bytes = encode_request(make_test_status().encode_bytes())
+        stream = MockFailingStream(
+            request_data=request_bytes,
+            fail_on_close=True,
+        )
 
-            request_bytes = encode_request(make_test_status().encode_bytes())
-            stream = MockFailingStream(
-                request_data=request_bytes,
-                fail_on_close=True,
-            )
-
-            # Should not raise, exception is caught
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
-
-            return stream.close_attempts
-
-        close_attempts = run_async(run_test())
+        # Should not raise, exception is caught
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
         # Close should be attempted
-        assert close_attempts >= 1
+        assert stream.close_attempts >= 1
 
-    def test_error_response_sent_despite_write_exception(self) -> None:
+    async def test_error_response_sent_despite_write_exception(self) -> None:
         """Error handling continues even when write fails."""
+        handler = DefaultRequestHandler()  # No status
+        server = ReqRespServer(handler=handler)
 
-        async def run_test() -> int:
-            handler = DefaultRequestHandler()  # No status
-            server = ReqRespServer(handler=handler)
+        request_bytes = encode_request(make_test_status().encode_bytes())
+        stream = MockFailingStream(
+            request_data=request_bytes,
+            fail_on_write=True,
+        )
 
-            request_bytes = encode_request(make_test_status().encode_bytes())
-            stream = MockFailingStream(
-                request_data=request_bytes,
-                fail_on_write=True,
-            )
-
-            # Should not raise, writes that fail are caught
-            await server.handle_stream(stream, STATUS_PROTOCOL_V1)
-
-            return stream.close_attempts
-
-        close_attempts = run_async(run_test())
+        # Should not raise, writes that fail are caught
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
 
         # Close should still be attempted after write failure
-        assert close_attempts >= 1
+        assert stream.close_attempts >= 1
 
 
 class TestRequestTimeoutConstant:
@@ -1470,13 +1247,8 @@ class TestMockStreamProtocolCompliance:
         assert hasattr(stream, "reset")
         assert callable(stream.reset)
 
-    def test_mock_stream_reset_closes_stream(self) -> None:
+    async def test_mock_stream_reset_closes_stream(self) -> None:
         """MockStream reset marks stream as closed."""
-
-        async def run_test() -> bool:
-            stream = MockStream()
-            await stream.reset()
-            return stream.closed
-
-        closed = run_async(run_test())
-        assert closed is True
+        stream = MockStream()
+        await stream.reset()
+        assert stream.closed is True
