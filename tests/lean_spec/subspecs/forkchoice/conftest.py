@@ -6,7 +6,7 @@ Provides mock state for testing fork choice behavior.
 
 from __future__ import annotations
 
-from typing import Type
+from typing import TYPE_CHECKING, Type
 
 import pytest
 
@@ -24,6 +24,10 @@ from lean_spec.subspecs.containers.state.types import (
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
+from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_store
+
+if TYPE_CHECKING:
+    from lean_spec.subspecs.forkchoice import Store
 
 
 class MockState(State):
@@ -61,6 +65,12 @@ class MockState(State):
 def mock_state_factory() -> Type[MockState]:
     """Factory fixture for creating MockState instances."""
     return MockState
+
+
+@pytest.fixture
+def pruning_store() -> Store:
+    """Store with 3 validators for pruning tests."""
+    return make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
 
 
 @pytest.fixture

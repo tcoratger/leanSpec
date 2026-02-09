@@ -3,22 +3,21 @@
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
 from tests.lean_spec.helpers import (
-    TEST_VALIDATOR_ID,
     make_attestation_data,
     make_bytes32,
     make_checkpoint,
     make_mock_signature,
-    make_store,
 )
 
 
-def test_prunes_entries_with_target_at_finalized() -> None:
+def test_prunes_entries_with_target_at_finalized(pruning_store: Store) -> None:
     """Verify entries with target.slot == finalized slot are pruned."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create attestation data with target.slot == 5
     attestation_data = make_attestation_data(
@@ -51,9 +50,9 @@ def test_prunes_entries_with_target_at_finalized() -> None:
     assert sig_key not in pruned_store.gossip_signatures
 
 
-def test_prunes_entries_with_target_before_finalized() -> None:
+def test_prunes_entries_with_target_before_finalized(pruning_store: Store) -> None:
     """Verify entries with target.slot < finalized slot are pruned."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create attestation data with target.slot == 3
     attestation_data = make_attestation_data(
@@ -86,9 +85,9 @@ def test_prunes_entries_with_target_before_finalized() -> None:
     assert sig_key not in pruned_store.gossip_signatures
 
 
-def test_keeps_entries_with_target_after_finalized() -> None:
+def test_keeps_entries_with_target_after_finalized(pruning_store: Store) -> None:
     """Verify entries with target.slot > finalized slot are kept."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create attestation data with target.slot == 10
     attestation_data = make_attestation_data(
@@ -122,9 +121,9 @@ def test_keeps_entries_with_target_after_finalized() -> None:
     assert pruned_store.attestation_data_by_root[data_root] == attestation_data
 
 
-def test_prunes_related_structures_together() -> None:
+def test_prunes_related_structures_together(pruning_store: Store) -> None:
     """Verify all four data structures are pruned atomically."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create stale attestation data
     stale_attestation = make_attestation_data(
@@ -202,9 +201,9 @@ def test_prunes_related_structures_together() -> None:
     assert fresh_key in pruned_store.latest_known_aggregated_payloads
 
 
-def test_returns_self_when_nothing_to_prune() -> None:
+def test_returns_self_when_nothing_to_prune(pruning_store: Store) -> None:
     """Verify optimization returns same instance when no pruning needed."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create fresh attestation data (target.slot > finalized.slot)
     fresh_attestation = make_attestation_data(
@@ -236,9 +235,9 @@ def test_returns_self_when_nothing_to_prune() -> None:
     assert pruned_store is store
 
 
-def test_handles_empty_attestation_data() -> None:
+def test_handles_empty_attestation_data(pruning_store: Store) -> None:
     """Verify pruning works correctly when attestation_data_by_root is empty."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Ensure store has empty attestation data
     assert len(store.attestation_data_by_root) == 0
@@ -250,9 +249,9 @@ def test_handles_empty_attestation_data() -> None:
     assert len(pruned_store.attestation_data_by_root) == 0
 
 
-def test_prunes_multiple_validators_same_data_root() -> None:
+def test_prunes_multiple_validators_same_data_root(pruning_store: Store) -> None:
     """Verify pruning removes entries for multiple validators with same data root."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create stale attestation data
     stale_attestation = make_attestation_data(
@@ -292,9 +291,9 @@ def test_prunes_multiple_validators_same_data_root() -> None:
     assert sig_key_2 not in pruned_store.gossip_signatures
 
 
-def test_mixed_stale_and_fresh_entries() -> None:
+def test_mixed_stale_and_fresh_entries(pruning_store: Store) -> None:
     """Verify correct pruning behavior with a mix of stale and fresh entries."""
-    store = make_store(num_validators=3, validator_id=TEST_VALIDATOR_ID)
+    store = pruning_store
 
     # Create multiple attestations at different slots
     attestations = [
