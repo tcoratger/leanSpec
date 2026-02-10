@@ -54,6 +54,14 @@ from __future__ import annotations
 import base64
 from typing import ClassVar, Self
 
+from Crypto.Hash import keccak
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import (
+    Prehashed,
+    encode_dss_signature,
+)
+
 from lean_spec.subspecs.networking.types import Multiaddr, NodeId, SeqNumber
 from lean_spec.types import (
     Bytes32,
@@ -237,14 +245,6 @@ class ENR(StrictBaseModel):
 
         Returns True if signature is valid, False otherwise.
         """
-        from Crypto.Hash import keccak
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import ec
-        from cryptography.hazmat.primitives.asymmetric.utils import (
-            Prehashed,
-            encode_dss_signature,
-        )
-
         if self.public_key is None:
             return False
 
@@ -279,10 +279,6 @@ class ENR(StrictBaseModel):
         Per EIP-778 "v4" identity scheme: keccak256(uncompressed_pubkey).
         The hash is computed over the 64-byte x||y coordinates.
         """
-        from Crypto.Hash import keccak
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import ec
-
         if self.public_key is None:
             return None
 

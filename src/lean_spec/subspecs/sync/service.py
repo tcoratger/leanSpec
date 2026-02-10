@@ -52,6 +52,7 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
+from lean_spec.subspecs.node.helpers import is_aggregator
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 from .backfill_sync import BackfillSync, NetworkRequester
@@ -424,8 +425,6 @@ class SyncService:
         # of incoming attestations. IDLE state waits for peer discovery.
         if not self._state.accepts_gossip:
             return
-
-        from lean_spec.subspecs.node.helpers import is_aggregator
 
         # Check if we are an aggregator
         is_aggregator_role = is_aggregator(

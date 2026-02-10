@@ -30,9 +30,9 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from threading import Lock
-from typing import TYPE_CHECKING
 
-from lean_spec.types import Bytes32, Bytes33, Bytes64
+from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.types import Bytes32, Bytes33, Bytes64, Uint64, rlp
 
 from .config import HANDSHAKE_TIMEOUT_SECS
 from .crypto import (
@@ -41,6 +41,7 @@ from .crypto import (
     verify_id_nonce_signature,
 )
 from .keys import derive_keys_from_pubkey
+from .messages import PROTOCOL_ID, PROTOCOL_VERSION, PacketFlag
 from .packet import (
     HandshakeAuthdata,
     WhoAreYouAuthdata,
@@ -49,9 +50,6 @@ from .packet import (
     generate_id_nonce,
 )
 from .session import Session, SessionCache
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.networking.enr import ENR
 
 
 class HandshakeState(Enum):
@@ -216,8 +214,6 @@ class HandshakeManager:
             - nonce: The request_nonce to use in the packet header
             - challenge_data: Full data for key derivation (masking-iv || static-header || authdata)
         """
-        from .messages import PROTOCOL_ID, PROTOCOL_VERSION, PacketFlag
-
         id_nonce = generate_id_nonce()
         authdata = encode_whoareyou_authdata(bytes(id_nonce), remote_enr_seq)
 
@@ -527,9 +523,6 @@ class HandshakeManager:
         Returns:
             Parsed ENR with computed node ID, or None if malformed.
         """
-        from lean_spec.subspecs.networking.enr import ENR
-        from lean_spec.types import Bytes64, Uint64, rlp
-
         try:
             # Decode the RLP list structure.
             #

@@ -4,17 +4,27 @@ import time
 
 import pytest
 
-from lean_spec.subspecs.networking.discovery.crypto import generate_secp256k1_keypair
+from lean_spec.subspecs.networking.discovery.crypto import (
+    generate_secp256k1_keypair,
+    sign_id_nonce,
+)
 from lean_spec.subspecs.networking.discovery.handshake import (
+    HandshakeError,
     HandshakeManager,
+    HandshakeResult,
     HandshakeState,
     PendingHandshake,
 )
 from lean_spec.subspecs.networking.discovery.keys import compute_node_id
 from lean_spec.subspecs.networking.discovery.packet import (
+    HandshakeAuthdata,
+    decode_handshake_authdata,
     decode_whoareyou_authdata,
+    encode_handshake_authdata,
 )
 from lean_spec.subspecs.networking.discovery.session import SessionCache
+from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.types import Bytes32, Bytes33, Bytes64, Uint64
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
 
@@ -367,13 +377,9 @@ class TestHandshakeValidation:
 
     def test_handle_handshake_requires_pending_state(self, manager, remote_keypair):
         """Handshake fails if no pending state exists for the remote."""
-        from lean_spec.subspecs.networking.discovery.handshake import HandshakeError
-
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Create fake handshake authdata.
-        from lean_spec.subspecs.networking.discovery.packet import HandshakeAuthdata
-
         fake_authdata = HandshakeAuthdata(
             src_id=bytes(remote_node_id),
             sig_size=64,
@@ -389,14 +395,10 @@ class TestHandshakeValidation:
 
     def test_handle_handshake_requires_sent_whoareyou_state(self, manager, remote_keypair):
         """Handshake fails if not in SENT_WHOAREYOU state."""
-        from lean_spec.subspecs.networking.discovery.handshake import HandshakeError
-
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Start handshake (puts in SENT_ORDINARY state).
         manager.start_handshake(bytes(remote_node_id))
-
-        from lean_spec.subspecs.networking.discovery.packet import HandshakeAuthdata
 
         fake_authdata = HandshakeAuthdata(
             src_id=bytes(remote_node_id),
@@ -413,8 +415,6 @@ class TestHandshakeValidation:
 
     def test_handle_handshake_rejects_src_id_mismatch(self, manager, remote_keypair):
         """Handshake fails if src_id doesn't match expected remote."""
-        from lean_spec.subspecs.networking.discovery.handshake import HandshakeError
-
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Set up WHOAREYOU state.
@@ -426,8 +426,6 @@ class TestHandshakeValidation:
         )
 
         # Create authdata with different src_id.
-        from lean_spec.subspecs.networking.discovery.packet import HandshakeAuthdata
-
         wrong_src_id = bytes([0xFF] * 32)
         fake_authdata = HandshakeAuthdata(
             src_id=wrong_src_id,
@@ -448,8 +446,6 @@ class TestHandshakeValidation:
         When we don't know the remote's ENR (signaled by enr_seq=0 in WHOAREYOU),
         the remote MUST include their ENR in the HANDSHAKE response.
         """
-        from lean_spec.subspecs.networking.discovery.handshake import HandshakeError
-
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Set up WHOAREYOU with enr_seq=0 (unknown).
@@ -459,8 +455,6 @@ class TestHandshakeValidation:
             0,  # enr_seq = 0 means we don't know remote's ENR
             bytes(16),
         )
-
-        from lean_spec.subspecs.networking.discovery.packet import HandshakeAuthdata
 
         # Create authdata without ENR record.
         fake_authdata = HandshakeAuthdata(
@@ -483,15 +477,6 @@ class TestHandshakeValidation:
 
         Exercises the complete WHOAREYOU -> HANDSHAKE -> session flow.
         """
-        from lean_spec.subspecs.networking.discovery.crypto import sign_id_nonce
-        from lean_spec.subspecs.networking.discovery.handshake import HandshakeResult
-        from lean_spec.subspecs.networking.discovery.packet import (
-            decode_handshake_authdata,
-            encode_handshake_authdata,
-        )
-        from lean_spec.subspecs.networking.enr.enr import ENR
-        from lean_spec.types import Bytes32, Bytes33, Bytes64, Uint64
-
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Node A (manager) creates WHOAREYOU for remote.
@@ -541,14 +526,6 @@ class TestHandshakeValidation:
         self, manager, remote_keypair, session_cache
     ):
         """Handshake fails when signature is invalid."""
-        from lean_spec.subspecs.networking.discovery.handshake import HandshakeError
-        from lean_spec.subspecs.networking.discovery.packet import (
-            decode_handshake_authdata,
-            encode_handshake_authdata,
-        )
-        from lean_spec.subspecs.networking.enr.enr import ENR
-        from lean_spec.types import Bytes64, Uint64
-
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Set up WHOAREYOU state.
@@ -714,9 +691,6 @@ class TestHandshakeENRCache:
 
     def test_register_enr_stores_in_cache(self, manager):
         """Registered ENRs are retrievable from cache."""
-        from lean_spec.subspecs.networking.enr import ENR
-        from lean_spec.types import Bytes64, Uint64
-
         remote_node_id = bytes(compute_node_id(NODE_B_PUBKEY))
 
         enr = ENR(

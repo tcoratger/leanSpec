@@ -13,6 +13,7 @@ import pytest
 
 from lean_spec.subspecs.networking.discovery.config import DiscoveryConfig
 from lean_spec.subspecs.networking.discovery.messages import (
+    Nodes,
     Ping,
     Pong,
     Port,
@@ -21,10 +22,12 @@ from lean_spec.subspecs.networking.discovery.messages import (
 from lean_spec.subspecs.networking.discovery.transport import (
     DiscoveryProtocol,
     DiscoveryTransport,
+    PendingMultiRequest,
     PendingRequest,
 )
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.types import Bytes64, Uint64
+from lean_spec.types.uint import Uint8
 
 
 class TestDiscoveryProtocol:
@@ -395,7 +398,6 @@ class TestMultiPacketNodesCollection:
 
     def test_pending_multi_request_creation(self, local_node_id, local_private_key, local_enr):
         """PendingMultiRequest stores all required fields."""
-        from lean_spec.subspecs.networking.discovery.transport import PendingMultiRequest
 
         loop = asyncio.new_event_loop()
         queue: asyncio.Queue = asyncio.Queue()
@@ -419,7 +421,6 @@ class TestMultiPacketNodesCollection:
 
     def test_pending_multi_request_expected_total_tracking(self):
         """expected_total is set from first NODES response."""
-        from lean_spec.subspecs.networking.discovery.transport import PendingMultiRequest
 
         loop = asyncio.new_event_loop()
         queue: asyncio.Queue = asyncio.Queue()
@@ -453,7 +454,6 @@ class TestMultiPacketNodesCollection:
 
     def test_pending_multi_request_queue_usage(self):
         """Response queue collects multiple messages."""
-        from lean_spec.subspecs.networking.discovery.transport import PendingMultiRequest
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -498,8 +498,6 @@ class TestNodesResponseAccumulation:
 
     def test_empty_nodes_response_handling(self):
         """NODES with total=0 indicates no results."""
-        from lean_spec.subspecs.networking.discovery.messages import Nodes
-        from lean_spec.types.uint import Uint8
 
         nodes = Nodes(
             request_id=RequestId(data=b"\x01"),
@@ -512,8 +510,6 @@ class TestNodesResponseAccumulation:
 
     def test_single_nodes_response_collection(self):
         """Single NODES response with total=1."""
-        from lean_spec.subspecs.networking.discovery.messages import Nodes
-        from lean_spec.types.uint import Uint8
 
         nodes = Nodes(
             request_id=RequestId(data=b"\x01"),
@@ -526,8 +522,6 @@ class TestNodesResponseAccumulation:
 
     def test_multiple_nodes_responses_expected(self):
         """Multiple NODES messages share same request_id."""
-        from lean_spec.subspecs.networking.discovery.messages import Nodes
-        from lean_spec.types.uint import Uint8
 
         request_id = RequestId(data=b"\x01\x02\x03\x04")
 
