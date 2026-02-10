@@ -234,6 +234,78 @@ class TestOfficialCryptoVectors:
         assert decrypted == plaintext
 
 
+class TestOfficialPacketVectors:
+    """Decode exact packet bytes from the devp2p spec test vectors.
+
+    These tests verify interoperability by decoding the spec's exact hex packets.
+    """
+
+    def test_decode_spec_ping_packet(self):
+        """Decode the exact Ping packet from the spec test vectors.
+
+        Verifies header fields match expected values.
+        """
+        packet_hex = (
+            "00000000000000000000000000000000088b3d4342774649325f313964a39e55"
+            "ea96c005ad52be8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
+            "4c4f53245d08da4bb252012b2cba3f4f374a90a75cff91f142fa9be3e0a5f3ef"
+            "268ccb9065aeecfd67a999e7fdc137e062b2ec4a0eb92947f0d9a74bfbf44dfb"
+            "a776b21301f8e47be718571f"
+        )
+        packet = bytes.fromhex(packet_hex)
+
+        header, _ciphertext, _message_ad = decode_packet_header(NODE_B_ID, packet)
+
+        assert header.flag == PacketFlag.MESSAGE
+        decoded_authdata = decode_message_authdata(header.authdata)
+        assert decoded_authdata.src_id == NODE_A_ID
+
+    def test_decode_spec_whoareyou_packet(self):
+        """Decode the exact WHOAREYOU packet from the spec test vectors.
+
+        Verifies id-nonce and enr-seq match expected values.
+        Per spec, the WHOAREYOU dest-node-id is Node B's ID.
+        """
+        packet_hex = (
+            "00000000000000000000000000000000088b3d434277464933a1ccc59f5967ad"
+            "1d6035f15e528627dde75cd68292f9e6c27d6b66c8100a873fcbaed4e16b8d14"
+            "f0de"
+        )
+        packet = bytes.fromhex(packet_hex)
+
+        header, _message, _message_ad = decode_packet_header(NODE_B_ID, packet)
+
+        assert header.flag == PacketFlag.WHOAREYOU
+        decoded_authdata = decode_whoareyou_authdata(header.authdata)
+        assert bytes(decoded_authdata.id_nonce) == SPEC_ID_NONCE
+        assert int(decoded_authdata.enr_seq) == 0
+
+    def test_decode_spec_handshake_packet(self):
+        """Decode the exact Handshake packet from the spec test vectors.
+
+        Verifies authdata fields (src-id, signature size, key size).
+        """
+        packet_hex = (
+            "00000000000000000000000000000000088b3d4342774649305f313964a39e55"
+            "ea96c005ad521d8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
+            "4c4f53245d08da4bb23698868350aaad22e3ab8dd034f548a1c43cd246be9856"
+            "2b5db0b3ba5a0f2014c8fef2c78e79b3c58a76b84e819de9e9da11ce86d7a0b5"
+            "7b8a1bba0ee4a8deab98ce9ad9e2cc76f037b9ef2855a3a5db025d75f9b6b280"
+            "0528e2a98c3a3c50752c47d3e56dc23c962de2d1e9dff8b9e5bc6a8d04ba37c3"
+            "6cf89ce3d9e5e4e3ed6c3f06bc16b81cfb3fdd6b8c4c01c9f04e164f52fa6ee0"
+            "5c2c56b3eea6aff2f86f"
+        )
+        packet = bytes.fromhex(packet_hex)
+
+        header, _ciphertext, _message_ad = decode_packet_header(NODE_B_ID, packet)
+
+        assert header.flag == PacketFlag.HANDSHAKE
+        decoded_authdata = decode_handshake_authdata(header.authdata)
+        assert decoded_authdata.src_id == NODE_A_ID
+        assert decoded_authdata.sig_size == 64
+        assert decoded_authdata.eph_key_size == 33
+
+
 class TestPacketEncodingRoundtrip:
     """Test full packet encoding/decoding roundtrips."""
 
