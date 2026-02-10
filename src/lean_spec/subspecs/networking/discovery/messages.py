@@ -291,20 +291,3 @@ class StaticHeader(StrictBaseModel):
 
     authdata_size: Uint16
     """Byte length of the authdata section following this header."""
-
-
-class WhoAreYouAuthdata(StrictBaseModel):
-    """
-    Authdata for WHOAREYOU packets (flag=1).
-
-    Sent when the recipient cannot decrypt an incoming message packet.
-    The nonce in the packet header is set to the nonce of the failed message.
-
-    Total size: 24 bytes (16 + 8).
-    """
-
-    id_nonce: IdNonce
-    """128-bit random value for identity verification."""
-
-    enr_seq: SeqNumber
-    """Recipient's known ENR sequence for the sender. 0 if unknown."""

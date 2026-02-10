@@ -230,7 +230,7 @@ class TestPacketEncoding:
             encryption_key=None,
         )
 
-        header, message_bytes = decode_packet_header(local_node_id, packet)
+        header, message_bytes, _message_ad = decode_packet_header(local_node_id, packet)
 
         assert header.flag == PacketFlag.WHOAREYOU
         assert bytes(header.nonce) == nonce

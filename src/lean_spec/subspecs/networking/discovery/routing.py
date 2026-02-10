@@ -4,7 +4,7 @@ Discovery v5 Routing Table
 Kademlia-style routing table for Node Discovery Protocol v5.1.
 
 Node Table Structure
---------------------
+
 Nodes keep information about other nodes in their neighborhood. Neighbor nodes
 are stored in a routing table consisting of 'k-buckets'. For each 0 <= i < 256,
 every node keeps a k-bucket for nodes of logdistance(self, n) == i.
@@ -14,7 +14,7 @@ Entries are sorted by time last seen: least-recently seen at head, most-recently
 seen at tail.
 
 Distance Metric
----------------
+
 The 'distance' between two node IDs is the bitwise XOR of the IDs, interpreted
 as a big-endian number:
 
@@ -26,7 +26,7 @@ bucket assignment:
     logdistance(n1, n2) = log2(distance(n1, n2))
 
 Bucket Eviction Policy
-----------------------
+
 When a new node N1 is encountered, it can be inserted into the corresponding
 bucket.
 
@@ -37,7 +37,7 @@ node N2 must be revalidated. If no reply is received from N2, it is considered d
 removed, and N1 added to the front of the bucket.
 
 Liveness Verification
----------------------
+
 Implementations should perform liveness checks asynchronously and occasionally
 verify that a random node in a random bucket is live by sending PING. When
 responding to FINDNODE, implementations must avoid relaying any nodes whose
@@ -148,13 +148,13 @@ class KBucket:
     - New nodes added to tail, eviction candidates at head
 
     Eviction Policy
-    ---------------
+
     When full, ping the head node (least-recently seen).
     - If it responds, keep it and discard the new node.
     - If it fails, evict it and add the new node.
 
     Replacement Cache
-    -----------------
+
     Implementations should maintain a 'replacement cache' alongside each bucket.
     This cache holds recently-seen nodes which would fall into the corresponding
     bucket but cannot become a member because it is at capacity. Once a bucket
@@ -257,7 +257,6 @@ class RoutingTable:
     Bucket i contains nodes with log2(distance) == i + 1.
 
     Fork Filtering
-    --------------
 
     When local_fork_digest is set:
 
@@ -266,7 +265,6 @@ class RoutingTable:
     - Requires eth2 ENR data to be present
 
     Lookup Algorithm
-    ----------------
 
     Locates the k closest nodes to a target ID:
 
@@ -277,7 +275,6 @@ class RoutingTable:
     5. Stop when k closest have been queried
 
     Table Maintenance
-    -----------------
 
     - Track close neighbors
     - Regularly refresh stale buckets

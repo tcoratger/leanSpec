@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import struct
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
-from lean_spec.types import Uint64
+from lean_spec.types import Bytes16, Uint64
 
 from .codec import (
     DiscoveryMessage,
@@ -30,8 +32,21 @@ from .codec import (
 )
 from .config import DiscoveryConfig
 from .handshake import HandshakeManager
-from .messages import FindNode, Nonce, PacketFlag, Ping, Pong, TalkReq
+from .messages import (
+    PROTOCOL_ID,
+    PROTOCOL_VERSION,
+    Distance,
+    FindNode,
+    Nodes,
+    Nonce,
+    PacketFlag,
+    Ping,
+    Pong,
+    TalkReq,
+    TalkResp,
+)
 from .packet import (
+    PacketHeader,
     decode_handshake_authdata,
     decode_message_authdata,
     decode_packet_header,
@@ -330,8 +345,6 @@ class DiscoveryTransport:
         Returns:
             List of RLP-encoded ENRs from all NODES responses.
         """
-        from .messages import Distance, Nodes
-
         request_id = generate_request_id()
         findnode = FindNode(
             request_id=request_id,
@@ -369,49 +382,16 @@ class DiscoveryTransport:
         Returns:
             List of response messages (may be empty on timeout/error).
         """
-        from .messages import Nodes
-
         if self._transport is None:
             raise RuntimeError("Transport not started")
 
         # Register address for responses.
         self._node_addresses[dest_node_id] = dest_addr
 
-        # Get or create session.
-        session = self._session_cache.get(dest_node_id)
+        # Build and send packet.
         nonce = generate_nonce()
-
-        # Encode message.
         message_bytes = encode_message(message)
-
-        if session is not None:
-            authdata = encode_message_authdata(self._local_node_id)
-            packet = encode_packet(
-                dest_node_id=dest_node_id,
-                src_node_id=self._local_node_id,
-                flag=PacketFlag.MESSAGE,
-                nonce=bytes(nonce),
-                authdata=authdata,
-                message=message_bytes,
-                encryption_key=session.send_key,
-            )
-        else:
-            # Trigger handshake via deliberate decryption failure.
-            self._handshake_manager.start_handshake(dest_node_id)
-            authdata = encode_message_authdata(self._local_node_id)
-
-            import os
-
-            dummy_key = os.urandom(16)
-            packet = encode_packet(
-                dest_node_id=dest_node_id,
-                src_node_id=self._local_node_id,
-                flag=PacketFlag.MESSAGE,
-                nonce=bytes(nonce),
-                authdata=authdata,
-                message=message_bytes,
-                encryption_key=dummy_key,
-            )
+        packet = self._build_and_send_packet(dest_node_id, dest_addr, nonce, message_bytes)
 
         # Create collector for multiple responses.
         loop = asyncio.get_running_loop()
@@ -488,8 +468,6 @@ class DiscoveryTransport:
         Returns:
             Response payload or None on timeout/error.
         """
-        from .messages import TalkResp
-
         request_id = generate_request_id()
         talkreq = TalkReq(
             request_id=request_id,
@@ -519,53 +497,10 @@ class DiscoveryTransport:
         # Register address for responses.
         self._node_addresses[dest_node_id] = dest_addr
 
-        # Get or create session.
-        session = self._session_cache.get(dest_node_id)
+        # Build and send packet.
         nonce = generate_nonce()
-
-        # Encode message.
         message_bytes = encode_message(message)
-
-        if session is not None:
-            # Have session, send encrypted message.
-            authdata = encode_message_authdata(self._local_node_id)
-            packet = encode_packet(
-                dest_node_id=dest_node_id,
-                src_node_id=self._local_node_id,
-                flag=PacketFlag.MESSAGE,
-                nonce=bytes(nonce),
-                authdata=authdata,
-                message=message_bytes,
-                encryption_key=session.send_key,
-            )
-        else:
-            # Deliberate decryption failure triggers handshake.
-            #
-            # Discovery v5's handshake is initiated by failure:
-            #
-            # 1. We send a MESSAGE with random encryption key
-            # 2. Recipient cannot decrypt (they don't have the key)
-            # 3. Recipient responds with WHOAREYOU challenge
-            # 4. We complete handshake with HANDSHAKE packet
-            #
-            # This approach avoids the need for session negotiation
-            # before sending the first message.
-            self._handshake_manager.start_handshake(dest_node_id)
-
-            authdata = encode_message_authdata(self._local_node_id)
-
-            import os
-
-            dummy_key = os.urandom(16)
-            packet = encode_packet(
-                dest_node_id=dest_node_id,
-                src_node_id=self._local_node_id,
-                flag=PacketFlag.MESSAGE,
-                nonce=bytes(nonce),
-                authdata=authdata,
-                message=message_bytes,
-                encryption_key=dummy_key,
-            )
+        packet = self._build_and_send_packet(dest_node_id, dest_addr, nonce, message_bytes)
 
         # Create pending request.
         loop = asyncio.get_running_loop()
@@ -596,25 +531,84 @@ class DiscoveryTransport:
         finally:
             self._pending_requests.pop(request_id_bytes, None)
 
+    def _build_and_send_packet(
+        self,
+        dest_node_id: bytes,
+        dest_addr: tuple[str, int],
+        nonce: Nonce,
+        message_bytes: bytes,
+    ) -> bytes:
+        """
+        Build a MESSAGE packet, using session key if available or a dummy key
+        to trigger handshake.
+
+        Args:
+            dest_node_id: 32-byte destination node ID.
+            dest_addr: (ip, port) tuple.
+            nonce: 12-byte message nonce.
+            message_bytes: Encoded message payload.
+
+        Returns:
+            Encoded packet bytes.
+        """
+        ip, port = dest_addr
+        session = self._session_cache.get(dest_node_id, ip, port)
+
+        authdata = encode_message_authdata(self._local_node_id)
+
+        if session is not None:
+            return encode_packet(
+                dest_node_id=dest_node_id,
+                src_node_id=self._local_node_id,
+                flag=PacketFlag.MESSAGE,
+                nonce=bytes(nonce),
+                authdata=authdata,
+                message=message_bytes,
+                encryption_key=session.send_key,
+            )
+
+        # Deliberate decryption failure triggers handshake.
+        #
+        # Discovery v5's handshake is initiated by failure:
+        #
+        # 1. We send a MESSAGE with random encryption key
+        # 2. Recipient cannot decrypt (they don't have the key)
+        # 3. Recipient responds with WHOAREYOU challenge
+        # 4. We complete handshake with HANDSHAKE packet
+        #
+        # This approach avoids the need for session negotiation
+        # before sending the first message.
+        self._handshake_manager.start_handshake(dest_node_id)
+        dummy_key = os.urandom(16)
+        return encode_packet(
+            dest_node_id=dest_node_id,
+            src_node_id=self._local_node_id,
+            flag=PacketFlag.MESSAGE,
+            nonce=bytes(nonce),
+            authdata=authdata,
+            message=message_bytes,
+            encryption_key=dummy_key,
+        )
+
     async def _handle_packet(self, data: bytes, addr: tuple[str, int]) -> None:
         """Handle a received UDP packet."""
         try:
             # Decode packet header.
-            header, message_bytes = decode_packet_header(self._local_node_id, data)
+            header, message_bytes, message_ad = decode_packet_header(self._local_node_id, data)
 
             if header.flag == PacketFlag.WHOAREYOU:
                 await self._handle_whoareyou(header, message_bytes, addr, data)
             elif header.flag == PacketFlag.HANDSHAKE:
-                await self._handle_handshake(header, message_bytes, addr, data)
+                await self._handle_handshake(header, message_bytes, addr, message_ad)
             else:
-                await self._handle_message(header, message_bytes, addr, data)
+                await self._handle_message(header, message_bytes, addr, message_ad)
 
         except Exception as e:
             logger.debug("Error handling packet from %s: %s", addr, e)
 
     async def _handle_whoareyou(
         self,
-        header,
+        header: PacketHeader,
         message_bytes: bytes,
         addr: tuple[str, int],
         raw_packet: bytes,
@@ -661,10 +655,6 @@ class DiscoveryTransport:
         # - authdata: 24 bytes (id-nonce 16 + enr-seq 8)
         #
         # We use the unmasked header, which we can reconstruct from the decoded values.
-        import struct
-
-        from .messages import PROTOCOL_ID, PROTOCOL_VERSION
-
         masking_iv = raw_packet[:16]
         static_header = (
             PROTOCOL_ID
@@ -688,11 +678,14 @@ class DiscoveryTransport:
 
         # Build and send the HANDSHAKE response.
         try:
+            ip, port = addr
             authdata, send_key, recv_key = self._handshake_manager.create_handshake_response(
                 remote_node_id=remote_node_id,
                 whoareyou=whoareyou,
                 remote_pubkey=remote_pubkey,
                 challenge_data=challenge_data,
+                remote_ip=ip,
+                remote_port=port,
             )
 
             # Re-send the original message, now encrypted with the new session key.
@@ -722,29 +715,29 @@ class DiscoveryTransport:
 
     async def _handle_handshake(
         self,
-        header,
+        header: PacketHeader,
         message_bytes: bytes,
         addr: tuple[str, int],
-        raw_packet: bytes,
+        message_ad: bytes,
     ) -> None:
         """Handle a HANDSHAKE packet."""
         handshake_authdata = decode_handshake_authdata(header.authdata)
         remote_node_id = handshake_authdata.src_id
 
         try:
-            result = self._handshake_manager.handle_handshake(remote_node_id, handshake_authdata)
+            ip, port = addr
+            result = self._handshake_manager.handle_handshake(
+                remote_node_id, handshake_authdata, remote_ip=ip, remote_port=port
+            )
             logger.debug("Handshake completed with %s", remote_node_id.hex()[:16])
 
             # Decrypt the included message.
             if len(message_bytes) > 0:
-                # Extract masked header for AAD.
-                masked_header = raw_packet[16 : 16 + 23 + len(header.authdata)]
-
                 plaintext = decrypt_message(
                     encryption_key=result.session.recv_key,
                     nonce=bytes(header.nonce),
                     ciphertext=message_bytes,
-                    masked_header=masked_header,
+                    message_ad=message_ad,
                 )
 
                 message = decode_message(plaintext)
@@ -755,31 +748,29 @@ class DiscoveryTransport:
 
     async def _handle_message(
         self,
-        header,
+        header: PacketHeader,
         message_bytes: bytes,
         addr: tuple[str, int],
-        raw_packet: bytes,
+        message_ad: bytes,
     ) -> None:
         """Handle an ordinary MESSAGE packet."""
         message_authdata = decode_message_authdata(header.authdata)
         remote_node_id = message_authdata.src_id
 
-        # Get session.
-        session = self._session_cache.get(remote_node_id)
+        # Get session keyed by (node_id, ip, port).
+        ip, port = addr
+        session = self._session_cache.get(remote_node_id, ip, port)
         if session is None:
             # Can't decrypt - send WHOAREYOU.
             await self._send_whoareyou(remote_node_id, header.nonce, addr)
             return
 
         try:
-            # Extract masked header for AAD.
-            masked_header = raw_packet[16 : 16 + 23 + len(header.authdata)]
-
             plaintext = decrypt_message(
                 encryption_key=session.recv_key,
                 nonce=bytes(header.nonce),
                 ciphertext=message_bytes,
-                masked_header=masked_header,
+                message_ad=message_ad,
             )
 
             message = decode_message(plaintext)
@@ -798,7 +789,8 @@ class DiscoveryTransport:
     ) -> None:
         """Process a successfully decoded message."""
         # Update session activity.
-        self._session_cache.touch(remote_node_id)
+        ip, port = addr
+        self._session_cache.touch(remote_node_id, ip, port)
 
         # Check if this is a response to a pending request.
         request_id = bytes(message.request_id)
@@ -826,8 +818,6 @@ class DiscoveryTransport:
         addr: tuple[str, int],
     ) -> None:
         """Send a WHOAREYOU packet."""
-        import os
-
         if self._transport is None:
             return
 
@@ -855,6 +845,7 @@ class DiscoveryTransport:
             authdata=authdata,
             message=b"",
             encryption_key=None,
+            masking_iv=Bytes16(masking_iv),
         )
 
         self._transport.sendto(packet, addr)
@@ -889,7 +880,8 @@ class DiscoveryTransport:
         #
         # The requester initiated the handshake.
         # By the time we respond, session keys must exist.
-        session = self._session_cache.get(dest_node_id)
+        ip, port = dest_addr
+        session = self._session_cache.get(dest_node_id, ip, port)
         if session is None:
             logger.debug("No session for response to %s", dest_node_id.hex()[:16])
             return False

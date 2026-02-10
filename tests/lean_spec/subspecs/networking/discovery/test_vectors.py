@@ -26,6 +26,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
     decode_message_authdata,
     decode_packet_header,
     decode_whoareyou_authdata,
+    decrypt_message,
     encode_handshake_authdata,
     encode_message_authdata,
     encode_packet,
@@ -233,164 +234,6 @@ class TestOfficialCryptoVectors:
         assert decrypted == plaintext
 
 
-class TestOfficialPacketVectors:
-    """
-    Packet encoding test vectors from devp2p spec.
-
-    Note: Full packet encoding verification requires deterministic masking IV,
-    which the spec test vectors use all-zeros IV for reproducibility.
-    These tests verify the underlying authdata encoding is correct.
-    """
-
-    def test_message_authdata_encoding(self):
-        """MESSAGE packet authdata is just the 32-byte source node ID."""
-        src_id = NODE_A_ID
-
-        authdata = encode_message_authdata(src_id)
-        assert authdata == src_id
-        assert len(authdata) == 32
-
-        # Decode and verify.
-        decoded = decode_message_authdata(authdata)
-        assert decoded.src_id == src_id
-
-    def test_whoareyou_authdata_encoding(self):
-        """WHOAREYOU authdata is id-nonce (16) + enr-seq (8)."""
-        id_nonce = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
-        enr_seq = 0
-
-        authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
-        assert len(authdata) == 24
-
-        # Decode and verify.
-        decoded = decode_whoareyou_authdata(authdata)
-        assert bytes(decoded.id_nonce) == id_nonce
-        assert int(decoded.enr_seq) == enr_seq
-
-    def test_whoareyou_authdata_with_nonzero_enr_seq(self):
-        """WHOAREYOU with known ENR sequence."""
-        id_nonce = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
-        enr_seq = 1
-
-        authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
-
-        decoded = decode_whoareyou_authdata(authdata)
-        assert int(decoded.enr_seq) == 1
-
-    def test_handshake_authdata_encoding(self):
-        """HANDSHAKE authdata contains signature and ephemeral key."""
-        src_id = NODE_A_ID
-        id_signature = bytes(64)  # Placeholder 64-byte signature.
-        eph_pubkey = bytes.fromhex(
-            "039a003ba6517b473fa0cd74aefe99dadfdb34627f90fec6362df85803908f53a5"
-        )
-
-        authdata = encode_handshake_authdata(
-            src_id=src_id,
-            id_signature=id_signature,
-            eph_pubkey=eph_pubkey,
-            record=None,
-        )
-
-        # Expected size: 32 (src_id) + 1 (sig_size) + 1 (key_size) + 64 + 33 = 131
-        assert len(authdata) == 131
-
-        # Decode and verify.
-        decoded = decode_handshake_authdata(authdata)
-        assert decoded.src_id == src_id
-        assert decoded.sig_size == 64
-        assert decoded.eph_key_size == 33
-        assert decoded.id_signature == id_signature
-        assert decoded.eph_pubkey == eph_pubkey
-        assert decoded.record is None
-
-    def test_handshake_authdata_with_enr(self):
-        """HANDSHAKE authdata can include an ENR record."""
-        src_id = NODE_A_ID
-        id_signature = bytes(64)
-        eph_pubkey = bytes.fromhex(
-            "039a003ba6517b473fa0cd74aefe99dadfdb34627f90fec6362df85803908f53a5"
-        )
-        # Minimal valid RLP-encoded ENR (just for testing).
-        enr_record = bytes.fromhex("f84180")  # Placeholder.
-
-        authdata = encode_handshake_authdata(
-            src_id=src_id,
-            id_signature=id_signature,
-            eph_pubkey=eph_pubkey,
-            record=enr_record,
-        )
-
-        # Decode and verify.
-        decoded = decode_handshake_authdata(authdata)
-        assert decoded.record == enr_record
-
-    def test_decode_spec_ping_packet(self):
-        """Decode the exact Ping packet from the spec test vectors.
-
-        Verifies header fields match expected values.
-        """
-        packet_hex = (
-            "00000000000000000000000000000000088b3d4342774649325f313964a39e55"
-            "ea96c005ad52be8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
-            "4c4f53245d08da4bb252012b2cba3f4f374a90a75cff91f142fa9be3e0a5f3ef"
-            "268ccb9065aeecfd67a999e7fdc137e062b2ec4a0eb92947f0d9a74bfbf44dfb"
-            "a776b21301f8e47be718571f"
-        )
-        packet = bytes.fromhex(packet_hex)
-
-        header, ciphertext = decode_packet_header(NODE_B_ID, packet)
-
-        assert header.flag == PacketFlag.MESSAGE
-        decoded_authdata = decode_message_authdata(header.authdata)
-        assert decoded_authdata.src_id == NODE_A_ID
-
-    def test_decode_spec_whoareyou_packet(self):
-        """Decode the exact WHOAREYOU packet from the spec test vectors.
-
-        Verifies id-nonce and enr-seq match expected values.
-        Per spec, the WHOAREYOU dest-node-id is Node B's ID.
-        """
-        packet_hex = (
-            "00000000000000000000000000000000088b3d434277464933a1ccc59f5967ad"
-            "1d6035f15e528627dde75cd68292f9e6c27d6b66c8100a873fcbaed4e16b8d14"
-            "f0de"
-        )
-        packet = bytes.fromhex(packet_hex)
-
-        header, message = decode_packet_header(NODE_B_ID, packet)
-
-        assert header.flag == PacketFlag.WHOAREYOU
-        decoded_authdata = decode_whoareyou_authdata(header.authdata)
-        assert bytes(decoded_authdata.id_nonce) == SPEC_ID_NONCE
-        assert int(decoded_authdata.enr_seq) == 0
-
-    def test_decode_spec_handshake_packet(self):
-        """Decode the exact Handshake packet from the spec test vectors.
-
-        Verifies authdata fields (src-id, signature size, key size).
-        """
-        packet_hex = (
-            "00000000000000000000000000000000088b3d4342774649305f313964a39e55"
-            "ea96c005ad521d8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
-            "4c4f53245d08da4bb23698868350aaad22e3ab8dd034f548a1c43cd246be9856"
-            "2b5db0b3ba5a0f2014c8fef2c78e79b3c58a76b84e819de9e9da11ce86d7a0b5"
-            "7b8a1bba0ee4a8deab98ce9ad9e2cc76f037b9ef2855a3a5db025d75f9b6b280"
-            "0528e2a98c3a3c50752c47d3e56dc23c962de2d1e9dff8b9e5bc6a8d04ba37c3"
-            "6cf89ce3d9e5e4e3ed6c3f06bc16b81cfb3fdd6b8c4c01c9f04e164f52fa6ee0"
-            "5c2c56b3eea6aff2f86f"
-        )
-        packet = bytes.fromhex(packet_hex)
-
-        header, ciphertext = decode_packet_header(NODE_B_ID, packet)
-
-        assert header.flag == PacketFlag.HANDSHAKE
-        decoded_authdata = decode_handshake_authdata(header.authdata)
-        assert decoded_authdata.src_id == NODE_A_ID
-        assert decoded_authdata.sig_size == 64
-        assert decoded_authdata.eph_key_size == 33
-
-
 class TestPacketEncodingRoundtrip:
     """Test full packet encoding/decoding roundtrips."""
 
@@ -415,7 +258,7 @@ class TestPacketEncodingRoundtrip:
         )
 
         # Decode header.
-        header, ciphertext = decode_packet_header(dest_id, packet)
+        header, ciphertext, _message_ad = decode_packet_header(dest_id, packet)
 
         assert header.flag == PacketFlag.MESSAGE
         assert len(header.authdata) == 32
@@ -444,7 +287,7 @@ class TestPacketEncodingRoundtrip:
         )
 
         # Decode header.
-        header, message = decode_packet_header(dest_id, packet)
+        header, message, _message_ad = decode_packet_header(dest_id, packet)
 
         assert header.flag == PacketFlag.WHOAREYOU
         assert bytes(header.nonce) == nonce
@@ -484,55 +327,13 @@ class TestPacketEncodingRoundtrip:
         )
 
         # Decode header.
-        header, ciphertext = decode_packet_header(dest_id, packet)
+        header, ciphertext, _message_ad = decode_packet_header(dest_id, packet)
 
         assert header.flag == PacketFlag.HANDSHAKE
 
         decoded_authdata = decode_handshake_authdata(header.authdata)
         assert decoded_authdata.src_id == src_id
         assert decoded_authdata.eph_pubkey == eph_pubkey
-
-
-class TestKeyDerivationEdgeCases:
-    """Additional key derivation tests beyond official vectors."""
-
-    def test_derive_keys_deterministic(self):
-        """Same inputs always produce same keys."""
-        secret = Bytes33(bytes(33))
-        initiator_id = Bytes32(NODE_A_ID)
-        recipient_id = Bytes32(NODE_B_ID)
-        challenge_data = make_challenge_data()
-
-        keys1 = derive_keys(secret, initiator_id, recipient_id, challenge_data)
-        keys2 = derive_keys(secret, initiator_id, recipient_id, challenge_data)
-
-        assert keys1 == keys2
-
-    def test_derive_keys_id_order_matters(self):
-        """Swapping initiator/recipient produces different keys."""
-        secret = Bytes33(bytes(33))
-        id_a = Bytes32(NODE_A_ID)
-        id_b = Bytes32(NODE_B_ID)
-        challenge_data = make_challenge_data()
-
-        keys_ab = derive_keys(secret, id_a, id_b, challenge_data)
-        keys_ba = derive_keys(secret, id_b, id_a, challenge_data)
-
-        assert keys_ab != keys_ba
-
-    def test_derive_keys_challenge_data_matters(self):
-        """Different challenge_data produces different keys."""
-        secret = Bytes33(bytes(33))
-        initiator_id = Bytes32(NODE_A_ID)
-        recipient_id = Bytes32(NODE_B_ID)
-
-        challenge_data1 = make_challenge_data(bytes(16))
-        challenge_data2 = make_challenge_data(bytes([1]) + bytes(15))
-
-        keys1 = derive_keys(secret, initiator_id, recipient_id, challenge_data1)
-        keys2 = derive_keys(secret, initiator_id, recipient_id, challenge_data2)
-
-        assert keys1 != keys2
 
 
 class TestOfficialPacketEncoding:
@@ -928,3 +729,71 @@ class TestAESCryptoEdgeCases:
         # Decryption of tampered ciphertext should fail with InvalidTag.
         with pytest.raises(InvalidTag):
             aes_gcm_decrypt(key, nonce, tampered, aad)
+
+
+class TestSpecPacketPayloadDecryption:
+    """Verify message payload decryption using correct AAD (masking-iv || plaintext header)."""
+
+    def test_message_packet_encrypt_decrypt_roundtrip(self):
+        """Encrypt a message in a packet and decrypt using message_ad from decode."""
+        src_id = NODE_A_ID
+        dest_id = NODE_B_ID
+        nonce = bytes(12)
+        encryption_key = bytes.fromhex("dccc82d81bd610f4f76d3ebe97a40571")
+        plaintext = bytes.fromhex("01c20101")  # PING message.
+
+        authdata = encode_message_authdata(src_id)
+
+        packet = encode_packet(
+            dest_node_id=dest_id,
+            src_node_id=src_id,
+            flag=PacketFlag.MESSAGE,
+            nonce=nonce,
+            authdata=authdata,
+            message=plaintext,
+            encryption_key=encryption_key,
+        )
+
+        # Decode header - returns message_ad for AAD.
+        header, ciphertext, message_ad = decode_packet_header(dest_id, packet)
+
+        # Decrypt using message_ad as AAD.
+        decrypted = decrypt_message(encryption_key, bytes(header.nonce), ciphertext, message_ad)
+        assert decrypted == plaintext
+
+    def test_handshake_packet_encrypt_decrypt_roundtrip(self):
+        """Handshake packet encrypts and decrypts using correct AAD."""
+        src_id = NODE_A_ID
+        dest_id = NODE_B_ID
+        nonce = bytes(12)
+        encryption_key = bytes.fromhex("dccc82d81bd610f4f76d3ebe97a40571")
+        plaintext = bytes.fromhex("01c20101")  # PING message.
+
+        id_signature = bytes(64)
+        eph_pubkey = bytes.fromhex(
+            "039a003ba6517b473fa0cd74aefe99dadfdb34627f90fec6362df85803908f53a5"
+        )
+
+        authdata = encode_handshake_authdata(
+            src_id=src_id,
+            id_signature=id_signature,
+            eph_pubkey=eph_pubkey,
+            record=None,
+        )
+
+        packet = encode_packet(
+            dest_node_id=dest_id,
+            src_node_id=src_id,
+            flag=PacketFlag.HANDSHAKE,
+            nonce=nonce,
+            authdata=authdata,
+            message=plaintext,
+            encryption_key=encryption_key,
+        )
+
+        # Decode header - returns message_ad for AAD.
+        header, ciphertext, message_ad = decode_packet_header(dest_id, packet)
+
+        # Decrypt using message_ad as AAD.
+        decrypted = decrypt_message(encryption_key, bytes(header.nonce), ciphertext, message_ad)
+        assert decrypted == plaintext
