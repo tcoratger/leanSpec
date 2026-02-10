@@ -15,6 +15,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
     decode_whoareyou_authdata,
 )
 from lean_spec.subspecs.networking.discovery.session import SessionCache
+from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
 
 class TestPendingHandshake:
@@ -716,17 +717,14 @@ class TestHandshakeENRCache:
         from lean_spec.subspecs.networking.enr import ENR
         from lean_spec.types import Bytes64, Uint64
 
-        remote_pub = bytes.fromhex(
-            "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-        )
-        remote_node_id = bytes(compute_node_id(remote_pub))
+        remote_node_id = bytes(compute_node_id(NODE_B_PUBKEY))
 
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
-                "secp256k1": remote_pub,
+                "secp256k1": NODE_B_PUBKEY,
             },
         )
 
