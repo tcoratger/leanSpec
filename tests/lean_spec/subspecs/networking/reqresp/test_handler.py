@@ -13,6 +13,7 @@ from lean_spec.subspecs.networking.reqresp.codec import (
 )
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
+    REQUEST_TIMEOUT_SECONDS,
     BlockLookup,
     DefaultRequestHandler,
     ReqRespServer,
@@ -1200,14 +1201,10 @@ class TestRequestTimeoutConstant:
 
     def test_timeout_is_positive(self) -> None:
         """Request timeout is a positive number."""
-        from lean_spec.subspecs.networking.reqresp.handler import REQUEST_TIMEOUT_SECONDS
-
         assert REQUEST_TIMEOUT_SECONDS > 0
 
     def test_timeout_is_reasonable(self) -> None:
         """Request timeout is within reasonable bounds."""
-        from lean_spec.subspecs.networking.reqresp.handler import REQUEST_TIMEOUT_SECONDS
-
         # Should be at least a few seconds
         assert REQUEST_TIMEOUT_SECONDS >= 1.0
         # Should not be excessively long

@@ -1,6 +1,7 @@
 """Tests for Discovery v5 cryptographic primitives."""
 
 import pytest
+from cryptography.exceptions import InvalidTag
 
 from lean_spec.subspecs.networking.discovery.crypto import (
     aes_ctr_decrypt,
@@ -93,8 +94,6 @@ class TestAesGcm:
 
     def test_wrong_aad_fails_decryption(self):
         """Test that wrong AAD causes authentication failure."""
-        from cryptography.exceptions import InvalidTag
-
         key = Bytes16.zero()
         nonce = Bytes12.zero()
         plaintext = b"secret"

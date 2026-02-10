@@ -18,6 +18,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
     xor_distance,
 )
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes64, Uint64
 from lean_spec.types.byte_arrays import Bytes4
@@ -470,7 +471,6 @@ class TestForkCompatibility:
 
     def test_fork_filter_rejects_mismatched_fork(self, local_node_id, remote_node_id):
         """Node with different fork_digest is rejected."""
-        from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 
         local_fork = Bytes4(bytes.fromhex("12345678"))
         table = RoutingTable(local_id=local_node_id, local_fork_digest=local_fork)
@@ -490,7 +490,6 @@ class TestForkCompatibility:
 
     def test_fork_filter_accepts_matching_fork(self, local_node_id, remote_node_id):
         """Node with matching fork_digest is accepted."""
-        from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 
         local_fork = Bytes4(bytes.fromhex("12345678"))
         table = RoutingTable(local_id=local_node_id, local_fork_digest=local_fork)
@@ -513,7 +512,6 @@ class TestForkCompatibility:
 
     def test_is_fork_compatible_method(self, local_node_id):
         """Verify is_fork_compatible for compatible, incompatible, and no-ENR entries."""
-        from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 
         local_fork = Bytes4(bytes.fromhex("12345678"))
         table = RoutingTable(local_id=local_node_id, local_fork_digest=local_fork)

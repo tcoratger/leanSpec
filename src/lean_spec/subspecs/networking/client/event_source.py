@@ -139,6 +139,7 @@ from lean_spec.subspecs.networking.service.events import (
 )
 from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.subspecs.networking.transport.connection import ConnectionManager, Stream
+from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
 from lean_spec.subspecs.networking.transport.multistream import (
     NegotiationError,
     negotiate_server,
@@ -703,8 +704,6 @@ class LiveNetworkEventSource:
             Initialized event source.
         """
         if connection_manager is None:
-            from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-
             identity_key = IdentityKeypair.generate()
             connection_manager = await ConnectionManager.create(identity_key)
 

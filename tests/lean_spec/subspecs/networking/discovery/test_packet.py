@@ -2,6 +2,8 @@
 
 import pytest
 
+from lean_spec.subspecs.networking.discovery.config import MAX_PACKET_SIZE, MIN_PACKET_SIZE
+from lean_spec.subspecs.networking.discovery.crypto import aes_ctr_encrypt
 from lean_spec.subspecs.networking.discovery.messages import PacketFlag
 from lean_spec.subspecs.networking.discovery.packet import (
     HANDSHAKE_HEADER_SIZE,
@@ -298,22 +300,16 @@ class TestPacketSizeLimits:
 
     def test_min_packet_size_constant(self):
         """MIN_PACKET_SIZE matches spec minimum."""
-        from lean_spec.subspecs.networking.discovery.config import MIN_PACKET_SIZE
-
         # masking-iv (16) + static-header (23) + min authdata (24 for WHOAREYOU)
         assert MIN_PACKET_SIZE == 63
 
     def test_max_packet_size_constant(self):
         """MAX_PACKET_SIZE matches IPv6 MTU."""
-        from lean_spec.subspecs.networking.discovery.config import MAX_PACKET_SIZE
-
         # IPv6 minimum MTU = 1280 bytes
         assert MAX_PACKET_SIZE == 1280
 
     def test_reject_undersized_packet(self):
         """Packets smaller than MIN_PACKET_SIZE are rejected."""
-        from lean_spec.subspecs.networking.discovery.config import MIN_PACKET_SIZE
-
         local_node_id = bytes(32)
 
         # Packet that's too small.
@@ -324,8 +320,6 @@ class TestPacketSizeLimits:
 
     def test_minimum_valid_packet_structure(self):
         """Minimum valid packet has correct structure."""
-        from lean_spec.subspecs.networking.discovery.config import MIN_PACKET_SIZE
-
         # WHOAREYOU is the smallest packet type:
         # masking-iv (16) + static-header (23) + authdata (24) = 63 bytes
         expected_min = 16 + STATIC_HEADER_SIZE + WHOAREYOU_AUTHDATA_SIZE
@@ -371,8 +365,6 @@ class TestPacketSizeLimits:
 
     def test_truncated_authdata_rejected(self):
         """Packet with incomplete authdata is rejected."""
-        from lean_spec.subspecs.networking.discovery.crypto import aes_ctr_encrypt
-
         local_node_id = bytes(32)
         masking_iv = bytes(16)
 
@@ -398,8 +390,6 @@ class TestPacketProtocolValidation:
 
     def test_invalid_protocol_id_rejected(self):
         """Packet with wrong protocol ID is rejected."""
-        from lean_spec.subspecs.networking.discovery.crypto import aes_ctr_encrypt
-
         local_node_id = bytes(32)
         masking_iv = bytes(16)
 
@@ -421,8 +411,6 @@ class TestPacketProtocolValidation:
 
     def test_invalid_protocol_version_rejected(self):
         """Packet with unsupported protocol version is rejected."""
-        from lean_spec.subspecs.networking.discovery.crypto import aes_ctr_encrypt
-
         local_node_id = bytes(32)
         masking_iv = bytes(16)
 

@@ -17,13 +17,20 @@ Test Vector Sources
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 
 from lean_spec.subspecs.networking import ResponseCode
+from lean_spec.subspecs.networking.config import MAX_PAYLOAD_SIZE
 from lean_spec.subspecs.networking.reqresp import (
+    CONTEXT_BYTES_LENGTH,
     CodecError,
+    ForkDigestMismatchError,
     decode_request,
     encode_request,
+    prepend_context_bytes,
+    validate_context_bytes,
 )
 from lean_spec.subspecs.networking.varint import (
     VarintError,
@@ -329,8 +336,6 @@ class TestBoundaryConditions:
 
     def test_payload_at_max_size(self) -> None:
         """Payload at exactly MAX_PAYLOAD_SIZE is accepted."""
-        from lean_spec.subspecs.networking.config import MAX_PAYLOAD_SIZE
-
         # Create payload at exactly MAX_PAYLOAD_SIZE
         ssz_data = b"X" * MAX_PAYLOAD_SIZE
 
@@ -345,8 +350,6 @@ class TestBoundaryConditions:
 
     def test_payload_over_max_size_rejected_on_encode(self) -> None:
         """Payload exceeding MAX_PAYLOAD_SIZE is rejected on encode."""
-        from lean_spec.subspecs.networking.config import MAX_PAYLOAD_SIZE
-
         oversized = b"X" * (MAX_PAYLOAD_SIZE + 1)
 
         with pytest.raises(CodecError, match="too large"):
@@ -354,8 +357,6 @@ class TestBoundaryConditions:
 
     def test_declared_length_over_max_rejected_on_decode(self) -> None:
         """Declared length exceeding MAX_PAYLOAD_SIZE is rejected on decode."""
-        from lean_spec.subspecs.networking.config import MAX_PAYLOAD_SIZE
-
         # Encode a small request, then modify the length prefix
         valid_encoded = encode_request(b"test")
 
@@ -369,8 +370,6 @@ class TestBoundaryConditions:
 
     def test_response_payload_at_max_size(self) -> None:
         """Response payload at exactly MAX_PAYLOAD_SIZE is accepted."""
-        from lean_spec.subspecs.networking.config import MAX_PAYLOAD_SIZE
-
         ssz_data = b"Y" * MAX_PAYLOAD_SIZE
 
         encoded = ResponseCode.SUCCESS.encode(ssz_data)
@@ -594,8 +593,6 @@ class TestSnappyFramingEdgeCases:
     def test_incompressible_data(self) -> None:
         """Incompressible (random-like) data roundtrips correctly."""
         # Create pseudo-random data that doesn't compress well
-        import hashlib
-
         incompressible = b""
         for i in range(1000):
             incompressible += hashlib.sha256(str(i).encode()).digest()
@@ -618,8 +615,6 @@ class TestContextBytesValidation:
 
     def test_validate_context_bytes_success(self) -> None:
         """Valid context bytes are validated and stripped."""
-        from lean_spec.subspecs.networking.reqresp import validate_context_bytes
-
         fork_digest = b"\x12\x34\x56\x78"
         payload = b"block data here"
         data = fork_digest + payload
@@ -629,11 +624,6 @@ class TestContextBytesValidation:
 
     def test_validate_context_bytes_mismatch(self) -> None:
         """Mismatched context bytes raise ForkDigestMismatchError."""
-        from lean_spec.subspecs.networking.reqresp import (
-            ForkDigestMismatchError,
-            validate_context_bytes,
-        )
-
         expected_fork = b"\x12\x34\x56\x78"
         actual_fork = b"\xde\xad\xbe\xef"
         payload = b"block data"
@@ -647,8 +637,6 @@ class TestContextBytesValidation:
 
     def test_validate_context_bytes_too_short(self) -> None:
         """Data shorter than context bytes raises CodecError."""
-        from lean_spec.subspecs.networking.reqresp import validate_context_bytes
-
         fork_digest = b"\x12\x34\x56\x78"
         too_short = b"\x12\x34"  # Only 2 bytes
 
@@ -657,8 +645,6 @@ class TestContextBytesValidation:
 
     def test_validate_context_bytes_exactly_4_bytes(self) -> None:
         """Data of exactly 4 bytes (context only, no payload) works."""
-        from lean_spec.subspecs.networking.reqresp import validate_context_bytes
-
         fork_digest = b"\x12\x34\x56\x78"
         data = fork_digest  # No payload, just context bytes
 
@@ -667,8 +653,6 @@ class TestContextBytesValidation:
 
     def test_prepend_context_bytes(self) -> None:
         """Context bytes are correctly prepended to payload."""
-        from lean_spec.subspecs.networking.reqresp import prepend_context_bytes
-
         fork_digest = b"\x12\x34\x56\x78"
         payload = b"block data"
 
@@ -678,8 +662,6 @@ class TestContextBytesValidation:
 
     def test_prepend_context_bytes_wrong_length(self) -> None:
         """Prepending context bytes with wrong length raises ValueError."""
-        from lean_spec.subspecs.networking.reqresp import prepend_context_bytes
-
         invalid_fork = b"\x12\x34\x56"  # Only 3 bytes
         payload = b"block data"
 
@@ -688,11 +670,6 @@ class TestContextBytesValidation:
 
     def test_context_bytes_roundtrip(self) -> None:
         """Prepend and validate context bytes roundtrip."""
-        from lean_spec.subspecs.networking.reqresp import (
-            prepend_context_bytes,
-            validate_context_bytes,
-        )
-
         fork_digest = b"\xab\xcd\xef\x01"
         original_payload = b"some response data"
 
@@ -706,8 +683,6 @@ class TestContextBytesValidation:
 
     def test_fork_digest_mismatch_error_message(self) -> None:
         """ForkDigestMismatchError has informative message."""
-        from lean_spec.subspecs.networking.reqresp import ForkDigestMismatchError
-
         expected = b"\x12\x34\x56\x78"
         actual = b"\xde\xad\xbe\xef"
 
@@ -717,6 +692,4 @@ class TestContextBytesValidation:
 
     def test_context_bytes_length_constant(self) -> None:
         """CONTEXT_BYTES_LENGTH constant is 4."""
-        from lean_spec.subspecs.networking.reqresp import CONTEXT_BYTES_LENGTH
-
         assert CONTEXT_BYTES_LENGTH == 4

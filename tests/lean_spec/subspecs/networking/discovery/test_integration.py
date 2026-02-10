@@ -6,6 +6,8 @@ Tests full protocol flows between components.
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from lean_spec.subspecs.networking.discovery.codec import (
@@ -19,6 +21,7 @@ from lean_spec.subspecs.networking.discovery.crypto import (
 from lean_spec.subspecs.networking.discovery.handshake import HandshakeManager
 from lean_spec.subspecs.networking.discovery.keys import compute_node_id, derive_keys_from_pubkey
 from lean_spec.subspecs.networking.discovery.messages import (
+    Distance,
     FindNode,
     MessageType,
     Nodes,
@@ -45,6 +48,7 @@ from lean_spec.subspecs.networking.discovery.session import Session, SessionCach
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes64, Uint64
+from lean_spec.types.uint import Uint8
 
 
 @pytest.fixture
@@ -99,8 +103,6 @@ class TestMessageRoundtrip:
 
     def test_findnode_roundtrip(self):
         """FINDNODE message encodes and decodes correctly."""
-        from lean_spec.subspecs.networking.discovery.messages import Distance
-
         original = FindNode(
             request_id=RequestId(data=b"\x01\x02\x03"),
             distances=[Distance(128), Distance(256)],
@@ -120,8 +122,6 @@ class TestMessageRoundtrip:
             seq=Uint64(1),
             pairs={"id": b"v4"},
         )
-
-        from lean_spec.types.uint import Uint8
 
         original = Nodes(
             request_id=RequestId(data=b"\x01\x02\x03"),
@@ -217,8 +217,6 @@ class TestSessionEstablishment:
 
     def test_session_cache_operations(self, node_a_keys, node_b_keys):
         """Session cache stores and retrieves sessions."""
-        import time
-
         cache = SessionCache()
 
         now = time.time()
@@ -244,8 +242,6 @@ class TestSessionEstablishment:
 
     def test_session_cache_eviction(self, node_a_keys):
         """Session cache evicts old sessions when full."""
-        import time
-
         cache = SessionCache(max_sessions=3)
 
         # Add 4 sessions.

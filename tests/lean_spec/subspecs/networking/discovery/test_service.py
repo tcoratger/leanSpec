@@ -458,8 +458,6 @@ class TestLookupAlgorithm:
 
     def test_lookup_result_contains_nodes(self, local_enr, local_private_key):
         """LookupResult contains found nodes."""
-        from lean_spec.subspecs.networking.types import NodeId
-
         nodes = [NodeEntry(node_id=NodeId(bytes([i]) + bytes(31))) for i in range(3)]
 
         result = LookupResult(

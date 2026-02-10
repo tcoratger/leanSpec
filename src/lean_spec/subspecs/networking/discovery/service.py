@@ -29,8 +29,9 @@ import logging
 import os
 import random
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
+from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types.uint import Uint8
 
@@ -41,9 +42,6 @@ from .messages import Distance, FindNode, Nodes, Ping, Pong, Port, TalkReq, Talk
 from .routing import NodeEntry, RoutingTable, log2_distance
 from .session import BondCache
 from .transport import DiscoveryTransport
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.networking.enr import ENR
 
 logger = logging.getLogger(__name__)
 
@@ -639,8 +637,6 @@ class DiscoveryService:
             enr_bytes: RLP-encoded ENR bytes from NODES response.
             seen: Dict tracking nodes seen during current lookup.
         """
-        from lean_spec.subspecs.networking.enr import ENR
-
         try:
             # Parse ENR from RLP.
             enr = ENR.from_rlp(enr_bytes)

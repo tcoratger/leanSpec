@@ -9,6 +9,12 @@ Reference:
 
 from __future__ import annotations
 
+import pytest
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+from lean_spec.subspecs.networking.discovery.codec import encode_message
 from lean_spec.subspecs.networking.discovery.crypto import (
     aes_gcm_decrypt,
     aes_gcm_encrypt,
@@ -20,8 +26,21 @@ from lean_spec.subspecs.networking.discovery.keys import (
     compute_node_id,
     derive_keys,
 )
-from lean_spec.subspecs.networking.discovery.messages import PacketFlag
+from lean_spec.subspecs.networking.discovery.messages import (
+    Distance,
+    FindNode,
+    MessageType,
+    Nodes,
+    PacketFlag,
+    Ping,
+    Pong,
+    Port,
+    RequestId,
+)
 from lean_spec.subspecs.networking.discovery.packet import (
+    HANDSHAKE_HEADER_SIZE,
+    STATIC_HEADER_SIZE,
+    WHOAREYOU_AUTHDATA_SIZE,
     decode_handshake_authdata,
     decode_message_authdata,
     decode_packet_header,
@@ -32,7 +51,10 @@ from lean_spec.subspecs.networking.discovery.packet import (
     encode_packet,
     encode_whoareyou_authdata,
 )
-from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64
+from lean_spec.subspecs.networking.discovery.routing import log2_distance, xor_distance
+from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64, Uint64
+from lean_spec.types.uint import Uint8
 from tests.lean_spec.helpers import make_challenge_data
 from tests.lean_spec.subspecs.networking.discovery.conftest import (
     NODE_A_ID,
@@ -79,9 +101,6 @@ class TestOfficialNodeIdVectors:
         We derive the public key from the private key since the spec
         provides the private key for Node B.
         """
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import ec
-
         # Derive public key from private key.
         private_key = ec.derive_private_key(
             int.from_bytes(NODE_B_PRIVKEY, "big"),
@@ -160,9 +179,6 @@ class TestOfficialCryptoVectors:
         assert signature == expected_sig
 
         # Also verify the signature.
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import ec
-
         private_key = ec.derive_private_key(
             int.from_bytes(SPEC_EPHEMERAL_KEY, "big"),
             ec.SECP256K1(),
@@ -404,10 +420,6 @@ class TestOfficialPacketEncoding:
         PING format: [request-id, enr-seq]
         Message type byte 0x01 prepended.
         """
-        from lean_spec.subspecs.networking.discovery.codec import encode_message
-        from lean_spec.subspecs.networking.discovery.messages import MessageType, Ping, RequestId
-        from lean_spec.types import Uint64
-
         # PING with request ID [0x00, 0x00, 0x00, 0x01] and enr_seq = 1
         ping = Ping(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
@@ -429,15 +441,6 @@ class TestOfficialPacketEncoding:
         PONG format: [request-id, enr-seq, recipient-ip, recipient-port]
         Message type byte 0x02 prepended.
         """
-        from lean_spec.subspecs.networking.discovery.codec import encode_message
-        from lean_spec.subspecs.networking.discovery.messages import (
-            MessageType,
-            Pong,
-            Port,
-            RequestId,
-        )
-        from lean_spec.types import Uint64
-
         pong = Pong(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
             enr_seq=Uint64(1),
@@ -457,14 +460,6 @@ class TestOfficialPacketEncoding:
         FINDNODE format: [request-id, [distances...]]
         Message type byte 0x03 prepended.
         """
-        from lean_spec.subspecs.networking.discovery.codec import encode_message
-        from lean_spec.subspecs.networking.discovery.messages import (
-            Distance,
-            FindNode,
-            MessageType,
-            RequestId,
-        )
-
         findnode = FindNode(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
             distances=[Distance(256), Distance(255)],
@@ -482,14 +477,6 @@ class TestOfficialPacketEncoding:
         NODES format: [request-id, total, [enrs...]]
         Message type byte 0x04 prepended.
         """
-        from lean_spec.subspecs.networking.discovery.codec import encode_message
-        from lean_spec.subspecs.networking.discovery.messages import (
-            MessageType,
-            Nodes,
-            RequestId,
-        )
-        from lean_spec.types.uint import Uint8
-
         nodes = Nodes(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
             total=Uint8(1),
@@ -517,12 +504,6 @@ class TestOfficialPacketEncoding:
         - nonce: 12 bytes
         - authdata-size: 2 bytes
         """
-        from lean_spec.subspecs.networking.discovery.packet import (
-            STATIC_HEADER_SIZE,
-            encode_message_authdata,
-            encode_packet,
-        )
-
         nonce = bytes(12)
         encryption_key = bytes(16)
         message = b"\x01\xc2\x01\x01"
@@ -550,13 +531,6 @@ class TestOfficialPacketEncoding:
         - authdata: id-nonce (16) + enr-seq (8) = 24 bytes
         - no message payload
         """
-        from lean_spec.subspecs.networking.discovery.packet import (
-            STATIC_HEADER_SIZE,
-            WHOAREYOU_AUTHDATA_SIZE,
-            encode_packet,
-            encode_whoareyou_authdata,
-        )
-
         nonce = bytes(12)
         id_nonce = bytes(16)
         enr_seq = 0
@@ -585,13 +559,6 @@ class TestOfficialPacketEncoding:
         - authdata: src-id (32) + sig-size (1) + eph-key-size (1) + sig + eph-key + [record]
         - encrypted message
         """
-        from lean_spec.subspecs.networking.discovery.packet import (
-            HANDSHAKE_HEADER_SIZE,
-            STATIC_HEADER_SIZE,
-            encode_handshake_authdata,
-            encode_packet,
-        )
-
         nonce = bytes(12)
         encryption_key = bytes(16)
         message = b"\x01\xc2\x01\x01"
@@ -719,9 +686,6 @@ class TestAESCryptoEdgeCases:
 
     def test_aes_gcm_wrong_key_fails_decryption(self):
         """AES-GCM decryption fails with wrong key."""
-        import pytest
-        from cryptography.exceptions import InvalidTag
-
         wrong_key = Bytes16(bytes.fromhex("00000000000000001a85107ac686990b"))
         aad = bytes(32)
         plaintext = b"secret message"
@@ -734,9 +698,6 @@ class TestAESCryptoEdgeCases:
 
     def test_aes_gcm_wrong_aad_fails_decryption(self):
         """AES-GCM decryption fails with wrong AAD."""
-        import pytest
-        from cryptography.exceptions import InvalidTag
-
         aad = bytes(32)
         wrong_aad = bytes([0xFF] * 32)
         plaintext = b"secret message"
@@ -749,9 +710,6 @@ class TestAESCryptoEdgeCases:
 
     def test_aes_gcm_tampered_ciphertext_fails(self):
         """AES-GCM decryption fails with tampered ciphertext."""
-        import pytest
-        from cryptography.exceptions import InvalidTag
-
         aad = bytes(32)
         plaintext = b"secret message"
 
@@ -832,9 +790,6 @@ class TestRoutingWithTestVectorNodeIds:
 
     def test_xor_distance_is_symmetric(self):
         """XOR distance between test vector nodes is symmetric and non-zero."""
-        from lean_spec.subspecs.networking.discovery.routing import xor_distance
-        from lean_spec.subspecs.networking.types import NodeId
-
         node_a = NodeId(NODE_A_ID)
         node_b = NodeId(NODE_B_ID)
 
@@ -844,10 +799,6 @@ class TestRoutingWithTestVectorNodeIds:
 
     def test_log2_distance_is_high(self):
         """Log2 distance between test vector nodes is high (differ in high bits)."""
-        from lean_spec.subspecs.networking.discovery.messages import Distance
-        from lean_spec.subspecs.networking.discovery.routing import log2_distance
-        from lean_spec.subspecs.networking.types import NodeId
-
         node_a = NodeId(NODE_A_ID)
         node_b = NodeId(NODE_B_ID)
 
