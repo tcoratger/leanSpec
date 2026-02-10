@@ -182,7 +182,7 @@ class TestEncryptedPacketRoundtrip:
         )
 
         # Decode header.
-        header, ciphertext = decode_packet_header(node_b_keys["node_id"], packet)
+        header, ciphertext, message_ad = decode_packet_header(node_b_keys["node_id"], packet)
 
         assert header.flag == PacketFlag.MESSAGE
 
@@ -200,12 +200,10 @@ class TestEncryptedPacketRoundtrip:
             is_initiator=False,
         )
 
-        # Extract masked header for AAD.
-        masked_header = packet[16 : 16 + 23 + len(header.authdata)]
-
         # Node B uses recv_key to decrypt (which equals Node A's send_key).
+        # message_ad = masking-iv || plaintext header (per spec).
         plaintext = aes_gcm_decrypt(
-            Bytes16(b_recv_key), Bytes12(header.nonce), ciphertext, masked_header
+            Bytes16(b_recv_key), Bytes12(header.nonce), ciphertext, message_ad
         )
 
         # Decode message.

@@ -19,6 +19,7 @@ from lean_spec.subspecs.networking.discovery.service import (
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes64, Uint64
+from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
 
 class TestDiscoveryServiceInit:
@@ -298,9 +299,7 @@ class TestENRAddressExtraction:
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
+                "secp256k1": NODE_B_PUBKEY,
                 "ip": bytes([127, 0, 0, 1]),
                 "udp": (9000).to_bytes(2, "big"),
             },
@@ -320,9 +319,7 @@ class TestENRAddressExtraction:
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
+                "secp256k1": NODE_B_PUBKEY,
                 "ip6": ipv6_bytes,
                 "udp6": (9000).to_bytes(2, "big"),
             },
@@ -341,9 +338,7 @@ class TestENRAddressExtraction:
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
+                "secp256k1": NODE_B_PUBKEY,
                 "ip": bytes([192, 168, 1, 1]),
                 "udp": (9000).to_bytes(2, "big"),
                 "ip6": ipv6_bytes,
@@ -362,9 +357,7 @@ class TestENRAddressExtraction:
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
-                "secp256k1": bytes.fromhex(
-                    "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-                ),
+                "secp256k1": NODE_B_PUBKEY,
             },
         )
 

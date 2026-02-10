@@ -32,7 +32,6 @@ from __future__ import annotations
 import os
 import struct
 from dataclasses import dataclass
-from enum import IntEnum
 
 from lean_spec.types import Bytes12, Bytes16, Uint64
 
@@ -61,14 +60,6 @@ WHOAREYOU_AUTHDATA_SIZE = 24
 
 HANDSHAKE_HEADER_SIZE = 34
 """Fixed portion of handshake authdata: src-id (32) + sig-size (1) + eph-key-size (1)."""
-
-
-class PacketType(IntEnum):
-    """Packet type aliases matching PacketFlag for clarity."""
-
-    MESSAGE = 0
-    WHOAREYOU = 1
-    HANDSHAKE = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +126,7 @@ def encode_packet(
     authdata: bytes,
     message: bytes,
     encryption_key: bytes | None = None,
+    masking_iv: Bytes16 | None = None,
 ) -> bytes:
     """
     Encode a Discovery v5 packet.
@@ -147,6 +139,8 @@ def encode_packet(
         authdata: Authentication data (varies by packet type).
         message: Message payload (plaintext for WHOAREYOU, encrypted otherwise).
         encryption_key: 16-byte key for message encryption (None for WHOAREYOU).
+        masking_iv: Optional 16-byte IV for header masking. Random if not provided.
+            Must be provided for WHOAREYOU to match the IV used in challenge_data.
 
     Returns:
         Complete encoded packet ready for UDP transmission.
@@ -156,13 +150,14 @@ def encode_packet(
     if len(nonce) != GCM_NONCE_SIZE:
         raise ValueError(f"Nonce must be {GCM_NONCE_SIZE} bytes, got {len(nonce)}")
 
-    # Fresh random IV for header masking.
-    #
-    # Using dest_node_id as the masking key is deterministic,
-    # so the IV MUST be random to prevent ciphertext patterns.
-    # Without randomness, identical packets would produce
-    # identical masked headers, enabling traffic analysis.
-    masking_iv = Bytes16(os.urandom(CTR_IV_SIZE))
+    if masking_iv is None:
+        # Fresh random IV for header masking.
+        #
+        # Using dest_node_id as the masking key is deterministic,
+        # so the IV MUST be random to prevent ciphertext patterns.
+        # Without randomness, identical packets would produce
+        # identical masked headers, enabling traffic analysis.
+        masking_iv = Bytes16(os.urandom(CTR_IV_SIZE))
 
     static_header = _encode_static_header(flag, nonce, len(authdata))
     header = static_header + authdata
@@ -182,16 +177,17 @@ def encode_packet(
         if encryption_key is None:
             raise ValueError("Encryption key required for non-WHOAREYOU packets")
 
-        # Masked header as AAD prevents header tampering.
+        # Per spec: message-ad = masking-iv || header (plaintext).
         #
-        # The recipient verifies the header wasn't modified
-        # without having to decrypt the payload first.
+        # The AAD binds the plaintext header to the encrypted message.
+        # The recipient reconstructs this from the decoded header.
+        message_ad = bytes(masking_iv) + header
         encrypted_message = aes_gcm_encrypt(
-            Bytes16(encryption_key), Bytes12(nonce), message, masked_header
+            Bytes16(encryption_key), Bytes12(nonce), message, message_ad
         )
 
     # Assemble packet.
-    packet = masking_iv + masked_header + encrypted_message
+    packet = bytes(masking_iv) + masked_header + encrypted_message
 
     if len(packet) > MAX_PACKET_SIZE:
         raise ValueError(f"Packet exceeds max size: {len(packet)} > {MAX_PACKET_SIZE}")
@@ -199,7 +195,7 @@ def encode_packet(
     return packet
 
 
-def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeader, bytes]:
+def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeader, bytes, bytes]:
     """
     Decode and unmask a Discovery v5 packet header.
 
@@ -208,7 +204,8 @@ def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeade
         data: Raw packet bytes.
 
     Returns:
-        Tuple of (header, message_bytes).
+        Tuple of (header, message_bytes, message_ad).
+        message_ad is masking-iv || plaintext header, used as AAD for decryption.
 
     Raises:
         ValueError: If packet is malformed.
@@ -224,8 +221,7 @@ def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeade
     masked_data = data[CTR_IV_SIZE:]
 
     # Decrypt static header first to get authdata size.
-    static_header_masked = masked_data[:STATIC_HEADER_SIZE]
-    static_header = aes_ctr_decrypt(masking_key, masking_iv, static_header_masked)
+    static_header = aes_ctr_decrypt(masking_key, masking_iv, masked_data[:STATIC_HEADER_SIZE])
 
     # Parse static header.
     protocol_id = static_header[:6]
@@ -245,15 +241,19 @@ def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeade
     if len(data) < header_end:
         raise ValueError(f"Packet truncated: need {header_end}, have {len(data)}")
 
-    # Decrypt the full header including authdata.
-    full_masked_header = masked_data[: STATIC_HEADER_SIZE + authdata_size]
-    full_header = aes_ctr_decrypt(masking_key, masking_iv, full_masked_header)
+    # Decrypt the full header (static header + authdata) in one pass.
+    full_header = aes_ctr_decrypt(
+        masking_key, masking_iv, masked_data[: STATIC_HEADER_SIZE + authdata_size]
+    )
     authdata = full_header[STATIC_HEADER_SIZE:]
 
     # Message bytes are everything after the header.
     message_bytes = data[header_end:]
 
-    return PacketHeader(flag=flag, nonce=nonce, authdata=authdata), message_bytes
+    # Per spec: message-ad = masking-iv || header (plaintext).
+    message_ad = bytes(masking_iv) + full_header
+
+    return PacketHeader(flag=flag, nonce=nonce, authdata=authdata), message_bytes, message_ad
 
 
 def decode_message_authdata(authdata: bytes) -> MessageAuthdata:
@@ -310,7 +310,7 @@ def decrypt_message(
     encryption_key: bytes,
     nonce: bytes,
     ciphertext: bytes,
-    masked_header: bytes,
+    message_ad: bytes,
 ) -> bytes:
     """
     Decrypt an encrypted message payload.
@@ -319,12 +319,12 @@ def decrypt_message(
         encryption_key: 16-byte session key.
         nonce: 12-byte nonce from packet header.
         ciphertext: Encrypted message with GCM tag.
-        masked_header: Masked header bytes (used as AAD).
+        message_ad: Additional authenticated data (masking-iv || plaintext header).
 
     Returns:
         Decrypted message plaintext.
     """
-    return aes_gcm_decrypt(Bytes16(encryption_key), Bytes12(nonce), ciphertext, masked_header)
+    return aes_gcm_decrypt(Bytes16(encryption_key), Bytes12(nonce), ciphertext, message_ad)
 
 
 def encode_message_authdata(src_id: bytes) -> bytes:

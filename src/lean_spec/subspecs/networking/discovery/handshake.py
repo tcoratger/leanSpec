@@ -253,6 +253,8 @@ class HandshakeManager:
         whoareyou: WhoAreYouAuthdata,
         remote_pubkey: bytes,
         challenge_data: bytes,
+        remote_ip: str = "",
+        remote_port: int = 0,
     ) -> tuple[bytes, bytes, bytes]:
         """
         Create a HANDSHAKE packet in response to WHOAREYOU.
@@ -265,6 +267,8 @@ class HandshakeManager:
             remote_pubkey: Remote's 33-byte compressed public key.
             challenge_data: Full WHOAREYOU data for key derivation
                 (masking-iv || static-header || authdata from received packet).
+            remote_ip: Remote peer's IP address for session keying.
+            remote_port: Remote peer's UDP port for session keying.
 
         Returns:
             Tuple of (authdata, send_key, recv_key).
@@ -312,12 +316,14 @@ class HandshakeManager:
             is_initiator=True,
         )
 
-        # Store session.
+        # Store session keyed by (node_id, ip, port).
         self._session_cache.create(
             node_id=remote_node_id,
             send_key=send_key,
             recv_key=recv_key,
             is_initiator=True,
+            ip=remote_ip,
+            port=remote_port,
         )
 
         # Clean up pending handshake.
@@ -330,6 +336,8 @@ class HandshakeManager:
         self,
         remote_node_id: bytes,
         handshake: HandshakeAuthdata,
+        remote_ip: str = "",
+        remote_port: int = 0,
     ) -> HandshakeResult:
         """
         Process a received HANDSHAKE packet.
@@ -339,6 +347,8 @@ class HandshakeManager:
         Args:
             remote_node_id: 32-byte node ID from packet source.
             handshake: Decoded HANDSHAKE authdata.
+            remote_ip: Remote peer's IP address for session keying.
+            remote_port: Remote peer's UDP port for session keying.
 
         Returns:
             HandshakeResult with established session.
@@ -409,12 +419,14 @@ class HandshakeManager:
             is_initiator=False,
         )
 
-        # Create session.
+        # Create session keyed by (node_id, ip, port).
         session = self._session_cache.create(
             node_id=remote_node_id,
             send_key=send_key,
             recv_key=recv_key,
             is_initiator=False,
+            ip=remote_ip,
+            port=remote_port,
         )
 
         # Clean up pending handshake.

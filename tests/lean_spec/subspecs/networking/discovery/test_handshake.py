@@ -15,6 +15,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
     decode_whoareyou_authdata,
 )
 from lean_spec.subspecs.networking.discovery.session import SessionCache
+from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
 
 class TestPendingHandshake:
@@ -475,6 +476,107 @@ class TestHandshakeValidation:
         with pytest.raises(HandshakeError, match="ENR required"):
             manager.handle_handshake(bytes(remote_node_id), fake_authdata)
 
+    def test_successful_handshake_with_signature_verification(
+        self, manager, remote_keypair, session_cache
+    ):
+        """Full handshake succeeds when signature is valid.
+
+        Exercises the complete WHOAREYOU -> HANDSHAKE -> session flow.
+        """
+        from lean_spec.subspecs.networking.discovery.crypto import sign_id_nonce
+        from lean_spec.subspecs.networking.discovery.handshake import HandshakeResult
+        from lean_spec.subspecs.networking.discovery.packet import (
+            decode_handshake_authdata,
+            encode_handshake_authdata,
+        )
+        from lean_spec.subspecs.networking.enr.enr import ENR
+        from lean_spec.types import Bytes32, Bytes33, Bytes64, Uint64
+
+        remote_priv, remote_pub, remote_node_id = remote_keypair
+
+        # Node A (manager) creates WHOAREYOU for remote.
+        masking_iv = bytes(16)
+        id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
+            bytes(remote_node_id), bytes(12), 0, masking_iv
+        )
+
+        # Remote creates handshake response.
+        eph_priv, eph_pub = generate_secp256k1_keypair()
+        local_node_id = manager._local_node_id
+
+        # Remote signs the id_nonce proving ownership.
+        id_signature = sign_id_nonce(
+            Bytes32(remote_priv),
+            challenge_data,
+            Bytes33(eph_pub),
+            Bytes32(local_node_id),
+        )
+
+        # Remote includes their ENR since enr_seq=0.
+        remote_enr = ENR(
+            signature=Bytes64(bytes(64)),
+            seq=Uint64(1),
+            pairs={"id": b"v4", "secp256k1": bytes(remote_pub)},
+        )
+
+        authdata_bytes = encode_handshake_authdata(
+            src_id=bytes(remote_node_id),
+            id_signature=id_signature,
+            eph_pubkey=eph_pub,
+            record=remote_enr.to_rlp(),
+        )
+
+        handshake = decode_handshake_authdata(authdata_bytes)
+
+        # Manager processes handshake - should succeed.
+        result = manager.handle_handshake(bytes(remote_node_id), handshake)
+
+        assert result is not None
+        assert isinstance(result, HandshakeResult)
+        assert result.session is not None
+        assert len(result.session.send_key) == 16
+        assert len(result.session.recv_key) == 16
+
+    def test_handle_handshake_rejects_invalid_signature(
+        self, manager, remote_keypair, session_cache
+    ):
+        """Handshake fails when signature is invalid."""
+        from lean_spec.subspecs.networking.discovery.handshake import HandshakeError
+        from lean_spec.subspecs.networking.discovery.packet import (
+            decode_handshake_authdata,
+            encode_handshake_authdata,
+        )
+        from lean_spec.subspecs.networking.enr.enr import ENR
+        from lean_spec.types import Bytes64, Uint64
+
+        remote_priv, remote_pub, remote_node_id = remote_keypair
+
+        # Set up WHOAREYOU state.
+        masking_iv = bytes(16)
+        manager.create_whoareyou(bytes(remote_node_id), bytes(12), 0, masking_iv)
+
+        # Generate ephemeral key.
+        _eph_priv, eph_pub = generate_secp256k1_keypair()
+
+        # Create authdata with INVALID signature (all-zero 64 bytes).
+        remote_enr = ENR(
+            signature=Bytes64(bytes(64)),
+            seq=Uint64(1),
+            pairs={"id": b"v4", "secp256k1": bytes(remote_pub)},
+        )
+
+        authdata_bytes = encode_handshake_authdata(
+            src_id=bytes(remote_node_id),
+            id_signature=bytes(64),  # Wrong signature.
+            eph_pubkey=eph_pub,
+            record=remote_enr.to_rlp(),
+        )
+
+        handshake = decode_handshake_authdata(authdata_bytes)
+
+        with pytest.raises(HandshakeError, match="Invalid ID signature"):
+            manager.handle_handshake(bytes(remote_node_id), handshake)
+
 
 class TestHandshakeConcurrency:
     """Concurrent handshake handling tests."""
@@ -615,17 +717,14 @@ class TestHandshakeENRCache:
         from lean_spec.subspecs.networking.enr import ENR
         from lean_spec.types import Bytes64, Uint64
 
-        remote_pub = bytes.fromhex(
-            "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-        )
-        remote_node_id = bytes(compute_node_id(remote_pub))
+        remote_node_id = bytes(compute_node_id(NODE_B_PUBKEY))
 
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=Uint64(1),
             pairs={
                 "id": b"v4",
-                "secp256k1": remote_pub,
+                "secp256k1": NODE_B_PUBKEY,
             },
         )
 

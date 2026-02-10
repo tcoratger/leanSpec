@@ -9,27 +9,28 @@ from lean_spec.subspecs.networking.types import NodeId
 from lean_spec.types import Bytes64, Uint64
 
 # From devp2p test vectors
-_NODE_B_PRIVKEY = bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
-_NODE_B_ID = bytes.fromhex("bbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9")
-_NODE_A_ID = bytes.fromhex("aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb")
+NODE_B_PRIVKEY = bytes.fromhex("66fb62bfbd66b9177a138c1e5cddbe4f7c30c343e94e68df8769459cb1cde628")
+NODE_B_ID = bytes.fromhex("bbbb9d047f0488c0b5a93c1c3f2d8bafc7c8ff337024a55434a0d0555de64db9")
+NODE_B_PUBKEY = bytes.fromhex("0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91")
+NODE_A_ID = bytes.fromhex("aaaa8419e9f49d0083561b48287df592939a8d19947d8c0ef88f2a4856a69fbb")
 
 
 @pytest.fixture
 def local_private_key() -> bytes:
     """Node B's private key from devp2p test vectors."""
-    return _NODE_B_PRIVKEY
+    return NODE_B_PRIVKEY
 
 
 @pytest.fixture
 def local_node_id() -> NodeId:
     """Node B's ID from devp2p test vectors."""
-    return NodeId(_NODE_B_ID)
+    return NodeId(NODE_B_ID)
 
 
 @pytest.fixture
 def remote_node_id() -> NodeId:
     """Node A's ID from devp2p test vectors."""
-    return NodeId(_NODE_A_ID)
+    return NodeId(NODE_A_ID)
 
 
 @pytest.fixture
@@ -40,9 +41,7 @@ def local_enr() -> ENR:
         seq=Uint64(1),
         pairs={
             "id": b"v4",
-            "secp256k1": bytes.fromhex(
-                "0317931e6e0840220642f230037d285d122bc59063221ef3226b1f403ddc69ca91"
-            ),
+            "secp256k1": NODE_B_PUBKEY,
             "ip": bytes([127, 0, 0, 1]),
             "udp": (9000).to_bytes(2, "big"),
         },

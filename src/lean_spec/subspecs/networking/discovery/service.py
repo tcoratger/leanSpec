@@ -24,7 +24,9 @@ References:
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import os
 import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
@@ -558,8 +560,6 @@ class DiscoveryService:
             await asyncio.sleep(REFRESH_INTERVAL_SECS)
             try:
                 # Perform lookup for random target.
-                import os
-
                 target = os.urandom(32)
                 await self.find_node(target)
             except Exception as e:
@@ -602,18 +602,7 @@ class DiscoveryService:
         Returns:
             Raw bytes representation of the IP address.
         """
-        import ipaddress
-
-        try:
-            # Try IPv4 first.
-            addr = ipaddress.ip_address(ip_str)
-            return addr.packed
-        except ValueError:
-            # Fall back to returning as-is if somehow already bytes.
-            if isinstance(ip_str, bytes):
-                return ip_str
-            # Last resort: encode as UTF-8 (shouldn't happen with valid IPs).
-            return ip_str.encode()
+        return ipaddress.ip_address(ip_str).packed
 
     def _enr_to_entry(self, enr: ENR) -> NodeEntry:
         """Convert an ENR to a NodeEntry."""
