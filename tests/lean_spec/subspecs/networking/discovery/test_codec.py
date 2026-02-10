@@ -4,6 +4,8 @@ import pytest
 
 from lean_spec.subspecs.networking.discovery.codec import (
     MessageDecodingError,
+    MessageEncodingError,
+    _decode_request_id,
     decode_message,
     encode_message,
     generate_request_id,
@@ -308,6 +310,24 @@ class TestDecodingErrors:
         """Test that invalid RLP raises MessageDecodingError."""
         with pytest.raises(MessageDecodingError):
             decode_message(b"\x01\xff\xff")  # PING type + invalid RLP
+
+
+class TestEncodingErrors:
+    """Tests for message encoding error handling."""
+
+    def test_encode_unknown_type_raises(self):
+        """Encoding an unsupported message type raises MessageEncodingError."""
+        with pytest.raises(MessageEncodingError, match="Unknown message type"):
+            encode_message("not_a_message")  # type: ignore[arg-type]
+
+
+class TestRequestIdDecoding:
+    """Tests for request ID decoding edge cases."""
+
+    def test_request_id_too_long_raises(self):
+        """Request ID longer than 8 bytes raises ValueError."""
+        with pytest.raises(ValueError, match="Request ID too long"):
+            _decode_request_id(bytes(9))
 
 
 class TestRequestIdGeneration:

@@ -266,28 +266,3 @@ class TalkResp(StrictBaseModel):
 
     response: bytes
     """Protocol-specific response. Empty if protocol unknown."""
-
-
-class StaticHeader(StrictBaseModel):
-    """
-    Fixed-size portion of the packet header.
-
-    Total size: 23 bytes (6 + 2 + 1 + 12 + 2).
-
-    The header is masked using AES-CTR with masking-key = dest-id[:16].
-    """
-
-    protocol_id: bytes = PROTOCOL_ID
-    """Protocol identifier. Must be b"discv5" (6 bytes)."""
-
-    version: Uint16 = Uint16(PROTOCOL_VERSION)
-    """Protocol version. Currently 0x0001."""
-
-    flag: Uint8
-    """Packet type: 0=message, 1=whoareyou, 2=handshake."""
-
-    nonce: Nonce
-    """96-bit message nonce. Must be unique per packet."""
-
-    authdata_size: Uint16
-    """Byte length of the authdata section following this header."""

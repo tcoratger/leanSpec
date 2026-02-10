@@ -32,7 +32,7 @@ from enum import Enum, auto
 from threading import Lock
 
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.types import Bytes32, Bytes33, Bytes64, Uint64, rlp
+from lean_spec.types import Bytes32, Bytes33, Bytes64
 
 from .config import HANDSHAKE_TIMEOUT_SECS
 from .crypto import (
@@ -122,6 +122,14 @@ class HandshakeManager:
 
     Thread-safe manager for concurrent handshakes with multiple peers.
     Integrates with SessionCache to store completed sessions.
+
+    Args:
+        local_node_id: Our 32-byte node ID.
+        local_private_key: Our 32-byte secp256k1 private key.
+        local_enr_rlp: Our RLP-encoded ENR.
+        local_enr_seq: Our current ENR sequence number.
+        session_cache: Session cache for storing completed sessions.
+        timeout_secs: Handshake timeout.
     """
 
     def __init__(
@@ -133,17 +141,7 @@ class HandshakeManager:
         session_cache: SessionCache,
         timeout_secs: float = HANDSHAKE_TIMEOUT_SECS,
     ):
-        """
-        Initialize the handshake manager.
-
-        Args:
-            local_node_id: Our 32-byte node ID.
-            local_private_key: Our 32-byte secp256k1 private key.
-            local_enr_rlp: Our RLP-encoded ENR.
-            local_enr_seq: Our current ENR sequence number.
-            session_cache: Session cache for storing completed sessions.
-            timeout_secs: Handshake timeout.
-        """
+        """Initialize handshake manager."""
         if len(local_node_id) != 32:
             raise ValueError(f"Local node ID must be 32 bytes, got {len(local_node_id)}")
         if len(local_private_key) != 32:
@@ -406,7 +404,7 @@ class HandshakeManager:
         #
         # The challenge_data was saved when we sent WHOAREYOU.
         # Using the same data ensures both sides derive identical keys.
-        recv_key, send_key = derive_keys_from_pubkey(
+        send_key, recv_key = derive_keys_from_pubkey(
             local_private_key=Bytes32(self._local_private_key),
             remote_public_key=handshake.eph_pubkey,
             local_node_id=Bytes32(self._local_node_id),
@@ -509,13 +507,12 @@ class HandshakeManager:
 
         return None
 
-    def _parse_enr_rlp(self, enr_rlp: bytes) -> "ENR | None":
+    def _parse_enr_rlp(self, enr_rlp: bytes) -> ENR | None:
         """
         Decode an RLP-encoded ENR into a structured record.
 
-        ENR (Ethereum Node Record) is the standard format for node identity.
-        Handshake packets may include the sender's ENR so we can verify
-        their identity without prior knowledge of the node.
+        Delegates to ENR.from_rlp which handles full validation
+        including key sorting, size limits, and node ID computation.
 
         Args:
             enr_rlp: RLP-encoded ENR bytes.
@@ -524,56 +521,11 @@ class HandshakeManager:
             Parsed ENR with computed node ID, or None if malformed.
         """
         try:
-            # Decode the RLP list structure.
-            #
-            # ENR format: [signature, seq, key1, val1, key2, val2, ...]
-            # Minimum: signature + seq = 2 items.
-            # Key-value pairs must come in pairs, so total is always even.
-            items = rlp.decode_rlp_list(enr_rlp)
-            if len(items) < 2 or len(items) % 2 != 0:
-                return None
-
-            # Extract signature (always 64 bytes for secp256k1).
-            signature_raw = items[0]
-            if len(signature_raw) != 64:
-                return None
-
-            # Extract sequence number (big-endian encoded).
-            #
-            # Sequence increments with each ENR update.
-            # Higher sequence means newer record.
-            seq_bytes = items[1]
-            seq = int.from_bytes(seq_bytes, "big") if seq_bytes else 0
-
-            # Extract key-value pairs.
-            #
-            # Common keys: "id", "secp256k1", "ip", "udp".
-            # Keys are UTF-8 strings; values are raw bytes.
-            pairs: dict[str, bytes] = {}
-            for i in range(2, len(items), 2):
-                key = items[i].decode("utf-8")
-                value = items[i + 1]
-                pairs[key] = value
-
-            enr = ENR(
-                signature=Bytes64(signature_raw),
-                seq=Uint64(seq),
-                pairs=pairs,
-            )
-
-            # Compute and attach the node ID.
-            #
-            # Node ID = keccak256(public_key).
-            # Pre-computing avoids repeated hashing during lookups.
-            node_id = enr.compute_node_id()
-            if node_id is not None:
-                return enr.model_copy(update={"node_id": node_id})
-
-            return enr
-        except (ValueError, KeyError, IndexError, UnicodeDecodeError):
+            return ENR.from_rlp(enr_rlp)
+        except ValueError:
             return None
 
-    def register_enr(self, node_id: bytes, enr: "ENR") -> None:
+    def register_enr(self, node_id: bytes, enr: ENR) -> None:
         """
         Cache an ENR for future handshake verification.
 
@@ -588,7 +540,7 @@ class HandshakeManager:
         """
         self._enr_cache[node_id] = enr
 
-    def get_cached_enr(self, node_id: bytes) -> "ENR | None":
+    def get_cached_enr(self, node_id: bytes) -> ENR | None:
         """
         Retrieve a previously cached ENR.
 

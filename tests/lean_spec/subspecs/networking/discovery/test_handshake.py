@@ -16,8 +16,10 @@ from lean_spec.subspecs.networking.discovery.handshake import (
     PendingHandshake,
 )
 from lean_spec.subspecs.networking.discovery.keys import compute_node_id
+from lean_spec.subspecs.networking.discovery.messages import IdNonce
 from lean_spec.subspecs.networking.discovery.packet import (
     HandshakeAuthdata,
+    WhoAreYouAuthdata,
     decode_handshake_authdata,
     decode_whoareyou_authdata,
     encode_handshake_authdata,
@@ -662,6 +664,96 @@ class TestHandshakeConcurrency:
 
         # Each challenge should have unique id_nonce.
         assert id_nonce1 != id_nonce2
+
+
+class TestHandshakeEnrInclusion:
+    """Tests for ENR inclusion/exclusion in HANDSHAKE responses."""
+
+    @pytest.fixture
+    def local_keypair(self):
+        """Generate a local keypair for testing."""
+        priv, pub = generate_secp256k1_keypair()
+        node_id = compute_node_id(pub)
+        return priv, pub, node_id
+
+    @pytest.fixture
+    def remote_keypair(self):
+        """Generate a remote keypair for testing."""
+        priv, pub = generate_secp256k1_keypair()
+        node_id = compute_node_id(pub)
+        return priv, pub, node_id
+
+    def test_enr_included_when_remote_seq_is_stale(self, local_keypair, remote_keypair):
+        """HANDSHAKE includes our ENR when remote's known seq is lower than ours.
+
+        When the WHOAREYOU's enr_seq < our local_enr_seq, the remote has a
+        stale copy of our ENR. We include our current ENR so they can update.
+        """
+        local_priv, local_pub, local_node_id = local_keypair
+        remote_priv, remote_pub, remote_node_id = remote_keypair
+
+        session_cache = SessionCache()
+        manager = HandshakeManager(
+            local_node_id=bytes(local_node_id),
+            local_private_key=local_priv,
+            local_enr_rlp=b"mock_enr_data",
+            local_enr_seq=5,
+            session_cache=session_cache,
+        )
+
+        # Remote creates WHOAREYOU with enr_seq=0 (stale).
+        whoareyou = WhoAreYouAuthdata(
+            id_nonce=IdNonce(bytes(16)),
+            enr_seq=Uint64(0),
+        )
+
+        challenge_data = bytes(63)
+        authdata, _, _ = manager.create_handshake_response(
+            remote_node_id=bytes(remote_node_id),
+            whoareyou=whoareyou,
+            remote_pubkey=bytes(remote_pub),
+            challenge_data=challenge_data,
+        )
+
+        # Decode authdata and verify ENR is present.
+        decoded = decode_handshake_authdata(authdata)
+        assert decoded.record is not None
+
+    def test_enr_excluded_when_remote_seq_is_current(self, local_keypair, remote_keypair):
+        """HANDSHAKE excludes our ENR when remote's known seq >= ours.
+
+        When the remote already has our current ENR, sending it again
+        wastes bandwidth. The handshake packet should omit the record.
+        """
+        local_priv, local_pub, local_node_id = local_keypair
+        remote_priv, remote_pub, remote_node_id = remote_keypair
+
+        session_cache = SessionCache()
+        manager = HandshakeManager(
+            local_node_id=bytes(local_node_id),
+            local_private_key=local_priv,
+            local_enr_rlp=b"mock_enr_data",
+            local_enr_seq=5,
+            session_cache=session_cache,
+        )
+
+        # Remote creates WHOAREYOU with enr_seq=5 (current).
+        whoareyou = WhoAreYouAuthdata(
+            id_nonce=IdNonce(bytes(16)),
+            enr_seq=Uint64(5),
+        )
+
+        challenge_data = bytes(63)
+        authdata, _, _ = manager.create_handshake_response(
+            remote_node_id=bytes(remote_node_id),
+            whoareyou=whoareyou,
+            remote_pubkey=bytes(remote_pub),
+            challenge_data=challenge_data,
+        )
+
+        # Decode authdata and verify ENR is absent.
+        decoded = decode_handshake_authdata(authdata)
+        assert decoded.record is None
 
 
 class TestHandshakeENRCache:

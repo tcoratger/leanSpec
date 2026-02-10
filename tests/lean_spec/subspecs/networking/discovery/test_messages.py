@@ -36,7 +36,6 @@ from lean_spec.subspecs.networking.discovery.messages import (
     Pong,
     Port,
     RequestId,
-    StaticHeader,
     TalkReq,
     TalkResp,
 )
@@ -314,28 +313,6 @@ class TestTalkResp:
             response=b"",
         )
         assert resp.response == b""
-
-
-class TestStaticHeader:
-    """Tests for packet static header."""
-
-    def test_default_protocol_id(self):
-        header = StaticHeader(
-            flag=Uint8(0),
-            nonce=Nonce(b"\x00" * 12),
-            authdata_size=Uint16(32),
-        )
-        assert header.protocol_id == b"discv5"
-        assert header.version == Uint16(0x0001)
-
-    def test_flag_values(self):
-        for flag in [0, 1, 2]:
-            header = StaticHeader(
-                flag=Uint8(flag),
-                nonce=Nonce(b"\xff" * 12),
-                authdata_size=Uint16(32),
-            )
-            assert header.flag == Uint8(flag)
 
 
 class TestWhoAreYouAuthdataConstruction:

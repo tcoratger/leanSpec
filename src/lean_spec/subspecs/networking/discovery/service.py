@@ -74,14 +74,17 @@ class DiscoveryService:
     Main Discovery v5 service.
 
     Provides high-level peer discovery functionality:
-    - find_node(): Lookup nodes close to a target ID
-    - get_random_nodes(): Get random peers from routing table
-    - get_peers_for_subnet(): Find peers for specific subnets
+    - Lookup nodes close to a target ID
+    - Get random peers from routing table
+    - Perform periodic table refresh and node revalidation
 
-    The service runs background tasks for:
-    - Table refresh (periodic lookups)
-    - Node revalidation (PING liveness checks)
-    - Session cleanup
+    Background tasks handle table refresh, liveness checks, and session cleanup.
+
+    Args:
+        local_enr: Our ENR.
+        private_key: Our 32-byte secp256k1 private key.
+        config: Optional protocol configuration.
+        bootnodes: Initial nodes to connect to.
     """
 
     def __init__(
@@ -91,15 +94,7 @@ class DiscoveryService:
         config: DiscoveryConfig | None = None,
         bootnodes: list[ENR] | None = None,
     ):
-        """
-        Initialize the discovery service.
-
-        Args:
-            local_enr: Our ENR.
-            private_key: Our 32-byte secp256k1 private key.
-            config: Optional protocol configuration.
-            bootnodes: Initial nodes to connect to.
-        """
+        """Initialize discovery service."""
         self._local_enr = local_enr
         self._private_key = private_key
         self._config = config or DiscoveryConfig()
@@ -123,9 +118,6 @@ class DiscoveryService:
 
         # Bond tracking.
         self._bond_cache = BondCache()
-
-        # ENR cache for known nodes.
-        self._enr_cache: dict[bytes, ENR] = {}
 
         # Background tasks.
         self._tasks: list[asyncio.Task] = []
@@ -341,7 +333,6 @@ class DiscoveryService:
                     addr = (enr.ip4, int(enr.udp_port))
                     self._transport.register_node_address(node_id, addr)
                     self._transport.register_enr(node_id, enr)
-                    self._enr_cache[node_id] = enr
 
                     # Add to routing table.
                     entry = self._enr_to_entry(enr)
@@ -379,8 +370,7 @@ class DiscoveryService:
         message: DiscoveryMessage,
         addr: tuple[str, int],
     ) -> None:
-        """Handle an incoming message."""
-        # Run handler in background.
+        """Dispatch an incoming message to async processing."""
         asyncio.create_task(self._process_message(remote_node_id, message, addr))
 
     async def _process_message(
@@ -389,16 +379,17 @@ class DiscoveryService:
         message: DiscoveryMessage,
         addr: tuple[str, int],
     ) -> None:
-        """Process an incoming message."""
+        """Route a decoded message to its type-specific handler."""
         # Update node address.
         self._transport.register_node_address(remote_node_id, addr)
 
-        if isinstance(message, Ping):
-            await self._handle_ping(remote_node_id, message, addr)
-        elif isinstance(message, FindNode):
-            await self._handle_findnode(remote_node_id, message, addr)
-        elif isinstance(message, TalkReq):
-            await self._handle_talkreq(remote_node_id, message, addr)
+        match message:
+            case Ping():
+                await self._handle_ping(remote_node_id, message, addr)
+            case FindNode():
+                await self._handle_findnode(remote_node_id, message, addr)
+            case TalkReq():
+                await self._handle_talkreq(remote_node_id, message, addr)
 
     async def _handle_ping(
         self,
@@ -630,7 +621,7 @@ class DiscoveryService:
         Parses the RLP-encoded ENR, validates it, and adds to:
         - The routing table (for future lookups)
         - The seen dict (for current lookup tracking)
-        - The ENR cache (for handshake verification)
+        - The transport ENR cache (for handshake verification)
         - The address registry (for UDP communication)
 
         Args:
@@ -669,7 +660,6 @@ class DiscoveryService:
             self._routing_table.add(entry)
 
             # Cache ENR for handshake verification.
-            self._enr_cache[bytes(node_id)] = enr
             self._transport.register_enr(bytes(node_id), enr)
 
             # Register address for communication.

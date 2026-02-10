@@ -67,9 +67,6 @@ _Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
 _Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
 """secp256k1 generator y-coordinate."""
 
-_POINT_AT_INFINITY: tuple[int, int] | None = None
-"""Represents the identity element for EC point arithmetic."""
-
 
 def _modinv(a: int, m: int) -> int:
     """Compute modular inverse using Fermat's little theorem (m must be prime)."""
@@ -87,7 +84,7 @@ def _point_add(p1: tuple[int, int] | None, p2: tuple[int, int] | None) -> tuple[
     x2, y2 = p2
 
     if x1 == x2 and y1 != y2:
-        return _POINT_AT_INFINITY
+        return None
 
     if x1 == x2:
         # Point doubling.
@@ -102,7 +99,7 @@ def _point_add(p1: tuple[int, int] | None, p2: tuple[int, int] | None) -> tuple[
 
 def _point_mul(k: int, point: tuple[int, int] | None) -> tuple[int, int] | None:
     """Scalar multiplication using double-and-add."""
-    result = _POINT_AT_INFINITY
+    result = None
     addend = point
     while k:
         if k & 1:
@@ -414,15 +411,16 @@ def verify_id_nonce_signature(
     domain_separator = b"discovery v5 identity proof"
     input_data = domain_separator + challenge_data + ephemeral_pubkey + dest_node_id
 
-    # Hash the input.
+    # Pre-hash with SHA256 since ECDSA verification expects a fixed-size digest.
     digest = hashlib.sha256(input_data).digest()
 
-    # Convert r||s to DER format.
+    # The cryptography library expects DER-encoded signatures, not raw r||s.
     r = int.from_bytes(signature[:32], "big")
     s = int.from_bytes(signature[32:], "big")
     der_signature = encode_dss_signature(r, s)
 
-    # Verify the signature.
+    # Return False on failure rather than raising, since invalid signatures
+    # are expected during normal protocol operation (e.g., stale handshakes).
     try:
         public_key = ec.EllipticCurvePublicKey.from_encoded_point(
             ec.SECP256K1(),

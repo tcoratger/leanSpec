@@ -216,14 +216,20 @@ def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeade
     # Extract masking IV.
     masking_iv = Bytes16(data[:CTR_IV_SIZE])
 
-    # Unmask enough to read the static header.
+    # Unmask the static header to learn the authdata size, then unmask the rest.
+    #
+    # AES-CTR is a stream cipher: decrypting the first N bytes produces the same
+    # output regardless of how many bytes follow. We exploit this by first
+    # decrypting just the 23-byte static header to read authdata_size, then
+    # decrypting the full header (static + authdata) in a single pass.
+    # The second call recomputes the keystream from offset 0, so both passes
+    # produce identical plaintext for the overlapping bytes.
     masking_key = Bytes16(local_node_id[:AES_KEY_SIZE])
     masked_data = data[CTR_IV_SIZE:]
 
-    # Decrypt static header first to get authdata size.
+    # First pass: decrypt static header to learn authdata size.
     static_header = aes_ctr_decrypt(masking_key, masking_iv, masked_data[:STATIC_HEADER_SIZE])
 
-    # Parse static header.
     protocol_id = static_header[:6]
     if protocol_id != PROTOCOL_ID:
         raise ValueError(f"Invalid protocol ID: {protocol_id!r}")
@@ -236,12 +242,11 @@ def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeade
     nonce = Nonce(static_header[9:21])
     authdata_size = struct.unpack(">H", static_header[21:23])[0]
 
-    # Verify we have enough data for authdata.
     header_end = CTR_IV_SIZE + STATIC_HEADER_SIZE + authdata_size
     if len(data) < header_end:
         raise ValueError(f"Packet truncated: need {header_end}, have {len(data)}")
 
-    # Decrypt the full header (static header + authdata) in one pass.
+    # Second pass: decrypt full header (static + authdata) from offset 0.
     full_header = aes_ctr_decrypt(
         masking_key, masking_iv, masked_data[: STATIC_HEADER_SIZE + authdata_size]
     )
@@ -276,6 +281,7 @@ def decode_whoareyou_authdata(authdata: bytes) -> WhoAreYouAuthdata:
 
 def decode_handshake_authdata(authdata: bytes) -> HandshakeAuthdata:
     """Decode HANDSHAKE packet authdata."""
+    # Fixed header: src-id (32 bytes) + sig-size (1 byte) + eph-key-size (1 byte) = 34 bytes.
     if len(authdata) < HANDSHAKE_HEADER_SIZE:
         raise ValueError(f"Handshake authdata too small: {len(authdata)}")
 
@@ -283,6 +289,7 @@ def decode_handshake_authdata(authdata: bytes) -> HandshakeAuthdata:
     sig_size = authdata[32]
     eph_key_size = authdata[33]
 
+    # Variable fields follow the fixed header: signature + ephemeral key + optional ENR.
     expected_min = HANDSHAKE_HEADER_SIZE + sig_size + eph_key_size
     if len(authdata) < expected_min:
         raise ValueError(f"Handshake authdata truncated: {len(authdata)} < {expected_min}")
@@ -294,6 +301,8 @@ def decode_handshake_authdata(authdata: bytes) -> HandshakeAuthdata:
     eph_pubkey = authdata[offset : offset + eph_key_size]
     offset += eph_key_size
 
+    # Remaining bytes are the RLP-encoded ENR, included when the recipient's
+    # known enr_seq was stale (signaled by WHOAREYOU.enr_seq < sender's seq).
     record = authdata[offset:] if offset < len(authdata) else None
 
     return HandshakeAuthdata(

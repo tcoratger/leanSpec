@@ -69,7 +69,7 @@ class Session:
         self.last_seen = time.time()
 
 
-SessionKey = tuple[bytes, str, int]
+type SessionKey = tuple[bytes, str, int]
 """Session cache key: (node_id, ip, port).
 
 Per spec, sessions are tied to a specific UDP endpoint.
@@ -201,6 +201,9 @@ class SessionCache:
         """
         Update the last_seen timestamp for a session.
 
+        Holds the lock across lookup and mutation to prevent a concurrent
+        thread from evicting the session between the two operations.
+
         Args:
             node_id: 32-byte peer node ID.
             ip: Peer IP address.
@@ -209,11 +212,13 @@ class SessionCache:
         Returns:
             True if session was updated, False if not found.
         """
-        session = self.get(node_id, ip, port)
-        if session is not None:
-            session.touch()
-            return True
-        return False
+        key: SessionKey = (node_id, ip, port)
+        with self._lock:
+            session = self.sessions.get(key)
+            if session is not None and not session.is_expired(self.timeout_secs):
+                session.touch()
+                return True
+            return False
 
     def cleanup_expired(self) -> int:
         """
