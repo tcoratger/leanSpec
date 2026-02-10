@@ -52,7 +52,6 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
-from lean_spec.subspecs.node.helpers import is_aggregator
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 from .backfill_sync import BackfillSync, NetworkRequester
@@ -426,11 +425,11 @@ class SyncService:
         if not self._state.accepts_gossip:
             return
 
-        # Check if we are an aggregator
-        is_aggregator_role = is_aggregator(
-            self.store.validator_id,
-            node_is_aggregator=self.is_aggregator,
-        )
+        # Check if we are an aggregator.
+        #
+        # A validator acts as an aggregator when it is active (has an ID)
+        # and the node operator has enabled aggregator mode.
+        is_aggregator_role = self.store.validator_id is not None and self.is_aggregator
 
         # Integrate the attestation into forkchoice state.
         #
