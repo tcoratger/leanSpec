@@ -4,6 +4,7 @@ import pytest
 from cryptography.exceptions import InvalidTag
 
 from lean_spec.subspecs.networking.discovery.crypto import (
+    _decompress_pubkey,
     aes_ctr_decrypt,
     aes_ctr_encrypt,
     aes_gcm_decrypt,
@@ -14,7 +15,7 @@ from lean_spec.subspecs.networking.discovery.crypto import (
     sign_id_nonce,
     verify_id_nonce_signature,
 )
-from lean_spec.types import Bytes12, Bytes16, Bytes32
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes64
 from tests.lean_spec.helpers import make_challenge_data
 
 
@@ -249,3 +250,108 @@ class TestIdNonceSignature:
         assert not verify_id_nonce_signature(
             signature, wrong_challenge_data, eph_pub, dest_node_id, pub
         )
+
+
+class TestEcdhNegativeCases:
+    """Negative tests for ECDH key agreement."""
+
+    def test_zero_private_key_rejected(self):
+        """ECDH rejects an all-zero private key (point at infinity)."""
+        _, pub = generate_secp256k1_keypair()
+        with pytest.raises(ValueError, match="point at infinity"):
+            ecdh_agree(Bytes32(bytes(32)), pub)
+
+    def test_invalid_private_key_too_short(self):
+        """ECDH rejects private key shorter than 32 bytes."""
+        _, pub = generate_secp256k1_keypair()
+        with pytest.raises((ValueError, TypeError)):
+            ecdh_agree(bytes(16), pub)  # type: ignore[arg-type]
+
+
+class TestSignIdNonceNegativeCases:
+    """Negative tests for ID nonce signing."""
+
+    def test_zero_private_key_rejected(self):
+        """Signing rejects an all-zero private key."""
+        _, eph_pub = generate_secp256k1_keypair()
+        with pytest.raises((ValueError, Exception)):
+            sign_id_nonce(
+                Bytes32(bytes(32)),
+                make_challenge_data(),
+                eph_pub,
+                Bytes32.zero(),
+            )
+
+    def test_wrong_length_dest_node_id(self):
+        """Signing rejects non-32-byte destination node ID."""
+        priv, _ = generate_secp256k1_keypair()
+        _, eph_pub = generate_secp256k1_keypair()
+        with pytest.raises((ValueError, TypeError)):
+            sign_id_nonce(
+                priv,
+                make_challenge_data(),
+                eph_pub,
+                bytes(16),  # type: ignore[arg-type]
+            )
+
+
+class TestVerifyIdNonceNegativeCases:
+    """Negative tests for ID nonce signature verification."""
+
+    def test_truncated_signature(self):
+        """Verification rejects signatures shorter than 64 bytes."""
+        _, pub = generate_secp256k1_keypair()
+        _, eph_pub = generate_secp256k1_keypair()
+
+        result = verify_id_nonce_signature(
+            Bytes64(bytes(63) + b"\x00"),  # 64 bytes but content is garbage
+            make_challenge_data(),
+            eph_pub,
+            Bytes32.zero(),
+            pub,
+        )
+        assert not result
+
+    def test_wrong_length_node_id(self):
+        """Verification rejects non-32-byte node ID."""
+        _, pub = generate_secp256k1_keypair()
+        _, eph_pub = generate_secp256k1_keypair()
+
+        result = verify_id_nonce_signature(
+            Bytes64(bytes(64)),
+            make_challenge_data(),
+            eph_pub,
+            Bytes32(bytes(16) + bytes(16)),  # 32 bytes, but let's test wrong content
+            pub,
+        )
+        assert not result
+
+
+class TestDecompressPubkeyNegativeCases:
+    """Negative tests for public key decompression."""
+
+    def test_invalid_prefix_byte(self):
+        """Decompression rejects keys with invalid prefix."""
+        # 33 bytes but prefix is 0x05 (not 0x02 or 0x03)
+        bad_key = bytes([0x05]) + bytes(32)
+        with pytest.raises(ValueError, match="Invalid public key encoding"):
+            _decompress_pubkey(bad_key)
+
+    def test_wrong_length(self):
+        """Decompression rejects keys with invalid length."""
+        with pytest.raises(ValueError, match="Invalid public key encoding"):
+            _decompress_pubkey(bytes(20))
+
+
+class TestAesGcmNegativeCases:
+    """Additional negative tests for AES-GCM."""
+
+    def test_decrypt_with_wrong_key(self):
+        """AES-GCM decryption fails with wrong key."""
+        key = Bytes16.zero()
+        wrong_key = Bytes16(bytes([0xFF] * 16))
+        nonce = Bytes12.zero()
+
+        ciphertext = aes_gcm_encrypt(key, nonce, b"secret", b"aad")
+        with pytest.raises(InvalidTag):
+            aes_gcm_decrypt(wrong_key, nonce, ciphertext, b"aad")

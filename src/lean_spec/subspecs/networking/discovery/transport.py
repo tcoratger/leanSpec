@@ -20,18 +20,22 @@ import logging
 import os
 import struct
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
+from cryptography.exceptions import InvalidTag
+
+from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.types import Bytes16, Uint64
 
 from .codec import (
     DiscoveryMessage,
+    MessageDecodingError,
     decode_message,
     encode_message,
     generate_request_id,
 )
 from .config import DiscoveryConfig
-from .handshake import HandshakeManager
+from .handshake import HandshakeError, HandshakeManager
 from .messages import (
     PROTOCOL_ID,
     PROTOCOL_VERSION,
@@ -57,9 +61,6 @@ from .packet import (
     generate_nonce,
 )
 from .session import SessionCache
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.networking.enr import ENR
 
 logger = logging.getLogger(__name__)
 
@@ -121,15 +122,15 @@ class PendingMultiRequest:
 
 
 class DiscoveryProtocol(asyncio.DatagramProtocol):
-    """Async UDP protocol handler for Discovery v5."""
+    """
+    Async UDP protocol handler for Discovery v5.
+
+    Args:
+        transport_handler: Parent transport for packet handling.
+    """
 
     def __init__(self, transport_handler: DiscoveryTransport):
-        """
-        Initialize the protocol handler.
-
-        Args:
-            transport_handler: Parent transport for packet handling.
-        """
+        """Initialize protocol handler."""
         self._handler = transport_handler
         self._transport: asyncio.DatagramTransport | None = None
 
@@ -160,6 +161,12 @@ class DiscoveryTransport:
     - Session management
     - Handshake orchestration
     - Request/response matching
+
+    Args:
+        local_node_id: Our 32-byte node ID.
+        local_private_key: Our 32-byte secp256k1 private key.
+        local_enr: Our ENR.
+        config: Optional protocol configuration.
     """
 
     def __init__(
@@ -169,15 +176,7 @@ class DiscoveryTransport:
         local_enr: ENR,
         config: DiscoveryConfig | None = None,
     ):
-        """
-        Initialize the transport.
-
-        Args:
-            local_node_id: Our 32-byte node ID.
-            local_private_key: Our 32-byte secp256k1 private key.
-            local_enr: Our ENR.
-            config: Optional protocol configuration.
-        """
+        """Initialize discovery transport."""
         self._local_node_id = local_node_id
         self._local_private_key = local_private_key
         self._local_enr = local_enr
@@ -197,16 +196,6 @@ class DiscoveryTransport:
         self._pending_requests: dict[bytes, PendingRequest] = {}
         self._pending_multi_requests: dict[bytes, PendingMultiRequest] = {}
         self._node_addresses: dict[bytes, tuple[str, int]] = {}
-
-        # ENR cache for handshake verification.
-        #
-        # When receiving WHOAREYOU, we must prove our identity by signing
-        # with our private key. When sending HANDSHAKE, we need the remote's
-        # public key to derive session keys via ECDH.
-        #
-        # This cache stores ENRs learned from NODES responses.
-        # It mirrors the handshake manager's cache but provides transport-level access.
-        self._enr_cache: dict[bytes, ENR] = {}
 
         self._message_handler: Callable[[bytes, DiscoveryMessage, tuple[str, int]], None] | None = (
             None
@@ -280,14 +269,12 @@ class DiscoveryTransport:
         - ECDH key derivation during session establishment
         - Verifying id-nonce signatures in handshake responses
 
-        Caches in both the transport and handshake manager to ensure
-        availability regardless of which component needs it first.
+        The handshake manager is the single owner of the ENR cache.
 
         Args:
             node_id: 32-byte node ID (keccak256 of public key).
             enr: The node's ENR.
         """
-        self._enr_cache[node_id] = enr
         self._handshake_manager.register_enr(node_id, enr)
 
     def get_enr(self, node_id: bytes) -> ENR | None:
@@ -300,7 +287,7 @@ class DiscoveryTransport:
         Returns:
             The cached ENR, or None if unknown.
         """
-        return self._enr_cache.get(node_id)
+        return self._handshake_manager.get_cached_enr(node_id)
 
     async def send_ping(self, dest_node_id: bytes, dest_addr: tuple[str, int]) -> Pong | None:
         """
@@ -591,7 +578,12 @@ class DiscoveryTransport:
         )
 
     async def _handle_packet(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Handle a received UDP packet."""
+        """
+        Decode and dispatch a received UDP packet.
+
+        Unmasking the header reveals the packet type (MESSAGE, WHOAREYOU,
+        or HANDSHAKE) and routes to the appropriate handler.
+        """
         try:
             # Decode packet header.
             header, message_bytes, message_ad = decode_packet_header(self._local_node_id, data)
@@ -603,7 +595,7 @@ class DiscoveryTransport:
             else:
                 await self._handle_message(header, message_bytes, addr, message_ad)
 
-        except Exception as e:
+        except (ValueError, MessageDecodingError, HandshakeError) as e:
             logger.debug("Error handling packet from %s: %s", addr, e)
 
     async def _handle_whoareyou(
@@ -669,7 +661,7 @@ class DiscoveryTransport:
         #
         # Session key derivation requires ECDH between our ephemeral private key
         # and the remote's static public key. Without their ENR, we cannot proceed.
-        remote_enr = self._enr_cache.get(remote_node_id)
+        remote_enr = self._handshake_manager.get_cached_enr(remote_node_id)
         if remote_enr is None or remote_enr.public_key is None:
             logger.debug("No ENR for %s, cannot complete handshake", remote_node_id.hex()[:16])
             return
@@ -710,7 +702,7 @@ class DiscoveryTransport:
                 self._transport.sendto(packet, addr)
                 logger.debug("Sent HANDSHAKE to %s", remote_node_id.hex()[:16])
 
-        except Exception as e:
+        except (HandshakeError, ValueError) as e:
             logger.debug("Failed to create handshake response: %s", e)
 
     async def _handle_handshake(
@@ -720,7 +712,12 @@ class DiscoveryTransport:
         addr: tuple[str, int],
         message_ad: bytes,
     ) -> None:
-        """Handle a HANDSHAKE packet."""
+        """
+        Complete a handshake initiated by our WHOAREYOU.
+
+        Verifies the remote's identity signature, derives session keys
+        via ECDH, and decrypts the included message payload.
+        """
         handshake_authdata = decode_handshake_authdata(header.authdata)
         remote_node_id = handshake_authdata.src_id
 
@@ -743,7 +740,7 @@ class DiscoveryTransport:
                 message = decode_message(plaintext)
                 await self._handle_decoded_message(remote_node_id, message, addr)
 
-        except Exception as e:
+        except (HandshakeError, ValueError) as e:
             logger.debug("Handshake failed: %s", e)
 
     async def _handle_message(
@@ -753,7 +750,12 @@ class DiscoveryTransport:
         addr: tuple[str, int],
         message_ad: bytes,
     ) -> None:
-        """Handle an ordinary MESSAGE packet."""
+        """
+        Decrypt and process an ordinary MESSAGE packet using session keys.
+
+        If no session exists or decryption fails, sends WHOAREYOU
+        to initiate a handshake with the sender.
+        """
         message_authdata = decode_message_authdata(header.authdata)
         remote_node_id = message_authdata.src_id
 
@@ -776,7 +778,7 @@ class DiscoveryTransport:
             message = decode_message(plaintext)
             await self._handle_decoded_message(remote_node_id, message, addr)
 
-        except Exception as e:
+        except (InvalidTag, ValueError, MessageDecodingError) as e:
             # Decryption failed - send WHOAREYOU.
             logger.debug("Decryption failed, sending WHOAREYOU: %s", e)
             await self._send_whoareyou(remote_node_id, header.nonce, addr)

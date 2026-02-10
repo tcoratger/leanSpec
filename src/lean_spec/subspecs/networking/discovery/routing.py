@@ -51,15 +51,13 @@ References:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterator
+from typing import Iterator
 
+from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import ForkDigest, NodeId, SeqNumber
 
 from .config import BUCKET_COUNT, K_BUCKET_SIZE
 from .messages import Distance
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.networking.enr import ENR
 
 
 def xor_distance(a: NodeId, b: NodeId) -> int:

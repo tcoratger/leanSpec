@@ -103,10 +103,8 @@ def derive_keys(
     # SHA-256 outputs 32 bytes, so one round suffices.
     t1 = hmac.new(prk, info + b"\x01", hashlib.sha256).digest()
 
-    keys = t1[:32]
-
-    initiator_key = Bytes16(keys[:SESSION_KEY_SIZE])
-    recipient_key = Bytes16(keys[SESSION_KEY_SIZE : SESSION_KEY_SIZE * 2])
+    initiator_key = Bytes16(t1[:SESSION_KEY_SIZE])
+    recipient_key = Bytes16(t1[SESSION_KEY_SIZE : SESSION_KEY_SIZE * 2])
 
     return initiator_key, recipient_key
 

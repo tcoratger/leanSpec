@@ -14,7 +14,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from lean_spec.subspecs.networking.discovery.codec import encode_message
+from lean_spec.subspecs.networking.discovery.codec import decode_message, encode_message
 from lean_spec.subspecs.networking.discovery.crypto import (
     aes_gcm_decrypt,
     aes_gcm_encrypt,
@@ -58,6 +58,7 @@ from lean_spec.types.uint import Uint8
 from tests.lean_spec.helpers import make_challenge_data
 from tests.lean_spec.subspecs.networking.discovery.conftest import (
     NODE_A_ID,
+    NODE_A_PRIVKEY,
     NODE_B_ID,
     NODE_B_PRIVKEY,
     NODE_B_PUBKEY,
@@ -113,6 +114,44 @@ class TestOfficialNodeIdVectors:
 
         computed = compute_node_id(pubkey_bytes)
         assert bytes(computed) == NODE_B_ID
+
+
+class TestOfficialNodeIdAndKeyVectors:
+    """Verify both node IDs and bidirectional ECDH from spec key material."""
+
+    def test_node_a_id_from_privkey(self):
+        """Node A's ID from its private key matches the spec vector."""
+        private_key = ec.derive_private_key(
+            int.from_bytes(NODE_A_PRIVKEY, "big"),
+            ec.SECP256K1(),
+        )
+        pubkey_bytes = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.CompressedPoint,
+        )
+        computed = compute_node_id(pubkey_bytes)
+        assert bytes(computed) == NODE_A_ID
+
+    def test_bidirectional_ecdh(self):
+        """ECDH(A_priv, B_pub) == ECDH(B_priv, A_pub).
+
+        Derives Node A's public key from its private key and verifies
+        that both sides compute the same shared secret.
+        """
+        # Derive Node A's public key from its private key.
+        a_privkey = ec.derive_private_key(
+            int.from_bytes(NODE_A_PRIVKEY, "big"),
+            ec.SECP256K1(),
+        )
+        a_pubkey_bytes = a_privkey.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.CompressedPoint,
+        )
+
+        shared_ab = ecdh_agree(Bytes32(NODE_A_PRIVKEY), NODE_B_PUBKEY)
+        shared_ba = ecdh_agree(Bytes32(NODE_B_PRIVKEY), a_pubkey_bytes)
+
+        assert shared_ab == shared_ba
 
 
 class TestOfficialCryptoVectors:
@@ -246,22 +285,29 @@ class TestOfficialPacketVectors:
     def test_decode_spec_ping_packet(self):
         """Decode the exact Ping packet from the spec test vectors.
 
-        Verifies header fields match expected values.
+        Verifies header fields and decrypts the message payload.
         """
         packet_hex = (
             "00000000000000000000000000000000088b3d4342774649325f313964a39e55"
             "ea96c005ad52be8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
-            "4c4f53245d08da4bb252012b2cba3f4f374a90a75cff91f142fa9be3e0a5f3ef"
-            "268ccb9065aeecfd67a999e7fdc137e062b2ec4a0eb92947f0d9a74bfbf44dfb"
-            "a776b21301f8e47be718571f"
+            "4c4f53245d08dab84102ed931f66d1492acb308fa1c6715b9d139b81acbdcc"
         )
         packet = bytes.fromhex(packet_hex)
 
-        header, _ciphertext, _message_ad = decode_packet_header(NODE_B_ID, packet)
+        header, ciphertext, message_ad = decode_packet_header(NODE_B_ID, packet)
 
         assert header.flag == PacketFlag.MESSAGE
         decoded_authdata = decode_message_authdata(header.authdata)
         assert decoded_authdata.src_id == NODE_A_ID
+
+        # Decrypt using the spec's read-key (all zeros for this test vector).
+        read_key = bytes(16)
+        plaintext = decrypt_message(read_key, bytes(header.nonce), ciphertext, message_ad)
+
+        # PING with request-id=0x00000001 (4 bytes) and enr-seq=2.
+        decoded = decode_message(plaintext)
+        assert isinstance(decoded, Ping)
+        assert int(decoded.enr_seq) == 2
 
     def test_decode_spec_whoareyou_packet(self):
         """Decode the exact WHOAREYOU packet from the spec test vectors.
@@ -271,8 +317,7 @@ class TestOfficialPacketVectors:
         """
         packet_hex = (
             "00000000000000000000000000000000088b3d434277464933a1ccc59f5967ad"
-            "1d6035f15e528627dde75cd68292f9e6c27d6b66c8100a873fcbaed4e16b8d14"
-            "f0de"
+            "1d6035f15e528627dde75cd68292f9e6c27d6b66c8100a873fcbaed4e16b8d"
         )
         packet = bytes.fromhex(packet_hex)
 
@@ -284,19 +329,18 @@ class TestOfficialPacketVectors:
         assert int(decoded_authdata.enr_seq) == 0
 
     def test_decode_spec_handshake_packet(self):
-        """Decode the exact Handshake packet from the spec test vectors.
+        """Decode the exact Handshake packet (no ENR) from the spec test vectors.
 
         Verifies authdata fields (src-id, signature size, key size).
         """
         packet_hex = (
             "00000000000000000000000000000000088b3d4342774649305f313964a39e55"
             "ea96c005ad521d8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
-            "4c4f53245d08da4bb23698868350aaad22e3ab8dd034f548a1c43cd246be9856"
-            "2b5db0b3ba5a0f2014c8fef2c78e79b3c58a76b84e819de9e9da11ce86d7a0b5"
-            "7b8a1bba0ee4a8deab98ce9ad9e2cc76f037b9ef2855a3a5db025d75f9b6b280"
-            "0528e2a98c3a3c50752c47d3e56dc23c962de2d1e9dff8b9e5bc6a8d04ba37c3"
-            "6cf89ce3d9e5e4e3ed6c3f06bc16b81cfb3fdd6b8c4c01c9f04e164f52fa6ee0"
-            "5c2c56b3eea6aff2f86f"
+            "4c4f53245d08da4bb252012b2cba3f4f374a90a75cff91f142fa9be3e0a5f3ef"
+            "268ccb9065aeecfd67a999e7fdc137e062b2ec4a0eb92947f0d9a74bfbf44dfb"
+            "a776b21301f8b65efd5796706adff216ab862a9186875f9494150c4ae06fa4d1"
+            "f0396c93f215fa4ef524f1eadf5f0f4126b79336671cbcf7a885b1f8bd2a5d83"
+            "9cf8"
         )
         packet = bytes.fromhex(packet_hex)
 
@@ -307,6 +351,47 @@ class TestOfficialPacketVectors:
         assert decoded_authdata.src_id == NODE_A_ID
         assert decoded_authdata.sig_size == 64
         assert decoded_authdata.eph_key_size == 33
+
+    def test_decode_spec_handshake_with_enr_packet(self):
+        """Decode the exact Handshake-with-ENR packet from the spec test vectors.
+
+        Verifies authdata fields and presence of embedded ENR record.
+        """
+        packet_hex = (
+            "00000000000000000000000000000000088b3d4342774649305f313964a39e55"
+            "ea96c005ad539c8c7560413a7008f16c9e6d2f43bbea8814a546b7409ce783d3"
+            "4c4f53245d08da4bb23698868350aaad22e3ab8dd034f548a1c43cd246be9856"
+            "2fafa0a1fa86d8e7a3b95ae78cc2b988ded6a5b59eb83ad58097252188b902b2"
+            "1481e30e5e285f19735796706adff216ab862a9186875f9494150c4ae06fa4d1"
+            "f0396c93f215fa4ef524e0ed04c3c21e39b1868e1ca8105e585ec17315e755e6"
+            "cfc4dd6cb7fd8e1a1f55e49b4b5eb024221482105346f3c82b15fdaae36a3bb1"
+            "2a494683b4a3c7f2ae41306252fed84785e2bbff3b022812d0882f06978df84a"
+            "80d443972213342d04b9048fc3b1d5fcb1df0f822152eced6da4d3f6df27e70e"
+            "4539717307a0208cd208d65093ccab5aa596a34d7511401987662d8cf62b1394"
+            "71"
+        )
+        packet = bytes.fromhex(packet_hex)
+
+        header, ciphertext, message_ad = decode_packet_header(NODE_B_ID, packet)
+
+        assert header.flag == PacketFlag.HANDSHAKE
+        decoded_authdata = decode_handshake_authdata(header.authdata)
+        assert decoded_authdata.src_id == NODE_A_ID
+        assert decoded_authdata.sig_size == 64
+        assert decoded_authdata.eph_key_size == 33
+
+        # This packet includes an ENR record (unlike the no-ENR handshake).
+        assert decoded_authdata.record is not None
+        assert len(decoded_authdata.record) > 0
+
+        # Decrypt the message using the spec's read-key.
+        read_key = bytes.fromhex("53b1c075f41876423154e157470c2f48")
+        plaintext = decrypt_message(read_key, bytes(header.nonce), ciphertext, message_ad)
+
+        # PING with request-id=0x00000001 and enr-seq=1.
+        decoded = decode_message(plaintext)
+        assert isinstance(decoded, Ping)
+        assert int(decoded.enr_seq) == 1
 
 
 class TestPacketEncodingRoundtrip:

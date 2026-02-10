@@ -194,6 +194,33 @@ class TestSessionCache:
         with pytest.raises(ValueError, match="Recv key must be 16 bytes"):
             cache.create(bytes(32), bytes(16), bytes(15), is_initiator=True)
 
+    def test_endpoint_keying_separates_sessions(self):
+        """Same node_id at different ip:port has separate sessions.
+
+        Per spec, sessions are tied to a specific UDP endpoint.
+        This prevents session confusion if a node changes IP or port.
+        """
+        cache = SessionCache()
+        node_id = bytes.fromhex("aa" * 32)
+        send_key_1 = bytes([0x01] * 16)
+        send_key_2 = bytes([0x02] * 16)
+
+        # Create sessions for same node at different endpoints.
+        cache.create(node_id, send_key_1, bytes(16), is_initiator=True, ip="10.0.0.1", port=9000)
+        cache.create(node_id, send_key_2, bytes(16), is_initiator=True, ip="10.0.0.2", port=9000)
+
+        # Each endpoint retrieves its own session.
+        session_1 = cache.get(node_id, "10.0.0.1", 9000)
+        session_2 = cache.get(node_id, "10.0.0.2", 9000)
+
+        assert session_1 is not None
+        assert session_2 is not None
+        assert session_1.send_key == send_key_1
+        assert session_2.send_key == send_key_2
+
+        # Different port for same IP is also separate.
+        assert cache.get(node_id, "10.0.0.1", 9001) is None
+
 
 class TestBondCache:
     """Tests for BondCache."""
