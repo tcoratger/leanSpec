@@ -106,7 +106,7 @@ from dataclasses import dataclass, field
 
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
-from lean_spec.subspecs.containers.attestation import SignedAttestation
+from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.networking.config import (
     GOSSIPSUB_DEFAULT_PROTOCOL_ID,
     GOSSIPSUB_PROTOCOL_ID_V12,
@@ -130,6 +130,7 @@ from lean_spec.subspecs.networking.reqresp.handler import (
 )
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.service.events import (
+    GossipAggregatedAttestationEvent,
     GossipAttestationEvent,
     GossipBlockEvent,
     NetworkEvent,
@@ -324,7 +325,7 @@ class GossipHandler:
         self,
         topic_str: str,
         compressed_data: bytes,
-    ) -> SignedBlockWithAttestation | SignedAttestation | None:
+    ) -> SignedBlockWithAttestation | SignedAttestation | SignedAggregatedAttestation | None:
         """
         Decode a gossip message from topic and compressed data.
 
@@ -392,6 +393,8 @@ class GossipHandler:
                     return SignedBlockWithAttestation.decode_bytes(ssz_bytes)
                 case TopicKind.ATTESTATION_SUBNET:
                     return SignedAttestation.decode_bytes(ssz_bytes)
+                case TopicKind.AGGREGATED_ATTESTATION:
+                    return SignedAggregatedAttestation.decode_bytes(ssz_bytes)
         except SSZSerializationError as e:
             raise GossipMessageError(f"SSZ decode failed: {e}") from e
 
@@ -818,6 +821,9 @@ class LiveNetworkEventSource:
                 case TopicKind.ATTESTATION_SUBNET:
                     if isinstance(message, SignedAttestation):
                         await self._emit_gossip_attestation(message, event.peer_id)
+                case TopicKind.AGGREGATED_ATTESTATION:
+                    if isinstance(message, SignedAggregatedAttestation):
+                        await self._emit_gossip_aggregated_attestation(message, event.peer_id)
 
             logger.debug("Processed gossipsub message %s from %s", topic.kind.value, event.peer_id)
 
@@ -1170,6 +1176,25 @@ class LiveNetworkEventSource:
             GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic)
         )
 
+    async def _emit_gossip_aggregated_attestation(
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+        peer_id: PeerId,
+    ) -> None:
+        """
+        Emit a gossip aggregated attestation event.
+
+        Args:
+            signed_attestation: Aggregated attestation received from gossip.
+            peer_id: Peer that sent it.
+        """
+        topic = GossipTopic(kind=TopicKind.AGGREGATED_ATTESTATION, fork_digest=self._fork_digest)
+        await self._events.put(
+            GossipAggregatedAttestationEvent(
+                signed_attestation=signed_attestation, peer_id=peer_id, topic=topic
+            )
+        )
+
     async def _accept_streams(self, peer_id: PeerId, conn: QuicConnection) -> None:
         """
         Accept incoming streams from a connection.
@@ -1465,6 +1490,15 @@ class LiveNetworkEventSource:
                     else:
                         # Type mismatch indicates a bug in decode_message.
                         logger.warning("Attestation topic but got %s", type(message).__name__)
+
+                case TopicKind.AGGREGATED_ATTESTATION:
+                    if isinstance(message, SignedAggregatedAttestation):
+                        await self._emit_gossip_aggregated_attestation(message, peer_id)
+                    else:
+                        logger.warning(
+                            "Aggregated attestation topic but got %s",
+                            type(message).__name__,
+                        )
 
             logger.debug("Received gossip %s from %s", topic.kind.value, peer_id)
 

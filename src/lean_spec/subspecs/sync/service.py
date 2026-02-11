@@ -38,9 +38,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import SlotClock
@@ -68,6 +68,8 @@ logger = logging.getLogger(__name__)
 
 BlockProcessor = Callable[[Store, SignedBlockWithAttestation], Store]
 
+PublishAggFn = Callable[[SignedAggregatedAttestation], Coroutine[Any, Any, None]]
+
 
 def default_block_processor(
     store: Store,
@@ -75,6 +77,10 @@ def default_block_processor(
 ) -> Store:
     """Default block processor using store block processing."""
     return store.on_block(block)
+
+
+async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> None:
+    """No-op default for aggregated attestation publishing."""
 
 
 @dataclass(slots=True)
@@ -156,6 +162,9 @@ class SyncService:
 
     process_block: BlockProcessor = field(default=default_block_processor)
     """Block processor function. Defaults to Store.on_block()."""
+
+    _publish_agg_fn: PublishAggFn = field(default=_noop_publish_agg)
+    """Callback for publishing aggregated attestations to the network."""
 
     _state: SyncState = field(default=SyncState.IDLE)
     """Current sync state."""
@@ -494,7 +503,7 @@ class SyncService:
         Args:
             signed_attestation: The aggregate to publish.
         """
-        await self.network.publish_aggregated_attestation(signed_attestation)
+        await self._publish_agg_fn(signed_attestation)
 
     async def start_sync(self) -> None:
         """

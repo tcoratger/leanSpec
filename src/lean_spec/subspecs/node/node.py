@@ -242,10 +242,9 @@ class Node:
 
         # Wire up aggregated attestation publishing.
         #
-        # ReqRespClient implements NetworkRequester which SyncService uses
-        # to publish aggregates. We route these to NetworkService.
-        if hasattr(config.network, "set_publish_agg_fn"):
-            config.network.set_publish_agg_fn(network_service.publish_aggregated_attestation)
+        # SyncService delegates aggregate publishing to NetworkService
+        # via a callback, avoiding a circular dependency.
+        sync_service._publish_agg_fn = network_service.publish_aggregated_attestation
 
         # Create API server if configured
         api_server: ApiServer | None = None

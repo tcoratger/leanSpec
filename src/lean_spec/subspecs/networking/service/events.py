@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
-from lean_spec.subspecs.containers.attestation import SignedAttestation
+from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport import PeerId
@@ -67,6 +67,25 @@ class GossipAttestationEvent:
 
     topic: GossipTopic
     """Topic the attestation was received on (includes fork digest)."""
+
+
+@dataclass(frozen=True, slots=True)
+class GossipAggregatedAttestationEvent:
+    """
+    Aggregated attestation received via gossip subscription.
+
+    Fired when a signed aggregated attestation arrives from the gossipsub network.
+    Aggregates contain multiple validator votes combined into a single proof.
+    """
+
+    signed_attestation: SignedAggregatedAttestation
+    """The signed aggregated attestation."""
+
+    peer_id: PeerId
+    """Peer that propagated this aggregated attestation to us."""
+
+    topic: GossipTopic
+    """Topic the aggregated attestation was received on."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +134,7 @@ class PeerDisconnectedEvent:
 NetworkEvent = (
     GossipBlockEvent
     | GossipAttestationEvent
+    | GossipAggregatedAttestationEvent
     | PeerStatusEvent
     | PeerConnectedEvent
     | PeerDisconnectedEvent

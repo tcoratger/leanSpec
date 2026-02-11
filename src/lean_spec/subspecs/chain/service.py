@@ -168,12 +168,18 @@ class ChainService:
 
         # Only tick if we're past genesis.
         if current_time >= self.clock.genesis_time:
-            new_store, _ = self.sync_service.store.on_tick(
+            new_store, new_aggregated_attestations = self.sync_service.store.on_tick(
                 time=current_time,
                 has_proposal=False,
                 is_aggregator=self.sync_service.is_aggregator,
             )
             self.sync_service.store = new_store
+
+            # Publish any aggregated attestations produced during catch-up.
+            if new_aggregated_attestations:
+                for agg in new_aggregated_attestations:
+                    await self.sync_service.publish_aggregated_attestation(agg)
+
             return self.clock.total_intervals()
 
         return None
