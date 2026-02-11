@@ -20,6 +20,7 @@ References:
 from __future__ import annotations
 
 import hashlib
+from typing import Final
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -55,16 +56,19 @@ CTR_IV_SIZE = 16
 ID_SIGNATURE_SIZE = 64
 """secp256k1 signature size (r || s, each 32 bytes)."""
 
-_P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+ID_SIGNATURE_DOMAIN: Final = b"discovery v5 identity proof"
+"""Domain separator for ID nonce signatures. Prevents cross-protocol reuse."""
+
+_P: Final = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
 """secp256k1 field prime."""
 
-_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_N: Final = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 """secp256k1 curve order."""
 
-_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
+_Gx: Final = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
 """secp256k1 generator x-coordinate."""
 
-_Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+_Gy: Final = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
 """secp256k1 generator y-coordinate."""
 
 
@@ -347,10 +351,9 @@ def sign_id_nonce(
     #
     # Using the full challenge_data (not just id_nonce) ensures the signature
     # is bound to the exact WHOAREYOU packet received, preventing replay attacks.
-    domain_separator = b"discovery v5 identity proof"
-    input_data = domain_separator + challenge_data + ephemeral_pubkey + dest_node_id
+    signing_input = ID_SIGNATURE_DOMAIN + challenge_data + ephemeral_pubkey + dest_node_id
 
-    digest = hashlib.sha256(input_data).digest()
+    digest = hashlib.sha256(signing_input).digest()
 
     # Sign the pre-hashed digest.
     #
@@ -408,8 +411,7 @@ def verify_id_nonce_signature(
 
     # Build the signing input per spec:
     # domain-separator || challenge-data || ephemeral-pubkey || node-id-B
-    domain_separator = b"discovery v5 identity proof"
-    input_data = domain_separator + challenge_data + ephemeral_pubkey + dest_node_id
+    input_data = ID_SIGNATURE_DOMAIN + challenge_data + ephemeral_pubkey + dest_node_id
 
     # Pre-hash with SHA256 since ECDSA verification expects a fixed-size digest.
     digest = hashlib.sha256(input_data).digest()

@@ -97,7 +97,6 @@ class TestEncryptedPacketRoundtrip:
         # Encode packet.
         packet = encode_packet(
             dest_node_id=node_b_keys["node_id"],
-            src_node_id=node_a_keys["node_id"],
             flag=PacketFlag.MESSAGE,
             nonce=bytes(nonce),
             authdata=authdata,

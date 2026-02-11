@@ -33,6 +33,7 @@ import os
 import struct
 from dataclasses import dataclass
 
+from lean_spec.subspecs.networking.types import NodeId
 from lean_spec.types import Bytes12, Bytes16, Uint64
 
 from .config import MAX_PACKET_SIZE, MIN_PACKET_SIZE
@@ -80,7 +81,7 @@ class PacketHeader:
 class MessageAuthdata:
     """Authdata for MESSAGE packets (flag=0)."""
 
-    src_id: bytes
+    src_id: NodeId
     """Sender's 32-byte node ID."""
 
 
@@ -99,7 +100,7 @@ class WhoAreYouAuthdata:
 class HandshakeAuthdata:
     """Authdata for HANDSHAKE packets (flag=2)."""
 
-    src_id: bytes
+    src_id: NodeId
     """Sender's 32-byte node ID."""
 
     sig_size: int
@@ -119,8 +120,7 @@ class HandshakeAuthdata:
 
 
 def encode_packet(
-    dest_node_id: bytes,
-    src_node_id: bytes,
+    dest_node_id: NodeId,
     flag: PacketFlag,
     nonce: bytes,
     authdata: bytes,
@@ -133,7 +133,6 @@ def encode_packet(
 
     Args:
         dest_node_id: 32-byte destination node ID (for header masking).
-        src_node_id: 32-byte source node ID (only used for logging/debugging).
         flag: Packet type flag.
         nonce: 12-byte message nonce.
         authdata: Authentication data (varies by packet type).
@@ -159,7 +158,7 @@ def encode_packet(
         # identical masked headers, enabling traffic analysis.
         masking_iv = Bytes16(os.urandom(CTR_IV_SIZE))
 
-    static_header = _encode_static_header(flag, nonce, len(authdata))
+    static_header = encode_static_header(flag, nonce, len(authdata))
     header = static_header + authdata
 
     # Header masking hides protocol metadata from observers.
@@ -195,7 +194,7 @@ def encode_packet(
     return packet
 
 
-def decode_packet_header(local_node_id: bytes, data: bytes) -> tuple[PacketHeader, bytes, bytes]:
+def decode_packet_header(local_node_id: NodeId, data: bytes) -> tuple[PacketHeader, bytes, bytes]:
     """
     Decode and unmask a Discovery v5 packet header.
 
@@ -265,7 +264,7 @@ def decode_message_authdata(authdata: bytes) -> MessageAuthdata:
     """Decode MESSAGE packet authdata."""
     if len(authdata) != MESSAGE_AUTHDATA_SIZE:
         raise ValueError(f"Invalid MESSAGE authdata size: {len(authdata)}")
-    return MessageAuthdata(src_id=authdata)
+    return MessageAuthdata(src_id=NodeId(authdata))
 
 
 def decode_whoareyou_authdata(authdata: bytes) -> WhoAreYouAuthdata:
@@ -285,7 +284,7 @@ def decode_handshake_authdata(authdata: bytes) -> HandshakeAuthdata:
     if len(authdata) < HANDSHAKE_HEADER_SIZE:
         raise ValueError(f"Handshake authdata too small: {len(authdata)}")
 
-    src_id = authdata[:32]
+    src_id = NodeId(authdata[:32])
     sig_size = authdata[32]
     eph_key_size = authdata[33]
 
@@ -336,7 +335,7 @@ def decrypt_message(
     return aes_gcm_decrypt(Bytes16(encryption_key), Bytes12(nonce), ciphertext, message_ad)
 
 
-def encode_message_authdata(src_id: bytes) -> bytes:
+def encode_message_authdata(src_id: NodeId) -> bytes:
     """Encode MESSAGE packet authdata."""
     if len(src_id) != 32:
         raise ValueError(f"Source ID must be 32 bytes, got {len(src_id)}")
@@ -351,7 +350,7 @@ def encode_whoareyou_authdata(id_nonce: bytes, enr_seq: int) -> bytes:
 
 
 def encode_handshake_authdata(
-    src_id: bytes,
+    src_id: NodeId,
     id_signature: bytes,
     eph_pubkey: bytes,
     record: bytes | None = None,
@@ -395,7 +394,7 @@ def generate_id_nonce() -> IdNonce:
     return IdNonce(os.urandom(16))
 
 
-def _encode_static_header(flag: PacketFlag, nonce: bytes, authdata_size: int) -> bytes:
+def encode_static_header(flag: PacketFlag, nonce: bytes, authdata_size: int) -> bytes:
     """Encode the 23-byte static header."""
     return (
         PROTOCOL_ID

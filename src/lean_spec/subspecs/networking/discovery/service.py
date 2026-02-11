@@ -28,8 +28,8 @@ import ipaddress
 import logging
 import os
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
@@ -38,8 +38,8 @@ from lean_spec.types.uint import Uint8
 from .codec import DiscoveryMessage
 from .config import ALPHA, K_BUCKET_SIZE, DiscoveryConfig
 from .keys import compute_node_id
-from .messages import Distance, FindNode, Nodes, Ping, Pong, Port, TalkReq, TalkResp
-from .routing import NodeEntry, RoutingTable, log2_distance
+from .messages import Distance, FindNode, IPv4, IPv6, Nodes, Ping, Pong, Port, TalkReq, TalkResp
+from .routing import NodeEntry, RoutingTable, log2_distance, xor_distance
 from .session import BondCache
 from .transport import DiscoveryTransport
 
@@ -59,7 +59,7 @@ REVALIDATION_INTERVAL_SECS = 300
 class LookupResult:
     """Result of a node lookup operation."""
 
-    target: bytes
+    target: NodeId
     """Target node ID that was searched for."""
 
     nodes: list[NodeEntry]
@@ -103,7 +103,7 @@ class DiscoveryService:
         # Compute our node ID from public key.
         if local_enr.public_key is None:
             raise ValueError("Local ENR must have a public key")
-        self._local_node_id = bytes(compute_node_id(bytes(local_enr.public_key)))
+        self._local_node_id = NodeId(compute_node_id(bytes(local_enr.public_key)))
 
         # Initialize routing table.
         self._routing_table = RoutingTable(local_id=NodeId(self._local_node_id))
@@ -180,7 +180,7 @@ class DiscoveryService:
 
         logger.info("Discovery service stopped")
 
-    async def find_node(self, target: bytes) -> LookupResult:
+    async def find_node(self, target: NodeId) -> LookupResult:
         """
         Perform a Kademlia lookup for a target node ID.
 
@@ -196,19 +196,18 @@ class DiscoveryService:
             raise ValueError(f"Target must be 32 bytes, got {len(target)}")
 
         # Start with closest known nodes.
-        target_id = NodeId(target)
-        closest = self._routing_table.closest_nodes(target_id, K_BUCKET_SIZE)
+        closest = self._routing_table.closest_nodes(target, K_BUCKET_SIZE)
         if not closest:
             return LookupResult(target=target, nodes=[], queried=0)
 
-        queried: set[bytes] = set()
-        seen: dict[bytes, NodeEntry] = {entry.node_id: entry for entry in closest}
+        queried: set[NodeId] = set()
+        seen: dict[NodeId, NodeEntry] = {entry.node_id: entry for entry in closest}
 
         while True:
             # Find unqueried nodes closest to target.
             candidates = sorted(
                 [e for e in seen.values() if e.node_id not in queried],
-                key=lambda e: log2_distance(e.node_id, target_id),
+                key=lambda e: xor_distance(e.node_id, target),
             )[:LOOKUP_PARALLELISM]
 
             if not candidates:
@@ -225,15 +224,15 @@ class DiscoveryService:
             if tasks:
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 for result in results:
-                    if isinstance(result, list):
-                        for enr_bytes in result:
-                            # Parse ENR from RLP and add to routing table.
-                            self._process_discovered_enr(enr_bytes, seen)
+                    if isinstance(result, tuple):
+                        enr_list, queried_id, distances = result
+                        for enr_bytes in enr_list:
+                            self._process_discovered_enr(enr_bytes, seen, queried_id, distances)
 
         # Sort by distance to target.
         result_nodes = sorted(
             seen.values(),
-            key=lambda e: log2_distance(e.node_id, NodeId(target)),
+            key=lambda e: xor_distance(e.node_id, target),
         )[:K_BUCKET_SIZE]
 
         return LookupResult(
@@ -295,7 +294,7 @@ class DiscoveryService:
 
     async def send_talk_request(
         self,
-        node_id: bytes,
+        node_id: NodeId,
         protocol: bytes,
         request: bytes,
     ) -> bytes | None:
@@ -346,17 +345,22 @@ class DiscoveryService:
 
     async def _query_node(
         self,
-        node_id: bytes,
+        node_id: NodeId,
         addr: tuple[str, int],
-        target: bytes,
-    ) -> list[bytes]:
-        """Query a node for nodes close to target."""
-        distance = int(log2_distance(NodeId(node_id), NodeId(target)))
+        target: NodeId,
+    ) -> tuple[list[bytes], NodeId, list[int]]:
+        """Query a node for nodes close to target.
+
+        Returns:
+            Tuple of (enr_bytes_list, queried_node_id, requested_distances).
+        """
+        distance = int(log2_distance(node_id, target))
         distances = [distance] if distance > 0 else [1, 2, 3]
 
-        return await self._transport.send_findnode(node_id, addr, distances)
+        enrs = await self._transport.send_findnode(node_id, addr, distances)
+        return enrs, node_id, distances
 
-    async def _ping_node(self, node_id: bytes, addr: tuple[str, int]) -> bool:
+    async def _ping_node(self, node_id: NodeId, addr: tuple[str, int]) -> bool:
         """Ping a node and update bond status."""
         pong = await self._transport.send_ping(node_id, addr)
         if pong is not None:
@@ -366,7 +370,7 @@ class DiscoveryService:
 
     def _handle_message(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         message: DiscoveryMessage,
         addr: tuple[str, int],
     ) -> None:
@@ -375,7 +379,7 @@ class DiscoveryService:
 
     async def _process_message(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         message: DiscoveryMessage,
         addr: tuple[str, int],
     ) -> None:
@@ -393,7 +397,7 @@ class DiscoveryService:
 
     async def _handle_ping(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         ping: Ping,
         addr: tuple[str, int],
     ) -> None:
@@ -439,7 +443,7 @@ class DiscoveryService:
 
     async def _handle_findnode(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         findnode: FindNode,
         addr: tuple[str, int],
     ) -> None:
@@ -500,7 +504,7 @@ class DiscoveryService:
 
     async def _handle_talkreq(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         talkreq: TalkReq,
         addr: tuple[str, int],
     ) -> None:
@@ -549,7 +553,7 @@ class DiscoveryService:
             await asyncio.sleep(REFRESH_INTERVAL_SECS)
             try:
                 # Perform lookup for random target.
-                target = os.urandom(32)
+                target = NodeId(os.urandom(32))
                 await self.find_node(target)
             except Exception as e:
                 logger.debug("Refresh failed: %s", e)
@@ -577,7 +581,7 @@ class DiscoveryService:
             await asyncio.sleep(60)
             self._bond_cache.cleanup_expired()
 
-    def _encode_ip_address(self, ip_str: str) -> bytes:
+    def _encode_ip_address(self, ip_str: str) -> IPv4 | IPv6:
         """
         Encode an IP address string to raw bytes.
 
@@ -591,7 +595,10 @@ class DiscoveryService:
         Returns:
             Raw bytes representation of the IP address.
         """
-        return ipaddress.ip_address(ip_str).packed
+        packed = ipaddress.ip_address(ip_str).packed
+        if len(packed) == 4:
+            return IPv4(packed)
+        return IPv6(packed)
 
     def _enr_to_entry(self, enr: ENR) -> NodeEntry:
         """Convert an ENR to a NodeEntry."""
@@ -613,7 +620,9 @@ class DiscoveryService:
     def _process_discovered_enr(
         self,
         enr_bytes: bytes,
-        seen: dict[bytes, NodeEntry],
+        seen: dict[NodeId, NodeEntry],
+        queried_node_id: NodeId | None = None,
+        requested_distances: list[int] | None = None,
     ) -> None:
         """
         Parse and process a discovered ENR from NODES response.
@@ -624,9 +633,14 @@ class DiscoveryService:
         - The transport ENR cache (for handshake verification)
         - The address registry (for UDP communication)
 
+        Verifies that returned nodes match the requested distances when provided.
+        This prevents routing table poisoning from malicious peers.
+
         Args:
             enr_bytes: RLP-encoded ENR bytes from NODES response.
             seen: Dict tracking nodes seen during current lookup.
+            queried_node_id: Node ID of the peer that returned this ENR.
+            requested_distances: Distances requested in the FINDNODE query.
         """
         try:
             # Parse ENR from RLP.
@@ -642,30 +656,44 @@ class DiscoveryService:
                 logger.debug("ENR has no valid node ID")
                 return
 
+            # Verify the returned node matches the requested distances.
+            #
+            # Per spec, recipients should verify returned nodes match requested
+            # distances. This prevents routing table poisoning from malicious peers.
+            if queried_node_id is not None and requested_distances is not None:
+                enr_dist = int(log2_distance(node_id, queried_node_id))
+                if enr_dist not in requested_distances:
+                    logger.debug(
+                        "Dropping ENR: distance %d not in requested %s",
+                        enr_dist,
+                        requested_distances,
+                    )
+                    return
+
             # Skip if this is our own ENR.
-            if bytes(node_id) == self._local_node_id:
+            if node_id == self._local_node_id:
                 return
 
             # Skip if already seen in this lookup.
-            if bytes(node_id) in seen:
+            if node_id in seen:
                 return
 
             # Create routing table entry.
             entry = self._enr_to_entry(enr)
 
             # Add to seen dict for lookup tracking.
-            seen[bytes(node_id)] = entry
+            seen[node_id] = entry
 
             # Add to routing table for future lookups.
             self._routing_table.add(entry)
 
             # Cache ENR for handshake verification.
-            self._transport.register_enr(bytes(node_id), enr)
+            self._transport.register_enr(node_id, enr)
 
             # Register address for communication.
             if enr.ip4 and enr.udp_port:
                 addr = (enr.ip4, int(enr.udp_port))
-                self._transport.register_node_address(bytes(node_id), addr)
+                self._transport.register_node_address(node_id, addr)
 
             logger.debug("Discovered node %s via NODES", node_id.hex()[:16])
 

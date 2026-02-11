@@ -25,13 +25,13 @@ References:
 
 from __future__ import annotations
 
-import struct
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from threading import Lock
 
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.types import NodeId
 from lean_spec.types import Bytes32, Bytes33, Bytes64
 
 from .config import HANDSHAKE_TIMEOUT_SECS
@@ -41,15 +41,22 @@ from .crypto import (
     verify_id_nonce_signature,
 )
 from .keys import derive_keys_from_pubkey
-from .messages import PROTOCOL_ID, PROTOCOL_VERSION, PacketFlag
+from .messages import PacketFlag
 from .packet import (
     HandshakeAuthdata,
     WhoAreYouAuthdata,
     encode_handshake_authdata,
+    encode_static_header,
     encode_whoareyou_authdata,
     generate_id_nonce,
 )
 from .session import Session, SessionCache
+
+MAX_PENDING_HANDSHAKES = 100
+"""Hard cap on concurrent pending handshakes to prevent resource exhaustion."""
+
+MAX_ENR_CACHE = 1000
+"""Maximum number of cached ENRs."""
 
 
 class HandshakeState(Enum):
@@ -75,7 +82,7 @@ class PendingHandshake:
     state: HandshakeState
     """Current state of this handshake."""
 
-    remote_node_id: bytes
+    remote_node_id: NodeId
     """32-byte node ID of the remote peer."""
 
     id_nonce: bytes | None = None
@@ -134,7 +141,7 @@ class HandshakeManager:
 
     def __init__(
         self,
-        local_node_id: bytes,
+        local_node_id: NodeId,
         local_private_key: bytes,
         local_enr_rlp: bytes,
         local_enr_seq: int,
@@ -154,7 +161,7 @@ class HandshakeManager:
         self._session_cache = session_cache
         self._timeout_secs = timeout_secs
 
-        self._pending: dict[bytes, PendingHandshake] = {}
+        self._pending: dict[NodeId, PendingHandshake] = {}
 
         # Cache of ENRs for nodes we may handshake with.
         #
@@ -162,11 +169,11 @@ class HandshakeManager:
         # The key comes from their ENR, which may arrive before the handshake
         # (via NODES responses) or within the handshake itself.
         # This cache stores pre-known ENRs for lookup during verification.
-        self._enr_cache: dict[bytes, ENR] = {}
+        self._enr_cache: dict[NodeId, ENR] = {}
 
         self._lock = Lock()
 
-    def start_handshake(self, remote_node_id: bytes) -> PendingHandshake:
+    def start_handshake(self, remote_node_id: NodeId) -> PendingHandshake:
         """
         Start tracking a new handshake as initiator.
 
@@ -180,6 +187,12 @@ class HandshakeManager:
             PendingHandshake in SENT_ORDINARY state.
         """
         with self._lock:
+            # Reject new handshakes when at capacity to prevent resource exhaustion.
+            if len(self._pending) >= MAX_PENDING_HANDSHAKES and remote_node_id not in self._pending:
+                self.cleanup_expired()
+                if len(self._pending) >= MAX_PENDING_HANDSHAKES:
+                    raise HandshakeError("Too many pending handshakes")
+
             pending = PendingHandshake(
                 state=HandshakeState.SENT_ORDINARY,
                 remote_node_id=remote_node_id,
@@ -189,7 +202,7 @@ class HandshakeManager:
 
     def create_whoareyou(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         request_nonce: bytes,
         remote_enr_seq: int,
         masking_iv: bytes,
@@ -219,13 +232,7 @@ class HandshakeManager:
         #
         # This data becomes the HKDF salt for session key derivation.
         # Both sides must use identical challenge_data to derive matching keys.
-        static_header = (
-            PROTOCOL_ID
-            + struct.pack(">H", PROTOCOL_VERSION)
-            + bytes([PacketFlag.WHOAREYOU])
-            + request_nonce
-            + struct.pack(">H", len(authdata))
-        )
+        static_header = encode_static_header(PacketFlag.WHOAREYOU, request_nonce, len(authdata))
         challenge_data = masking_iv + static_header + authdata
 
         with self._lock:
@@ -243,7 +250,7 @@ class HandshakeManager:
 
     def create_handshake_response(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         whoareyou: WhoAreYouAuthdata,
         remote_pubkey: bytes,
         challenge_data: bytes,
@@ -328,7 +335,7 @@ class HandshakeManager:
 
     def handle_handshake(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         handshake: HandshakeAuthdata,
         remote_ip: str = "",
         remote_port: int = 0,
@@ -432,7 +439,7 @@ class HandshakeManager:
             remote_enr=handshake.record,
         )
 
-    def get_pending(self, remote_node_id: bytes) -> PendingHandshake | None:
+    def get_pending(self, remote_node_id: NodeId) -> PendingHandshake | None:
         """Get pending handshake for a node."""
         with self._lock:
             pending = self._pending.get(remote_node_id)
@@ -441,7 +448,7 @@ class HandshakeManager:
                 return None
             return pending
 
-    def cancel_handshake(self, remote_node_id: bytes) -> bool:
+    def cancel_handshake(self, remote_node_id: NodeId) -> bool:
         """Cancel a pending handshake."""
         with self._lock:
             if remote_node_id in self._pending:
@@ -461,7 +468,7 @@ class HandshakeManager:
                 del self._pending[node_id]
             return len(expired)
 
-    def _get_remote_pubkey(self, node_id: bytes, enr_record: bytes | None) -> bytes | None:
+    def _get_remote_pubkey(self, node_id: NodeId, enr_record: bytes | None) -> bytes | None:
         """
         Retrieve the remote node's static public key for signature verification.
 
@@ -525,7 +532,7 @@ class HandshakeManager:
         except ValueError:
             return None
 
-    def register_enr(self, node_id: bytes, enr: ENR) -> None:
+    def register_enr(self, node_id: NodeId, enr: ENR) -> None:
         """
         Cache an ENR for future handshake verification.
 
@@ -538,9 +545,14 @@ class HandshakeManager:
             node_id: 32-byte node ID (keccak256 of public key).
             enr: The node's ENR containing their public key.
         """
+        # Evict oldest entry when at capacity.
+        if len(self._enr_cache) >= MAX_ENR_CACHE and node_id not in self._enr_cache:
+            oldest_key = next(iter(self._enr_cache))
+            del self._enr_cache[oldest_key]
+
         self._enr_cache[node_id] = enr
 
-    def get_cached_enr(self, node_id: bytes) -> ENR | None:
+    def get_cached_enr(self, node_id: NodeId) -> ENR | None:
         """
         Retrieve a previously cached ENR.
 

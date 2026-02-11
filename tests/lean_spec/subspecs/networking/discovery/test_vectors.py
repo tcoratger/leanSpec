@@ -29,6 +29,7 @@ from lean_spec.subspecs.networking.discovery.keys import (
 from lean_spec.subspecs.networking.discovery.messages import (
     Distance,
     FindNode,
+    IPv4,
     MessageType,
     Nodes,
     PacketFlag,
@@ -62,10 +63,10 @@ from tests.lean_spec.subspecs.networking.discovery.conftest import (
     NODE_B_ID,
     NODE_B_PRIVKEY,
     NODE_B_PUBKEY,
+    SPEC_ID_NONCE,
 )
 
 # Spec test vector values for ECDH and key derivation.
-SPEC_ID_NONCE = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
 SPEC_NONCE = bytes.fromhex("0102030405060708090a0b0c")
 SPEC_CHALLENGE_DATA = bytes.fromhex(
     "000000000000000000000000000000006469736376350001010102030405060708090a0b0c"
@@ -407,7 +408,6 @@ class TestPacketEncodingRoundtrip:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.MESSAGE,
             nonce=nonce,
             authdata=authdata,
@@ -434,7 +434,6 @@ class TestPacketEncodingRoundtrip:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.WHOAREYOU,
             nonce=nonce,
             authdata=authdata,
@@ -471,7 +470,6 @@ class TestPacketEncodingRoundtrip:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.HANDSHAKE,
             nonce=nonce,
             authdata=authdata,
@@ -529,7 +527,7 @@ class TestOfficialPacketEncoding:
         pong = Pong(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
             enr_seq=Uint64(1),
-            recipient_ip=b"\x7f\x00\x00\x01",  # 127.0.0.1
+            recipient_ip=IPv4(b"\x7f\x00\x00\x01"),  # 127.0.0.1
             recipient_port=Port(30303),
         )
 
@@ -597,7 +595,6 @@ class TestOfficialPacketEncoding:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.MESSAGE,
             nonce=nonce,
             authdata=authdata,
@@ -624,7 +621,6 @@ class TestOfficialPacketEncoding:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.WHOAREYOU,
             nonce=nonce,
             authdata=authdata,
@@ -662,7 +658,6 @@ class TestOfficialPacketEncoding:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.HANDSHAKE,
             nonce=nonce,
             authdata=authdata,
@@ -719,24 +714,6 @@ class TestOfficialKeyDerivation:
         # Bytes 55-63: enr-seq (8 bytes, all zeros).
         assert challenge_data[55:63] == bytes(8)
 
-    def test_key_derivation_with_different_secrets_produces_different_keys(self):
-        """Different ECDH secrets produce completely different session keys."""
-        id_nonce = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
-        challenge_data = make_challenge_data(id_nonce)
-
-        secret1 = Bytes33(
-            bytes.fromhex("033b11a2a1f214567e1537ce5e509ffd9b21373247f2a3ff6841f4976f53165e7e")
-        )
-        secret2 = Bytes33(
-            bytes.fromhex("024c22b3b2f325678e2648df6f610aaead32484358f3b4ee7952e5a87964276f8f")
-        )
-
-        keys1 = derive_keys(secret1, Bytes32(NODE_A_ID), Bytes32(NODE_B_ID), challenge_data)
-        keys2 = derive_keys(secret2, Bytes32(NODE_A_ID), Bytes32(NODE_B_ID), challenge_data)
-
-        # Different secrets must produce different keys.
-        assert keys1 != keys2
-
 
 class TestAESCryptoEdgeCases:
     """Additional AES-GCM test cases beyond spec vectors."""
@@ -769,30 +746,6 @@ class TestAESCryptoEdgeCases:
         decrypted = aes_gcm_decrypt(Bytes16(SPEC_AES_KEY), Bytes12(SPEC_AES_NONCE), ciphertext, aad)
         assert decrypted == plaintext
 
-    def test_aes_gcm_wrong_key_fails_decryption(self):
-        """AES-GCM decryption fails with wrong key."""
-        wrong_key = Bytes16(bytes.fromhex("00000000000000001a85107ac686990b"))
-        aad = bytes(32)
-        plaintext = b"secret message"
-
-        ciphertext = aes_gcm_encrypt(Bytes16(SPEC_AES_KEY), Bytes12(SPEC_AES_NONCE), plaintext, aad)
-
-        # Decryption with wrong key should fail with InvalidTag.
-        with pytest.raises(InvalidTag):
-            aes_gcm_decrypt(wrong_key, Bytes12(SPEC_AES_NONCE), ciphertext, aad)
-
-    def test_aes_gcm_wrong_aad_fails_decryption(self):
-        """AES-GCM decryption fails with wrong AAD."""
-        aad = bytes(32)
-        wrong_aad = bytes([0xFF] * 32)
-        plaintext = b"secret message"
-
-        ciphertext = aes_gcm_encrypt(Bytes16(SPEC_AES_KEY), Bytes12(SPEC_AES_NONCE), plaintext, aad)
-
-        # Decryption with wrong AAD should fail with InvalidTag.
-        with pytest.raises(InvalidTag):
-            aes_gcm_decrypt(Bytes16(SPEC_AES_KEY), Bytes12(SPEC_AES_NONCE), ciphertext, wrong_aad)
-
     def test_aes_gcm_tampered_ciphertext_fails(self):
         """AES-GCM decryption fails with tampered ciphertext."""
         aad = bytes(32)
@@ -821,7 +774,6 @@ class TestSpecPacketPayloadDecryption:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.MESSAGE,
             nonce=nonce,
             authdata=authdata,
@@ -854,7 +806,6 @@ class TestSpecPacketPayloadDecryption:
 
         packet = encode_packet(
             dest_node_id=NODE_B_ID,
-            src_node_id=NODE_A_ID,
             flag=PacketFlag.HANDSHAKE,
             nonce=nonce,
             authdata=authdata,

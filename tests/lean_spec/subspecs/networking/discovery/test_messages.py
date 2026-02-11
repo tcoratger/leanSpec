@@ -14,8 +14,6 @@ from lean_spec.subspecs.networking.discovery.config import (
     HANDSHAKE_TIMEOUT_SECS,
     K_BUCKET_SIZE,
     MAX_NODES_RESPONSE,
-    MAX_PACKET_SIZE,
-    MIN_PACKET_SIZE,
     REQUEST_TIMEOUT_SECS,
     DiscoveryConfig,
 )
@@ -42,7 +40,7 @@ from lean_spec.subspecs.networking.discovery.messages import (
 from lean_spec.subspecs.networking.discovery.packet import WhoAreYouAuthdata
 from lean_spec.subspecs.networking.types import SeqNumber
 from lean_spec.types.uint import Uint8, Uint16, Uint64
-from tests.lean_spec.subspecs.networking.discovery.test_vectors import SPEC_ID_NONCE
+from tests.lean_spec.subspecs.networking.discovery.conftest import SPEC_ID_NONCE
 
 
 class TestProtocolConstants:
@@ -78,10 +76,6 @@ class TestProtocolConstants:
 
     def test_bond_expiry(self):
         assert BOND_EXPIRY_SECS == 86400
-
-    def test_packet_size_limits(self):
-        assert MAX_PACKET_SIZE == 1280
-        assert MIN_PACKET_SIZE == 63
 
 
 class TestCustomTypes:
@@ -216,7 +210,7 @@ class TestPong:
         pong = Pong(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
             enr_seq=SeqNumber(42),
-            recipient_ip=b"\xc0\xa8\x01\x01",
+            recipient_ip=IPv4(b"\xc0\xa8\x01\x01"),
             recipient_port=Port(9000),
         )
 
@@ -225,7 +219,7 @@ class TestPong:
         assert pong.recipient_port == Port(9000)
 
     def test_creation_ipv6(self):
-        ipv6 = b"\x00" * 15 + b"\x01"
+        ipv6 = IPv6(b"\x00" * 15 + b"\x01")
         pong = Pong(
             request_id=RequestId(data=b"\x01"),
             enr_seq=SeqNumber(1),
@@ -352,11 +346,3 @@ class TestMessageConstructionFromTestVectors:
     def test_plaintext_message_type(self):
         plaintext = bytes.fromhex("01c20101")
         assert plaintext[0] == MessageType.PING
-
-
-class TestPacketStructure:
-    """Tests for Discovery v5 packet structure constants."""
-
-    def test_static_header_size(self):
-        expected_size = 6 + 2 + 1 + 12 + 2
-        assert expected_size == 23

@@ -175,7 +175,7 @@ class Pong(StrictBaseModel):
     enr_seq: SeqNumber
     """Responder's ENR sequence number."""
 
-    recipient_ip: bytes
+    recipient_ip: IPv4 | IPv6
     """Sender's IP as seen by responder. 4 bytes (IPv4) or 16 bytes (IPv6)."""
 
     recipient_port: Port
