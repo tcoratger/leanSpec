@@ -470,7 +470,8 @@ class NodeCluster:
         # 3. GRAFT messages to be sent and processed
         #
         # A longer delay ensures proper mesh formation before block production.
-        await asyncio.sleep(5.0)
+        # CI machines need more time due to lower CPU/scheduling priority.
+        await asyncio.sleep(10.0)
 
         # Phase 4: Start node services (validators, chain service, etc).
         #

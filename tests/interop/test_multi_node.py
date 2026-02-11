@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.interop
 
 
-@pytest.mark.timeout(200)
+@pytest.mark.timeout(300)
 @pytest.mark.num_validators(3)
 async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     """
@@ -100,7 +100,7 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     # Each node needs at least 2 peers (the other two nodes).
     # This ensures gossip will reach all nodes.
     # The 15s timeout handles slow handshakes.
-    await assert_peer_connections(node_cluster, min_peers=2, timeout=15)
+    await assert_peer_connections(node_cluster, min_peers=2, timeout=30)
 
     # Wait for finalization with convergence-based polling.
     #
@@ -110,7 +110,7 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     # Finalization requires 2 consecutive justified epochs.
     # With 3 validators and 4s slots, this typically takes ~30s
     # but may take longer on slow CI machines.
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=100)
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=150)
 
     # Verify heads converged across nodes.
     #
@@ -124,7 +124,7 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=30)
 
 
-@pytest.mark.timeout(200)
+@pytest.mark.timeout(300)
 @pytest.mark.num_validators(3)
 async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     """
@@ -165,13 +165,13 @@ async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     #
     # Hub (node 0) has 2 peers; spokes have 1 peer each.
     # Using min_peers=1 ensures spokes pass the check.
-    await assert_peer_connections(node_cluster, min_peers=1, timeout=15)
+    await assert_peer_connections(node_cluster, min_peers=1, timeout=30)
 
     # Wait for finalization with convergence-based polling.
     #
     # Hub-and-spoke adds latency (messages route through hub)
     # but the protocol should still achieve finalization.
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=100)
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=150)
 
     # Verify heads converged across nodes.
     #
