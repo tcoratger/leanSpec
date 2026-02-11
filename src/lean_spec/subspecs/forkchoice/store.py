@@ -329,10 +329,9 @@ class Store(Container):
 
         # Topology Check
         #
-        # History is linear and monotonic. Source must be older than Target.
-        # The head is the chain tip — it must be at least as recent as both.
+        # History is linear and monotonic: source <= target <= head.
+        # The second check implies head >= source by transitivity.
         assert data.source.slot <= data.target.slot, "Source checkpoint slot must not exceed target"
-        assert data.head.slot >= data.source.slot, "Head checkpoint must not be older than source"
         assert data.head.slot >= data.target.slot, "Head checkpoint must not be older than target"
 
         # Consistency Check

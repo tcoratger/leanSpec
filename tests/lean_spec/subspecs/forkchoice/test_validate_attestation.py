@@ -67,7 +67,8 @@ class TestValidateAttestationHeadChecks:
 
         # Point the head back to genesis (slot 0) while source is at slot 1.
         # Time flows forward: the chain tip cannot be older than the justified source.
-        # This violates the topology check.
+        # Since source <= target is enforced first, head < source also means head < target.
+        # The topology check catches this via the head >= target assertion.
         attestation = Attestation(
             validator_id=ValidatorIndex(0),
             data=AttestationData(
@@ -78,7 +79,7 @@ class TestValidateAttestationHeadChecks:
             ),
         )
 
-        with pytest.raises(AssertionError, match="Head checkpoint must not be older than source"):
+        with pytest.raises(AssertionError, match="Head checkpoint must not be older than target"):
             store.validate_attestation(attestation)
 
     def test_head_slot_less_than_target_rejected(
