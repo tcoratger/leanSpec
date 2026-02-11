@@ -162,7 +162,7 @@ class TestSafeTargetAdvancement:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
-        store = store.aggregate_committee_signatures()
+        store, _ = store.aggregate_committee_signatures()
 
         # Update safe target (uses latest_new_aggregated_payloads)
         store = store.update_safe_target()
@@ -206,7 +206,7 @@ class TestSafeTargetAdvancement:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
-        store = store.aggregate_committee_signatures()
+        store, _ = store.aggregate_committee_signatures()
 
         # Update safe target
         store = store.update_safe_target()
@@ -246,7 +246,7 @@ class TestSafeTargetAdvancement:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate into new payloads
-        store = store.aggregate_committee_signatures()
+        store, _ = store.aggregate_committee_signatures()
 
         # Update safe target should use new aggregated payloads
         store = store.update_safe_target()
@@ -300,7 +300,7 @@ class TestJustificationLogic:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate signatures before producing the next block
-        store = store.aggregate_committee_signatures()
+        store, _ = store.aggregate_committee_signatures()
 
         # Produce block 2 which includes these attestations
         store, block_2, signatures = store.produce_block_with_signatures(slot_2, proposer_2)
@@ -381,7 +381,7 @@ class TestJustificationLogic:
             )
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
-        store = store.aggregate_committee_signatures()
+        store, _ = store.aggregate_committee_signatures()
         store = store.update_safe_target()
 
         # Neither target should be justified with only half validators
@@ -526,7 +526,7 @@ class TestIntegrationScenarios:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Phase 3: Aggregate signatures into payloads
-        store = store.aggregate_committee_signatures()
+        store, _ = store.aggregate_committee_signatures()
 
         # Phase 4: Update safe target
         store = store.update_safe_target()
@@ -591,7 +591,7 @@ class TestIntegrationScenarios:
         # Process block via on_block on a fresh consumer store
         consumer_store = observer_store
         block_time = consumer_store.config.genesis_time + block.slot * Uint64(SECONDS_PER_SLOT)
-        consumer_store = consumer_store.on_tick(block_time, has_proposal=True)
+        consumer_store, _ = consumer_store.on_tick(block_time, has_proposal=True)
         consumer_store = consumer_store.on_block(signed_block)
 
         # Get attestation target after on_block

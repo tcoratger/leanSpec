@@ -323,7 +323,10 @@ class ValidatorService:
         Args:
             slot: Current slot number.
         """
+        # Ensure we are attesting to the latest known head
+        self.sync_service.store = self.sync_service.store.update_head()
         store = self.sync_service.store
+
         head_state = store.states.get(store.head)
         if head_state is None:
             return

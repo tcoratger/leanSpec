@@ -46,6 +46,7 @@ from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
     Block,
+    SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlockWithAttestation,
 )
@@ -402,7 +403,8 @@ class SyncService:
     async def on_gossip_attestation(
         self,
         attestation: SignedAttestation,
-        peer_id: PeerId,  # noqa: ARG002
+        subnet_id: int,
+        peer_id: PeerId | None = None,
     ) -> None:
         """
         Handle attestation received via gossip.
@@ -416,7 +418,8 @@ class SyncService:
 
         Args:
             attestation: The signed attestation received.
-            peer_id: The peer that propagated the attestation (unused for now).
+            subnet_id: Subnet ID the attestation was received on.
+            peer_id: The peer that propagated the attestation (optional).
         """
         # Guard: Only process gossip in states that accept it.
         #
@@ -453,6 +456,45 @@ class SyncService:
             #
             # These are expected during normal operation and don't indicate bugs.
             pass
+
+    async def on_gossip_aggregated_attestation(
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+        peer_id: PeerId,  # noqa: ARG002
+    ) -> None:
+        """
+        Handle aggregated attestation received via gossip.
+
+        Aggregated attestations are collections of individual votes for the same
+        target, signed by an aggregator. They provide efficient propagation of
+        consensus weight.
+
+        Args:
+            signed_attestation: The signed aggregated attestation received.
+            peer_id: The peer that propagated the aggregate (unused for now).
+        """
+        if not self._state.accepts_gossip:
+            return
+
+        try:
+            self.store = self.store.on_gossip_aggregated_attestation(signed_attestation)
+        except (AssertionError, KeyError):
+            # Aggregation validation failed.
+            pass
+
+    async def publish_aggregated_attestation(
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+    ) -> None:
+        """
+        Publish an aggregated attestation to the network.
+
+        Called by the chain service when this node acts as an aggregator.
+
+        Args:
+            signed_attestation: The aggregate to publish.
+        """
+        await self.network.publish_aggregated_attestation(signed_attestation)
 
     async def start_sync(self) -> None:
         """

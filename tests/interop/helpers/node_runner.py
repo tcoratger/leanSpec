@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
+from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import Checkpoint, Validator
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
@@ -237,6 +238,7 @@ class NodeCluster:
         self,
         node_index: int,
         validator_indices: list[int] | None = None,
+        is_aggregator: bool = False,
         bootnodes: list[str] | None = None,
         *,
         start_services: bool = True,
@@ -247,6 +249,7 @@ class NodeCluster:
         Args:
             node_index: Index for this node (for logging/identification).
             validator_indices: Which validators this node controls.
+            is_aggregator: Whether this node is aggregator
             bootnodes: Addresses to connect to on startup.
             start_services: If True, start the node's services immediately.
                 If False, call test_node.start() manually after mesh is stable.
@@ -285,6 +288,7 @@ class NodeCluster:
             api_config=None,  # Disable API server for interop tests (not needed for P2P testing)
             validator_registry=validator_registry,
             fork_digest=self.fork_digest,
+            is_aggregator=is_aggregator,
         )
 
         node = Node.from_genesis(config)
@@ -353,9 +357,20 @@ class NodeCluster:
         await event_source.start_gossipsub()
 
         block_topic = f"/leanconsensus/{self.fork_digest}/block/ssz_snappy"
-        attestation_topic = f"/leanconsensus/{self.fork_digest}/attestation/ssz_snappy"
+        aggregation_topic = f"/leanconsensus/{self.fork_digest}/aggregation/ssz_snappy"
         event_source.subscribe_gossip_topic(block_topic)
-        event_source.subscribe_gossip_topic(attestation_topic)
+        event_source.subscribe_gossip_topic(aggregation_topic)
+
+        # Determine subnets for our validators and subscribe.
+        #
+        # Validators only subscribe to the subnets they are assigned to.
+        # This matches the Ethereum gossip specification.
+        if validator_indices:
+            from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
+            for idx in validator_indices:
+                subnet_id = idx % int(ATTESTATION_COMMITTEE_COUNT)
+                topic = f"/leanconsensus/{self.fork_digest}/attestation_{subnet_id}/ssz_snappy"
+                event_source.subscribe_gossip_topic(topic)
 
         # Optionally start the node's services.
         #
@@ -411,9 +426,20 @@ class NodeCluster:
         # This allows the gossipsub mesh to form before validators start
         # producing blocks and attestations. Otherwise, early blocks/attestations
         # would be "Published message to 0 peers" because the mesh is empty.
+        aggregator_indices = set(range(int(ATTESTATION_COMMITTEE_COUNT)))
         for i in range(num_nodes):
             validator_indices = validators_per_node[i] if i < len(validators_per_node) else []
-            await self.start_node(i, validator_indices, start_services=False)
+
+            # A node is an aggregator if it controls any of the first
+            # ATTESTATION_COMMITTEE_COUNT validators.
+            is_node_aggregator = any(vid in aggregator_indices for vid in validator_indices)
+
+            await self.start_node(
+                i,
+                validator_indices,
+                is_aggregator=is_node_aggregator,
+                start_services=False,
+            )
 
             # Stagger node startup like Ream does.
             #

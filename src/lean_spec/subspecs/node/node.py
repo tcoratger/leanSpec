@@ -22,7 +22,7 @@ from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT, INTERVALS_PER_SLOT
 from lean_spec.subspecs.chain.service import ChainService
-from lean_spec.subspecs.containers import Block, BlockBody, State
+from lean_spec.subspecs.containers import Block, BlockBody, SignedBlockWithAttestation, State
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
@@ -240,6 +240,13 @@ class Node:
             is_aggregator=config.is_aggregator,
         )
 
+        # Wire up aggregated attestation publishing.
+        #
+        # ReqRespClient implements NetworkRequester which SyncService uses
+        # to publish aggregates. We route these to NetworkService.
+        if hasattr(config.network, "set_publish_agg_fn"):
+            config.network.set_publish_agg_fn(network_service.publish_aggregated_attestation)
+
         # Create API server if configured
         api_server: ApiServer | None = None
         if config.api_config is not None:
@@ -262,12 +269,19 @@ class Node:
             async def publish_attestation_wrapper(attestation: SignedAttestation) -> None:
                 subnet_id = attestation.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
                 await network_service.publish_attestation(attestation, subnet_id)
+                # Also route locally so we can aggregate our own attestation
+                await sync_service.on_gossip_attestation(attestation, subnet_id, peer_id=None)
+
+            async def publish_block_wrapper(block: SignedBlockWithAttestation) -> None:
+                await network_service.publish_block(block)
+                # Also route locally so we update our own store
+                await sync_service.on_gossip_block(block, peer_id=None)
 
             validator_service = ValidatorService(
                 sync_service=sync_service,
                 clock=clock,
                 registry=config.validator_registry,
-                on_block=network_service.publish_block,
+                on_block=publish_block_wrapper,
                 on_attestation=publish_attestation_wrapper,
             )
 

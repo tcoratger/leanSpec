@@ -28,7 +28,9 @@ class MockStore:
     head: Bytes32 = field(default_factory=lambda: ZERO_HASH)
     latest_finalized: MockCheckpoint = field(default_factory=MockCheckpoint)
 
-    def on_tick(self, time: Uint64, has_proposal: bool) -> MockStore:
+    def on_tick(
+        self, time: Uint64, has_proposal: bool, is_aggregator: bool = False
+    ) -> tuple[MockStore, list]:
         """Record the tick call and return a new store."""
         new_store = MockStore(
             time=time,
@@ -37,7 +39,7 @@ class MockStore:
             latest_finalized=self.latest_finalized,
         )
         new_store.tick_calls.append((time, has_proposal))
-        return new_store
+        return new_store, []
 
 
 @dataclass
@@ -45,6 +47,7 @@ class MockSyncService:
     """Mock sync service for testing ChainService."""
 
     store: MockStore = field(default_factory=MockStore)
+    is_aggregator: bool = False
 
 
 class TestChainServiceLifecycle:
