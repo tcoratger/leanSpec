@@ -7,17 +7,16 @@ from dataclasses import dataclass, field
 
 from lean_spec.subspecs.containers import Checkpoint, SignedBlockWithAttestation
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE
 from lean_spec.subspecs.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
 )
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
-    REQUEST_TIMEOUT_SECONDS,
-    BlockLookup,
     DefaultRequestHandler,
     ReqRespServer,
-    YamuxResponseStream,
+    StreamResponseAdapter,
 )
 from lean_spec.subspecs.networking.reqresp.message import (
     BLOCKS_BY_ROOT_PROTOCOL_V1,
@@ -26,6 +25,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
     RequestedBlockRoots,
     Status,
 )
+from lean_spec.subspecs.networking.varint import encode_varint
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_test_block, make_test_status
 
@@ -110,13 +110,13 @@ class MockResponseStream:
         self.finished = True
 
 
-class TestYamuxResponseStream:
-    """Tests for YamuxResponseStream wire format encoding."""
+class TestStreamResponseAdapter:
+    """Tests for StreamResponseAdapter wire format encoding."""
 
     async def test_send_success_encodes_correctly(self) -> None:
         """Success response uses SUCCESS code and encodes SSZ data."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         ssz_data = b"\x01\x02\x03\x04"
         await response.send_success(ssz_data)
@@ -137,7 +137,7 @@ class TestYamuxResponseStream:
     async def test_send_error_encodes_correctly(self) -> None:
         """Error response uses specified code and UTF-8 message."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         await response.send_error(ResponseCode.INVALID_REQUEST, "Bad request")
 
@@ -157,7 +157,7 @@ class TestYamuxResponseStream:
     async def test_send_error_server_error(self) -> None:
         """SERVER_ERROR code encodes correctly."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         await response.send_error(ResponseCode.SERVER_ERROR, "Internal error")
 
@@ -170,7 +170,7 @@ class TestYamuxResponseStream:
     async def test_send_error_resource_unavailable(self) -> None:
         """RESOURCE_UNAVAILABLE code encodes correctly."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         await response.send_error(ResponseCode.RESOURCE_UNAVAILABLE, "Block not found")
 
@@ -183,7 +183,7 @@ class TestYamuxResponseStream:
     async def test_finish_closes_stream(self) -> None:
         """Finish closes the underlying stream."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         assert not stream.closed
         await response.finish()
@@ -664,68 +664,13 @@ class TestIntegration:
         assert blocks[0].message.block.slot == Slot(10)
 
 
-class TestResponseStreamProtocol:
-    """Tests verifying ResponseStream protocol compliance."""
-
-    def test_mock_response_stream_is_protocol_compliant(self) -> None:
-        """MockResponseStream implements ResponseStream protocol."""
-        # This test verifies our mock is usable with the handler
-        mock = MockResponseStream()
-
-        # Should have the required methods
-        assert hasattr(mock, "send_success")
-        assert hasattr(mock, "send_error")
-        assert hasattr(mock, "finish")
-
-        # Methods should be callable
-        assert callable(mock.send_success)
-        assert callable(mock.send_error)
-        assert callable(mock.finish)
-
-    def test_yamux_response_stream_is_protocol_compliant(self) -> None:
-        """YamuxResponseStream implements ResponseStream protocol."""
-        stream = MockStream()
-        yamux = YamuxResponseStream(_stream=stream)
-
-        assert hasattr(yamux, "send_success")
-        assert hasattr(yamux, "send_error")
-        assert hasattr(yamux, "finish")
-
-
-class TestBlockLookupTypeAlias:
-    """Tests for BlockLookup type alias usage."""
-
-    async def test_async_function_matches_block_lookup_signature(self) -> None:
-        """Verify async function can be used as BlockLookup."""
-
-        async def my_lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-            return None
-
-        # Should type-check as BlockLookup
-        lookup: BlockLookup = my_lookup
-
-        result = await lookup(Bytes32(b"\x00" * 32))
-        assert result is None
-
-    async def test_block_lookup_returning_block(self) -> None:
-        """BlockLookup returning a block works correctly."""
-        block = make_test_block(slot=42, seed=42)
-
-        async def my_lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
-            return block
-
-        result = await my_lookup(Bytes32(b"\x00" * 32))
-        assert result is not None
-        assert result.message.block.slot == Slot(42)
-
-
-class TestYamuxResponseStreamMultipleResponses:
-    """Tests for YamuxResponseStream with multiple responses in sequence."""
+class TestStreamResponseAdapterMultipleResponses:
+    """Tests for StreamResponseAdapter with multiple responses in sequence."""
 
     async def test_send_multiple_success_responses(self) -> None:
         """Multiple SUCCESS responses are written independently."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         await response.send_success(b"\x01\x02")
         await response.send_success(b"\x03\x04")
@@ -745,7 +690,7 @@ class TestYamuxResponseStreamMultipleResponses:
     async def test_send_success_then_error(self) -> None:
         """Success response followed by error response."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         await response.send_success(b"\xaa\xbb")
         await response.send_error(ResponseCode.RESOURCE_UNAVAILABLE, "Done")
@@ -765,7 +710,7 @@ class TestYamuxResponseStreamMultipleResponses:
     async def test_send_empty_success_response(self) -> None:
         """Empty SUCCESS response payload is handled."""
         stream = MockStream()
-        response = YamuxResponseStream(_stream=stream)
+        response = StreamResponseAdapter(_stream=stream)
 
         await response.send_success(b"")
 
@@ -1196,56 +1141,58 @@ class TestHandlerExceptionRecovery:
         assert stream.close_attempts >= 1
 
 
-class TestRequestTimeoutConstant:
-    """Tests for REQUEST_TIMEOUT_SECONDS constant."""
+class TestStreamResponseAdapterErrorTruncation:
+    """Tests for error message truncation in StreamResponseAdapter."""
 
-    def test_timeout_is_positive(self) -> None:
-        """Request timeout is a positive number."""
-        assert REQUEST_TIMEOUT_SECONDS > 0
-
-    def test_timeout_is_reasonable(self) -> None:
-        """Request timeout is within reasonable bounds."""
-        # Should be at least a few seconds
-        assert REQUEST_TIMEOUT_SECONDS >= 1.0
-        # Should not be excessively long
-        assert REQUEST_TIMEOUT_SECONDS <= 60.0
-
-
-class TestMockStreamProtocolCompliance:
-    """Tests verifying mock streams match the Stream protocol."""
-
-    def test_mock_stream_has_protocol_id(self) -> None:
-        """MockStream has protocol_id property."""
+    async def test_send_error_truncates_long_messages(self) -> None:
+        """Error messages exceeding 256 bytes are truncated."""
         stream = MockStream()
-        assert hasattr(stream, "protocol_id")
-        assert isinstance(stream.protocol_id, str)
+        response = StreamResponseAdapter(_stream=stream)
 
-    def test_mock_stream_has_read_method(self) -> None:
-        """MockStream has read method."""
-        stream = MockStream()
-        assert hasattr(stream, "read")
-        assert callable(stream.read)
+        long_message = "X" * 500
+        await response.send_error(ResponseCode.INVALID_REQUEST, long_message)
 
-    def test_mock_stream_has_write_method(self) -> None:
-        """MockStream has write method."""
-        stream = MockStream()
-        assert hasattr(stream, "write")
-        assert callable(stream.write)
+        encoded = stream.written[0]
+        code, decoded = ResponseCode.decode(encoded)
+        assert code == ResponseCode.INVALID_REQUEST
+        assert len(decoded) == MAX_ERROR_MESSAGE_SIZE
 
-    def test_mock_stream_has_close_method(self) -> None:
-        """MockStream has close method."""
+    async def test_send_error_short_message_unchanged(self) -> None:
+        """Short error messages are not truncated."""
         stream = MockStream()
-        assert hasattr(stream, "close")
-        assert callable(stream.close)
+        response = StreamResponseAdapter(_stream=stream)
 
-    def test_mock_stream_has_reset_method(self) -> None:
-        """MockStream has reset method."""
-        stream = MockStream()
-        assert hasattr(stream, "reset")
-        assert callable(stream.reset)
+        short_message = "Bad request"
+        await response.send_error(ResponseCode.INVALID_REQUEST, short_message)
 
-    async def test_mock_stream_reset_closes_stream(self) -> None:
-        """MockStream reset marks stream as closed."""
-        stream = MockStream()
-        await stream.reset()
+        encoded = stream.written[0]
+        code, decoded = ResponseCode.decode(encoded)
+        assert code == ResponseCode.INVALID_REQUEST
+        assert decoded == b"Bad request"
+
+
+class TestReadRequestBufferLimit:
+    """Tests for buffer size limits in _read_request."""
+
+    async def test_read_request_rejects_oversized_compressed_data(self) -> None:
+        """Unbounded compressed data stream is rejected."""
+        handler = DefaultRequestHandler(our_status=make_test_status())
+        server = ReqRespServer(handler=handler)
+
+        # Send a small varint claiming length 10, then flood with garbage data
+        # exceeding the max compressed size limit
+        declared_length = 10
+        varint_bytes = encode_varint(declared_length)
+        max_compressed = declared_length + declared_length // 6 + 1024
+
+        # Create a stream with varint + way more data than max_compressed
+        oversized_data = varint_bytes + b"\x00" * (max_compressed + 5000)
+        stream = MockStream(request_data=oversized_data)
+
+        await server.handle_stream(stream, STATUS_PROTOCOL_V1)
+
         assert stream.closed is True
+        assert len(stream.written) >= 1
+
+        code, _ = ResponseCode.decode(stream.written[0])
+        assert code == ResponseCode.INVALID_REQUEST
