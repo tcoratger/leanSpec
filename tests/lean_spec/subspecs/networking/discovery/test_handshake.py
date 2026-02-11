@@ -26,8 +26,45 @@ from lean_spec.subspecs.networking.discovery.packet import (
 )
 from lean_spec.subspecs.networking.discovery.session import SessionCache
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.types import NodeId
 from lean_spec.types import Bytes32, Bytes33, Bytes64, Uint64
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
+
+
+@pytest.fixture
+def local_keypair():
+    """Generate a local keypair for testing."""
+    priv, pub = generate_secp256k1_keypair()
+    node_id = compute_node_id(pub)
+    return priv, pub, node_id
+
+
+@pytest.fixture
+def remote_keypair():
+    """Generate a remote keypair for testing."""
+    priv, pub = generate_secp256k1_keypair()
+    node_id = compute_node_id(pub)
+    return priv, pub, node_id
+
+
+@pytest.fixture
+def session_cache():
+    """Create a session cache."""
+    return SessionCache()
+
+
+@pytest.fixture
+def manager(local_keypair, session_cache):
+    """Create a handshake manager."""
+    priv, pub, node_id = local_keypair
+
+    return HandshakeManager(
+        local_node_id=node_id,
+        local_private_key=priv,
+        local_enr_rlp=b"mock_enr",
+        local_enr_seq=1,
+        session_cache=session_cache,
+    )
 
 
 class TestPendingHandshake:
@@ -37,7 +74,7 @@ class TestPendingHandshake:
         """Test creating a pending handshake."""
         pending = PendingHandshake(
             state=HandshakeState.IDLE,
-            remote_node_id=bytes(32),
+            remote_node_id=NodeId(bytes(32)),
         )
 
         assert pending.state == HandshakeState.IDLE
@@ -48,7 +85,7 @@ class TestPendingHandshake:
         """Test that new handshake is not expired."""
         pending = PendingHandshake(
             state=HandshakeState.IDLE,
-            remote_node_id=bytes(32),
+            remote_node_id=NodeId(bytes(32)),
         )
 
         assert not pending.is_expired(timeout_secs=1.0)
@@ -57,7 +94,7 @@ class TestPendingHandshake:
         """Test that old handshake is expired."""
         pending = PendingHandshake(
             state=HandshakeState.IDLE,
-            remote_node_id=bytes(32),
+            remote_node_id=NodeId(bytes(32)),
             started_at=time.time() - 10,
         )
 
@@ -66,37 +103,6 @@ class TestPendingHandshake:
 
 class TestHandshakeManager:
     """Tests for HandshakeManager."""
-
-    @pytest.fixture
-    def local_keypair(self):
-        """Generate a local keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def remote_keypair(self):
-        """Generate a remote keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def manager(self, local_keypair):
-        """Create a handshake manager."""
-        priv, pub, node_id = local_keypair
-        session_cache = SessionCache()
-
-        # Create a mock ENR RLP
-        local_enr_rlp = b"mock_enr"
-
-        return HandshakeManager(
-            local_node_id=bytes(node_id),
-            local_private_key=priv,
-            local_enr_rlp=local_enr_rlp,
-            local_enr_seq=1,
-            session_cache=session_cache,
-        )
 
     def test_start_handshake(self, manager):
         """Test starting a handshake as initiator."""
@@ -187,7 +193,7 @@ class TestHandshakeManager:
         """Test that invalid local node ID raises ValueError."""
         with pytest.raises(ValueError, match="Local node ID must be 32 bytes"):
             HandshakeManager(
-                local_node_id=bytes(31),
+                local_node_id=bytes(31),  # type: ignore[arg-type]
                 local_private_key=bytes(32),
                 local_enr_rlp=b"enr",
                 local_enr_seq=1,
@@ -198,7 +204,7 @@ class TestHandshakeManager:
         """Test that invalid local private key raises ValueError."""
         with pytest.raises(ValueError, match="Local private key must be 32 bytes"):
             HandshakeManager(
-                local_node_id=bytes(32),
+                local_node_id=NodeId(bytes(32)),
                 local_private_key=bytes(31),
                 local_enr_rlp=b"enr",
                 local_enr_seq=1,
@@ -230,35 +236,6 @@ class TestHandshakeState:
 
 class TestHandshakeStateTransitions:
     """Verify all state machine transitions."""
-
-    @pytest.fixture
-    def local_keypair(self):
-        """Generate a local keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def remote_keypair(self):
-        """Generate a remote keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def manager(self, local_keypair):
-        """Create a handshake manager."""
-        priv, pub, node_id = local_keypair
-        session_cache = SessionCache()
-        local_enr_rlp = b"mock_enr"
-
-        return HandshakeManager(
-            local_node_id=bytes(node_id),
-            local_private_key=priv,
-            local_enr_rlp=local_enr_rlp,
-            local_enr_seq=1,
-            session_cache=session_cache,
-        )
 
     def test_idle_to_sent_ordinary_on_start_handshake(self, manager):
         """Starting a handshake transitions to SENT_ORDINARY state.
@@ -344,46 +321,13 @@ class TestHandshakeStateTransitions:
 class TestHandshakeValidation:
     """Handshake security validation tests."""
 
-    @pytest.fixture
-    def local_keypair(self):
-        """Generate a local keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def remote_keypair(self):
-        """Generate a remote keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def session_cache(self):
-        """Create a session cache."""
-        return SessionCache()
-
-    @pytest.fixture
-    def manager(self, local_keypair, session_cache):
-        """Create a handshake manager."""
-        priv, pub, node_id = local_keypair
-        local_enr_rlp = b"mock_enr"
-
-        return HandshakeManager(
-            local_node_id=bytes(node_id),
-            local_private_key=priv,
-            local_enr_rlp=local_enr_rlp,
-            local_enr_seq=1,
-            session_cache=session_cache,
-        )
-
     def test_handle_handshake_requires_pending_state(self, manager, remote_keypair):
         """Handshake fails if no pending state exists for the remote."""
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Create fake handshake authdata.
         fake_authdata = HandshakeAuthdata(
-            src_id=bytes(remote_node_id),
+            src_id=NodeId(remote_node_id),
             sig_size=64,
             eph_key_size=33,
             id_signature=bytes(64),
@@ -393,17 +337,17 @@ class TestHandshakeValidation:
 
         # Should fail because no WHOAREYOU was sent.
         with pytest.raises(HandshakeError, match="No pending handshake"):
-            manager.handle_handshake(bytes(remote_node_id), fake_authdata)
+            manager.handle_handshake(NodeId(remote_node_id), fake_authdata)
 
     def test_handle_handshake_requires_sent_whoareyou_state(self, manager, remote_keypair):
         """Handshake fails if not in SENT_WHOAREYOU state."""
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Start handshake (puts in SENT_ORDINARY state).
-        manager.start_handshake(bytes(remote_node_id))
+        manager.start_handshake(NodeId(remote_node_id))
 
         fake_authdata = HandshakeAuthdata(
-            src_id=bytes(remote_node_id),
+            src_id=NodeId(remote_node_id),
             sig_size=64,
             eph_key_size=33,
             id_signature=bytes(64),
@@ -413,7 +357,7 @@ class TestHandshakeValidation:
 
         # Should fail because we're in SENT_ORDINARY, not SENT_WHOAREYOU.
         with pytest.raises(HandshakeError, match="Unexpected handshake state"):
-            manager.handle_handshake(bytes(remote_node_id), fake_authdata)
+            manager.handle_handshake(NodeId(remote_node_id), fake_authdata)
 
     def test_handle_handshake_rejects_src_id_mismatch(self, manager, remote_keypair):
         """Handshake fails if src_id doesn't match expected remote."""
@@ -421,14 +365,14 @@ class TestHandshakeValidation:
 
         # Set up WHOAREYOU state.
         manager.create_whoareyou(
-            bytes(remote_node_id),
+            NodeId(remote_node_id),
             bytes(12),
             0,
             bytes(16),
         )
 
         # Create authdata with different src_id.
-        wrong_src_id = bytes([0xFF] * 32)
+        wrong_src_id = NodeId(bytes([0xFF] * 32))
         fake_authdata = HandshakeAuthdata(
             src_id=wrong_src_id,
             sig_size=64,
@@ -440,7 +384,7 @@ class TestHandshakeValidation:
 
         # Should fail due to source ID mismatch.
         with pytest.raises(HandshakeError, match="Source ID mismatch"):
-            manager.handle_handshake(bytes(remote_node_id), fake_authdata)
+            manager.handle_handshake(NodeId(remote_node_id), fake_authdata)
 
     def test_handle_handshake_requires_enr_when_seq_zero(self, manager, remote_keypair):
         """Handshake fails if enr_seq=0 and no ENR included.
@@ -452,7 +396,7 @@ class TestHandshakeValidation:
 
         # Set up WHOAREYOU with enr_seq=0 (unknown).
         manager.create_whoareyou(
-            bytes(remote_node_id),
+            NodeId(remote_node_id),
             bytes(12),
             0,  # enr_seq = 0 means we don't know remote's ENR
             bytes(16),
@@ -460,7 +404,7 @@ class TestHandshakeValidation:
 
         # Create authdata without ENR record.
         fake_authdata = HandshakeAuthdata(
-            src_id=bytes(remote_node_id),
+            src_id=NodeId(remote_node_id),
             sig_size=64,
             eph_key_size=33,
             id_signature=bytes(64),
@@ -470,7 +414,7 @@ class TestHandshakeValidation:
 
         # Should fail because ENR is required.
         with pytest.raises(HandshakeError, match="ENR required"):
-            manager.handle_handshake(bytes(remote_node_id), fake_authdata)
+            manager.handle_handshake(NodeId(remote_node_id), fake_authdata)
 
     def test_successful_handshake_with_signature_verification(
         self, manager, remote_keypair, session_cache
@@ -484,7 +428,7 @@ class TestHandshakeValidation:
         # Node A (manager) creates WHOAREYOU for remote.
         masking_iv = bytes(16)
         id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
-            bytes(remote_node_id), bytes(12), 0, masking_iv
+            NodeId(remote_node_id), bytes(12), 0, masking_iv
         )
 
         # Remote creates handshake response.
@@ -507,7 +451,7 @@ class TestHandshakeValidation:
         )
 
         authdata_bytes = encode_handshake_authdata(
-            src_id=bytes(remote_node_id),
+            src_id=NodeId(remote_node_id),
             id_signature=id_signature,
             eph_pubkey=eph_pub,
             record=remote_enr.to_rlp(),
@@ -516,7 +460,7 @@ class TestHandshakeValidation:
         handshake = decode_handshake_authdata(authdata_bytes)
 
         # Manager processes handshake - should succeed.
-        result = manager.handle_handshake(bytes(remote_node_id), handshake)
+        result = manager.handle_handshake(NodeId(remote_node_id), handshake)
 
         assert result is not None
         assert isinstance(result, HandshakeResult)
@@ -532,7 +476,7 @@ class TestHandshakeValidation:
 
         # Set up WHOAREYOU state.
         masking_iv = bytes(16)
-        manager.create_whoareyou(bytes(remote_node_id), bytes(12), 0, masking_iv)
+        manager.create_whoareyou(NodeId(remote_node_id), bytes(12), 0, masking_iv)
 
         # Generate ephemeral key.
         _eph_priv, eph_pub = generate_secp256k1_keypair()
@@ -545,7 +489,7 @@ class TestHandshakeValidation:
         )
 
         authdata_bytes = encode_handshake_authdata(
-            src_id=bytes(remote_node_id),
+            src_id=NodeId(remote_node_id),
             id_signature=bytes(64),  # Wrong signature.
             eph_pubkey=eph_pub,
             record=remote_enr.to_rlp(),
@@ -554,33 +498,11 @@ class TestHandshakeValidation:
         handshake = decode_handshake_authdata(authdata_bytes)
 
         with pytest.raises(HandshakeError, match="Invalid ID signature"):
-            manager.handle_handshake(bytes(remote_node_id), handshake)
+            manager.handle_handshake(NodeId(remote_node_id), handshake)
 
 
 class TestHandshakeConcurrency:
     """Concurrent handshake handling tests."""
-
-    @pytest.fixture
-    def local_keypair(self):
-        """Generate a local keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def manager(self, local_keypair):
-        """Create a handshake manager."""
-        priv, pub, node_id = local_keypair
-        session_cache = SessionCache()
-        local_enr_rlp = b"mock_enr"
-
-        return HandshakeManager(
-            local_node_id=bytes(node_id),
-            local_private_key=priv,
-            local_enr_rlp=local_enr_rlp,
-            local_enr_seq=1,
-            session_cache=session_cache,
-        )
 
     def test_multiple_handshakes_independent(self, manager):
         """Handshakes to different peers don't interfere."""
@@ -669,20 +591,6 @@ class TestHandshakeConcurrency:
 class TestHandshakeEnrInclusion:
     """Tests for ENR inclusion/exclusion in HANDSHAKE responses."""
 
-    @pytest.fixture
-    def local_keypair(self):
-        """Generate a local keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def remote_keypair(self):
-        """Generate a remote keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
     def test_enr_included_when_remote_seq_is_stale(self, local_keypair, remote_keypair):
         """HANDSHAKE includes our ENR when remote's known seq is lower than ours.
 
@@ -694,7 +602,7 @@ class TestHandshakeEnrInclusion:
 
         session_cache = SessionCache()
         manager = HandshakeManager(
-            local_node_id=bytes(local_node_id),
+            local_node_id=local_node_id,
             local_private_key=local_priv,
             local_enr_rlp=b"mock_enr_data",
             local_enr_seq=5,
@@ -709,7 +617,7 @@ class TestHandshakeEnrInclusion:
 
         challenge_data = bytes(63)
         authdata, _, _ = manager.create_handshake_response(
-            remote_node_id=bytes(remote_node_id),
+            remote_node_id=NodeId(remote_node_id),
             whoareyou=whoareyou,
             remote_pubkey=bytes(remote_pub),
             challenge_data=challenge_data,
@@ -730,7 +638,7 @@ class TestHandshakeEnrInclusion:
 
         session_cache = SessionCache()
         manager = HandshakeManager(
-            local_node_id=bytes(local_node_id),
+            local_node_id=local_node_id,
             local_private_key=local_priv,
             local_enr_rlp=b"mock_enr_data",
             local_enr_seq=5,
@@ -745,7 +653,7 @@ class TestHandshakeEnrInclusion:
 
         challenge_data = bytes(63)
         authdata, _, _ = manager.create_handshake_response(
-            remote_node_id=bytes(remote_node_id),
+            remote_node_id=NodeId(remote_node_id),
             whoareyou=whoareyou,
             remote_pubkey=bytes(remote_pub),
             challenge_data=challenge_data,
@@ -759,31 +667,9 @@ class TestHandshakeEnrInclusion:
 class TestHandshakeENRCache:
     """Tests for ENR caching in handshake manager."""
 
-    @pytest.fixture
-    def local_keypair(self):
-        """Generate a local keypair for testing."""
-        priv, pub = generate_secp256k1_keypair()
-        node_id = compute_node_id(pub)
-        return priv, pub, node_id
-
-    @pytest.fixture
-    def manager(self, local_keypair):
-        """Create a handshake manager."""
-        priv, pub, node_id = local_keypair
-        session_cache = SessionCache()
-        local_enr_rlp = b"mock_enr"
-
-        return HandshakeManager(
-            local_node_id=bytes(node_id),
-            local_private_key=priv,
-            local_enr_rlp=local_enr_rlp,
-            local_enr_seq=1,
-            session_cache=session_cache,
-        )
-
     def test_register_enr_stores_in_cache(self, manager):
         """Registered ENRs are retrievable from cache."""
-        remote_node_id = bytes(compute_node_id(NODE_B_PUBKEY))
+        remote_node_id = compute_node_id(NODE_B_PUBKEY)
 
         enr = ENR(
             signature=Bytes64(bytes(64)),

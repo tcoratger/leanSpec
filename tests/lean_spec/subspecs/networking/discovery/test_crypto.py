@@ -194,6 +194,16 @@ class TestPubkeyConversion:
 
         assert uncompressed[0] == 0x04
 
+    def test_passthrough_for_65_byte_key(self):
+        """Test that 65-byte uncompressed key passes through unchanged."""
+        _, compressed = generate_secp256k1_keypair()
+        uncompressed = pubkey_to_uncompressed(compressed)
+
+        # Passing an already-uncompressed key returns the same bytes.
+        result = pubkey_to_uncompressed(uncompressed)
+        assert result == uncompressed
+        assert len(result) == 65
+
 
 class TestIdNonceSignature:
     """Tests for ID nonce signing and verification."""

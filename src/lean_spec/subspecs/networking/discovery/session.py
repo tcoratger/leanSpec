@@ -24,6 +24,8 @@ import time
 from dataclasses import dataclass, field
 from threading import Lock
 
+from lean_spec.subspecs.networking.types import NodeId
+
 from .config import BOND_EXPIRY_SECS
 
 DEFAULT_SESSION_TIMEOUT_SECS = 86400
@@ -42,7 +44,7 @@ class Session:
     Keys are directional: we use different keys for send vs receive.
     """
 
-    node_id: bytes
+    node_id: NodeId
     """Peer's 32-byte node ID."""
 
     send_key: bytes
@@ -69,7 +71,7 @@ class Session:
         self.last_seen = time.time()
 
 
-type SessionKey = tuple[bytes, str, int]
+type SessionKey = tuple[NodeId, str, int]
 """Session cache key: (node_id, ip, port).
 
 Per spec, sessions are tied to a specific UDP endpoint.
@@ -99,7 +101,7 @@ class SessionCache:
     _lock: Lock = field(default_factory=Lock)
     """Thread safety lock."""
 
-    def get(self, node_id: bytes, ip: str = "", port: int = 0) -> Session | None:
+    def get(self, node_id: NodeId, ip: str = "", port: int = 0) -> Session | None:
         """
         Get an active session for a node at a specific endpoint.
 
@@ -127,7 +129,7 @@ class SessionCache:
 
     def create(
         self,
-        node_id: bytes,
+        node_id: NodeId,
         send_key: bytes,
         recv_key: bytes,
         is_initiator: bool,
@@ -178,7 +180,7 @@ class SessionCache:
 
         return session
 
-    def remove(self, node_id: bytes, ip: str = "", port: int = 0) -> bool:
+    def remove(self, node_id: NodeId, ip: str = "", port: int = 0) -> bool:
         """
         Remove a session.
 
@@ -197,7 +199,7 @@ class SessionCache:
                 return True
             return False
 
-    def touch(self, node_id: bytes, ip: str = "", port: int = 0) -> bool:
+    def touch(self, node_id: NodeId, ip: str = "", port: int = 0) -> bool:
         """
         Update the last_seen timestamp for a session.
 
@@ -243,11 +245,11 @@ class SessionCache:
             return len(self.sessions)
 
     def _evict_oldest(self) -> None:
-        """Evict the oldest session. Must be called with lock held."""
+        """Evict the least recently used session. Must be called with lock held."""
         if not self.sessions:
             return
 
-        oldest_key = min(self.sessions, key=lambda k: self.sessions[k].created_at)
+        oldest_key = min(self.sessions, key=lambda k: self.sessions[k].last_seen)
         del self.sessions[oldest_key]
 
 
@@ -263,7 +265,7 @@ class BondCache:
     even if the session expires.
     """
 
-    bonds: dict[bytes, float] = field(default_factory=dict)
+    bonds: dict[NodeId, float] = field(default_factory=dict)
     """Node ID -> timestamp of last successful PONG."""
 
     expiry_secs: float = BOND_EXPIRY_SECS
@@ -272,7 +274,7 @@ class BondCache:
     _lock: Lock = field(default_factory=Lock)
     """Thread safety lock."""
 
-    def is_bonded(self, node_id: bytes) -> bool:
+    def is_bonded(self, node_id: NodeId) -> bool:
         """Check if we have a valid bond with a node."""
         with self._lock:
             timestamp = self.bonds.get(node_id)
@@ -283,12 +285,12 @@ class BondCache:
                 return False
             return True
 
-    def add_bond(self, node_id: bytes) -> None:
+    def add_bond(self, node_id: NodeId) -> None:
         """Record a successful bond with a node."""
         with self._lock:
             self.bonds[node_id] = time.time()
 
-    def remove_bond(self, node_id: bytes) -> bool:
+    def remove_bond(self, node_id: NodeId) -> bool:
         """Remove a bond."""
         with self._lock:
             if node_id in self.bonds:

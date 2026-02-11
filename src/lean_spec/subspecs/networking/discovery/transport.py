@@ -18,13 +18,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import struct
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from cryptography.exceptions import InvalidTag
 
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.types import NodeId
 from lean_spec.types import Bytes16, Uint64
 
 from .codec import (
@@ -37,8 +37,6 @@ from .codec import (
 from .config import DiscoveryConfig
 from .handshake import HandshakeError, HandshakeManager
 from .messages import (
-    PROTOCOL_ID,
-    PROTOCOL_VERSION,
     Distance,
     FindNode,
     Nodes,
@@ -58,6 +56,7 @@ from .packet import (
     decrypt_message,
     encode_message_authdata,
     encode_packet,
+    encode_static_header,
     generate_nonce,
 )
 from .session import SessionCache
@@ -72,7 +71,7 @@ class PendingRequest:
     request_id: bytes
     """Request ID for matching responses."""
 
-    dest_node_id: bytes
+    dest_node_id: NodeId
     """Destination node ID."""
 
     sent_at: float
@@ -84,7 +83,7 @@ class PendingRequest:
     message: DiscoveryMessage
     """Original message (for retransmission after handshake)."""
 
-    future: asyncio.Future
+    future: asyncio.Future[DiscoveryMessage | None]
     """Future to complete when response arrives."""
 
 
@@ -99,7 +98,7 @@ class PendingMultiRequest:
     request_id: bytes
     """Request ID for matching responses."""
 
-    dest_node_id: bytes
+    dest_node_id: NodeId
     """Destination node ID."""
 
     sent_at: float
@@ -111,7 +110,7 @@ class PendingMultiRequest:
     message: DiscoveryMessage
     """Original message (for retransmission after handshake)."""
 
-    response_queue: asyncio.Queue
+    response_queue: asyncio.Queue[DiscoveryMessage]
     """Queue to collect multiple responses."""
 
     expected_total: int | None
@@ -171,7 +170,7 @@ class DiscoveryTransport:
 
     def __init__(
         self,
-        local_node_id: bytes,
+        local_node_id: NodeId,
         local_private_key: bytes,
         local_enr: ENR,
         config: DiscoveryConfig | None = None,
@@ -195,11 +194,11 @@ class DiscoveryTransport:
         self._transport: asyncio.DatagramTransport | None = None
         self._pending_requests: dict[bytes, PendingRequest] = {}
         self._pending_multi_requests: dict[bytes, PendingMultiRequest] = {}
-        self._node_addresses: dict[bytes, tuple[str, int]] = {}
+        self._node_addresses: dict[NodeId, tuple[str, int]] = {}
 
-        self._message_handler: Callable[[bytes, DiscoveryMessage, tuple[str, int]], None] | None = (
-            None
-        )
+        self._message_handler: (
+            Callable[[NodeId, DiscoveryMessage, tuple[str, int]], None] | None
+        ) = None
 
         self._running = False
 
@@ -247,20 +246,20 @@ class DiscoveryTransport:
 
     def set_message_handler(
         self,
-        handler: Callable[[bytes, DiscoveryMessage, tuple[str, int]], None],
+        handler: Callable[[NodeId, DiscoveryMessage, tuple[str, int]], None],
     ) -> None:
         """Set handler for incoming messages."""
         self._message_handler = handler
 
-    def register_node_address(self, node_id: bytes, address: tuple[str, int]) -> None:
+    def register_node_address(self, node_id: NodeId, address: tuple[str, int]) -> None:
         """Register a node's UDP address."""
         self._node_addresses[node_id] = address
 
-    def get_node_address(self, node_id: bytes) -> tuple[str, int] | None:
+    def get_node_address(self, node_id: NodeId) -> tuple[str, int] | None:
         """Get a node's registered UDP address."""
         return self._node_addresses.get(node_id)
 
-    def register_enr(self, node_id: bytes, enr: ENR) -> None:
+    def register_enr(self, node_id: NodeId, enr: ENR) -> None:
         """
         Cache an ENR for future handshake completion.
 
@@ -277,7 +276,7 @@ class DiscoveryTransport:
         """
         self._handshake_manager.register_enr(node_id, enr)
 
-    def get_enr(self, node_id: bytes) -> ENR | None:
+    def get_enr(self, node_id: NodeId) -> ENR | None:
         """
         Retrieve a cached ENR by node ID.
 
@@ -289,7 +288,7 @@ class DiscoveryTransport:
         """
         return self._handshake_manager.get_cached_enr(node_id)
 
-    async def send_ping(self, dest_node_id: bytes, dest_addr: tuple[str, int]) -> Pong | None:
+    async def send_ping(self, dest_node_id: NodeId, dest_addr: tuple[str, int]) -> Pong | None:
         """
         Send a PING and wait for PONG.
 
@@ -313,7 +312,7 @@ class DiscoveryTransport:
 
     async def send_findnode(
         self,
-        dest_node_id: bytes,
+        dest_node_id: NodeId,
         dest_addr: tuple[str, int],
         distances: list[int],
     ) -> list[bytes]:
@@ -351,7 +350,7 @@ class DiscoveryTransport:
 
     async def _send_multi_response_request(
         self,
-        dest_node_id: bytes,
+        dest_node_id: NodeId,
         dest_addr: tuple[str, int],
         message: DiscoveryMessage,
     ) -> list[DiscoveryMessage]:
@@ -378,7 +377,7 @@ class DiscoveryTransport:
         # Build and send packet.
         nonce = generate_nonce()
         message_bytes = encode_message(message)
-        packet = self._build_and_send_packet(dest_node_id, dest_addr, nonce, message_bytes)
+        packet = self._build_message_packet(dest_node_id, dest_addr, nonce, message_bytes)
 
         # Create collector for multiple responses.
         loop = asyncio.get_running_loop()
@@ -438,7 +437,7 @@ class DiscoveryTransport:
 
     async def send_talkreq(
         self,
-        dest_node_id: bytes,
+        dest_node_id: NodeId,
         dest_addr: tuple[str, int],
         protocol: bytes,
         request: bytes,
@@ -469,7 +468,7 @@ class DiscoveryTransport:
 
     async def _send_request(
         self,
-        dest_node_id: bytes,
+        dest_node_id: NodeId,
         dest_addr: tuple[str, int],
         message: DiscoveryMessage,
     ) -> DiscoveryMessage | None:
@@ -487,7 +486,7 @@ class DiscoveryTransport:
         # Build and send packet.
         nonce = generate_nonce()
         message_bytes = encode_message(message)
-        packet = self._build_and_send_packet(dest_node_id, dest_addr, nonce, message_bytes)
+        packet = self._build_message_packet(dest_node_id, dest_addr, nonce, message_bytes)
 
         # Create pending request.
         loop = asyncio.get_running_loop()
@@ -518,9 +517,9 @@ class DiscoveryTransport:
         finally:
             self._pending_requests.pop(request_id_bytes, None)
 
-    def _build_and_send_packet(
+    def _build_message_packet(
         self,
-        dest_node_id: bytes,
+        dest_node_id: NodeId,
         dest_addr: tuple[str, int],
         nonce: Nonce,
         message_bytes: bytes,
@@ -546,7 +545,6 @@ class DiscoveryTransport:
         if session is not None:
             return encode_packet(
                 dest_node_id=dest_node_id,
-                src_node_id=self._local_node_id,
                 flag=PacketFlag.MESSAGE,
                 nonce=bytes(nonce),
                 authdata=authdata,
@@ -569,7 +567,6 @@ class DiscoveryTransport:
         dummy_key = os.urandom(16)
         return encode_packet(
             dest_node_id=dest_node_id,
-            src_node_id=self._local_node_id,
             flag=PacketFlag.MESSAGE,
             nonce=bytes(nonce),
             authdata=authdata,
@@ -648,12 +645,8 @@ class DiscoveryTransport:
         #
         # We use the unmasked header, which we can reconstruct from the decoded values.
         masking_iv = raw_packet[:16]
-        static_header = (
-            PROTOCOL_ID
-            + struct.pack(">H", PROTOCOL_VERSION)
-            + bytes([PacketFlag.WHOAREYOU])
-            + bytes(header.nonce)
-            + struct.pack(">H", len(header.authdata))
+        static_header = encode_static_header(
+            PacketFlag.WHOAREYOU, bytes(header.nonce), len(header.authdata)
         )
         challenge_data = masking_iv + static_header + header.authdata
 
@@ -690,7 +683,6 @@ class DiscoveryTransport:
 
             packet = encode_packet(
                 dest_node_id=remote_node_id,
-                src_node_id=self._local_node_id,
                 flag=PacketFlag.HANDSHAKE,
                 nonce=bytes(nonce),
                 authdata=authdata,
@@ -785,7 +777,7 @@ class DiscoveryTransport:
 
     async def _handle_decoded_message(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         message: DiscoveryMessage,
         addr: tuple[str, int],
     ) -> None:
@@ -815,7 +807,7 @@ class DiscoveryTransport:
 
     async def _send_whoareyou(
         self,
-        remote_node_id: bytes,
+        remote_node_id: NodeId,
         request_nonce: Nonce,
         addr: tuple[str, int],
     ) -> None:
@@ -823,8 +815,13 @@ class DiscoveryTransport:
         if self._transport is None:
             return
 
-        # Get last known ENR seq for this node (0 if unknown).
-        remote_enr_seq = 0
+        # Look up the cached ENR sequence for this node.
+        #
+        # If we know their ENR, send the current seq so they can skip
+        # including the full ENR in the handshake response, saving bandwidth.
+        # Fall back to 0 if unknown, which forces the remote to include their ENR.
+        cached_enr = self._handshake_manager.get_cached_enr(remote_node_id)
+        remote_enr_seq = int(cached_enr.seq) if cached_enr is not None else 0
 
         # Generate masking IV for the WHOAREYOU packet.
         #
@@ -841,7 +838,6 @@ class DiscoveryTransport:
 
         packet = encode_packet(
             dest_node_id=remote_node_id,
-            src_node_id=self._local_node_id,
             flag=PacketFlag.WHOAREYOU,
             nonce=nonce,
             authdata=authdata,
@@ -855,7 +851,7 @@ class DiscoveryTransport:
 
     async def send_response(
         self,
-        dest_node_id: bytes,
+        dest_node_id: NodeId,
         dest_addr: tuple[str, int],
         message: DiscoveryMessage,
     ) -> bool:
@@ -895,7 +891,6 @@ class DiscoveryTransport:
 
         packet = encode_packet(
             dest_node_id=dest_node_id,
-            src_node_id=self._local_node_id,
             flag=PacketFlag.MESSAGE,
             nonce=bytes(nonce),
             authdata=authdata,

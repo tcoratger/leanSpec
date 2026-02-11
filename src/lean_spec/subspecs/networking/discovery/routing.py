@@ -50,8 +50,8 @@ References:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import ForkDigest, NodeId, SeqNumber
@@ -107,7 +107,7 @@ def log2_distance(a: NodeId, b: NodeId) -> Distance:
     return Distance(distance.bit_length())
 
 
-@dataclass
+@dataclass(slots=True)
 class NodeEntry:
     """
     Entry in the routing table representing a discovered node.
@@ -135,7 +135,7 @@ class NodeEntry:
     """Full ENR record. Contains fork data for compatibility checks."""
 
 
-@dataclass
+@dataclass(slots=True)
 class KBucket:
     """
     K-bucket holding nodes at a specific log2 distance range.
@@ -246,7 +246,7 @@ class KBucket:
         return self.nodes[-1] if self.nodes else None
 
 
-@dataclass
+@dataclass(slots=True)
 class RoutingTable:
     """
     Kademlia routing table for Discovery v5.
