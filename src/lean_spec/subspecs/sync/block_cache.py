@@ -103,7 +103,7 @@ class PendingBlock:
     slot order to ensure parents are processed before children.
     """
 
-    received_from: PeerId
+    received_from: PeerId | None
     """
     Peer that sent this block.
 
@@ -112,6 +112,7 @@ class PendingBlock:
         - If invalid, they get penalized.
 
     This creates incentives for good behavior.
+    None for self-produced blocks.
     """
 
     received_at: float = field(default_factory=time)
@@ -165,7 +166,7 @@ class BlockCache:
     def add(
         self,
         block: SignedBlockWithAttestation,
-        peer: PeerId,
+        peer: PeerId | None,
         backfill_depth: int = 0,
     ) -> PendingBlock:
         """

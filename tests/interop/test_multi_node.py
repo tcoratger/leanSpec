@@ -145,9 +145,7 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
         #
         # - High new_atts, low known_atts = processing bottleneck
         # - Low counts everywhere = gossip not propagating
-        new_atts = [
-            len(node._store.latest_new_aggregated_payloads) for node in node_cluster.nodes
-        ]
+        new_atts = [len(node._store.latest_new_aggregated_payloads) for node in node_cluster.nodes]
         known_atts = [
             len(node._store.latest_known_aggregated_payloads) for node in node_cluster.nodes
         ]

@@ -356,7 +356,7 @@ class SyncService:
     async def on_gossip_block(
         self,
         block: SignedBlockWithAttestation,
-        peer_id: PeerId,
+        peer_id: PeerId | None,
     ) -> None:
         """
         Handle block received via gossip.

@@ -859,7 +859,6 @@ class Store(Container):
 
     def accept_new_attestations(self) -> "Store":
         """Process pending aggregated payloads and update forkchoice head."""
-
         # Merge new aggregated payloads into known aggregated payloads
         merged_aggregated_payloads = dict(self.latest_known_aggregated_payloads)
         for sig_key, proofs in self.latest_new_aggregated_payloads.items():
@@ -1067,7 +1066,8 @@ class Store(Container):
             is_aggregator: Whether the node is an aggregator.
 
         Returns:
-            Tuple of (new Store with time advanced, list of all produced SignedAggregatedAttestation).
+            Tuple of (new Store with time advanced,
+            list of all produced SignedAggregatedAttestation).
         """
         # Calculate target time in intervals
         time_delta_ms = (time - self.config.genesis_time) * Uint64(1000)

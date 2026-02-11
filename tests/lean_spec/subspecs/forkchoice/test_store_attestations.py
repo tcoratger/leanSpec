@@ -728,12 +728,13 @@ class TestTickIntervalAggregation:
             # After tick, time becomes time+1, and interval = (time+1) % 5
             # So we need time+1 % 5 == target_interval
             # Therefore time = target_interval - 1 (mod 5)
-                    pre_tick_time = (target_interval - 1) % int(INTERVALS_PER_SLOT)
-                    test_store = store.model_copy(update={"time": Uint64(pre_tick_time)})
-            
-                    updated_store, _ = test_store.tick_interval(has_proposal=False, is_aggregator=True)
-            
-                    assert sig_key not in updated_store.latest_new_aggregated_payloads, (                f"Aggregation should NOT occur at interval {target_interval}"
+            pre_tick_time = (target_interval - 1) % int(INTERVALS_PER_SLOT)
+            test_store = store.model_copy(update={"time": Uint64(pre_tick_time)})
+
+            updated_store, _ = test_store.tick_interval(has_proposal=False, is_aggregator=True)
+
+            assert sig_key not in updated_store.latest_new_aggregated_payloads, (
+                f"Aggregation should NOT occur at interval {target_interval}"
             )
 
     def test_interval_0_accepts_attestations_with_proposal(
@@ -809,11 +810,12 @@ class TestEndToEndAggregationFlow:
             sig_key = SignatureKey(vid, data_root)
             assert sig_key in store.gossip_signatures, f"Signature for {vid} should be stored"
 
-            # Step 2: Advance to interval 2 (aggregation interval)
-            store = store.model_copy(update={"time": Uint64(1)})
-            store, _ = store.tick_interval(has_proposal=False, is_aggregator=True)
-        
-            # Step 3: Verify aggregated proofs were created        for vid in attesting_validators:
+        # Step 2: Advance to interval 2 (aggregation interval)
+        store = store.model_copy(update={"time": Uint64(1)})
+        store, _ = store.tick_interval(has_proposal=False, is_aggregator=True)
+
+        # Step 3: Verify aggregated proofs were created
+        for vid in attesting_validators:
             sig_key = SignatureKey(vid, data_root)
             assert sig_key in store.latest_new_aggregated_payloads, (
                 f"Aggregated proof for {vid} should exist after interval 2"
