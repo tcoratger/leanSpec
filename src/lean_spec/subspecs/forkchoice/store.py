@@ -308,7 +308,9 @@ class Store(Container):
         Ensures the vote respects the basic laws of time and topology:
             1. The blocks voted for must exist in our store.
             2. A vote cannot span backwards in time (source > target).
-            3. A vote cannot be for a future slot.
+            3. The head must be at least as recent as source and target.
+            4. Checkpoint slots must match the actual block slots.
+            5. A vote cannot be for a future slot.
 
         Args:
             attestation: Attestation to validate (unsigned).
@@ -328,15 +330,20 @@ class Store(Container):
         # Topology Check
         #
         # History is linear and monotonic. Source must be older than Target.
+        # The head is the chain tip — it must be at least as recent as both.
         assert data.source.slot <= data.target.slot, "Source checkpoint slot must not exceed target"
+        assert data.head.slot >= data.source.slot, "Head checkpoint must not be older than source"
+        assert data.head.slot >= data.target.slot, "Head checkpoint must not be older than target"
 
         # Consistency Check
         #
-        # Validate checkpoint slots match block slots
+        # Validate checkpoint slots match block slots.
         source_block = self.blocks[data.source.root]
         target_block = self.blocks[data.target.root]
+        head_block = self.blocks[data.head.root]
         assert source_block.slot == data.source.slot, "Source checkpoint slot mismatch"
         assert target_block.slot == data.target.slot, "Target checkpoint slot mismatch"
+        assert head_block.slot == data.head.slot, "Head checkpoint slot mismatch"
 
         # Time Check
         #
