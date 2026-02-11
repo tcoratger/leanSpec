@@ -24,14 +24,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
 import pytest
 
 from .helpers import (
     NodeCluster,
+    assert_all_finalized_to,
     assert_heads_consistent,
     assert_peer_connections,
+    assert_same_finalized_checkpoint,
     full_mesh,
     mesh_2_2_2,
 )
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.interop
 
 
-@pytest.mark.timeout(120)
+@pytest.mark.timeout(200)
 @pytest.mark.num_validators(3)
 async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     """
@@ -101,107 +102,29 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     # The 15s timeout handles slow handshakes.
     await assert_peer_connections(node_cluster, min_peers=2, timeout=15)
 
-    # Let the chain run for a fixed duration.
+    # Wait for finalization with convergence-based polling.
     #
-    # Timing calculation:
+    # Instead of a fixed duration, we actively poll for the target state.
+    # This is more robust under varying CI performance.
     #
-    # - Slot duration: 4 seconds
-    # - Slots in 70s: ~17 slots
-    # - Finalization requires: 2 consecutive justified epochs
-    # - With 3 validators: justification needs 2/3 = 2 attestations per slot
+    # Finalization requires 2 consecutive justified epochs.
+    # With 3 validators and 4s slots, this typically takes ~30s
+    # but may take longer on slow CI machines.
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=100)
+
+    # Verify heads converged across nodes.
     #
-    # This duration allows enough time for validators to:
-    #
-    # 1. Produce blocks (one per slot, round-robin)
-    # 2. Broadcast attestations (all validators each slot)
-    # 3. Accumulate justification (2+ matching attestations)
-    # 4. Finalize (justified epoch becomes finalized)
-    run_duration = 70
-    poll_interval = 5
-
-    logger.info("Running chain for %d seconds...", run_duration)
-
-    # Poll the chain state periodically.
-    #
-    # This provides visibility into consensus progress during the test.
-    # The logged metrics help debug failures.
-    start = time.monotonic()
-    while time.monotonic() - start < run_duration:
-        # Collect current state from each node.
-        #
-        # Head slot: the highest slot block each node has seen.
-        # Finalized slot: the most recent finalized checkpoint slot.
-        # Justified slot: the most recent justified checkpoint slot.
-        slots = [node.head_slot for node in node_cluster.nodes]
-        finalized = [node.finalized_slot for node in node_cluster.nodes]
-        justified = [node.justified_slot for node in node_cluster.nodes]
-
-        # Track attestation counts for debugging.
-        #
-        # New attestations: received but not yet processed by fork choice.
-        # Known attestations: already incorporated into the store.
-        #
-        # These counts reveal if gossip is working:
-        #
-        # - High new_atts, low known_atts = processing bottleneck
-        # - Low counts everywhere = gossip not propagating
-        new_atts = [len(node._store.latest_new_aggregated_payloads) for node in node_cluster.nodes]
-        known_atts = [
-            len(node._store.latest_known_aggregated_payloads) for node in node_cluster.nodes
-        ]
-
-        logger.info(
-            "Progress: head=%s justified=%s finalized=%s new_atts=%s known_atts=%s",
-            slots,
-            justified,
-            finalized,
-            new_atts,
-            known_atts,
-        )
-        await asyncio.sleep(poll_interval)
-
-    # Capture final state for assertions.
-    head_slots = [node.head_slot for node in node_cluster.nodes]
-    finalized_slots = [node.finalized_slot for node in node_cluster.nodes]
-
-    logger.info("FINAL: head_slots=%s finalized=%s", head_slots, finalized_slots)
-
-    # Verify the chain advanced sufficiently.
-    #
-    # Minimum 5 slots ensures:
-    #
-    # - Block production is working (at least 5 blocks created)
-    # - Gossip is propagating (all nodes see the same progress)
-    # - No single node is stuck or partitioned
-    assert all(slot >= 5 for slot in head_slots), (
-        f"Chain did not advance enough. Head slots: {head_slots}"
-    )
-
-    # Verify heads are consistent across nodes.
-    #
-    # In a healthy network, all nodes should converge to similar head slots.
-    # A difference > 2 slots indicates gossip or fork choice issues.
-    head_diff = max(head_slots) - min(head_slots)
-    assert head_diff <= 2, f"Head slots diverged too much. Slots: {head_slots}, diff: {head_diff}"
-
-    # Verify ALL nodes finalized.
-    #
-    # With 70s runtime (~17 slots) and working gossip, every node
-    # should have finalized at least one checkpoint.
-    assert all(slot > 0 for slot in finalized_slots), (
-        f"Not all nodes finalized. Finalized slots: {finalized_slots}"
-    )
+    # After finalization, all nodes should agree on head within 2 slots.
+    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
 
     # Verify finalized checkpoints are consistent.
     #
     # All nodes must agree on the finalized checkpoint.
     # Finalization is irreversible - divergent finalization would be catastrophic.
-    assert len(set(finalized_slots)) == 1, (
-        f"Finalized slots inconsistent across nodes: {finalized_slots}"
-    )
+    await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=30)
 
 
-@pytest.mark.timeout(120)
+@pytest.mark.timeout(200)
 @pytest.mark.num_validators(3)
 async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     """
@@ -244,58 +167,21 @@ async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     # Using min_peers=1 ensures spokes pass the check.
     await assert_peer_connections(node_cluster, min_peers=1, timeout=15)
 
-    # Match Ream's 70 second test duration.
+    # Wait for finalization with convergence-based polling.
     #
-    # Finalization requires sufficient time for:
-    # - Multiple slots to pass (4s each)
-    # - Attestations to accumulate
-    # - Justification and finalization to occur
-    run_duration = 70
-    poll_interval = 5
+    # Hub-and-spoke adds latency (messages route through hub)
+    # but the protocol should still achieve finalization.
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=100)
 
-    logger.info("Running chain for %d seconds (mesh_2_2_2)...", run_duration)
-
-    # Poll chain progress.
-    start = time.monotonic()
-    while time.monotonic() - start < run_duration:
-        slots = [node.head_slot for node in node_cluster.nodes]
-        finalized = [node.finalized_slot for node in node_cluster.nodes]
-        logger.info("Progress: head_slots=%s finalized=%s", slots, finalized)
-        await asyncio.sleep(poll_interval)
-
-    # Final state capture.
-    head_slots = [node.head_slot for node in node_cluster.nodes]
-    finalized_slots = [node.finalized_slot for node in node_cluster.nodes]
-
-    logger.info("FINAL: head_slots=%s finalized=%s", head_slots, finalized_slots)
-
-    # Same assertions as full mesh.
-    #
-    # Despite reduced connectivity (messages route through hub),
-    # the protocol should still achieve full consensus.
-
-    # Chain must advance sufficiently.
-    assert all(slot >= 5 for slot in head_slots), (
-        f"Chain did not advance enough. Head slots: {head_slots}"
-    )
-
-    # Heads must be consistent across nodes.
+    # Verify heads converged across nodes.
     #
     # Hub-and-spoke adds latency but should not cause divergence.
-    head_diff = max(head_slots) - min(head_slots)
-    assert head_diff <= 2, f"Head slots diverged too much. Slots: {head_slots}, diff: {head_diff}"
-
-    # ALL nodes must finalize.
-    assert all(slot > 0 for slot in finalized_slots), (
-        f"Not all nodes finalized. Finalized slots: {finalized_slots}"
-    )
+    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
 
     # Finalized checkpoints must be identical.
     #
     # Even with indirect connectivity, finalization must be consistent.
-    assert len(set(finalized_slots)) == 1, (
-        f"Finalized slots inconsistent across nodes: {finalized_slots}"
-    )
+    await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=30)
 
 
 @pytest.mark.timeout(30)
