@@ -44,7 +44,6 @@ logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.interop
 
 
-@pytest.mark.skip(reason="Interop test not passing - needs update (#359)")
 @pytest.mark.timeout(120)
 @pytest.mark.num_validators(3)
 async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
@@ -146,8 +145,12 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
         #
         # - High new_atts, low known_atts = processing bottleneck
         # - Low counts everywhere = gossip not propagating
-        new_atts = [len(node._store.latest_new_attestations) for node in node_cluster.nodes]
-        known_atts = [len(node._store.latest_known_attestations) for node in node_cluster.nodes]
+        new_atts = [
+            len(node._store.latest_new_aggregated_payloads) for node in node_cluster.nodes
+        ]
+        known_atts = [
+            len(node._store.latest_known_aggregated_payloads) for node in node_cluster.nodes
+        ]
 
         logger.info(
             "Progress: head=%s justified=%s finalized=%s new_atts=%s known_atts=%s",
@@ -200,7 +203,6 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     )
 
 
-@pytest.mark.skip(reason="Interop test not passing - needs update (#359)")
 @pytest.mark.timeout(120)
 @pytest.mark.num_validators(3)
 async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
