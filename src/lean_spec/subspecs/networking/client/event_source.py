@@ -1,9 +1,9 @@
 """
 Network event source bridging transport to sync service.
 
-This module implements NetworkEventSource, producing events from real
-network connections. It bridges the gap between the low-level transport
-layer (QUIC ConnectionManager) and the high-level sync service.
+This module produces events from real network connections. It bridges the
+gap between the low-level transport layer (QUIC ConnectionManager) and the
+high-level sync service.
 
 
 WHY THIS MODULE EXISTS
@@ -125,8 +125,8 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
     BlockLookup,
-    DefaultRequestHandler,
     ReqRespServer,
+    RequestHandler,
 )
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.service.events import (
@@ -551,7 +551,6 @@ class LiveNetworkEventSource:
     """
     Produces NetworkEvent objects from real network connections.
 
-    Implements the NetworkEventSource protocol for use with NetworkService.
     Bridges the transport layer (ConnectionManager) to the event-driven
     sync layer.
 
@@ -658,7 +657,7 @@ class LiveNetworkEventSource:
     Tracked for cleanup on shutdown. Tasks remove themselves on completion.
     """
 
-    _reqresp_handler: DefaultRequestHandler = field(init=False)
+    _reqresp_handler: RequestHandler = field(init=False)
     """Handler for inbound ReqResp requests.
 
     Provides chain data to peers requesting Status or BlocksByRoot.
@@ -683,7 +682,7 @@ class LiveNetworkEventSource:
     def __post_init__(self) -> None:
         """Initialize handlers with current configuration."""
         object.__setattr__(self, "_gossip_handler", GossipHandler(fork_digest=self._fork_digest))
-        object.__setattr__(self, "_reqresp_handler", DefaultRequestHandler())
+        object.__setattr__(self, "_reqresp_handler", RequestHandler())
         object.__setattr__(self, "_reqresp_server", ReqRespServer(handler=self._reqresp_handler))
         object.__setattr__(
             self, "_gossipsub_behavior", GossipsubBehavior(params=GossipsubParameters())

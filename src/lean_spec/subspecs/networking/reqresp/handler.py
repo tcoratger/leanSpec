@@ -20,19 +20,6 @@ The flows mirror each other but have different responsibilities:
 Keeping them separate makes each flow easier to understand and test.
 
 
-WHY HANDLERS USE ResponseStream ABSTRACTION
--------------------------------------------
-Handlers receive a ResponseStream instead of a raw transport stream.
-This design provides three benefits:
-
-1. Testability: Unit tests provide mock streams without network I/O.
-2. Flexibility: Different transports work with the same handlers.
-3. Clarity: Handlers focus on protocol logic, not wire format encoding.
-
-The ResponseStream translates high-level operations (send success, send error) into the
-wire format defined in codec.py.
-
-
 WIRE FORMAT
 -----------
 All responses use the same wire format from codec.py:
@@ -73,10 +60,8 @@ References:
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Protocol
 
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
@@ -96,55 +81,9 @@ from .message import (
 logger = logging.getLogger(__name__)
 
 
-class ResponseStream(Protocol):
-    """
-    Protocol for sending chunked responses to peers.
-
-    Abstracts the underlying stream transport, allowing handlers to send
-    responses without knowing the wire format details.
-
-    Response Types
-    --------------
-    - Success: Contains SSZ-encoded response data.
-    - Error: Contains UTF-8 error message.
-
-    Both types are encoded using the same wire format from codec.py.
-    """
-
-    async def send_success(self, ssz_data: bytes) -> None:
-        """
-        Send a SUCCESS response chunk.
-
-        Args:
-            ssz_data: SSZ-encoded response payload.
-        """
-        ...
-
-    async def send_error(self, code: ResponseCode, message: str) -> None:
-        """
-        Send an error response and close the stream.
-
-        Args:
-            code: Error code (INVALID_REQUEST, SERVER_ERROR, RESOURCE_UNAVAILABLE).
-            message: Human-readable error description.
-        """
-        ...
-
-    async def finish(self) -> None:
-        """
-        Signal end of response stream.
-
-        Called after all response chunks have been sent.
-        Closes the stream gracefully.
-        """
-        ...
-
-
 @dataclass(slots=True)
 class StreamResponseAdapter:
-    """Adapts a transport Stream to the ResponseStream protocol.
-
-    Encodes responses using the wire format from codec.py and writes
+    """Encodes responses using the wire format from codec.py and writes
     them to the underlying stream.
     """
 
@@ -175,61 +114,6 @@ class StreamResponseAdapter:
         await self._stream.close()
 
 
-class RequestHandler(ABC):
-    """
-    Abstract base for request handlers.
-
-    Implementations provide the logic for responding to specific request types.
-    The sync service or network layer implements this to provide chain data.
-
-
-    HANDLER CONTRACT
-    ----------------
-    Handlers MUST:
-
-    - Send at least one response (success or error) via ResponseStream.
-    - Not raise exceptions (errors should be sent as error responses).
-    - Be idempotent (same request may arrive multiple times).
-
-
-    CONCURRENCY
-    -----------
-    Handlers may be called concurrently for different requests.
-    Implementations should be thread-safe if accessing shared state.
-    """
-
-    @abstractmethod
-    async def handle_status(self, request: Status, response: ResponseStream) -> None:
-        """
-        Handle incoming Status request.
-
-        The handler should respond with our current chain status.
-
-        Args:
-            request: Peer's status message.
-            response: Stream for sending our status response.
-        """
-        ...
-
-    @abstractmethod
-    async def handle_blocks_by_root(
-        self,
-        request: BlocksByRootRequest,
-        response: ResponseStream,
-    ) -> None:
-        """
-        Handle incoming BlocksByRoot request.
-
-        The handler should send each requested block as a separate response chunk.
-        Blocks we do not have should be skipped (or RESOURCE_UNAVAILABLE sent).
-
-        Args:
-            request: List of block roots being requested.
-            response: Stream for sending block responses.
-        """
-        ...
-
-
 BlockLookup = Callable[[Bytes32], Awaitable[SignedBlockWithAttestation | None]]
 """Type alias for block lookup function.
 
@@ -238,12 +122,11 @@ Takes a block root and returns the block if available, None otherwise.
 
 
 @dataclass(slots=True)
-class DefaultRequestHandler(RequestHandler):
+class RequestHandler:
     """
-    Default request handler implementation.
+    Request handler for inbound peer requests.
 
     Uses callbacks to retrieve chain data.
-    Suitable for use with NetworkEventSource.
 
 
     STATUS HANDLING
@@ -265,7 +148,7 @@ class DefaultRequestHandler(RequestHandler):
     block_lookup: BlockLookup | None = None
     """Callback to look up blocks by root."""
 
-    async def handle_status(self, request: Status, response: ResponseStream) -> None:
+    async def handle_status(self, request: Status, response: StreamResponseAdapter) -> None:
         """
         Handle incoming Status request.
 
@@ -299,7 +182,7 @@ class DefaultRequestHandler(RequestHandler):
     async def handle_blocks_by_root(
         self,
         request: BlocksByRootRequest,
-        response: ResponseStream,
+        response: StreamResponseAdapter,
     ) -> None:
         """
         Handle incoming BlocksByRoot request.
@@ -373,7 +256,7 @@ class ReqRespServer:
     2. Decode the request (remove length prefix, decompress Snappy).
     3. Deserialize SSZ bytes to the appropriate type.
     4. Dispatch to handler.
-    5. Handler sends response(s) via ResponseStream.
+    5. Handler sends response(s) via StreamResponseAdapter.
     6. Close stream.
 
 
@@ -517,7 +400,7 @@ class ReqRespServer:
         self,
         protocol_id: str,
         ssz_bytes: bytes,
-        response: ResponseStream,
+        response: StreamResponseAdapter,
     ) -> None:
         """
         Dispatch a request to the appropriate handler.

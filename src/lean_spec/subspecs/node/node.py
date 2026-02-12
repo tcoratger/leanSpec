@@ -28,7 +28,8 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.networking import NetworkEventSource, NetworkService
+from lean_spec.subspecs.networking import NetworkService
+from lean_spec.subspecs.networking.client.event_source import LiveNetworkEventSource
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database, SQLiteDatabase
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
@@ -50,7 +51,7 @@ class NodeConfig:
     validators: Validators
     """Initial validator set for genesis state."""
 
-    event_source: NetworkEventSource
+    event_source: LiveNetworkEventSource
     """Source of network events."""
 
     network: NetworkRequester

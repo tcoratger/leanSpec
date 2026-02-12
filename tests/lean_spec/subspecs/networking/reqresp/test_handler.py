@@ -14,8 +14,8 @@ from lean_spec.subspecs.networking.reqresp.codec import (
 )
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
-    DefaultRequestHandler,
     ReqRespServer,
+    RequestHandler,
     StreamResponseAdapter,
 )
 from lean_spec.subspecs.networking.reqresp.message import (
@@ -190,13 +190,13 @@ class TestStreamResponseAdapter:
         assert stream.closed is True
 
 
-class TestDefaultRequestHandlerStatus:
-    """Tests for DefaultRequestHandler.handle_status."""
+class TestRequestHandlerStatus:
+    """Tests for RequestHandler.handle_status."""
 
     async def test_handle_status_returns_our_status(self) -> None:
         """Returns our configured status on valid request."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         response = MockResponseStream()
 
         peer_status = Status(
@@ -204,7 +204,7 @@ class TestDefaultRequestHandlerStatus:
             head=Checkpoint(root=Bytes32(b"\xbb" * 32), slot=Slot(150)),
         )
 
-        await handler.handle_status(peer_status, response)
+        await handler.handle_status(peer_status, response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 1
@@ -216,11 +216,11 @@ class TestDefaultRequestHandlerStatus:
 
     async def test_handle_status_no_status_returns_error(self) -> None:
         """Returns SERVER_ERROR when no status is configured."""
-        handler = DefaultRequestHandler()  # No our_status set
+        handler = RequestHandler()  # No our_status set
         response = MockResponseStream()
 
         peer_status = make_test_status()
-        await handler.handle_status(peer_status, response)
+        await handler.handle_status(peer_status, response)  # type: ignore[arg-type]
 
         assert len(response.successes) == 0
         assert len(response.errors) == 1
@@ -230,7 +230,7 @@ class TestDefaultRequestHandlerStatus:
     async def test_handle_status_ignores_peer_status(self) -> None:
         """Peer's status does not affect our response."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         response = MockResponseStream()
 
         # Peer claims different chain state
@@ -239,7 +239,7 @@ class TestDefaultRequestHandlerStatus:
             head=Checkpoint(root=Bytes32(b"\xee" * 32), slot=Slot(10000)),
         )
 
-        await handler.handle_status(peer_status, response)
+        await handler.handle_status(peer_status, response)  # type: ignore[arg-type]
 
         # Our response is independent of peer's status
         returned_status = Status.decode_bytes(response.successes[0])
@@ -247,8 +247,8 @@ class TestDefaultRequestHandlerStatus:
         assert returned_status.finalized.slot == Slot(100)
 
 
-class TestDefaultRequestHandlerBlocksByRoot:
-    """Tests for DefaultRequestHandler.handle_blocks_by_root."""
+class TestRequestHandlerBlocksByRoot:
+    """Tests for RequestHandler.handle_blocks_by_root."""
 
     async def test_handle_blocks_by_root_returns_found_blocks(self) -> None:
         """Sends SUCCESS response for each found block."""
@@ -264,14 +264,14 @@ class TestDefaultRequestHandlerBlocksByRoot:
         async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return block_roots.get(bytes(root))
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         request = BlocksByRootRequest(
             roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32), Bytes32(b"\x22" * 32)])
         )
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 2
@@ -293,7 +293,7 @@ class TestDefaultRequestHandlerBlocksByRoot:
                 return block1
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         # Request two blocks, only one exists
@@ -306,7 +306,7 @@ class TestDefaultRequestHandlerBlocksByRoot:
             )
         )
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         # Only one block returned, no errors
         assert len(response.errors) == 0
@@ -314,12 +314,12 @@ class TestDefaultRequestHandlerBlocksByRoot:
 
     async def test_handle_blocks_by_root_no_lookup_returns_error(self) -> None:
         """Returns SERVER_ERROR when no lookup callback is configured."""
-        handler = DefaultRequestHandler()  # No block_lookup set
+        handler = RequestHandler()  # No block_lookup set
         response = MockResponseStream()
 
         request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32)]))
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         assert len(response.successes) == 0
         assert len(response.errors) == 1
@@ -332,12 +332,12 @@ class TestDefaultRequestHandlerBlocksByRoot:
         async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[]))
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 0
@@ -353,7 +353,7 @@ class TestDefaultRequestHandlerBlocksByRoot:
                 return block2
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         # First block causes error, second succeeds
@@ -361,7 +361,7 @@ class TestDefaultRequestHandlerBlocksByRoot:
             roots=RequestedBlockRoots(data=[Bytes32(b"\x11" * 32), Bytes32(b"\x22" * 32)])
         )
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         # Second block still returned despite first lookup failing
         assert len(response.errors) == 0
@@ -377,7 +377,7 @@ class TestReqRespServer:
     async def test_handle_status_request(self) -> None:
         """Full Status request/response flow through ReqRespServer."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         server = ReqRespServer(handler=handler)
 
         # Build wire-format request
@@ -414,7 +414,7 @@ class TestReqRespServer:
                 return block1
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         server = ReqRespServer(handler=handler)
 
         # Build wire-format request
@@ -436,7 +436,7 @@ class TestReqRespServer:
 
     async def test_empty_request_returns_error(self) -> None:
         """Empty request data returns INVALID_REQUEST error."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         stream = MockStream(request_data=b"")
@@ -452,7 +452,7 @@ class TestReqRespServer:
 
     async def test_decode_error_returns_invalid_request(self) -> None:
         """Malformed wire data returns INVALID_REQUEST error."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         # Invalid snappy data after length prefix
@@ -469,7 +469,7 @@ class TestReqRespServer:
 
     async def test_invalid_ssz_returns_invalid_request(self) -> None:
         """Valid wire format but invalid SSZ returns INVALID_REQUEST."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         # Valid wire format but SSZ is too short for Status (needs 80 bytes)
@@ -488,7 +488,7 @@ class TestReqRespServer:
 
     async def test_unknown_protocol_returns_error(self) -> None:
         """Unknown protocol ID returns SERVER_ERROR."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         # Valid request data but unknown protocol
@@ -508,7 +508,7 @@ class TestReqRespServer:
 
     async def test_stream_closed_on_completion(self) -> None:
         """Stream is always closed after handling, even on success."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         status = make_test_status()
@@ -521,7 +521,7 @@ class TestReqRespServer:
 
     async def test_stream_closed_on_error(self) -> None:
         """Stream is closed even when handling fails."""
-        handler = DefaultRequestHandler()  # No status configured
+        handler = RequestHandler()  # No status configured
         server = ReqRespServer(handler=handler)
 
         status = make_test_status()
@@ -567,7 +567,7 @@ class TestIntegration:
     async def test_roundtrip_status_request(self) -> None:
         """Full encode -> server -> decode roundtrip for Status."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         server = ReqRespServer(handler=handler)
 
         # Client side: encode request
@@ -608,7 +608,7 @@ class TestIntegration:
         async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return blocks_by_root.get(bytes(root))
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         server = ReqRespServer(handler=handler)
 
         # Client side: encode request
@@ -643,7 +643,7 @@ class TestIntegration:
                 return block1
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         server = ReqRespServer(handler=handler)
 
         # Request two blocks, only one exists
@@ -770,7 +770,7 @@ class TestReqRespServerChunkedRead:
     async def test_handle_chunked_status_request(self) -> None:
         """Request data arriving in multiple chunks is assembled correctly."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         server = ReqRespServer(handler=handler)
 
         # Build wire-format request
@@ -794,7 +794,7 @@ class TestReqRespServerChunkedRead:
     async def test_handle_single_byte_chunks(self) -> None:
         """Request data arriving one byte at a time is handled."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         server = ReqRespServer(handler=handler)
 
         peer_status = make_test_status()
@@ -823,7 +823,7 @@ class TestReqRespServerEdgeCases:
         async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         server = ReqRespServer(handler=handler)
 
         # Valid wire format but wrong SSZ structure for BlocksByRootRequest
@@ -842,7 +842,7 @@ class TestReqRespServerEdgeCases:
 
     async def test_truncated_varint_returns_error(self) -> None:
         """Truncated varint in request returns INVALID_REQUEST."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         # Varint with continuation bit set but no following byte
@@ -858,8 +858,8 @@ class TestReqRespServerEdgeCases:
         assert code == ResponseCode.INVALID_REQUEST
 
 
-class TestDefaultRequestHandlerEdgeCases:
-    """Edge cases for DefaultRequestHandler."""
+class TestRequestHandlerEdgeCases:
+    """Edge cases for RequestHandler."""
 
     async def test_blocks_by_root_single_block(self) -> None:
         """Single block request returns correctly."""
@@ -871,12 +871,12 @@ class TestDefaultRequestHandlerEdgeCases:
                 return block
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         request = BlocksByRootRequest(roots=RequestedBlockRoots(data=[root]))
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 1
@@ -890,7 +890,7 @@ class TestDefaultRequestHandlerEdgeCases:
         async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return None
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         request = BlocksByRootRequest(
@@ -903,7 +903,7 @@ class TestDefaultRequestHandlerEdgeCases:
             )
         )
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 0
@@ -922,7 +922,7 @@ class TestDefaultRequestHandlerEdgeCases:
         async def lookup(root: Bytes32) -> SignedBlockWithAttestation | None:
             return blocks.get(bytes(root))
 
-        handler = DefaultRequestHandler(block_lookup=lookup)
+        handler = RequestHandler(block_lookup=lookup)
         response = MockResponseStream()
 
         request = BlocksByRootRequest(
@@ -935,7 +935,7 @@ class TestDefaultRequestHandlerEdgeCases:
             )
         )
 
-        await handler.handle_blocks_by_root(request, response)
+        await handler.handle_blocks_by_root(request, response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 2
@@ -949,17 +949,17 @@ class TestDefaultRequestHandlerEdgeCases:
 
     async def test_status_update_after_initialization(self) -> None:
         """Status can be updated after handler creation."""
-        handler = DefaultRequestHandler()
+        handler = RequestHandler()
         response1 = MockResponseStream()
 
         # First request with no status
-        await handler.handle_status(make_test_status(), response1)
+        await handler.handle_status(make_test_status(), response1)  # type: ignore[arg-type]
 
         # Update status
         handler.our_status = make_test_status()
 
         response2 = MockResponseStream()
-        await handler.handle_status(make_test_status(), response2)
+        await handler.handle_status(make_test_status(), response2)  # type: ignore[arg-type]
 
         # First request should fail
         assert len(response1.successes) == 0
@@ -974,7 +974,7 @@ class TestConcurrentRequestHandling:
     async def test_concurrent_status_requests(self) -> None:
         """Multiple concurrent status requests are handled independently."""
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status)
+        handler = RequestHandler(our_status=our_status)
         server = ReqRespServer(handler=handler)
 
         # Create multiple streams with requests
@@ -1015,7 +1015,7 @@ class TestConcurrentRequestHandling:
             return None
 
         our_status = make_test_status()
-        handler = DefaultRequestHandler(our_status=our_status, block_lookup=lookup)
+        handler = RequestHandler(our_status=our_status, block_lookup=lookup)
         server = ReqRespServer(handler=handler)
 
         # Status request
@@ -1108,7 +1108,7 @@ class TestHandlerExceptionRecovery:
 
     async def test_stream_closed_despite_close_exception(self) -> None:
         """Stream close is attempted even if it raises an exception."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         request_bytes = encode_request(make_test_status().encode_bytes())
@@ -1125,7 +1125,7 @@ class TestHandlerExceptionRecovery:
 
     async def test_error_response_sent_despite_write_exception(self) -> None:
         """Error handling continues even when write fails."""
-        handler = DefaultRequestHandler()  # No status
+        handler = RequestHandler()  # No status
         server = ReqRespServer(handler=handler)
 
         request_bytes = encode_request(make_test_status().encode_bytes())
@@ -1176,7 +1176,7 @@ class TestReadRequestBufferLimit:
 
     async def test_read_request_rejects_oversized_compressed_data(self) -> None:
         """Unbounded compressed data stream is rejected."""
-        handler = DefaultRequestHandler(our_status=make_test_status())
+        handler = RequestHandler(our_status=make_test_status())
         server = ReqRespServer(handler=handler)
 
         # Send a small varint claiming length 10, then flood with garbage data
