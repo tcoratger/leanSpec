@@ -2,27 +2,19 @@
 
 from typing import Type
 
-from framework.forks import BaseFork, BaseForkMeta
+from framework.forks import BaseFork, BaseForkMeta, ForkRegistry
 
+from . import forks as _forks_module
 from .forks import Devnet
-from .helpers import (
-    ALL_FORKS,
-    get_fork_by_name,
-    get_forks,
-    get_forks_with_no_parents,
-    get_from_until_fork_set,
-)
 
 Fork = Type[BaseFork]
 
+registry = ForkRegistry(_forks_module)
+
 __all__ = [
-    "ALL_FORKS",
     "BaseFork",
     "BaseForkMeta",
     "Devnet",
     "Fork",
-    "get_fork_by_name",
-    "get_forks",
-    "get_forks_with_no_parents",
-    "get_from_until_fork_set",
+    "registry",
 ]
