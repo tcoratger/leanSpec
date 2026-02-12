@@ -1023,7 +1023,7 @@ class Store(Container):
             is_aggregator: Whether the node is an aggregator.
 
         Returns:
-            Tuple of (new Store with advanced time, list of new SignedAggregatedAttestation).
+            Tuple of (new store with advanced time, list of new signed aggregated attestation).
         """
         # Advance time by one interval
         store = self.model_copy(update={"time": self.time + Uint64(1)})
@@ -1063,8 +1063,8 @@ class Store(Container):
             is_aggregator: Whether the node is an aggregator.
 
         Returns:
-            Tuple of (new Store with time advanced,
-            list of all produced SignedAggregatedAttestation).
+            Tuple of (new store with time advanced,
+            list of all produced signed aggregated attestation).
         """
         # Calculate target time in intervals
         time_delta_ms = (time - self.config.genesis_time) * Uint64(1000)
@@ -1156,7 +1156,7 @@ class Store(Container):
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
         #
-        # MODIFIED: We allow the target to be up to 1 slot ahead of safe_target
+        # We allow the target to be up to 1 slot ahead of the safe target
         # to ensure the chain can actually start advancing from genesis.
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot + Slot(1):

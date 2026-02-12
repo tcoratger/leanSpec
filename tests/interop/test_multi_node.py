@@ -99,7 +99,7 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     #
     # Each node needs at least 2 peers (the other two nodes).
     # This ensures gossip will reach all nodes.
-    # The 15s timeout handles slow handshakes.
+    # The 30s timeout handles slow handshakes.
     await assert_peer_connections(node_cluster, min_peers=2, timeout=30)
 
     # Wait for finalization with convergence-based polling.
