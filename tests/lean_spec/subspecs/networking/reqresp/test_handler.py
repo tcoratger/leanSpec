@@ -199,12 +199,7 @@ class TestRequestHandlerStatus:
         handler = RequestHandler(our_status=our_status)
         response = MockResponseStream()
 
-        peer_status = Status(
-            finalized=Checkpoint(root=Bytes32(b"\xaa" * 32), slot=Slot(50)),
-            head=Checkpoint(root=Bytes32(b"\xbb" * 32), slot=Slot(150)),
-        )
-
-        await handler.handle_status(peer_status, response)  # type: ignore[arg-type]
+        await handler.handle_status(response)  # type: ignore[arg-type]
 
         assert len(response.errors) == 0
         assert len(response.successes) == 1
@@ -219,8 +214,7 @@ class TestRequestHandlerStatus:
         handler = RequestHandler()  # No our_status set
         response = MockResponseStream()
 
-        peer_status = make_test_status()
-        await handler.handle_status(peer_status, response)  # type: ignore[arg-type]
+        await handler.handle_status(response)  # type: ignore[arg-type]
 
         assert len(response.successes) == 0
         assert len(response.errors) == 1
@@ -233,15 +227,8 @@ class TestRequestHandlerStatus:
         handler = RequestHandler(our_status=our_status)
         response = MockResponseStream()
 
-        # Peer claims different chain state
-        peer_status = Status(
-            finalized=Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(9999)),
-            head=Checkpoint(root=Bytes32(b"\xee" * 32), slot=Slot(10000)),
-        )
+        await handler.handle_status(response)  # type: ignore[arg-type]
 
-        await handler.handle_status(peer_status, response)  # type: ignore[arg-type]
-
-        # Our response is independent of peer's status
         returned_status = Status.decode_bytes(response.successes[0])
         assert returned_status.head.slot == Slot(200)
         assert returned_status.finalized.slot == Slot(100)
@@ -953,13 +940,13 @@ class TestRequestHandlerEdgeCases:
         response1 = MockResponseStream()
 
         # First request with no status
-        await handler.handle_status(make_test_status(), response1)  # type: ignore[arg-type]
+        await handler.handle_status(response1)  # type: ignore[arg-type]
 
         # Update status
         handler.our_status = make_test_status()
 
         response2 = MockResponseStream()
-        await handler.handle_status(make_test_status(), response2)  # type: ignore[arg-type]
+        await handler.handle_status(response2)  # type: ignore[arg-type]
 
         # First request should fail
         assert len(response1.successes) == 0

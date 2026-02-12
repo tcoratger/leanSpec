@@ -148,14 +148,13 @@ class RequestHandler:
     block_lookup: BlockLookup | None = None
     """Callback to look up blocks by root."""
 
-    async def handle_status(self, request: Status, response: StreamResponseAdapter) -> None:
+    async def handle_status(self, response: StreamResponseAdapter) -> None:
         """
         Handle incoming Status request.
 
         Responds with our current chain status.
 
         Args:
-            request: Peer's status (logged but not used for response).
             response: Stream for sending our status.
         """
         # Guard: Ensure we have a status configured.
@@ -166,17 +165,6 @@ class RequestHandler:
             await response.send_error(ResponseCode.SERVER_ERROR, "Status not available")
             return
 
-        # Respond with OUR status, not the peer's.
-        #
-        # The Status exchange is symmetric: each side sends its own chain state.
-        # The peer's status (in `request`) is useful for:
-        #
-        # - Logging for debugging
-        # - Peer scoring (handled elsewhere)
-        # - Fork detection (handled by sync layer)
-        #
-        # But it does NOT affect what we respond with.
-        # We always send our current head and finalized checkpoint.
         await response.send_success(self.our_status.encode_bytes())
 
     async def handle_blocks_by_root(
@@ -440,7 +428,7 @@ class ReqRespServer:
                 logger.debug("Status decode error: %s", e)
                 await response.send_error(ResponseCode.INVALID_REQUEST, "Invalid Status message")
                 return
-            await self.handler.handle_status(request, response)
+            await self.handler.handle_status(response)
 
         elif protocol_id == BLOCKS_BY_ROOT_PROTOCOL_V1:
             # BlocksByRoot request: Peer wants specific blocks by hash.
