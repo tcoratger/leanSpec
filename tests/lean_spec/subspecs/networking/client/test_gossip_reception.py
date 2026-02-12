@@ -67,16 +67,8 @@ class MockStream:
         """Return a mock protocol ID."""
         return "/meshsub/1.1.0"
 
-    async def read(self, n: int = -1) -> bytes:
-        """
-        Read data from the mock stream.
-
-        Args:
-            n: Ignored, uses chunk_size instead.
-
-        Returns:
-            Next chunk of data, or empty bytes if exhausted.
-        """
+    async def read(self) -> bytes:
+        """Return next chunk of data, or empty bytes if exhausted."""
         if self.offset >= len(self.data):
             return b""
         end = min(self.offset + self.chunk_size, len(self.data))
@@ -84,9 +76,11 @@ class MockStream:
         self.offset = end
         return chunk
 
-    async def write(self, data: bytes) -> None:
+    def write(self, data: bytes) -> None:
         """Mock write (not used in reception tests)."""
-        pass
+
+    async def drain(self) -> None:
+        """Mock drain (not used in reception tests)."""
 
     async def close(self) -> None:
         """Mock close."""

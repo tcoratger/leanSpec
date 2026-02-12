@@ -40,8 +40,8 @@ from aioquic.quic.events import (
 )
 
 from ..identity import IdentityKeypair
-from ..multistream import negotiate_lazy_client
 from ..peer_id import PeerId
+from .stream_adapter import QuicStreamAdapter
 from .tls import generate_libp2p_certificate
 
 
@@ -221,12 +221,8 @@ class QuicConnection:
         self._streams[stream_id] = stream
 
         # Negotiate the application protocol.
-        wrapper = _QuicStreamWrapper(stream)
-        negotiated = await negotiate_lazy_client(
-            wrapper.reader,
-            wrapper.writer,
-            protocol,
-        )
+        adapter = QuicStreamAdapter(stream)
+        negotiated = await adapter.negotiate_lazy_client(protocol)
         stream._protocol_id = negotiated
 
         # Yield to allow aioquic to process any pending events.
@@ -617,69 +613,3 @@ class QuicConnectionManager:
         )
         # Keep running until shutdown is requested.
         await shutdown_event.wait()
-
-
-class _QuicStreamWrapper:
-    """Wrapper to use QuicStream with multistream negotiation."""
-
-    __slots__ = ("_stream", "_buffer", "reader", "writer")
-
-    def __init__(self, stream: QuicStream) -> None:
-        self._stream = stream
-        self._buffer = b""
-        self.reader = _QuicStreamReader(self)
-        self.writer = _QuicStreamWriter(self)
-
-
-class _QuicStreamReader:
-    """Fake StreamReader that reads from QuicStream."""
-
-    __slots__ = ("_wrapper",)
-
-    def __init__(self, wrapper: _QuicStreamWrapper) -> None:
-        self._wrapper = wrapper
-
-    async def read(self, n: int) -> bytes:
-        """Read up to n bytes."""
-        if not self._wrapper._buffer:
-            self._wrapper._buffer = await self._wrapper._stream.read()
-
-        result = self._wrapper._buffer[:n]
-        self._wrapper._buffer = self._wrapper._buffer[n:]
-        return result
-
-    async def readexactly(self, n: int) -> bytes:
-        """Read exactly n bytes."""
-        result = b""
-        while len(result) < n:
-            chunk = await self.read(n - len(result))
-            if not chunk:
-                raise asyncio.IncompleteReadError(result, n)
-            result += chunk
-        return result
-
-
-class _QuicStreamWriter:
-    """Fake StreamWriter that writes to QuicStream."""
-
-    __slots__ = ("_wrapper", "_pending")
-
-    def __init__(self, wrapper: _QuicStreamWrapper) -> None:
-        self._wrapper = wrapper
-        self._pending = b""
-
-    def write(self, data: bytes) -> None:
-        """Buffer data for writing."""
-        self._pending += data
-
-    async def drain(self) -> None:
-        """Flush pending data."""
-        if self._pending:
-            await self._wrapper._stream.write(self._pending)
-            self._pending = b""
-
-    def close(self) -> None:
-        """No-op."""
-
-    async def wait_closed(self) -> None:
-        """No-op."""

@@ -46,9 +46,9 @@ from lean_spec.subspecs.networking.reqresp.message import (
     Status,
 )
 from lean_spec.subspecs.networking.transport import PeerId
-from lean_spec.subspecs.networking.transport.connection import (
-    ConnectionManager,
+from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnection,
+    QuicConnectionManager,
 )
 from lean_spec.types import Bytes32
 
@@ -72,7 +72,7 @@ class ReqRespClient:
     Multiple concurrent requests to different peers are safe.
     """
 
-    connection_manager: ConnectionManager
+    connection_manager: QuicConnectionManager
     """Connection manager providing transport."""
 
     _connections: dict[PeerId, QuicConnection] = field(default_factory=dict)
