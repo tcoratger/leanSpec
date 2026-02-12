@@ -7,7 +7,6 @@ The Store tracks all information required for the LMD GHOST forkchoice algorithm
 __all__ = ["Store"]
 
 import copy
-import logging
 from collections import defaultdict
 
 from lean_spec.subspecs.chain.config import (
@@ -45,8 +44,6 @@ from lean_spec.types import (
     Uint64,
 )
 from lean_spec.types.container import Container
-
-logger = logging.getLogger(__name__)
 
 
 class Store(Container):

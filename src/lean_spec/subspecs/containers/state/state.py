@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import AbstractSet, Collection, Iterable
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -33,8 +32,6 @@ from .types import (
     JustifiedSlots,
     Validators,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class State(Container):
@@ -452,13 +449,6 @@ class State(Container):
         #
         # The rules below filter out invalid or irrelevant votes.
         for attestation in attestations:
-            logger.debug(
-                "Processing attestation: target=slot%d source=slot%d participants=%s",
-                attestation.data.target.slot,
-                attestation.data.source.slot,
-                attestation.aggregation_bits.to_validator_indices(),
-            )
-
             source = attestation.data.source
             target = attestation.data.target
 
@@ -467,7 +457,6 @@ class State(Container):
             # A vote may only originate from a point in history that is already justified.
             # A source that lacks existing justification cannot be used to anchor a new vote.
             if not justified_slots.is_slot_justified(finalized_slot, source.slot):
-                logger.debug("Skipping attestation: source slot %d not justified", source.slot)
                 continue
 
             # Ignore votes for targets that have already reached consensus.
@@ -479,7 +468,6 @@ class State(Container):
 
             # Ignore votes that reference zero-hash slots.
             if source.root == ZERO_HASH or target.root == ZERO_HASH:
-                logger.debug("Skipping attestation: zero root in source/target")
                 continue
 
             # Ensure the vote refers to blocks that actually exist on our chain.
@@ -503,11 +491,6 @@ class State(Container):
             )
 
             if not source_matches or not target_matches:
-                logger.debug(
-                    "Skipping attestation: root mismatch (source_match=%s target_match=%s)",
-                    source_matches,
-                    target_matches,
-                )
                 continue
 
             # Ensure time flows forward.
@@ -515,11 +498,6 @@ class State(Container):
             # A target must always lie strictly after its source slot.
             # Otherwise the vote makes no chronological sense.
             if target.slot <= source.slot:
-                logger.debug(
-                    "Skipping attestation: target slot %d <= source slot %d",
-                    target.slot,
-                    source.slot,
-                )
                 continue
 
             # Ensure the target falls on a slot that can be justified after the finalized one.
@@ -536,11 +514,6 @@ class State(Container):
             # Any target outside this pattern is not eligible for justification,
             # so votes for it are simply ignored.
             if not target.slot.is_justifiable_after(self.latest_finalized.slot):
-                logger.debug(
-                    "Skipping attestation: target slot %d not justifiable after finalized slot %d",
-                    target.slot,
-                    self.latest_finalized.slot,
-                )
                 continue
 
             # Record the vote.
@@ -569,12 +542,6 @@ class State(Container):
             count = sum(bool(justified) for justified in justifications[target.root])
 
             if 3 * count >= (2 * len(self.validators)):
-                logger.info(
-                    "Supermajority reached for target slot %d: %d votes (threshold: %d)",
-                    target.slot,
-                    count,
-                    (2 * len(self.validators) + 2) // 3,
-                )
                 # The block becomes justified
                 #
                 # The chain now considers this block part of its safe head.
@@ -606,7 +573,6 @@ class State(Container):
                     old_finalized_slot = finalized_slot
                     latest_finalized = source
                     finalized_slot = latest_finalized.slot
-                    logger.info("Finalization advanced to slot %d", finalized_slot)
 
                     # Rebase/prune justification tracking across the new finalized boundary.
                     #
