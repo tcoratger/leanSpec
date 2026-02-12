@@ -59,7 +59,7 @@ class MockStream:
         """Mock protocol ID."""
         return STATUS_PROTOCOL_V1
 
-    async def read(self, n: int = -1) -> bytes:
+    async def read(self) -> bytes:
         """
         Return request data in a single chunk, then empty bytes.
 
@@ -71,9 +71,12 @@ class MockStream:
         self._read_offset = len(self.request_data)
         return chunk
 
-    async def write(self, data: bytes) -> None:
-        """Accumulate written data for inspection."""
+    def write(self, data: bytes) -> None:
+        """Buffer written data for inspection."""
         self.written.append(data)
+
+    async def drain(self) -> None:
+        """No-op flush."""
 
     async def close(self) -> None:
         """Mark stream as closed."""
@@ -730,7 +733,7 @@ class MockChunkedStream:
         """Mock protocol ID."""
         return STATUS_PROTOCOL_V1
 
-    async def read(self, n: int = -1) -> bytes:
+    async def read(self) -> bytes:
         """Return chunks one at a time."""
         if self.chunk_index >= len(self.chunks):
             return b""
@@ -738,9 +741,12 @@ class MockChunkedStream:
         self.chunk_index += 1
         return chunk
 
-    async def write(self, data: bytes) -> None:
-        """Accumulate written data."""
+    def write(self, data: bytes) -> None:
+        """Buffer written data."""
         self.written.append(data)
+
+    async def drain(self) -> None:
+        """No-op flush."""
 
     async def close(self) -> None:
         """Mark stream as closed."""
@@ -1064,7 +1070,7 @@ class MockFailingStream:
         """Mock protocol ID."""
         return STATUS_PROTOCOL_V1
 
-    async def read(self, n: int = -1) -> bytes:
+    async def read(self) -> bytes:
         """Return request data."""
         if self._read_offset >= len(self.request_data):
             return b""
@@ -1072,11 +1078,14 @@ class MockFailingStream:
         self._read_offset = len(self.request_data)
         return chunk
 
-    async def write(self, data: bytes) -> None:
-        """Optionally fail on write."""
+    def write(self, data: bytes) -> None:
+        """Buffer written data (may fail if configured)."""
         if self.fail_on_write:
             raise ConnectionError("Write failed")
         self.written.append(data)
+
+    async def drain(self) -> None:
+        """No-op flush."""
 
     async def close(self) -> None:
         """Optionally fail on close."""

@@ -66,7 +66,7 @@ from dataclasses import dataclass
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE
-from lean_spec.subspecs.networking.transport.connection.types import Stream
+from lean_spec.subspecs.networking.transport.protocols import InboundStreamProtocol
 from lean_spec.subspecs.networking.varint import VarintError, decode_varint
 from lean_spec.types import Bytes32
 
@@ -87,7 +87,7 @@ class StreamResponseAdapter:
     them to the underlying stream.
     """
 
-    _stream: Stream
+    _stream: InboundStreamProtocol
     """Underlying transport stream."""
 
     async def send_success(self, ssz_data: bytes) -> None:
@@ -97,7 +97,8 @@ class StreamResponseAdapter:
             ssz_data: SSZ-encoded response payload.
         """
         encoded = ResponseCode.SUCCESS.encode(ssz_data)
-        await self._stream.write(encoded)
+        self._stream.write(encoded)
+        await self._stream.drain()
 
     async def send_error(self, code: ResponseCode, message: str) -> None:
         """Send an error response.
@@ -107,7 +108,8 @@ class StreamResponseAdapter:
             message: Human-readable error description.
         """
         encoded = code.encode(message.encode("utf-8")[:MAX_ERROR_MESSAGE_SIZE])
-        await self._stream.write(encoded)
+        self._stream.write(encoded)
+        await self._stream.drain()
 
     async def finish(self) -> None:
         """Close the stream gracefully."""
@@ -260,7 +262,7 @@ class ReqRespServer:
     handler: RequestHandler
     """Handler for processing requests."""
 
-    async def handle_stream(self, stream: Stream, protocol_id: str) -> None:
+    async def handle_stream(self, stream: InboundStreamProtocol, protocol_id: str) -> None:
         """
         Handle an incoming ReqResp stream.
 
@@ -320,7 +322,7 @@ class ReqRespServer:
                 # Close failed. Log is unnecessary - peer will timeout.
                 pass
 
-    async def _read_request(self, stream: Stream) -> bytes:
+    async def _read_request(self, stream: InboundStreamProtocol) -> bytes:
         """
         Read length-prefixed request data from a stream.
 

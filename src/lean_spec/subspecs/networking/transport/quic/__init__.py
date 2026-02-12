@@ -19,12 +19,15 @@ from .connection import (
     QuicTransportError,
     is_quic_multiaddr,
 )
+from .stream_adapter import NegotiationError, QuicStreamAdapter
 from .tls import generate_libp2p_certificate
 
 __all__ = [
+    "NegotiationError",
     "QuicConnection",
     "QuicConnectionManager",
     "QuicStream",
+    "QuicStreamAdapter",
     "QuicTransportError",
     "is_quic_multiaddr",
     "generate_libp2p_certificate",

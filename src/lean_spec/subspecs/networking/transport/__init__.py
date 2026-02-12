@@ -10,9 +10,7 @@ Architecture:
     Application Protocol (gossipsub, reqresp)
 
 Components:
-    - quic/: QUIC transport with libp2p-tls authentication
-    - multistream/: Protocol negotiation
-    - connection/: Stream protocol and re-exports of QUIC types
+    - quic/: QUIC transport with libp2p-tls authentication and protocol negotiation
     - identity/: secp256k1 keypairs and identity proofs
 
 QUIC provides encryption and multiplexing natively, eliminating the need
@@ -24,7 +22,6 @@ References:
     - libp2p/specs quic, tls, multistream-select
 """
 
-from .connection import ConnectionManager, Stream
 from .identity import (
     NOISE_IDENTITY_PREFIX,
     IdentityKeypair,
@@ -32,23 +29,21 @@ from .identity import (
     verify_identity_proof,
     verify_signature,
 )
-from .multistream import (
-    MULTISTREAM_PROTOCOL_ID,
-    NegotiationError,
-    negotiate_client,
-    negotiate_server,
-)
 from .peer_id import Base58, KeyType, Multihash, MultihashCode, PeerId, PublicKeyProto
-from .protocols import StreamReaderProtocol, StreamWriterProtocol
-from .quic import QuicConnection, QuicConnectionManager, generate_libp2p_certificate
+from .quic import (
+    NegotiationError,
+    QuicConnection,
+    QuicConnectionManager,
+    generate_libp2p_certificate,
+)
+from .quic.stream_adapter import QuicStreamAdapter
 
 __all__ = [
-    # Connection management
-    "Stream",
-    "ConnectionManager",
     # QUIC transport
     "QuicConnection",
     "QuicConnectionManager",
+    "QuicStreamAdapter",
+    "NegotiationError",
     "generate_libp2p_certificate",
     # Identity (secp256k1 keypair)
     "IdentityKeypair",
@@ -56,11 +51,6 @@ __all__ = [
     "NOISE_IDENTITY_PREFIX",
     "create_identity_proof",
     "verify_identity_proof",
-    # multistream-select
-    "MULTISTREAM_PROTOCOL_ID",
-    "NegotiationError",
-    "negotiate_client",
-    "negotiate_server",
     # PeerId (peer_id module)
     "PeerId",
     "PublicKeyProto",
@@ -68,7 +58,4 @@ __all__ = [
     "KeyType",
     "MultihashCode",
     "Base58",
-    # Stream protocols
-    "StreamReaderProtocol",
-    "StreamWriterProtocol",
 ]

@@ -83,11 +83,8 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     create_subscription_rpc,
 )
 from lean_spec.subspecs.networking.gossipsub.types import MessageId
-from lean_spec.subspecs.networking.transport import (
-    PeerId,
-    StreamReaderProtocol,
-    StreamWriterProtocol,
-)
+from lean_spec.subspecs.networking.transport import PeerId
+from lean_spec.subspecs.networking.transport.quic.stream_adapter import QuicStreamAdapter
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 from lean_spec.types import Bytes20, Uint16
 
@@ -143,10 +140,10 @@ class PeerState:
     subscriptions: set[str] = field(default_factory=set)
     """Topics this peer is subscribed to."""
 
-    outbound_stream: StreamWriterProtocol | None = None
+    outbound_stream: QuicStreamAdapter | None = None
     """Outbound RPC stream (we opened this to send)."""
 
-    inbound_stream: StreamReaderProtocol | None = None
+    inbound_stream: QuicStreamAdapter | None = None
     """Inbound RPC stream (they opened this to receive)."""
 
     receive_task: asyncio.Task[None] | None = None
@@ -329,7 +326,7 @@ class GossipsubBehavior:
     async def add_peer(
         self,
         peer_id: PeerId,
-        stream: StreamReaderProtocol | StreamWriterProtocol,
+        stream: QuicStreamAdapter,
         *,
         inbound: bool = False,
     ) -> None:
@@ -348,11 +345,9 @@ class GossipsubBehavior:
         existing = self._peers.get(peer_id)
 
         if inbound:
-            reader = cast(StreamReaderProtocol, stream)
-
             # Peer opened an inbound stream to us — use for receiving.
             if existing is None:
-                state = PeerState(peer_id=peer_id, inbound_stream=reader)
+                state = PeerState(peer_id=peer_id, inbound_stream=stream)
                 self._peers[peer_id] = state
                 logger.info(
                     "[GS %x] Added gossipsub peer %s (inbound first)", self._short_id, peer_id
@@ -361,11 +356,11 @@ class GossipsubBehavior:
                 if existing.inbound_stream is not None:
                     logger.debug("Peer %s already has inbound stream, ignoring", peer_id)
                     return
-                existing.inbound_stream = reader
+                existing.inbound_stream = stream
                 state = existing
                 logger.debug("Added inbound stream for peer %s", peer_id)
 
-            state.receive_task = asyncio.create_task(self._receive_loop(peer_id, reader))
+            state.receive_task = asyncio.create_task(self._receive_loop(peer_id, stream))
 
             # Yield so the receive loop task starts before we return.
             # Ensures the listener is ready for subscription RPCs
@@ -373,11 +368,9 @@ class GossipsubBehavior:
             await asyncio.sleep(0)
 
         else:
-            writer = cast(StreamWriterProtocol, stream)
-
             # We opened an outbound stream — use for sending.
             if existing is None:
-                state = PeerState(peer_id=peer_id, outbound_stream=writer)
+                state = PeerState(peer_id=peer_id, outbound_stream=stream)
                 self._peers[peer_id] = state
                 logger.info(
                     "[GS %x] Added gossipsub peer %s (outbound first)", self._short_id, peer_id
@@ -386,7 +379,7 @@ class GossipsubBehavior:
                 if existing.outbound_stream is not None:
                     logger.debug("Peer %s already has outbound stream, ignoring", peer_id)
                     return
-                existing.outbound_stream = writer
+                existing.outbound_stream = stream
                 logger.debug("Added outbound stream for peer %s", peer_id)
 
             if self.mesh.subscriptions:
@@ -887,7 +880,7 @@ class GossipsubBehavior:
         except Exception as e:
             logger.warning("Failed to send RPC to %s: %s", peer_id, e)
 
-    async def _receive_loop(self, peer_id: PeerId, stream: StreamReaderProtocol) -> None:
+    async def _receive_loop(self, peer_id: PeerId, stream: QuicStreamAdapter) -> None:
         """Process incoming RPCs from a peer for the lifetime of the connection.
 
         Each RPC is length-prefixed with a varint, matching the libp2p

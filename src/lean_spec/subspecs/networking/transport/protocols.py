@@ -1,10 +1,8 @@
-"""
-Shared Protocol definitions for transport layer.
+"""Shared protocol definitions for transport layer.
 
-These protocols define the interface for stream-like objects used
-throughout the networking transport stack. They allow the transport
-code to work with asyncio streams, yamux streams, or any other
-implementation that provides the same interface.
+InboundStreamProtocol
+    Used by ReqResp handler and gossip message processing. Matches
+    QuicStreamAdapter's buffered I/O interface.
 """
 
 from __future__ import annotations
@@ -12,33 +10,27 @@ from __future__ import annotations
 from typing import Protocol
 
 
-class StreamReaderProtocol(Protocol):
-    """Protocol for objects that can read data like asyncio.StreamReader."""
+class InboundStreamProtocol(Protocol):
+    """Buffered stream for inbound request and gossip handling.
 
-    async def read(self, n: int) -> bytes:
-        """Read up to n bytes."""
+    Matches QuicStreamAdapter and test mocks.
+
+    - ``read()`` takes no arguments (returns next available chunk).
+    - ``close()`` is async (QUIC streams need async FIN).
+    """
+
+    async def read(self) -> bytes:
+        """Read available data."""
         ...
-
-    async def readexactly(self, n: int) -> bytes:
-        """Read exactly n bytes."""
-        ...
-
-
-class StreamWriterProtocol(Protocol):
-    """Protocol for objects that can write data like asyncio.StreamWriter."""
 
     def write(self, data: bytes) -> None:
-        """Write data to buffer."""
+        """Buffer data for writing."""
         ...
 
     async def drain(self) -> None:
-        """Flush the buffer."""
+        """Flush buffered data."""
         ...
 
-    def close(self) -> None:
-        """Close the writer."""
-        ...
-
-    async def wait_closed(self) -> None:
-        """Wait for the writer to close."""
+    async def close(self) -> None:
+        """Close the stream."""
         ...
