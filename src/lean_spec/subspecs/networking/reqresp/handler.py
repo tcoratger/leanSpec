@@ -65,7 +65,7 @@ The protocol ID determines:
 
 References:
     Ethereum P2P spec:
-        https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
+        https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
     Wire format details:
         See codec.py in this package
 """

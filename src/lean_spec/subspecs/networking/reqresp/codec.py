@@ -64,7 +64,7 @@ This prevents decompression bombs (small compressed → huge uncompressed).
 
 References:
     Ethereum P2P spec:
-        https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
+        https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
     LEB128 encoding:
         https://en.wikipedia.org/wiki/LEB128
     Snappy framing:
@@ -210,7 +210,7 @@ class ResponseCode(IntEnum):
       - Codes 128-255: Treated as INVALID_REQUEST (invalid range).
 
     Reference:
-        https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
+        https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
     """
 
     SUCCESS = 0
