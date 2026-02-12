@@ -233,11 +233,8 @@ def pytest_configure(config: pytest.Config) -> None:
     clean = config.getoption("--clean")
 
     # Get available forks from layer-specific module
-    get_forks = layer_module.forks.get_forks
-    get_fork_by_name = layer_module.forks.get_fork_by_name
-
-    available_forks = get_forks()
-    available_fork_names = sorted(fork.name() for fork in available_forks)
+    registry = layer_module.forks.registry
+    available_fork_names = sorted(fork.name() for fork in registry.forks)
 
     # Validate fork
     if not fork_name:
@@ -248,7 +245,7 @@ def pytest_configure(config: pytest.Config) -> None:
         )
         pytest.exit("Missing required --fork option.", returncode=pytest.ExitCode.USAGE_ERROR)
 
-    fork_class = get_fork_by_name(fork_name)
+    fork_class = registry.get_fork_by_name(fork_name)
     if fork_class is None:
         print(
             f"Error: Unsupported fork for {layer} layer: {fork_name}\n",
@@ -289,13 +286,13 @@ def pytest_collection_modifyitems(config: pytest.Config, items: List[pytest.Item
 
     fork_class = config.test_fork_class
     layer_module = config.layer_module  # type: ignore[attr-defined]
-    get_fork_by_name = layer_module.forks.get_fork_by_name
+    registry = layer_module.forks.registry
     verbose = config.getoption("verbose")
     deselected = []
     selected = []
 
     for item in items:
-        if not _is_test_item_valid_for_fork(item, fork_class, get_fork_by_name):
+        if not _is_test_item_valid_for_fork(item, fork_class, registry.get_fork_by_name):
             if verbose < 2:
                 deselected.append(item)
             else:
@@ -500,9 +497,9 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
     fork_class = metafunc.config.test_fork_class  # type: ignore[attr-defined]
     layer_module = metafunc.config.layer_module  # type: ignore[attr-defined]
-    get_fork_by_name = layer_module.forks.get_fork_by_name
+    registry = layer_module.forks.registry
 
-    if not _is_test_valid_for_fork(metafunc, fork_class, get_fork_by_name):
+    if not _is_test_valid_for_fork(metafunc, fork_class, registry.get_fork_by_name):
         verbose = metafunc.config.getoption("verbose")
         if verbose >= 2:
             metafunc.parametrize(
