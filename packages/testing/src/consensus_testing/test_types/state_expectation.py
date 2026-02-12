@@ -121,7 +121,7 @@ class StateExpectation(CamelModel):
         for field_name in self.model_fields_set:
             accessor = self._ACCESSORS.get(field_name)
             if accessor is None:
-                continue
+                raise ValueError(f"No accessor defined for field: {field_name}")
             expected = getattr(self, field_name)
             actual = accessor(state)
             if actual != expected:
