@@ -13,7 +13,7 @@ Subnet subscription keys (SSZ Bitvectors):
 - attnets: Bitvector[64] - attestation subnets (bit i = subscribed to subnet i)
 - syncnets: Bitvector[4] - sync committee subnets
 
-See: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
+See: https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
 """
 
 from typing import ClassVar

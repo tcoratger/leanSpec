@@ -92,7 +92,7 @@ Key v1.1 features used:
 
 
 References:
-    - Ethereum P2P spec: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
+    - Ethereum P2P spec: https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
     - Gossipsub v1.1: https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md
     - SSZ spec: https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md
     - Snappy format: https://github.com/google/snappy/blob/main/format_description.txt
