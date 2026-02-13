@@ -102,6 +102,13 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     # The 30s timeout handles slow handshakes.
     await assert_peer_connections(node_cluster, min_peers=2, timeout=30)
 
+    # Verify gossip is working by checking head consensus.
+    #
+    # After mesh formation, nodes should converge on the same head within a few slots.
+    # This confirms gossip subscriptions are active (not just peer connections).
+    # Catches race conditions where peers connect but gossip mesh isn't fully formed.
+    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
+
     # Wait for finalization with convergence-based polling.
     #
     # Instead of a fixed duration, we actively poll for the target state.
@@ -168,6 +175,12 @@ async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     # Hub (node 0) has 2 peers; spokes have 1 peer each.
     # Using min_peers=1 ensures spokes pass the check.
     await assert_peer_connections(node_cluster, min_peers=1, timeout=30)
+
+    # Verify gossip mesh is active before waiting for finalization.
+    #
+    # Nodes should converge on head via gossip propagation through hub.
+    # This ensures the hub is properly relaying messages to spokes.
+    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
 
     # Wait for finalization with convergence-based polling.
     #

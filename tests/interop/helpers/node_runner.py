@@ -466,7 +466,8 @@ class NodeCluster:
         #
         # A longer delay ensures proper mesh formation before block production.
         # CI machines need more time due to lower CPU/scheduling priority.
-        await asyncio.sleep(10.0)
+        # Increased to 15s to handle slow CI and strict attestation target walkback.
+        await asyncio.sleep(15.0)
 
         # Phase 4: Start node services (validators, chain service, etc).
         #
