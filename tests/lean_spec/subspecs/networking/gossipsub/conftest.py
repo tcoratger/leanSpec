@@ -63,7 +63,7 @@ def add_peer(
     state = PeerState(
         peer_id=peer_id,
         subscriptions=subscriptions or set(),
-        outbound_stream=MockOutboundStream() if with_stream else None,
+        outbound_stream=MockOutboundStream() if with_stream else None,  # type: ignore[arg-type]
     )
     behavior._peers[peer_id] = state
     return peer_id

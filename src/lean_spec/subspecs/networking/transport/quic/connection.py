@@ -26,7 +26,6 @@ import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from aioquic.asyncio import QuicConnectionProtocol
 from aioquic.asyncio import connect as quic_connect
@@ -40,12 +39,10 @@ from aioquic.quic.events import (
     StreamReset,
 )
 
-from ..multistream import negotiate_lazy_client
+from ..identity import IdentityKeypair
 from ..peer_id import PeerId
+from .stream_adapter import QuicStreamAdapter
 from .tls import generate_libp2p_certificate
-
-if TYPE_CHECKING:
-    from ..identity import IdentityKeypair
 
 
 class QuicTransportError(Exception):
@@ -224,12 +221,8 @@ class QuicConnection:
         self._streams[stream_id] = stream
 
         # Negotiate the application protocol.
-        wrapper = _QuicStreamWrapper(stream)
-        negotiated = await negotiate_lazy_client(
-            wrapper.reader,
-            wrapper.writer,
-            protocol,
-        )
+        adapter = QuicStreamAdapter(stream)
+        negotiated = await adapter.negotiate_lazy_client(protocol)
         stream._protocol_id = negotiated
 
         # Yield to allow aioquic to process any pending events.
@@ -528,8 +521,6 @@ class QuicConnectionManager:
             else:
                 # Generate a random peer ID for now.
                 # This is NOT correct for production but allows testing.
-                from ..identity import IdentityKeypair
-
                 temp_key = IdentityKeypair.generate()
                 peer_id = temp_key.to_peer_id()
 
@@ -590,8 +581,6 @@ class QuicConnectionManager:
         # Callback to set up connection when handshake completes.
         # Captures this manager's state (self, on_connection, host, port).
         def handle_handshake(protocol_instance: LibP2PQuicProtocol) -> None:
-            from ..identity import IdentityKeypair
-
             temp_key = IdentityKeypair.generate()
             remote_peer_id = temp_key.to_peer_id()
 
@@ -624,69 +613,3 @@ class QuicConnectionManager:
         )
         # Keep running until shutdown is requested.
         await shutdown_event.wait()
-
-
-class _QuicStreamWrapper:
-    """Wrapper to use QuicStream with multistream negotiation."""
-
-    __slots__ = ("_stream", "_buffer", "reader", "writer")
-
-    def __init__(self, stream: QuicStream) -> None:
-        self._stream = stream
-        self._buffer = b""
-        self.reader = _QuicStreamReader(self)
-        self.writer = _QuicStreamWriter(self)
-
-
-class _QuicStreamReader:
-    """Fake StreamReader that reads from QuicStream."""
-
-    __slots__ = ("_wrapper",)
-
-    def __init__(self, wrapper: _QuicStreamWrapper) -> None:
-        self._wrapper = wrapper
-
-    async def read(self, n: int) -> bytes:
-        """Read up to n bytes."""
-        if not self._wrapper._buffer:
-            self._wrapper._buffer = await self._wrapper._stream.read()
-
-        result = self._wrapper._buffer[:n]
-        self._wrapper._buffer = self._wrapper._buffer[n:]
-        return result
-
-    async def readexactly(self, n: int) -> bytes:
-        """Read exactly n bytes."""
-        result = b""
-        while len(result) < n:
-            chunk = await self.read(n - len(result))
-            if not chunk:
-                raise asyncio.IncompleteReadError(result, n)
-            result += chunk
-        return result
-
-
-class _QuicStreamWriter:
-    """Fake StreamWriter that writes to QuicStream."""
-
-    __slots__ = ("_wrapper", "_pending")
-
-    def __init__(self, wrapper: _QuicStreamWrapper) -> None:
-        self._wrapper = wrapper
-        self._pending = b""
-
-    def write(self, data: bytes) -> None:
-        """Buffer data for writing."""
-        self._pending += data
-
-    async def drain(self) -> None:
-        """Flush pending data."""
-        if self._pending:
-            await self._wrapper._stream.write(self._pending)
-            self._pending = b""
-
-    def close(self) -> None:
-        """No-op."""
-
-    async def wait_closed(self) -> None:
-        """No-op."""

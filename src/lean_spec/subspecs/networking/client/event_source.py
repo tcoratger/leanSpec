@@ -1,9 +1,9 @@
 """
 Network event source bridging transport to sync service.
 
-This module implements NetworkEventSource, producing events from real
-network connections. It bridges the gap between the low-level transport
-layer (QUIC ConnectionManager) and the high-level sync service.
+This module produces events from real network connections. It bridges the
+gap between the low-level transport layer (QUIC ConnectionManager) and the
+high-level sync service.
 
 
 WHY THIS MODULE EXISTS
@@ -92,7 +92,7 @@ Key v1.1 features used:
 
 
 References:
-    - Ethereum P2P spec: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md
+    - Ethereum P2P spec: https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
     - Gossipsub v1.1: https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md
     - SSZ spec: https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md
     - Snappy format: https://github.com/google/snappy/blob/main/format_description.txt
@@ -125,8 +125,8 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
     BlockLookup,
-    DefaultRequestHandler,
     ReqRespServer,
+    RequestHandler,
 )
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.service.events import (
@@ -139,16 +139,16 @@ from lean_spec.subspecs.networking.service.events import (
     PeerStatusEvent,
 )
 from lean_spec.subspecs.networking.transport import PeerId
-from lean_spec.subspecs.networking.transport.connection import ConnectionManager, Stream
-from lean_spec.subspecs.networking.transport.multistream import (
-    NegotiationError,
-    negotiate_server,
-)
+from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
+from lean_spec.subspecs.networking.transport.protocols import InboundStreamProtocol
 from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnection,
     QuicConnectionManager,
-    QuicStream,
     is_quic_multiaddr,
+)
+from lean_spec.subspecs.networking.transport.quic.stream_adapter import (
+    NegotiationError,
+    QuicStreamAdapter,
 )
 from lean_spec.subspecs.networking.varint import (
     VarintError,
@@ -176,95 +176,6 @@ Includes:
 - GossipSub v1.1 and v1.2
 - Request/response protocols (Status, BlocksByRoot)
 """
-
-
-class _QuicStreamReaderWriter:
-    """Adapts QuicStream for multistream-select negotiation.
-
-    Provides buffered read/write interface matching asyncio StreamReader/Writer.
-    Used during protocol negotiation on QUIC streams.
-    """
-
-    def __init__(self, stream: QuicStream | Stream) -> None:
-        self._stream = stream
-        self._buffer = b""
-        self._write_buffer = b""
-
-    async def read(self, n: int | None = None) -> bytes:
-        """Read bytes from the stream.
-
-        - If n is provided, returns at most n bytes.
-        - If n is None, returns all available data (no limit).
-
-        If buffer has data, returns from buffer.
-        Otherwise reads from stream and buffers excess.
-        """
-        # If no limit, return all buffered data plus new read
-        if n is None:
-            if self._buffer:
-                result = self._buffer
-                self._buffer = b""
-                return result
-            return await self._stream.read()
-
-        # If we have buffered data, return from that first (up to n bytes)
-        if self._buffer:
-            result = self._buffer[:n]
-            self._buffer = self._buffer[n:]
-            return result
-
-        # Read from stream
-        data = await self._stream.read()
-        if not data:
-            return b""
-
-        # Return up to n bytes, buffer the rest
-        if len(data) > n:
-            self._buffer = data[n:]
-            return data[:n]
-        return data
-
-    async def readexactly(self, n: int) -> bytes:
-        """Read exactly n bytes from the stream."""
-        while len(self._buffer) < n:
-            chunk = await self._stream.read()
-            if not chunk:
-                raise EOFError("Stream closed before enough data received")
-            self._buffer += chunk
-
-        result = self._buffer[:n]
-        self._buffer = self._buffer[n:]
-        return result
-
-    def write(self, data: bytes) -> None:
-        """Buffer data for writing (synchronous for StreamWriter compatibility)."""
-        self._write_buffer += data
-
-    async def drain(self) -> None:
-        """Flush buffered data to the stream."""
-        if self._write_buffer:
-            await self._stream.write(self._write_buffer)
-            self._write_buffer = b""
-
-    async def close(self) -> None:
-        """Close the underlying stream."""
-        await self._stream.close()
-
-    async def finish_write(self) -> None:
-        """Half-close the stream (signal end of writing)."""
-        # Flush any buffered data first
-        if self._write_buffer:
-            await self._stream.write(self._write_buffer)
-            self._write_buffer = b""
-        # Call finish_write if available (QUIC streams have this)
-        finish_write = getattr(self._stream, "finish_write", None)
-        if finish_write is not None:
-            await finish_write()
-
-    async def wait_closed(self) -> None:
-        """Wait for the stream to close."""
-        # No-op for QUIC streams
-        pass
 
 
 @dataclass(slots=True)
@@ -420,7 +331,7 @@ class GossipHandler:
             raise GossipMessageError(f"Invalid topic: {e}") from e
 
 
-async def read_gossip_message(stream: Stream) -> tuple[str, bytes]:
+async def read_gossip_message(stream: InboundStreamProtocol) -> tuple[str, bytes]:
     """
     Read a gossip message from a QUIC stream.
 
@@ -553,7 +464,6 @@ class LiveNetworkEventSource:
     """
     Produces NetworkEvent objects from real network connections.
 
-    Implements the NetworkEventSource protocol for use with NetworkService.
     Bridges the transport layer (ConnectionManager) to the event-driven
     sync layer.
 
@@ -598,7 +508,7 @@ class LiveNetworkEventSource:
     producers to wait.
     """
 
-    connection_manager: ConnectionManager
+    connection_manager: QuicConnectionManager
     """Underlying transport manager for QUIC connections.
 
     Handles the full connection stack: QUIC transport with TLS 1.3 encryption.
@@ -660,7 +570,7 @@ class LiveNetworkEventSource:
     Tracked for cleanup on shutdown. Tasks remove themselves on completion.
     """
 
-    _reqresp_handler: DefaultRequestHandler = field(init=False)
+    _reqresp_handler: RequestHandler = field(init=False)
     """Handler for inbound ReqResp requests.
 
     Provides chain data to peers requesting Status or BlocksByRoot.
@@ -685,7 +595,7 @@ class LiveNetworkEventSource:
     def __post_init__(self) -> None:
         """Initialize handlers with current configuration."""
         object.__setattr__(self, "_gossip_handler", GossipHandler(fork_digest=self._fork_digest))
-        object.__setattr__(self, "_reqresp_handler", DefaultRequestHandler())
+        object.__setattr__(self, "_reqresp_handler", RequestHandler())
         object.__setattr__(self, "_reqresp_server", ReqRespServer(handler=self._reqresp_handler))
         object.__setattr__(
             self, "_gossipsub_behavior", GossipsubBehavior(params=GossipsubParameters())
@@ -694,7 +604,7 @@ class LiveNetworkEventSource:
     @classmethod
     async def create(
         cls,
-        connection_manager: ConnectionManager | None = None,
+        connection_manager: QuicConnectionManager | None = None,
     ) -> LiveNetworkEventSource:
         """
         Create a new LiveNetworkEventSource.
@@ -706,10 +616,8 @@ class LiveNetworkEventSource:
             Initialized event source.
         """
         if connection_manager is None:
-            from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-
             identity_key = IdentityKeypair.generate()
-            connection_manager = await ConnectionManager.create(identity_key)
+            connection_manager = await QuicConnectionManager.create(identity_key)
 
         reqresp_client = ReqRespClient(connection_manager=connection_manager)
 
@@ -1096,7 +1004,7 @@ class LiveNetworkEventSource:
             stream = await conn.open_stream(GOSSIPSUB_DEFAULT_PROTOCOL_ID)
 
             # Wrap in reader/writer for buffered I/O.
-            wrapped_stream = _QuicStreamReaderWriter(stream)
+            wrapped_stream = QuicStreamAdapter(stream)
 
             # Add peer to the gossipsub behavior (outbound stream).
             await self._gossipsub_behavior.add_peer(peer_id, wrapped_stream, inbound=False)
@@ -1259,10 +1167,10 @@ class LiveNetworkEventSource:
                 # Multistream-select runs on top to agree on what protocol to use.
                 # We create a wrapper for buffered I/O during negotiation, and
                 # preserve it for later use (to avoid losing buffered data).
-                wrapper: _QuicStreamReaderWriter | None = None
+                wrapper: QuicStreamAdapter | None = None
 
                 try:
-                    wrapper = _QuicStreamReaderWriter(stream)
+                    wrapper = QuicStreamAdapter(stream)
                     gs_id = self._gossipsub_behavior._instance_id % 0xFFFF
                     logger.debug(
                         "[GS %x] Accepting stream %d from %s, attempting protocol negotiation",
@@ -1271,11 +1179,7 @@ class LiveNetworkEventSource:
                         peer_id,
                     )
                     protocol_id = await asyncio.wait_for(
-                        negotiate_server(
-                            wrapper,
-                            wrapper,  # type: ignore[arg-type]
-                            set(SUPPORTED_PROTOCOLS),
-                        ),
+                        wrapper.negotiate_server(set(SUPPORTED_PROTOCOLS)),
                         timeout=RESP_TIMEOUT,
                     )
                     stream._protocol_id = protocol_id
@@ -1384,7 +1288,7 @@ class LiveNetworkEventSource:
                     assert wrapper is not None
                     task = asyncio.create_task(
                         self._reqresp_server.handle_stream(
-                            wrapper,  # type: ignore[arg-type]
+                            wrapper,
                             protocol_id,
                         )
                     )
@@ -1415,7 +1319,7 @@ class LiveNetworkEventSource:
             # The connection will be cleaned up elsewhere.
             logger.warning("Stream acceptor error for %s: %s", peer_id, e)
 
-    async def _handle_gossip_stream(self, peer_id: PeerId, stream: Stream) -> None:
+    async def _handle_gossip_stream(self, peer_id: PeerId, stream: InboundStreamProtocol) -> None:
         """
         Handle an incoming gossip stream.
 
