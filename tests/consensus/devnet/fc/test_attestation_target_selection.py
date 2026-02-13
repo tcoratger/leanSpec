@@ -17,21 +17,22 @@ def test_attestation_target_at_genesis_initially(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target starts near genesis before safe target updates.
+    Attestation target stays at genesis before safe target updates.
 
     Scenario
     --------
     Process two blocks at slots 1 and 2.
 
     Expected:
-        - After slot 1: target = slot 1 (1 slot ahead of safe target allowed)
-        - After slot 2: target = slot 1 (walkback stops at safe_target + 1)
+        - After slot 1: target = slot 0 (walkback to safe_target)
+        - After slot 2: target = slot 0 (walkback to safe_target)
 
     Why This Matters
     ----------------
     Initially, the safe target is at genesis (slot 0). The attestation target
-    is allowed up to 1 slot ahead of safe target to ensure the chain can
-    start advancing from genesis.
+    walks back to safe_target to maintain separation between head votes
+    (fork choice) and target votes (BFT finality). The chain bootstraps
+    via update_safe_target at interval 3.
     """
     fork_choice_test(
         steps=[
@@ -39,14 +40,14 @@ def test_attestation_target_at_genesis_initially(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
         ],
@@ -65,7 +66,7 @@ def test_attestation_target_advances_with_attestations(
 
     Expected:
         - Initial blocks: target stays at genesis (slot 0)
-        - Later blocks: target advances as attestations accumulate
+        - Later blocks: target advances as walkback from head reaches further slots
         - Target remains behind head for safety
 
     Why This Matters
@@ -84,21 +85,21 @@ def test_attestation_target_advances_with_attestations(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(1),  # 1 slot ahead of safe target allowed
+                    attestation_target_slot=Slot(0),  # Walks back to safe_target
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(1),  # Walks back to safe_target + 1
+                    attestation_target_slot=Slot(0),  # Walks back to safe_target
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(1),  # Walks back to safe_target + 1
+                    attestation_target_slot=Slot(0),  # Walks back to safe_target
                 ),
             ),
             BlockStep(
@@ -147,21 +148,21 @@ def test_attestation_target_with_slot_gaps(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    attestation_target_slot=Slot(1),  # Walks back 5→3→1, stops at safe_target+1
+                    attestation_target_slot=Slot(0),  # Walks back 5→3→1→0, at safe_target
                 ),
             ),
         ],
@@ -198,21 +199,21 @@ def test_attestation_target_with_extended_chain(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -293,13 +294,13 @@ def test_attestation_target_justifiable_constraint(
                     head_slot=Slot(i),
                     attestation_target_slot=Slot(
                         # Mapping of current slot -> expected target slot
-                        # With +1 allowance: walkback stops at safe_target + 1
-                        # delta = target_slot - finalized_slot
+                        # Walkback stops at safe_target (slot 0) then
+                        # justifiability is checked: delta = target - finalized
                         {
-                            1: 1,  # At safe_target + 1, no walkback needed
-                            2: 1,  # Walks back to safe_target + 1
-                            3: 1,  # Walks back to safe_target + 1
-                            4: 1,  # 3-step walkback from 4 → 1
+                            1: 0,  # Walks back to safe_target
+                            2: 0,  # Walks back to safe_target
+                            3: 0,  # Walks back to safe_target
+                            4: 1,  # 3-step walkback from 4 → 1, delta 1 ≤ 5
                             5: 2,  # 3-step walkback from 5 → 2, delta 2 ≤ 5
                             6: 3,  # 3-step walkback from 6 → 3, delta 3 ≤ 5
                             7: 4,  # 3-step walkback from 7 → 4, delta 4 ≤ 5
