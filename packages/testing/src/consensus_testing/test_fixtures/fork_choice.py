@@ -393,103 +393,72 @@ class ForkChoiceTest(BaseConsensusFixture):
                 is_aggregator=True,
             )
 
-        # Prepare attestations and aggregated payloads for block construction.
-        #
+        # Aggregate gossip signatures and merge into known payloads.
+        # This makes recently gossiped attestations available for block construction.
+        aggregation_store = working_store.aggregate_committee_signatures()
+        merged_store = aggregation_store.accept_new_attestations()
+
         # Two sources of attestations:
         # 1. Explicit attestations from the spec (always included)
         # 2. Store attestations (only if include_store_attestations is True)
-        #
-        # For all attestations, we need to create aggregated proofs
-        # so build_block can include them in the block body.
-        # Attestations with the same data should be merged into a single proof.
         available_attestations: list[Attestation]
         known_block_roots: set[Bytes32] | None = None
 
-        # First, aggregate any gossip signatures into payloads
-        # This ensures that signatures from previous blocks (like proposer attestations)
-        # are available for extraction
-        aggregation_store = working_store.aggregate_committee_signatures()
-
-        # Now combine aggregated payloads from both sources
-        aggregated_payloads = (
-            dict(store.latest_known_aggregated_payloads)
-            if store.latest_known_aggregated_payloads
-            else {}
-        )
-        # Add newly aggregated payloads from gossip signatures
-        for key, proofs in aggregation_store.latest_new_aggregated_payloads.items():
-            if key not in aggregated_payloads:
-                aggregated_payloads[key] = []
-            aggregated_payloads[key].extend(proofs)
-
-        # Collect all attestations that need aggregated proofs
-        all_attestations_for_proofs: list[Attestation] = list(attestations)
-
         if spec.include_store_attestations:
-            # Gather all attestations by extracting from aggregated payloads.
-            # This now includes attestations from gossip signatures that were just aggregated.
-            known_attestations = store._extract_attestations_from_aggregated_payloads(
-                store.latest_known_aggregated_payloads
+            # Extract from merged payloads (contains both known and newly aggregated)
+            attestation_map = merged_store.extract_attestations_from_aggregated_payloads(
+                merged_store.latest_known_aggregated_payloads
             )
-            new_attestations = aggregation_store._extract_attestations_from_aggregated_payloads(
-                aggregation_store.latest_new_aggregated_payloads
-            )
-
-            # Convert to list of Attestations
             store_attestations = [
-                Attestation(validator_id=vid, data=data) for vid, data in known_attestations.items()
+                Attestation(validator_id=vid, data=data) for vid, data in attestation_map.items()
             ]
-            store_attestations.extend(
-                Attestation(validator_id=vid, data=data) for vid, data in new_attestations.items()
-            )
-
-            # Add store attestations to the list for proof creation
-            all_attestations_for_proofs.extend(store_attestations)
-
-            # Combine for block construction
             available_attestations = store_attestations + attestations
             known_block_roots = set(store.blocks.keys())
         else:
             # Use only explicit attestations from the spec
             available_attestations = attestations
 
-        # Update attestation_data_by_root with any new attestation data
-        attestation_data_by_root = dict(aggregation_store.attestation_data_by_root)
-        for attestation in all_attestations_for_proofs:
-            data_root = attestation.data.data_root_bytes()
-            attestation_data_by_root[data_root] = attestation.data
-
-        # Use the aggregated payloads we just created
-        # No need to call aggregate_committee_signatures again since we already did it
-
-        # Build the block using spec logic
+        # Build the block using spec logic.
         #
         # State handles the core block construction.
         # This includes state transition and root computation.
         parent_state = store.states[parent_root]
-        final_block, _, _, _ = parent_state.build_block(
+        final_block, post_state, _, _ = parent_state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
             attestations=available_attestations,
             available_attestations=available_attestations,
             known_block_roots=known_block_roots,
-            aggregated_payloads=aggregated_payloads,
+            aggregated_payloads=merged_store.latest_known_aggregated_payloads,
         )
 
-        # Create proposer attestation
-        #
-        # The proposer must also attest to their own block.
-        # This attestation commits to the block they just created.
+        # Create proposer attestation using the spec's attestation data production.
+        # Build a temporary store with the new block integrated so
+        # produce_attestation_data() sees the correct chain view.
         block_root = hash_tree_root(final_block)
+        latest_justified = (
+            post_state.latest_justified
+            if post_state.latest_justified.slot > store.latest_justified.slot
+            else store.latest_justified
+        )
+        latest_finalized = (
+            post_state.latest_finalized
+            if post_state.latest_finalized.slot > store.latest_finalized.slot
+            else store.latest_finalized
+        )
+        temp_store = store.model_copy(
+            update={
+                "blocks": {**store.blocks, block_root: final_block},
+                "states": {**store.states, block_root: post_state},
+                "head": block_root,
+                "latest_justified": latest_justified,
+                "latest_finalized": latest_finalized,
+            }
+        )
         proposer_attestation = Attestation(
             validator_id=proposer_index,
-            data=AttestationData(
-                slot=spec.slot,
-                head=Checkpoint(root=block_root, slot=spec.slot),
-                target=Checkpoint(root=block_root, slot=spec.slot),
-                source=Checkpoint(root=parent_root, slot=parent_state.latest_block_header.slot),
-            ),
+            data=temp_store.produce_attestation_data(spec.slot),
         )
 
         # Sign everything

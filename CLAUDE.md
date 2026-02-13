@@ -50,6 +50,10 @@ uvx tox                  # Everything (checks + tests + docs)
 - Test files/functions must start with `test_`
 - **No example code in docstrings**: Do not include `Example:` sections with code blocks in docstrings. Keep documentation concise and focused on explaining *what* and *why*, not *how to use*. Unit tests serve as usage examples.
 - **No section separator comments**: Never use banner-style separator comments (`# ====...`, `# ----...`, or similar). They add visual clutter with no value. Use blank lines to separate logical sections. If a section needs a heading, a single `#` comment line is enough.
+- **CRITICAL - Preserve existing documentation**: When refactoring or modifying code, NEVER remove or rewrite existing comments and docstrings unless they are directly invalidated by the code change. Removing documentation that still applies creates unnecessary noise in code review diffs and destroys context that was carefully written. Only modify documentation when:
+  - The documented behavior has actually changed
+  - The comment references code that no longer exists
+  - The comment is factually wrong after your change
 
 ### Import Style
 
