@@ -108,9 +108,11 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     # This is more robust under varying CI performance.
     #
     # Finalization requires 2 consecutive justified epochs.
-    # With 3 validators and 4s slots, this typically takes ~30s
-    # but may take longer on slow CI machines.
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=150)
+    # With 3 validators and 4s slots, this typically takes ~40-50s
+    # due to the 1-slot delay in attestation target advancement.
+    # The strict walkback (target <= safe_target.slot) means targets
+    # lag by 1 slot compared to heads, requiring extra time for consensus.
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=180)
 
     # Verify heads converged across nodes.
     #
@@ -171,7 +173,8 @@ async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     #
     # Hub-and-spoke adds latency (messages route through hub)
     # but the protocol should still achieve finalization.
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=150)
+    # The strict walkback (target <= safe_target.slot) adds ~1 slot delay.
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=180)
 
     # Verify heads converged across nodes.
     #
