@@ -45,15 +45,23 @@ from lean_spec.subspecs.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
     SignatureKey,
 )
+from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
 from lean_spec.subspecs.xmss.containers import KeyPair, PublicKey, Signature
 from lean_spec.subspecs.xmss.interface import (
     PROD_SIGNATURE_SCHEME,
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
+)
+from lean_spec.subspecs.xmss.types import (
+    HashDigestList,
+    HashDigestVector,
+    HashTreeOpening,
+    Randomness,
 )
 from lean_spec.types import Uint64
 
@@ -64,6 +72,7 @@ __all__ = [
     "LazyKeyDict",
     "NUM_VALIDATORS",
     "XmssKeyManager",
+    "create_dummy_signature",
     "download_keys",
     "get_keys_dir",
     "get_shared_key_manager",
@@ -92,6 +101,29 @@ _KEY_MANAGER_CACHE: dict[tuple[str, Slot], XmssKeyManager] = {}
 
 _SHARED_MANAGER_MAX_SLOT: Slot = Slot(10)
 """Default max slot for the shared key manager."""
+
+
+def create_dummy_signature() -> Signature:
+    """
+    Create a structurally valid but cryptographically invalid individual signature.
+
+    The signature has proper structure (correct number of siblings, hashes, etc.)
+    but all values are zeros, so it will fail cryptographic verification.
+    """
+    # Create zero-filled hash digests with correct dimensions
+    zero_digest = HashDigestVector(data=[Fp(0) for _ in range(TARGET_CONFIG.HASH_LEN_FE)])
+
+    # Path needs LOG_LIFETIME siblings for the Merkle authentication path
+    siblings = HashDigestList(data=[zero_digest for _ in range(TARGET_CONFIG.LOG_LIFETIME)])
+
+    # Hashes need DIMENSION vectors for the Winternitz chain hashes
+    hashes = HashDigestList(data=[zero_digest for _ in range(TARGET_CONFIG.DIMENSION)])
+
+    return Signature(
+        path=HashTreeOpening(siblings=siblings),
+        rho=Randomness(data=[Fp(0) for _ in range(TARGET_CONFIG.RAND_LEN_FE)]),
+        hashes=hashes,
+    )
 
 
 def get_shared_key_manager(max_slot: Slot = _SHARED_MANAGER_MAX_SLOT) -> XmssKeyManager:

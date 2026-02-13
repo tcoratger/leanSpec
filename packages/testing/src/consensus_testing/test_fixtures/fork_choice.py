@@ -33,14 +33,17 @@ from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64
 
-from ..keys import LEAN_ENV_TO_SCHEMES, XmssKeyManager, get_shared_key_manager
+from ..keys import (
+    LEAN_ENV_TO_SCHEMES,
+    XmssKeyManager,
+    create_dummy_signature,
+    get_shared_key_manager,
+)
 from ..test_types import (
     AggregatedAttestationSpec,
     AttestationStep,
@@ -140,19 +143,20 @@ class ForkChoiceTest(BaseConsensusFixture):
         We scan steps to find the highest slot needed.
         """
         if self.max_slot is None:
-            max_slot_value = Slot(0)
-
             # Find the maximum slot across all block and attestation steps.
             #
             # XMSS signatures are slot-dependent.
             # Keys must be generated up to this slot before signing.
-            for step in self.steps:
-                if isinstance(step, BlockStep):
-                    max_slot_value = max(max_slot_value, step.block.slot)
-                elif isinstance(step, AttestationStep):
-                    max_slot_value = max(max_slot_value, step.attestation.message.slot)
-
-            self.max_slot = max_slot_value
+            self.max_slot = max(
+                (
+                    step.block.slot
+                    if isinstance(step, BlockStep)
+                    else step.attestation.message.slot
+                    for step in self.steps
+                    if isinstance(step, (BlockStep, AttestationStep))
+                ),
+                default=Slot(0),
+            )
 
         return self
 
@@ -231,59 +235,62 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Store follows immutable pattern: each method returns a new Store.
         for i, step in enumerate(self.steps):
             try:
-                if isinstance(step, TickStep):
-                    # Time advancement may trigger slot boundaries.
-                    # At slot boundaries, pending attestations may become active.
-                    # Always act as aggregator to ensure gossip signatures are aggregated
-                    store = store.on_tick(Uint64(step.time), has_proposal=False, is_aggregator=True)
+                match step:
+                    case TickStep():
+                        # Time advancement may trigger slot boundaries.
+                        # At slot boundaries, pending attestations may become active.
+                        # Always act as aggregator to ensure gossip signatures are aggregated
+                        store = store.on_tick(
+                            Uint64(step.time), has_proposal=False, is_aggregator=True
+                        )
 
-                elif isinstance(step, BlockStep):
-                    # Build a complete signed block from the lightweight spec.
-                    # The spec contains minimal fields; we fill the rest.
-                    signed_block = self._build_block_from_spec(
-                        step.block, store, self._block_registry, key_manager
-                    )
+                    case BlockStep():
+                        # Build a complete signed block from the lightweight spec.
+                        # The spec contains minimal fields; we fill the rest.
+                        signed_block = self._build_block_from_spec(
+                            step.block, store, self._block_registry, key_manager
+                        )
 
-                    # Store the filled Block for serialization
-                    block = signed_block.message.block
-                    step._filled_block = signed_block.message
+                        # Store the filled Block for serialization
+                        block = signed_block.message.block
+                        step._filled_block = signed_block.message
 
-                    # Register labeled blocks for fork building.
-                    # Later blocks can reference this one as their parent.
-                    if step.block.label is not None:
-                        if step.block.label in self._block_registry:
-                            raise ValueError(
-                                f"Step {i}: duplicate label '{step.block.label}' - "
-                                f"labels must be unique within a test"
-                            )
-                        self._block_registry[step.block.label] = block
+                        # Register labeled blocks for fork building.
+                        # Later blocks can reference this one as their parent.
+                        if step.block.label is not None:
+                            if step.block.label in self._block_registry:
+                                raise ValueError(
+                                    f"Step {i}: duplicate label '{step.block.label}' - "
+                                    f"labels must be unique within a test"
+                                )
+                            self._block_registry[step.block.label] = block
 
-                    # Advance time to the block's slot.
-                    # Store rejects blocks from the future.
-                    # This tick includes a block (has proposal).
-                    # Always act as aggregator to ensure gossip signatures are aggregated
-                    slot_duration_seconds = block.slot * SECONDS_PER_SLOT
-                    block_time = store.config.genesis_time + slot_duration_seconds
-                    store = store.on_tick(block_time, has_proposal=True, is_aggregator=True)
+                        # Advance time to the block's slot.
+                        # Store rejects blocks from the future.
+                        # This tick includes a block (has proposal).
+                        # Always act as aggregator to ensure gossip signatures are aggregated
+                        slot_duration_seconds = block.slot * SECONDS_PER_SLOT
+                        block_time = store.config.genesis_time + slot_duration_seconds
+                        store = store.on_tick(block_time, has_proposal=True, is_aggregator=True)
 
-                    # Process the block through Store.
-                    # This validates, applies state transition, and updates head.
-                    store = store.on_block(
-                        signed_block,
-                        scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
-                    )
+                        # Process the block through Store.
+                        # This validates, applies state transition, and updates head.
+                        store = store.on_block(
+                            signed_block,
+                            scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
+                        )
 
-                elif isinstance(step, AttestationStep):
-                    # Process a gossip attestation.
-                    # Gossip attestations arrive outside of blocks.
-                    # They influence the fork choice weight calculation.
-                    store = store.on_gossip_attestation(
-                        step.attestation,
-                        scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
-                    )
+                    case AttestationStep():
+                        # Process a gossip attestation.
+                        # Gossip attestations arrive outside of blocks.
+                        # They influence the fork choice weight calculation.
+                        store = store.on_gossip_attestation(
+                            step.attestation,
+                            scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
+                        )
 
-                else:
-                    raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
+                    case _:
+                        raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
 
                 # Validate Store state if checks are provided.
                 # Labels in checks are resolved to actual block roots.
@@ -379,16 +386,14 @@ class ForkChoiceTest(BaseConsensusFixture):
             sig_key = SignatureKey(attestation.validator_id, attestation.data.data_root_bytes())
             if sig_key not in valid_signature_keys:
                 continue
-            signature = attestation_signatures.get(sig_key)
-            if signature is None:
+            if (signature := attestation_signatures.get(sig_key)) is None:
                 continue
-            signed_attestation = SignedAttestation(
-                validator_id=attestation.validator_id,
-                message=attestation.data,
-                signature=signature,
-            )
             working_store = working_store.on_gossip_attestation(
-                signed_attestation,
+                SignedAttestation(
+                    validator_id=attestation.validator_id,
+                    message=attestation.data,
+                    signature=signature,
+                ),
                 scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                 is_aggregator=True,
             )
@@ -604,11 +609,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 else:
                     # Dummy signature for testing invalid signature handling.
                     # The Store should reject attestations with bad signatures.
-                    signature = Signature(
-                        path=HashTreeOpening(siblings=HashDigestList(data=[])),
-                        rho=Randomness(data=[Fp(0) for _ in range(Randomness.LENGTH)]),
-                        hashes=HashDigestList(data=[]),
-                    )
+                    signature = create_dummy_signature()
 
                 # Index signature by validator and data root.
                 # This enables lookup during signature aggregation.
@@ -651,13 +652,13 @@ class ForkChoiceTest(BaseConsensusFixture):
         """
         # Resolve target from label.
         # The label references a block that will be the target checkpoint.
-        if spec.target_root_label not in block_registry:
+        if (target_block := block_registry.get(spec.target_root_label)) is None:
             raise ValueError(
                 f"target_root_label '{spec.target_root_label}' not found - "
                 f"available: {list(block_registry.keys())}"
             )
 
-        target_root = hash_tree_root(block_registry[spec.target_root_label])
+        target_root = hash_tree_root(target_block)
         target = Checkpoint(root=target_root, slot=spec.target_slot)
 
         # Build the attestation data.

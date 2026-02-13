@@ -24,46 +24,14 @@ from lean_spec.subspecs.containers.block.types import (
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import (
-    HashDigestList,
-    HashDigestVector,
-    HashTreeOpening,
-    Randomness,
-)
 from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
 
-from ..keys import XmssKeyManager, get_shared_key_manager
+from ..keys import XmssKeyManager, create_dummy_signature, get_shared_key_manager
 from ..test_types import AggregatedAttestationSpec, BlockSpec
 from .base import BaseConsensusFixture
-
-
-def _create_dummy_signature() -> Signature:
-    """
-    Create a structurally valid but cryptographically invalid individual signature.
-
-    The signature has proper structure (correct number of siblings, hashes, etc.)
-    but all values are zeros, so it will fail cryptographic verification.
-    """
-    # Create zero-filled hash digests with correct dimensions
-    zero_digest = HashDigestVector(data=[Fp(0) for _ in range(TARGET_CONFIG.HASH_LEN_FE)])
-
-    # Path needs LOG_LIFETIME siblings for the Merkle authentication path
-    siblings = HashDigestList(data=[zero_digest for _ in range(TARGET_CONFIG.LOG_LIFETIME)])
-
-    # Hashes need DIMENSION vectors for the Winternitz chain hashes
-    hashes = HashDigestList(data=[zero_digest for _ in range(TARGET_CONFIG.DIMENSION)])
-
-    return Signature(
-        path=HashTreeOpening(siblings=siblings),
-        rho=Randomness(data=[Fp(0) for _ in range(TARGET_CONFIG.RAND_LEN_FE)]),
-        hashes=hashes,
-    )
 
 
 def _create_dummy_aggregated_proof(validator_ids: list[ValidatorIndex]) -> AggregatedSignatureProof:
@@ -322,7 +290,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 proposer_attestation.data,
             )
         else:
-            proposer_attestation_signature = _create_dummy_signature()
+            proposer_attestation_signature = create_dummy_signature()
 
         return SignedBlockWithAttestation(
             message=BlockWithAttestation(
