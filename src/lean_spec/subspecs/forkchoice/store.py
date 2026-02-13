@@ -1181,12 +1181,8 @@ class Store(Container):
 
         # Walk back toward safe target (up to `JUSTIFICATION_LOOKBACK_SLOTS` steps)
         #
-        # Target must not exceed safe_target's slot. This preserves the
-        # separation between head votes (fork choice) and target votes
-        # (BFT finality). Allowing target == head would conflate the two.
-        #
-        # At genesis, target stays at slot 0 until safe_target advances
-        # via update_safe_target at interval 3.
+        # This ensures the target doesn't advance too far ahead of safe target,
+        # providing a balance between liveness and safety.
         for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
             if self.blocks[target_block_root].slot > self.blocks[self.safe_target].slot:
                 target_block_root = self.blocks[target_block_root].parent_root
