@@ -861,7 +861,28 @@ class Store(Container):
         )
 
     def accept_new_attestations(self) -> "Store":
-        """Process pending aggregated payloads and update forkchoice head."""
+        """
+        Process pending aggregated payloads and update forkchoice head.
+
+        Moves aggregated payloads from latest_new_aggregated_payloads to
+        latest_known_aggregated_payloads, making them eligible to contribute to
+        fork choice weights. This migration happens at specific interval ticks.
+
+        The Interval Tick System
+        -------------------------
+        Aggregated payloads progress through intervals:
+        - Interval 0: Block proposal
+        - Interval 1: Validators cast attestations (enter "new")
+        - Interval 2: Aggregators create proofs & broadcast
+        - Interval 3: Safe target update
+        - Interval 4: Process accumulated attestations
+
+        This staged progression ensures proper timing and prevents premature
+        influence on fork choice decisions.
+
+        Returns:
+            New Store with migrated aggregated payloads and updated head.
+        """
         # Merge new aggregated payloads into known aggregated payloads
         merged_aggregated_payloads = dict(self.latest_known_aggregated_payloads)
         for sig_key, proofs in self.latest_new_aggregated_payloads.items():
@@ -954,14 +975,15 @@ class Store(Container):
             committee_signatures,
         )
 
-        # Create list for broadcasting
+        # Create list of aggregated attestations for broadcasting
         new_aggregates: list[SignedAggregatedAttestation] = []
         for aggregated_attestation, aggregated_signature in aggregated_results:
-            agg = SignedAggregatedAttestation(
-                data=aggregated_attestation.data,
-                proof=aggregated_signature,
+            new_aggregates.append(
+                SignedAggregatedAttestation(
+                    data=aggregated_attestation.data,
+                    proof=aggregated_signature,
+                )
             )
-            new_aggregates.append(agg)
 
         # Compute new aggregated payloads
         new_gossip_sigs = dict(self.gossip_signatures)
