@@ -431,7 +431,7 @@ class StoreChecks(CamelModel):
                     # Extract attestations from aggregated payloads
                     if check.location == "new":
                         extracted_attestations = (
-                            store._extract_attestations_from_aggregated_payloads(
+                            store.extract_attestations_from_aggregated_payloads(
                                 store.latest_new_aggregated_payloads
                             )
                         )
@@ -445,7 +445,7 @@ class StoreChecks(CamelModel):
 
                     else:  # check.location == "known"
                         extracted_attestations = (
-                            store._extract_attestations_from_aggregated_payloads(
+                            store.extract_attestations_from_aggregated_payloads(
                                 store.latest_known_aggregated_payloads
                             )
                         )
@@ -572,7 +572,7 @@ class StoreChecks(CamelModel):
                     # Calculate attestation weight: count attestations voting for this fork
                     # An attestation votes for this fork if its head is this block or a descendant
                     # Extract attestations from latest_known_aggregated_payloads
-                    known_attestations = store._extract_attestations_from_aggregated_payloads(
+                    known_attestations = store.extract_attestations_from_aggregated_payloads(
                         store.latest_known_aggregated_payloads
                     )
                     weight = 0

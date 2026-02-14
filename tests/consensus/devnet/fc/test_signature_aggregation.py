@@ -308,13 +308,15 @@ def test_auto_collect_proposer_attestations(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    # Proposer 1's attestation should be auto-collected
+                    # Proposer 1's attestation should be auto-collected.
+                    # Target is genesis (slot 0) because the spec's attestation target
+                    # algorithm walks back from head toward safe_target.
                     block_attestation_count=1,
                     block_attestations=[
                         AggregatedAttestationCheck(
                             participants={1},
                             attestation_slot=Slot(1),
-                            target_slot=Slot(1),
+                            target_slot=Slot(0),
                         ),
                     ],
                 ),
@@ -337,10 +339,10 @@ def test_auto_collect_combined_with_explicit_attestations(
 
     Expected
     --------
-    Block body contains merged attestation from all sources:
-    - Proposer 1's attestation (auto-collected)
-    - Validators 0 and 3 (explicitly specified)
-    - All merged into single aggregation (same target)
+    Block body contains attestations from all sources.
+    Proposer 1's attestation targets genesis (slot 0) via the spec's target
+    walk-back algorithm, while explicit attestations target block_1 (slot 1).
+    Different targets produce separate aggregation groups.
     """
     fork_choice_test(
         steps=[
@@ -363,11 +365,16 @@ def test_auto_collect_combined_with_explicit_attestations(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    # All attestations merged: proposer 1 + explicit {0, 3}
-                    block_attestation_count=1,
+                    # Two separate groups: proposer targets genesis, explicit targets block_1
+                    block_attestation_count=2,
                     block_attestations=[
                         AggregatedAttestationCheck(
-                            participants={0, 1, 3},
+                            participants={1},
+                            attestation_slot=Slot(1),
+                            target_slot=Slot(0),
+                        ),
+                        AggregatedAttestationCheck(
+                            participants={0, 3},
                             attestation_slot=Slot(1),
                             target_slot=Slot(1),
                         ),
