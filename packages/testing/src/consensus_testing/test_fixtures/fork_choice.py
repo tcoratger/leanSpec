@@ -33,14 +33,17 @@ from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import SignatureKey
 from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32, Uint64
 
-from ..keys import LEAN_ENV_TO_SCHEMES, XmssKeyManager, get_shared_key_manager
+from ..keys import (
+    LEAN_ENV_TO_SCHEMES,
+    XmssKeyManager,
+    create_dummy_signature,
+    get_shared_key_manager,
+)
 from ..test_types import (
     AggregatedAttestationSpec,
     AttestationStep,
@@ -231,61 +234,62 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Store follows immutable pattern: each method returns a new Store.
         for i, step in enumerate(self.steps):
             try:
-                if isinstance(step, TickStep):
-                    # Time advancement may trigger slot boundaries.
-                    # At slot boundaries, pending attestations may become active.
-                    # Always act as aggregator to ensure gossip signatures are aggregated
-                    store, _ = store.on_tick(
-                        Uint64(step.time), has_proposal=False, is_aggregator=True
-                    )
+                match step:
+                    case TickStep():
+                        # Time advancement may trigger slot boundaries.
+                        # At slot boundaries, pending attestations may become active.
+                        # Always act as aggregator to ensure gossip signatures are aggregated
+                        store, _ = store.on_tick(
+                            Uint64(step.time), has_proposal=False, is_aggregator=True
+                        )
 
-                elif isinstance(step, BlockStep):
-                    # Build a complete signed block from the lightweight spec.
-                    # The spec contains minimal fields; we fill the rest.
-                    signed_block = self._build_block_from_spec(
-                        step.block, store, self._block_registry, key_manager
-                    )
+                    case BlockStep():
+                        # Build a complete signed block from the lightweight spec.
+                        # The spec contains minimal fields; we fill the rest.
+                        signed_block = self._build_block_from_spec(
+                            step.block, store, self._block_registry, key_manager
+                        )
 
-                    # Store the filled Block for serialization
-                    block = signed_block.message.block
-                    step._filled_block = signed_block.message
+                        # Store the filled Block for serialization
+                        block = signed_block.message.block
+                        step._filled_block = signed_block.message
 
-                    # Register labeled blocks for fork building.
-                    # Later blocks can reference this one as their parent.
-                    if step.block.label is not None:
-                        if step.block.label in self._block_registry:
-                            raise ValueError(
-                                f"Step {i}: duplicate label '{step.block.label}' - "
-                                f"labels must be unique within a test"
-                            )
-                        self._block_registry[step.block.label] = block
+                        # Register labeled blocks for fork building.
+                        # Later blocks can reference this one as their parent.
+                        if step.block.label is not None:
+                            if step.block.label in self._block_registry:
+                                raise ValueError(
+                                    f"Step {i}: duplicate label '{step.block.label}' - "
+                                    f"labels must be unique within a test"
+                                )
+                            self._block_registry[step.block.label] = block
 
-                    # Advance time to the block's slot.
-                    # Store rejects blocks from the future.
-                    # This tick includes a block (has proposal).
-                    # Always act as aggregator to ensure gossip signatures are aggregated
-                    slot_duration_seconds = block.slot * SECONDS_PER_SLOT
-                    block_time = store.config.genesis_time + slot_duration_seconds
-                    store, _ = store.on_tick(block_time, has_proposal=True, is_aggregator=True)
+                        # Advance time to the block's slot.
+                        # Store rejects blocks from the future.
+                        # This tick includes a block (has proposal).
+                        # Always act as aggregator to ensure gossip signatures are aggregated
+                        slot_duration_seconds = block.slot * SECONDS_PER_SLOT
+                        block_time = store.config.genesis_time + slot_duration_seconds
+                        store, _ = store.on_tick(block_time, has_proposal=True, is_aggregator=True)
 
-                    # Process the block through Store.
-                    # This validates, applies state transition, and updates head.
-                    store = store.on_block(
-                        signed_block,
-                        scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
-                    )
+                        # Process the block through Store.
+                        # This validates, applies state transition, and updates head.
+                        store = store.on_block(
+                            signed_block,
+                            scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
+                        )
 
-                elif isinstance(step, AttestationStep):
-                    # Process a gossip attestation.
-                    # Gossip attestations arrive outside of blocks.
-                    # They influence the fork choice weight calculation.
-                    store = store.on_gossip_attestation(
-                        step.attestation,
-                        scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
-                    )
+                    case AttestationStep():
+                        # Process a gossip attestation.
+                        # Gossip attestations arrive outside of blocks.
+                        # They influence the fork choice weight calculation.
+                        store = store.on_gossip_attestation(
+                            step.attestation,
+                            scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
+                        )
 
-                else:
-                    raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
+                    case _:
+                        raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
 
                 # Validate Store state if checks are provided.
                 # Labels in checks are resolved to actual block roots.
@@ -381,117 +385,84 @@ class ForkChoiceTest(BaseConsensusFixture):
             sig_key = SignatureKey(attestation.validator_id, attestation.data.data_root_bytes())
             if sig_key not in valid_signature_keys:
                 continue
-            signature = attestation_signatures.get(sig_key)
-            if signature is None:
+            if (signature := attestation_signatures.get(sig_key)) is None:
                 continue
-            signed_attestation = SignedAttestation(
-                validator_id=attestation.validator_id,
-                message=attestation.data,
-                signature=signature,
-            )
             working_store = working_store.on_gossip_attestation(
-                signed_attestation,
+                SignedAttestation(
+                    validator_id=attestation.validator_id,
+                    message=attestation.data,
+                    signature=signature,
+                ),
                 scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                 is_aggregator=True,
             )
 
-        # Prepare attestations and aggregated payloads for block construction.
-        #
+        # Aggregate gossip signatures and merge into known payloads.
+        # This makes recently gossiped attestations available for block construction.
+        aggregation_store, _ = working_store.aggregate_committee_signatures()
+        merged_store = aggregation_store.accept_new_attestations()
+
         # Two sources of attestations:
         # 1. Explicit attestations from the spec (always included)
         # 2. Store attestations (only if include_store_attestations is True)
-        #
-        # For all attestations, we need to create aggregated proofs
-        # so build_block can include them in the block body.
-        # Attestations with the same data should be merged into a single proof.
         available_attestations: list[Attestation]
         known_block_roots: set[Bytes32] | None = None
 
-        # First, aggregate any gossip signatures into payloads
-        # This ensures that signatures from previous blocks (like proposer attestations)
-        # are available for extraction
-        aggregation_store, _ = working_store.aggregate_committee_signatures()
-
-        # Now combine aggregated payloads from both sources
-        aggregated_payloads = (
-            dict(store.latest_known_aggregated_payloads)
-            if store.latest_known_aggregated_payloads
-            else {}
-        )
-        # Add newly aggregated payloads from gossip signatures
-        for key, proofs in aggregation_store.latest_new_aggregated_payloads.items():
-            if key not in aggregated_payloads:
-                aggregated_payloads[key] = []
-            aggregated_payloads[key].extend(proofs)
-
-        # Collect all attestations that need aggregated proofs
-        all_attestations_for_proofs: list[Attestation] = list(attestations)
-
         if spec.include_store_attestations:
-            # Gather all attestations by extracting from aggregated payloads.
-            # This now includes attestations from gossip signatures that were just aggregated.
-            known_attestations = store._extract_attestations_from_aggregated_payloads(
-                store.latest_known_aggregated_payloads
+            # Extract from merged payloads (contains both known and newly aggregated)
+            attestation_map = merged_store.extract_attestations_from_aggregated_payloads(
+                merged_store.latest_known_aggregated_payloads
             )
-            new_attestations = aggregation_store._extract_attestations_from_aggregated_payloads(
-                aggregation_store.latest_new_aggregated_payloads
-            )
-
-            # Convert to list of Attestations
             store_attestations = [
-                Attestation(validator_id=vid, data=data) for vid, data in known_attestations.items()
+                Attestation(validator_id=vid, data=data) for vid, data in attestation_map.items()
             ]
-            store_attestations.extend(
-                Attestation(validator_id=vid, data=data) for vid, data in new_attestations.items()
-            )
-
-            # Add store attestations to the list for proof creation
-            all_attestations_for_proofs.extend(store_attestations)
-
-            # Combine for block construction
             available_attestations = store_attestations + attestations
             known_block_roots = set(store.blocks.keys())
         else:
             # Use only explicit attestations from the spec
             available_attestations = attestations
 
-        # Update attestation_data_by_root with any new attestation data
-        attestation_data_by_root = dict(aggregation_store.attestation_data_by_root)
-        for attestation in all_attestations_for_proofs:
-            data_root = attestation.data.data_root_bytes()
-            attestation_data_by_root[data_root] = attestation.data
-
-        # Use the aggregated payloads we just created
-        # No need to call aggregate_committee_signatures again since we already did it
-
-        # Build the block using spec logic
+        # Build the block using spec logic.
         #
         # State handles the core block construction.
         # This includes state transition and root computation.
         parent_state = store.states[parent_root]
-        final_block, _, _, _ = parent_state.build_block(
+        final_block, post_state, _, _ = parent_state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
             attestations=available_attestations,
             available_attestations=available_attestations,
             known_block_roots=known_block_roots,
-            aggregated_payloads=aggregated_payloads,
+            aggregated_payloads=merged_store.latest_known_aggregated_payloads,
         )
 
-        # Create proposer attestation
-        #
-        # The proposer must also attest to their own block.
-        # This attestation commits to the block they just created.
+        # Create proposer attestation using the spec's attestation data production.
+        # Build a temporary store with the new block integrated so
+        # produce_attestation_data() sees the correct chain view.
         block_root = hash_tree_root(final_block)
+        latest_justified = (
+            post_state.latest_justified
+            if post_state.latest_justified.slot > store.latest_justified.slot
+            else store.latest_justified
+        )
+        latest_finalized = (
+            post_state.latest_finalized
+            if post_state.latest_finalized.slot > store.latest_finalized.slot
+            else store.latest_finalized
+        )
+        temp_store = store.model_copy(
+            update={
+                "blocks": {**store.blocks, block_root: final_block},
+                "states": {**store.states, block_root: post_state},
+                "head": block_root,
+                "latest_justified": latest_justified,
+                "latest_finalized": latest_finalized,
+            }
+        )
         proposer_attestation = Attestation(
             validator_id=proposer_index,
-            data=AttestationData(
-                slot=spec.slot,
-                head=Checkpoint(root=block_root, slot=spec.slot),
-                target=Checkpoint(root=block_root, slot=spec.slot),
-                source=Checkpoint(root=parent_root, slot=parent_state.latest_block_header.slot),
-            ),
+            data=temp_store.produce_attestation_data(spec.slot),
         )
 
         # Sign everything
@@ -637,11 +608,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 else:
                     # Dummy signature for testing invalid signature handling.
                     # The Store should reject attestations with bad signatures.
-                    signature = Signature(
-                        path=HashTreeOpening(siblings=HashDigestList(data=[])),
-                        rho=Randomness(data=[Fp(0) for _ in range(Randomness.LENGTH)]),
-                        hashes=HashDigestList(data=[]),
-                    )
+                    signature = create_dummy_signature()
 
                 # Index signature by validator and data root.
                 # This enables lookup during signature aggregation.
@@ -684,13 +651,13 @@ class ForkChoiceTest(BaseConsensusFixture):
         """
         # Resolve target from label.
         # The label references a block that will be the target checkpoint.
-        if spec.target_root_label not in block_registry:
+        if (target_block := block_registry.get(spec.target_root_label)) is None:
             raise ValueError(
                 f"target_root_label '{spec.target_root_label}' not found - "
                 f"available: {list(block_registry.keys())}"
             )
 
-        target_root = hash_tree_root(block_registry[spec.target_root_label])
+        target_root = hash_tree_root(target_block)
         target = Checkpoint(root=target_root, slot=spec.target_slot)
 
         # Build the attestation data.

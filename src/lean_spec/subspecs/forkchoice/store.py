@@ -689,7 +689,7 @@ class Store(Container):
 
         return store
 
-    def _extract_attestations_from_aggregated_payloads(
+    def extract_attestations_from_aggregated_payloads(
         self, aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]]
     ) -> dict[ValidatorIndex, AttestationData]:
         """
@@ -840,7 +840,7 @@ class Store(Container):
 
         """
         # Extract attestations from known aggregated payloads
-        attestations = self._extract_attestations_from_aggregated_payloads(
+        attestations = self.extract_attestations_from_aggregated_payloads(
             self.latest_known_aggregated_payloads
         )
 
@@ -929,7 +929,7 @@ class Store(Container):
         min_target_score = -(-num_validators * 2 // 3)
 
         # Extract attestations from new aggregated payloads
-        attestations = self._extract_attestations_from_aggregated_payloads(
+        attestations = self.extract_attestations_from_aggregated_payloads(
             self.latest_new_aggregated_payloads
         )
 
@@ -1296,7 +1296,7 @@ class Store(Container):
         # Extract attestations from known aggregated payloads.
         # These attestations have already influenced fork choice.
         # Including them in the block makes them permanent on-chain.
-        attestation_data_map = store._extract_attestations_from_aggregated_payloads(
+        attestation_data_map = store.extract_attestations_from_aggregated_payloads(
             store.latest_known_aggregated_payloads
         )
         available_attestations = [

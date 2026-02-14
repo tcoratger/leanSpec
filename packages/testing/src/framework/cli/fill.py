@@ -81,14 +81,14 @@ def fill(
     # Check and download keys if needed (only for consensus layer)
     if layer.lower() == "consensus":
         # Import here to avoid loading leanSpec modules before LEAN_ENV is set
-        from consensus_testing.keys import _download_keys, _get_keys_dir
+        from consensus_testing.keys import download_keys, get_keys_dir
 
-        keys_dir = _get_keys_dir(scheme.lower())
+        keys_dir = get_keys_dir(scheme.lower())
 
         # Check if keys already exist, if not, download them
         if not (keys_dir.exists() and any(keys_dir.glob("*.json"))):
             click.echo(f"Test keys for '{scheme}' scheme not found. Downloading...")
-            _download_keys(scheme.lower())
+            download_keys(scheme.lower())
 
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-fill.ini"
     # Find project root by looking for pyproject.toml with [tool.uv.workspace]

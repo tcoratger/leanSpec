@@ -59,7 +59,7 @@ def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyMan
     updated_store = consumer_store.on_block(signed_block)
 
     # Verify attestations can be extracted from aggregated payloads
-    extracted_attestations = updated_store._extract_attestations_from_aggregated_payloads(
+    extracted_attestations = updated_store.extract_attestations_from_aggregated_payloads(
         updated_store.latest_known_aggregated_payloads
     )
     assert ValidatorIndex(1) in extracted_attestations
