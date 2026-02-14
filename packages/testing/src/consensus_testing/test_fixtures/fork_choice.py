@@ -143,20 +143,19 @@ class ForkChoiceTest(BaseConsensusFixture):
         We scan steps to find the highest slot needed.
         """
         if self.max_slot is None:
+            max_slot_value = Slot(0)
+
             # Find the maximum slot across all block and attestation steps.
             #
             # XMSS signatures are slot-dependent.
             # Keys must be generated up to this slot before signing.
-            self.max_slot = max(
-                (
-                    step.block.slot
-                    if isinstance(step, BlockStep)
-                    else step.attestation.message.slot
-                    for step in self.steps
-                    if isinstance(step, (BlockStep, AttestationStep))
-                ),
-                default=Slot(0),
-            )
+            for step in self.steps:
+                if isinstance(step, BlockStep):
+                    max_slot_value = max(max_slot_value, step.block.slot)
+                elif isinstance(step, AttestationStep):
+                    max_slot_value = max(max_slot_value, step.attestation.message.slot)
+
+            self.max_slot = max_slot_value
 
         return self
 
