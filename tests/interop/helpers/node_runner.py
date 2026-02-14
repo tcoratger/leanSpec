@@ -202,6 +202,8 @@ class NodeCluster:
     def __post_init__(self) -> None:
         """Initialize validators and keys."""
         self._generate_validators()
+        # Default genesis time for single-node starts.
+        # start_all() overrides this to align with service start.
         self._genesis_time = int(time.time())
 
     def _generate_validators(self) -> None:
@@ -417,6 +419,13 @@ class NodeCluster:
         if validators_per_node is None:
             validators_per_node = self._distribute_validators(num_nodes)
 
+        # Set genesis time to coincide with service start.
+        #
+        # Phases 1-3 (node creation, connection, mesh stabilization) take ~10s.
+        # Setting genesis in the future prevents wasting slots during setup.
+        # The first block will be produced at slot 1, shortly after services start.
+        self._genesis_time = int(time.time()) + 10
+
         # Phase 1: Create nodes with networking ready but services not running.
         #
         # This allows the gossipsub mesh to form before validators start
@@ -464,10 +473,8 @@ class NodeCluster:
         # 2. Subscription RPCs to be exchanged
         # 3. GRAFT messages to be sent and processed
         #
-        # A longer delay ensures proper mesh formation before block production.
-        # CI machines need more time due to lower CPU/scheduling priority.
-        # Increased to 15s to handle slow CI and strict attestation target walkback.
-        await asyncio.sleep(15.0)
+        # 5s allows ~7 heartbeats which is sufficient for mesh formation.
+        await asyncio.sleep(5.0)
 
         # Phase 4: Start node services (validators, chain service, etc).
         #

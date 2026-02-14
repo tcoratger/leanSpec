@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.interop
 
 
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(150)
 @pytest.mark.num_validators(3)
 async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     """
@@ -61,143 +61,43 @@ async def test_mesh_finalization(node_cluster: NodeCluster) -> None:
     - Checkpoint finalization (justified child of justified parent)
 
     Network topology: Full mesh (every node connected to every other).
-    This maximizes connectivity and minimizes propagation latency.
-
-    Timing rationale:
-
-    - 60s timeout: allows ~15 slots at 4s each, plenty for finalization
-    - 30s run duration: ~7-8 slots, enough for 2 epochs of justification
-    - 15s peer timeout: sufficient for QUIC handshake
-
-    The Ream project uses similar parameters for compatibility testing.
     """
-    # Build the network topology.
-    #
-    # Full mesh with 3 nodes creates 3 bidirectional connections:
-    # - Node 0 <-> Node 1
-    # - Node 0 <-> Node 2
-    # - Node 1 <-> Node 2
     topology = full_mesh(3)
-
-    # Assign exactly one validator to each node.
-    #
-    # Validator indices match node indices for clarity.
-    # With 3 validators total, each controls 1/3 of voting power.
     validators_per_node = [[0], [1], [2]]
 
-    # Start all nodes with the configured topology.
-    #
-    # Each node begins:
-    #
-    # - Listening on a unique port
-    # - Connecting to peers per topology
-    # - Running the block production loop
-    # - Subscribing to gossip topics
     await node_cluster.start_all(topology, validators_per_node)
 
-    # Wait for peer connections before proceeding.
-    #
-    # Each node needs at least 2 peers (the other two nodes).
-    # This ensures gossip will reach all nodes.
-    # The 30s timeout handles slow handshakes.
-    await assert_peer_connections(node_cluster, min_peers=2, timeout=30)
-
-    # Verify gossip is working by checking head consensus.
-    #
-    # After mesh formation, nodes should converge on the same head within a few slots.
-    # This confirms gossip subscriptions are active (not just peer connections).
-    # Catches race conditions where peers connect but gossip mesh isn't fully formed.
+    await assert_peer_connections(node_cluster, min_peers=2, timeout=15)
     await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
 
-    # Wait for finalization with convergence-based polling.
-    #
-    # Instead of a fixed duration, we actively poll for the target state.
-    # This is more robust under varying CI performance.
-    #
-    # Finalization requires 2 consecutive justified epochs.
-    # With 3 validators and 4s slots, this typically takes ~40-50s
-    # due to the 1-slot delay in attestation target advancement.
-    # The strict walkback (target <= safe_target.slot) means targets
-    # lag by 1 slot compared to heads, requiring extra time for consensus.
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=180)
+    # With aligned genesis time, finalization typically occurs ~40s after service start.
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=90)
 
-    # Verify heads converged across nodes.
-    #
-    # After finalization, all nodes should agree on head within 2 slots.
-    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
-
-    # Verify finalized checkpoints are consistent.
-    #
-    # All nodes must agree on the finalized checkpoint.
-    # Finalization is irreversible - divergent finalization would be catastrophic.
-    await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=30)
+    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=15)
+    await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=15)
 
 
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(150)
 @pytest.mark.num_validators(3)
 async def test_mesh_2_2_2_finalization(node_cluster: NodeCluster) -> None:
     """
     Verify finalization with hub-and-spoke topology.
 
-    This tests consensus under restricted connectivity:
-
-    - Node 0 is the hub (receives all connections)
-    - Nodes 1 and 2 are spokes (only connect to hub)
-    - Spokes cannot communicate directly
-
-    Topology diagram::
-
-        Node 1 ---> Node 0 <--- Node 2
-
-    This is harder than full mesh because:
-
-    - Messages between spokes must route through the hub
-    - Hub failure would partition the network
-    - Gossip takes two hops instead of one
-
-    The test verifies that even with indirect connectivity,
-    the protocol achieves finalization. This matches the
-    Ream project's `test_lean_node_finalizes_mesh_2_2_2` test.
+    Node 0 is the hub; nodes 1 and 2 are spokes that only connect to the hub.
+    Messages between spokes must route through the hub.
     """
-    # Build hub-and-spoke topology.
-    #
-    # Returns [(1, 0), (2, 0)]: nodes 1 and 2 dial node 0.
-    # Node 0 acts as the central hub.
     topology = mesh_2_2_2()
-
-    # Same validator assignment as full mesh test.
     validators_per_node = [[0], [1], [2]]
 
     await node_cluster.start_all(topology, validators_per_node)
 
-    # Lower peer requirement than full mesh.
-    #
-    # Hub (node 0) has 2 peers; spokes have 1 peer each.
-    # Using min_peers=1 ensures spokes pass the check.
-    await assert_peer_connections(node_cluster, min_peers=1, timeout=30)
-
-    # Verify gossip mesh is active before waiting for finalization.
-    #
-    # Nodes should converge on head via gossip propagation through hub.
-    # This ensures the hub is properly relaying messages to spokes.
+    await assert_peer_connections(node_cluster, min_peers=1, timeout=15)
     await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
 
-    # Wait for finalization with convergence-based polling.
-    #
-    # Hub-and-spoke adds latency (messages route through hub)
-    # but the protocol should still achieve finalization.
-    # The strict walkback (target <= safe_target.slot) adds ~1 slot delay.
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=180)
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=90)
 
-    # Verify heads converged across nodes.
-    #
-    # Hub-and-spoke adds latency but should not cause divergence.
-    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=30)
-
-    # Finalized checkpoints must be identical.
-    #
-    # Even with indirect connectivity, finalization must be consistent.
-    await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=30)
+    await assert_heads_consistent(node_cluster, max_slot_diff=2, timeout=15)
+    await assert_same_finalized_checkpoint(node_cluster.nodes, timeout=15)
 
 
 @pytest.mark.timeout(30)
@@ -253,7 +153,7 @@ async def test_two_node_connection(node_cluster: NodeCluster) -> None:
     await assert_heads_consistent(node_cluster, max_slot_diff=2)
 
 
-@pytest.mark.timeout(45)
+@pytest.mark.timeout(60)
 @pytest.mark.num_validators(3)
 async def test_block_gossip_propagation(node_cluster: NodeCluster) -> None:
     """
@@ -319,7 +219,7 @@ async def test_block_gossip_propagation(node_cluster: NodeCluster) -> None:
 
 
 @pytest.mark.xfail(reason="Sync service doesn't pull missing blocks for isolated nodes")
-@pytest.mark.timeout(180)
+@pytest.mark.timeout(120)
 @pytest.mark.num_validators(3)
 async def test_partition_recovery(node_cluster: NodeCluster) -> None:
     """

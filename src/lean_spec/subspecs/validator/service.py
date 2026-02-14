@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, cast
 
 from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
+from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import (
     Attestation,
     AttestationData,
@@ -54,7 +55,7 @@ from lean_spec.subspecs.containers.block import (
 )
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Uint64
 
 from .registry import ValidatorEntry, ValidatorRegistry
@@ -286,10 +287,14 @@ class ValidatorService:
                 # This adds our attestation and signatures to the block.
                 signed_block = self._sign_block(block, validator_index, signatures)
 
-                # The proposer's attestation is already stored in the block.
-                # When the block is broadcast, the proposer signature is tracked
-                # in gossip_signatures for future aggregation.
-                # No need to separately process the proposer attestation.
+                # Store proposer's attestation signature locally for aggregation.
+                #
+                # The proposer's block is already in the store from produce_block_with_signatures.
+                # When on_gossip_block is called locally, it returns early (duplicate check).
+                # So the proposer's attestation signature never reaches gossip_signatures
+                # via on_block. We must store it explicitly here so the aggregator
+                # (which may be this same node) can include it in aggregation.
+                self._store_proposer_attestation_signature(signed_block, validator_index)
 
                 self._blocks_produced += 1
                 metrics.blocks_proposed.inc()
@@ -323,6 +328,21 @@ class ValidatorService:
         Args:
             slot: Current slot number.
         """
+        # Wait briefly for the current slot's block to arrive via gossip.
+        #
+        # At interval 1 (800ms after slot start), the slot's block may not
+        # have arrived yet from the proposer node (production + gossip + verification
+        # can exceed 800ms on slow machines). Without the block, attestations
+        # would reference an old head, causing safe_target to stall.
+        store = self.sync_service.store
+        current_slot_has_block = any(block.slot == slot for block in store.blocks.values())
+        if not current_slot_has_block:
+            for _ in range(8):
+                await asyncio.sleep(0.05)
+                store = self.sync_service.store
+                if any(block.slot == slot for block in store.blocks.values()):
+                    break
+
         # Ensure we are attesting to the latest known head
         self.sync_service.store = self.sync_service.store.update_head()
         store = self.sync_service.store
@@ -460,6 +480,55 @@ class ValidatorService:
             validator_id=validator_index,
             message=attestation_data,
             signature=signature,
+        )
+
+    def _store_proposer_attestation_signature(
+        self,
+        signed_block: SignedBlockWithAttestation,
+        validator_index: ValidatorIndex,
+    ) -> None:
+        """
+        Store the proposer's attestation signature in gossip_signatures.
+
+        When the proposer produces a block, the block is added to the store
+        immediately. The subsequent local on_gossip_block call returns early
+        because the block is already in the store (duplicate check). This means
+        the proposer's attestation signature never reaches gossip_signatures
+        via the normal on_block path.
+
+        This method explicitly stores the signature so aggregation can include it.
+
+        Args:
+            signed_block: The signed block containing the proposer attestation.
+            validator_index: The proposer's validator index.
+        """
+        store = self.sync_service.store
+        if store.validator_id is None:
+            return
+
+        # Only store if the proposer is in the same subnet as the aggregator.
+        proposer_subnet = validator_index.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
+        current_subnet = store.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
+        if proposer_subnet != current_subnet:
+            return
+
+        proposer_attestation = signed_block.message.proposer_attestation
+        proposer_signature = signed_block.signature.proposer_signature
+        data_root = proposer_attestation.data.data_root_bytes()
+
+        sig_key = SignatureKey(validator_index, data_root)
+        new_gossip_sigs = dict(store.gossip_signatures)
+        new_gossip_sigs[sig_key] = proposer_signature
+
+        # Also store the attestation data for later extraction during aggregation.
+        new_attestation_data_by_root = dict(store.attestation_data_by_root)
+        new_attestation_data_by_root[data_root] = proposer_attestation.data
+
+        self.sync_service.store = store.model_copy(
+            update={
+                "gossip_signatures": new_gossip_sigs,
+                "attestation_data_by_root": new_attestation_data_by_root,
+            }
         )
 
     def _ensure_prepared_for_epoch(
