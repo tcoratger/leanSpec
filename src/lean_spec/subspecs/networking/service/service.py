@@ -147,21 +147,17 @@ class NetworkService:
                 )
                 await self.sync_service.on_gossip_block(block, peer_id)
 
-            case GossipAttestationEvent(attestation=attestation, peer_id=peer_id, topic=topic):
+            case GossipAttestationEvent(attestation=attestation):
                 #
                 # SyncService will validate signature and update forkchoice.
-                await self.sync_service.on_gossip_attestation(
-                    attestation=attestation,
-                    subnet_id=topic.subnet_id or 0,
-                    peer_id=peer_id,
-                )
+                await self.sync_service.on_gossip_attestation(attestation)
 
-            case GossipAggregatedAttestationEvent(signed_attestation=att, peer_id=peer_id):
+            case GossipAggregatedAttestationEvent(signed_attestation=att):
                 # Route aggregated attestations to sync service.
                 #
                 # Aggregates contain multiple validator votes and are used
                 # to advance justification and finalization.
-                await self.sync_service.on_gossip_aggregated_attestation(att, peer_id)
+                await self.sync_service.on_gossip_aggregated_attestation(att)
 
             case PeerStatusEvent(peer_id=peer_id, status=status):
                 # Route peer status updates to sync service.

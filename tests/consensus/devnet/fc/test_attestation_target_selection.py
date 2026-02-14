@@ -17,22 +17,24 @@ def test_attestation_target_at_genesis_initially(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target stays at genesis before safe target updates.
+    Attestation target starts at genesis before safe target updates.
 
     Scenario
     --------
     Process two blocks at slots 1 and 2.
 
     Expected:
-        - After slot 1: target = slot 0 (walkback to safe_target)
-        - After slot 2: target = slot 0 (walkback to safe_target)
+        - After slot 1: target = slot 0 (genesis/finalized)
+        - After slot 2: target = slot 0 (genesis/finalized)
+        - Target root automatically validated against block at slot 0
 
     Why This Matters
     ----------------
-    Initially, the safe target is at genesis (slot 0). The attestation target
-    walks back to safe_target to maintain separation between head votes
-    (fork choice) and target votes (BFT finality). The chain bootstraps
-    via update_safe_target at interval 3.
+    Initially, the safe target is at genesis (slot 0), so the attestation
+    target walks back from head to genesis.
+
+    This conservative behavior ensures validators don't attest too far ahead
+    before there's sufficient attestation weight to advance the safe target.
     """
     fork_choice_test(
         steps=[
@@ -47,7 +49,7 @@ def test_attestation_target_at_genesis_initially(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(0),
+                    attestation_target_slot=Slot(0),  # Still genesis
                 ),
             ),
         ],
@@ -66,7 +68,7 @@ def test_attestation_target_advances_with_attestations(
 
     Expected:
         - Initial blocks: target stays at genesis (slot 0)
-        - Later blocks: target advances as walkback from head reaches further slots
+        - Later blocks: target advances as attestations accumulate
         - Target remains behind head for safety
 
     Why This Matters
@@ -85,35 +87,35 @@ def test_attestation_target_advances_with_attestations(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(0),  # Walks back to safe_target
+                    attestation_target_slot=Slot(0),  # Still at genesis
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(0),  # Walks back to safe_target
+                    attestation_target_slot=Slot(0),  # Still at genesis
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(0),  # Walks back to safe_target
+                    attestation_target_slot=Slot(0),  # Still at genesis
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(4)),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    attestation_target_slot=Slot(1),  # 3-step walkback from 4 → 1
+                    attestation_target_slot=Slot(1),  # Advances to slot 1
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    attestation_target_slot=Slot(2),  # 3-step walkback from 5 → 2
+                    attestation_target_slot=Slot(2),  # Continues advancing
                 ),
             ),
         ],
@@ -162,7 +164,7 @@ def test_attestation_target_with_slot_gaps(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    attestation_target_slot=Slot(0),  # Walks back 5→3→1→0, at safe_target
+                    attestation_target_slot=Slot(0),
                 ),
             ),
         ],
@@ -199,56 +201,56 @@ def test_attestation_target_with_extended_chain(
                 block=BlockSpec(slot=Slot(1)),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(0),
+                    attestation_target_slot=Slot(0),  # Genesis
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(0),
+                    attestation_target_slot=Slot(0),  # Still genesis
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(0),
+                    attestation_target_slot=Slot(0),  # Still genesis
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(4)),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    attestation_target_slot=Slot(1),
+                    attestation_target_slot=Slot(1),  # Advances to slot 1
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    attestation_target_slot=Slot(2),
+                    attestation_target_slot=Slot(2),  # Stable at 2
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(6)),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    attestation_target_slot=Slot(3),
+                    attestation_target_slot=Slot(3),  # Continues to advance
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(7)),
                 checks=StoreChecks(
                     head_slot=Slot(7),
-                    attestation_target_slot=Slot(4),
+                    attestation_target_slot=Slot(4),  # Continues advancing
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(8)),
                 checks=StoreChecks(
                     head_slot=Slot(8),
-                    attestation_target_slot=Slot(5),
+                    attestation_target_slot=Slot(5),  # Continues advancing
                 ),
             ),
         ],
@@ -294,39 +296,39 @@ def test_attestation_target_justifiable_constraint(
                     head_slot=Slot(i),
                     attestation_target_slot=Slot(
                         # Mapping of current slot -> expected target slot
-                        # Walkback stops at safe_target (slot 0) then
-                        # justifiability is checked: delta = target - finalized
+                        # delta = current_slot - JUSTIFICATION_LOOKBACK_SLOTS - finalized_slot
+                        # delta = current_slot - 3 - 0
                         {
-                            1: 0,  # Walks back to safe_target
-                            2: 0,  # Walks back to safe_target
-                            3: 0,  # Walks back to safe_target
-                            4: 1,  # 3-step walkback from 4 → 1, delta 1 ≤ 5
-                            5: 2,  # 3-step walkback from 5 → 2, delta 2 ≤ 5
-                            6: 3,  # 3-step walkback from 6 → 3, delta 3 ≤ 5
-                            7: 4,  # 3-step walkback from 7 → 4, delta 4 ≤ 5
-                            8: 5,  # 3-step walkback from 8 → 5, delta 5 ≤ 5
-                            9: 6,  # delta = 6, pronic number (2*3)
-                            10: 6,  # delta = 7, not justifiable → walks to 6
-                            11: 6,  # delta = 8, not justifiable → walks to 6
-                            12: 9,  # delta = 9, perfect square (3^2)
-                            13: 9,  # delta = 10, not justifiable → walks to 9
-                            14: 9,  # delta = 11, not justifiable → walks to 9
-                            15: 12,  # delta = 12, pronic number (3*4)
-                            16: 12,  # delta = 13, not justifiable → walks to 12
-                            17: 12,  # delta = 14, not justifiable → walks to 12
-                            18: 12,  # delta = 15, not justifiable → walks to 12
-                            19: 16,  # delta = 16, perfect square (4^2)
-                            20: 16,  # delta = 17, not justifiable → walks to 16
-                            21: 16,  # delta = 18, not justifiable → walks to 16
-                            22: 16,  # delta = 19, not justifiable → walks to 16
-                            23: 20,  # delta = 20, pronic number (4*5)
-                            24: 20,  # delta = 21, not justifiable → walks to 20
-                            25: 20,  # delta = 22, not justifiable → walks to 20
-                            26: 20,  # delta = 23, not justifiable → walks to 20
-                            27: 20,  # delta = 24, not justifiable → walks to 20
-                            28: 25,  # delta = 25, perfect square (5^2)
-                            29: 25,  # delta = 26, not justifiable → walks to 25
-                            30: 25,  # delta = 27, not justifiable → walks to 25
+                            1: 0,  # 3-slot walkback reaches safe target at slot 0
+                            2: 0,  # 3-slot walkback reaches safe target at slot 0
+                            3: 0,  # 3-slot walkback reaches safe target at slot 0
+                            4: 1,  # delta = 4 - 3 - 0 = 1, Rule 1: delta 1 ≤ 5
+                            5: 2,  # delta = 5 - 3 - 0 = 2, Rule 1: delta 2 ≤ 5
+                            6: 3,  # delta = 6 - 3 - 0 = 3, Rule 1: delta 3 ≤ 5
+                            7: 4,  # delta = 7 - 3 - 0 = 4, Rule 1: delta 4 ≤ 5
+                            8: 5,  # delta = 8 - 3 - 0 = 5, Rule 1: delta 5 ≤ 5
+                            9: 6,  # delta = 6 - 0 = 6, Rule 3: pronic number (2*3)
+                            10: 6,  # delta = 10 - 3 - 0 = 7
+                            11: 6,  # delta = 11 - 3 - 0 = 8
+                            12: 9,  # delta = 9 - 0 = 9, Rule 2: perfect square (3^2)
+                            13: 9,  # delta = 13 - 3 - 0 = 10
+                            14: 9,  # delta = 14 - 3 - 0 = 11
+                            15: 12,  # delta = 15 - 3 - 0 = 12, Rule 3: pronic number (3*4)
+                            16: 12,  # delta = 16 - 3 - 0 = 13
+                            17: 12,  # delta = 17 - 3 - 0 = 14
+                            18: 12,  # delta = 18 - 3 - 0 = 15
+                            19: 16,  # delta = 19 - 3 - 0 = 16, Rule 2: perfect square (4^2)
+                            20: 16,  # delta = 20 - 3 - 0 = 17
+                            21: 16,  # delta = 21 - 3 - 0 = 18
+                            22: 16,  # delta = 22 - 3 - 0 = 19
+                            23: 20,  # delta = 23 - 3 - 0 = 20, Rule 3: pronic number (4*5)
+                            24: 20,  # delta = 24 - 3 - 0 = 21
+                            25: 20,  # delta = 25 - 3 - 0 = 22
+                            26: 20,  # delta = 26 - 3 - 0 = 23
+                            27: 20,  # delta = 27 - 3 - 0 = 24
+                            28: 25,  # delta = 28 - 3 - 0 = 25, Rule 2: perfect square (5^2)
+                            29: 25,  # delta = 29 - 3 - 0 = 26
+                            30: 25,  # delta = 30 - 3 - 0 = 27
                         }[i]
                     ),
                 ),

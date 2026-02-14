@@ -267,7 +267,7 @@ class Node:
                 subnet_id = attestation.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
                 await network_service.publish_attestation(attestation, subnet_id)
                 # Also route locally so we can aggregate our own attestation
-                await sync_service.on_gossip_attestation(attestation, subnet_id, peer_id=None)
+                await sync_service.on_gossip_attestation(attestation)
 
             async def publish_block_wrapper(block: SignedBlockWithAttestation) -> None:
                 await network_service.publish_block(block)

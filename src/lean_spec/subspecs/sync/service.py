@@ -412,8 +412,6 @@ class SyncService:
     async def on_gossip_attestation(
         self,
         attestation: SignedAttestation,
-        subnet_id: int,
-        peer_id: PeerId | None = None,
     ) -> None:
         """
         Handle attestation received via gossip.
@@ -427,8 +425,6 @@ class SyncService:
 
         Args:
             attestation: The signed attestation received.
-            subnet_id: Subnet ID the attestation was received on.
-            peer_id: The peer that propagated the attestation (optional).
         """
         # Guard: Only process gossip in states that accept it.
         #
@@ -467,7 +463,6 @@ class SyncService:
     async def on_gossip_aggregated_attestation(
         self,
         signed_attestation: SignedAggregatedAttestation,
-        peer_id: PeerId,  # noqa: ARG002
     ) -> None:
         """
         Handle aggregated attestation received via gossip.
@@ -478,16 +473,14 @@ class SyncService:
 
         Args:
             signed_attestation: The signed aggregated attestation received.
-            peer_id: The peer that propagated the aggregate (unused for now).
         """
         if not self._state.accepts_gossip:
             return
 
         try:
             self.store = self.store.on_gossip_aggregated_attestation(signed_attestation)
-        except (AssertionError, KeyError):
-            # Aggregation validation failed.
-            pass
+        except (AssertionError, KeyError) as e:
+            logger.warning("Aggregated attestation validation failed: %s", e)
 
     async def publish_aggregated_attestation(
         self,
