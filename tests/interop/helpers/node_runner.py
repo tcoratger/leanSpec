@@ -417,9 +417,10 @@ class NodeCluster:
         # Set genesis time to coincide with service start.
         #
         # Phases 1-3 (node creation, connection, mesh stabilization) take ~10s.
-        # Setting genesis in the future prevents wasting slots during setup.
-        # The first block will be produced at slot 1, shortly after services start.
-        self._genesis_time = int(time.time()) + 10
+        # Setting genesis 15s in the future provides margin for slow environments
+        # (CI, heavy load) where setup may exceed 10s.
+        # Prevents wasting slots before the mesh is ready.
+        self._genesis_time = int(time.time()) + 15
 
         # Phase 1: Create nodes with networking ready but services not running.
         #

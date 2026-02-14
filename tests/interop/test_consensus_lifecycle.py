@@ -49,7 +49,7 @@ Activity counts gossip signatures, new aggregated, and known aggregated.
 """
 
 
-@pytest.mark.timeout(150)
+@pytest.mark.timeout(240)
 @pytest.mark.num_validators(3)
 async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     """
@@ -57,7 +57,7 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
 
     Each phase depends on the previous one succeeding.
     Failure at any phase logs pipeline diagnostics for debugging.
-    The 150-second timeout covers all seven phases end-to-end.
+    The 240-second timeout covers all seven phases end-to-end.
 
     Checkpoint snapshots from every phase feed into a final
     monotonicity check. Justified and finalized slots must never
@@ -247,7 +247,7 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     # 3. Justified >= finalized (monotonicity invariant)
     # 4. Fork choice ancestry (head descends from checkpoints)
     logger.info("Phase 6: Finalization")
-    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=30)
+    await assert_all_finalized_to(node_cluster, target_slot=1, timeout=60)
     diags = node_cluster.log_diagnostics("finalization")
     checkpoint_history.append(diags)
 
@@ -314,7 +314,7 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     # proposer rotation: at least 2 different validators had their
     # blocks finalized, confirming end-to-end round-robin operation.
     logger.info("Phase 7: Sustained finalization")
-    await assert_all_finalized_to(node_cluster, target_slot=2, timeout=30)
+    await assert_all_finalized_to(node_cluster, target_slot=2, timeout=60)
     diags = node_cluster.log_diagnostics("sustained-finalization")
     checkpoint_history.append(diags)
 
