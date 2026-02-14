@@ -520,7 +520,7 @@ def make_signed_block_from_store(
 
     slot_duration = block.slot * SECONDS_PER_SLOT
     block_time = store.config.genesis_time + slot_duration
-    advanced_store = store.on_tick(block_time, has_proposal=True)
+    advanced_store, _ = store.on_tick(block_time, has_proposal=True)
 
     return advanced_store, signed_block
 

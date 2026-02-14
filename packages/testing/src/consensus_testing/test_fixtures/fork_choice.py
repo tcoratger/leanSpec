@@ -239,7 +239,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                         # Time advancement may trigger slot boundaries.
                         # At slot boundaries, pending attestations may become active.
                         # Always act as aggregator to ensure gossip signatures are aggregated
-                        store = store.on_tick(
+                        store, _ = store.on_tick(
                             Uint64(step.time), has_proposal=False, is_aggregator=True
                         )
 
@@ -270,7 +270,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                         # Always act as aggregator to ensure gossip signatures are aggregated
                         slot_duration_seconds = block.slot * SECONDS_PER_SLOT
                         block_time = store.config.genesis_time + slot_duration_seconds
-                        store = store.on_tick(block_time, has_proposal=True, is_aggregator=True)
+                        store, _ = store.on_tick(block_time, has_proposal=True, is_aggregator=True)
 
                         # Process the block through Store.
                         # This validates, applies state transition, and updates head.
@@ -399,7 +399,7 @@ class ForkChoiceTest(BaseConsensusFixture):
 
         # Aggregate gossip signatures and merge into known payloads.
         # This makes recently gossiped attestations available for block construction.
-        aggregation_store = working_store.aggregate_committee_signatures()
+        aggregation_store, _ = working_store.aggregate_committee_signatures()
         merged_store = aggregation_store.accept_new_attestations()
 
         # Two sources of attestations:

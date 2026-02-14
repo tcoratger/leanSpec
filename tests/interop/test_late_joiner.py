@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.interop
 
 
-@pytest.mark.skip(reason="Interop test not passing - needs update (#359)")
 @pytest.mark.timeout(240)
 @pytest.mark.num_validators(3)
 async def test_late_joiner_sync(node_cluster: NodeCluster) -> None:
@@ -36,7 +35,7 @@ async def test_late_joiner_sync(node_cluster: NodeCluster) -> None:
     """
     validators_per_node = [[0], [1], [2]]
 
-    await node_cluster.start_node(0, validators_per_node[0])
+    await node_cluster.start_node(0, validators_per_node[0], is_aggregator=True)
     await node_cluster.start_node(1, validators_per_node[1])
 
     node0 = node_cluster.nodes[0]

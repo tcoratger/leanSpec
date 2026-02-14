@@ -8,6 +8,7 @@ from .assertions import (
     assert_peer_connections,
     assert_same_finalized_checkpoint,
 )
+from .diagnostics import PipelineDiagnostics
 from .node_runner import NodeCluster, TestNode
 from .port_allocator import PortAllocator
 from .topology import chain, full_mesh, mesh_2_2_2, star
@@ -20,6 +21,8 @@ __all__ = [
     "assert_block_propagated",
     "assert_chain_progressing",
     "assert_same_finalized_checkpoint",
+    # Diagnostics
+    "PipelineDiagnostics",
     # Node management
     "TestNode",
     "NodeCluster",

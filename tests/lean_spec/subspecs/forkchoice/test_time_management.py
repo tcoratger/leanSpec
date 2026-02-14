@@ -59,7 +59,7 @@ class TestOnTick:
         initial_time = sample_store.time
         target_time = sample_store.config.genesis_time + Uint64(200)  # Much later time
 
-        sample_store = sample_store.on_tick(target_time, has_proposal=True)
+        sample_store, _ = sample_store.on_tick(target_time, has_proposal=True)
 
         # Time should advance
         assert sample_store.time > initial_time
@@ -69,7 +69,7 @@ class TestOnTick:
         initial_time = sample_store.time
         target_time = sample_store.config.genesis_time + Uint64(100)
 
-        sample_store = sample_store.on_tick(target_time, has_proposal=False)
+        sample_store, _ = sample_store.on_tick(target_time, has_proposal=False)
 
         # Time should still advance
         assert sample_store.time >= initial_time
@@ -80,7 +80,7 @@ class TestOnTick:
         current_target = sample_store.config.genesis_time + initial_time
 
         # Try to advance to current time (should be no-op)
-        sample_store = sample_store.on_tick(current_target, has_proposal=True)
+        sample_store, _ = sample_store.on_tick(current_target, has_proposal=True)
 
         # Should not change significantly (time can only increase)
         # Tolerance increased for 5-interval per slot system
@@ -91,7 +91,7 @@ class TestOnTick:
         initial_time = sample_store.time
         target_time = sample_store.config.genesis_time + initial_time + Uint64(1)
 
-        sample_store = sample_store.on_tick(target_time, has_proposal=False)
+        sample_store, _ = sample_store.on_tick(target_time, has_proposal=False)
 
         # Should advance by small amount
         assert sample_store.time >= initial_time
@@ -105,7 +105,7 @@ class TestIntervalTicking:
         initial_time = sample_store.time
 
         # Tick one interval forward
-        sample_store = sample_store.tick_interval(has_proposal=False)
+        sample_store, _ = sample_store.tick_interval(has_proposal=False)
 
         # Time should advance by one interval
         assert sample_store.time == initial_time + Uint64(1)
@@ -114,7 +114,7 @@ class TestIntervalTicking:
         """Test interval ticking with proposal."""
         initial_time = sample_store.time
 
-        sample_store = sample_store.tick_interval(has_proposal=True)
+        sample_store, _ = sample_store.tick_interval(has_proposal=True)
 
         # Time should advance
         assert sample_store.time == initial_time + Uint64(1)
@@ -125,7 +125,7 @@ class TestIntervalTicking:
 
         # Tick multiple intervals
         for i in range(5):
-            sample_store = sample_store.tick_interval(has_proposal=(i % 2 == 0))
+            sample_store, _ = sample_store.tick_interval(has_proposal=(i % 2 == 0))
 
         # Should have advanced by 5 intervals
         assert sample_store.time == initial_time + Uint64(5)
@@ -139,7 +139,7 @@ class TestIntervalTicking:
         # Tick through a complete slot cycle
         for interval in range(INTERVALS_PER_SLOT):
             has_proposal = interval == 0  # Proposal only in first interval
-            sample_store = sample_store.tick_interval(has_proposal=has_proposal)
+            sample_store, _ = sample_store.tick_interval(has_proposal=has_proposal)
 
             current_interval = sample_store.time % INTERVALS_PER_SLOT
             expected_interval = Uint64((interval + 1)) % INTERVALS_PER_SLOT

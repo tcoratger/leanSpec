@@ -494,7 +494,6 @@ class Store(Container):
         new_attestation_data_by_root = dict(self.attestation_data_by_root)
         new_attestation_data_by_root[data_root] = data
 
-        store = self
         for vid in validator_ids:
             # Update Proof Map
             #
@@ -503,7 +502,7 @@ class Store(Container):
             new_aggregated_payloads.setdefault(key, []).append(proof)
 
         # Return store with updated aggregated payloads and attestation data
-        return store.model_copy(
+        return self.model_copy(
             update={
                 "latest_new_aggregated_payloads": new_aggregated_payloads,
                 "attestation_data_by_root": new_attestation_data_by_root,
@@ -943,7 +942,7 @@ class Store(Container):
 
         return self.model_copy(update={"safe_target": safe_target})
 
-    def aggregate_committee_signatures(self) -> "Store":
+    def aggregate_committee_signatures(self) -> tuple["Store", list[SignedAggregatedAttestation]]:
         """
         Aggregate committee signatures for attestations in committee_signatures.
 
@@ -951,7 +950,7 @@ class Store(Container):
         Attestations are reconstructed from gossip_signatures using attestation_data_by_root.
 
         Returns:
-            New Store with updated latest_new_aggregated_payloads.
+            Tuple of (new Store with updated payloads, list of new SignedAggregatedAttestation).
         """
         new_aggregated_payloads = dict(self.latest_new_aggregated_payloads)
 
@@ -976,13 +975,15 @@ class Store(Container):
             committee_signatures,
         )
 
-        # iterate to broadcast aggregated attestations
+        # Create list of aggregated attestations for broadcasting
+        new_aggregates: list[SignedAggregatedAttestation] = []
         for aggregated_attestation, aggregated_signature in aggregated_results:
-            _ = SignedAggregatedAttestation(
-                data=aggregated_attestation.data,
-                proof=aggregated_signature,
+            new_aggregates.append(
+                SignedAggregatedAttestation(
+                    data=aggregated_attestation.data,
+                    proof=aggregated_signature,
+                )
             )
-            # Note: here we should broadcast the aggregated signature to committee_aggregators topic
 
         # Compute new aggregated payloads
         new_gossip_sigs = dict(self.gossip_signatures)
@@ -1004,9 +1005,11 @@ class Store(Container):
                 "latest_new_aggregated_payloads": new_aggregated_payloads,
                 "gossip_signatures": new_gossip_sigs,
             }
-        )
+        ), new_aggregates
 
-    def tick_interval(self, has_proposal: bool, is_aggregator: bool = False) -> "Store":
+    def tick_interval(
+        self, has_proposal: bool, is_aggregator: bool = False
+    ) -> tuple["Store", list[SignedAggregatedAttestation]]:
         """
         Advance store time by one interval and perform interval-specific actions.
 
@@ -1048,11 +1051,12 @@ class Store(Container):
             is_aggregator: Whether the node is an aggregator.
 
         Returns:
-            New Store with advanced time and interval-specific updates applied.
+            Tuple of (new store with advanced time, list of new signed aggregated attestation).
         """
         # Advance time by one interval
         store = self.model_copy(update={"time": self.time + Uint64(1)})
         current_interval = store.time % INTERVALS_PER_SLOT
+        new_aggregates: list[SignedAggregatedAttestation] = []
 
         if current_interval == Uint64(0):
             # Start of slot - process attestations if proposal exists
@@ -1061,7 +1065,7 @@ class Store(Container):
         elif current_interval == Uint64(2):
             # Aggregation interval - aggregators create proofs
             if is_aggregator:
-                store = store.aggregate_committee_signatures()
+                store, new_aggregates = store.aggregate_committee_signatures()
         elif current_interval == Uint64(3):
             # Fast confirm - update safe target based on received proofs
             store = store.update_safe_target()
@@ -1069,9 +1073,11 @@ class Store(Container):
             # End of slot - accept accumulated attestations
             store = store.accept_new_attestations()
 
-        return store
+        return store, new_aggregates
 
-    def on_tick(self, time: Uint64, has_proposal: bool, is_aggregator: bool = False) -> "Store":
+    def on_tick(
+        self, time: Uint64, has_proposal: bool, is_aggregator: bool = False
+    ) -> tuple["Store", list[SignedAggregatedAttestation]]:
         """
         Advance forkchoice store time to given timestamp.
 
@@ -1085,7 +1091,8 @@ class Store(Container):
             is_aggregator: Whether the node is an aggregator.
 
         Returns:
-            New Store with time advanced and all interval actions performed.
+            Tuple of (new store with time advanced,
+            list of all produced signed aggregated attestation).
         """
         # Calculate target time in intervals
         time_delta_ms = (time - self.config.genesis_time) * Uint64(1000)
@@ -1093,14 +1100,16 @@ class Store(Container):
 
         # Tick forward one interval at a time
         store = self
+        all_new_aggregates: list[SignedAggregatedAttestation] = []
         while store.time < tick_interval_time:
             # Check if proposal should be signaled for next interval
             should_signal_proposal = has_proposal and (store.time + Uint64(1)) == tick_interval_time
 
             # Advance by one interval with appropriate signaling
-            store = store.tick_interval(should_signal_proposal, is_aggregator)
+            store, new_aggregates = store.tick_interval(should_signal_proposal, is_aggregator)
+            all_new_aggregates.extend(new_aggregates)
 
-        return store
+        return store, all_new_aggregates
 
     def get_proposal_head(self, slot: Slot) -> tuple["Store", Bytes32]:
         """
@@ -1128,7 +1137,7 @@ class Store(Container):
         slot_time = self.config.genesis_time + slot_duration_seconds
 
         # Advance time to current slot (ticking intervals)
-        store = self.on_tick(slot_time, True)
+        store, _ = self.on_tick(slot_time, True)
 
         # Process any pending attestations before proposal
         store = store.accept_new_attestations()
@@ -1192,7 +1201,7 @@ class Store(Container):
         # Create checkpoint from selected target block
         target_block = self.blocks[target_block_root]
 
-        return Checkpoint(root=hash_tree_root(target_block), slot=target_block.slot)
+        return Checkpoint(root=target_block_root, slot=target_block.slot)
 
     def produce_attestation_data(self, slot: Slot) -> AttestationData:
         """
@@ -1299,7 +1308,7 @@ class Store(Container):
         #
         # The builder iteratively collects valid attestations.
         # It returns the final block, post-state, and signature proofs.
-        final_block, final_post_state, _, signatures = head_state.build_block(
+        final_block, final_post_state, collected_attestations, signatures = head_state.build_block(
             slot=slot,
             proposer_index=validator_index,
             parent_root=head_root,

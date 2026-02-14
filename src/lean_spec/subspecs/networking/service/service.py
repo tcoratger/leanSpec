@@ -28,13 +28,14 @@ from typing import TYPE_CHECKING
 
 from lean_spec.snappy import frame_compress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
-from lean_spec.subspecs.containers.attestation import SignedAttestation
+from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.networking.client.event_source import LiveNetworkEventSource
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.peer.info import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
 
 from .events import (
+    GossipAggregatedAttestationEvent,
     GossipAttestationEvent,
     GossipBlockEvent,
     NetworkEvent,
@@ -146,13 +147,17 @@ class NetworkService:
                 )
                 await self.sync_service.on_gossip_block(block, peer_id)
 
-            case GossipAttestationEvent(attestation=attestation, peer_id=peer_id):
+            case GossipAttestationEvent(attestation=attestation):
                 #
                 # SyncService will validate signature and update forkchoice.
-                await self.sync_service.on_gossip_attestation(
-                    attestation=attestation,
-                    peer_id=peer_id,
-                )
+                await self.sync_service.on_gossip_attestation(attestation)
+
+            case GossipAggregatedAttestationEvent(signed_attestation=att):
+                # Route aggregated attestations to sync service.
+                #
+                # Aggregates contain multiple validator votes and are used
+                # to advance justification and finalization.
+                await self.sync_service.on_gossip_aggregated_attestation(att)
 
             case PeerStatusEvent(peer_id=peer_id, status=status):
                 # Route peer status updates to sync service.
@@ -234,3 +239,19 @@ class NetworkService:
 
         await self.event_source.publish(str(topic), compressed)
         logger.debug("Published attestation for slot %s", attestation.message.slot)
+
+    async def publish_aggregated_attestation(
+        self, signed_attestation: SignedAggregatedAttestation
+    ) -> None:
+        """
+        Publish an aggregated attestation to the aggregation gossip topic.
+
+        Args:
+            signed_attestation: Aggregated attestation to publish.
+        """
+        topic = GossipTopic.committee_aggregation(self.fork_digest)
+        ssz_bytes = signed_attestation.encode_bytes()
+        compressed = frame_compress(ssz_bytes)
+
+        await self.event_source.publish(str(topic), compressed)
+        logger.debug("Published aggregated attestation for slot %s", signed_attestation.data.slot)

@@ -143,7 +143,7 @@ class HeadSync:
     async def on_gossip_block(
         self,
         block: SignedBlockWithAttestation,
-        peer_id: PeerId,
+        peer_id: PeerId | None,
         store: Store,
     ) -> tuple[HeadSyncResult, Store]:
         """
@@ -217,7 +217,7 @@ class HeadSync:
     async def _process_block_with_descendants(
         self,
         block: SignedBlockWithAttestation,
-        peer_id: PeerId,
+        peer_id: PeerId | None,
         store: Store,
     ) -> tuple[HeadSyncResult, Store]:
         """
@@ -283,7 +283,7 @@ class HeadSync:
         self,
         parent_root: Bytes32,
         store: Store,
-        peer_id: PeerId,
+        peer_id: PeerId | None,
     ) -> int:
         """
         Process any cached blocks that descend from the given parent.
@@ -351,7 +351,7 @@ class HeadSync:
     async def _cache_and_backfill(
         self,
         block: SignedBlockWithAttestation,
-        peer_id: PeerId,
+        peer_id: PeerId | None,
         store: Store,
     ) -> tuple[HeadSyncResult, Store]:
         """

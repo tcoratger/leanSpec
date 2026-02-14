@@ -125,9 +125,10 @@ class ChainService:
             #
             # This minimal service does not produce blocks.
             # Block production requires validator keys.
-            new_store = self.sync_service.store.on_tick(
+            new_store, new_aggregated_attestations = self.sync_service.store.on_tick(
                 time=current_time,
                 has_proposal=False,
+                is_aggregator=self.sync_service.is_aggregator,
             )
 
             # Update sync service's store reference.
@@ -136,6 +137,11 @@ class ChainService:
             # we update its reference so gossip block processing sees
             # the updated time.
             self.sync_service.store = new_store
+
+            # Publish any new aggregated attestations produced this tick
+            if new_aggregated_attestations:
+                for agg in new_aggregated_attestations:
+                    await self.sync_service.publish_aggregated_attestation(agg)
 
             logger.info(
                 "Tick: slot=%d interval=%d time=%d head=%s finalized=slot%d",
@@ -162,11 +168,17 @@ class ChainService:
 
         # Only tick if we're past genesis.
         if current_time >= self.clock.genesis_time:
-            new_store = self.sync_service.store.on_tick(
+            new_store, _ = self.sync_service.store.on_tick(
                 time=current_time,
                 has_proposal=False,
+                is_aggregator=self.sync_service.is_aggregator,
             )
             self.sync_service.store = new_store
+
+            # Discard aggregated attestations from catch-up.
+            # During initial sync we may be many slots behind.
+            # Publishing stale aggregations would spam the network.
+
             return self.clock.total_intervals()
 
         return None

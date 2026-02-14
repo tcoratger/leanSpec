@@ -38,14 +38,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
     Block,
+    SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlockWithAttestation,
 )
@@ -67,6 +68,8 @@ logger = logging.getLogger(__name__)
 
 BlockProcessor = Callable[[Store, SignedBlockWithAttestation], Store]
 
+PublishAggFn = Callable[[SignedAggregatedAttestation], Coroutine[Any, Any, None]]
+
 
 def default_block_processor(
     store: Store,
@@ -74,6 +77,10 @@ def default_block_processor(
 ) -> Store:
     """Default block processor using store block processing."""
     return store.on_block(block)
+
+
+async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> None:
+    """No-op default for aggregated attestation publishing."""
 
 
 @dataclass(slots=True)
@@ -155,6 +162,9 @@ class SyncService:
 
     process_block: BlockProcessor = field(default=default_block_processor)
     """Block processor function. Defaults to Store.on_block()."""
+
+    _publish_agg_fn: PublishAggFn = field(default=_noop_publish_agg)
+    """Callback for publishing aggregated attestations to the network."""
 
     _state: SyncState = field(default=SyncState.IDLE)
     """Current sync state."""
@@ -346,7 +356,7 @@ class SyncService:
     async def on_gossip_block(
         self,
         block: SignedBlockWithAttestation,
-        peer_id: PeerId,
+        peer_id: PeerId | None,
     ) -> None:
         """
         Handle block received via gossip.
@@ -402,7 +412,6 @@ class SyncService:
     async def on_gossip_attestation(
         self,
         attestation: SignedAttestation,
-        peer_id: PeerId,  # noqa: ARG002
     ) -> None:
         """
         Handle attestation received via gossip.
@@ -416,7 +425,6 @@ class SyncService:
 
         Args:
             attestation: The signed attestation received.
-            peer_id: The peer that propagated the attestation (unused for now).
         """
         # Guard: Only process gossip in states that accept it.
         #
@@ -451,6 +459,42 @@ class SyncService:
             #
             # These are expected during normal operation and don't indicate bugs.
             pass
+
+    async def on_gossip_aggregated_attestation(
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+    ) -> None:
+        """
+        Handle aggregated attestation received via gossip.
+
+        Aggregated attestations are collections of individual votes for the same
+        target, signed by an aggregator. They provide efficient propagation of
+        consensus weight.
+
+        Args:
+            signed_attestation: The signed aggregated attestation received.
+        """
+        if not self._state.accepts_gossip:
+            return
+
+        try:
+            self.store = self.store.on_gossip_aggregated_attestation(signed_attestation)
+        except (AssertionError, KeyError) as e:
+            logger.warning("Aggregated attestation validation failed: %s", e)
+
+    async def publish_aggregated_attestation(
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+    ) -> None:
+        """
+        Publish an aggregated attestation to the network.
+
+        Called by the chain service when this node acts as an aggregator.
+
+        Args:
+            signed_attestation: The aggregate to publish.
+        """
+        await self._publish_agg_fn(signed_attestation)
 
     async def start_sync(self) -> None:
         """
