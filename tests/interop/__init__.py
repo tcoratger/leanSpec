@@ -1,10 +1,13 @@
 """
 Interop tests for multi-node leanSpec consensus.
 
-Tests verify:
+A single lifecycle test validates the full consensus pipeline:
 
-- Chain finalization across multiple nodes
-- Gossip communication correctness
-- Late-joiner checkpoint sync scenarios
-- Network partition recovery
+- Connectivity
+- Block production
+- Attestation
+- Safe target
+- Justification
+- Finalization
+- Sustained finalization
 """
