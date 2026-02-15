@@ -13,8 +13,6 @@ from lean_spec.subspecs.chain.config import (
     ATTESTATION_COMMITTEE_COUNT,
     INTERVALS_PER_SLOT,
     JUSTIFICATION_LOOKBACK_SLOTS,
-    MILLISECONDS_PER_INTERVAL,
-    SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.containers import (
     Attestation,
@@ -1076,17 +1074,17 @@ class Store(Container):
         return store, new_aggregates
 
     def on_tick(
-        self, time: Uint64, has_proposal: bool, is_aggregator: bool = False
+        self, target_interval: Uint64, has_proposal: bool, is_aggregator: bool = False
     ) -> tuple["Store", list[SignedAggregatedAttestation]]:
         """
-        Advance forkchoice store time to given timestamp.
+        Advance forkchoice store time to given interval count.
 
         Ticks store forward interval by interval, performing appropriate
         actions for each interval type. This method handles time progression
         incrementally to ensure all interval-specific actions are performed.
 
         Args:
-            time: Target time as Unix timestamp in seconds.
+            target_interval: Target time as intervals since genesis.
             has_proposal: Whether node has proposal for current slot.
             is_aggregator: Whether the node is an aggregator.
 
@@ -1094,16 +1092,12 @@ class Store(Container):
             Tuple of (new store with time advanced,
             list of all produced signed aggregated attestation).
         """
-        # Calculate target time in intervals
-        time_delta_ms = (time - self.config.genesis_time) * Uint64(1000)
-        tick_interval_time = time_delta_ms // MILLISECONDS_PER_INTERVAL
-
         # Tick forward one interval at a time
         store = self
         all_new_aggregates: list[SignedAggregatedAttestation] = []
-        while store.time < tick_interval_time:
+        while store.time < target_interval:
             # Check if proposal should be signaled for next interval
-            should_signal_proposal = has_proposal and (store.time + Uint64(1)) == tick_interval_time
+            should_signal_proposal = has_proposal and (store.time + Uint64(1)) == target_interval
 
             # Advance by one interval with appropriate signaling
             store, new_aggregates = store.tick_interval(should_signal_proposal, is_aggregator)
@@ -1132,12 +1126,9 @@ class Store(Container):
         Returns:
             Tuple of (new Store with updated time, head root for building).
         """
-        # Calculate time corresponding to this slot
-        slot_duration_seconds = slot * SECONDS_PER_SLOT
-        slot_time = self.config.genesis_time + slot_duration_seconds
-
-        # Advance time to current slot (ticking intervals)
-        store, _ = self.on_tick(slot_time, True)
+        # Advance time to this slot's first interval
+        target_interval = Uint64(slot * INTERVALS_PER_SLOT)
+        store, _ = self.on_tick(target_interval, True)
 
         # Process any pending attestations before proposal
         store = store.accept_new_attestations()

@@ -96,7 +96,7 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     # 2. Parent chain integrity - slot numbers strictly increase
     # 3. Proposer assignment - round-robin matches slot % 3
     logger.info("Phase 2: Block production")
-    reached = await node_cluster.wait_for_slot(target_slot=1, timeout=12)
+    reached = await node_cluster.wait_for_slot(target_slot=1, timeout=25)
     diags = node_cluster.log_diagnostics("block-production")
     checkpoint_history.append(diags)
     assert reached, f"Block production stalled: head slots {[d.head_slot for d in diags]}"

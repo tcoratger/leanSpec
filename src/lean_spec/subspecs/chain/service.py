@@ -112,13 +112,7 @@ class ChainService:
                 if total_interval <= last_handled_total_interval:
                     continue
 
-            # Get current wall-clock time as Unix timestamp (may have changed after sleep).
-            #
-            # The store expects an absolute timestamp, not intervals.
-            # It internally converts to intervals.
-            current_time = self.clock.current_time()
-
-            # Tick the store forward to current time.
+            # Tick the store forward to current interval.
             #
             # The store advances time interval by interval, performing
             # appropriate actions at each interval.
@@ -126,7 +120,7 @@ class ChainService:
             # This minimal service does not produce blocks.
             # Block production requires validator keys.
             new_store, new_aggregated_attestations = self.sync_service.store.on_tick(
-                time=current_time,
+                target_interval=total_interval,
                 has_proposal=False,
                 is_aggregator=self.sync_service.is_aggregator,
             )
@@ -144,10 +138,9 @@ class ChainService:
                     await self.sync_service.publish_aggregated_attestation(agg)
 
             logger.info(
-                "Tick: slot=%d interval=%d time=%d head=%s finalized=slot%d",
+                "Tick: slot=%d interval=%d head=%s finalized=slot%d",
                 self.clock.current_slot(),
-                self.clock.total_intervals(),
-                current_time,
+                total_interval,
                 new_store.head.hex(),
                 new_store.latest_finalized.slot,
             )
@@ -168,8 +161,9 @@ class ChainService:
 
         # Only tick if we're past genesis.
         if current_time >= self.clock.genesis_time:
+            target_interval = self.clock.total_intervals()
             new_store, _ = self.sync_service.store.on_tick(
-                time=current_time,
+                target_interval=target_interval,
                 has_proposal=False,
                 is_aggregator=self.sync_service.is_aggregator,
             )
@@ -179,7 +173,7 @@ class ChainService:
             # During initial sync we may be many slots behind.
             # Publishing stale aggregations would spam the network.
 
-            return self.clock.total_intervals()
+            return target_interval
 
         return None
 
