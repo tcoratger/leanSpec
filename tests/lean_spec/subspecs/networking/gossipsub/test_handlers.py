@@ -1,8 +1,4 @@
-"""Tests for gossipsub RPC handlers.
-
-Tests cover all handler methods: GRAFT, PRUNE, IHAVE, IWANT, IDONTWANT,
-subscription handling, message forwarding, and full RPC dispatch.
-"""
+"""Tests for gossipsub RPC handlers."""
 
 from __future__ import annotations
 
@@ -10,6 +6,7 @@ import time
 
 import pytest
 
+from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
 from lean_spec.subspecs.networking.gossipsub.behavior import (
     IDONTWANT_SIZE_THRESHOLD,
     GossipsubMessageEvent,
@@ -50,7 +47,7 @@ class TestHandleGraft:
         # Peer should be added to mesh
         assert peer_id in behavior.mesh.get_mesh_peers(topic)
         # No PRUNE sent
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
     @pytest.mark.asyncio
     async def test_ignore_graft_not_subscribed(self) -> None:
@@ -62,7 +59,7 @@ class TestHandleGraft:
         await behavior._handle_graft(peer_id, graft)
 
         # No PRUNE sent -- silent ignore prevents amplification attacks.
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
     @pytest.mark.asyncio
     async def test_reject_graft_mesh_full(self) -> None:
@@ -81,11 +78,16 @@ class TestHandleGraft:
         peer_id = add_peer(behavior, "newPeer", {topic})
         await behavior._handle_graft(peer_id, ControlGraft(topic_id=topic))
 
-        # Should receive PRUNE
-        assert len(capture.sent) == 1
-        _, rpc = capture.sent[0]
-        assert rpc.control is not None
-        assert len(rpc.control.prune) == 1
+        assert capture.sent == [
+            (
+                peer_id,
+                RPC(
+                    control=ControlMessage(
+                        prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)]
+                    )
+                ),
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_reject_graft_in_backoff(self) -> None:
@@ -100,11 +102,16 @@ class TestHandleGraft:
 
         await behavior._handle_graft(peer_id, ControlGraft(topic_id=topic))
 
-        # Should receive PRUNE (backoff rejection)
-        assert len(capture.sent) == 1
-        _, rpc = capture.sent[0]
-        assert rpc.control is not None
-        assert len(rpc.control.prune) == 1
+        assert capture.sent == [
+            (
+                peer_id,
+                RPC(
+                    control=ControlMessage(
+                        prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)]
+                    )
+                ),
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_graft_idempotent(self) -> None:
@@ -120,7 +127,7 @@ class TestHandleGraft:
         await behavior._handle_graft(peer_id, graft)
 
         assert peer_id in behavior.mesh.get_mesh_peers(topic)
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
 
 class TestHandlePrune:
@@ -201,11 +208,9 @@ class TestHandleIHave:
         ihave = ControlIHave(topic_id="topic", message_ids=[msg_id])
         await behavior._handle_ihave(peer_id, ihave)
 
-        assert len(capture.sent) == 1
-        _, rpc = capture.sent[0]
-        assert rpc.control is not None
-        assert len(rpc.control.iwant) == 1
-        assert msg_id in rpc.control.iwant[0].message_ids
+        assert capture.sent == [
+            (peer_id, RPC(control=ControlMessage(iwant=[ControlIWant(message_ids=[msg_id])])))
+        ]
 
     @pytest.mark.asyncio
     async def test_ihave_ignores_seen(self) -> None:
@@ -220,7 +225,7 @@ class TestHandleIHave:
         ihave = ControlIHave(topic_id="topic", message_ids=[bytes(msg_id)])
         await behavior._handle_ihave(peer_id, ihave)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
     @pytest.mark.asyncio
     async def test_ihave_partial_seen(self) -> None:
@@ -236,12 +241,12 @@ class TestHandleIHave:
         ihave = ControlIHave(topic_id="topic", message_ids=[bytes(seen_id), unseen_id])
         await behavior._handle_ihave(peer_id, ihave)
 
-        assert len(capture.sent) == 1
-        _, rpc = capture.sent[0]
-        assert rpc.control is not None
-        wanted = rpc.control.iwant[0].message_ids
-        assert unseen_id in wanted
-        assert bytes(seen_id) not in wanted
+        assert capture.sent == [
+            (
+                peer_id,
+                RPC(control=ControlMessage(iwant=[ControlIWant(message_ids=[unseen_id])])),
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_ihave_skips_wrong_length_ids(self) -> None:
@@ -254,7 +259,7 @@ class TestHandleIHave:
         await behavior._handle_ihave(peer_id, ihave)
 
         # No IWANT sent
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
 
 class TestHandleIWant:
@@ -273,10 +278,7 @@ class TestHandleIWant:
         iwant = ControlIWant(message_ids=[bytes(msg.id)])
         await behavior._handle_iwant(peer_id, iwant)
 
-        assert len(capture.sent) == 1
-        _, rpc = capture.sent[0]
-        assert len(rpc.publish) == 1
-        assert rpc.publish[0].data == b"payload"
+        assert capture.sent == [(peer_id, RPC(publish=[Message(topic="topic", data=b"payload")]))]
 
     @pytest.mark.asyncio
     async def test_iwant_ignores_uncached(self) -> None:
@@ -287,7 +289,7 @@ class TestHandleIWant:
         iwant = ControlIWant(message_ids=[b"12345678901234567890"])
         await behavior._handle_iwant(peer_id, iwant)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
     @pytest.mark.asyncio
     async def test_iwant_skips_wrong_length_ids(self) -> None:
@@ -298,7 +300,7 @@ class TestHandleIWant:
         iwant = ControlIWant(message_ids=[b"short"])
         await behavior._handle_iwant(peer_id, iwant)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
 
 class TestHandleSubscription:
@@ -340,11 +342,9 @@ class TestHandleSubscription:
         sub = SubOpts(subscribe=True, topic_id="topic1")
         await behavior._handle_subscription(peer_id, sub)
 
-        event = behavior._event_queue.get_nowait()
-        assert isinstance(event, GossipsubPeerEvent)
-        assert event.peer_id == peer_id
-        assert event.topic == "topic1"
-        assert event.subscribed is True
+        assert behavior._event_queue.get_nowait() == GossipsubPeerEvent(
+            peer_id=peer_id, topic="topic1", subscribed=True
+        )
 
 
 class TestHandleMessage:
@@ -365,10 +365,7 @@ class TestHandleMessage:
         msg = Message(topic=topic, data=b"hello")
         await behavior._handle_message(sender, msg)
 
-        # Should forward to mesh_rx but not sender
-        sent_peers = [p for p, _ in capture.sent]
-        assert mesh_rx in sent_peers
-        assert sender not in sent_peers
+        assert capture.sent == [(mesh_rx, RPC(publish=[msg]))]
 
     @pytest.mark.asyncio
     async def test_duplicate_message_ignored(self) -> None:
@@ -381,11 +378,11 @@ class TestHandleMessage:
         msg = Message(topic=topic, data=b"hello")
 
         await behavior._handle_message(peer_id, msg)
-        first_sent_count = len(capture.sent)
+        assert capture.sent == []
 
         # Second time should be ignored
         await behavior._handle_message(peer_id, msg)
-        assert len(capture.sent) == first_sent_count
+        assert capture.sent == []
 
     @pytest.mark.asyncio
     async def test_message_event_emitted(self) -> None:
@@ -396,10 +393,12 @@ class TestHandleMessage:
         msg = Message(topic="topic", data=b"payload")
         await behavior._handle_message(peer_id, msg)
 
-        event = behavior._event_queue.get_nowait()
-        assert isinstance(event, GossipsubMessageEvent)
-        assert event.topic == "topic"
-        assert event.data == b"payload"
+        assert behavior._event_queue.get_nowait() == GossipsubMessageEvent(
+            peer_id=peer_id,
+            topic="topic",
+            data=b"payload",
+            message_id=GossipsubMessage.compute_id(b"topic", b"payload"),
+        )
 
     @pytest.mark.asyncio
     async def test_message_callback_invoked(self) -> None:
@@ -413,8 +412,14 @@ class TestHandleMessage:
         msg = Message(topic="topic", data=b"data")
         await behavior._handle_message(peer_id, msg)
 
-        assert len(received) == 1
-        assert received[0].data == b"data"
+        assert received == [
+            GossipsubMessageEvent(
+                peer_id=peer_id,
+                topic="topic",
+                data=b"data",
+                message_id=GossipsubMessage.compute_id(b"topic", b"data"),
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_empty_topic_ignored(self) -> None:
@@ -425,7 +430,7 @@ class TestHandleMessage:
         msg = Message(topic="", data=b"data")
         await behavior._handle_message(peer_id, msg)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
         assert behavior._event_queue.empty()
 
     @pytest.mark.asyncio
@@ -438,10 +443,13 @@ class TestHandleMessage:
         msg = Message(topic="topic", data=b"data")
         await behavior._handle_message(peer_id, msg)
 
-        # No forwarding RPCs sent (event is still emitted)
-        assert len(capture.sent) == 0
-        event = behavior._event_queue.get_nowait()
-        assert isinstance(event, GossipsubMessageEvent)
+        assert capture.sent == []
+        assert behavior._event_queue.get_nowait() == GossipsubMessageEvent(
+            peer_id=peer_id,
+            topic="topic",
+            data=b"data",
+            message_id=GossipsubMessage.compute_id(b"topic", b"data"),
+        )
 
     @pytest.mark.asyncio
     async def test_idontwant_sent_for_large_messages(self) -> None:
@@ -457,11 +465,20 @@ class TestHandleMessage:
 
         large_data = b"x" * IDONTWANT_SIZE_THRESHOLD
         msg = Message(topic=topic, data=large_data)
+        msg_id = GossipsubMessage.compute_id(topic.encode("utf-8"), large_data)
         await behavior._handle_message(sender, msg)
 
-        # Should have forwarded message + sent IDONTWANT
-        idontwant_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.idontwant]
-        assert len(idontwant_rpcs) >= 1
+        assert capture.sent == [
+            (other, RPC(publish=[msg])),
+            (
+                other,
+                RPC(
+                    control=ControlMessage(
+                        idontwant=[ControlIDontWant(message_ids=[bytes(msg_id)])]
+                    )
+                ),
+            ),
+        ]
 
     @pytest.mark.asyncio
     async def test_idontwant_not_sent_for_small_messages(self) -> None:
@@ -479,9 +496,7 @@ class TestHandleMessage:
         msg = Message(topic=topic, data=small_data)
         await behavior._handle_message(sender, msg)
 
-        # No IDONTWANT RPCs
-        idontwant_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.idontwant]
-        assert len(idontwant_rpcs) == 0
+        assert capture.sent == [(other, RPC(publish=[msg]))]
 
     @pytest.mark.asyncio
     async def test_message_not_forwarded_to_idontwant_peer(self) -> None:
@@ -503,9 +518,7 @@ class TestHandleMessage:
         msg = Message(topic=topic, data=b"hello")
         await behavior._handle_message(sender, msg)
 
-        # peer_ax should NOT have received the message forward
-        forward_peers = [p for p, r in capture.sent if r.publish]
-        assert peer_ax not in forward_peers
+        assert capture.sent == []
 
 
 class TestHandleIDontWant:
@@ -553,20 +566,22 @@ class TestHandleRPC:
 
         await behavior._handle_rpc(peer_id, rpc)
 
-        # Subscription processed
         assert "new_topic" in behavior._peers[peer_id].subscriptions
+        assert peer_id in behavior.mesh.get_mesh_peers(topic)
+        assert capture.sent == []
 
-        # Message processed (event emitted)
         events = []
         while not behavior._event_queue.empty():
             events.append(behavior._event_queue.get_nowait())
-        msg_events = [e for e in events if isinstance(e, GossipsubMessageEvent)]
-        peer_events = [e for e in events if isinstance(e, GossipsubPeerEvent)]
-        assert len(msg_events) == 1
-        assert len(peer_events) == 1
-
-        # GRAFT processed (peer added to mesh)
-        assert peer_id in behavior.mesh.get_mesh_peers(topic)
+        assert events == [
+            GossipsubPeerEvent(peer_id=peer_id, topic="new_topic", subscribed=True),
+            GossipsubMessageEvent(
+                peer_id=peer_id,
+                topic=topic,
+                data=b"data",
+                message_id=GossipsubMessage.compute_id(topic.encode("utf-8"), b"data"),
+            ),
+        ]
 
     @pytest.mark.asyncio
     async def test_unknown_peer_is_noop(self) -> None:
@@ -577,4 +592,4 @@ class TestHandleRPC:
         rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="topic")])
         await behavior._handle_rpc(unknown, rpc)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []

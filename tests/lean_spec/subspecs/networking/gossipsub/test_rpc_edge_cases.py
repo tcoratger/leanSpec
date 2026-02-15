@@ -31,30 +31,18 @@ class TestPeerInfoRoundtrip:
     def test_peer_info_with_both_fields(self) -> None:
         """PeerInfo roundtrips with both peer_id and signed_peer_record."""
         info = PeerInfo(peer_id=b"peer123", signed_peer_record=b"record456")
-        encoded = info.encode()
-        decoded = PeerInfo.decode(encoded)
-
-        assert decoded.peer_id == b"peer123"
-        assert decoded.signed_peer_record == b"record456"
+        assert PeerInfo.decode(info.encode()) == info
 
     def test_peer_info_peer_id_only(self) -> None:
         """PeerInfo roundtrips with only peer_id."""
         info = PeerInfo(peer_id=b"peerOnly")
-        encoded = info.encode()
-        decoded = PeerInfo.decode(encoded)
-
-        assert decoded.peer_id == b"peerOnly"
-        assert decoded.signed_peer_record == b""
+        assert PeerInfo.decode(info.encode()) == info
 
     def test_peer_info_empty(self) -> None:
         """Empty PeerInfo produces empty encoding."""
         info = PeerInfo()
-        encoded = info.encode()
-        assert encoded == b""
-
-        decoded = PeerInfo.decode(b"")
-        assert decoded.peer_id == b""
-        assert decoded.signed_peer_record == b""
+        assert info.encode() == b""
+        assert PeerInfo.decode(b"") == PeerInfo()
 
 
 class TestPruneWithPeerExchange:
@@ -62,30 +50,20 @@ class TestPruneWithPeerExchange:
 
     def test_prune_with_peers(self) -> None:
         """ControlPrune roundtrips with peer exchange info."""
-        peers = [
-            PeerInfo(peer_id=b"alt1", signed_peer_record=b"rec1"),
-            PeerInfo(peer_id=b"alt2"),
-        ]
-        prune = ControlPrune(topic_id="/topic", peers=peers, backoff=120)
-        encoded = prune.encode()
-        decoded = ControlPrune.decode(encoded)
-
-        assert decoded.topic_id == "/topic"
-        assert decoded.backoff == 120
-        assert len(decoded.peers) == 2
-        assert decoded.peers[0].peer_id == b"alt1"
-        assert decoded.peers[0].signed_peer_record == b"rec1"
-        assert decoded.peers[1].peer_id == b"alt2"
+        prune = ControlPrune(
+            topic_id="/topic",
+            peers=[
+                PeerInfo(peer_id=b"alt1", signed_peer_record=b"rec1"),
+                PeerInfo(peer_id=b"alt2"),
+            ],
+            backoff=120,
+        )
+        assert ControlPrune.decode(prune.encode()) == prune
 
     def test_prune_no_peers(self) -> None:
         """ControlPrune without peers field."""
         prune = ControlPrune(topic_id="/topic", backoff=60)
-        encoded = prune.encode()
-        decoded = ControlPrune.decode(encoded)
-
-        assert decoded.topic_id == "/topic"
-        assert decoded.backoff == 60
-        assert decoded.peers == []
+        assert ControlPrune.decode(prune.encode()) == prune
 
 
 class TestSkipField:
@@ -133,27 +111,21 @@ class TestEmptyDecode:
 
     def test_rpc_decode_empty(self) -> None:
         """Decoding empty bytes returns an empty RPC."""
-        rpc = RPC.decode(b"")
-        assert rpc.subscriptions == []
-        assert rpc.publish == []
-        assert rpc.control is None
+        assert RPC.decode(b"") == RPC()
 
     def test_message_decode_empty(self) -> None:
         """Decoding empty bytes returns a default Message."""
-        msg = Message.decode(b"")
-        assert msg.topic == ""
-        assert msg.data == b""
+        assert Message.decode(b"") == Message()
 
     def test_control_message_decode_empty(self) -> None:
         """Decoding empty bytes returns an empty ControlMessage."""
         ctrl = ControlMessage.decode(b"")
+        assert ctrl == ControlMessage()
         assert ctrl.is_empty()
 
     def test_subopts_decode_empty(self) -> None:
         """Decoding empty bytes returns default SubOpts."""
-        sub = SubOpts.decode(b"")
-        assert sub.subscribe is False
-        assert sub.topic_id == ""
+        assert SubOpts.decode(b"") == SubOpts(subscribe=False, topic_id="")
 
 
 class TestForwardCompatibility:
@@ -161,18 +133,14 @@ class TestForwardCompatibility:
 
     def test_rpc_with_unknown_varint_field(self) -> None:
         """RPC ignores unknown varint fields."""
-        # Encode a normal subscription, then append an unknown field (field 99, varint).
-        sub = SubOpts(subscribe=True, topic_id="topic")
-        rpc = RPC(subscriptions=[sub])
+        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="topic")])
         data = bytearray(rpc.encode())
 
         # Append unknown field 99, wire type varint, value 42.
         data.extend(encode_tag(99, WIRE_TYPE_VARINT))
         data.extend(b"\x2a")  # varint 42
 
-        decoded = RPC.decode(bytes(data))
-        assert len(decoded.subscriptions) == 1
-        assert decoded.subscriptions[0].topic_id == "topic"
+        assert RPC.decode(bytes(data)) == rpc
 
     def test_message_with_unknown_field(self) -> None:
         """Message ignores unknown length-delimited fields."""
@@ -182,9 +150,7 @@ class TestForwardCompatibility:
         # Append unknown field 99.
         data.extend(encode_bytes(99, b"unknown_data"))
 
-        decoded = Message.decode(bytes(data))
-        assert decoded.topic == "t"
-        assert decoded.data == b"d"
+        assert Message.decode(bytes(data)) == msg
 
 
 class TestLengthValidation:
@@ -218,12 +184,7 @@ class TestMultiTopicControl:
                 ControlGraft(topic_id="/topicC"),
             ]
         )
-        encoded = ctrl.encode()
-        decoded = ControlMessage.decode(encoded)
-
-        assert len(decoded.graft) == 3
-        topics = [g.topic_id for g in decoded.graft]
-        assert topics == ["/topicA", "/topicB", "/topicC"]
+        assert ControlMessage.decode(ctrl.encode()) == ctrl
 
     def test_full_control_message_all_types(self) -> None:
         """Control message with all types in a single message."""
@@ -233,13 +194,7 @@ class TestMultiTopicControl:
             graft=[ControlGraft(topic_id="/t")],
             prune=[ControlPrune(topic_id="/t", backoff=30)],
         )
-        encoded = ctrl.encode()
-        decoded = ControlMessage.decode(encoded)
-
-        assert len(decoded.ihave) == 1
-        assert len(decoded.iwant) == 1
-        assert len(decoded.graft) == 1
-        assert len(decoded.prune) == 1
+        assert ControlMessage.decode(ctrl.encode()) == ctrl
 
     def test_rpc_with_multiple_subscriptions_and_messages(self) -> None:
         """RPC with multiple subscriptions and published messages."""
@@ -254,10 +209,4 @@ class TestMultiTopicControl:
                 Message(topic="/c", data=b"msg2"),
             ],
         )
-        encoded = rpc.encode()
-        decoded = RPC.decode(encoded)
-
-        assert len(decoded.subscriptions) == 3
-        assert len(decoded.publish) == 2
-        assert decoded.publish[0].data == b"msg1"
-        assert decoded.publish[1].data == b"msg2"
+        assert RPC.decode(rpc.encode()) == rpc

@@ -8,7 +8,15 @@ from __future__ import annotations
 
 import pytest
 
+from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
+from lean_spec.subspecs.networking.gossipsub.rpc import (
+    RPC,
+    ControlMessage,
+    ControlPrune,
+    Message,
+    SubOpts,
+)
 
 from .conftest import add_peer, make_behavior
 
@@ -30,9 +38,9 @@ class TestPublish:
 
         await behavior.publish(topic, b"hello")
 
-        sent_peers = [p for p, _ in capture.sent]
-        assert p1 in sent_peers
-        assert p2 in sent_peers
+        publish_rpc = RPC(publish=[Message(topic=topic, data=b"hello")])
+        assert {p for p, _ in capture.sent} == {p1, p2}
+        assert all(rpc == publish_rpc for _, rpc in capture.sent)
 
     @pytest.mark.asyncio
     async def test_publish_to_unsubscribed_topic_uses_fanout(self) -> None:
@@ -45,10 +53,9 @@ class TestPublish:
 
         await behavior.publish(topic, b"fanoutMsg")
 
-        # At least one peer should have received the message.
-        sent_peers = [p for p, _ in capture.sent]
-        assert len(sent_peers) > 0
-        # The topic should now have a fanout entry.
+        publish_rpc = RPC(publish=[Message(topic=topic, data=b"fanoutMsg")])
+        assert len(capture.sent) > 0
+        assert all(rpc == publish_rpc for _, rpc in capture.sent)
         assert topic in behavior.mesh.fanout_topics
 
     @pytest.mark.asyncio
@@ -90,7 +97,7 @@ class TestPublish:
         # No peers added -- mesh is empty.
         await behavior.publish(topic, b"data")
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
 
 class TestBroadcastSubscription:
@@ -111,10 +118,8 @@ class TestBroadcastSubscription:
         for task in list(behavior._background_tasks):
             await task
 
-        # Both peers should have received subscription RPCs.
-        sub_peers = {p for p, r in capture.sent if r.subscriptions}
-        assert p1 in sub_peers
-        assert p2 in sub_peers
+        sub_rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="newTopic")])
+        assert capture.sent == [(p1, sub_rpc), (p2, sub_rpc)]
 
     @pytest.mark.asyncio
     async def test_subscribe_grafts_eligible_peers(self) -> None:
@@ -180,13 +185,22 @@ class TestBroadcastSubscription:
         behavior.mesh.add_to_mesh(topic, p1)
         behavior.mesh.add_to_mesh(topic, p2)
 
+        # Drain background tasks from subscribe() before testing unsubscribe.
+        for task in list(behavior._background_tasks):
+            await task
+        capture.sent.clear()
+
         behavior.unsubscribe(topic)
 
         for task in list(behavior._background_tasks):
             await task
 
-        # PRUNE should have been sent to both former mesh peers.
-        prune_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.prune]
-        prune_peers = {p for p, _ in prune_rpcs}
-        assert p1 in prune_peers
-        assert p2 in prune_peers
+        sub_rpc = RPC(subscriptions=[SubOpts(subscribe=False, topic_id=topic)])
+        prune_rpc = RPC(
+            control=ControlMessage(prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)])
+        )
+        sub_sends = [(p, r) for p, r in capture.sent if r.subscriptions]
+        prune_sends = [(p, r) for p, r in capture.sent if r.control and r.control.prune]
+        assert sub_sends == [(p1, sub_rpc), (p2, sub_rpc)]
+        assert {p for p, _ in prune_sends} == {p1, p2}
+        assert all(rpc == prune_rpc for _, rpc in prune_sends)

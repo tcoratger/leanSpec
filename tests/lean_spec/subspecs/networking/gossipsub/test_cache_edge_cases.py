@@ -153,10 +153,7 @@ class TestMessageCachePutAndGet:
         cache = MessageCache()
         msg = GossipsubMessage(topic=b"t", raw_data=b"data")
         cache.put("t", msg)
-
-        retrieved = cache.get(msg.id)
-        assert retrieved is not None
-        assert retrieved.id == msg.id
+        assert cache.get(msg.id) == msg
 
     def test_get_returns_none_for_unknown(self) -> None:
         """get() returns None for an unknown message ID."""
