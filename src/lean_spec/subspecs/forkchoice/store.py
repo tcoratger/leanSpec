@@ -903,57 +903,106 @@ class Store(Container):
 
     def update_safe_target(self) -> "Store":
         """
-        Update the safe target for attestations.
+        Compute the deepest block that has 2/3+ supermajority attestation weight.
 
-        Computes target that has sufficient (2/3+ majority) attestation support.
-        The safe target represents a block with enough attestation weight to be
-        considered "safe" for validators to attest to.
+        The safe target is the furthest-from-genesis block where enough validators
+        agree. Validators use it to decide which block is safe to attest to.
+        Only blocks meeting the supermajority threshold qualify.
 
-        Algorithm
-        ---------
-        1. Get validator count from head state
-        2. Calculate 2/3 majority threshold (ceiling division)
-        3. Merge all attestation evidence (new + known aggregated payloads)
-        4. Run fork choice with minimum score requirement
-        5. Return new Store with updated safe_target
+        This runs at interval 3 of the slot cycle:
+
+        - Interval 0: Block proposal
+        - Interval 1: Validators cast attestation votes
+        - Interval 2: Aggregators create proofs, broadcast via gossip
+        - Interval 3: Safe target update (HERE)
+        - Interval 4: New attestations migrate to "known" pool
+
+        Because interval 4 has not yet run, attestations live in two pools:
+
+        - "new": freshly received from gossipsub aggregation this slot
+        - "known": from block attestations and previously accepted gossip
+
+        Both pools must be merged to get the full attestation picture.
+        Using only one pool undercounts support. See inline comments for
+        concrete scenarios where this matters.
+
+        Note: the Ream reference implementation uses only the "new" pool.
+        Our merge approach is more conservative. It ensures the safe target
+        reflects every attestation the node knows about.
 
         Returns:
             New Store with updated safe_target.
         """
-        # Get validator count from head state
+        # Look up the post-state of the current head block.
+        #
+        # The validator registry in this state tells us how many active
+        # validators exist. We need that count to compute the threshold.
         head_state = self.states[self.head]
         num_validators = len(head_state.validators)
 
-        # Calculate 2/3 majority threshold (ceiling division)
+        # Compute the 2/3 supermajority threshold.
+        #
+        # A block needs at least this many attestation votes to be "safe".
+        # The ceiling division (negation trick) ensures we round UP.
+        # For example, 100 validators => threshold is 67, not 66.
         min_target_score = -(-num_validators * 2 // 3)
 
-        # Merge both new and known attestation evidence.
+        # Merge both attestation pools into a single unified view.
         #
-        # The safe target must reflect ALL attestation support:
-        # - "new" payloads: from gossip aggregation (interval 2)
-        # - "known" payloads: from block attestations and previously accepted gossip
+        # Why merge? At interval 3, the migration step (interval 4) has not
+        # run yet. Attestations can enter the "known" pool through paths that
+        # bypass gossipsub entirely:
         #
-        # Using only "new" payloads undercounts because:
-        # - The proposer's attestation goes directly to "known" (bundled in block)
-        # - A node's own gossip attestation never loops back through gossipsub
+        # 1. Proposer's own attestation: the block proposer bundles their
+        #    attestation directly in the block body. When the block is
+        #    processed, this attestation lands in "known" immediately.
+        #    It never appears in "new" because it was never gossipped.
+        #
+        # 2. Self-attestation: a node's own gossip attestation does not
+        #    loop back through gossipsub to itself. The node records it
+        #    locally in "known" without going through the "new" pipeline.
+        #
+        # Without this merge, those attestations would be invisible to the
+        # safe target calculation, causing it to undercount support.
+        #
+        # The technique: start with a shallow copy of "known", then overlay
+        # every entry from "new" on top. When both pools contain proofs for
+        # the same signature key, concatenate the proof lists.
         all_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] = dict(
             self.latest_known_aggregated_payloads
         )
         for sig_key, proofs in self.latest_new_aggregated_payloads.items():
             if sig_key in all_payloads:
+                # Both pools have proofs for this key. Combine them.
                 all_payloads[sig_key] = [*all_payloads[sig_key], *proofs]
             else:
+                # Only "new" has proofs for this key. Add them directly.
                 all_payloads[sig_key] = proofs
 
+        # Convert the merged aggregated payloads into per-validator votes.
+        #
+        # Each proof encodes which validators participated.
+        # This step unpacks those bitfields into a flat mapping of validator -> vote.
         attestations = self.extract_attestations_from_aggregated_payloads(all_payloads)
 
-        # Find head with minimum attestation threshold.
+        # Run LMD GHOST with the supermajority threshold.
+        #
+        # The walk starts from the latest justified checkpoint and descends
+        # through the block tree. At each fork, only children with at least
+        # `min_target_score` attestation weight are considered. The result
+        # is the deepest block that clears the 2/3 bar.
+        #
+        # If no child meets the threshold at some fork, the walk stops
+        # early. The safe target is then shallower than the actual head.
         safe_target = self._compute_lmd_ghost_head(
             start_root=self.latest_justified.root,
             attestations=attestations,
             min_score=min_target_score,
         )
 
+        # Return a new Store with only the safe target updated.
+        #
+        # The head and attestation pools remain unchanged.
         return self.model_copy(update={"safe_target": safe_target})
 
     def aggregate_committee_signatures(self) -> tuple["Store", list[SignedAggregatedAttestation]]:
