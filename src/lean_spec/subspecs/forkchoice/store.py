@@ -1108,9 +1108,10 @@ class Store(Container):
             Tuple of (new store with time advanced,
             list of all produced signed aggregated attestation).
         """
-        # Tick forward one interval at a time
         store = self
         all_new_aggregates: list[SignedAggregatedAttestation] = []
+
+        # Tick forward one interval at a time
         while store.time < target_interval:
             # Check if proposal should be signaled for next interval
             should_signal_proposal = has_proposal and (store.time + Uint64(1)) == target_interval
