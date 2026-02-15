@@ -208,6 +208,11 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     diags = node_cluster.log_diagnostics("safe-target")
     checkpoint_history.append(diags)
 
+    # Re-read after diagnostics to avoid stale-snapshot race.
+    # The 2-second poll sleep lets gossip update the store between
+    # the last snapshot and the assertion.
+    safe_targets = [n.diagnostics().safe_target_slot for n in node_cluster.nodes]
+
     # Per-node assertion to identify which node stalled.
     for i, st in enumerate(safe_targets):
         assert st >= 1, f"Node {i}: safe_target_slot={st}, expected >= 1"
@@ -231,6 +236,9 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
 
     diags = node_cluster.log_diagnostics("justification")
     checkpoint_history.append(diags)
+
+    # Re-read after diagnostics to avoid stale-snapshot race.
+    justified_slots = [n.justified_slot for n in node_cluster.nodes]
 
     # Per-node assertion to identify which node failed to justify.
     for i, js in enumerate(justified_slots):
