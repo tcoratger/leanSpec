@@ -913,8 +913,9 @@ class Store(Container):
         ---------
         1. Get validator count from head state
         2. Calculate 2/3 majority threshold (ceiling division)
-        3. Run fork choice with minimum score requirement
-        4. Return new Store with updated safe_target
+        3. Merge all attestation evidence (new + known aggregated payloads)
+        4. Run fork choice with minimum score requirement
+        5. Return new Store with updated safe_target
 
         Returns:
             New Store with updated safe_target.
@@ -926,10 +927,25 @@ class Store(Container):
         # Calculate 2/3 majority threshold (ceiling division)
         min_target_score = -(-num_validators * 2 // 3)
 
-        # Extract attestations from new aggregated payloads
-        attestations = self.extract_attestations_from_aggregated_payloads(
-            self.latest_new_aggregated_payloads
+        # Merge both new and known attestation evidence.
+        #
+        # The safe target must reflect ALL attestation support:
+        # - "new" payloads: from gossip aggregation (interval 2)
+        # - "known" payloads: from block attestations and previously accepted gossip
+        #
+        # Using only "new" payloads undercounts because:
+        # - The proposer's attestation goes directly to "known" (bundled in block)
+        # - A node's own gossip attestation never loops back through gossipsub
+        all_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] = dict(
+            self.latest_known_aggregated_payloads
         )
+        for sig_key, proofs in self.latest_new_aggregated_payloads.items():
+            if sig_key in all_payloads:
+                all_payloads[sig_key] = [*all_payloads[sig_key], *proofs]
+            else:
+                all_payloads[sig_key] = proofs
+
+        attestations = self.extract_attestations_from_aggregated_payloads(all_payloads)
 
         # Find head with minimum attestation threshold.
         safe_target = self._compute_lmd_ghost_head(
