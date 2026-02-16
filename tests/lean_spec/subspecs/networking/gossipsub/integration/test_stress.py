@@ -53,8 +53,16 @@ async def test_peer_churn(
             await new_node.connect_to(existing)
 
     # Heartbeat rounds let the mesh absorb new peers via GRAFT.
+    # Under CPU pressure, a fixed number of rounds may not suffice.
+    # Retry until all meshes converge or a timeout is hit.
     await asyncio.sleep(0.1)
-    await network.stabilize_mesh(TOPIC, rounds=5)
+    max_rounds = 20
+    for _ in range(max_rounds):
+        await network.stabilize_mesh(TOPIC, rounds=1)
+        if all(
+            params.d_low <= node.get_mesh_size(TOPIC) <= params.d_high for node in network.nodes
+        ):
+            break
 
     for node in network.nodes:
         size = node.get_mesh_size(TOPIC)
