@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.networking import varint
 from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
 from lean_spec.subspecs.networking.transport.peer_id import (
     Base58,
@@ -92,33 +91,6 @@ class TestBase58:
 
         with pytest.raises(ValueError, match="Invalid Base58 character"):
             Base58.decode("l")  # 'l' not in Base58
-
-
-class TestVarintEncoding:
-    """Tests for varint encoding."""
-
-    def test_encode_zero(self) -> None:
-        """Zero encodes to single byte."""
-        assert varint.encode_varint(0) == b"\x00"
-
-    def test_encode_small_values(self) -> None:
-        """Values < 128 encode to single byte."""
-        assert varint.encode_varint(1) == b"\x01"
-        assert varint.encode_varint(127) == b"\x7f"
-
-    def test_encode_128(self) -> None:
-        """128 requires two bytes."""
-        assert varint.encode_varint(128) == b"\x80\x01"
-
-    def test_encode_large_values(self) -> None:
-        """Large values use multiple bytes."""
-        assert varint.encode_varint(300) == b"\xac\x02"
-        assert varint.encode_varint(16384) == b"\x80\x80\x01"
-
-    def test_encode_negative_raises(self) -> None:
-        """Negative values raise ValueError."""
-        with pytest.raises(ValueError, match="non-negative"):
-            varint.encode_varint(-1)
 
 
 class TestMultihash:

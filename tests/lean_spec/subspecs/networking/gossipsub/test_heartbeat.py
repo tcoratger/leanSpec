@@ -13,6 +13,13 @@ import pytest
 from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
 from lean_spec.subspecs.networking.gossipsub.mcache import SeenCache
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
+from lean_spec.subspecs.networking.gossipsub.rpc import (
+    RPC,
+    ControlGraft,
+    ControlIHave,
+    ControlMessage,
+    ControlPrune,
+)
 from lean_spec.types import Bytes20
 
 from .conftest import add_peer, make_behavior, make_peer
@@ -28,21 +35,19 @@ class TestMaintainMesh:
         topic = "test_topic"
         behavior.subscribe(topic)
 
-        # Add 5 eligible peers (subscribed, with outbound stream)
-        names = ["peerA", "peerB", "peerC", "peerD", "peerE"]
+        # Exactly d=4 eligible peers so random.sample selects all deterministically.
+        names = ["peerA", "peerB", "peerC", "peerD"]
         for name in names:
             add_peer(behavior, name, {topic})
 
-        # Mesh is empty (0 < d_low=3), should graft up to d=4
         now = time.time()
         await behavior._maintain_mesh(topic, now)
 
-        # Verify GRAFTs were sent
-        graft_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.graft]
-        assert len(graft_rpcs) == 4  # d=4 peers grafted
-        # All grafted peers should be in mesh
-        mesh = behavior.mesh.get_mesh_peers(topic)
-        assert len(mesh) == 4
+        expected_peers = {make_peer(name) for name in names}
+        graft_rpc = RPC(control=ControlMessage(graft=[ControlGraft(topic_id=topic)]))
+        assert {p for p, _ in capture.sent} == expected_peers
+        assert all(rpc == graft_rpc for _, rpc in capture.sent)
+        assert behavior.mesh.get_mesh_peers(topic) == expected_peers
 
     @pytest.mark.asyncio
     async def test_prunes_when_above_d_high(self) -> None:
@@ -53,20 +58,25 @@ class TestMaintainMesh:
 
         # Add 6 peers and put them all in mesh (exceeds d_high=4)
         names = ["peerA", "peerB", "peerC", "peerD", "peerE", "peerF"]
+        all_peers = set()
         for name in names:
             pid = add_peer(behavior, name, {topic})
             behavior.mesh.add_to_mesh(topic, pid)
+            all_peers.add(pid)
 
         now = time.time()
         await behavior._maintain_mesh(topic, now)
 
-        # Mesh should be reduced to d=3
         mesh = behavior.mesh.get_mesh_peers(topic)
         assert len(mesh) == 3
 
-        # Pruned peers should have received PRUNE
-        prune_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.prune]
-        assert len(prune_rpcs) == 3  # 6 - 3 = 3 pruned
+        prune_rpc = RPC(
+            control=ControlMessage(prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)])
+        )
+        pruned_peers = {p for p, _ in capture.sent}
+        assert len(capture.sent) == 3
+        assert all(rpc == prune_rpc for _, rpc in capture.sent)
+        assert pruned_peers | mesh == all_peers
 
     @pytest.mark.asyncio
     async def test_respects_backoff(self) -> None:
@@ -125,8 +135,7 @@ class TestMaintainMesh:
         now = time.time()
         await behavior._maintain_mesh(topic, now)
 
-        # No GRAFTs or PRUNEs sent
-        assert len(capture.sent) == 0
+        assert capture.sent == []
         assert len(behavior.mesh.get_mesh_peers(topic)) == 4
 
     @pytest.mark.asyncio
@@ -177,12 +186,16 @@ class TestEmitGossip:
 
         await behavior._emit_gossip(topic)
 
-        # IHAVE should go to non-mesh peer
-        ihave_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.ihave]
-        assert len(ihave_rpcs) >= 1
-        sent_to = {p for p, _ in ihave_rpcs}
-        assert non_mesh_pid in sent_to
-        assert mesh_pid not in sent_to
+        assert capture.sent == [
+            (
+                non_mesh_pid,
+                RPC(
+                    control=ControlMessage(
+                        ihave=[ControlIHave(topic_id=topic, message_ids=[bytes(msg.id)])]
+                    )
+                ),
+            )
+        ]
 
     @pytest.mark.asyncio
     async def test_skips_when_no_cached_messages(self) -> None:
@@ -195,7 +208,7 @@ class TestEmitGossip:
 
         await behavior._emit_gossip(topic)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
     @pytest.mark.asyncio
     async def test_skips_peers_without_outbound_stream(self) -> None:
@@ -212,7 +225,7 @@ class TestEmitGossip:
 
         await behavior._emit_gossip(topic)
 
-        assert len(capture.sent) == 0
+        assert capture.sent == []
 
 
 class TestHeartbeatIntegration:
@@ -325,11 +338,20 @@ class TestHeartbeatIntegration:
 
         await behavior._heartbeat()
 
-        # IHAVE should have been sent for the fanout topic
-        ihave_rpcs = [(p, r) for p, r in capture.sent if r.control and r.control.ihave]
+        # Heartbeat emits gossip for fanout topics.
+        # Filter to IHAVE RPCs for the fanout topic.
         fanout_ihaves = [
             (p, r)
-            for p, r in ihave_rpcs
+            for p, r in capture.sent
             if r.control and any(ih.topic_id == fan_topic for ih in r.control.ihave)
         ]
-        assert len(fanout_ihaves) >= 1
+        assert fanout_ihaves == [
+            (
+                fan_peer,
+                RPC(
+                    control=ControlMessage(
+                        ihave=[ControlIHave(topic_id=fan_topic, message_ids=[bytes(msg.id)])]
+                    )
+                ),
+            )
+        ]

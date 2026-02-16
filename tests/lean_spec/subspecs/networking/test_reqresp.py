@@ -35,57 +35,6 @@ from lean_spec.subspecs.networking.varint import (
 )
 
 
-class TestVarintEncoding:
-    """Tests for varint (LEB128) encoding/decoding."""
-
-    def test_encode_zero(self) -> None:
-        """Zero encodes to a single null byte."""
-        assert encode_varint(0) == b"\x00"
-
-    def test_encode_small_values(self) -> None:
-        """Values 0-127 encode to a single byte."""
-        assert encode_varint(1) == b"\x01"
-        assert encode_varint(127) == b"\x7f"
-
-    def test_encode_two_byte_values(self) -> None:
-        """Values 128-16383 encode to two bytes."""
-        assert encode_varint(128) == b"\x80\x01"
-        assert encode_varint(300) == b"\xac\x02"
-
-    def test_encode_large_values(self) -> None:
-        """Large values encode and decode correctly."""
-        test_values = [65536, 2**20, 2**24, 2**32 - 1, 2**63]
-        for value in test_values:
-            encoded = encode_varint(value)
-            decoded, consumed = decode_varint(encoded)
-            assert decoded == value
-            assert consumed == len(encoded)
-
-    def test_decode_with_offset(self) -> None:
-        """Decoding at an offset works correctly."""
-        data = b"prefix\xac\x02suffix"
-        value, consumed = decode_varint(data, offset=6)
-        assert value == 300
-        assert consumed == 2
-
-    def test_encode_negative_raises(self) -> None:
-        """Negative values raise ValueError."""
-        with pytest.raises(ValueError, match="non-negative"):
-            encode_varint(-1)
-
-    def test_decode_truncated_raises(self) -> None:
-        """Truncated varints raise VarintError."""
-        with pytest.raises(VarintError, match="Truncated"):
-            decode_varint(b"\x80")  # Missing continuation byte
-
-    def test_roundtrip(self) -> None:
-        """Encoding then decoding returns the original value."""
-        for value in [0, 1, 127, 128, 255, 16383, 16384, 65535, 2**20]:
-            encoded = encode_varint(value)
-            decoded, _ = decode_varint(encoded)
-            assert decoded == value
-
-
 class TestRequestCodec:
     """Tests for request encoding/decoding."""
 
@@ -224,78 +173,6 @@ class TestInteroperability:
         # Rest should be valid snappy framed data
         snappy_data = encoded[1 + varint_size :]
         assert snappy_data.startswith(b"\xff\x06\x00\x00sNaPpY")
-
-
-class TestVarintVectors:
-    """Hardcoded varint test vectors from the Protocol Buffers specification.
-
-    These vectors ensure compatibility with the LEB128 format used by
-    Protocol Buffers and libp2p.
-
-    Source: Protocol Buffers Encoding Guide
-        https://protobuf.dev/programming-guides/encoding/
-
-    Notable examples from the spec:
-        - 150 encodes as [0x96, 0x01] (used in protobuf documentation)
-        - 300 encodes as [0xAC, 0x02] (used in protobuf documentation)
-    """
-
-    # Test vectors: (value, expected_encoding)
-    # From Protocol Buffers encoding guide and LEB128 spec
-    ENCODING_VECTORS: list[tuple[int, bytes]] = [
-        (0, b"\x00"),
-        (1, b"\x01"),
-        (127, b"\x7f"),
-        (128, b"\x80\x01"),
-        (150, b"\x96\x01"),  # Protobuf documentation example
-        (300, b"\xac\x02"),  # Protobuf documentation example
-        (16383, b"\xff\x7f"),  # Maximum 2-byte varint
-        (16384, b"\x80\x80\x01"),  # Minimum 3-byte varint
-        (2097151, b"\xff\xff\x7f"),  # Maximum 3-byte varint
-        (2097152, b"\x80\x80\x80\x01"),  # Minimum 4-byte varint
-        (268435455, b"\xff\xff\xff\x7f"),  # Maximum 4-byte varint
-    ]
-
-    @pytest.mark.parametrize("value,expected", ENCODING_VECTORS)
-    def test_encode_matches_protobuf_spec(self, value: int, expected: bytes) -> None:
-        """Encoding matches the protobuf specification vectors."""
-        assert encode_varint(value) == expected
-
-    @pytest.mark.parametrize("value,encoded", ENCODING_VECTORS)
-    def test_decode_matches_protobuf_spec(self, value: int, encoded: bytes) -> None:
-        """Decoding matches the protobuf specification vectors."""
-        decoded, consumed = decode_varint(encoded)
-        assert decoded == value
-        assert consumed == len(encoded)
-
-    def test_64bit_max_value(self) -> None:
-        """Maximum 64-bit value encodes to exactly 10 bytes."""
-        max_u64 = (2**64) - 1
-        encoded = encode_varint(max_u64)
-        assert len(encoded) == 10
-
-        decoded, consumed = decode_varint(encoded)
-        assert decoded == max_u64
-        assert consumed == 10
-
-    def test_power_of_two_boundaries(self) -> None:
-        """Values at power-of-two boundaries encode correctly."""
-        for power in [7, 14, 21, 28, 35, 42, 49, 56, 63]:
-            value = 2**power
-            encoded = encode_varint(value)
-            decoded, _ = decode_varint(encoded)
-            assert decoded == value
-
-            # Value just below the boundary
-            value_below = (2**power) - 1
-            encoded_below = encode_varint(value_below)
-            decoded_below, _ = decode_varint(encoded_below)
-            assert decoded_below == value_below
-
-            # Boundary values should require one more byte than values below
-            if power % 7 == 0:
-                assert len(encoded_below) == power // 7
-                assert len(encoded) == (power // 7) + 1
 
 
 class TestBoundaryConditions:

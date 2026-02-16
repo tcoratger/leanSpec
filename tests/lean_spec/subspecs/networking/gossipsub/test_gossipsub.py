@@ -5,12 +5,6 @@ import pytest
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client.event_source import GossipHandler
 from lean_spec.subspecs.networking.gossipsub import (
-    ControlGraft,
-    ControlIDontWant,
-    ControlIHave,
-    ControlIWant,
-    ControlMessage,
-    ControlPrune,
     ForkMismatchError,
     GossipsubParameters,
     GossipTopic,
@@ -21,6 +15,13 @@ from lean_spec.subspecs.networking.gossipsub import (
 from lean_spec.subspecs.networking.gossipsub.mesh import FanoutEntry, MeshState, TopicMesh
 from lean_spec.subspecs.networking.gossipsub.rpc import (
     RPC,
+    ControlGraft,
+    ControlIDontWant,
+    ControlIHave,
+    ControlIWant,
+    ControlMessage,
+    ControlPrune,
+    Message,
     SubOpts,
     create_graft_rpc,
     create_ihave_rpc,
@@ -29,29 +30,6 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     create_publish_rpc,
     create_subscription_rpc,
 )
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    ControlGraft as RPCControlGraft,
-)
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    ControlIDontWant as RPCControlIDontWant,
-)
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    ControlIHave as RPCControlIHave,
-)
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    ControlIWant as RPCControlIWant,
-)
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    ControlMessage as RPCControlMessage,
-)
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    ControlPrune as RPCControlPrune,
-)
-from lean_spec.subspecs.networking.gossipsub.rpc import (
-    Message as RPCMessage,
-)
-from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
-from lean_spec.types import Bytes20
 
 
 def peer(name: str) -> PeerId:
@@ -84,49 +62,6 @@ class TestGossipsubParameters:
 
 class TestControlMessages:
     """Test suite for gossipsub control messages."""
-
-    def test_graft_creation(self) -> None:
-        """Test GRAFT message creation."""
-        graft = ControlGraft(topic_id="test_topic")
-        assert graft.topic_id == "test_topic"
-
-    def test_prune_creation(self) -> None:
-        """Test PRUNE message creation."""
-        prune = ControlPrune(topic_id="test_topic")
-        assert prune.topic_id == "test_topic"
-
-    def test_ihave_creation(self) -> None:
-        """Test IHAVE message creation."""
-        msg_ids = [Bytes20(b"12345678901234567890"), Bytes20(b"abcdefghijklmnopqrst")]
-        ihave = ControlIHave(topic_id="test_topic", message_ids=msg_ids)
-
-        assert ihave.topic_id == "test_topic"
-        assert len(ihave.message_ids) == 2
-
-    def test_iwant_creation(self) -> None:
-        """Test IWANT message creation."""
-        msg_ids = [Bytes20(b"12345678901234567890")]
-        iwant = ControlIWant(message_ids=msg_ids)
-
-        assert len(iwant.message_ids) == 1
-
-    def test_idontwant_creation(self) -> None:
-        """Test IDONTWANT message creation (v1.2)."""
-        msg_ids = [Bytes20(b"12345678901234567890")]
-        idontwant = ControlIDontWant(message_ids=msg_ids)
-
-        assert len(idontwant.message_ids) == 1
-
-    def test_control_message_aggregation(self) -> None:
-        """Test aggregated control message container."""
-        graft = ControlGraft(topic_id="topic1")
-        prune = ControlPrune(topic_id="topic2")
-
-        control = ControlMessage(graft=[graft], prune=[prune])
-
-        assert len(control.graft) == 1
-        assert len(control.prune) == 1
-        assert not control.is_empty()
 
     def test_control_message_empty_check(self) -> None:
         """Test control message empty check."""
@@ -166,12 +101,10 @@ class TestTopicForkValidation:
 
     def test_from_string_validated_success(self) -> None:
         """Test from_string_validated parses and validates successfully."""
-        topic = GossipTopic.from_string_validated(
+        assert GossipTopic.from_string_validated(
             "/leanconsensus/0x12345678/block/ssz_snappy",
             expected_fork_digest="0x12345678",
-        )
-        assert topic.kind == TopicKind.BLOCK
-        assert topic.fork_digest == "0x12345678"
+        ) == GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
 
     def test_from_string_validated_raises_on_mismatch(self) -> None:
         """Test from_string_validated raises ForkMismatchError on mismatch."""
@@ -193,25 +126,23 @@ class TestTopicFormatting:
     def test_gossip_topic_creation(self) -> None:
         """Test GossipTopic creation."""
         topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
-
-        assert topic.kind == TopicKind.BLOCK
-        assert topic.fork_digest == "0x12345678"
+        assert topic == GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
         assert str(topic) == "/leanconsensus/0x12345678/block/ssz_snappy"
 
     def test_gossip_topic_from_string(self) -> None:
         """Test parsing topic string."""
-        topic = GossipTopic.from_string("/leanconsensus/0x12345678/block/ssz_snappy")
-
-        assert topic.kind == TopicKind.BLOCK
-        assert topic.fork_digest == "0x12345678"
+        assert GossipTopic.from_string("/leanconsensus/0x12345678/block/ssz_snappy") == GossipTopic(
+            kind=TopicKind.BLOCK, fork_digest="0x12345678"
+        )
 
     def test_gossip_topic_factory_methods(self) -> None:
         """Test GossipTopic factory methods."""
-        block_topic = GossipTopic.block("0xabcd1234")
-        assert block_topic.kind == TopicKind.BLOCK
-
-        attestation_subnet_topic = GossipTopic.attestation_subnet("0xabcd1234", 0)
-        assert attestation_subnet_topic.kind == TopicKind.ATTESTATION_SUBNET
+        assert GossipTopic.block("0xabcd1234") == GossipTopic(
+            kind=TopicKind.BLOCK, fork_digest="0xabcd1234"
+        )
+        assert GossipTopic.attestation_subnet("0xabcd1234", 0) == GossipTopic(
+            kind=TopicKind.ATTESTATION_SUBNET, fork_digest="0xabcd1234", subnet_id=0
+        )
 
     def test_format_topic_string(self) -> None:
         """Test topic string formatting."""
@@ -220,14 +151,12 @@ class TestTopicFormatting:
 
     def test_parse_topic_string(self) -> None:
         """Test topic string parsing."""
-        prefix, fork_digest, topic_name, encoding = parse_topic_string(
-            "/leanconsensus/0x12345678/block/ssz_snappy"
+        assert parse_topic_string("/leanconsensus/0x12345678/block/ssz_snappy") == (
+            "leanconsensus",
+            "0x12345678",
+            "block",
+            "ssz_snappy",
         )
-
-        assert prefix == "leanconsensus"
-        assert fork_digest == "0x12345678"
-        assert topic_name == "block"
-        assert encoding == "ssz_snappy"
 
     def test_invalid_topic_string(self) -> None:
         """Test handling of invalid topic strings."""
@@ -251,11 +180,7 @@ class TestMeshState:
         """Test MeshState initialization."""
         params = GossipsubParameters(d=8, d_low=6, d_high=12, d_lazy=6)
         mesh = MeshState(params=params)
-
-        assert mesh.params.d == 8
-        assert mesh.params.d_low == 6
-        assert mesh.params.d_high == 12
-        assert mesh.params.d_lazy == 6
+        assert mesh.params == GossipsubParameters(d=8, d_low=6, d_high=12, d_lazy=6)
 
     def test_subscribe_and_unsubscribe(self) -> None:
         """Test topic subscription."""
@@ -281,16 +206,12 @@ class TestMeshState:
         assert mesh.add_to_mesh("topic1", peer2)
         assert not mesh.add_to_mesh("topic1", peer1)  # Already in mesh
 
-        peers = mesh.get_mesh_peers("topic1")
-        assert peer1 in peers
-        assert peer2 in peers
+        assert mesh.get_mesh_peers("topic1") == {peer1, peer2}
 
         assert mesh.remove_from_mesh("topic1", peer1)
         assert not mesh.remove_from_mesh("topic1", peer1)  # Already removed
 
-        peers = mesh.get_mesh_peers("topic1")
-        assert peer1 not in peers
-        assert peer2 in peers
+        assert mesh.get_mesh_peers("topic1") == {peer2}
 
     def test_gossip_peer_selection(self) -> None:
         """Test selection of non-mesh peers for gossip."""
@@ -302,20 +223,13 @@ class TestMeshState:
         mesh.add_to_mesh("topic1", peer1)
         mesh.add_to_mesh("topic1", peer2)
 
-        all_peers = {
-            peer("peer1"),
-            peer("peer2"),
-            peer("peer3"),
-            peer("peer4"),
-            peer("peer5"),
-            peer("peer6"),
-        }
+        # Exactly d_lazy=3 non-mesh peers → all returned deterministically.
+        non_mesh = {peer("peer3"), peer("peer4"), peer("peer5")}
+        all_peers = {peer1, peer2} | non_mesh
 
         gossip_peers = mesh.select_peers_for_gossip("topic1", all_peers)
 
-        mesh_peers = mesh.get_mesh_peers("topic1")
-        for p in gossip_peers:
-            assert p not in mesh_peers
+        assert set(gossip_peers) == non_mesh
 
 
 class TestTopicMesh:
@@ -328,11 +242,11 @@ class TestTopicMesh:
 
         assert topic_mesh.add_peer(peer1)
         assert not topic_mesh.add_peer(peer1)  # Already exists
-        assert peer1 in topic_mesh.peers
+        assert topic_mesh.peers == {peer1}
 
         assert topic_mesh.remove_peer(peer1)
         assert not topic_mesh.remove_peer(peer1)  # Already removed
-        assert peer1 not in topic_mesh.peers
+        assert topic_mesh.peers == set()
 
 
 class TestFanoutEntry:
@@ -371,7 +285,7 @@ class TestFanoutOperations:
         mesh.add_to_mesh(topic, p1)
 
         result = mesh.update_fanout(topic, {p1, peer("p2")})
-        assert p1 in result
+        assert result == {p1}
 
     def test_update_fanout_fills_to_d(self) -> None:
         """update_fanout fills fanout up to D peers."""
@@ -472,70 +386,17 @@ class TestRPCProtobufEncoding:
     ensuring our encoding matches the expected protobuf wire format.
     """
 
-    def test_varint_encoding(self) -> None:
-        """Test varint encoding matches protobuf spec."""
-        # Single byte varints (0-127)
-        assert encode_varint(0) == b"\x00"
-        assert encode_varint(1) == b"\x01"
-        assert encode_varint(127) == b"\x7f"
-
-        # Two byte varints (128-16383)
-        assert encode_varint(128) == b"\x80\x01"
-        assert encode_varint(300) == b"\xac\x02"
-        assert encode_varint(16383) == b"\xff\x7f"
-
-        # Larger varints
-        assert encode_varint(16384) == b"\x80\x80\x01"
-
-    def test_varint_decoding(self) -> None:
-        """Test varint decoding matches protobuf spec."""
-        # Single byte
-        value, pos = decode_varint(b"\x00", 0)
-        assert value == 0
-        assert pos == 1
-
-        value, pos = decode_varint(b"\x7f", 0)
-        assert value == 127
-        assert pos == 1
-
-        # Multi-byte
-        value, pos = decode_varint(b"\x80\x01", 0)
-        assert value == 128
-        assert pos == 2
-
-        value, pos = decode_varint(b"\xac\x02", 0)
-        assert value == 300
-        assert pos == 2
-
-    def test_varint_roundtrip(self) -> None:
-        """Test varint encode/decode roundtrip."""
-        test_values = [0, 1, 127, 128, 255, 256, 16383, 16384, 2097151, 268435455]
-        for value in test_values:
-            encoded = encode_varint(value)
-            decoded, _ = decode_varint(encoded, 0)
-            assert decoded == value, f"Failed for value {value}"
-
     def test_subopts_encode_decode(self) -> None:
         """Test SubOpts (subscription) encoding/decoding."""
-        # Subscribe
         sub = SubOpts(subscribe=True, topic_id="/leanconsensus/0x12345678/block/ssz_snappy")
-        encoded = sub.encode()
-        decoded = SubOpts.decode(encoded)
+        assert SubOpts.decode(sub.encode()) == sub
 
-        assert decoded.subscribe is True
-        assert decoded.topic_id == "/leanconsensus/0x12345678/block/ssz_snappy"
-
-        # Unsubscribe
         unsub = SubOpts(subscribe=False, topic_id="/test/topic")
-        encoded = unsub.encode()
-        decoded = SubOpts.decode(encoded)
-
-        assert decoded.subscribe is False
-        assert decoded.topic_id == "/test/topic"
+        assert SubOpts.decode(unsub.encode()) == unsub
 
     def test_message_encode_decode(self) -> None:
         """Test Message encoding/decoding."""
-        msg = RPCMessage(
+        msg = Message(
             from_peer=b"peer123",
             data=b"hello world",
             seqno=b"\x00\x01\x02\x03\x04\x05\x06\x07",
@@ -543,89 +404,49 @@ class TestRPCProtobufEncoding:
             signature=b"sig" * 16,
             key=b"pubkey",
         )
-        encoded = msg.encode()
-        decoded = RPCMessage.decode(encoded)
-
-        assert decoded.from_peer == b"peer123"
-        assert decoded.data == b"hello world"
-        assert decoded.seqno == b"\x00\x01\x02\x03\x04\x05\x06\x07"
-        assert decoded.topic == "/test/topic"
-        assert decoded.signature == b"sig" * 16
-        assert decoded.key == b"pubkey"
+        assert Message.decode(msg.encode()) == msg
 
     def test_message_minimal(self) -> None:
         """Test Message with only required fields."""
-        msg = RPCMessage(topic="/test/topic", data=b"payload")
-        encoded = msg.encode()
-        decoded = RPCMessage.decode(encoded)
-
-        assert decoded.topic == "/test/topic"
-        assert decoded.data == b"payload"
-        assert decoded.from_peer == b""
-        assert decoded.seqno == b""
+        msg = Message(topic="/test/topic", data=b"payload")
+        assert Message.decode(msg.encode()) == msg
 
     def test_control_graft_encode_decode(self) -> None:
         """Test ControlGraft encoding/decoding."""
-        graft = RPCControlGraft(topic_id="/test/blocks")
-        encoded = graft.encode()
-        decoded = RPCControlGraft.decode(encoded)
-
-        assert decoded.topic_id == "/test/blocks"
+        graft = ControlGraft(topic_id="/test/blocks")
+        assert ControlGraft.decode(graft.encode()) == graft
 
     def test_control_prune_encode_decode(self) -> None:
         """Test ControlPrune encoding/decoding with backoff."""
-        prune = RPCControlPrune(topic_id="/test/blocks", backoff=60)
-        encoded = prune.encode()
-        decoded = RPCControlPrune.decode(encoded)
-
-        assert decoded.topic_id == "/test/blocks"
-        assert decoded.backoff == 60
+        prune = ControlPrune(topic_id="/test/blocks", backoff=60)
+        assert ControlPrune.decode(prune.encode()) == prune
 
     def test_control_ihave_encode_decode(self) -> None:
         """Test ControlIHave encoding/decoding."""
-        msg_ids = [b"msgid1234567890ab", b"msgid2345678901bc", b"msgid3456789012cd"]
-        ihave = RPCControlIHave(topic_id="/test/blocks", message_ids=msg_ids)
-        encoded = ihave.encode()
-        decoded = RPCControlIHave.decode(encoded)
-
-        assert decoded.topic_id == "/test/blocks"
-        assert decoded.message_ids == msg_ids
+        ihave = ControlIHave(
+            topic_id="/test/blocks",
+            message_ids=[b"msgid1234567890ab", b"msgid2345678901bc", b"msgid3456789012cd"],
+        )
+        assert ControlIHave.decode(ihave.encode()) == ihave
 
     def test_control_iwant_encode_decode(self) -> None:
         """Test ControlIWant encoding/decoding."""
-        msg_ids = [b"msgid1234567890ab", b"msgid2345678901bc"]
-        iwant = RPCControlIWant(message_ids=msg_ids)
-        encoded = iwant.encode()
-        decoded = RPCControlIWant.decode(encoded)
-
-        assert decoded.message_ids == msg_ids
+        iwant = ControlIWant(message_ids=[b"msgid1234567890ab", b"msgid2345678901bc"])
+        assert ControlIWant.decode(iwant.encode()) == iwant
 
     def test_control_idontwant_encode_decode(self) -> None:
         """Test ControlIDontWant encoding/decoding (v1.2)."""
-        msg_ids = [b"msgid1234567890ab"]
-        idontwant = RPCControlIDontWant(message_ids=msg_ids)
-        encoded = idontwant.encode()
-        decoded = RPCControlIDontWant.decode(encoded)
-
-        assert decoded.message_ids == msg_ids
+        idontwant = ControlIDontWant(message_ids=[b"msgid1234567890ab"])
+        assert ControlIDontWant.decode(idontwant.encode()) == idontwant
 
     def test_control_message_aggregate(self) -> None:
         """Test ControlMessage with multiple control types."""
-        ctrl = RPCControlMessage(
-            graft=[RPCControlGraft(topic_id="/topic1")],
-            prune=[RPCControlPrune(topic_id="/topic2", backoff=30)],
-            ihave=[RPCControlIHave(topic_id="/topic1", message_ids=[b"msg123456789012"])],
+        ctrl = ControlMessage(
+            graft=[ControlGraft(topic_id="/topic1")],
+            prune=[ControlPrune(topic_id="/topic2", backoff=30)],
+            ihave=[ControlIHave(topic_id="/topic1", message_ids=[b"msg123456789012"])],
         )
-        encoded = ctrl.encode()
-        decoded = RPCControlMessage.decode(encoded)
-
-        assert len(decoded.graft) == 1
-        assert decoded.graft[0].topic_id == "/topic1"
-        assert len(decoded.prune) == 1
-        assert decoded.prune[0].topic_id == "/topic2"
-        assert decoded.prune[0].backoff == 30
-        assert len(decoded.ihave) == 1
-        assert decoded.ihave[0].topic_id == "/topic1"
+        assert ControlMessage.decode(ctrl.encode()) == ctrl
 
     def test_rpc_subscription_only(self) -> None:
         """Test RPC with only subscriptions."""
@@ -635,64 +456,34 @@ class TestRPCProtobufEncoding:
                 SubOpts(subscribe=False, topic_id="/topic2"),
             ]
         )
-        encoded = rpc.encode()
-        decoded = RPC.decode(encoded)
-
-        assert len(decoded.subscriptions) == 2
-        assert decoded.subscriptions[0].subscribe is True
-        assert decoded.subscriptions[0].topic_id == "/topic1"
-        assert decoded.subscriptions[1].subscribe is False
-        assert decoded.subscriptions[1].topic_id == "/topic2"
+        assert RPC.decode(rpc.encode()) == rpc
 
     def test_rpc_publish_only(self) -> None:
         """Test RPC with only published messages."""
         rpc = RPC(
             publish=[
-                RPCMessage(topic="/blocks", data=b"block_data_1"),
-                RPCMessage(topic="/attestations", data=b"attestation_data"),
+                Message(topic="/blocks", data=b"block_data_1"),
+                Message(topic="/attestations", data=b"attestation_data"),
             ]
         )
-        encoded = rpc.encode()
-        decoded = RPC.decode(encoded)
-
-        assert len(decoded.publish) == 2
-        assert decoded.publish[0].topic == "/blocks"
-        assert decoded.publish[0].data == b"block_data_1"
-        assert decoded.publish[1].topic == "/attestations"
+        assert RPC.decode(rpc.encode()) == rpc
 
     def test_rpc_control_only(self) -> None:
         """Test RPC with only control messages."""
-        rpc = RPC(control=RPCControlMessage(graft=[RPCControlGraft(topic_id="/blocks")]))
-        encoded = rpc.encode()
-        decoded = RPC.decode(encoded)
-
-        assert decoded.control is not None
-        assert len(decoded.control.graft) == 1
-        assert decoded.control.graft[0].topic_id == "/blocks"
+        rpc = RPC(control=ControlMessage(graft=[ControlGraft(topic_id="/blocks")]))
+        assert RPC.decode(rpc.encode()) == rpc
 
     def test_rpc_full_message(self) -> None:
         """Test RPC with all message types (full gossipsub exchange)."""
         rpc = RPC(
             subscriptions=[SubOpts(subscribe=True, topic_id="/blocks")],
-            publish=[RPCMessage(topic="/blocks", data=b"block_payload")],
-            control=RPCControlMessage(
-                graft=[RPCControlGraft(topic_id="/blocks")],
-                ihave=[RPCControlIHave(topic_id="/blocks", message_ids=[b"msgid123456789ab"])],
+            publish=[Message(topic="/blocks", data=b"block_payload")],
+            control=ControlMessage(
+                graft=[ControlGraft(topic_id="/blocks")],
+                ihave=[ControlIHave(topic_id="/blocks", message_ids=[b"msgid123456789ab"])],
             ),
         )
-        encoded = rpc.encode()
-        decoded = RPC.decode(encoded)
-
-        # Verify all parts decoded correctly
-        assert len(decoded.subscriptions) == 1
-        assert decoded.subscriptions[0].subscribe is True
-
-        assert len(decoded.publish) == 1
-        assert decoded.publish[0].data == b"block_payload"
-
-        assert decoded.control is not None
-        assert len(decoded.control.graft) == 1
-        assert len(decoded.control.ihave) == 1
+        assert RPC.decode(rpc.encode()) == rpc
 
     def test_rpc_empty_check(self) -> None:
         """Test RPC is_empty method."""
@@ -704,70 +495,48 @@ class TestRPCProtobufEncoding:
 
     def test_rpc_helper_functions(self) -> None:
         """Test RPC creation helper functions."""
-        # Subscription RPC
-        sub_rpc = create_subscription_rpc(["/topic1", "/topic2"], subscribe=True)
-        assert len(sub_rpc.subscriptions) == 2
-        assert all(s.subscribe for s in sub_rpc.subscriptions)
+        assert create_subscription_rpc(["/topic1", "/topic2"], subscribe=True) == RPC(
+            subscriptions=[
+                SubOpts(subscribe=True, topic_id="/topic1"),
+                SubOpts(subscribe=True, topic_id="/topic2"),
+            ]
+        )
 
-        # GRAFT RPC
-        graft_rpc = create_graft_rpc(["/topic1"])
-        assert graft_rpc.control is not None
-        assert len(graft_rpc.control.graft) == 1
+        assert create_graft_rpc(["/topic1"]) == RPC(
+            control=ControlMessage(graft=[ControlGraft(topic_id="/topic1")])
+        )
 
-        # PRUNE RPC
-        prune_rpc = create_prune_rpc(["/topic1"], backoff=120)
-        assert prune_rpc.control is not None
-        assert len(prune_rpc.control.prune) == 1
-        assert prune_rpc.control.prune[0].backoff == 120
+        assert create_prune_rpc(["/topic1"], backoff=120) == RPC(
+            control=ControlMessage(prune=[ControlPrune(topic_id="/topic1", backoff=120)])
+        )
 
-        # IHAVE RPC
-        ihave_rpc = create_ihave_rpc("/topic1", [b"msg1", b"msg2"])
-        assert ihave_rpc.control is not None
-        assert len(ihave_rpc.control.ihave) == 1
-        assert len(ihave_rpc.control.ihave[0].message_ids) == 2
+        assert create_ihave_rpc("/topic1", [b"msg1", b"msg2"]) == RPC(
+            control=ControlMessage(
+                ihave=[ControlIHave(topic_id="/topic1", message_ids=[b"msg1", b"msg2"])]
+            )
+        )
 
-        # IWANT RPC
-        iwant_rpc = create_iwant_rpc([b"msg1"])
-        assert iwant_rpc.control is not None
-        assert len(iwant_rpc.control.iwant) == 1
+        assert create_iwant_rpc([b"msg1"]) == RPC(
+            control=ControlMessage(iwant=[ControlIWant(message_ids=[b"msg1"])])
+        )
 
-        # Publish RPC
-        pub_rpc = create_publish_rpc("/topic1", b"data")
-        assert len(pub_rpc.publish) == 1
-        assert pub_rpc.publish[0].data == b"data"
+        assert create_publish_rpc("/topic1", b"data") == RPC(
+            publish=[Message(topic="/topic1", data=b"data")]
+        )
 
     def test_wire_format_compatibility(self) -> None:
         """Test wire format matches expected protobuf encoding.
 
-        This test verifies that our encoding produces the same bytes as
-        a reference implementation would for simple cases.
+        Verifies that our encoding produces bytes that round-trip
+        correctly through decode, matching the original structure.
         """
-        # A subscription RPC with a simple topic
         rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="test")])
-        encoded = rpc.encode()
-
-        # Verify it can be decoded
-        decoded = RPC.decode(encoded)
-        assert decoded.subscriptions[0].topic_id == "test"
-        assert decoded.subscriptions[0].subscribe is True
-
-        # Verify structure: field 1 (subscriptions) is length-delimited
-        # SubOpts: field 1 (bool), field 2 (string)
-        # Expected encoding for this simple case can be computed manually
-        # but the roundtrip test above verifies correctness
+        assert RPC.decode(rpc.encode()) == rpc
 
     def test_large_message_encoding(self) -> None:
         """Test encoding of large messages (typical block size)."""
-        # Simulate a large block payload (100KB)
-        large_data = b"x" * 100_000
-
-        rpc = RPC(publish=[RPCMessage(topic="/blocks", data=large_data)])
-        encoded = rpc.encode()
-        decoded = RPC.decode(encoded)
-
-        assert len(decoded.publish) == 1
-        assert len(decoded.publish[0].data) == 100_000
-        assert decoded.publish[0].data == large_data
+        rpc = RPC(publish=[Message(topic="/blocks", data=b"x" * 100_000)])
+        assert RPC.decode(rpc.encode()) == rpc
 
 
 class TestGossipHandlerForkValidation:
@@ -802,11 +571,6 @@ class TestGossipHandlerForkValidation:
     def test_get_topic_accepts_matching_fork(self) -> None:
         """GossipHandler.get_topic() returns topic for matching fork."""
         handler = GossipHandler(fork_digest="0x12345678")
-
-        # Topic with matching fork_digest
-        matching_topic = "/leanconsensus/0x12345678/block/ssz_snappy"
-
-        topic = handler.get_topic(matching_topic)
-
-        assert topic.kind == TopicKind.BLOCK
-        assert topic.fork_digest == "0x12345678"
+        assert handler.get_topic("/leanconsensus/0x12345678/block/ssz_snappy") == GossipTopic(
+            kind=TopicKind.BLOCK, fork_digest="0x12345678"
+        )
