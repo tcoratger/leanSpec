@@ -31,7 +31,7 @@ from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.networking.client.event_source import LiveNetworkEventSource
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
-from lean_spec.subspecs.networking.peer.info import PeerInfo
+from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
 
 from .events import (

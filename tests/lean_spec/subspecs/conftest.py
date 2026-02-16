@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer.info import PeerInfo
+from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
 
 

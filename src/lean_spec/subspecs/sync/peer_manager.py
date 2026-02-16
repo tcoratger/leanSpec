@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer.info import PeerInfo
+from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
 
 from .config import MAX_CONCURRENT_REQUESTS

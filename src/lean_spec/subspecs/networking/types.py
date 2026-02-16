@@ -36,6 +36,22 @@ Multiaddr = str
 """Multiaddress string, e.g. ``/ip4/192.168.1.1/udp/9000/quic-v1``."""
 
 
+class Direction(IntEnum):
+    """
+    Direction of a peer connection.
+
+    Indicates whether:
+        - we initiated the connection (outbound) or
+        - the peer connected to us (inbound).
+    """
+
+    INBOUND = auto()
+    """Peer initiated the connection to us."""
+
+    OUTBOUND = auto()
+    """We initiated the connection to the peer."""
+
+
 class ConnectionState(IntEnum):
     """
     Peer connection state machine.
