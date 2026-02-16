@@ -3,32 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import IntEnum, auto
 from time import time
 from typing import TYPE_CHECKING
 
-from ..transport import PeerId
-from ..types import ConnectionState, Multiaddr
+from .transport import PeerId
+from .types import ConnectionState, Direction, Multiaddr
 
 if TYPE_CHECKING:
-    from ..enr import ENR
-    from ..reqresp import Status
-
-
-class Direction(IntEnum):
-    """
-    Direction of a peer connection.
-
-    Indicates whether:
-        - we initiated the connection (outbound) or
-        - the peer connected to us (inbound).
-    """
-
-    INBOUND = auto()
-    """Peer initiated the connection to us."""
-
-    OUTBOUND = auto()
-    """We initiated the connection to the peer."""
+    from .enr import ENR
+    from .reqresp import Status
 
 
 @dataclass

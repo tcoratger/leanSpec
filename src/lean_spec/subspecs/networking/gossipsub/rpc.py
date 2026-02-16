@@ -351,7 +351,7 @@ class ControlGraft:
 
 
 @dataclass(slots=True)
-class PeerInfo:
+class PrunePeerInfo:
     """Peer information for PRUNE peer exchange."""
 
     peer_id: bytes = b""
@@ -370,7 +370,7 @@ class PeerInfo:
         return bytes(result)
 
     @classmethod
-    def decode(cls, data: bytes) -> PeerInfo:
+    def decode(cls, data: bytes) -> PrunePeerInfo:
         """Decode from protobuf."""
         peer_id = b""
         signed_peer_record = b""
@@ -401,7 +401,7 @@ class ControlPrune:
     topic_id: str = ""
     """Topic being pruned from."""
 
-    peers: list[PeerInfo] = field(default_factory=list)
+    peers: list[PrunePeerInfo] = field(default_factory=list)
     """Peer exchange - alternative peers for the topic (v1.1)."""
 
     backoff: int = 0
@@ -422,7 +422,7 @@ class ControlPrune:
     def decode(cls, data: bytes) -> ControlPrune:
         """Decode from protobuf."""
         topic_id = ""
-        peers: list[PeerInfo] = []
+        peers: list[PrunePeerInfo] = []
         backoff = 0
         pos = 0
 
@@ -435,7 +435,7 @@ class ControlPrune:
                 pos += length
             elif field_num == 2 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
                 length, pos = _decode_length_at(data, pos)
-                peers.append(PeerInfo.decode(data[pos : pos + length]))
+                peers.append(PrunePeerInfo.decode(data[pos : pos + length]))
                 pos += length
             elif field_num == 3 and wire_type == WIRE_TYPE_VARINT:
                 backoff, pos = _decode_varint_at(data, pos)

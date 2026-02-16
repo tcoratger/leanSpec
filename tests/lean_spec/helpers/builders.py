@@ -34,7 +34,7 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer.info import PeerInfo
+from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.types import ConnectionState
 from lean_spec.subspecs.ssz.hash import hash_tree_root

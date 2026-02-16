@@ -7,9 +7,9 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
-from lean_spec.subspecs.networking.peer import Direction, PeerInfo
+from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp import Status
-from lean_spec.subspecs.networking.types import ConnectionState, GoodbyeReason
+from lean_spec.subspecs.networking.types import ConnectionState, Direction, GoodbyeReason
 from lean_spec.types import Bytes32, Bytes64, Uint64
 
 

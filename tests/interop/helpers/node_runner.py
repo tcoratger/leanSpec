@@ -19,7 +19,7 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
-from lean_spec.subspecs.networking.peer.info import PeerInfo
+from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.types import ConnectionState
 from lean_spec.subspecs.node import Node, NodeConfig

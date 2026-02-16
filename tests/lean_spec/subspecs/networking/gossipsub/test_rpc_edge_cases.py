@@ -16,8 +16,8 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     ControlMessage,
     ControlPrune,
     Message,
-    PeerInfo,
     ProtobufDecodeError,
+    PrunePeerInfo,
     SubOpts,
     _skip_field,
     encode_bytes,
@@ -25,24 +25,24 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
 )
 
 
-class TestPeerInfoRoundtrip:
-    """Tests for PeerInfo protobuf encoding/decoding."""
+class TestPrunePeerInfoRoundtrip:
+    """Tests for PrunePeerInfo protobuf encoding/decoding."""
 
     def test_peer_info_with_both_fields(self) -> None:
-        """PeerInfo roundtrips with both peer_id and signed_peer_record."""
-        info = PeerInfo(peer_id=b"peer123", signed_peer_record=b"record456")
-        assert PeerInfo.decode(info.encode()) == info
+        """PrunePeerInfo roundtrips with both peer_id and signed_peer_record."""
+        info = PrunePeerInfo(peer_id=b"peer123", signed_peer_record=b"record456")
+        assert PrunePeerInfo.decode(info.encode()) == info
 
     def test_peer_info_peer_id_only(self) -> None:
-        """PeerInfo roundtrips with only peer_id."""
-        info = PeerInfo(peer_id=b"peerOnly")
-        assert PeerInfo.decode(info.encode()) == info
+        """PrunePeerInfo roundtrips with only peer_id."""
+        info = PrunePeerInfo(peer_id=b"peerOnly")
+        assert PrunePeerInfo.decode(info.encode()) == info
 
     def test_peer_info_empty(self) -> None:
-        """Empty PeerInfo produces empty encoding."""
-        info = PeerInfo()
+        """Empty PrunePeerInfo produces empty encoding."""
+        info = PrunePeerInfo()
         assert info.encode() == b""
-        assert PeerInfo.decode(b"") == PeerInfo()
+        assert PrunePeerInfo.decode(b"") == PrunePeerInfo()
 
 
 class TestPruneWithPeerExchange:
@@ -53,8 +53,8 @@ class TestPruneWithPeerExchange:
         prune = ControlPrune(
             topic_id="/topic",
             peers=[
-                PeerInfo(peer_id=b"alt1", signed_peer_record=b"rec1"),
-                PeerInfo(peer_id=b"alt2"),
+                PrunePeerInfo(peer_id=b"alt1", signed_peer_record=b"rec1"),
+                PrunePeerInfo(peer_id=b"alt2"),
             ],
             backoff=120,
         )
