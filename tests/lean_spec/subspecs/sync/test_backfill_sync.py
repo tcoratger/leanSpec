@@ -10,9 +10,14 @@ from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
 from lean_spec.subspecs.sync.backfill_sync import BackfillSync
-from lean_spec.subspecs.sync.block_cache import BlockCache
+from lean_spec.subspecs.sync.block_cache import BlockCache, PendingBlock
 from lean_spec.subspecs.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
-from lean_spec.subspecs.sync.peer_manager import PeerManager
+from lean_spec.subspecs.sync.peer_manager import (
+    INITIAL_PEER_SCORE,
+    SCORE_SUCCESS_BONUS,
+    PeerManager,
+    SyncPeer,
+)
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import MockNetworkRequester, make_signed_block
 
@@ -55,10 +60,17 @@ class TestBackfillChainResolution:
 
         await backfill_system.fill_missing([block_root])
 
-        assert block_root in backfill_system.block_cache
         cached = backfill_system.block_cache.get(block_root)
         assert cached is not None
-        assert cached.slot == Slot(10)
+        assert cached == PendingBlock(
+            block=block,
+            root=block_root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(10),
+            received_from=peer_id,
+            received_at=cached.received_at,
+            backfill_depth=1,
+        )
 
     async def test_recursive_parent_chain_resolution(
         self,
@@ -93,20 +105,42 @@ class TestBackfillChainResolution:
 
         await backfill_system.fill_missing([child_root])
 
-        assert child_root in backfill_system.block_cache
-        assert parent_root in backfill_system.block_cache
-        assert grandparent_root in backfill_system.block_cache
-
         child_cached = backfill_system.block_cache.get(child_root)
         parent_cached = backfill_system.block_cache.get(parent_root)
         grandparent_cached = backfill_system.block_cache.get(grandparent_root)
 
         assert child_cached is not None
+        assert child_cached == PendingBlock(
+            block=child,
+            root=child_root,
+            parent_root=parent_root,
+            slot=Slot(3),
+            received_from=peer_id,
+            received_at=child_cached.received_at,
+            backfill_depth=1,
+        )
+
         assert parent_cached is not None
+        assert parent_cached == PendingBlock(
+            block=parent,
+            root=parent_root,
+            parent_root=grandparent_root,
+            slot=Slot(2),
+            received_from=peer_id,
+            received_at=parent_cached.received_at,
+            backfill_depth=2,
+        )
+
         assert grandparent_cached is not None
-        assert child_cached.backfill_depth == 1
-        assert parent_cached.backfill_depth == 2
-        assert grandparent_cached.backfill_depth == 3
+        assert grandparent_cached == PendingBlock(
+            block=grandparent,
+            root=grandparent_root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(1),
+            received_from=peer_id,
+            received_at=grandparent_cached.received_at,
+            backfill_depth=3,
+        )
 
     async def test_depth_limit_stops_infinite_recursion(
         self,
@@ -118,7 +152,7 @@ class TestBackfillChainResolution:
 
         await backfill_system.fill_missing([root], depth=MAX_BACKFILL_DEPTH)
 
-        assert len(network.request_log) == 0
+        assert network.request_log == []
         assert root not in backfill_system.block_cache
 
     async def test_skips_already_cached_blocks(
@@ -140,7 +174,7 @@ class TestBackfillChainResolution:
 
         await backfill_system.fill_missing([block_root])
 
-        assert len(network.request_log) == 0
+        assert network.request_log == []
 
 
 class TestBatchingAndPeerManagement:
@@ -150,6 +184,7 @@ class TestBatchingAndPeerManagement:
         self,
         backfill_system: BackfillSync,
         network: MockNetworkRequester,
+        peer_id: PeerId,
     ) -> None:
         """Requests larger than MAX_BLOCKS_PER_REQUEST are split."""
         num_roots = MAX_BLOCKS_PER_REQUEST + 5
@@ -157,9 +192,10 @@ class TestBatchingAndPeerManagement:
 
         await backfill_system.fill_missing(roots)
 
-        assert len(network.request_log) == 2
-        assert len(network.request_log[0][1]) == MAX_BLOCKS_PER_REQUEST
-        assert len(network.request_log[1][1]) == 5
+        assert network.request_log == [
+            (peer_id, roots[:MAX_BLOCKS_PER_REQUEST]),
+            (peer_id, roots[MAX_BLOCKS_PER_REQUEST:]),
+        ]
 
     async def test_no_requests_without_available_peer(
         self,
@@ -175,7 +211,7 @@ class TestBatchingAndPeerManagement:
 
         await backfill.fill_missing([Bytes32(b"\x01" * 32)])
 
-        assert len(network.request_log) == 0
+        assert network.request_log == []
 
     async def test_network_failure_handled_gracefully(
         self,
@@ -188,7 +224,7 @@ class TestBatchingAndPeerManagement:
 
         await backfill_system.fill_missing([root])
 
-        assert root not in backfill_system._pending
+        assert backfill_system._pending == set()
 
 
 class TestOrphanHandling:
@@ -279,7 +315,8 @@ class TestRequestTracking:
     ) -> None:
         """Empty response completes the request, keeping the peer available."""
         manager = PeerManager()
-        manager.add_peer(PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED))
+        info = PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED)
+        manager.add_peer(info)
         backfill = BackfillSync(
             peer_manager=manager,
             block_cache=BlockCache(),
@@ -291,9 +328,11 @@ class TestRequestTracking:
         await backfill.fill_missing([unknown_root])
 
         peer = manager.get_peer(peer_id)
-        assert peer is not None
-        assert peer.requests_in_flight == 0
-        assert peer.is_available()
+        assert peer == SyncPeer(
+            info=info,
+            requests_in_flight=0,
+            score=INITIAL_PEER_SCORE + SCORE_SUCCESS_BONUS,
+        )
 
     async def test_in_flight_deduplication(
         self,
@@ -343,7 +382,7 @@ class TestRequestTracking:
         # First call fails.
         network.should_fail = True
         await backfill.fill_missing([root])
-        assert root not in backfill._pending
+        assert backfill._pending == set()
 
         # Second call succeeds.
         network.should_fail = False

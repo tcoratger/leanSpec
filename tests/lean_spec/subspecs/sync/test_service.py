@@ -12,7 +12,7 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.sync.service import SyncService
+from lean_spec.subspecs.sync.service import SyncProgress, SyncService
 from lean_spec.subspecs.sync.states import SyncState
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import (
@@ -174,8 +174,9 @@ class TestGossipBlockHandling:
 
         await sync_service.on_gossip_block(block, peer_id)
 
-        # Block should not be processed or cached
+        # Block should not be processed or cached.
         assert sync_service._blocks_processed == 0
+        assert sync_service.block_cache.orphan_count == 0
         assert len(sync_service.block_cache) == 0
 
     async def test_processes_gossip_in_syncing_state(
@@ -237,18 +238,30 @@ class TestProgressReporting:
         """get_progress accurately reflects service state."""
         # Initial progress
         progress = sync_service.get_progress()
-        assert progress.state == SyncState.IDLE
-        assert progress.local_head_slot == Slot(0)
-        assert progress.blocks_processed == 0
-        assert progress.peers_connected == 1  # We added one peer in fixture
+        assert progress == SyncProgress(
+            state=SyncState.IDLE,
+            local_head_slot=Slot(0),
+            network_finalized_slot=None,
+            blocks_processed=0,
+            peers_connected=1,
+            cache_size=0,
+            orphan_count=0,
+        )
 
         # After processing some blocks
         sync_service._state = SyncState.SYNCING
         sync_service._blocks_processed = 42
 
         progress = sync_service.get_progress()
-        assert progress.state == SyncState.SYNCING
-        assert progress.blocks_processed == 42
+        assert progress == SyncProgress(
+            state=SyncState.SYNCING,
+            local_head_slot=Slot(0),
+            network_finalized_slot=None,
+            blocks_processed=42,
+            peers_connected=1,
+            cache_size=0,
+            orphan_count=0,
+        )
 
     def test_progress_includes_network_consensus(
         self,
@@ -263,7 +276,15 @@ class TestProgressReporting:
         sync_service.peer_manager.update_status(peer_id, status)
 
         progress = sync_service.get_progress()
-        assert progress.network_finalized_slot == Slot(100)
+        assert progress == SyncProgress(
+            state=SyncState.IDLE,
+            local_head_slot=Slot(0),
+            network_finalized_slot=Slot(100),
+            blocks_processed=0,
+            peers_connected=1,
+            cache_size=0,
+            orphan_count=0,
+        )
 
     def test_progress_tracks_cache_state(
         self,
@@ -290,8 +311,15 @@ class TestProgressReporting:
         sync_service.block_cache.mark_orphan(pending1.root)
 
         progress = sync_service.get_progress()
-        assert progress.cache_size == 2
-        assert progress.orphan_count == 1
+        assert progress == SyncProgress(
+            state=SyncState.IDLE,
+            local_head_slot=Slot(0),
+            network_finalized_slot=None,
+            blocks_processed=0,
+            peers_connected=1,
+            cache_size=2,
+            orphan_count=1,
+        )
 
 
 class TestReset:
@@ -327,7 +355,7 @@ class TestReset:
         assert sync_service._blocks_processed == 0
         assert len(sync_service.block_cache) == 0
         assert sync_service._backfill is not None
-        assert len(sync_service._backfill._pending) == 0
+        assert sync_service._backfill._pending == set()
 
 
 class TestAttestationGossipHandling:
@@ -397,8 +425,7 @@ class TestAttestationGossipHandling:
 
         await sync_service.on_gossip_attestation(attestation)
 
-        assert len(sync_service._pending_attestations) == 1
-        assert sync_service._pending_attestations[0] is attestation
+        assert sync_service._pending_attestations == [attestation]
 
     async def test_buffered_attestation_replayed_after_block(
         self,
@@ -429,7 +456,7 @@ class TestAttestationGossipHandling:
         await sync_service.on_gossip_block(block, peer_id)
 
         # Attestation was replayed (accepted by mock store).
-        assert len(sync_service._pending_attestations) == 0
+        assert sync_service._pending_attestations == []
         mock_store = cast(MockForkchoiceStore, sync_service.store)
         assert attestation in mock_store._attestations_received
 

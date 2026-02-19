@@ -36,12 +36,15 @@ class TestPendingBlock:
             received_from=peer_id,
         )
 
-        assert pending.block == block
-        assert pending.root == root
-        assert pending.parent_root == Bytes32.zero()
-        assert pending.slot == Slot(1)
-        assert pending.received_from == peer_id
-        assert pending.backfill_depth == 0
+        assert pending == PendingBlock(
+            block=block,
+            root=root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(1),
+            received_from=peer_id,
+            received_at=pending.received_at,
+            backfill_depth=0,
+        )
 
     def test_pending_block_default_received_at(self, peer_id: PeerId) -> None:
         """PendingBlock sets received_at to current time by default."""
@@ -84,7 +87,15 @@ class TestPendingBlock:
             backfill_depth=5,
         )
 
-        assert pending.backfill_depth == 5
+        assert pending == PendingBlock(
+            block=block,
+            root=root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(1),
+            received_from=peer_id,
+            received_at=pending.received_at,
+            backfill_depth=5,
+        )
 
 
 class TestBlockCacheBasicOperations:
@@ -109,9 +120,17 @@ class TestBlockCacheBasicOperations:
 
         pending = cache.add(block, peer_id)
 
+        root = hash_tree_root(block.message.block)
         assert len(cache) == 1
-        assert pending.block == block
-        assert pending.received_from == peer_id
+        assert pending == PendingBlock(
+            block=block,
+            root=root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(1),
+            received_from=peer_id,
+            received_at=pending.received_at,
+            backfill_depth=0,
+        )
 
     def test_contains_block(self, peer_id: PeerId) -> None:
         """Contains check works for cached blocks."""
@@ -141,7 +160,6 @@ class TestBlockCacheBasicOperations:
         pending = cache.add(block, peer_id)
         retrieved = cache.get(pending.root)
 
-        assert retrieved is not None
         assert retrieved == pending
 
     def test_get_nonexistent_block(self) -> None:
@@ -337,8 +355,7 @@ class TestBlockCacheOrphanTracking:
 
         orphan_parents = cache.get_orphan_parents()
 
-        assert len(orphan_parents) == 1
-        assert parent_root in orphan_parents
+        assert orphan_parents == [parent_root]
 
     def test_get_orphan_parents_deduplicates(self, peer_id: PeerId) -> None:
         """get_orphan_parents deduplicates when multiple orphans share a parent."""
@@ -367,8 +384,7 @@ class TestBlockCacheOrphanTracking:
         orphan_parents = cache.get_orphan_parents()
 
         # Should return the common parent only once
-        assert len(orphan_parents) == 1
-        assert common_parent in orphan_parents
+        assert orphan_parents == [common_parent]
 
     def test_get_orphan_parents_excludes_cached_parents(self, peer_id: PeerId) -> None:
         """get_orphan_parents excludes parents that are already in the cache."""
@@ -396,7 +412,7 @@ class TestBlockCacheOrphanTracking:
         orphan_parents = cache.get_orphan_parents()
 
         # Parent is in cache, so should not be returned
-        assert len(orphan_parents) == 0
+        assert orphan_parents == []
 
 
 class TestBlockCacheParentChildIndex:
@@ -425,8 +441,7 @@ class TestBlockCacheParentChildIndex:
 
         children = cache.get_children(parent_root)
 
-        assert len(children) == 1
-        assert children[0] == pending
+        assert children == [pending]
 
     def test_get_children_multiple_children(self, peer_id: PeerId) -> None:
         """get_children returns all children of a parent."""
@@ -452,10 +467,10 @@ class TestBlockCacheParentChildIndex:
 
         children = cache.get_children(parent_root)
 
-        assert len(children) == 2
-        roots = {c.root for c in children}
-        assert pending1.root in roots
-        assert pending2.root in roots
+        # Both blocks have the same slot, so order within that slot is non-deterministic.
+        assert sorted(children, key=lambda p: p.root) == sorted(
+            [pending1, pending2], key=lambda p: p.root
+        )
 
     def test_get_children_sorted_by_slot(self, peer_id: PeerId) -> None:
         """get_children returns children sorted by slot."""
@@ -482,16 +497,13 @@ class TestBlockCacheParentChildIndex:
             state_root=Bytes32(b"\x02" * 32),
         )
 
-        cache.add(block_slot3, peer_id)
-        cache.add(block_slot1, peer_id)
-        cache.add(block_slot2, peer_id)
+        pending3 = cache.add(block_slot3, peer_id)
+        pending1 = cache.add(block_slot1, peer_id)
+        pending2 = cache.add(block_slot2, peer_id)
 
         children = cache.get_children(parent_root)
 
-        assert len(children) == 3
-        assert children[0].slot == Slot(1)
-        assert children[1].slot == Slot(2)
-        assert children[2].slot == Slot(3)
+        assert children == [pending1, pending2, pending3]
 
     def test_remove_clears_parent_index(self, peer_id: PeerId) -> None:
         """Removing a block clears it from the parent-to-children index."""
@@ -505,11 +517,11 @@ class TestBlockCacheParentChildIndex:
         )
 
         pending = cache.add(block, peer_id)
-        assert len(cache.get_children(parent_root)) == 1
+        assert cache.get_children(parent_root) == [pending]
 
         cache.remove(pending.root)
 
-        assert len(cache.get_children(parent_root)) == 0
+        assert cache.get_children(parent_root) == []
 
 
 class TestBlockCacheCapacityManagement:
@@ -647,8 +659,7 @@ class TestBlockCacheProcessable:
 
         processable = cache.get_processable(mock_store)
 
-        assert len(processable) == 1
-        assert processable[0] == pending
+        assert processable == [pending]
 
     def test_get_processable_sorted_by_slot(self, peer_id: PeerId) -> None:
         """get_processable returns blocks sorted by slot."""
@@ -678,16 +689,13 @@ class TestBlockCacheProcessable:
             state_root=Bytes32(b"\x02" * 32),
         )
 
-        cache.add(block3, peer_id)
-        cache.add(block1, peer_id)
-        cache.add(block2, peer_id)
+        pending3 = cache.add(block3, peer_id)
+        pending1 = cache.add(block1, peer_id)
+        pending2 = cache.add(block2, peer_id)
 
         processable = cache.get_processable(mock_store)
 
-        assert len(processable) == 3
-        assert processable[0].slot == Slot(1)
-        assert processable[1].slot == Slot(2)
-        assert processable[2].slot == Slot(3)
+        assert processable == [pending1, pending2, pending3]
 
 
 class TestBlockCacheBackfillDepth:
@@ -705,7 +713,16 @@ class TestBlockCacheBackfillDepth:
 
         pending = cache.add(block, peer_id, backfill_depth=10)
 
-        assert pending.backfill_depth == 10
+        root = hash_tree_root(block.message.block)
+        assert pending == PendingBlock(
+            block=block,
+            root=root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(1),
+            received_from=peer_id,
+            received_at=pending.received_at,
+            backfill_depth=10,
+        )
 
     def test_add_default_backfill_depth_is_zero(self, peer_id: PeerId) -> None:
         """Adding a block without backfill depth defaults to 0."""
@@ -719,4 +736,13 @@ class TestBlockCacheBackfillDepth:
 
         pending = cache.add(block, peer_id)
 
-        assert pending.backfill_depth == 0
+        root = hash_tree_root(block.message.block)
+        assert pending == PendingBlock(
+            block=block,
+            root=root,
+            parent_root=Bytes32.zero(),
+            slot=Slot(1),
+            received_from=peer_id,
+            received_at=pending.received_at,
+            backfill_depth=0,
+        )
