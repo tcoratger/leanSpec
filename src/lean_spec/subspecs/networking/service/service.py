@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING
 from lean_spec.snappy import frame_compress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
-from lean_spec.subspecs.networking.client.event_source import LiveNetworkEventSource
+from lean_spec.subspecs.networking.client.event_source import EventSource
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
@@ -70,7 +70,7 @@ class NetworkService:
     sync_service: SyncService
     """Sync service that receives routed events."""
 
-    event_source: LiveNetworkEventSource
+    event_source: EventSource
     """Source of network events from the transport layer."""
 
     fork_digest: str = field(default="0x00000000")

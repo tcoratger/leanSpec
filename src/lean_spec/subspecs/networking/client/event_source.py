@@ -103,6 +103,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import Protocol, Self
 
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
@@ -160,6 +161,27 @@ from lean_spec.types.exceptions import SSZSerializationError
 from .reqresp_client import ReqRespClient
 
 logger = logging.getLogger(__name__)
+
+
+class EventSource(Protocol):
+    """Protocol for network event sources.
+
+    Defines the minimal interface needed by NetworkService.
+    LiveNetworkEventSource satisfies this with real network I/O.
+    MockEventSource satisfies this for testing.
+    """
+
+    def __aiter__(self) -> Self:
+        """Return self as async iterator."""
+        ...
+
+    async def __anext__(self) -> NetworkEvent:
+        """Yield the next network event."""
+        ...
+
+    async def publish(self, topic: str, data: bytes) -> None:
+        """Broadcast a message to all peers on a topic."""
+        ...
 
 
 class GossipMessageError(Exception):

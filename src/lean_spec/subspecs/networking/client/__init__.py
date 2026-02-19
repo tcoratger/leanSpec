@@ -13,10 +13,11 @@ LiveNetworkEventSource
     Bridges connection events to NetworkService events.
 """
 
-from .event_source import LiveNetworkEventSource
+from .event_source import EventSource, LiveNetworkEventSource
 from .reqresp_client import ReqRespClient
 
 __all__ = [
+    "EventSource",
     "LiveNetworkEventSource",
     "ReqRespClient",
 ]

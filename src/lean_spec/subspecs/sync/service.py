@@ -198,6 +198,17 @@ class SyncService:
     Same buffering strategy as individual attestations.
     """
 
+    def set_publish_agg_fn(
+        self, fn: Callable[[SignedAggregatedAttestation], Coroutine[Any, Any, None]]
+    ) -> None:
+        """Wire the aggregated attestation publisher after construction.
+
+        Breaks circular dependency between SyncService and NetworkService.
+        NetworkService needs SyncService at construction, but SyncService
+        needs NetworkService's publish method. This setter resolves the cycle.
+        """
+        self._publish_agg_fn = fn
+
     def __post_init__(self) -> None:
         """Initialize sync components."""
         self._init_components()
