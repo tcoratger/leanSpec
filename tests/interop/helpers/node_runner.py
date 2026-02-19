@@ -363,7 +363,7 @@ class NodeCluster:
         # This matches the Ethereum gossip specification.
         if validator_indices:
             for idx in validator_indices:
-                subnet_id = idx % int(ATTESTATION_COMMITTEE_COUNT)
+                subnet_id = int(idx) % int(ATTESTATION_COMMITTEE_COUNT)
                 topic = f"/leanconsensus/{self.fork_digest}/attestation_{subnet_id}/ssz_snappy"
                 event_source.subscribe_gossip_topic(topic)
 
