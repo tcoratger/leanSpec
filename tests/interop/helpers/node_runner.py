@@ -428,7 +428,7 @@ class NodeCluster:
         # This allows the gossipsub mesh to form before validators start
         # producing blocks and attestations. Otherwise, early blocks/attestations
         # would be "Published message to 0 peers" because the mesh is empty.
-        aggregator_indices = set(range(int(ATTESTATION_COMMITTEE_COUNT)))
+        aggregator_indices = {ValidatorIndex(i) for i in range(int(ATTESTATION_COMMITTEE_COUNT))}
         for i in range(num_nodes):
             validator_indices = validators_per_node[i] if i < len(validators_per_node) else []
 
