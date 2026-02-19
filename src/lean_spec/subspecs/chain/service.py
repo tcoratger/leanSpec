@@ -1,19 +1,18 @@
 """
 Chain service that drives consensus timing.
 
-The Chain Problem
------------------
-Ethereum consensus runs on a clock. Every 4 seconds (1 slot), validators:
-- Interval 0: Propose blocks
-- Interval 1: Create attestations
-- Interval 2: Update safe target
-- Interval 3: Accept attestations into fork choice
+Ethereum consensus runs on a clock. Every 4 seconds (1 slot), validators act
+at each of the 5 intervals:
+
+- Interval 0: Block proposal
+- Interval 1: Vote propagation
+- Interval 2: Aggregation
+- Interval 3: Safe target update
+- Interval 4: Attestation acceptance into fork choice
 
 The Store has all this logic built in. But nothing drives the clock.
-ChainService is that driver - a simple timer loop.
+ChainService is that driver — a simple timer loop:
 
-How It Works
-------------
 1. Sleep until next interval boundary
 2. Get current wall-clock time
 3. Tick the store forward to current time
@@ -154,8 +153,8 @@ class ChainService:
         Between each remaining interval tick, yields to the event loop so
         gossip messages can be processed.
 
-        Updates ``self.sync_service.store`` in place after each tick so
-        concurrent gossip handlers see current time.
+        Updates the sync service's store after each tick so concurrent
+        gossip handlers see current time.
 
         Returns aggregated attestations produced during the ticks.
         """

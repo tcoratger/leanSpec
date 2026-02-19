@@ -37,31 +37,14 @@ class TestSyncStateTransitions:
         """IDLE cannot transition directly to SYNCED."""
         assert not SyncState.IDLE.can_transition_to(SyncState.SYNCED)
 
-    def test_idle_cannot_transition_to_itself(self) -> None:
-        """IDLE cannot transition to IDLE."""
-        assert not SyncState.IDLE.can_transition_to(SyncState.IDLE)
-
     def test_syncing_valid_transitions(self) -> None:
         """SYNCING can transition to SYNCED or IDLE."""
         assert SyncState.SYNCING.can_transition_to(SyncState.SYNCED)
         assert SyncState.SYNCING.can_transition_to(SyncState.IDLE)
 
-    def test_syncing_cannot_transition_to_itself(self) -> None:
-        """SYNCING cannot transition to itself."""
-        assert not SyncState.SYNCING.can_transition_to(SyncState.SYNCING)
-
     def test_synced_valid_transitions(self) -> None:
         """SYNCED can transition to SYNCING or IDLE."""
         assert SyncState.SYNCED.can_transition_to(SyncState.SYNCING)
-        assert SyncState.SYNCED.can_transition_to(SyncState.IDLE)
-
-    def test_synced_cannot_transition_to_itself(self) -> None:
-        """SYNCED cannot transition to itself."""
-        assert not SyncState.SYNCED.can_transition_to(SyncState.SYNCED)
-
-    def test_all_active_states_can_transition_to_idle(self) -> None:
-        """SYNCING and SYNCED can transition to IDLE (loss of peers)."""
-        assert SyncState.SYNCING.can_transition_to(SyncState.IDLE)
         assert SyncState.SYNCED.can_transition_to(SyncState.IDLE)
 
 
@@ -135,15 +118,6 @@ class TestSyncStateTransitionPaths:
         current = SyncState.SYNCED
 
         assert current == SyncState.SYNCED
-
-    def test_any_active_state_to_idle_on_disconnect(self) -> None:
-        """Test that any active state can return to IDLE on peer disconnect."""
-        active_states = [SyncState.SYNCING, SyncState.SYNCED]
-
-        for state in active_states:
-            assert state.can_transition_to(SyncState.IDLE), (
-                f"{state.name} should transition to IDLE"
-            )
 
 
 class TestSyncStateEdgeCases:

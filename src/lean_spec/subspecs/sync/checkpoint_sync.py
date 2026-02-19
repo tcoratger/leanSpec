@@ -151,8 +151,7 @@ async def verify_checkpoint_state(state: "State") -> bool:
         # If the data was corrupted, hashing will likely fail or produce
         # an unexpected result. We log the root for debugging.
         state_root = hash_tree_root(state)
-        root_preview = state_root.hex()[:16]
-        logger.info(f"Checkpoint state verified: slot={state.slot}, root={root_preview}...")
+        logger.info(f"Checkpoint state verified: slot={state.slot}, root={state_root}...")
         return True
 
     except Exception as e:

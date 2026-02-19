@@ -6,7 +6,7 @@ gossip rather than explicit requests. HeadSync manages this event-driven mode
 of operation.
 
 How It Works
-------------
+
 1. **Gossip arrives**: A new block is received via gossip subscription
 2. **Check parent**: Does the parent exist in our Store?
 3. **If yes**: Process immediately and check for cached descendants
@@ -18,7 +18,7 @@ This is more efficient than polling because:
 - Natural handling of out-of-order arrivals
 
 Descendant Processing
----------------------
+
 When a parent block arrives (either via gossip or backfill), there may be
 cached children waiting for it:
 
@@ -31,7 +31,7 @@ This ensures that chains of blocks are processed efficiently once their
 common ancestor arrives.
 
 Error Handling
---------------
+
 Block processing can fail for various reasons:
 
 - Invalid signatures
@@ -95,11 +95,11 @@ class HeadSync:
     possible or caching them for later processing.
 
     How It Works
-    ------------
+
     When a gossip block arrives:
 
     1. **Check Store**: Is the parent already in our Store?
-       - Yes: Process immediately via `store.on_block()`
+       - Yes: Process immediately
        - No: Cache the block and trigger backfill
 
     2. **If processed**: Check cache for descendants
@@ -109,10 +109,10 @@ class HeadSync:
     3. **Return result**: Report what happened for state machine decisions
 
     Integration
-    -----------
+
     HeadSync receives blocks but does not own the Store. The SyncService must:
 
-    - Call `on_gossip_block()` when gossip blocks arrive
+    - Forward gossip blocks when they arrive
     - Apply the returned Store updates
     - Use the result to update sync state
 
@@ -131,7 +131,7 @@ class HeadSync:
 
     This is injected to allow flexibility in block processing.
 
-    The default implementation uses `store.on_block()`, but tests can inject mocks.
+    The default implementation uses the store's block processing, but tests can inject mocks.
 
     Signature: (store, block) -> new_store
     Raises: Exception on validation failure
@@ -169,8 +169,8 @@ class HeadSync:
         logger.debug(
             "on_gossip_block: slot=%s root=%s parent=%s",
             slot,
-            block_root.hex()[:8],
-            parent_root.hex()[:8],
+            block_root.hex(),
+            parent_root.hex(),
         )
 
         # Skip if already processing (reentrant call).
@@ -263,7 +263,7 @@ class HeadSync:
                 ), store
 
             # Process cached descendants.
-            descendants_count = await self._process_cached_descendants(
+            descendants_count, store = await self._process_cached_descendants(
                 parent_root=block_root,
                 store=store,
                 peer_id=peer_id,
@@ -284,7 +284,7 @@ class HeadSync:
         parent_root: Bytes32,
         store: Store,
         peer_id: PeerId | None,
-    ) -> int:
+    ) -> tuple[int, Store]:
         """
         Process any cached blocks that descend from the given parent.
 
@@ -300,7 +300,7 @@ class HeadSync:
             peer_id: Peer ID for error attribution.
 
         Returns:
-            Number of descendants successfully processed.
+            Tuple of (descendants successfully processed, updated store).
         """
         processed_count = 0
 
@@ -328,15 +328,13 @@ class HeadSync:
                     # Remove from cache after successful processing.
                     self.block_cache.remove(child_root)
 
-                    # Unmark orphan status.
-                    self.block_cache.unmark_orphan(child_root)
-
                     # Recursively process this child's descendants.
-                    processed_count += await self._process_cached_descendants(
+                    desc_count, store = await self._process_cached_descendants(
                         parent_root=child_root,
                         store=store,
                         peer_id=peer_id,
                     )
+                    processed_count += desc_count
 
                 except Exception:
                     # Processing failed. Leave in cache for retry or discard.
@@ -346,7 +344,7 @@ class HeadSync:
             finally:
                 self._processing.discard(child_root)
 
-        return processed_count
+        return processed_count, store
 
     async def _cache_and_backfill(
         self,
@@ -422,7 +420,6 @@ class HeadSync:
                         store = self.process_block(store, pending.block)
                         processed_count += 1
                         self.block_cache.remove(pending.root)
-                        self.block_cache.unmark_orphan(pending.root)
 
                     except Exception:
                         # Processing failed. Remove from cache to avoid infinite loop.

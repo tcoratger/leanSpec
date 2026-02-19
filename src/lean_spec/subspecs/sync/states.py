@@ -12,7 +12,7 @@ class SyncState(Enum):
     This is a simple three-state machine for reactive synchronization:
 
     State Machine Diagram
-    ---------------------
+
     ::
 
         IDLE --> SYNCING --> SYNCED
@@ -20,7 +20,7 @@ class SyncState(Enum):
           +---------+-----------+
 
     The Lifecycle
-    -------------
+
     A newly started node follows this progression:
 
     1. **IDLE**: Node starts, no peers connected yet
@@ -28,14 +28,14 @@ class SyncState(Enum):
     3. **SYNCED**: Local head reaches network finalized slot; fully synchronized
 
     How It Works
-    ------------
+
     - Blocks arrive via gossip
     - If parent is known, process immediately
     - If parent is unknown, cache block and fetch parent (backfill)
     - Backfill happens naturally within SYNCING, not as a separate state
 
     Transitions
-    -----------
+
     IDLE -> SYNCING
         - Triggered when: Peers connected and we need to sync
         - Action: Start processing gossip blocks
@@ -115,6 +115,16 @@ class SyncState(Enum):
         return target in _VALID_TRANSITIONS.get(self, set())
 
     @property
+    def is_idle(self) -> bool:
+        """
+        Check if this state represents inactivity.
+
+        Returns:
+            True if no synchronization is in progress.
+        """
+        return self == SyncState.IDLE
+
+    @property
     def is_syncing(self) -> bool:
         """
         Check if this state represents active synchronization.
@@ -123,6 +133,16 @@ class SyncState(Enum):
             True if the state involves active block processing.
         """
         return self == SyncState.SYNCING
+
+    @property
+    def is_synced(self) -> bool:
+        """
+        Check if this state represents full synchronization.
+
+        Returns:
+            True if the node is caught up with the network.
+        """
+        return self == SyncState.SYNCED
 
     @property
     def accepts_gossip(self) -> bool:

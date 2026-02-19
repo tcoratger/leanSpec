@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
+from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.service.events import NetworkEvent
@@ -183,4 +184,11 @@ class MockForkchoiceStore:
     ) -> MockForkchoiceStore:
         """Track attestation additions. Returns self for assignment chaining."""
         self._attestations_received.append(signed_attestation)
+        return self
+
+    def on_gossip_aggregated_attestation(
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+    ) -> MockForkchoiceStore:
+        """Track aggregated attestation additions. Returns self for assignment chaining."""
         return self

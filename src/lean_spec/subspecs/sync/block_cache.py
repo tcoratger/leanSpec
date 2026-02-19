@@ -2,7 +2,7 @@
 Block cache for downloaded blocks awaiting parent resolution.
 
 Why Cache Blocks?
------------------
+
 In an ideal world, blocks arrive in perfect order: parent before child, always.
 Reality differs. Network latency, parallel downloads, and gossip propagation
 mean blocks often arrive before their parents are known.
@@ -16,7 +16,7 @@ The block cache provides a third option: hold the block until its parent
 arrives, then process both.
 
 How It Works
-------------
+
 The cache maintains three data structures:
 
 1. **Block storage**: Maps block root to PendingBlock (the block + metadata)
@@ -31,7 +31,7 @@ When a parent arrives:
 4. Recursively check if processed children have their own waiting children
 
 Memory Safety
--------------
+
 The cache is bounded by MAX_CACHED_BLOCKS (1024). When full, FIFO eviction
 removes the oldest blocks. This prevents memory exhaustion from attacks or
 prolonged network partitions that could otherwise grow the cache unboundedly.
@@ -251,7 +251,7 @@ class BlockCache:
             return None
 
         # Clean up orphan tracking.
-        self._orphans.discard(root)
+        self.unmark_orphan(root)
 
         # Clean up parent index.
         #
@@ -374,28 +374,10 @@ class BlockCache:
         # Sort ensures parent-before-child processing order.
         return sorted(processable, key=lambda p: p.slot)
 
-    def get_highest_slot(self) -> Slot | None:
-        """
-        Get the highest slot among cached blocks.
-
-        This is useful for progress reporting without exposing internal storage.
-
-        Returns:
-            The highest slot in the cache, or None if the cache is empty.
-        """
-        if not self._blocks:
-            return None
-        return max(p.slot for p in self._blocks.values())
-
     @property
     def orphan_count(self) -> int:
         """Number of orphan blocks in the cache."""
         return len(self._orphans)
-
-    @property
-    def is_empty(self) -> bool:
-        """Check if the cache is empty."""
-        return len(self._blocks) == 0
 
     def clear(self) -> None:
         """Remove all blocks from the cache."""

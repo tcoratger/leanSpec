@@ -1,6 +1,5 @@
 """
-Slot Clock
-==========
+Slot Clock.
 
 Time-to-slot conversion for Lean Consensus.
 
