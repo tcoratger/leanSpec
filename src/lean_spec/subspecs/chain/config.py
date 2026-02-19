@@ -4,8 +4,6 @@ from typing import Final
 
 from lean_spec.types.uint import Uint64
 
-# --- Time Parameters ---
-
 INTERVALS_PER_SLOT = Uint64(5)
 """Number of intervals per slot for forkchoice processing."""
 
@@ -20,8 +18,6 @@ MILLISECONDS_PER_INTERVAL = MILLISECONDS_PER_SLOT // INTERVALS_PER_SLOT
 
 JUSTIFICATION_LOOKBACK_SLOTS: Final = Uint64(3)
 """The number of slots to lookback for justification."""
-
-# --- State List Length Presets ---
 
 HISTORICAL_ROOTS_LIMIT: Final = Uint64(2**18)
 """

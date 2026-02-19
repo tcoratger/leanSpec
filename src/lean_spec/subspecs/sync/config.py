@@ -22,3 +22,6 @@ MAX_CACHED_BLOCKS: Final[int] = 1024
 
 MAX_BACKFILL_DEPTH: Final[int] = 512
 """Maximum depth for backfill parent chain resolution."""
+
+MAX_PENDING_ATTESTATIONS: Final[int] = 1024
+"""Maximum buffered attestations awaiting block processing."""

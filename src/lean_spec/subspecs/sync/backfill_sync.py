@@ -6,7 +6,7 @@ If the parent also has an unknown parent, we continue recursively. This process
 is called "backfill" because we are filling in gaps going backward in time.
 
 The Challenge
--------------
+
 Blocks can arrive out of order for several reasons:
 
 1. **Gossip timing**: A child block gossips faster than its parent
@@ -17,7 +17,7 @@ Without backfill, these orphan blocks would be useless. With backfill, we can
 resolve them once their parents arrive or are explicitly fetched.
 
 How It Works
-------------
+
 1. Track orphan blocks in the BlockCache
 2. When an orphan is detected, request its parent from peers
 3. If the fetched parent is also an orphan, request its parent
@@ -28,7 +28,7 @@ This is more memory-efficient than downloading the entire chain upfront,
 and handles dynamic gaps naturally.
 
 Depth Limiting
---------------
+
 Backfill depth is limited to prevent attacks and resource exhaustion:
 
 - An attacker could send a block claiming to have a parent millions of slots ago
@@ -92,23 +92,23 @@ class BackfillSync:
     arrive with unknown parents, this class orchestrates fetching those parents.
 
     How It Works
-    ------------
+
     1. **Detection**: BlockCache marks blocks as orphans when added
     2. **Request**: BackfillSync requests missing parents from peers
     3. **Recursion**: If fetched parents are also orphans, continue fetching
     4. **Resolution**: When parent chain is complete, blocks become processable
 
     Integration
-    -----------
+
     BackfillSync does not process blocks itself. It only ensures parents exist
     in the BlockCache. The SyncService is responsible for:
 
-    - Calling `fill_missing()` when orphans are detected
+    - Triggering backfill when orphans are detected
     - Processing blocks when they become processable
     - Integrating blocks into the Store
 
     Thread Safety
-    -------------
+
     This class is designed for single-threaded async operation. The `_pending`
     set tracks in-flight requests to avoid duplicate fetches.
     """
@@ -208,15 +208,15 @@ class BackfillSync:
             )
 
             if blocks:
-                # Request succeeded.
+                # Request succeeded with data.
                 self.peer_manager.on_request_success(peer.peer_id)
 
                 # Add blocks to cache and check for further orphans.
                 await self._process_received_blocks(blocks, peer.peer_id, depth)
             else:
                 # Empty response. Peer may not have the blocks.
-                # This is not necessarily a failure (blocks may not exist).
-                pass
+                # Still a completed request — release the in-flight slot.
+                self.peer_manager.on_request_success(peer.peer_id)
 
         except Exception:
             # Network error.
@@ -263,17 +263,6 @@ class BackfillSync:
         # Recursively fetch orphan parents.
         if new_orphan_parents:
             await self.fill_missing(new_orphan_parents, depth=depth + 1)
-
-    async def fill_all_orphans(self) -> None:
-        """
-        Fetch parents for all current orphan blocks.
-
-        Convenience method that fetches the parent roots of all blocks
-        currently marked as orphans in the cache.
-        """
-        orphan_parents = self.block_cache.get_orphan_parents()
-        if orphan_parents:
-            await self.fill_missing(orphan_parents)
 
     def reset(self) -> None:
         """Clear all pending state."""

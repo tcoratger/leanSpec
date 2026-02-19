@@ -9,7 +9,14 @@ from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.types import ConnectionState
 from lean_spec.subspecs.sync.config import MAX_CONCURRENT_REQUESTS
-from lean_spec.subspecs.sync.peer_manager import PeerManager, SyncPeer
+from lean_spec.subspecs.sync.peer_manager import (
+    INITIAL_PEER_SCORE,
+    MIN_PEER_SCORE,
+    SCORE_FAILURE_PENALTY,
+    SCORE_SUCCESS_BONUS,
+    PeerManager,
+    SyncPeer,
+)
 from lean_spec.types import Bytes32
 
 
@@ -287,13 +294,14 @@ class TestPeerManagerRequestCallbacks:
     """Tests for PeerManager request callbacks."""
 
     def test_on_request_success(self, connected_peer_info: PeerInfo) -> None:
-        """on_request_success decrements in-flight count."""
+        """on_request_success decrements in-flight count and increases score."""
         manager = PeerManager()
         sync_peer = manager.add_peer(connected_peer_info)
         sync_peer.requests_in_flight = 1
 
         manager.on_request_success(connected_peer_info.peer_id)
         assert sync_peer.requests_in_flight == 0
+        assert sync_peer.score == INITIAL_PEER_SCORE + SCORE_SUCCESS_BONUS
 
     def test_on_request_success_nonexistent_peer(self) -> None:
         """on_request_success does nothing for nonexistent peer."""
@@ -302,13 +310,14 @@ class TestPeerManagerRequestCallbacks:
         manager.on_request_success(peer("16Uiu2HAmNonexistent"))
 
     def test_on_request_failure(self, connected_peer_info: PeerInfo) -> None:
-        """on_request_failure decrements in-flight count."""
+        """on_request_failure decrements in-flight count and decreases score."""
         manager = PeerManager()
         sync_peer = manager.add_peer(connected_peer_info)
         sync_peer.requests_in_flight = 1
 
         manager.on_request_failure(connected_peer_info.peer_id)
         assert sync_peer.requests_in_flight == 0
+        assert sync_peer.score == INITIAL_PEER_SCORE - SCORE_FAILURE_PENALTY
 
     def test_on_request_failure_nonexistent_peer(self) -> None:
         """on_request_failure does nothing for nonexistent peer."""
@@ -335,3 +344,60 @@ class TestPeerManagerGetAllPeers:
 
         peers = manager.get_all_peers()
         assert len(peers) == 2
+
+
+class TestPeerScoring:
+    """Tests for peer scoring and weighted selection."""
+
+    def test_score_starts_at_initial(self, connected_peer_info: PeerInfo) -> None:
+        """New peers start with INITIAL_PEER_SCORE."""
+        manager = PeerManager()
+        sync_peer = manager.add_peer(connected_peer_info)
+        assert sync_peer.score == INITIAL_PEER_SCORE
+
+    def test_repeated_failures_lower_score(self, connected_peer_info: PeerInfo) -> None:
+        """Repeated failures reduce score toward MIN_PEER_SCORE."""
+        manager = PeerManager()
+        sync_peer = manager.add_peer(connected_peer_info)
+        sync_peer.requests_in_flight = 10
+
+        for _ in range(20):
+            manager.on_request_failure(connected_peer_info.peer_id)
+
+        assert sync_peer.score == MIN_PEER_SCORE
+
+    def test_failed_peer_deprioritized(self, peer_id: PeerId, peer_id_2: PeerId) -> None:
+        """Peer with low score is selected less often than high-score peer."""
+        manager = PeerManager()
+        info1 = PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED)
+        info2 = PeerInfo(peer_id=peer_id_2, state=ConnectionState.CONNECTED)
+
+        peer1 = manager.add_peer(info1)
+        manager.add_peer(info2)
+
+        # Drive peer1 score to minimum.
+        peer1.requests_in_flight = 10
+        for _ in range(20):
+            manager.on_request_failure(peer_id)
+
+        assert peer1.score == MIN_PEER_SCORE
+
+        # Sample selections — peer2 should dominate.
+        selections = [manager.select_peer_for_request() for _ in range(100)]
+        peer2_count = sum(1 for s in selections if s is not None and s.peer_id == peer_id_2)
+        assert peer2_count > 80
+
+    def test_overloaded_peer_skipped(self, peer_id: PeerId, peer_id_2: PeerId) -> None:
+        """Peer at MAX_CONCURRENT_REQUESTS is skipped in favor of available peer."""
+        manager = PeerManager()
+        info1 = PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED)
+        info2 = PeerInfo(peer_id=peer_id_2, state=ConnectionState.CONNECTED)
+
+        peer1 = manager.add_peer(info1)
+        manager.add_peer(info2)
+
+        peer1.requests_in_flight = MAX_CONCURRENT_REQUESTS
+
+        selected = manager.select_peer_for_request()
+        assert selected is not None
+        assert selected.peer_id == peer_id_2

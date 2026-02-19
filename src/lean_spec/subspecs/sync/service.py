@@ -4,25 +4,25 @@ Sync service orchestrator.
 This is the main entry point for synchronization.
 
 The Core Problem
-----------------
-When an Ethereum node starts, it has no chain history. Before it can validate
-new blocks or produce attestations, it must synchronize with the network. This
-involves:
 
+When an Ethereum node starts, it has no chain history. Before it can validate
+new blocks or produce attestations, it must synchronize with the network.
+
+This involves:
 1. **Discovery**: Finding peers with chain data
 2. **Assessment**: Determining how far behind we are
 3. **Download**: Fetching missing blocks when they arrive out of order
 4. **Validation**: Verifying and integrating blocks into our Store
 
 How It Works
-------------
+
 - Blocks arrive via gossip subscription
 - If parent is known, process immediately
 - If parent is unknown, cache block and fetch parent (backfill)
 - When parents arrive, process waiting children
 
 State Machine
--------------
+
 ::
 
     IDLE --> SYNCING --> SYNCED
@@ -50,6 +50,7 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     SignedBlockWithAttestation,
 )
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
@@ -57,6 +58,7 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 from .backfill_sync import BackfillSync, NetworkRequester
 from .block_cache import BlockCache
+from .config import MAX_PENDING_ATTESTATIONS
 from .head_sync import HeadSync
 from .peer_manager import PeerManager
 from .states import SyncState
@@ -65,10 +67,6 @@ if TYPE_CHECKING:
     from lean_spec.subspecs.storage import Database
 
 logger = logging.getLogger(__name__)
-
-BlockProcessor = Callable[[Store, SignedBlockWithAttestation], Store]
-
-PublishAggFn = Callable[[SignedAggregatedAttestation], Coroutine[Any, Any, None]]
 
 
 def default_block_processor(
@@ -94,10 +92,10 @@ class SyncProgress:
     state: SyncState
     """Current sync state machine state."""
 
-    local_head_slot: int | None = None
+    local_head_slot: Slot | None = None
     """Slot of our current chain head."""
 
-    network_finalized_slot: int | None = None
+    network_finalized_slot: Slot | None = None
     """Network consensus on finalized slot (mode of peer reports)."""
 
     blocks_processed: int = 0
@@ -127,7 +125,7 @@ class SyncService:
     - Maintains the forkchoice Store
 
     Design Philosophy
-    -----------------
+
     The service is designed to be:
 
     **Reactive**: Responds to gossip blocks rather than proactively fetching.
@@ -160,10 +158,14 @@ class SyncService:
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
 
-    process_block: BlockProcessor = field(default=default_block_processor)
-    """Block processor function. Defaults to Store.on_block()."""
+    process_block: Callable[[Store, SignedBlockWithAttestation], Store] = field(
+        default=default_block_processor
+    )
+    """Block processor function. Defaults to the store's block processing."""
 
-    _publish_agg_fn: PublishAggFn = field(default=_noop_publish_agg)
+    _publish_agg_fn: Callable[[SignedAggregatedAttestation], Coroutine[Any, Any, None]] = field(
+        default=_noop_publish_agg
+    )
     """Callback for publishing aggregated attestations to the network."""
 
     _state: SyncState = field(default=SyncState.IDLE)
@@ -236,7 +238,7 @@ class SyncService:
         This wrapper is injected into HeadSync to track processed blocks
         and optionally persist them to the database.
         """
-        # Delegate to the actual block processor (typically Store.on_block).
+        # Delegate to the actual block processor.
         #
         # The processor validates the block and updates forkchoice state.
         with metrics.block_processing_time.time():
@@ -313,7 +315,7 @@ class SyncService:
     @property
     def is_synced(self) -> bool:
         """Check if synced with network."""
-        return self._state == SyncState.SYNCED
+        return self._state.is_synced
 
     def get_progress(self) -> SyncProgress:
         """
@@ -335,8 +337,8 @@ class SyncService:
 
         return SyncProgress(
             state=self._state,
-            local_head_slot=int(head_slot),
-            network_finalized_slot=int(network_slot) if network_slot else None,
+            local_head_slot=head_slot,
+            network_finalized_slot=network_slot,
             blocks_processed=self._blocks_processed,
             # Only count peers that have an active connection.
             peers_connected=sum(1 for p in self.peer_manager.get_all_peers() if p.is_connected()),
@@ -473,6 +475,8 @@ class SyncService:
             # This handles the common case where attestations arrive
             # slightly before the block they reference.
             self._pending_attestations.append(attestation)
+            if len(self._pending_attestations) > MAX_PENDING_ATTESTATIONS:
+                self._pending_attestations = self._pending_attestations[-MAX_PENDING_ATTESTATIONS:]
 
     async def on_gossip_aggregated_attestation(
         self,
@@ -496,14 +500,18 @@ class SyncService:
         except (AssertionError, KeyError):
             # Target block not yet processed. Buffer for replay.
             self._pending_aggregated_attestations.append(signed_attestation)
+            if len(self._pending_aggregated_attestations) > MAX_PENDING_ATTESTATIONS:
+                self._pending_aggregated_attestations = self._pending_aggregated_attestations[
+                    -MAX_PENDING_ATTESTATIONS:
+                ]
 
     def _replay_pending_attestations(self) -> None:
         """Retry buffered attestations after a block is processed.
 
         Drains both pending queues, attempting each attestation against the
         updated store. Attestations that still fail (e.g., referencing a block
-        not yet received) are discarded — they will arrive again via gossip
-        or be included in a future block.
+        not yet received) are kept in the buffer for the next replay attempt.
+        The buffer is bounded by MAX_PENDING_ATTESTATIONS to prevent unbounded growth.
         """
         is_aggregator_role = self.store.validator_id is not None and self.is_aggregator
 
@@ -516,7 +524,7 @@ class SyncService:
                     is_aggregator=is_aggregator_role,
                 )
             except (AssertionError, KeyError):
-                pass
+                self._pending_attestations.append(attestation)
 
         pending_agg = self._pending_aggregated_attestations
         self._pending_aggregated_attestations = []
@@ -524,7 +532,7 @@ class SyncService:
             try:
                 self.store = self.store.on_gossip_aggregated_attestation(signed_attestation)
             except (AssertionError, KeyError):
-                pass
+                self._pending_aggregated_attestations.append(signed_attestation)
 
     async def publish_aggregated_attestation(
         self,
@@ -587,7 +595,7 @@ class SyncService:
         #
         # If already SYNCING, we should not re-trigger.
         # This prevents redundant state transitions.
-        if self._state not in (SyncState.IDLE, SyncState.SYNCED):
+        if self._state.is_syncing:
             return
 
         # Guard: Require peer information before syncing.
@@ -606,7 +614,7 @@ class SyncService:
         # network has finalized past our head, we are definitely behind.
         if network_finalized > head_slot:
             await self._transition_to(SyncState.SYNCING)
-        elif self._state == SyncState.IDLE:
+        elif self._state.is_idle:
             # Transition from IDLE even if caught up.
             #
             # IDLE -> SYNCING enables gossip processing. Even if our head matches
@@ -621,7 +629,7 @@ class SyncService:
         finalized slot and there are no orphan blocks.
         """
         # Guard: Only check completion while actively syncing.
-        if self._state != SyncState.SYNCING:
+        if not self._state.is_syncing:
             return
 
         # Invariant: All orphan blocks must be resolved before declaring synced.

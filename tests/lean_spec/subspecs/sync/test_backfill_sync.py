@@ -194,13 +194,13 @@ class TestBatchingAndPeerManagement:
 class TestOrphanHandling:
     """Tests for orphan block management during backfill."""
 
-    async def test_fill_all_orphans_fetches_missing_parents(
+    async def test_orphan_parents_fetched_via_fill_missing(
         self,
         backfill_system: BackfillSync,
         network: MockNetworkRequester,
         peer_id: PeerId,
     ) -> None:
-        """fill_all_orphans fetches parents for all orphan blocks in cache."""
+        """Fetching orphan parents via get_orphan_parents + fill_missing resolves orphans."""
         parent = make_signed_block(
             slot=Slot(1),
             proposer_index=ValidatorIndex(0),
@@ -220,7 +220,8 @@ class TestOrphanHandling:
 
         assert backfill_system.block_cache.orphan_count == 1
 
-        await backfill_system.fill_all_orphans()
+        orphan_parents = backfill_system.block_cache.get_orphan_parents()
+        await backfill_system.fill_missing(orphan_parents)
 
         assert parent_root in backfill_system.block_cache
 
@@ -257,7 +258,8 @@ class TestOrphanHandling:
         backfill_system.block_cache.mark_orphan(pending1.root)
         backfill_system.block_cache.mark_orphan(pending2.root)
 
-        await backfill_system.fill_all_orphans()
+        orphan_parents = backfill_system.block_cache.get_orphan_parents()
+        await backfill_system.fill_missing(orphan_parents)
 
         all_requested_roots = [root for _, roots in network.request_log for root in roots]
         assert all_requested_roots.count(parent_root) == 1
@@ -265,3 +267,85 @@ class TestOrphanHandling:
         assert parent_root in network.request_log[0][1]
 
         assert parent_root in backfill_system.block_cache
+
+
+class TestRequestTracking:
+    """Tests for request in-flight tracking."""
+
+    async def test_empty_response_does_not_leak_requests_in_flight(
+        self,
+        peer_id: PeerId,
+        network: MockNetworkRequester,
+    ) -> None:
+        """Empty response completes the request, keeping the peer available."""
+        manager = PeerManager()
+        manager.add_peer(PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED))
+        backfill = BackfillSync(
+            peer_manager=manager,
+            block_cache=BlockCache(),
+            network=network,
+        )
+
+        # Request a root the network doesn't have (returns empty).
+        unknown_root = Bytes32(b"\xff" * 32)
+        await backfill.fill_missing([unknown_root])
+
+        peer = manager.get_peer(peer_id)
+        assert peer is not None
+        assert peer.requests_in_flight == 0
+        assert peer.is_available()
+
+    async def test_in_flight_deduplication(
+        self,
+        backfill_system: BackfillSync,
+        network: MockNetworkRequester,
+    ) -> None:
+        """Duplicate fill_missing calls for the same root make only one request."""
+        block = make_signed_block(
+            slot=Slot(5),
+            proposer_index=ValidatorIndex(0),
+            parent_root=Bytes32.zero(),
+            state_root=Bytes32.zero(),
+        )
+        root = network.add_block(block)
+
+        # First call fetches the block (may also try to fetch its parent).
+        await backfill_system.fill_missing([root])
+        requests_after_first = len(network.request_log)
+        assert requests_after_first >= 1
+
+        # Second call: root is now in cache, so no new request.
+        await backfill_system.fill_missing([root])
+        assert len(network.request_log) == requests_after_first
+
+    async def test_retry_after_failure_clears_pending(
+        self,
+        peer_id: PeerId,
+    ) -> None:
+        """Failed request clears pending so a retry can succeed."""
+        network = MockNetworkRequester()
+        manager = PeerManager()
+        manager.add_peer(PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED))
+        backfill = BackfillSync(
+            peer_manager=manager,
+            block_cache=BlockCache(),
+            network=network,
+        )
+
+        block = make_signed_block(
+            slot=Slot(5),
+            proposer_index=ValidatorIndex(0),
+            parent_root=Bytes32.zero(),
+            state_root=Bytes32.zero(),
+        )
+        root = network.add_block(block)
+
+        # First call fails.
+        network.should_fail = True
+        await backfill.fill_missing([root])
+        assert root not in backfill._pending
+
+        # Second call succeeds.
+        network.should_fail = False
+        await backfill.fill_missing([root])
+        assert root in backfill.block_cache

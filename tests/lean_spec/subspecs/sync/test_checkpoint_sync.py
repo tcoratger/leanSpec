@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock
 
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
+from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.subspecs.containers import State
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
@@ -39,6 +41,19 @@ class TestStateVerification:
         )
 
         result = await verify_checkpoint_state(empty_state)
+        assert result is False
+
+    async def test_state_exceeding_validator_limit_fails(self) -> None:
+        """State with more validators than VALIDATOR_REGISTRY_LIMIT fails."""
+        # Use a mock because SSZList enforces LIMIT at construction time,
+        # preventing creation of a real State with too many validators.
+        mock_state = MagicMock()
+        mock_state.slot = Slot(0)
+        mock_validators = MagicMock()
+        mock_validators.__len__ = MagicMock(return_value=int(VALIDATOR_REGISTRY_LIMIT) + 1)
+        mock_state.validators = mock_validators
+
+        result = await verify_checkpoint_state(mock_state)
         assert result is False
 
 

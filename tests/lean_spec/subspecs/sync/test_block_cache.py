@@ -95,7 +95,6 @@ class TestBlockCacheBasicOperations:
         cache = BlockCache()
 
         assert len(cache) == 0
-        assert cache.is_empty
         assert cache.orphan_count == 0
 
     def test_add_block(self, peer_id: PeerId) -> None:
@@ -111,7 +110,6 @@ class TestBlockCacheBasicOperations:
         pending = cache.add(block, peer_id)
 
         assert len(cache) == 1
-        assert not cache.is_empty
         assert pending.block == block
         assert pending.received_from == peer_id
 
@@ -196,7 +194,6 @@ class TestBlockCacheBasicOperations:
         cache.clear()
 
         assert len(cache) == 0
-        assert cache.is_empty
         assert cache.orphan_count == 0
 
 
