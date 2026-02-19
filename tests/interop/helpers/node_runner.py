@@ -14,6 +14,7 @@ from typing import cast
 
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import Checkpoint, Validator
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
@@ -187,7 +188,7 @@ class NodeCluster:
     _validators: Validators | None = field(default=None, repr=False)
     """Shared validator set."""
 
-    _secret_keys: dict[int, SecretKey] = field(default_factory=dict, repr=False)
+    _secret_keys: dict[ValidatorIndex, SecretKey] = field(default_factory=dict, repr=False)
     """Secret keys by validator index."""
 
     _genesis_time: int = field(default=0, repr=False)
@@ -208,15 +209,15 @@ class NodeCluster:
         validators: list[Validator] = []
         scheme = TARGET_SIGNATURE_SCHEME
 
-        # Use a number of active epochs within the scheme's lifetime.
+        # Use a number of active slots within the scheme's lifetime.
         # TEST_CONFIG has LOG_LIFETIME=8 -> lifetime=256.
         # PROD_CONFIG has LOG_LIFETIME=32 -> lifetime=2^32.
-        # Use the full lifetime to avoid exhausting prepared epochs during tests.
-        num_active_epochs = int(scheme.config.LIFETIME)
+        # Use the full lifetime to avoid exhausting prepared slots during tests.
+        num_active_slots = int(scheme.config.LIFETIME)
 
         for i in range(self.num_validators):
-            keypair = scheme.key_gen(Uint64(0), Uint64(num_active_epochs))
-            self._secret_keys[i] = keypair.secret
+            keypair = scheme.key_gen(Slot(0), Uint64(num_active_slots))
+            self._secret_keys[ValidatorIndex(i)] = keypair.secret
 
             pubkey_bytes = keypair.public.encode_bytes()[:52]
             pubkey = Bytes52(pubkey_bytes.ljust(52, b"\x00"))
@@ -233,7 +234,7 @@ class NodeCluster:
     async def start_node(
         self,
         node_index: int,
-        validator_indices: list[int] | None = None,
+        validator_indices: list[ValidatorIndex] | None = None,
         is_aggregator: bool = False,
         bootnodes: list[str] | None = None,
         *,
@@ -395,7 +396,7 @@ class NodeCluster:
     async def start_all(
         self,
         topology: list[tuple[int, int]],
-        validators_per_node: list[list[int]] | None = None,
+        validators_per_node: list[list[ValidatorIndex]] | None = None,
     ) -> None:
         """
         Start multiple nodes with given topology.
@@ -480,7 +481,7 @@ class NodeCluster:
         for node in self.nodes:
             await node.start()
 
-    def _distribute_validators(self, num_nodes: int) -> list[list[int]]:
+    def _distribute_validators(self, num_nodes: int) -> list[list[ValidatorIndex]]:
         """
         Distribute validators evenly across nodes.
 
@@ -493,9 +494,9 @@ class NodeCluster:
         if num_nodes == 0:
             return []
 
-        distribution: list[list[int]] = [[] for _ in range(num_nodes)]
+        distribution: list[list[ValidatorIndex]] = [[] for _ in range(num_nodes)]
         for i in range(self.num_validators):
-            distribution[i % num_nodes].append(i)
+            distribution[i % num_nodes].append(ValidatorIndex(i))
 
         return distribution
 

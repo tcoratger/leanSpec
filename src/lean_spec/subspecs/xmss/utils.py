@@ -72,7 +72,7 @@ def int_to_base_p(value: int, num_limbs: int) -> list[Fp]:
 
 
 def expand_activation_time(
-    log_lifetime: int, desired_activation_epoch: int, desired_num_active_epochs: int
+    log_lifetime: int, desired_activation_slot: int, desired_num_active_slots: int
 ) -> tuple[int, int]:
     """
     Expands and aligns the activation time to top-bottom tree boundaries.
@@ -81,9 +81,9 @@ def expand_activation_time(
     `sqrt(LIFETIME)` boundaries. This function takes the user's desired activation
     interval and expands it to meet the following requirements:
 
-    1.  **Start alignment**: Start epoch is rounded down to a multiple of `sqrt(LIFETIME)`
-    2.  **End alignment**: End epoch is rounded up to a multiple of `sqrt(LIFETIME)`
-    3.  **Minimum duration**: At least `2 * sqrt(LIFETIME)` epochs (two bottom trees)
+    1.  **Start alignment**: Start slot is rounded down to a multiple of `sqrt(LIFETIME)`
+    2.  **End alignment**: End slot is rounded up to a multiple of `sqrt(LIFETIME)`
+    3.  **Minimum duration**: At least `2 * sqrt(LIFETIME)` slots (two bottom trees)
     4.  **Lifetime bounds**: Clamped to `[0, LIFETIME)`
 
     ### Algorithm
@@ -98,32 +98,32 @@ def expand_activation_time(
     ### Example
 
     For `LOG_LIFETIME = 32` (LIFETIME = 2^32, C = 2^16 = 65536):
-    - Request: epochs [10000, 80000) → 70000 epochs
-    - Aligned: epochs [0, 131072) → 131072 epochs = 2 bottom trees
+    - Request: slots [10000, 80000) → 70000 slots
+    - Aligned: slots [0, 131072) → 131072 slots = 2 bottom trees
 
     Args:
         log_lifetime: The logarithm (base 2) of the total lifetime.
-        desired_activation_epoch: The user's requested first epoch.
-        desired_num_active_epochs: The user's requested number of epochs.
+        desired_activation_slot: The user's requested first slot.
+        desired_num_active_slots: The user's requested number of slots.
 
     Returns:
         A tuple `(start_bottom_tree_index, end_bottom_tree_index)` where:
         - `start_bottom_tree_index`: Index of the first bottom tree (0, 1, 2, ...)
         - `end_bottom_tree_index`: Index past the last bottom tree (exclusive)
-        - Actual epochs: `[start_index * C, end_index * C)`
+        - Actual slots: `[start_index * C, end_index * C)`
     """
     # Calculate sqrt(LIFETIME) and the alignment mask.
     c = 1 << (log_lifetime // 2)  # C = 2^(LOG_LIFETIME/2)
     c_mask = ~(c - 1)  # Mask for rounding to multiples of C
 
-    # Calculate the desired end epoch.
-    desired_end_epoch = desired_activation_epoch + desired_num_active_epochs
+    # Calculate the desired end slot.
+    desired_end_slot = desired_activation_slot + desired_num_active_slots
 
     # Step 1: Align start downward to a multiple of C.
-    start = desired_activation_epoch & c_mask
+    start = desired_activation_slot & c_mask
 
     # Step 2: Round end upward to a multiple of C.
-    end = (desired_end_epoch + c - 1) & c_mask
+    end = (desired_end_slot + c - 1) & c_mask
 
     # Step 3: Enforce minimum duration of 2*C.
     if end - start < 2 * c:
@@ -146,7 +146,7 @@ def expand_activation_time(
             start = (lifetime - duration) & c_mask  # Keep alignment
 
     # Convert to bottom tree indices.
-    # Bottom tree i covers epochs [i*C, (i+1)*C).
+    # Bottom tree i covers slots [i*C, (i+1)*C).
     start_bottom_tree_index = start // c
     end_bottom_tree_index = end // c
 

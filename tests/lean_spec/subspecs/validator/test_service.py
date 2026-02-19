@@ -536,7 +536,7 @@ class TestValidatorServiceIntegration:
 
         is_valid = TARGET_SIGNATURE_SCHEME.verify(
             pk=proposer_public_key,
-            epoch=signed_block.message.block.slot,
+            slot=signed_block.message.block.slot,
             message=message_bytes,
             sig=signed_block.signature.proposer_signature,
         )
@@ -580,7 +580,7 @@ class TestValidatorServiceIntegration:
 
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
-                epoch=signed_att.message.slot,
+                slot=signed_att.message.slot,
                 message=message_bytes,
                 sig=signed_att.signature,
             )
@@ -676,7 +676,7 @@ class TestValidatorServiceIntegration:
 
         is_valid = TARGET_SIGNATURE_SCHEME.verify(
             pk=public_key,
-            epoch=signed_block.message.block.slot,
+            slot=signed_block.message.block.slot,
             message=message_bytes,
             sig=signed_block.signature.proposer_signature,
         )
@@ -715,7 +715,7 @@ class TestValidatorServiceIntegration:
             public_keys=public_keys,
             signatures=signatures,
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
         aggregated_payloads = {SignatureKey(vid, data_root): [proof] for vid in participants}
@@ -889,17 +889,16 @@ class TestValidatorServiceIntegration:
         computed_state_root = hash_tree_root(stored_state)
         assert produced_block.state_root == computed_state_root
 
-    async def test_signature_uses_correct_slot_as_epoch(
+    async def test_signature_uses_correct_slot(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
         real_registry: ValidatorRegistry,
     ) -> None:
         """
-        Verify signatures use the correct slot as the XMSS epoch parameter.
+        Verify signatures use the correct slot as the XMSS slot parameter.
 
-        XMSS is stateful and uses epochs for one-time signature keys.
-        The slot number serves as the epoch in the lean protocol.
+        XMSS is stateful and uses slots for one-time signature keys.
         """
         clock = SlotClock(genesis_time=Uint64(0))
         attestations_produced: list[SignedAttestation] = []
@@ -918,27 +917,27 @@ class TestValidatorServiceIntegration:
 
         await service._produce_attestations(test_slot)
 
-        # Verify each signature was created with the correct epoch (slot)
+        # Verify each signature was created with the correct slot
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
             public_key = key_manager.get_public_key(validator_id)
             message_bytes = signed_att.message.data_root_bytes()
 
-            # Verification must use the same epoch that was used for signing
+            # Verification must use the same slot that was used for signing
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
-                epoch=test_slot,  # Must match the signing slot
+                slot=test_slot,  # Must match the signing slot
                 message=message_bytes,
                 sig=signed_att.signature,
             )
             assert is_valid, f"Signature for validator {validator_id} at slot {test_slot} failed"
 
-            # Verify with wrong epoch should fail
-            wrong_epoch = test_slot + Slot(1)
+            # Verify with wrong slot should fail
+            wrong_slot = test_slot + Slot(1)
             is_invalid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
-                epoch=wrong_epoch,
+                slot=wrong_slot,
                 message=message_bytes,
                 sig=signed_att.signature,
             )
-            assert not is_invalid, "Signature should fail with wrong epoch"
+            assert not is_invalid, "Signature should fail with wrong slot"

@@ -61,6 +61,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from lean_spec.subspecs.containers.validator import SubnetId
+
 
 class ForkMismatchError(ValueError):
     """Raised when a topic's fork_digest does not match the expected value."""
@@ -151,7 +153,7 @@ class GossipTopic:
     Peers must match on fork digest to exchange messages on a topic.
     """
 
-    subnet_id: int | None = None
+    subnet_id: SubnetId | None = None
     """Subnet id for attestation subnet topics (required for ATTESTATION_SUBNET)."""
 
     def __str__(self) -> str:
@@ -227,7 +229,7 @@ class GossipTopic:
             try:
                 # Validate the subnet ID is a valid integer
                 subnet_part = topic_name[len("attestation_") :]
-                subnet_id = int(subnet_part)
+                subnet_id = SubnetId(int(subnet_part))
                 return cls(
                     kind=TopicKind.ATTESTATION_SUBNET,
                     fork_digest=fork_digest,
@@ -290,7 +292,7 @@ class GossipTopic:
         return cls(kind=TopicKind.AGGREGATED_ATTESTATION, fork_digest=fork_digest)
 
     @classmethod
-    def attestation_subnet(cls, fork_digest: str, subnet_id: int) -> GossipTopic:
+    def attestation_subnet(cls, fork_digest: str, subnet_id: SubnetId) -> GossipTopic:
         """Create an attestation subnet topic for the given fork and subnet.
 
         Args:

@@ -388,7 +388,7 @@ class ENR(StrictBaseModel):
 
         enr = cls(
             signature=signature,
-            seq=Uint64(seq),
+            seq=SeqNumber(seq),
             pairs=pairs,
         )
 

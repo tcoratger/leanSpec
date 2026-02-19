@@ -19,6 +19,7 @@ from pathlib import Path
 
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     ATTESTATION_COMMITTEE_COUNT,
     INTERVALS_PER_SLOT,
@@ -367,7 +368,7 @@ class Node:
         # The store starts with just the head block and state.
         # Additional blocks can be loaded on demand or via sync.
         return Store(
-            time=store_time,
+            time=Interval(int(store_time)),
             config=head_state.config,
             head=head_root,
             safe_target=head_root,

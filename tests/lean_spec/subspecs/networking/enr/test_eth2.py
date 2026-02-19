@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.networking.enr import Eth2Data
 from lean_spec.subspecs.networking.enr.eth2 import (
     FAR_FUTURE_EPOCH,
@@ -82,7 +83,7 @@ class TestAttestationSubnets:
         subnets = AttestationSubnets.from_subnet_ids([10, 20, 30])
         result = subnets.subscribed_subnets()
 
-        assert result == [10, 20, 30]
+        assert result == [SubnetId(10), SubnetId(20), SubnetId(30)]
 
     def test_invalid_subnet_id_in_from_subnet_ids(self) -> None:
         """from_subnet_ids() raises for invalid subnet IDs."""
@@ -112,7 +113,7 @@ class TestAttestationSubnets:
         """from_subnet_ids handles duplicates correctly."""
         subnets = AttestationSubnets.from_subnet_ids([5, 5, 5, 10])
         assert subnets.subscription_count() == 2
-        assert subnets.subscribed_subnets() == [5, 10]
+        assert subnets.subscribed_subnets() == [SubnetId(5), SubnetId(10)]
 
     def test_encode_bytes_empty(self) -> None:
         """Empty subscriptions serialize to 8 zero bytes."""

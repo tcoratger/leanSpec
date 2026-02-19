@@ -92,7 +92,9 @@ class TestValidatorRegistry:
         key_0 = MagicMock(name="key_0")
         key_2 = MagicMock(name="key_2")
 
-        registry = ValidatorRegistry.from_secret_keys({0: key_0, 2: key_2})
+        registry = ValidatorRegistry.from_secret_keys(
+            {ValidatorIndex(0): key_0, ValidatorIndex(2): key_2}
+        )
 
         assert registry_state(registry) == {ValidatorIndex(0): key_0, ValidatorIndex(2): key_2}
 

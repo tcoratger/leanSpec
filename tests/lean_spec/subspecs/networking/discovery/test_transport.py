@@ -29,8 +29,8 @@ from lean_spec.subspecs.networking.discovery.transport import (
     PendingRequest,
 )
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId
-from lean_spec.types import Bytes64, Uint64
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.types import Bytes64
 from lean_spec.types.uint import Uint8
 
 
@@ -171,7 +171,7 @@ class TestDiscoveryTransport:
 
         remote_enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
 
@@ -312,7 +312,7 @@ class TestPendingRequest:
         loop = asyncio.new_event_loop()
         future: asyncio.Future = loop.create_future()
 
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
 
         pending = PendingRequest(
             request_id=b"\x01\x02\x03\x04",
@@ -359,7 +359,7 @@ class TestSendResponse:
 
         pong = Pong(
             request_id=RequestId(data=b"\x01"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
             recipient_ip=IPv4(b"\x7f\x00\x00\x01"),
             recipient_port=Port(9000),
         )
@@ -383,7 +383,7 @@ class TestSendResponse:
 
         pong = Pong(
             request_id=RequestId(data=b"\x01"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
             recipient_ip=IPv4(b"\x7f\x00\x00\x01"),
             recipient_port=Port(9000),
         )
@@ -477,9 +477,9 @@ class TestMultiPacketNodesCollection:
             )
 
             # Simulate receiving 3 messages.
-            ping1 = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
-            ping2 = Ping(request_id=RequestId(data=b"\x02"), enr_seq=Uint64(2))
-            ping3 = Ping(request_id=RequestId(data=b"\x03"), enr_seq=Uint64(3))
+            ping1 = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
+            ping2 = Ping(request_id=RequestId(data=b"\x02"), enr_seq=SeqNumber(2))
+            ping3 = Ping(request_id=RequestId(data=b"\x03"), enr_seq=SeqNumber(3))
             await pending.response_queue.put(ping1)
             await pending.response_queue.put(ping2)
             await pending.response_queue.put(ping3)
@@ -569,7 +569,7 @@ class TestRequestResponseCorrelation:
         loop = asyncio.new_event_loop()
         future: asyncio.Future = loop.create_future()
 
-        message = Ping(request_id=RequestId(data=b"\x01\x02\x03\x04"), enr_seq=Uint64(1))
+        message = Ping(request_id=RequestId(data=b"\x01\x02\x03\x04"), enr_seq=SeqNumber(1))
 
         pending = PendingRequest(
             request_id=b"\x01\x02\x03\x04",
@@ -594,7 +594,7 @@ class TestRequestResponseCorrelation:
         async def test_future():
             future: asyncio.Future = loop.create_future()
 
-            message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+            message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
             pending = PendingRequest(
                 request_id=b"\x01",
                 dest_node_id=NodeId(bytes(32)),
@@ -610,7 +610,7 @@ class TestRequestResponseCorrelation:
             # Complete the future with a response.
             response = Pong(
                 request_id=RequestId(data=b"\x01"),
-                enr_seq=Uint64(2),
+                enr_seq=SeqNumber(2),
                 recipient_ip=IPv4(b"\x7f\x00\x00\x01"),
                 recipient_port=Port(9000),
             )
@@ -630,7 +630,7 @@ class TestRequestResponseCorrelation:
 
         future: asyncio.Future = loop.create_future()
 
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
         pending = PendingRequest(
             request_id=b"\x01",
             dest_node_id=NodeId(bytes(32)),
@@ -659,8 +659,8 @@ class TestRequestResponseCorrelation:
         future1: asyncio.Future = loop.create_future()
         future2: asyncio.Future = loop.create_future()
 
-        message1 = Ping(request_id=RequestId(data=request_id_1), enr_seq=Uint64(1))
-        message2 = Ping(request_id=RequestId(data=request_id_2), enr_seq=Uint64(2))
+        message1 = Ping(request_id=RequestId(data=request_id_1), enr_seq=SeqNumber(1))
+        message2 = Ping(request_id=RequestId(data=request_id_2), enr_seq=SeqNumber(2))
 
         pending1 = PendingRequest(
             request_id=request_id_1,
@@ -701,7 +701,7 @@ class TestRequestResponseCorrelation:
 
         nonce = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c"
 
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
         pending = PendingRequest(
             request_id=b"\x01",
             dest_node_id=NodeId(bytes(32)),
@@ -722,7 +722,7 @@ class TestRequestResponseCorrelation:
         loop = asyncio.new_event_loop()
         future: asyncio.Future = loop.create_future()
 
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(42))
+        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(42))
         pending = PendingRequest(
             request_id=b"\x01",
             dest_node_id=NodeId(bytes(32)),
@@ -1100,7 +1100,7 @@ class TestHandleDecodedMessage:
 
         pong = Pong(
             request_id=RequestId(data=request_id),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
             recipient_ip=IPv4(b"\x7f\x00\x00\x01"),
             recipient_port=Port(9000),
         )
@@ -1163,7 +1163,7 @@ class TestHandleDecodedMessage:
 
         ping = Ping(
             request_id=RequestId(data=b"\xff\xff"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
         )
 
         await transport._handle_decoded_message(remote_node_id, ping, ("192.168.1.1", 30303))
@@ -1183,7 +1183,7 @@ class TestHandleDecodedMessage:
 
         ping = Ping(
             request_id=RequestId(data=b"\xff\xff"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
         )
 
         # Should not raise.
@@ -1203,11 +1203,11 @@ class TestHandleDecodedMessage:
         with patch.object(transport._session_cache, "touch") as mock_touch:
             ping = Ping(
                 request_id=RequestId(data=b"\xff"),
-                enr_seq=Uint64(1),
+                enr_seq=SeqNumber(1),
             )
             await transport._handle_decoded_message(remote_node_id, ping, ("192.168.1.1", 30303))
 
-            mock_touch.assert_called_once_with(remote_node_id, "192.168.1.1", 30303)
+            mock_touch.assert_called_once_with(remote_node_id, "192.168.1.1", Port(30303))
 
 
 class TestHandlePacketDispatch:
@@ -1333,7 +1333,7 @@ class TestSendWhoareyou:
         # Register a remote ENR with seq=42.
         remote_enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(42),
+            seq=SeqNumber(42),
             pairs={"id": b"v4"},
         )
         transport.register_enr(remote_node_id, remote_enr)
@@ -1357,6 +1357,6 @@ class TestSendWhoareyou:
 
             # Verify enr_seq=42 was passed, not 0.
             call_kwargs = mock_create.call_args
-            assert call_kwargs[1]["remote_enr_seq"] == 42
+            assert call_kwargs[1]["remote_enr_seq"] == SeqNumber(42)
 
         await transport.stop()

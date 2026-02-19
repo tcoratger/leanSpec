@@ -26,7 +26,9 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
 ) -> None:
     state = make_keyed_genesis_state(2, container_key_manager)
     source = Checkpoint(root=make_bytes32(1), slot=Slot(0))
-    att_data = make_attestation_data_simple(2, make_bytes32(3), make_bytes32(4), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(2), make_bytes32(3), make_bytes32(4), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(2)]
     data_root = att_data.data_root_bytes()
     gossip_signatures = {
@@ -56,7 +58,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     aggregated_proofs[0].verify(
         public_keys=public_keys,
         message=data_root,
-        epoch=att_data.slot,
+        slot=att_data.slot,
     )
 
 
@@ -66,7 +68,9 @@ def test_aggregate_signatures_splits_when_needed(
     """Test that gossip and aggregated proofs are kept separate."""
     state = make_keyed_genesis_state(3, container_key_manager)
     source = Checkpoint(root=make_bytes32(2), slot=Slot(0))
-    att_data = make_attestation_data_simple(3, make_bytes32(5), make_bytes32(6), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(3), make_bytes32(5), make_bytes32(6), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(3)]
     data_root = att_data.data_root_bytes()
     gossip_signatures = {
@@ -113,7 +117,7 @@ def test_aggregate_signatures_splits_when_needed(
             proof.verify(
                 public_keys=[container_key_manager.get_public_key(ValidatorIndex(0))],
                 message=data_root,
-                epoch=att_data.slot,
+                slot=att_data.slot,
             )
 
 
@@ -163,7 +167,7 @@ def test_build_block_collects_valid_available_attestations(
     aggregated_proofs[0].verify(
         public_keys=[container_key_manager.get_public_key(ValidatorIndex(0))],
         message=data_root,
-        epoch=att_data.slot,
+        slot=att_data.slot,
     )
 
 
@@ -222,8 +226,12 @@ def test_aggregated_signatures_with_multiple_data_groups(
     """Multiple attestation data groups should be processed independently."""
     state = make_keyed_genesis_state(4, container_key_manager)
     source = Checkpoint(root=make_bytes32(22), slot=Slot(0))
-    att_data1 = make_attestation_data_simple(9, make_bytes32(23), make_bytes32(24), source=source)
-    att_data2 = make_attestation_data_simple(10, make_bytes32(25), make_bytes32(26), source=source)
+    att_data1 = make_attestation_data_simple(
+        Slot(9), make_bytes32(23), make_bytes32(24), source=source
+    )
+    att_data2 = make_attestation_data_simple(
+        Slot(10), make_bytes32(25), make_bytes32(26), source=source
+    )
 
     attestations = [
         Attestation(validator_id=ValidatorIndex(0), data=att_data1),
@@ -268,7 +276,7 @@ def test_aggregated_signatures_with_multiple_data_groups(
         proof.verify(
             public_keys=public_keys,
             message=agg_att.data.data_root_bytes(),
-            epoch=agg_att.data.slot,
+            slot=agg_att.data.slot,
         )
 
 
@@ -278,7 +286,9 @@ def test_aggregated_signatures_falls_back_to_block_payload(
     """Should fall back to block payload when gossip is incomplete."""
     state = make_keyed_genesis_state(2, container_key_manager)
     source = Checkpoint(root=make_bytes32(27), slot=Slot(0))
-    att_data = make_attestation_data_simple(11, make_bytes32(28), make_bytes32(29), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(11), make_bytes32(28), make_bytes32(29), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(2)]
     data_root = att_data.data_root_bytes()
 
@@ -320,7 +330,7 @@ def test_aggregated_signatures_falls_back_to_block_payload(
             proof.verify(
                 public_keys=[container_key_manager.get_public_key(ValidatorIndex(0))],
                 message=data_root,
-                epoch=att_data.slot,
+                slot=att_data.slot,
             )
 
 
@@ -433,7 +443,9 @@ def test_greedy_selects_proof_with_maximum_overlap(
     """
     state = make_keyed_genesis_state(4, container_key_manager)
     source = Checkpoint(root=make_bytes32(60), slot=Slot(0))
-    att_data = make_attestation_data_simple(12, make_bytes32(61), make_bytes32(62), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(12), make_bytes32(61), make_bytes32(62), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(4)]
     data_root = att_data.data_root_bytes()
 
@@ -489,7 +501,9 @@ def test_greedy_stops_when_no_useful_proofs_remain(
     """
     state = make_keyed_genesis_state(5, container_key_manager)
     source = Checkpoint(root=make_bytes32(70), slot=Slot(0))
-    att_data = make_attestation_data_simple(13, make_bytes32(71), make_bytes32(72), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(13), make_bytes32(71), make_bytes32(72), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(5)]
     data_root = att_data.data_root_bytes()
 
@@ -558,7 +572,9 @@ def test_greedy_handles_overlapping_proof_chains(
     """
     state = make_keyed_genesis_state(5, container_key_manager)
     source = Checkpoint(root=make_bytes32(80), slot=Slot(0))
-    att_data = make_attestation_data_simple(14, make_bytes32(81), make_bytes32(82), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(14), make_bytes32(81), make_bytes32(82), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(5)]
     data_root = att_data.data_root_bytes()
 
@@ -626,7 +642,9 @@ def test_greedy_single_validator_proofs(
     """
     state = make_keyed_genesis_state(3, container_key_manager)
     source = Checkpoint(root=make_bytes32(90), slot=Slot(0))
-    att_data = make_attestation_data_simple(15, make_bytes32(91), make_bytes32(92), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(15), make_bytes32(91), make_bytes32(92), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(3)]
     data_root = att_data.data_root_bytes()
 
@@ -683,7 +701,9 @@ def test_validator_in_both_gossip_and_fallback_proof(
     """
     state = make_keyed_genesis_state(2, container_key_manager)
     source = Checkpoint(root=make_bytes32(100), slot=Slot(0))
-    att_data = make_attestation_data_simple(16, make_bytes32(101), make_bytes32(102), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(16), make_bytes32(101), make_bytes32(102), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(2)]
     data_root = att_data.data_root_bytes()
 
@@ -726,7 +746,7 @@ def test_validator_in_both_gossip_and_fallback_proof(
     for proof in aggregated_proofs:
         participants = proof.participants.to_validator_indices()
         public_keys = [container_key_manager.get_public_key(vid) for vid in participants]
-        proof.verify(public_keys=public_keys, message=data_root, epoch=att_data.slot)
+        proof.verify(public_keys=public_keys, message=data_root, slot=att_data.slot)
 
 
 def test_gossip_none_and_aggregated_payloads_none(
@@ -741,7 +761,9 @@ def test_gossip_none_and_aggregated_payloads_none(
     """
     state = make_keyed_genesis_state(2, container_key_manager)
     source = Checkpoint(root=make_bytes32(110), slot=Slot(0))
-    att_data = make_attestation_data_simple(17, make_bytes32(111), make_bytes32(112), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(17), make_bytes32(111), make_bytes32(112), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(2)]
 
     results = state.aggregate_gossip_signatures(
@@ -770,7 +792,9 @@ def test_aggregated_payloads_only_no_gossip(
     """
     state = make_keyed_genesis_state(3, container_key_manager)
     source = Checkpoint(root=make_bytes32(120), slot=Slot(0))
-    att_data = make_attestation_data_simple(18, make_bytes32(121), make_bytes32(122), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(18), make_bytes32(121), make_bytes32(122), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(3)]
     data_root = att_data.data_root_bytes()
 
@@ -794,7 +818,7 @@ def test_aggregated_payloads_only_no_gossip(
     assert participants == {0, 1, 2}
 
     public_keys = [container_key_manager.get_public_key(ValidatorIndex(i)) for i in range(3)]
-    aggregated_proofs[0].verify(public_keys=public_keys, message=data_root, epoch=att_data.slot)
+    aggregated_proofs[0].verify(public_keys=public_keys, message=data_root, slot=att_data.slot)
 
 
 def test_proof_with_extra_validators_beyond_needed(
@@ -818,7 +842,9 @@ def test_proof_with_extra_validators_beyond_needed(
     """
     state = make_keyed_genesis_state(4, container_key_manager)
     source = Checkpoint(root=make_bytes32(130), slot=Slot(0))
-    att_data = make_attestation_data_simple(19, make_bytes32(131), make_bytes32(132), source=source)
+    att_data = make_attestation_data_simple(
+        Slot(19), make_bytes32(131), make_bytes32(132), source=source
+    )
     attestations = [Attestation(validator_id=ValidatorIndex(i), data=att_data) for i in range(2)]
     data_root = att_data.data_root_bytes()
 

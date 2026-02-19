@@ -31,7 +31,7 @@ from enum import Enum, auto
 from threading import Lock
 
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes32, Bytes33, Bytes64
 
 from .config import HANDSHAKE_TIMEOUT_SECS
@@ -41,7 +41,7 @@ from .crypto import (
     verify_id_nonce_signature,
 )
 from .keys import derive_keys_from_pubkey
-from .messages import PacketFlag
+from .messages import PacketFlag, Port
 from .packet import (
     HandshakeAuthdata,
     WhoAreYouAuthdata,
@@ -51,6 +51,9 @@ from .packet import (
     generate_id_nonce,
 )
 from .session import Session, SessionCache
+
+_DEFAULT_PORT = Port(0)
+"""Default port value for optional port parameters."""
 
 MAX_PENDING_HANDSHAKES = 100
 """Hard cap on concurrent pending handshakes to prevent resource exhaustion."""
@@ -97,7 +100,7 @@ class PendingHandshake:
     challenge_nonce: bytes | None = None
     """12-byte nonce from the packet that triggered WHOAREYOU."""
 
-    remote_enr_seq: int = 0
+    remote_enr_seq: SeqNumber = SeqNumber(0)
     """ENR seq we sent in WHOAREYOU. If 0, remote MUST include their ENR in HANDSHAKE."""
 
     started_at: float = field(default_factory=time.time)
@@ -144,7 +147,7 @@ class HandshakeManager:
         local_node_id: NodeId,
         local_private_key: bytes,
         local_enr_rlp: bytes,
-        local_enr_seq: int,
+        local_enr_seq: SeqNumber,
         session_cache: SessionCache,
         timeout_secs: float = HANDSHAKE_TIMEOUT_SECS,
     ):
@@ -204,7 +207,7 @@ class HandshakeManager:
         self,
         remote_node_id: NodeId,
         request_nonce: bytes,
-        remote_enr_seq: int,
+        remote_enr_seq: SeqNumber,
         masking_iv: bytes,
     ) -> tuple[bytes, bytes, bytes, bytes]:
         """
@@ -255,7 +258,7 @@ class HandshakeManager:
         remote_pubkey: bytes,
         challenge_data: bytes,
         remote_ip: str = "",
-        remote_port: int = 0,
+        remote_port: Port = _DEFAULT_PORT,
     ) -> tuple[bytes, bytes, bytes]:
         """
         Create a HANDSHAKE packet in response to WHOAREYOU.
@@ -293,7 +296,7 @@ class HandshakeManager:
 
         # Include our ENR if the remote's known seq is stale.
         record = None
-        if int(whoareyou.enr_seq) < self._local_enr_seq:
+        if whoareyou.enr_seq < self._local_enr_seq:
             record = self._local_enr_rlp
 
         # Build authdata.
@@ -338,7 +341,7 @@ class HandshakeManager:
         remote_node_id: NodeId,
         handshake: HandshakeAuthdata,
         remote_ip: str = "",
-        remote_port: int = 0,
+        remote_port: Port = _DEFAULT_PORT,
     ) -> HandshakeResult:
         """
         Process a received HANDSHAKE packet.
@@ -383,7 +386,7 @@ class HandshakeManager:
         # If we sent enr_seq=0, we signaled that we don't know the remote's ENR.
         # Per spec, the remote MUST include their ENR in the HANDSHAKE response
         # so we can verify their identity.
-        if remote_enr_seq == 0 and handshake.record is None:
+        if remote_enr_seq == SeqNumber(0) and handshake.record is None:
             raise HandshakeError(
                 f"ENR required in HANDSHAKE from unknown node {remote_node_id.hex()[:16]}"
             )

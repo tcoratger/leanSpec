@@ -92,21 +92,21 @@ def test_expand_activation_time(
 
     # Verify alignment
     c = 1 << (log_lifetime // 2)
-    actual_start_epoch = start_tree * c
-    actual_end_epoch = end_tree * c
-    assert actual_start_epoch % c == 0
-    assert actual_end_epoch % c == 0
+    actual_start_slot = start_tree * c
+    actual_end_slot = end_tree * c
+    assert actual_start_slot % c == 0
+    assert actual_end_slot % c == 0
 
     # Verify it covers the desired range (if the desired range fits within lifetime)
     lifetime = c * c
-    desired_end_epoch = desired_activation + desired_num
-    if desired_end_epoch <= lifetime:
-        assert actual_start_epoch <= desired_activation
-        assert actual_end_epoch >= desired_end_epoch
+    desired_end_slot = desired_activation + desired_num
+    if desired_end_slot <= lifetime:
+        assert actual_start_slot <= desired_activation
+        assert actual_end_slot >= desired_end_slot
     else:
         # If desired range exceeds lifetime, verify it's clamped to lifetime bounds
-        assert actual_start_epoch >= 0
-        assert actual_end_epoch <= lifetime
+        assert actual_start_slot >= 0
+        assert actual_end_slot <= lifetime
 
 
 def test_hash_subtree_from_prf_key() -> None:

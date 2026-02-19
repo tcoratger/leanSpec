@@ -13,8 +13,9 @@ from lean_multisig_py import (
 )
 
 from lean_spec.subspecs.containers.attestation import AggregationBits
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
 from lean_spec.types.container import Container
 
@@ -61,7 +62,7 @@ class AggregatedSignatureProof(Container):
     it covers.
 
     The proof can verify that all participants signed the same message in the
-    same epoch, using a single verification operation instead of checking
+    same slot, using a single verification operation instead of checking
     each signature individually.
     """
 
@@ -78,7 +79,7 @@ class AggregatedSignatureProof(Container):
         public_keys: Sequence[PublicKey],
         signatures: Sequence[Signature],
         message: Bytes32,
-        epoch: Uint64,
+        slot: Slot,
         mode: str | None = None,
     ) -> Self:
         """
@@ -89,7 +90,7 @@ class AggregatedSignatureProof(Container):
             public_keys: Public keys of the signers (must match signatures order).
             signatures: Individual XMSS signatures to aggregate.
             message: The 32-byte message that was signed.
-            epoch: The epoch in which the signatures were created.
+            slot: The slot in which the signatures were created.
             mode: The mode to use for the aggregation (test or prod).
 
         Returns:
@@ -105,7 +106,7 @@ class AggregatedSignatureProof(Container):
                 [pk.encode_bytes() for pk in public_keys],
                 [sig.encode_bytes() for sig in signatures],
                 message,
-                epoch,
+                slot,
                 mode=mode,
             )
             return cls(
@@ -119,7 +120,7 @@ class AggregatedSignatureProof(Container):
         self,
         public_keys: Sequence[PublicKey],
         message: Bytes32,
-        epoch: Uint64,
+        slot: Slot,
         mode: str | None = None,
     ) -> None:
         """
@@ -128,7 +129,7 @@ class AggregatedSignatureProof(Container):
         Args:
             public_keys: Public keys of the participants (order must match participants bitfield).
             message: The 32-byte message that was signed.
-            epoch: The epoch in which the signatures were created.
+            slot: The slot in which the signatures were created.
             mode: The mode to use for the verification (test or prod).
 
         Raises:
@@ -141,7 +142,7 @@ class AggregatedSignatureProof(Container):
                 [pk.encode_bytes() for pk in public_keys],
                 message,
                 self.proof_data.encode_bytes(),
-                epoch,
+                slot,
                 mode=mode,
             )
         except Exception as exc:

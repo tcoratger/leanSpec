@@ -4,6 +4,7 @@ import pytest
 from consensus_testing import SSZTestFiller
 
 from lean_spec.subspecs.containers.attestation import AggregationBits
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss import PublicKey, SecretKey, Signature
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
@@ -87,8 +88,8 @@ def test_secret_key_minimal(ssz: SSZTestFiller) -> None:
         value=SecretKey(
             prf_key=PRFKey.zero(),
             parameter=_zero_parameter(),
-            activation_epoch=Uint64(0),
-            num_active_epochs=Uint64(1),
+            activation_slot=Slot(0),
+            num_active_slots=Uint64(1),
             top_tree=empty_subtree,
             left_bottom_tree_index=Uint64(0),
             left_bottom_tree=empty_subtree,

@@ -164,12 +164,11 @@ class SignedBlockWithAttestation(Container):
             public_keys = [validators[vid].get_pubkey() for vid in validator_ids]
 
             # Verify the aggregated signature against all public keys.
-            # Uses slot as epoch for XMSS one-time signature indexing.
             try:
                 aggregated_signature.verify(
                     public_keys=public_keys,
                     message=attestation_data_root,
-                    epoch=aggregated_attestation.data.slot,
+                    slot=aggregated_attestation.data.slot,
                 )
             except AggregationError as exc:
                 raise AssertionError(

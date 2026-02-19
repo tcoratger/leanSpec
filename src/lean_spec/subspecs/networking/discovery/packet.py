@@ -33,8 +33,8 @@ import os
 import struct
 from dataclasses import dataclass
 
-from lean_spec.subspecs.networking.types import NodeId
-from lean_spec.types import Bytes12, Bytes16, Uint64
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.types import Bytes12, Bytes16
 
 from .config import MAX_PACKET_SIZE, MIN_PACKET_SIZE
 from .crypto import (
@@ -92,7 +92,7 @@ class WhoAreYouAuthdata:
     id_nonce: IdNonce
     """16-byte identity challenge nonce."""
 
-    enr_seq: Uint64
+    enr_seq: SeqNumber
     """Sender's last known ENR sequence for the target. 0 if unknown."""
 
 
@@ -273,7 +273,7 @@ def decode_whoareyou_authdata(authdata: bytes) -> WhoAreYouAuthdata:
         raise ValueError(f"Invalid WHOAREYOU authdata size: {len(authdata)}")
 
     id_nonce = IdNonce(authdata[:16])
-    enr_seq = Uint64(struct.unpack(">Q", authdata[16:24])[0])
+    enr_seq = SeqNumber(struct.unpack(">Q", authdata[16:24])[0])
 
     return WhoAreYouAuthdata(id_nonce=id_nonce, enr_seq=enr_seq)
 
@@ -342,7 +342,7 @@ def encode_message_authdata(src_id: NodeId) -> bytes:
     return src_id
 
 
-def encode_whoareyou_authdata(id_nonce: bytes, enr_seq: int) -> bytes:
+def encode_whoareyou_authdata(id_nonce: bytes, enr_seq: SeqNumber) -> bytes:
     """Encode WHOAREYOU packet authdata."""
     if len(id_nonce) != 16:
         raise ValueError(f"ID nonce must be 16 bytes, got {len(id_nonce)}")

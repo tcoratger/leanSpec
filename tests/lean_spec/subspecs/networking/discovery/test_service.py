@@ -27,7 +27,7 @@ from lean_spec.subspecs.networking.discovery.service import (
 )
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes64, Uint64
+from lean_spec.types import Bytes64
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
 
@@ -64,7 +64,7 @@ class TestDiscoveryServiceInit:
         """Service accepts bootnodes list."""
         bootnode = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": bytes.fromhex(
@@ -85,7 +85,7 @@ class TestDiscoveryServiceInit:
         """Service requires ENR to have a public key."""
         enr_without_pubkey = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
 
@@ -305,7 +305,7 @@ class TestENRAddressExtraction:
         """Extract IPv4 address from ENR."""
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": NODE_B_PUBKEY,
@@ -325,7 +325,7 @@ class TestENRAddressExtraction:
 
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": NODE_B_PUBKEY,
@@ -344,7 +344,7 @@ class TestENRAddressExtraction:
 
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": NODE_B_PUBKEY,
@@ -363,7 +363,7 @@ class TestENRAddressExtraction:
         """ENR without IP returns None for ip4."""
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": NODE_B_PUBKEY,
@@ -485,7 +485,7 @@ class TestBootstrap:
         """Service accepts bootnodes in constructor."""
         bootnode = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": bytes.fromhex(
@@ -510,7 +510,7 @@ class TestBootstrap:
         for i in range(5):
             bootnode = ENR(
                 signature=Bytes64(bytes(64)),
-                seq=Uint64(i + 1),
+                seq=SeqNumber(i + 1),
                 pairs={
                     "id": b"v4",
                     "secp256k1": bytes.fromhex(
@@ -562,7 +562,7 @@ class TestHandlePing:
             private_key=local_private_key,
         )
 
-        ping = Ping(request_id=RequestId(data=b"\x01\x02"), enr_seq=Uint64(1))
+        ping = Ping(request_id=RequestId(data=b"\x01\x02"), enr_seq=SeqNumber(1))
         addr = ("192.168.1.1", 30303)
 
         with patch.object(
@@ -583,7 +583,7 @@ class TestHandlePing:
             private_key=local_private_key,
         )
 
-        ping = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+        ping = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
         addr = ("192.168.1.1", 30303)
 
         with patch.object(service._transport, "send_response", new=AsyncMock(return_value=True)):
@@ -601,7 +601,7 @@ class TestHandlePing:
             private_key=local_private_key,
         )
 
-        ping = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+        ping = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
         addr = ("192.168.1.1", 30303)
 
         with patch.object(service._transport, "send_response", new=AsyncMock(return_value=False)):
@@ -619,7 +619,7 @@ class TestHandlePing:
             private_key=local_private_key,
         )
 
-        ping = Ping(request_id=RequestId(data=b"\x01"), enr_seq=Uint64(1))
+        ping = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
         addr = ("10.0.0.5", 9001)
 
         with patch.object(
@@ -855,7 +855,7 @@ class TestBootstrapFlow:
         )
         bootnode = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": node_a_pubkey,
@@ -884,7 +884,7 @@ class TestBootstrapFlow:
         )
         bootnode = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": node_a_pubkey,
@@ -929,7 +929,7 @@ class TestProcessDiscoveredEnr:
         # Create a valid ENR.
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={
                 "id": b"v4",
                 "secp256k1": bytes.fromhex(

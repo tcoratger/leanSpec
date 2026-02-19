@@ -867,7 +867,7 @@ class State(Container):
                     public_keys=gossip_keys,
                     signatures=gossip_sigs,
                     message=data_root,
-                    epoch=data.slot,
+                    slot=data.slot,
                 )
                 attestation = AggregatedAttestation(aggregation_bits=participants, data=data)
                 results.append((attestation, proof))
@@ -915,7 +915,7 @@ class State(Container):
             )  # validators contributed to this attestation
 
             # Validators that are missing in the current aggregation are put into remaining.
-            remaining: set[Uint64] = set(validator_ids)
+            remaining: set[ValidatorIndex] = set(validator_ids)
 
             # Fallback to existing proofs
             #

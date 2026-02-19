@@ -41,7 +41,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
 from lean_spec.subspecs.networking.discovery.session import Session, SessionCache
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes64, Uint64
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes64
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ class TestEncryptedPacketRoundtrip:
         # Create a PING message.
         ping = Ping(
             request_id=RequestId(data=b"\x01"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
         )
         message_bytes = encode_message(ping)
 
@@ -218,7 +218,7 @@ class TestHandshakeManagerIntegration:
         cache = SessionCache()
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
 
@@ -226,7 +226,7 @@ class TestHandshakeManagerIntegration:
             local_node_id=node_a_keys["node_id"],
             local_private_key=node_a_keys["private_key"],
             local_enr_rlp=enr.to_rlp(),
-            local_enr_seq=1,
+            local_enr_seq=SeqNumber(1),
             session_cache=cache,
         )
 
@@ -236,7 +236,7 @@ class TestHandshakeManagerIntegration:
         id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
             remote_node_id=node_b_keys["node_id"],
             request_nonce=request_nonce,
-            remote_enr_seq=0,
+            remote_enr_seq=SeqNumber(0),
             masking_iv=masking_iv,
         )
 
@@ -252,7 +252,7 @@ class TestHandshakeManagerIntegration:
         cache = SessionCache()
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
 
@@ -260,7 +260,7 @@ class TestHandshakeManagerIntegration:
             local_node_id=node_a_keys["node_id"],
             local_private_key=node_a_keys["private_key"],
             local_enr_rlp=enr.to_rlp(),
-            local_enr_seq=1,
+            local_enr_seq=SeqNumber(1),
             session_cache=cache,
         )
 
@@ -298,12 +298,12 @@ class TestFullHandshakeFlow:
 
         enr_a = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4", "secp256k1": node_a_keys["public_key"]},
         )
         enr_b = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4", "secp256k1": node_b_keys["public_key"]},
         )
 
@@ -311,7 +311,7 @@ class TestFullHandshakeFlow:
             local_node_id=node_a_keys["node_id"],
             local_private_key=node_a_keys["private_key"],
             local_enr_rlp=enr_a.to_rlp(),
-            local_enr_seq=1,
+            local_enr_seq=SeqNumber(1),
             session_cache=cache_a,
         )
 
@@ -319,7 +319,7 @@ class TestFullHandshakeFlow:
             local_node_id=node_b_keys["node_id"],
             local_private_key=node_b_keys["private_key"],
             local_enr_rlp=enr_b.to_rlp(),
-            local_enr_seq=1,
+            local_enr_seq=SeqNumber(1),
             session_cache=cache_b,
         )
 
@@ -332,7 +332,7 @@ class TestFullHandshakeFlow:
         id_nonce, whoareyou_authdata, _, challenge_data = manager_b.create_whoareyou(
             remote_node_id=node_a_keys["node_id"],
             request_nonce=request_nonce,
-            remote_enr_seq=0,
+            remote_enr_seq=SeqNumber(0),
             masking_iv=masking_iv,
         )
 

@@ -23,11 +23,10 @@ ForkDigest = Bytes4
 Version = Bytes4
 """4-byte fork version number (e.g., 0x01000000 for Phase0)."""
 
-SeqNumber = Uint64
-"""Sequence number used in ENR records, metadata, and ping messages."""
 
-SubnetId = Uint64
-"""Subnet identifier (0-63) for attestation subnet partitioning."""
+class SeqNumber(Uint64):
+    """Sequence number used in ENR records, metadata, and ping messages."""
+
 
 ProtocolId = str
 """Libp2p protocol identifier, e.g. ``/eth2/beacon_chain/req/status/1/ssz_snappy``."""

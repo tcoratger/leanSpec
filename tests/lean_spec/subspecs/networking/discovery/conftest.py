@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId
-from lean_spec.types import Bytes64, Uint64
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.types import Bytes64
 
 # From devp2p test vectors
 NODE_A_PRIVKEY = bytes.fromhex("eef77acb6c6a6eebc5b363a475ac583ec7eccdb42b6481424c60f59aa326547f")
@@ -46,7 +46,7 @@ def local_enr() -> ENR:
     """Minimal local ENR for testing."""
     return ENR(
         signature=Bytes64(bytes(64)),
-        seq=Uint64(1),
+        seq=SeqNumber(1),
         pairs={
             "id": b"v4",
             "secp256k1": NODE_B_PUBKEY,
