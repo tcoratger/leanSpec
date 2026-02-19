@@ -320,7 +320,7 @@ class XmssKeyManager:
 
         # Advance key state until slot is in prepared interval
         prepared = self.scheme.get_prepared_interval(sk)
-        while slot not in prepared:
+        while int(slot) not in prepared:
             activation = self.scheme.get_activation_interval(sk)
             if prepared.stop >= activation.stop:
                 raise ValueError(f"Slot {slot} exceeds key lifetime {activation.stop}")
