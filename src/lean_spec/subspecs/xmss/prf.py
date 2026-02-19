@@ -164,7 +164,7 @@ class Prf(StrictBaseModel):
             PRF_DOMAIN_SEP
             + PRF_DOMAIN_SEP_DOMAIN_ELEMENT
             + key
-            + int(epoch).to_bytes(4, "big")
+            + epoch.to_bytes(4, "big")
             + chain_index.to_bytes(8, "big")
         )
 
@@ -222,9 +222,9 @@ class Prf(StrictBaseModel):
             PRF_DOMAIN_SEP
             + PRF_DOMAIN_SEP_RANDOMNESS
             + key
-            + int(epoch).to_bytes(4, "big")
+            + epoch.to_bytes(4, "big")
             + message
-            + int(counter).to_bytes(8, "big")
+            + counter.to_bytes(8, "big")
         )
 
         # Extract enough bytes for RAND_LEN_FE field elements
