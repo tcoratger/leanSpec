@@ -37,7 +37,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
-from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import (
@@ -297,7 +296,6 @@ class ValidatorService:
                 self._store_proposer_attestation_signature(signed_block, validator_index)
 
                 self._blocks_produced += 1
-                metrics.blocks_proposed.inc()
 
                 # Emit the block for network propagation.
                 await self.on_block(signed_block)
@@ -371,7 +369,6 @@ class ValidatorService:
             signed_attestation = self._sign_attestation(attestation_data, validator_index)
 
             self._attestations_produced += 1
-            metrics.attestations_produced.inc()
 
             # Process attestation locally before publishing.
             #

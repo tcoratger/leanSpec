@@ -42,7 +42,6 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lean_spec.subspecs import metrics
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
     Block,
@@ -241,24 +240,12 @@ class SyncService:
         # Delegate to the actual block processor.
         #
         # The processor validates the block and updates forkchoice state.
-        with metrics.block_processing_time.time():
-            new_store = self.process_block(store, block)
+        new_store = self.process_block(store, block)
 
-        # Track metrics after successful processing.
+        # Track processed blocks.
         #
         # We only count blocks that pass validation and update the store.
         self._blocks_processed += 1
-        metrics.blocks_processed.inc()
-
-        # Update chain state metrics.
-        metrics.head_slot.set(float(new_store.blocks[new_store.head].slot))
-        metrics.justified_slot.set(float(new_store.latest_justified.slot))
-        metrics.finalized_slot.set(float(new_store.latest_finalized.slot))
-
-        # Update validator count from head state.
-        head_state = new_store.states.get(new_store.head)
-        if head_state is not None:
-            metrics.validators_count.set(float(len(head_state.validators)))
 
         # Persist block and state to database if available.
         #
