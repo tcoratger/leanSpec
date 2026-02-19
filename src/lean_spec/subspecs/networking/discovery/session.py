@@ -27,6 +27,10 @@ from threading import Lock
 from lean_spec.subspecs.networking.types import NodeId
 
 from .config import BOND_EXPIRY_SECS
+from .messages import Port
+
+_DEFAULT_PORT = Port(0)
+"""Default port value for optional port parameters."""
 
 DEFAULT_SESSION_TIMEOUT_SECS = 86400
 """Default session timeout (24 hours)."""
@@ -71,7 +75,7 @@ class Session:
         self.last_seen = time.time()
 
 
-type SessionKey = tuple[NodeId, str, int]
+type SessionKey = tuple[NodeId, str, Port]
 """Session cache key: (node_id, ip, port).
 
 Per spec, sessions are tied to a specific UDP endpoint.
@@ -101,7 +105,7 @@ class SessionCache:
     _lock: Lock = field(default_factory=Lock)
     """Thread safety lock."""
 
-    def get(self, node_id: NodeId, ip: str = "", port: int = 0) -> Session | None:
+    def get(self, node_id: NodeId, ip: str = "", port: Port = _DEFAULT_PORT) -> Session | None:
         """
         Get an active session for a node at a specific endpoint.
 
@@ -134,7 +138,7 @@ class SessionCache:
         recv_key: bytes,
         is_initiator: bool,
         ip: str = "",
-        port: int = 0,
+        port: Port = _DEFAULT_PORT,
     ) -> Session:
         """
         Create and store a new session.
@@ -180,7 +184,7 @@ class SessionCache:
 
         return session
 
-    def remove(self, node_id: NodeId, ip: str = "", port: int = 0) -> bool:
+    def remove(self, node_id: NodeId, ip: str = "", port: Port = _DEFAULT_PORT) -> bool:
         """
         Remove a session.
 
@@ -199,7 +203,7 @@ class SessionCache:
                 return True
             return False
 
-    def touch(self, node_id: NodeId, ip: str = "", port: int = 0) -> bool:
+    def touch(self, node_id: NodeId, ip: str = "", port: Port = _DEFAULT_PORT) -> bool:
         """
         Update the last_seen timestamp for a session.
 

@@ -9,8 +9,8 @@ from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp import Status
-from lean_spec.subspecs.networking.types import ConnectionState, Direction, GoodbyeReason
-from lean_spec.types import Bytes32, Bytes64, Uint64
+from lean_spec.subspecs.networking.types import ConnectionState, Direction, GoodbyeReason, SeqNumber
+from lean_spec.types import Bytes32, Bytes64
 
 
 def peer(name: str) -> PeerId:
@@ -111,7 +111,7 @@ class TestPeerInfoForkDigest:
         )
         return ENR(
             signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"eth2": eth2_bytes, "id": b"v4"},
         )
 
@@ -125,7 +125,7 @@ class TestPeerInfoForkDigest:
         # ENR without eth2 key
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
         info = PeerInfo(peer_id=peer("test"), enr=enr)

@@ -11,7 +11,7 @@ from typing import NamedTuple, cast
 
 from consensus_testing.keys import XmssKeyManager, get_shared_key_manager
 
-from lean_spec.subspecs.chain.clock import SlotClock
+from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.containers import (
     Attestation,
@@ -263,7 +263,7 @@ def make_signed_block(
 
 
 def make_aggregated_attestation(
-    participant_ids: list[int],
+    participant_ids: list[ValidatorIndex],
     attestation_slot: Slot,
     source: Checkpoint,
     target: Checkpoint,
@@ -281,9 +281,7 @@ def make_aggregated_attestation(
     )
 
     return AggregatedAttestation(
-        aggregation_bits=AggregationBits.from_validator_indices(
-            [ValidatorIndex(i) for i in participant_ids]
-        ),
+        aggregation_bits=AggregationBits.from_validator_indices(participant_ids),
         data=data,
     )
 
@@ -433,16 +431,16 @@ def make_store_with_gossip_signatures(
 
 
 def make_attestation_data_simple(
-    slot: int,
+    slot: Slot,
     head_root: Bytes32,
     target_root: Bytes32,
     source: Checkpoint,
 ) -> AttestationData:
     """Create attestation data with head/target roots and a source checkpoint."""
     return AttestationData(
-        slot=Slot(slot),
-        head=Checkpoint(root=head_root, slot=Slot(slot)),
-        target=Checkpoint(root=target_root, slot=Slot(slot)),
+        slot=slot,
+        head=Checkpoint(root=head_root, slot=slot),
+        target=Checkpoint(root=target_root, slot=slot),
         source=source,
     )
 
@@ -472,7 +470,7 @@ def make_aggregated_proof(
             key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
         ],
         message=data_root,
-        epoch=attestation_data.slot,
+        slot=attestation_data.slot,
     )
 
 
@@ -518,7 +516,7 @@ def make_signed_block_from_store(
         ),
     )
 
-    target_interval = block.slot * INTERVALS_PER_SLOT
+    target_interval = Interval(block.slot * INTERVALS_PER_SLOT)
     advanced_store, _ = store.on_tick(target_interval, has_proposal=True)
 
     return advanced_store, signed_block

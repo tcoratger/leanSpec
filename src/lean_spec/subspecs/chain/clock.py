@@ -17,8 +17,9 @@ from lean_spec.types import Uint64
 
 from .config import MILLISECONDS_PER_INTERVAL, MILLISECONDS_PER_SLOT, SECONDS_PER_SLOT
 
-Interval = Uint64
-"""Interval count since genesis (matches ``Store.time``)."""
+
+class Interval(Uint64):
+    """Interval count since genesis (matches ``Store.time``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +58,7 @@ class SlotClock:
     def current_interval(self) -> Interval:
         """Get the current interval within the slot (0-4)."""
         milliseconds_into_slot = self._milliseconds_since_genesis() % MILLISECONDS_PER_SLOT
-        return milliseconds_into_slot // MILLISECONDS_PER_INTERVAL
+        return Interval(milliseconds_into_slot // MILLISECONDS_PER_INTERVAL)
 
     def total_intervals(self) -> Interval:
         """
@@ -65,7 +66,7 @@ class SlotClock:
 
         This is the value expected by our store time type.
         """
-        return self._milliseconds_since_genesis() // MILLISECONDS_PER_INTERVAL
+        return Interval(self._milliseconds_since_genesis() // MILLISECONDS_PER_INTERVAL)
 
     def current_time(self) -> Uint64:
         """Get current wall-clock time as Uint64 (Unix timestamp in seconds)."""

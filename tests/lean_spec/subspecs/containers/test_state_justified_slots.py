@@ -15,6 +15,7 @@ from lean_spec.subspecs.containers.state.types import (
     JustificationRoots,
     JustificationValidators,
 )
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Boolean
 from tests.lean_spec.helpers import make_aggregated_attestation, make_block, make_genesis_state
 
@@ -56,7 +57,7 @@ def test_justified_slots_rebases_when_finalization_advances() -> None:
     source_0 = Checkpoint(root=block_1.parent_root, slot=Slot(0))
     target_1 = Checkpoint(root=block_2.parent_root, slot=Slot(1))
     att_0_to_1 = make_aggregated_attestation(
-        participant_ids=[0, 1],
+        participant_ids=[ValidatorIndex(0), ValidatorIndex(1)],
         attestation_slot=Slot(2),
         source=source_0,
         target=target_1,
@@ -72,7 +73,7 @@ def test_justified_slots_rebases_when_finalization_advances() -> None:
     source_1 = Checkpoint(root=block_2.parent_root, slot=Slot(1))
     target_2 = Checkpoint(root=block_3.parent_root, slot=Slot(2))
     att_1_to_2 = make_aggregated_attestation(
-        participant_ids=[0, 1],
+        participant_ids=[ValidatorIndex(0), ValidatorIndex(1)],
         attestation_slot=Slot(3),
         source=source_1,
         target=target_2,
@@ -127,7 +128,7 @@ def test_pruning_keeps_pending_justifications() -> None:
     source_0 = Checkpoint(root=block_1.parent_root, slot=Slot(0))
     target_1 = Checkpoint(root=block_2.parent_root, slot=Slot(1))
     att_0_to_1 = make_aggregated_attestation(
-        participant_ids=[0, 1],
+        participant_ids=[ValidatorIndex(0), ValidatorIndex(1)],
         attestation_slot=Slot(2),
         source=source_0,
         target=target_1,
@@ -178,7 +179,7 @@ def test_pruning_keeps_pending_justifications() -> None:
     source_1 = Checkpoint(root=state.historical_block_hashes[1], slot=Slot(1))
     target_2 = Checkpoint(root=state.historical_block_hashes[2], slot=Slot(2))
     att_1_to_2 = make_aggregated_attestation(
-        participant_ids=[0, 1],
+        participant_ids=[ValidatorIndex(0), ValidatorIndex(1)],
         attestation_slot=Slot(5),
         source=source_1,
         target=target_2,

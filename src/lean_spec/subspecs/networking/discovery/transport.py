@@ -24,8 +24,8 @@ from dataclasses import dataclass
 from cryptography.exceptions import InvalidTag
 
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId
-from lean_spec.types import Bytes16, Uint64
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.types import Bytes16
 
 from .codec import (
     DiscoveryMessage,
@@ -44,6 +44,7 @@ from .messages import (
     PacketFlag,
     Ping,
     Pong,
+    Port,
     TalkReq,
     TalkResp,
 )
@@ -186,7 +187,7 @@ class DiscoveryTransport:
             local_node_id=local_node_id,
             local_private_key=local_private_key,
             local_enr_rlp=local_enr.to_rlp(),
-            local_enr_seq=int(local_enr.seq),
+            local_enr_seq=SeqNumber(local_enr.seq),
             session_cache=self._session_cache,
         )
 
@@ -302,7 +303,7 @@ class DiscoveryTransport:
         request_id = generate_request_id()
         ping = Ping(
             request_id=request_id,
-            enr_seq=Uint64(self._local_enr.seq),
+            enr_seq=SeqNumber(self._local_enr.seq),
         )
 
         response = await self._send_request(dest_node_id, dest_addr, ping)
@@ -538,7 +539,7 @@ class DiscoveryTransport:
             Encoded packet bytes.
         """
         ip, port = dest_addr
-        session = self._session_cache.get(dest_node_id, ip, port)
+        session = self._session_cache.get(dest_node_id, ip, Port(port))
 
         authdata = encode_message_authdata(self._local_node_id)
 
@@ -670,7 +671,7 @@ class DiscoveryTransport:
                 remote_pubkey=remote_pubkey,
                 challenge_data=challenge_data,
                 remote_ip=ip,
-                remote_port=port,
+                remote_port=Port(port),
             )
 
             # Re-send the original message, now encrypted with the new session key.
@@ -716,7 +717,7 @@ class DiscoveryTransport:
         try:
             ip, port = addr
             result = self._handshake_manager.handle_handshake(
-                remote_node_id, handshake_authdata, remote_ip=ip, remote_port=port
+                remote_node_id, handshake_authdata, remote_ip=ip, remote_port=Port(port)
             )
             logger.debug("Handshake completed with %s", remote_node_id.hex()[:16])
 
@@ -753,7 +754,7 @@ class DiscoveryTransport:
 
         # Get session keyed by (node_id, ip, port).
         ip, port = addr
-        session = self._session_cache.get(remote_node_id, ip, port)
+        session = self._session_cache.get(remote_node_id, ip, Port(port))
         if session is None:
             # Can't decrypt - send WHOAREYOU.
             await self._send_whoareyou(remote_node_id, header.nonce, addr)
@@ -784,7 +785,7 @@ class DiscoveryTransport:
         """Process a successfully decoded message."""
         # Update session activity.
         ip, port = addr
-        self._session_cache.touch(remote_node_id, ip, port)
+        self._session_cache.touch(remote_node_id, ip, Port(port))
 
         # Check if this is a response to a pending request.
         request_id = bytes(message.request_id)
@@ -821,7 +822,7 @@ class DiscoveryTransport:
         # including the full ENR in the handshake response, saving bandwidth.
         # Fall back to 0 if unknown, which forces the remote to include their ENR.
         cached_enr = self._handshake_manager.get_cached_enr(remote_node_id)
-        remote_enr_seq = int(cached_enr.seq) if cached_enr is not None else 0
+        remote_enr_seq = SeqNumber(cached_enr.seq) if cached_enr is not None else SeqNumber(0)
 
         # Generate masking IV for the WHOAREYOU packet.
         #
@@ -879,7 +880,7 @@ class DiscoveryTransport:
         # The requester initiated the handshake.
         # By the time we respond, session keys must exist.
         ip, port = dest_addr
-        session = self._session_cache.get(dest_node_id, ip, port)
+        session = self._session_cache.get(dest_node_id, ip, Port(port))
         if session is None:
             logger.debug("No session for response to %s", dest_node_id.hex()[:16])
             return False

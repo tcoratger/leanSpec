@@ -4,6 +4,7 @@ import time
 
 import pytest
 
+from lean_spec.subspecs.networking.discovery.messages import Port
 from lean_spec.subspecs.networking.discovery.session import (
     BondCache,
     Session,
@@ -207,12 +208,16 @@ class TestSessionCache:
         send_key_2 = bytes([0x02] * 16)
 
         # Create sessions for same node at different endpoints.
-        cache.create(node_id, send_key_1, bytes(16), is_initiator=True, ip="10.0.0.1", port=9000)
-        cache.create(node_id, send_key_2, bytes(16), is_initiator=True, ip="10.0.0.2", port=9000)
+        cache.create(
+            node_id, send_key_1, bytes(16), is_initiator=True, ip="10.0.0.1", port=Port(9000)
+        )
+        cache.create(
+            node_id, send_key_2, bytes(16), is_initiator=True, ip="10.0.0.2", port=Port(9000)
+        )
 
         # Each endpoint retrieves its own session.
-        session_1 = cache.get(node_id, "10.0.0.1", 9000)
-        session_2 = cache.get(node_id, "10.0.0.2", 9000)
+        session_1 = cache.get(node_id, "10.0.0.1", Port(9000))
+        session_2 = cache.get(node_id, "10.0.0.2", Port(9000))
 
         assert session_1 is not None
         assert session_2 is not None
@@ -220,7 +225,7 @@ class TestSessionCache:
         assert session_2.send_key == send_key_2
 
         # Different port for same IP is also separate.
-        assert cache.get(node_id, "10.0.0.1", 9001) is None
+        assert cache.get(node_id, "10.0.0.1", Port(9001)) is None
 
 
 class TestBondCache:

@@ -2,6 +2,7 @@
 
 import pytest
 
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client.event_source import GossipHandler
 from lean_spec.subspecs.networking.gossipsub import (
@@ -140,8 +141,8 @@ class TestTopicFormatting:
         assert GossipTopic.block("0xabcd1234") == GossipTopic(
             kind=TopicKind.BLOCK, fork_digest="0xabcd1234"
         )
-        assert GossipTopic.attestation_subnet("0xabcd1234", 0) == GossipTopic(
-            kind=TopicKind.ATTESTATION_SUBNET, fork_digest="0xabcd1234", subnet_id=0
+        assert GossipTopic.attestation_subnet("0xabcd1234", SubnetId(0)) == GossipTopic(
+            kind=TopicKind.ATTESTATION_SUBNET, fork_digest="0xabcd1234", subnet_id=SubnetId(0)
         )
 
     def test_format_topic_string(self) -> None:

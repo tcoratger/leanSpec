@@ -9,6 +9,10 @@ from ..xmss.containers import PublicKey
 from .slot import Slot
 
 
+class SubnetId(Uint64):
+    """Subnet identifier (0-63) for attestation subnet partitioning."""
+
+
 class ValidatorIndex(Uint64):
     """Represents a validator's unique index as a 64-bit unsigned integer."""
 
@@ -24,16 +28,16 @@ class ValidatorIndex(Uint64):
         """Check if this index is within valid bounds for a registry of given size."""
         return int(self) < num_validators
 
-    def compute_subnet_id(self, num_committees: "int | Uint64") -> int:
+    def compute_subnet_id(self, num_committees: int) -> SubnetId:
         """Compute the attestation subnet id for this validator.
 
         Args:
             num_committees: Positive number of committees.
 
         Returns:
-            An integer subnet id in 0..(num_committees-1).
+            A SubnetId in 0..(num_committees-1).
         """
-        return int(self) % int(num_committees)
+        return SubnetId(int(self) % int(num_committees))
 
 
 class ValidatorIndices(SSZList[ValidatorIndex]):

@@ -11,6 +11,7 @@ from __future__ import annotations
 from pydantic import model_validator
 
 from lean_spec.config import LEAN_ENV
+from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.xmss.target_sum import (
     PROD_TARGET_SUM_ENCODER,
     TEST_TARGET_SUM_ENCODER,
@@ -73,9 +74,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
         return self
 
-    def key_gen(self, activation_epoch: Uint64, num_active_epochs: Uint64) -> KeyPair:
+    def key_gen(self, activation_slot: Slot, num_active_slots: Uint64) -> KeyPair:
         """
-        Generates a new cryptographic key pair for a specified range of epochs.
+        Generates a new cryptographic key pair for a specified range of slots.
 
         This is a **randomized** algorithm that establishes a signer's identity using
         the memory-efficient Top-Bottom Tree Traversal approach.
@@ -85,14 +86,14 @@ class GeneralizedXmssScheme(StrictBaseModel):
         1.  **Expand Activation Time**: Align the requested activation interval to
             `sqrt(LIFETIME)` boundaries to enable efficient tree partitioning.
             This ensures the interval starts at a multiple of `sqrt(LIFETIME)` and
-            has a minimum duration of `2 * sqrt(LIFETIME)` epochs.
+            has a minimum duration of `2 * sqrt(LIFETIME)` slots.
 
         2.  **Generate Master Secrets**: Generate PRF key and public parameter `P`.
             The PRF key allows deterministic on-demand regeneration of one-time keys.
 
         3.  **Generate First Two Bottom Trees**: Create the first two bottom trees
-            (covering the initial `2 * sqrt(LIFETIME)` epochs) and keep them in memory.
-            Each bottom tree covers `sqrt(LIFETIME)` consecutive epochs.
+            (covering the initial `2 * sqrt(LIFETIME)` slots) and keep them in memory.
+            Each bottom tree covers `sqrt(LIFETIME)` consecutive slots.
 
         4.  **Generate Remaining Bottom Tree Roots**: For all other bottom trees in
             the range, generate only their roots (not the full trees). This saves
@@ -107,21 +108,21 @@ class GeneralizedXmssScheme(StrictBaseModel):
         Traditional approach: O(LIFETIME) memory
         Top-Bottom approach: O(sqrt(LIFETIME)) memory
 
-        For LOG_LIFETIME=32 (2^32 epochs):
+        For LOG_LIFETIME=32 (2^32 slots):
         - Traditional: ~hundreds of GiB
         - Top-Bottom: much more reasonable
 
         Args:
-            activation_epoch: The starting epoch for which this key is valid.
+            activation_slot: The starting slot for which this key is valid.
             - Will be aligned downward to `sqrt(LIFETIME)` boundary.
-            num_active_epochs: The number of consecutive epochs the key can be used for.
+            num_active_slots: The number of consecutive slots the key can be used for.
             - Will be rounded up to at least `2 * sqrt(LIFETIME)`.
 
         Returns:
             A `KeyPair` containing the public and secret keys.
 
         Note:
-            The actual activation epoch and num_active_epochs in the returned SecretKey
+            The actual activation slot and num_active_slots in the returned SecretKey
             may be larger than requested due to alignment requirements.
 
         For the formal specification of this process, please refer to:
@@ -133,7 +134,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         config = self.config
 
         # Ensure the requested activation range is within the scheme's total supported lifetime.
-        if activation_epoch + num_active_epochs > config.LIFETIME:
+        if activation_slot + num_active_slots > config.LIFETIME:
             raise ValueError("Activation range exceeds the key's lifetime.")
 
         # Generate the random public parameter `P` and the master PRF key.
@@ -144,15 +145,15 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # Step 1: Expand and align activation time to sqrt(LIFETIME) boundaries.
         start_bottom_tree_index, end_bottom_tree_index = expand_activation_time(
-            config.LOG_LIFETIME, int(activation_epoch), int(num_active_epochs)
+            config.LOG_LIFETIME, int(activation_slot), int(num_active_slots)
         )
 
         num_bottom_trees = end_bottom_tree_index - start_bottom_tree_index
         leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
 
-        # Calculate the actual (expanded) activation epoch and count.
-        actual_activation_epoch = start_bottom_tree_index * leaves_per_bottom_tree
-        actual_num_active_epochs = num_bottom_trees * leaves_per_bottom_tree
+        # Calculate the actual (expanded) activation slot and count.
+        actual_activation_slot = start_bottom_tree_index * leaves_per_bottom_tree
+        actual_num_active_slots = num_bottom_trees * leaves_per_bottom_tree
 
         # Step 2: Generate the first two bottom trees (kept in memory).
         left_bottom_tree = HashSubTree.from_prf_key(
@@ -211,8 +212,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         sk = SecretKey(
             prf_key=prf_key,
             parameter=parameter,
-            activation_epoch=Uint64(actual_activation_epoch),
-            num_active_epochs=Uint64(actual_num_active_epochs),
+            activation_slot=Slot(actual_activation_slot),
+            num_active_slots=Uint64(actual_num_active_slots),
             top_tree=top_tree,
             left_bottom_tree_index=Uint64(start_bottom_tree_index),
             left_bottom_tree=left_bottom_tree,
@@ -220,14 +221,14 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
         return KeyPair(public=pk, secret=sk)
 
-    def sign(self, sk: SecretKey, epoch: Uint64, message: Bytes32) -> Signature:
+    def sign(self, sk: SecretKey, slot: Slot, message: Bytes32) -> Signature:
         """
-        Produces a digital signature for a given message at a specific epoch.
+        Produces a digital signature for a given message at a specific slot.
 
         This is a **deterministic** algorithm. Calling `sign` twice with the same
-        (sk, epoch, message) triple produces the same signature.
+        (sk, slot, message) triple produces the same signature.
 
-        **CRITICAL SECURITY WARNING**: A secret key for a given epoch must **NEVER** be used
+        **CRITICAL SECURITY WARNING**: A secret key for a given slot must **NEVER** be used
         to sign two different messages. Doing so would reveal parts of the secret key
         and allow an attacker to forge signatures. This is the fundamental security
         property of a synchronized (stateful) signature scheme.
@@ -248,12 +249,12 @@ class GeneralizedXmssScheme(StrictBaseModel):
             The collection of these intermediate hashes forms the one-time signature.
 
         3.  **Merkle Path**: The signer retrieves the Merkle authentication path for the leaf
-            corresponding to the current `epoch`. This path proves that the one-time public key
-            for this epoch is part of the main public key (the Merkle root).
+            corresponding to the current `slot`. This path proves that the one-time public key
+            for this slot is part of the main public key (the Merkle root).
 
         Args:
             sk: The secret key to use for signing.
-            epoch: The epoch for which the signature is being created.
+            slot: The slot for which the signature is being created.
             message: The message to be signed.
 
         Returns:
@@ -267,24 +268,24 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Verify that the secret key is currently active for the requested signing epoch.
-        epoch_int = int(epoch)
-        activation_int = int(sk.activation_epoch)
-        if not (activation_int <= epoch_int < activation_int + int(sk.num_active_epochs)):
-            raise ValueError("Key is not active for the specified epoch.")
+        # Verify that the secret key is currently active for the requested signing slot.
+        slot_int = int(slot)
+        activation_int = int(sk.activation_slot)
+        if not (activation_int <= slot_int < activation_int + int(sk.num_active_slots)):
+            raise ValueError("Key is not active for the specified slot.")
 
-        # Verify that the epoch is within the prepared interval (covered by loaded bottom trees).
+        # Verify that the slot is within the prepared interval (covered by loaded bottom trees).
         #
-        # With top-bottom tree traversal, only epochs within the prepared interval can be
+        # With top-bottom tree traversal, only slots within the prepared interval can be
         # signed without computing additional bottom trees.
         #
-        # If the epoch is outside this range, we need to slide the window forward.
+        # If the slot is outside this range, we need to slide the window forward.
         leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
         prepared_start = int(sk.left_bottom_tree_index) * leaves_per_bottom_tree
         prepared_end = prepared_start + 2 * leaves_per_bottom_tree
-        if not (prepared_start <= epoch_int < prepared_end):
+        if not (prepared_start <= slot_int < prepared_end):
             raise ValueError(
-                f"Epoch {epoch} is outside the prepared interval "
+                f"Slot {slot} is outside the prepared interval "
                 f"[{prepared_start}, {prepared_end}). "
                 f"Call advance_preparation() to slide the window forward."
             )
@@ -295,12 +296,12 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # produces a valid codeword (i.e., one that meets the target sum constraint).
         #
         # The randomness is deterministically derived from the PRF to ensure
-        # that signing is reproducible for the same (sk, epoch, message).
+        # that signing is reproducible for the same (sk, slot, message).
         for attempts in range(config.MAX_TRIES):
             # Derive deterministic randomness `rho` from PRF using the attempt counter.
-            rho = self.prf.get_randomness(sk.prf_key, epoch, message, Uint64(attempts))
+            rho = self.prf.get_randomness(sk.prf_key, slot, message, Uint64(attempts))
             # Attempt to encode the message with the deterministic `rho`.
-            codeword = self.encoder.encode(sk.parameter, message, rho, epoch)
+            codeword = self.encoder.encode(sk.parameter, message, rho, slot)
             # If encoding is successful, we've found our `rho` and `codeword`.
             #
             # We can exit the loop.
@@ -322,14 +323,14 @@ class GeneralizedXmssScheme(StrictBaseModel):
         ots_hashes: list[HashDigestVector] = []
         for chain_index, steps in enumerate(codeword):
             # Derive the secret start of the current chain using the master PRF key.
-            start_digest = self.prf.apply(sk.prf_key, epoch, Uint64(chain_index))
+            start_digest = self.prf.apply(sk.prf_key, slot, Uint64(chain_index))
             # Walk the hash chain for the number of `steps` specified by the
             # corresponding digit in the codeword.
             #
             # The result is one component of the OTS.
             ots_digest = self.hasher.hash_chain(
                 parameter=sk.parameter,
-                epoch=epoch,
+                epoch=slot,
                 chain_index=chain_index,
                 start_step=0,
                 num_steps=steps,
@@ -337,24 +338,24 @@ class GeneralizedXmssScheme(StrictBaseModel):
             )
             ots_hashes.append(ots_digest)
 
-        # Retrieve the Merkle authentication path for the current epoch's leaf.
+        # Retrieve the Merkle authentication path for the current slot's leaf.
         # With top-bottom tree traversal, we use combined_path to merge paths from
         # the bottom tree and top tree.
 
-        # Determine which bottom tree contains this epoch (reuse leaves_per_bottom_tree from above).
+        # Determine which bottom tree contains this slot (reuse leaves_per_bottom_tree from above).
         boundary = (int(sk.left_bottom_tree_index) + 1) * leaves_per_bottom_tree
-        bottom_tree = sk.left_bottom_tree if epoch_int < boundary else sk.right_bottom_tree
+        bottom_tree = sk.left_bottom_tree if slot_int < boundary else sk.right_bottom_tree
 
         # Ensure bottom tree exists
         if bottom_tree is None:
             raise ValueError(
-                f"Epoch {epoch} requires bottom tree but it is not available. "
+                f"Slot {slot} requires bottom tree but it is not available. "
                 f"Prepared interval may have been exceeded. Call advance_preparation() "
                 f"to slide the window forward."
             )
 
         # Generate the combined authentication path
-        path = combined_path(sk.top_tree, bottom_tree, epoch)
+        path = combined_path(sk.top_tree, bottom_tree, slot)
 
         # Assemble and return the final signature, which contains:
         # - The OTS,
@@ -362,9 +363,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # - The randomness `rho` needed for verification.
         return Signature(path=path, rho=rho, hashes=HashDigestList(data=ots_hashes))
 
-    def verify(self, pk: PublicKey, epoch: Uint64, message: Bytes32, sig: Signature) -> bool:
+    def verify(self, pk: PublicKey, slot: Slot, message: Bytes32, sig: Signature) -> bool:
         r"""
-        Verifies a digital signature against a public key, message, and epoch.
+        Verifies a digital signature against a public key, message, and slot.
 
         This is a **deterministic** algorithm.
 
@@ -381,7 +382,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             chain's public endpoint, which is one component of the one-time public key.
 
         3.  **Compute Merkle Leaf**: The verifier hashes the full set of reconstructed
-            chain endpoints to compute the expected Merkle leaf for the given `epoch`.
+            chain endpoints to compute the expected Merkle leaf for the given slot.
 
         4.  **Verify Merkle Path**: The verifier uses the authentication `path` from the
             signature to compute a candidate Merkle root, starting from the leaf computed
@@ -390,7 +391,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         Args:
             pk: The public key to verify against.
-            epoch: The epoch the signature corresponds to.
+            slot: The slot the signature corresponds to.
             message: The message that was supposedly signed.
             sig: The signature object to be verified.
 
@@ -405,17 +406,17 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Validate epoch bounds.
+        # Validate slot bounds.
         #
         # Return False instead of raising to avoid panic on invalid signatures.
-        # The epoch is attacker-controlled input.
-        if epoch > self.config.LIFETIME:
+        # The slot is attacker-controlled input.
+        if slot > self.config.LIFETIME:
             return False
 
         # Re-encode the message using the randomness `rho` from the signature.
         #
         # If the encoding is invalid (e.g., fails the target sum check), the signature is invalid.
-        codeword = self.encoder.encode(pk.parameter, message, sig.rho, epoch)
+        codeword = self.encoder.encode(pk.parameter, message, sig.rho, slot)
         if codeword is None:
             return False
 
@@ -429,7 +430,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             num_steps_remaining = config.BASE - 1 - xi
             end_digest = self.hasher.hash_chain(
                 parameter=pk.parameter,
-                epoch=epoch,
+                epoch=slot,
                 chain_index=chain_index,
                 start_step=xi,
                 num_steps=num_steps_remaining,
@@ -440,41 +441,41 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # Verify the Merkle path.
         #
         # This function internally:
-        # - Hashes the `chain_ends` to get the leaf node for the epoch,
+        # - Hashes the `chain_ends` to get the leaf node for the slot,
         # - Uses the `opening` path from the signature to compute a candidate root.
         # - It returns true if and only if this candidate root matches the public key's root.
         return verify_path(
             hasher=self.hasher,
             parameter=pk.parameter,
             root=pk.root,
-            position=epoch,
+            position=slot,
             leaf_parts=chain_ends,
             opening=sig.path,
         )
 
     def get_activation_interval(self, sk: SecretKey) -> range:
         """
-        Returns the epoch range for which this secret key is active.
+        Returns the slot range for which this secret key is active.
 
-        The activation interval is `[activation_epoch, activation_epoch + num_active_epochs)`.
-        A signature can only be created for an epoch within this range.
+        The activation interval is `[activation_slot, activation_slot + num_active_slots)`.
+        A signature can only be created for a slot within this range.
 
         Args:
             sk: The secret key to query.
 
         Returns:
-            A Python range object representing the valid epoch range.
+            A Python range object representing the valid slot range.
         """
-        start = int(sk.activation_epoch)
-        end = start + int(sk.num_active_epochs)
+        start = int(sk.activation_slot)
+        end = start + int(sk.num_active_slots)
         return range(start, end)
 
     def get_prepared_interval(self, sk: SecretKey) -> range:
         """
-        Returns the epoch range currently prepared (covered by loaded bottom trees).
+        Returns the slot range currently prepared (covered by loaded bottom trees).
 
         With top-bottom tree traversal, a secret key maintains a sliding window of
-        two consecutive bottom trees. This method returns the range of epochs that
+        two consecutive bottom trees. This method returns the range of slots that
         can be signed with the currently loaded trees, without needing to compute
         additional bottom trees.
 
@@ -485,7 +486,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             sk: The secret key to query.
 
         Returns:
-            A Python range object representing the prepared epoch range.
+            A Python range object representing the prepared slot range.
 
         Raises:
             ValueError: If the secret key is missing top-bottom tree structures.
@@ -505,10 +506,10 @@ class GeneralizedXmssScheme(StrictBaseModel):
         3. The newly computed tree becomes the new right tree
         4. Increments `left_bottom_tree_index`
 
-        After this operation, the prepared interval moves forward by `sqrt(LIFETIME)` epochs.
+        After this operation, the prepared interval moves forward by `sqrt(LIFETIME)` slots.
 
-        **When to call**: Call this method after signing with an epoch that is in the
-        right half of the prepared interval, to ensure the next epoch range is ready.
+        **When to call**: Call this method after signing with a slot that is in the
+        right half of the prepared interval, to ensure the next slot range is ready.
 
         Args:
             sk: The secret key to advance.
@@ -523,9 +524,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
         left_index = int(sk.left_bottom_tree_index)
 
         # Check if advancing would exceed the activation interval
-        next_prepared_end_epoch = (left_index + 3) * leaves_per_bottom_tree
-        activation_end = int(sk.activation_epoch) + int(sk.num_active_epochs)
-        if next_prepared_end_epoch > activation_end:
+        next_prepared_end_slot = (left_index + 3) * leaves_per_bottom_tree
+        activation_end = int(sk.activation_slot) + int(sk.num_active_slots)
+        if next_prepared_end_slot > activation_end:
             # Nothing to do - we're already at the end of the activation interval
             return sk
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
     JUSTIFICATION_LOOKBACK_SLOTS,
@@ -588,7 +589,7 @@ class TestIntegrationScenarios:
 
         # Process block via on_block on a fresh consumer store
         consumer_store = observer_store
-        target_interval = block.slot * INTERVALS_PER_SLOT
+        target_interval = Interval(block.slot * INTERVALS_PER_SLOT)
         consumer_store, _ = consumer_store.on_tick(target_interval, has_proposal=True)
         consumer_store = consumer_store.on_block(signed_block)
 

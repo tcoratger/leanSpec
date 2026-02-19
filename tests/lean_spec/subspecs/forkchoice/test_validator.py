@@ -3,6 +3,7 @@
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.containers import (
     Attestation,
     AttestationData,
@@ -131,7 +132,7 @@ class TestBlockProduction:
             proof.verify(
                 public_keys=public_keys,
                 message=agg_att.data.data_root_bytes(),
-                epoch=agg_att.data.slot,
+                slot=agg_att.data.slot,
             )
 
     def test_produce_block_sequential_slots(self, sample_store: Store) -> None:
@@ -248,7 +249,7 @@ class TestBlockProduction:
             proof.verify(
                 public_keys=public_keys,
                 message=agg_att.data.data_root_bytes(),
-                epoch=agg_att.data.slot,
+                slot=agg_att.data.slot,
             )
 
 
@@ -386,7 +387,7 @@ class TestValidatorErrorHandling:
 
         # Create store with missing parent state
         store = Store(
-            time=Uint64(100),
+            time=Interval(100),
             config=config,
             head=Bytes32(b"nonexistent" + b"\x00" * 21),
             safe_target=Bytes32(b"nonexistent" + b"\x00" * 21),

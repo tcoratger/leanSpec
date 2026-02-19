@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING
 from lean_spec.snappy import frame_compress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.networking.client.event_source import EventSource
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.peer import PeerInfo
@@ -222,7 +223,9 @@ class NetworkService:
         await self.event_source.publish(str(topic), compressed)
         logger.debug("Published block at slot %s", block.message.block.slot)
 
-    async def publish_attestation(self, attestation: SignedAttestation, subnet_id: int) -> None:
+    async def publish_attestation(
+        self, attestation: SignedAttestation, subnet_id: SubnetId
+    ) -> None:
         """
         Publish an attestation to the attestation subnet gossip topic.
 

@@ -342,7 +342,7 @@ class TestOnGossipAggregatedAttestation:
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
             ],
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
         signed_aggregated = SignedAggregatedAttestation(
@@ -383,7 +383,7 @@ class TestOnGossipAggregatedAttestation:
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
             ],
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
         signed_aggregated = SignedAggregatedAttestation(
@@ -419,7 +419,7 @@ class TestOnGossipAggregatedAttestation:
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in actual_signers
             ],
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
         signed_aggregated = SignedAggregatedAttestation(
@@ -452,7 +452,7 @@ class TestOnGossipAggregatedAttestation:
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants_1
             ],
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
         # Second proof: validators 1 and 3 (validator 1 overlaps)
@@ -464,7 +464,7 @@ class TestOnGossipAggregatedAttestation:
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants_2
             ],
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
         store = store.on_gossip_aggregated_attestation(
@@ -551,7 +551,7 @@ class TestAggregateCommitteeSignatures:
         proof.verify(
             public_keys=public_keys,
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )
 
     def test_empty_gossip_signatures_produces_no_proofs(self, key_manager: XmssKeyManager) -> None:
@@ -829,5 +829,5 @@ class TestEndToEndAggregationFlow:
         proof.verify(
             public_keys=public_keys,
             message=data_root,
-            epoch=attestation_data.slot,
+            slot=attestation_data.slot,
         )

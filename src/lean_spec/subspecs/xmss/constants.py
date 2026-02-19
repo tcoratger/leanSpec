@@ -31,7 +31,7 @@ class XmssConfig(StrictBaseModel):
     @property
     def LIFETIME(self) -> Uint64:  # noqa: N802
         """
-        The maximum number of epochs supported by this configuration.
+        The maximum number of slots supported by this configuration.
 
         An individual key pair can be active for a smaller sub-range.
         """

@@ -18,6 +18,7 @@ See: https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-in
 
 from typing import ClassVar
 
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.networking.types import ForkDigest, Version
 from lean_spec.types import StrictBaseModel, Uint64
 from lean_spec.types.bitfields import BaseBitvector
@@ -89,9 +90,9 @@ class AttestationSubnets(BaseBitvector):
             raise ValueError(f"Subnet ID must be 0-63, got {subnet_id}")
         return bool(self.data[subnet_id])
 
-    def subscribed_subnets(self) -> list[int]:
+    def subscribed_subnets(self) -> list[SubnetId]:
         """List of subscribed subnet IDs."""
-        return [i for i in range(self.LENGTH) if self.data[i]]
+        return [SubnetId(i) for i in range(self.LENGTH) if self.data[i]]
 
     def subscription_count(self) -> int:
         """Number of subscribed subnets."""

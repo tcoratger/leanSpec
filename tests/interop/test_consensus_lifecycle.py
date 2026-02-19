@@ -19,6 +19,8 @@ import logging
 
 import pytest
 
+from lean_spec.subspecs.containers.validator import ValidatorIndex
+
 from .helpers import (
     NodeCluster,
     PipelineDiagnostics,
@@ -77,7 +79,11 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
 
     # One validator per node. Isolating validators ensures each node
     # proposes independently and attestations travel over the network.
-    validators_per_node = [[0], [1], [2]]
+    validators_per_node = [
+        [ValidatorIndex(0)],
+        [ValidatorIndex(1)],
+        [ValidatorIndex(2)],
+    ]
 
     await node_cluster.start_all(topology, validators_per_node)
 

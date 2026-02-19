@@ -3,6 +3,7 @@
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
@@ -48,7 +49,7 @@ class TestGetForkchoiceStore:
             validator_id=TEST_VALIDATOR_ID,
         )
 
-        assert store.time == INTERVALS_PER_SLOT * Uint64(anchor_slot)
+        assert store.time == Interval(int(INTERVALS_PER_SLOT) * anchor_slot)
 
 
 class TestOnTick:
@@ -58,7 +59,7 @@ class TestOnTick:
         """Test basic on_tick."""
         initial_time = sample_store.time
         # 200 seconds = 200*1000/800 = 250 intervals
-        target_interval = Uint64(200) * Uint64(1000) // MILLISECONDS_PER_INTERVAL
+        target_interval = Interval(200 * 1000 // int(MILLISECONDS_PER_INTERVAL))
 
         sample_store, _ = sample_store.on_tick(target_interval, has_proposal=True)
 
@@ -69,7 +70,7 @@ class TestOnTick:
         """Test on_tick without proposal."""
         initial_time = sample_store.time
         # 100 seconds = 125 intervals
-        target_interval = Uint64(100) * Uint64(1000) // MILLISECONDS_PER_INTERVAL
+        target_interval = Interval(100 * 1000 // int(MILLISECONDS_PER_INTERVAL))
 
         sample_store, _ = sample_store.on_tick(target_interval, has_proposal=False)
 
@@ -80,7 +81,7 @@ class TestOnTick:
         """Test on_tick when already at target time (should be no-op)."""
         initial_time = sample_store.time
 
-        sample_store, _ = sample_store.on_tick(initial_time, has_proposal=True)
+        sample_store, _ = sample_store.on_tick(Interval(initial_time), has_proposal=True)
 
         # No-op: target equals current time
         assert sample_store.time == initial_time
@@ -88,7 +89,7 @@ class TestOnTick:
     def test_on_tick_small_increment(self, sample_store: Store) -> None:
         """Test on_tick with small interval increment."""
         initial_time = sample_store.time
-        target_interval = initial_time + Uint64(1)
+        target_interval = Interval(int(initial_time) + 1)
 
         sample_store, _ = sample_store.on_tick(target_interval, has_proposal=False)
 

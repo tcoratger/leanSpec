@@ -315,10 +315,10 @@ class TestWhoAreYouAuthdataConstruction:
     def test_creation(self):
         authdata = WhoAreYouAuthdata(
             id_nonce=IdNonce(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"),
-            enr_seq=Uint64(0),
+            enr_seq=SeqNumber(0),
         )
         assert len(authdata.id_nonce) == 16
-        assert authdata.enr_seq == Uint64(0)
+        assert authdata.enr_seq == SeqNumber(0)
 
 
 class TestMessageConstructionFromTestVectors:
@@ -338,10 +338,10 @@ class TestMessageConstructionFromTestVectors:
     def test_whoareyou_authdata_construction(self):
         authdata = WhoAreYouAuthdata(
             id_nonce=IdNonce(SPEC_ID_NONCE),
-            enr_seq=Uint64(0),
+            enr_seq=SeqNumber(0),
         )
         assert authdata.id_nonce == IdNonce(SPEC_ID_NONCE)
-        assert authdata.enr_seq == Uint64(0)
+        assert authdata.enr_seq == SeqNumber(0)
 
     def test_plaintext_message_type(self):
         plaintext = bytes.fromhex("01c20101")

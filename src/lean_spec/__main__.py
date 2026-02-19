@@ -35,6 +35,7 @@ from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
@@ -489,7 +490,7 @@ async def run_node(
     # Subscribe to attestation subnet topics based on local validator id.
     validator_id = validator_registry.primary_index() if validator_registry else None
     if validator_id is None:
-        subnet_id = 0
+        subnet_id = SubnetId(0)
         logger.info("No local validator id; subscribing to attestation subnet %d", subnet_id)
     else:
         subnet_id = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)

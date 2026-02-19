@@ -111,7 +111,7 @@ class ValidatorService:
     _attestations_produced: int = field(default=0, repr=False)
     """Counter for produced attestations."""
 
-    _attested_slots: set[int] = field(default_factory=set, repr=False)
+    _attested_slots: set[Slot] = field(default_factory=set, repr=False)
     """Slots for which we've already produced attestations (prevents duplicates)."""
 
     async def run(self) -> None:
@@ -188,14 +188,13 @@ class ValidatorService:
             # we should still attest as soon as we can within the same slot.
             #
             # We track attested slots to prevent duplicate attestations.
-            slot_int = int(slot)
             logger.debug(
-                "ValidatorService: attestation check interval=%d slot_int=%d attested=%s",
+                "ValidatorService: attestation check interval=%d slot=%d attested=%s",
                 interval,
-                slot_int,
-                slot_int in self._attested_slots,
+                slot,
+                slot in self._attested_slots,
             )
-            if interval >= Uint64(1) and slot_int not in self._attested_slots:
+            if interval >= Uint64(1) and slot not in self._attested_slots:
                 logger.debug(
                     "ValidatorService: producing attestations for slot %d (interval %d)",
                     slot,
@@ -203,13 +202,13 @@ class ValidatorService:
                 )
                 await self._produce_attestations(slot)
                 logger.debug("ValidatorService: done producing attestations for slot %d", slot)
-                self._attested_slots.add(slot_int)
+                self._attested_slots.add(slot)
 
                 # Prune old entries to prevent unbounded growth.
                 #
                 # Keep only recent slots (current slot - 4) to bound memory usage.
                 # We never need to attest for slots that far in the past.
-                prune_threshold = max(0, slot_int - 4)
+                prune_threshold = Slot(max(0, int(slot) - 4))
                 self._attested_slots = {s for s in self._attested_slots if s >= prune_threshold}
 
             # Intervals 2-4 have no additional validator duties.
@@ -427,8 +426,8 @@ class ValidatorService:
         if entry is None:
             raise ValueError(f"No secret key for validator {validator_index}")
 
-        # Ensure the XMSS secret key is prepared for this epoch.
-        entry = self._ensure_prepared_for_epoch(entry, block.slot)
+        # Ensure the XMSS secret key is prepared for this slot.
+        entry = self._ensure_prepared_for_slot(entry, block.slot)
 
         proposer_signature = TARGET_SIGNATURE_SCHEME.sign(
             entry.secret_key,
@@ -479,12 +478,12 @@ class ValidatorService:
         if entry is None:
             raise ValueError(f"No secret key for validator {validator_index}")
 
-        # Ensure the XMSS secret key is prepared for this epoch.
-        entry = self._ensure_prepared_for_epoch(entry, attestation_data.slot)
+        # Ensure the XMSS secret key is prepared for this slot.
+        entry = self._ensure_prepared_for_slot(entry, attestation_data.slot)
 
         # Sign the attestation data root.
         #
-        # Uses XMSS one-time signature for the current epoch (slot).
+        # Uses XMSS one-time signature for the current slot.
         signature = TARGET_SIGNATURE_SCHEME.sign(
             entry.secret_key,
             attestation_data.slot,
@@ -546,36 +545,36 @@ class ValidatorService:
             }
         )
 
-    def _ensure_prepared_for_epoch(
+    def _ensure_prepared_for_slot(
         self,
         entry: ValidatorEntry,
-        epoch: Slot,
+        slot: Slot,
     ) -> ValidatorEntry:
         """
-        Ensure the secret key is prepared for signing at the given epoch.
+        Ensure the secret key is prepared for signing at the given slot.
 
-        XMSS uses a sliding window of prepared epochs. If the requested epoch
+        XMSS uses a sliding window of prepared slots. If the requested slot
         is outside this window, we advance the preparation by computing
-        additional bottom trees until the epoch is covered.
+        additional bottom trees until the slot is covered.
 
         Args:
             entry: Validator entry containing the secret key.
-            epoch: The epoch (slot) at which we need to sign.
+            slot: The slot at which we need to sign.
 
         Returns:
             The entry, possibly with an updated secret key.
         """
         scheme = cast(GeneralizedXmssScheme, TARGET_SIGNATURE_SCHEME)
-        get_prepared_interval = scheme.get_prepared_interval(entry.secret_key)
+        prepared_interval = scheme.get_prepared_interval(entry.secret_key)
 
-        # If epoch is already in the prepared interval, no action needed.
-        epoch_int = int(epoch)
-        if epoch_int in get_prepared_interval:
+        # If slot is already in the prepared interval, no action needed.
+        slot_int = int(slot)
+        if slot_int in prepared_interval:
             return entry
 
-        # Advance preparation until the epoch is covered.
+        # Advance preparation until the slot is covered.
         secret_key = entry.secret_key
-        while epoch_int not in scheme.get_prepared_interval(secret_key):
+        while slot_int not in scheme.get_prepared_interval(secret_key):
             secret_key = scheme.advance_preparation(secret_key)
 
         # Update the registry with the new secret key.

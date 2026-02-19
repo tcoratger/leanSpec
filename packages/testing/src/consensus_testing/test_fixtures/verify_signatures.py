@@ -242,7 +242,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
                     public_keys=signer_public_keys,
                     signatures=signer_signatures,
                     message=data_root,
-                    epoch=attestation_data.slot,
+                    slot=attestation_data.slot,
                 )
                 # Replace participants with claimed validator_ids (mismatch!)
                 invalid_proof = AggregatedSignatureProof(

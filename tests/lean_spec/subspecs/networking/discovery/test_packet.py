@@ -21,7 +21,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
     generate_id_nonce,
     generate_nonce,
 )
-from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes16
 
 
@@ -76,7 +76,7 @@ class TestWhoAreYouAuthdata:
     def test_encode_whoareyou_authdata(self):
         """Test WHOAREYOU authdata encoding."""
         id_nonce = bytes(16)
-        enr_seq = 42
+        enr_seq = SeqNumber(42)
 
         authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
 
@@ -85,24 +85,24 @@ class TestWhoAreYouAuthdata:
     def test_decode_whoareyou_authdata(self):
         """Test WHOAREYOU authdata decoding."""
         id_nonce = bytes.fromhex("aa" * 16)
-        enr_seq = 12345
+        enr_seq = SeqNumber(12345)
 
         authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
         decoded = decode_whoareyou_authdata(authdata)
 
         assert bytes(decoded.id_nonce) == id_nonce
-        assert int(decoded.enr_seq) == enr_seq
+        assert decoded.enr_seq == enr_seq
 
     def test_roundtrip(self):
         """Test encoding then decoding preserves values."""
         id_nonce = bytes.fromhex("01" * 16)
-        enr_seq = 2**63 - 1  # Max uint64
+        enr_seq = SeqNumber(2**63 - 1)  # Max uint64
 
         authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
         decoded = decode_whoareyou_authdata(authdata)
 
         assert bytes(decoded.id_nonce) == id_nonce
-        assert int(decoded.enr_seq) == enr_seq
+        assert decoded.enr_seq == enr_seq
 
     def test_invalid_size_raises(self):
         """Test that invalid authdata size raises ValueError."""
@@ -202,7 +202,7 @@ class TestPacketEncoding:
         dest_node_id = NodeId(bytes(32))
         nonce = bytes(12)
         id_nonce = bytes(16)
-        authdata = encode_whoareyou_authdata(id_nonce, 0)
+        authdata = encode_whoareyou_authdata(id_nonce, SeqNumber(0))
 
         packet = encode_packet(
             dest_node_id=dest_node_id,
@@ -221,7 +221,7 @@ class TestPacketEncoding:
         """Test packet header decoding."""
         local_node_id = NodeId(bytes(32))
         nonce = bytes(12)
-        authdata = encode_whoareyou_authdata(bytes(16), 42)
+        authdata = encode_whoareyou_authdata(bytes(16), SeqNumber(42))
 
         packet = encode_packet(
             dest_node_id=local_node_id,
@@ -422,7 +422,7 @@ class TestAuthdataInvalidLengths:
     def test_encode_whoareyou_authdata_wrong_id_nonce_length(self):
         """WHOAREYOU authdata rejects id_nonce that is not 16 bytes."""
         with pytest.raises(ValueError, match="ID nonce must be 16 bytes"):
-            encode_whoareyou_authdata(bytes(15), 0)
+            encode_whoareyou_authdata(bytes(15), SeqNumber(0))
 
     def test_encode_message_authdata_wrong_src_id_length(self):
         """MESSAGE authdata rejects src_id that is not 32 bytes."""

@@ -53,8 +53,8 @@ from lean_spec.subspecs.networking.discovery.packet import (
     encode_whoareyou_authdata,
 )
 from lean_spec.subspecs.networking.discovery.routing import log2_distance, xor_distance
-from lean_spec.subspecs.networking.types import NodeId
-from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64, Uint64
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64
 from lean_spec.types.uint import Uint8
 from tests.lean_spec.helpers import make_challenge_data
 from tests.lean_spec.subspecs.networking.discovery.conftest import (
@@ -428,7 +428,7 @@ class TestPacketEncodingRoundtrip:
         """WHOAREYOU packet encodes and decodes correctly."""
         nonce = bytes.fromhex("0102030405060708090a0b0c")
         id_nonce = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
-        enr_seq = 0
+        enr_seq = SeqNumber(0)
 
         authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
 
@@ -449,7 +449,7 @@ class TestPacketEncodingRoundtrip:
 
         decoded_authdata = decode_whoareyou_authdata(header.authdata)
         assert bytes(decoded_authdata.id_nonce) == id_nonce
-        assert int(decoded_authdata.enr_seq) == enr_seq
+        assert decoded_authdata.enr_seq == enr_seq
 
     def test_handshake_packet_roundtrip(self):
         """HANDSHAKE packet encodes and decodes correctly."""
@@ -506,7 +506,7 @@ class TestOfficialPacketEncoding:
         # PING with request ID [0x00, 0x00, 0x00, 0x01] and enr_seq = 1
         ping = Ping(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
         )
 
         encoded = encode_message(ping)
@@ -526,7 +526,7 @@ class TestOfficialPacketEncoding:
         """
         pong = Pong(
             request_id=RequestId(data=b"\x00\x00\x00\x01"),
-            enr_seq=Uint64(1),
+            enr_seq=SeqNumber(1),
             recipient_ip=IPv4(b"\x7f\x00\x00\x01"),  # 127.0.0.1
             recipient_port=Port(30303),
         )
@@ -615,7 +615,7 @@ class TestOfficialPacketEncoding:
         """
         nonce = bytes(12)
         id_nonce = bytes(16)
-        enr_seq = 0
+        enr_seq = SeqNumber(0)
 
         authdata = encode_whoareyou_authdata(id_nonce, enr_seq)
 

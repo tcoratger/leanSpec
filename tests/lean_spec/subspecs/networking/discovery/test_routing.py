@@ -20,7 +20,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes64, Uint64
+from lean_spec.types import Bytes64
 from lean_spec.types.byte_arrays import Bytes4
 
 
@@ -111,7 +111,7 @@ class TestNodeEntry:
         node_id = NodeId(bytes(32))
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
 
@@ -462,7 +462,7 @@ class TestForkCompatibility:
 
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"id": b"v4"},
         )
         entry = NodeEntry(node_id=remote_node_id, enr=enr)
@@ -480,7 +480,7 @@ class TestForkCompatibility:
         eth2_bytes = remote_digest + remote_digest + int(FAR_FUTURE_EPOCH).to_bytes(8, "little")
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"eth2": eth2_bytes, "id": b"v4"},
         )
         entry = NodeEntry(node_id=remote_node_id, enr=enr)
@@ -502,7 +502,7 @@ class TestForkCompatibility:
         )
         enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"eth2": eth2_bytes, "id": b"v4"},
         )
         entry = NodeEntry(node_id=remote_node_id, enr=enr)
@@ -524,7 +524,7 @@ class TestForkCompatibility:
         )
         compatible_enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"eth2": eth2_match, "id": b"v4"},
         )
         compatible_entry = NodeEntry(node_id=NodeId(b"\x01" * 32), enr=compatible_enr)
@@ -538,7 +538,7 @@ class TestForkCompatibility:
         )
         incompatible_enr = ENR(
             signature=Bytes64(bytes(64)),
-            seq=Uint64(1),
+            seq=SeqNumber(1),
             pairs={"eth2": eth2_mismatch, "id": b"v4"},
         )
         incompatible_entry = NodeEntry(node_id=NodeId(b"\x02" * 32), enr=incompatible_enr)

@@ -314,16 +314,16 @@ class XmssKeyManager:
         Raises:
             ValueError: If slot exceeds key lifetime.
         """
-        epoch = attestation_data.slot
+        slot = attestation_data.slot
         kp = self[validator_id]
         sk = kp.secret
 
-        # Advance key state until epoch is in prepared interval
+        # Advance key state until slot is in prepared interval
         prepared = self.scheme.get_prepared_interval(sk)
-        while int(epoch) not in prepared:
+        while int(slot) not in prepared:
             activation = self.scheme.get_activation_interval(sk)
             if prepared.stop >= activation.stop:
-                raise ValueError(f"Epoch {epoch} exceeds key lifetime {activation.stop}")
+                raise ValueError(f"Slot {slot} exceeds key lifetime {activation.stop}")
             sk = self.scheme.advance_preparation(sk)
             prepared = self.scheme.get_prepared_interval(sk)
 
@@ -332,7 +332,7 @@ class XmssKeyManager:
 
         # Sign hash tree root of the attestation data
         message = attestation_data.data_root_bytes()
-        return self.scheme.sign(sk, epoch, message)
+        return self.scheme.sign(sk, slot, message)
 
     def build_attestation_signatures(
         self,
@@ -351,7 +351,7 @@ class XmssKeyManager:
         for agg in aggregated_attestations:
             validator_ids = agg.aggregation_bits.to_validator_indices()
             message = agg.data.data_root_bytes()
-            epoch = agg.data.slot
+            slot = agg.data.slot
 
             public_keys: list[PublicKey] = [self.get_public_key(vid) for vid in validator_ids]
             signatures: list[Signature] = [
@@ -370,7 +370,7 @@ class XmssKeyManager:
                 public_keys=public_keys,
                 signatures=signatures,
                 message=message,
-                epoch=epoch,
+                slot=slot,
             )
             proofs.append(proof)
 
@@ -378,11 +378,11 @@ class XmssKeyManager:
 
 
 def _generate_single_keypair(
-    scheme: GeneralizedXmssScheme, num_epochs: int, index: int
+    scheme: GeneralizedXmssScheme, num_slots: int, index: int
 ) -> dict[str, str]:
     """Generate one key pair (module-level for pickling in ProcessPoolExecutor)."""
     print(f"Starting key #{index} generation...")
-    pk, sk = scheme.key_gen(Uint64(0), Uint64(num_epochs))
+    pk, sk = scheme.key_gen(Slot(0), Uint64(num_slots))
     return KeyPair(public=pk, secret=sk).to_dict()
 
 
@@ -397,20 +397,20 @@ def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
     Args:
         lean_env: Name of the XMSS signature scheme to use (e.g. "test" or "prod").
         count: Number of validators.
-        max_slot: Maximum slot (key lifetime = max_slot + 1 epochs).
+        max_slot: Maximum slot (key lifetime = max_slot + 1 slots).
     """
     scheme = LEAN_ENV_TO_SCHEMES[lean_env]
     keys_dir = get_keys_dir(lean_env)
-    num_epochs = max_slot + 1
+    num_slots = max_slot + 1
     num_workers = os.cpu_count() or 1
 
     print(
         f"Generating {count} XMSS key pairs for {lean_env} environment "
-        f"({num_epochs} epochs) using {num_workers} cores..."
+        f"({num_slots} slots) using {num_workers} cores..."
     )
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        worker_func = partial(_generate_single_keypair, scheme, num_epochs)
+        worker_func = partial(_generate_single_keypair, scheme, num_slots)
         key_pairs = list(executor.map(worker_func, range(count)))
 
     # Create keys directory (remove old one if it exists)

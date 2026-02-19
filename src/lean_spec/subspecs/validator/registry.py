@@ -297,7 +297,7 @@ class ValidatorRegistry:
         return registry
 
     @classmethod
-    def from_secret_keys(cls, keys: dict[int, SecretKey]) -> ValidatorRegistry:
+    def from_secret_keys(cls, keys: dict[ValidatorIndex, SecretKey]) -> ValidatorRegistry:
         """
         Create registry from a dictionary of secret keys.
 
@@ -311,5 +311,5 @@ class ValidatorRegistry:
         """
         registry = cls()
         for index, secret_key in keys.items():
-            registry.add(ValidatorEntry(index=ValidatorIndex(index), secret_key=secret_key))
+            registry.add(ValidatorEntry(index=index, secret_key=secret_key))
         return registry
