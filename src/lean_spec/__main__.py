@@ -41,7 +41,7 @@ from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.node import Node, NodeConfig, get_local_validator_id
+from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import (
     CheckpointSyncError,
@@ -281,7 +281,7 @@ async def _init_from_checkpoint(
         #
         # The store treats this as the new "genesis" for fork choice purposes.
         # All blocks before the checkpoint are effectively pruned.
-        validator_id = get_local_validator_id(validator_registry)
+        validator_id = validator_registry.primary_index() if validator_registry else None
         store = Store.get_forkchoice_store(state, anchor_block, validator_id)
         logger.info(
             "Initialized from checkpoint at slot %d (finalized=%s)",
@@ -487,7 +487,7 @@ async def run_node(
     block_topic = str(GossipTopic.block(GOSSIP_FORK_DIGEST))
     event_source.subscribe_gossip_topic(block_topic)
     # Subscribe to attestation subnet topics based on local validator id.
-    validator_id = get_local_validator_id(validator_registry)
+    validator_id = validator_registry.primary_index() if validator_registry else None
     if validator_id is None:
         subnet_id = 0
         logger.info("No local validator id; subscribing to attestation subnet %d", subnet_id)

@@ -66,6 +66,27 @@ class TestValidatorRegistry:
             ValidatorIndex(4): key_4,
         }
 
+    def test_primary_index_returns_none_for_empty_registry(self) -> None:
+        """Empty registry returns None for primary index."""
+        registry = ValidatorRegistry()
+        assert registry.primary_index() is None
+
+    def test_primary_index_returns_first_index(self) -> None:
+        """Primary index returns the first validator index."""
+        registry = ValidatorRegistry()
+        key = MagicMock(name="key_5")
+        registry.add(ValidatorEntry(index=ValidatorIndex(5), secret_key=key))
+
+        assert registry.primary_index() == ValidatorIndex(5)
+
+    def test_primary_index_with_multiple_validators(self) -> None:
+        """Primary index returns the first inserted index."""
+        registry = ValidatorRegistry()
+        registry.add(ValidatorEntry(index=ValidatorIndex(3), secret_key=MagicMock()))
+        registry.add(ValidatorEntry(index=ValidatorIndex(1), secret_key=MagicMock()))
+
+        assert registry.primary_index() == ValidatorIndex(3)
+
     def test_from_secret_keys(self) -> None:
         """Registry from dict preserves exact index-to-key mapping."""
         key_0 = MagicMock(name="key_0")
