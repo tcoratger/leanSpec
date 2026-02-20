@@ -21,6 +21,7 @@ from lean_spec.subspecs.networking.discovery.crypto import (
 from lean_spec.subspecs.networking.discovery.handshake import HandshakeManager
 from lean_spec.subspecs.networking.discovery.keys import compute_node_id, derive_keys_from_pubkey
 from lean_spec.subspecs.networking.discovery.messages import (
+    Nonce,
     PacketFlag,
     Ping,
     RequestId,
@@ -41,7 +42,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
 from lean_spec.subspecs.networking.discovery.session import Session, SessionCache
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes64
+from lean_spec.types import Bytes12, Bytes16, Bytes64
 
 
 @pytest.fixture
@@ -49,7 +50,7 @@ def node_a_keys():
     """Node A's keypair."""
     priv, pub = generate_secp256k1_keypair()
     node_id = compute_node_id(pub)
-    return {"private_key": priv, "public_key": pub, "node_id": bytes(node_id)}
+    return {"private_key": priv, "public_key": pub, "node_id": NodeId(node_id)}
 
 
 @pytest.fixture
@@ -57,7 +58,7 @@ def node_b_keys():
     """Node B's keypair."""
     priv, pub = generate_secp256k1_keypair()
     node_id = compute_node_id(pub)
-    return {"private_key": priv, "public_key": pub, "node_id": bytes(node_id)}
+    return {"private_key": priv, "public_key": pub, "node_id": NodeId(node_id)}
 
 
 class TestEncryptedPacketRoundtrip:
@@ -67,7 +68,7 @@ class TestEncryptedPacketRoundtrip:
         """MESSAGE packet encrypts and decrypts correctly."""
         # Build mock challenge_data for key derivation.
         # Format: masking-iv (16) + static-header (23) + authdata (24) = 63 bytes.
-        masking_iv = bytes(16)
+        masking_iv = Bytes16(bytes(16))
         static_header = b"discv5" + b"\x00\x01\x01" + bytes(12) + b"\x00\x18"
         authdata = bytes(24)
         challenge_data = masking_iv + static_header + authdata
@@ -75,10 +76,10 @@ class TestEncryptedPacketRoundtrip:
         # Create session keys (derived from ECDH).
         # Node A is initiator.
         send_key, recv_key = derive_keys_from_pubkey(
-            local_private_key=Bytes32(node_a_keys["private_key"]),
+            local_private_key=node_a_keys["private_key"],
             remote_public_key=node_b_keys["public_key"],
-            local_node_id=Bytes32(node_a_keys["node_id"]),
-            remote_node_id=Bytes32(node_b_keys["node_id"]),
+            local_node_id=node_a_keys["node_id"],
+            remote_node_id=node_b_keys["node_id"],
             challenge_data=challenge_data,
             is_initiator=True,
         )
@@ -98,7 +99,7 @@ class TestEncryptedPacketRoundtrip:
         packet = encode_packet(
             dest_node_id=node_b_keys["node_id"],
             flag=PacketFlag.MESSAGE,
-            nonce=bytes(nonce),
+            nonce=nonce,
             authdata=authdata,
             message=message_bytes,
             encryption_key=send_key,
@@ -115,10 +116,10 @@ class TestEncryptedPacketRoundtrip:
 
         # Node B derives keys as recipient (using same challenge_data).
         b_send_key, b_recv_key = derive_keys_from_pubkey(
-            local_private_key=Bytes32(node_b_keys["private_key"]),
+            local_private_key=node_b_keys["private_key"],
             remote_public_key=node_a_keys["public_key"],
-            local_node_id=Bytes32(node_b_keys["node_id"]),
-            remote_node_id=Bytes32(node_a_keys["node_id"]),
+            local_node_id=node_b_keys["node_id"],
+            remote_node_id=node_a_keys["node_id"],
             challenge_data=challenge_data,
             is_initiator=False,
         )
@@ -145,8 +146,8 @@ class TestSessionEstablishment:
         now = time.time()
         session = Session(
             node_id=node_b_keys["node_id"],
-            send_key=bytes(16),
-            recv_key=bytes(16),
+            send_key=Bytes16(bytes(16)),
+            recv_key=Bytes16(bytes(16)),
             created_at=now,
             last_seen=now,
             is_initiator=True,
@@ -231,8 +232,8 @@ class TestHandshakeManagerIntegration:
         )
 
         # Create WHOAREYOU.
-        request_nonce = bytes(12)
-        masking_iv = bytes(16)
+        request_nonce = Nonce(bytes(12))
+        masking_iv = Bytes16(bytes(16))
         id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
             remote_node_id=node_b_keys["node_id"],
             request_nonce=request_nonce,
@@ -327,8 +328,8 @@ class TestFullHandshakeFlow:
         manager_a.start_handshake(node_b_keys["node_id"])
 
         # Step 2: Node B creates WHOAREYOU.
-        request_nonce = bytes(12)
-        masking_iv = bytes(16)
+        request_nonce = Nonce(bytes(12))
+        masking_iv = Bytes16(bytes(16))
         id_nonce, whoareyou_authdata, _, challenge_data = manager_b.create_whoareyou(
             remote_node_id=node_a_keys["node_id"],
             request_nonce=request_nonce,

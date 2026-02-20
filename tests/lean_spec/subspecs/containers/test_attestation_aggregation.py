@@ -61,7 +61,9 @@ class TestAggregatedAttestation:
             source=Checkpoint(root=Bytes32.zero(), slot=Slot(2)),
         )
 
-        bits = AggregationBits.from_validator_indices([ValidatorIndex(2), ValidatorIndex(7)])
+        bits = AggregationBits.from_validator_indices(
+            ValidatorIndices(data=[ValidatorIndex(2), ValidatorIndex(7)])
+        )
         agg = AggregatedAttestation(aggregation_bits=bits, data=att_data)
 
         # Verify we can extract validator indices
@@ -78,12 +80,12 @@ class TestAggregatedAttestation:
             source=Checkpoint(root=Bytes32.zero(), slot=Slot(7)),
         )
 
-        validator_ids = [ValidatorIndex(i) for i in [0, 5, 10, 15, 20, 25]]
+        validator_ids = ValidatorIndices(data=[ValidatorIndex(i) for i in [0, 5, 10, 15, 20, 25]])
         bits = AggregationBits.from_validator_indices(validator_ids)
         agg = AggregatedAttestation(aggregation_bits=bits, data=att_data)
 
         recovered = agg.aggregation_bits.to_validator_indices()
-        assert recovered == ValidatorIndices(data=validator_ids)
+        assert recovered == validator_ids
 
 
 class TestAggregateByData:

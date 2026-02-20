@@ -1,7 +1,5 @@
 """Tests for secp256k1 identity keypair."""
 
-import pytest
-
 from lean_spec.subspecs.networking.transport.identity import (
     IdentityKeypair,
     verify_signature,
@@ -34,20 +32,9 @@ class TestIdentityKeypair:
     def test_from_bytes_roundtrip(self) -> None:
         """Keypair can be loaded from raw bytes."""
         original = IdentityKeypair.generate()
-        private_bytes = original.private_key_bytes()
-
-        restored = IdentityKeypair.from_bytes(private_bytes)
-
+        restored = IdentityKeypair.from_bytes(original.private_key_bytes())
         assert restored.public_key_bytes() == original.public_key_bytes()
         assert restored.private_key_bytes() == original.private_key_bytes()
-
-    def test_from_bytes_invalid_length(self) -> None:
-        """Loading from invalid bytes raises ValueError."""
-        with pytest.raises(ValueError, match="Expected 32 bytes"):
-            IdentityKeypair.from_bytes(b"\x00" * 16)
-
-        with pytest.raises(ValueError, match="Expected 32 bytes"):
-            IdentityKeypair.from_bytes(b"\x00" * 64)
 
     def test_sign_and_verify(self) -> None:
         """Signatures can be verified."""

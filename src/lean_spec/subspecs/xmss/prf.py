@@ -110,7 +110,7 @@ class Prf(StrictBaseModel):
     """Configuration parameters for the PRF."""
 
     @model_validator(mode="after")
-    def _validate_strict_types(self) -> "Prf":
+    def _validate_strict_types(self) -> Prf:
         """Reject subclasses to prevent type confusion attacks."""
         enforce_strict_types(self, config=XmssConfig)
         return self

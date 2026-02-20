@@ -127,7 +127,7 @@ def test_signed_attestation_minimal(ssz: SSZTestFiller) -> None:
         type_name="SignedAttestation",
         value=SignedAttestation(
             validator_id=ValidatorIndex(0),
-            message=_zero_attestation_data(),
+            data=_zero_attestation_data(),
             signature=_empty_signature(),
         ),
     )

@@ -33,6 +33,7 @@ from dataclasses import dataclass
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.types import Bytes32, Bytes33
 from lean_spec.types.uint import Uint8
 
 from .codec import DiscoveryMessage
@@ -90,7 +91,7 @@ class DiscoveryService:
     def __init__(
         self,
         local_enr: ENR,
-        private_key: bytes,
+        private_key: Bytes32,
         config: DiscoveryConfig | None = None,
         bootnodes: list[ENR] | None = None,
     ):
@@ -103,7 +104,7 @@ class DiscoveryService:
         # Compute our node ID from public key.
         if local_enr.public_key is None:
             raise ValueError("Local ENR must have a public key")
-        self._local_node_id = NodeId(compute_node_id(bytes(local_enr.public_key)))
+        self._local_node_id = NodeId(compute_node_id(Bytes33(local_enr.public_key)))
 
         # Initialize routing table.
         self._routing_table = RoutingTable(local_id=NodeId(self._local_node_id))

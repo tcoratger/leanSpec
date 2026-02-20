@@ -32,7 +32,7 @@ from threading import Lock
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes32, Bytes33, Bytes64
+from lean_spec.types import Bytes16, Bytes32, Bytes33
 
 from .config import HANDSHAKE_TIMEOUT_SECS
 from .crypto import (
@@ -41,7 +41,7 @@ from .crypto import (
     verify_id_nonce_signature,
 )
 from .keys import derive_keys_from_pubkey
-from .messages import PacketFlag, Port
+from .messages import IdNonce, Nonce, PacketFlag, Port
 from .packet import (
     HandshakeAuthdata,
     WhoAreYouAuthdata,
@@ -88,16 +88,16 @@ class PendingHandshake:
     remote_node_id: NodeId
     """32-byte node ID of the remote peer."""
 
-    id_nonce: bytes | None = None
+    id_nonce: IdNonce | None = None
     """16-byte challenge nonce (set when WHOAREYOU sent/received)."""
 
     challenge_data: bytes | None = None
     """Full WHOAREYOU packet data for key derivation (masking-iv || static-header || authdata)."""
 
-    ephemeral_privkey: bytes | None = None
+    ephemeral_privkey: Bytes32 | None = None
     """32-byte ephemeral private key (set when we send HANDSHAKE)."""
 
-    challenge_nonce: bytes | None = None
+    challenge_nonce: Nonce | None = None
     """12-byte nonce from the packet that triggered WHOAREYOU."""
 
     remote_enr_seq: SeqNumber = SeqNumber(0)
@@ -111,7 +111,7 @@ class PendingHandshake:
         return time.time() - self.started_at > timeout_secs
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class HandshakeResult:
     """Result of a completed handshake."""
 
@@ -145,18 +145,13 @@ class HandshakeManager:
     def __init__(
         self,
         local_node_id: NodeId,
-        local_private_key: bytes,
+        local_private_key: Bytes32,
         local_enr_rlp: bytes,
         local_enr_seq: SeqNumber,
         session_cache: SessionCache,
         timeout_secs: float = HANDSHAKE_TIMEOUT_SECS,
     ):
         """Initialize handshake manager."""
-        if len(local_node_id) != 32:
-            raise ValueError(f"Local node ID must be 32 bytes, got {len(local_node_id)}")
-        if len(local_private_key) != 32:
-            raise ValueError(f"Local private key must be 32 bytes, got {len(local_private_key)}")
-
         self._local_node_id = local_node_id
         self._local_private_key = local_private_key
         self._local_enr_rlp = local_enr_rlp
@@ -206,10 +201,10 @@ class HandshakeManager:
     def create_whoareyou(
         self,
         remote_node_id: NodeId,
-        request_nonce: bytes,
+        request_nonce: Nonce,
         remote_enr_seq: SeqNumber,
-        masking_iv: bytes,
-    ) -> tuple[bytes, bytes, bytes, bytes]:
+        masking_iv: Bytes16,
+    ) -> tuple[bytes, bytes, Nonce, bytes]:
         """
         Create a WHOAREYOU packet in response to an undecryptable message.
 
@@ -229,20 +224,20 @@ class HandshakeManager:
             - challenge_data: Full data for key derivation (masking-iv || static-header || authdata)
         """
         id_nonce = generate_id_nonce()
-        authdata = encode_whoareyou_authdata(bytes(id_nonce), remote_enr_seq)
+        authdata = encode_whoareyou_authdata(id_nonce, remote_enr_seq)
 
         # Build challenge_data per spec: masking-iv || static-header || authdata.
         #
         # This data becomes the HKDF salt for session key derivation.
         # Both sides must use identical challenge_data to derive matching keys.
         static_header = encode_static_header(PacketFlag.WHOAREYOU, request_nonce, len(authdata))
-        challenge_data = masking_iv + static_header + authdata
+        challenge_data = bytes(masking_iv) + static_header + authdata
 
         with self._lock:
             pending = PendingHandshake(
                 state=HandshakeState.SENT_WHOAREYOU,
                 remote_node_id=remote_node_id,
-                id_nonce=bytes(id_nonce),
+                id_nonce=id_nonce,
                 challenge_data=challenge_data,
                 challenge_nonce=request_nonce,
                 remote_enr_seq=remote_enr_seq,
@@ -255,11 +250,11 @@ class HandshakeManager:
         self,
         remote_node_id: NodeId,
         whoareyou: WhoAreYouAuthdata,
-        remote_pubkey: bytes,
+        remote_pubkey: Bytes33,
         challenge_data: bytes,
         remote_ip: str = "",
         remote_port: Port = _DEFAULT_PORT,
-    ) -> tuple[bytes, bytes, bytes]:
+    ) -> tuple[bytes, Bytes16, Bytes16]:
         """
         Create a HANDSHAKE packet in response to WHOAREYOU.
 
@@ -288,10 +283,10 @@ class HandshakeManager:
         # Per spec, the signature input includes the full challenge_data (not just id_nonce)
         # to bind the signature to this specific WHOAREYOU exchange.
         id_signature = sign_id_nonce(
-            Bytes32(self._local_private_key),
+            self._local_private_key,
             challenge_data,
             eph_pubkey,
-            Bytes32(remote_node_id),
+            remote_node_id,
         )
 
         # Include our ENR if the remote's known seq is stale.
@@ -314,8 +309,8 @@ class HandshakeManager:
         send_key, recv_key = derive_keys_from_pubkey(
             local_private_key=eph_privkey,
             remote_public_key=remote_pubkey,
-            local_node_id=Bytes32(self._local_node_id),
-            remote_node_id=Bytes32(remote_node_id),
+            local_node_id=self._local_node_id,
+            remote_node_id=remote_node_id,
             challenge_data=challenge_data,
             is_initiator=True,
         )
@@ -402,11 +397,11 @@ class HandshakeManager:
         # The signature was computed over challenge_data (not just id_nonce),
         # and includes our node_id as the WHOAREYOU sender (node-id-B).
         if not verify_id_nonce_signature(
-            signature=Bytes64(handshake.id_signature),
+            signature=handshake.id_signature,
             challenge_data=challenge_data,
-            ephemeral_pubkey=Bytes33(handshake.eph_pubkey),
-            dest_node_id=Bytes32(self._local_node_id),
-            public_key_bytes=Bytes33(remote_pubkey),
+            ephemeral_pubkey=handshake.eph_pubkey,
+            dest_node_id=self._local_node_id,
+            public_key_bytes=remote_pubkey,
         ):
             raise HandshakeError("Invalid ID signature")
 
@@ -415,10 +410,10 @@ class HandshakeManager:
         # The challenge_data was saved when we sent WHOAREYOU.
         # Using the same data ensures both sides derive identical keys.
         send_key, recv_key = derive_keys_from_pubkey(
-            local_private_key=Bytes32(self._local_private_key),
+            local_private_key=self._local_private_key,
             remote_public_key=handshake.eph_pubkey,
-            local_node_id=Bytes32(self._local_node_id),
-            remote_node_id=Bytes32(remote_node_id),
+            local_node_id=self._local_node_id,
+            remote_node_id=remote_node_id,
             challenge_data=challenge_data,
             is_initiator=False,
         )
@@ -471,7 +466,7 @@ class HandshakeManager:
                 del self._pending[node_id]
             return len(expired)
 
-    def _get_remote_pubkey(self, node_id: NodeId, enr_record: bytes | None) -> bytes | None:
+    def _get_remote_pubkey(self, node_id: NodeId, enr_record: bytes | None) -> Bytes33 | None:
         """
         Retrieve the remote node's static public key for signature verification.
 
@@ -503,7 +498,7 @@ class HandshakeManager:
                     # to ensure the ENR belongs to who we think sent it.
                     computed_id = enr.compute_node_id()
                     if computed_id is not None and bytes(computed_id) == node_id:
-                        return bytes(enr.public_key)
+                        return Bytes33(enr.public_key)
             except (ValueError, KeyError, IndexError):
                 pass
 
@@ -513,7 +508,7 @@ class HandshakeManager:
         # Use it if the handshake packet did not include an ENR.
         cached_enr = self._enr_cache.get(node_id)
         if cached_enr is not None and cached_enr.public_key is not None:
-            return bytes(cached_enr.public_key)
+            return Bytes33(cached_enr.public_key)
 
         return None
 

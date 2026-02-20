@@ -155,11 +155,6 @@ def aes_ctr_encrypt(key: Bytes16, iv: Bytes16, plaintext: bytes) -> bytes:
     Returns:
         Ciphertext of same length as plaintext.
     """
-    if len(key) != AES_KEY_SIZE:
-        raise ValueError(f"Key must be {AES_KEY_SIZE} bytes, got {len(key)}")
-    if len(iv) != CTR_IV_SIZE:
-        raise ValueError(f"IV must be {CTR_IV_SIZE} bytes, got {len(iv)}")
-
     cipher = Cipher(algorithms.AES(key), modes.CTR(iv))
     encryptor = cipher.encryptor()
     return encryptor.update(plaintext) + encryptor.finalize()
@@ -198,11 +193,6 @@ def aes_gcm_encrypt(key: Bytes16, nonce: Bytes12, plaintext: bytes, aad: bytes) 
     Returns:
         Ciphertext with 16-byte authentication tag appended.
     """
-    if len(key) != AES_KEY_SIZE:
-        raise ValueError(f"Key must be {AES_KEY_SIZE} bytes, got {len(key)}")
-    if len(nonce) != GCM_NONCE_SIZE:
-        raise ValueError(f"Nonce must be {GCM_NONCE_SIZE} bytes, got {len(nonce)}")
-
     aesgcm = AESGCM(key)
     return aesgcm.encrypt(nonce, plaintext, aad)
 
@@ -225,16 +215,11 @@ def aes_gcm_decrypt(key: Bytes16, nonce: Bytes12, ciphertext: bytes, aad: bytes)
     Raises:
         cryptography.exceptions.InvalidTag: If authentication fails.
     """
-    if len(key) != AES_KEY_SIZE:
-        raise ValueError(f"Key must be {AES_KEY_SIZE} bytes, got {len(key)}")
-    if len(nonce) != GCM_NONCE_SIZE:
-        raise ValueError(f"Nonce must be {GCM_NONCE_SIZE} bytes, got {len(nonce)}")
-
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(nonce, ciphertext, aad)
 
 
-def ecdh_agree(private_key_bytes: Bytes32, public_key_bytes: bytes) -> Bytes33:
+def ecdh_agree(private_key_bytes: Bytes32, public_key_bytes: Bytes33 | Bytes65) -> Bytes33:
     """
     Perform secp256k1 ECDH key agreement.
 
@@ -252,9 +237,6 @@ def ecdh_agree(private_key_bytes: Bytes32, public_key_bytes: bytes) -> Bytes33:
     Returns:
         33-byte shared secret (compressed point from ECDH).
     """
-    if len(private_key_bytes) != 32:
-        raise ValueError(f"Private key must be 32 bytes, got {len(private_key_bytes)}")
-
     scalar = int.from_bytes(private_key_bytes, "big")
     point = _decompress_pubkey(public_key_bytes)
     result = _point_mul(scalar, point)
@@ -287,7 +269,7 @@ def generate_secp256k1_keypair() -> tuple[Bytes32, Bytes33]:
     return Bytes32(private_bytes), Bytes33(public_bytes)
 
 
-def pubkey_to_uncompressed(public_key_bytes: bytes) -> Bytes65:
+def pubkey_to_uncompressed(public_key_bytes: Bytes33 | Bytes65) -> Bytes65:
     """
     Convert any secp256k1 public key to uncompressed format.
 
@@ -337,11 +319,6 @@ def sign_id_nonce(
     Returns:
         64-byte signature (r || s, each 32 bytes).
     """
-    if len(private_key_bytes) != 32:
-        raise ValueError(f"Private key must be 32 bytes, got {len(private_key_bytes)}")
-    if len(dest_node_id) != 32:
-        raise ValueError(f"Dest node ID must be 32 bytes, got {len(dest_node_id)}")
-
     # The signing input binds several values together per the spec:
     #
     # - Domain separator prevents cross-protocol signature reuse
@@ -404,11 +381,6 @@ def verify_id_nonce_signature(
     Returns:
         True if signature is valid, False otherwise.
     """
-    if len(signature) != ID_SIGNATURE_SIZE:
-        return False
-    if len(dest_node_id) != 32:
-        return False
-
     # Build the signing input per spec:
     # domain-separator || challenge-data || ephemeral-pubkey || node-id-B
     input_data = ID_SIGNATURE_DOMAIN + challenge_data + ephemeral_pubkey + dest_node_id

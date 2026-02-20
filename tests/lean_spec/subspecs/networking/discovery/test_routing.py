@@ -19,9 +19,8 @@ from lean_spec.subspecs.networking.discovery.routing import (
 )
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
-from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.subspecs.networking.types import ForkDigest, NodeId, SeqNumber
 from lean_spec.types import Bytes64
-from lean_spec.types.byte_arrays import Bytes4
 
 
 class TestXorDistance:
@@ -447,7 +446,7 @@ class TestForkCompatibility:
         """With fork filter, nodes without ENR are rejected."""
         table = RoutingTable(
             local_id=local_node_id,
-            local_fork_digest=Bytes4(bytes(4)),
+            local_fork_digest=ForkDigest(bytes(4)),
         )
         entry = NodeEntry(node_id=remote_node_id, enr=None)
 
@@ -457,7 +456,7 @@ class TestForkCompatibility:
         """Nodes without eth2 data are rejected when filtering."""
         table = RoutingTable(
             local_id=local_node_id,
-            local_fork_digest=Bytes4(bytes(4)),
+            local_fork_digest=ForkDigest(bytes(4)),
         )
 
         enr = ENR(
@@ -472,7 +471,7 @@ class TestForkCompatibility:
     def test_fork_filter_rejects_mismatched_fork(self, local_node_id, remote_node_id):
         """Node with different fork_digest is rejected."""
 
-        local_fork = Bytes4(bytes.fromhex("12345678"))
+        local_fork = ForkDigest(bytes.fromhex("12345678"))
         table = RoutingTable(local_id=local_node_id, local_fork_digest=local_fork)
 
         # Build eth2 bytes with a different fork digest.
@@ -491,7 +490,7 @@ class TestForkCompatibility:
     def test_fork_filter_accepts_matching_fork(self, local_node_id, remote_node_id):
         """Node with matching fork_digest is accepted."""
 
-        local_fork = Bytes4(bytes.fromhex("12345678"))
+        local_fork = ForkDigest(bytes.fromhex("12345678"))
         table = RoutingTable(local_id=local_node_id, local_fork_digest=local_fork)
 
         # Build eth2 bytes with the same fork digest.
@@ -513,7 +512,7 @@ class TestForkCompatibility:
     def test_is_fork_compatible_method(self, local_node_id):
         """Verify is_fork_compatible for compatible, incompatible, and no-ENR entries."""
 
-        local_fork = Bytes4(bytes.fromhex("12345678"))
+        local_fork = ForkDigest(bytes.fromhex("12345678"))
         table = RoutingTable(local_id=local_node_id, local_fork_digest=local_fork)
 
         # Compatible entry.

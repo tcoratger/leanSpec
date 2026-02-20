@@ -154,76 +154,6 @@ class Store(Container):
     Used for recursive signature aggregation when building blocks.
     """
 
-    @classmethod
-    def get_forkchoice_store(
-        cls,
-        anchor_state: State,
-        anchor_block: Block,
-        validator_id: ValidatorIndex | None,
-    ) -> "Store":
-        """
-        Initialize forkchoice store from an anchor state and block.
-
-        The anchor block and its state form the starting point for fork choice.
-        We treat this anchor as both justified and finalized.
-
-        Args:
-            anchor_state: The state corresponding to the anchor block.
-            anchor_block: A trusted block (e.g. genesis or checkpoint).
-            validator_id: Index of the validator running this store.
-
-        Returns:
-            A new Store instance, ready to accept blocks and attestations.
-
-        Raises:
-            AssertionError:
-                If the anchor block's state root does not match the hash
-                of the provided state.
-        """
-        # Compute the SSZ root of the given state.
-        #
-        # This is the canonical hash that should appear in the block's state root.
-        computed_state_root = hash_tree_root(anchor_state)
-
-        # Check that the block actually points to this state.
-        #
-        # If this fails, the caller has supplied inconsistent inputs.
-        assert anchor_block.state_root == computed_state_root, (
-            "Anchor block state root must match anchor state hash"
-        )
-
-        # Compute the SSZ root of the anchor block itself.
-        #
-        # This root will be used as:
-        # - the key in the blocks/states maps,
-        # - the initial head,
-        # - the root of the initial checkpoints.
-        anchor_root = hash_tree_root(anchor_block)
-
-        # Read the slot at which the anchor block was proposed.
-        anchor_slot = anchor_block.slot
-
-        # Build an initial checkpoint using the anchor block.
-        #
-        # Both the root and the slot come directly from the anchor.
-        # Initialize checkpoints from the anchor state
-        #
-        # We explicitly set the root to the anchor block root.
-        # The anchor state internally might have zero-hash checkpoints (if genesis),
-        # but the Store must treat the anchor block as the justified/finalized point.
-
-        return cls(
-            time=Interval(anchor_slot * INTERVALS_PER_SLOT),
-            config=anchor_state.config,
-            head=anchor_root,
-            safe_target=anchor_root,
-            latest_justified=anchor_state.latest_justified.model_copy(update={"root": anchor_root}),
-            latest_finalized=anchor_state.latest_finalized.model_copy(update={"root": anchor_root}),
-            blocks={anchor_root: anchor_block},
-            states={anchor_root: anchor_state},
-            validator_id=validator_id,
-        )
-
     def prune_stale_attestation_data(self) -> "Store":
         """
         Remove attestation data that can no longer influence fork choice.
@@ -376,7 +306,7 @@ class Store(Container):
             AssertionError: If signature verification fails.
         """
         validator_id = signed_attestation.validator_id
-        attestation_data = signed_attestation.message
+        attestation_data = signed_attestation.data
         signature = signed_attestation.signature
 
         # Validate the attestation first so unknown blocks are rejected cleanly
@@ -651,8 +581,7 @@ class Store(Container):
         # Store proposer signature for future lookup if it belongs to the same committee
         # as the current validator.
         if self.validator_id is not None:
-            proposer_validator_id = proposer_attestation.validator_id
-            proposer_subnet_id = proposer_validator_id.compute_subnet_id(
+            proposer_subnet_id = proposer_attestation.validator_id.compute_subnet_id(
                 ATTESTATION_COMMITTEE_COUNT
             )
             current_validator_subnet_id = self.validator_id.compute_subnet_id(
@@ -1010,7 +939,7 @@ class Store(Container):
         # Each SignatureKey contains (validator_id, data_root)
         # We look up the full AttestationData from attestation_data_by_root
         attestation_list: list[Attestation] = []
-        for sig_key in self.gossip_signatures.keys():
+        for sig_key in self.gossip_signatures:
             data_root = sig_key.data_root
             attestation_data = self.attestation_data_by_root.get(data_root)
             if attestation_data is not None:

@@ -492,7 +492,7 @@ class ValidatorService:
 
         return SignedAttestation(
             validator_id=validator_index,
-            message=attestation_data,
+            data=attestation_data,
             signature=signature,
         )
 

@@ -232,7 +232,7 @@ class NetworkService:
         compressed = frame_compress(ssz_bytes)
 
         await self.event_source.publish(str(topic), compressed)
-        logger.debug("Published attestation for slot %s", attestation.message.slot)
+        logger.debug("Published attestation for slot %s", attestation.data.slot)
 
     async def publish_aggregated_attestation(
         self, signed_attestation: SignedAggregatedAttestation

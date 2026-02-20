@@ -34,15 +34,13 @@ import struct
 from dataclasses import dataclass
 
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes12, Bytes16
+from lean_spec.types import Bytes12, Bytes16, Bytes33, Bytes64
 
 from .config import MAX_PACKET_SIZE, MIN_PACKET_SIZE
 from .crypto import (
     AES_KEY_SIZE,
-    COMPRESSED_PUBKEY_SIZE,
     CTR_IV_SIZE,
     GCM_NONCE_SIZE,
-    ID_SIGNATURE_SIZE,
     aes_ctr_decrypt,
     aes_ctr_encrypt,
     aes_gcm_decrypt,
@@ -109,10 +107,10 @@ class HandshakeAuthdata:
     eph_key_size: int
     """Size of ephemeral public key. 33 for compressed secp256k1."""
 
-    id_signature: bytes
+    id_signature: Bytes64
     """ID nonce signature proving identity ownership."""
 
-    eph_pubkey: bytes
+    eph_pubkey: Bytes33
     """Ephemeral public key for ECDH."""
 
     record: bytes | None
@@ -122,10 +120,10 @@ class HandshakeAuthdata:
 def encode_packet(
     dest_node_id: NodeId,
     flag: PacketFlag,
-    nonce: bytes,
+    nonce: Nonce,
     authdata: bytes,
     message: bytes,
-    encryption_key: bytes | None = None,
+    encryption_key: Bytes16 | None = None,
     masking_iv: Bytes16 | None = None,
 ) -> bytes:
     """
@@ -144,11 +142,6 @@ def encode_packet(
     Returns:
         Complete encoded packet ready for UDP transmission.
     """
-    if len(dest_node_id) != 32:
-        raise ValueError(f"Destination node ID must be 32 bytes, got {len(dest_node_id)}")
-    if len(nonce) != GCM_NONCE_SIZE:
-        raise ValueError(f"Nonce must be {GCM_NONCE_SIZE} bytes, got {len(nonce)}")
-
     if masking_iv is None:
         # Fresh random IV for header masking.
         #
@@ -181,9 +174,7 @@ def encode_packet(
         # The AAD binds the plaintext header to the encrypted message.
         # The recipient reconstructs this from the decoded header.
         message_ad = bytes(masking_iv) + header
-        encrypted_message = aes_gcm_encrypt(
-            Bytes16(encryption_key), Bytes12(nonce), message, message_ad
-        )
+        encrypted_message = aes_gcm_encrypt(encryption_key, Bytes12(nonce), message, message_ad)
 
     # Assemble packet.
     packet = bytes(masking_iv) + masked_header + encrypted_message
@@ -294,10 +285,10 @@ def decode_handshake_authdata(authdata: bytes) -> HandshakeAuthdata:
         raise ValueError(f"Handshake authdata truncated: {len(authdata)} < {expected_min}")
 
     offset = HANDSHAKE_HEADER_SIZE
-    id_signature = authdata[offset : offset + sig_size]
+    id_signature = Bytes64(authdata[offset : offset + sig_size])
     offset += sig_size
 
-    eph_pubkey = authdata[offset : offset + eph_key_size]
+    eph_pubkey = Bytes33(authdata[offset : offset + eph_key_size])
     offset += eph_key_size
 
     # Remaining bytes are the RLP-encoded ENR, included when the recipient's
@@ -315,8 +306,8 @@ def decode_handshake_authdata(authdata: bytes) -> HandshakeAuthdata:
 
 
 def decrypt_message(
-    encryption_key: bytes,
-    nonce: bytes,
+    encryption_key: Bytes16,
+    nonce: Nonce,
     ciphertext: bytes,
     message_ad: bytes,
 ) -> bytes:
@@ -332,27 +323,23 @@ def decrypt_message(
     Returns:
         Decrypted message plaintext.
     """
-    return aes_gcm_decrypt(Bytes16(encryption_key), Bytes12(nonce), ciphertext, message_ad)
+    return aes_gcm_decrypt(encryption_key, Bytes12(nonce), ciphertext, message_ad)
 
 
 def encode_message_authdata(src_id: NodeId) -> bytes:
     """Encode MESSAGE packet authdata."""
-    if len(src_id) != 32:
-        raise ValueError(f"Source ID must be 32 bytes, got {len(src_id)}")
     return src_id
 
 
-def encode_whoareyou_authdata(id_nonce: bytes, enr_seq: SeqNumber) -> bytes:
+def encode_whoareyou_authdata(id_nonce: IdNonce, enr_seq: SeqNumber) -> bytes:
     """Encode WHOAREYOU packet authdata."""
-    if len(id_nonce) != 16:
-        raise ValueError(f"ID nonce must be 16 bytes, got {len(id_nonce)}")
     return id_nonce + struct.pack(">Q", enr_seq)
 
 
 def encode_handshake_authdata(
     src_id: NodeId,
-    id_signature: bytes,
-    eph_pubkey: bytes,
+    id_signature: Bytes64,
+    eph_pubkey: Bytes33,
     record: bytes | None = None,
 ) -> bytes:
     """
@@ -367,15 +354,6 @@ def encode_handshake_authdata(
     Returns:
         Encoded authdata bytes.
     """
-    if len(src_id) != 32:
-        raise ValueError(f"Source ID must be 32 bytes, got {len(src_id)}")
-    if len(id_signature) != ID_SIGNATURE_SIZE:
-        raise ValueError(f"Signature must be {ID_SIGNATURE_SIZE} bytes, got {len(id_signature)}")
-    if len(eph_pubkey) != COMPRESSED_PUBKEY_SIZE:
-        raise ValueError(
-            f"Ephemeral pubkey must be {COMPRESSED_PUBKEY_SIZE} bytes, got {len(eph_pubkey)}"
-        )
-
     authdata = src_id + bytes([len(id_signature), len(eph_pubkey)]) + id_signature + eph_pubkey
 
     if record is not None:
@@ -394,7 +372,7 @@ def generate_id_nonce() -> IdNonce:
     return IdNonce(os.urandom(16))
 
 
-def encode_static_header(flag: PacketFlag, nonce: bytes, authdata_size: int) -> bytes:
+def encode_static_header(flag: PacketFlag, nonce: Nonce, authdata_size: int) -> bytes:
     """Encode the 23-byte static header."""
     return (
         PROTOCOL_ID

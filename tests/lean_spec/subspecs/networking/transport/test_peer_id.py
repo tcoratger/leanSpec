@@ -23,6 +23,7 @@ from lean_spec.subspecs.networking.transport.peer_id import (
     PeerId,
     PublicKeyProto,
 )
+from lean_spec.types import Bytes33
 
 # Protobuf tag constants for test assertions
 _PROTOBUF_TAG_TYPE = 0x08  # (1 << 3) | 0 = field 1, varint
@@ -273,14 +274,6 @@ class TestDerivePeerId:
 
         assert str(peer_id1) != str(peer_id2)
 
-    def test_from_secp256k1_invalid_length(self) -> None:
-        """from_secp256k1 rejects invalid key lengths."""
-        with pytest.raises(ValueError, match="must be 33 bytes"):
-            PeerId.from_secp256k1(bytes(32))
-
-        with pytest.raises(ValueError, match="must be 33 bytes"):
-            PeerId.from_secp256k1(bytes(34))
-
 
 class TestPeerIdFormat:
     """Tests for PeerId format and structure."""
@@ -482,8 +475,8 @@ class TestKnownVectors:
         This matches the libp2p spec test vector.
         """
         # From spec: 08021221037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99
-        key_data = bytes.fromhex(
-            "037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99"
+        key_data = Bytes33(
+            bytes.fromhex("037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99")
         )
         peer_id = PeerId.from_secp256k1(key_data)
 

@@ -56,16 +56,6 @@ class TestAesCtr:
 
         assert ct1 != ct2
 
-    def test_invalid_key_length_raises(self):
-        """Test that invalid key length raises ValueError."""
-        with pytest.raises(ValueError, match="Key must be 16 bytes"):
-            aes_ctr_encrypt(bytes(15), bytes(16), b"data")  # type: ignore[arg-type]
-
-    def test_invalid_iv_length_raises(self):
-        """Test that invalid IV length raises ValueError."""
-        with pytest.raises(ValueError, match="IV must be 16 bytes"):
-            aes_ctr_encrypt(bytes(16), bytes(15), b"data")  # type: ignore[arg-type]
-
 
 class TestAesGcm:
     """Tests for AES-GCM encryption/decryption."""
@@ -104,16 +94,6 @@ class TestAesGcm:
 
         with pytest.raises(InvalidTag):
             aes_gcm_decrypt(key, nonce, ciphertext, b"wrong aad")
-
-    def test_invalid_key_length_raises(self):
-        """Test that invalid key length raises ValueError."""
-        with pytest.raises(ValueError, match="Key must be 16 bytes"):
-            aes_gcm_encrypt(bytes(15), bytes(12), b"data", b"")  # type: ignore[arg-type]
-
-    def test_invalid_nonce_length_raises(self):
-        """Test that invalid nonce length raises ValueError."""
-        with pytest.raises(ValueError, match="Nonce must be 12 bytes"):
-            aes_gcm_encrypt(bytes(16), bytes(11), b"data", b"")  # type: ignore[arg-type]
 
 
 class TestEcdh:
@@ -290,18 +270,6 @@ class TestSignIdNonceNegativeCases:
                 make_challenge_data(),
                 eph_pub,
                 Bytes32.zero(),
-            )
-
-    def test_wrong_length_dest_node_id(self):
-        """Signing rejects non-32-byte destination node ID."""
-        priv, _ = generate_secp256k1_keypair()
-        _, eph_pub = generate_secp256k1_keypair()
-        with pytest.raises((ValueError, TypeError)):
-            sign_id_nonce(
-                priv,
-                make_challenge_data(),
-                eph_pub,
-                bytes(16),  # type: ignore[arg-type]
             )
 
 

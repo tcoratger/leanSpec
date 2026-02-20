@@ -67,7 +67,7 @@ class TestBlockProduction:
         )
         signed_5 = SignedAttestation(
             validator_id=ValidatorIndex(5),
-            message=data_5,
+            data=data_5,
             signature=key_manager.sign_attestation_data(ValidatorIndex(5), data_5),
         )
         data_6 = AttestationData(
@@ -78,15 +78,15 @@ class TestBlockProduction:
         )
         signed_6 = SignedAttestation(
             validator_id=ValidatorIndex(6),
-            message=data_6,
+            data=data_6,
             signature=key_manager.sign_attestation_data(ValidatorIndex(6), data_6),
         )
 
-        data_root_5 = signed_5.message.data_root_bytes()
-        data_root_6 = signed_6.message.data_root_bytes()
+        data_root_5 = signed_5.data.data_root_bytes()
+        data_root_6 = signed_6.data.data_root_bytes()
 
-        proof_5 = make_aggregated_proof(key_manager, [ValidatorIndex(5)], signed_5.message)
-        proof_6 = make_aggregated_proof(key_manager, [ValidatorIndex(6)], signed_6.message)
+        proof_5 = make_aggregated_proof(key_manager, [ValidatorIndex(5)], signed_5.data)
+        proof_6 = make_aggregated_proof(key_manager, [ValidatorIndex(6)], signed_6.data)
 
         sig_key_5 = SignatureKey(ValidatorIndex(5), data_root_5)
         sig_key_6 = SignatureKey(ValidatorIndex(6), data_root_6)
@@ -98,8 +98,8 @@ class TestBlockProduction:
                     sig_key_6: [proof_6],
                 },
                 "attestation_data_by_root": {
-                    data_root_5: signed_5.message,
-                    data_root_6: signed_6.message,
+                    data_root_5: signed_5.data,
+                    data_root_6: signed_6.data,
                 },
                 "gossip_signatures": {
                     sig_key_5: signed_5.signature,
@@ -216,18 +216,18 @@ class TestBlockProduction:
         )
         signed_7 = SignedAttestation(
             validator_id=ValidatorIndex(7),
-            message=data_7,
+            data=data_7,
             signature=key_manager.sign_attestation_data(ValidatorIndex(7), data_7),
         )
 
-        data_root_7 = signed_7.message.data_root_bytes()
-        proof_7 = make_aggregated_proof(key_manager, [ValidatorIndex(7)], signed_7.message)
+        data_root_7 = signed_7.data.data_root_bytes()
+        proof_7 = make_aggregated_proof(key_manager, [ValidatorIndex(7)], signed_7.data)
 
         sig_key_7 = SignatureKey(ValidatorIndex(7), data_root_7)
         sample_store = sample_store.model_copy(
             update={
                 "latest_known_aggregated_payloads": {sig_key_7: [proof_7]},
-                "attestation_data_by_root": {data_root_7: signed_7.message},
+                "attestation_data_by_root": {data_root_7: signed_7.data},
                 "gossip_signatures": {sig_key_7: signed_7.signature},
             }
         )

@@ -30,7 +30,7 @@ import hmac
 
 from Crypto.Hash import keccak
 
-from lean_spec.types import Bytes16, Bytes32, Bytes33
+from lean_spec.types import Bytes16, Bytes32, Bytes33, Bytes65
 
 from .crypto import ecdh_agree, pubkey_to_uncompressed
 
@@ -75,13 +75,6 @@ def derive_keys(
     The initiator uses initiator_key to encrypt and recipient_key to decrypt.
     The recipient uses recipient_key to encrypt and initiator_key to decrypt.
     """
-    if len(secret) != 33:
-        raise ValueError(f"Secret must be 33 bytes, got {len(secret)}")
-    if len(initiator_id) != 32:
-        raise ValueError(f"Initiator ID must be 32 bytes, got {len(initiator_id)}")
-    if len(recipient_id) != 32:
-        raise ValueError(f"Recipient ID must be 32 bytes, got {len(recipient_id)}")
-
     # HKDF-Extract: PRK = HMAC-SHA256(salt, IKM).
     #
     # Using challenge_data as salt binds session keys to the specific WHOAREYOU.
@@ -111,7 +104,7 @@ def derive_keys(
 
 def derive_keys_from_pubkey(
     local_private_key: Bytes32,
-    remote_public_key: bytes,
+    remote_public_key: Bytes33 | Bytes65,
     local_node_id: Bytes32,
     remote_node_id: Bytes32,
     challenge_data: bytes,
@@ -125,7 +118,7 @@ def derive_keys_from_pubkey(
 
     Args:
         local_private_key: Our 32-byte secp256k1 private key.
-        remote_public_key: Peer's compressed public key.
+        remote_public_key: Peer's compressed (33-byte) or uncompressed (65-byte) public key.
         local_node_id: Our 32-byte node ID.
         remote_node_id: Peer's 32-byte node ID.
         challenge_data: WHOAREYOU packet data (masking-iv || static-header || authdata).
@@ -154,7 +147,7 @@ def derive_keys_from_pubkey(
         return recipient_key, initiator_key
 
 
-def compute_node_id(public_key_bytes: bytes) -> Bytes32:
+def compute_node_id(public_key_bytes: Bytes33 | Bytes65) -> Bytes32:
     """
     Compute node ID from public key.
 

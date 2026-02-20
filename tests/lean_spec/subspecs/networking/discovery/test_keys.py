@@ -1,7 +1,5 @@
 """Tests for Discovery v5 key derivation."""
 
-import pytest
-
 from lean_spec.subspecs.networking.discovery.crypto import (
     generate_secp256k1_keypair,
     pubkey_to_uncompressed,
@@ -80,21 +78,6 @@ class TestDeriveKeys:
         keys_ba = derive_keys(secret, node_b, node_a, challenge_data)
 
         assert keys_ab != keys_ba
-
-    def test_invalid_secret_length_raises(self):
-        """Test that invalid secret length raises ValueError."""
-        with pytest.raises(ValueError, match="Secret must be 33 bytes"):
-            derive_keys(bytes(32), bytes(32), bytes(32), make_challenge_data())  # type: ignore[arg-type]
-
-    def test_invalid_initiator_id_length_raises(self):
-        """Test that invalid initiator ID length raises ValueError."""
-        with pytest.raises(ValueError, match="Initiator ID must be 32 bytes"):
-            derive_keys(bytes(33), bytes(31), bytes(32), make_challenge_data())  # type: ignore[arg-type]
-
-    def test_invalid_recipient_id_length_raises(self):
-        """Test that invalid recipient ID length raises ValueError."""
-        with pytest.raises(ValueError, match="Recipient ID must be 32 bytes"):
-            derive_keys(bytes(33), bytes(32), bytes(31), make_challenge_data())  # type: ignore[arg-type]
 
 
 class TestDeriveKeysFromPubkey:

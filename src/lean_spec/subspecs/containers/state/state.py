@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from typing import AbstractSet, Collection, Iterable
+from typing import TYPE_CHECKING, AbstractSet, Collection, Iterable
 
+from lean_spec.subspecs.chain.clock import Interval
+from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
@@ -24,7 +26,7 @@ from ..block.types import AggregatedAttestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
-from ..validator import ValidatorIndex
+from ..validator import ValidatorIndex, ValidatorIndices
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
@@ -32,6 +34,9 @@ from .types import (
     JustifiedSlots,
     Validators,
 )
+
+if TYPE_CHECKING:
+    from lean_spec.subspecs.forkchoice import Store
 
 
 class State(Container):
@@ -73,7 +78,7 @@ class State(Container):
     """A bitlist of validators who participated in justifications."""
 
     @classmethod
-    def generate_genesis(cls, genesis_time: Uint64, validators: Validators) -> "State":
+    def generate_genesis(cls, genesis_time: Uint64, validators: Validators) -> State:
         """
         Generate a genesis state with empty history and proper initial values.
 
@@ -117,7 +122,72 @@ class State(Container):
             justifications_validators=JustificationValidators(data=[]),
         )
 
-    def process_slots(self, target_slot: Slot) -> "State":
+    def to_forkchoice_store(
+        self,
+        anchor_block: Block,
+        validator_id: ValidatorIndex | None,
+    ) -> Store:
+        """
+        Initialize a forkchoice store from this state and an anchor block.
+
+        The anchor block and this state form the starting point for fork choice.
+        Both are treated as justified and finalized.
+
+        Args:
+            anchor_block: A trusted block (e.g. genesis or checkpoint).
+            validator_id: Index of the validator running this store.
+
+        Returns:
+            A new Store instance, ready to accept blocks and attestations.
+
+        Raises:
+            AssertionError:
+                If the anchor block's state root does not match the hash
+                of this state.
+        """
+        from lean_spec.subspecs.forkchoice import Store
+
+        # Compute the SSZ root of this state.
+        #
+        # This is the canonical hash that should appear in the block's state root.
+        computed_state_root = hash_tree_root(self)
+
+        # Check that the block actually points to this state.
+        #
+        # If this fails, the caller has supplied inconsistent inputs.
+        assert anchor_block.state_root == computed_state_root, (
+            "Anchor block state root must match anchor state hash"
+        )
+
+        # Compute the SSZ root of the anchor block itself.
+        #
+        # This root will be used as:
+        # - the key in the blocks/states maps,
+        # - the initial head,
+        # - the root of the initial checkpoints.
+        anchor_root = hash_tree_root(anchor_block)
+
+        # Read the slot at which the anchor block was proposed.
+        anchor_slot = anchor_block.slot
+
+        # Initialize checkpoints from this state.
+        #
+        # We explicitly set the root to the anchor block root.
+        # The state internally might have zero-hash checkpoints (if genesis),
+        # but the Store must treat the anchor block as the justified/finalized point.
+        return Store(
+            time=Interval(anchor_slot * INTERVALS_PER_SLOT),
+            config=self.config,
+            head=anchor_root,
+            safe_target=anchor_root,
+            latest_justified=self.latest_justified.model_copy(update={"root": anchor_root}),
+            latest_finalized=self.latest_finalized.model_copy(update={"root": anchor_root}),
+            blocks={anchor_root: anchor_block},
+            states={anchor_root: self},
+            validator_id=validator_id,
+        )
+
+    def process_slots(self, target_slot: Slot) -> State:
         """
         Advance the state through empty slots up to, but not including, target_slot.
 
@@ -192,7 +262,7 @@ class State(Container):
         # Reached the target slot. Return the advanced state.
         return state
 
-    def process_block_header(self, block: Block) -> "State":
+    def process_block_header(self, block: Block) -> State:
         """
         Validate the block header and update header-linked state.
 
@@ -341,7 +411,7 @@ class State(Container):
             }
         )
 
-    def process_block(self, block: Block) -> "State":
+    def process_block(self, block: Block) -> State:
         """
         Apply full block processing including header and body.
 
@@ -368,7 +438,7 @@ class State(Container):
     def process_attestations(
         self,
         attestations: Iterable[AggregatedAttestation],
-    ) -> "State":
+    ) -> State:
         """
         Apply attestations and update justification/finalization
         according to the Lean Consensus 3SF-mini rules.
@@ -617,7 +687,7 @@ class State(Container):
             }
         )
 
-    def state_transition(self, block: Block, valid_signatures: bool = True) -> "State":
+    def state_transition(self, block: Block, valid_signatures: bool = True) -> State:
         """
         Apply the complete state transition function for a block.
 
@@ -670,7 +740,7 @@ class State(Container):
         available_attestations: Iterable[Attestation] | None = None,
         known_block_roots: AbstractSet[Bytes32] | None = None,
         aggregated_payloads: dict[SignatureKey, list[AggregatedSignatureProof]] | None = None,
-    ) -> tuple[Block, "State", list[AggregatedAttestation], list[AggregatedSignatureProof]]:
+    ) -> tuple[Block, State, list[AggregatedAttestation], list[AggregatedSignatureProof]]:
         """
         Build a valid block on top of this state.
 
@@ -858,7 +928,9 @@ class State(Container):
             # The aggregation combines multiple XMSS signatures into a single
             # compact proof that can verify all participants signed the message.
             if gossip_ids:
-                participants = AggregationBits.from_validator_indices(gossip_ids)
+                participants = AggregationBits.from_validator_indices(
+                    ValidatorIndices(data=gossip_ids)
+                )
                 proof = AggregatedSignatureProof.aggregate(
                     participants=participants,
                     public_keys=gossip_keys,

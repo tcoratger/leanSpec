@@ -77,11 +77,12 @@ class Nonce(BaseBytes):
     LENGTH: ClassVar[int] = 12
 
 
-Distance = Uint16
-"""Log2 distance (0-256). Distance 0 returns the node's own ENR."""
+class Distance(Uint16):
+    """Log2 distance (0-256). Distance 0 returns the node's own ENR."""
 
-Port = Uint16
-"""UDP port number (0-65535)."""
+
+class Port(Uint16):
+    """UDP port number (0-65535)."""
 
 
 class PacketFlag(IntEnum):

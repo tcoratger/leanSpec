@@ -70,7 +70,7 @@ class JustifiedSlots(BaseBitlist):
         finalized_slot: Slot,
         target_slot: Slot,
         value: Boolean,
-    ) -> "JustifiedSlots":
+    ) -> JustifiedSlots:
         """
         Return a new bitfield with the justification status updated.
 

@@ -15,6 +15,7 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     SignedBlockWithAttestation,
     ValidatorIndex,
+    ValidatorIndices,
 )
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
@@ -576,11 +577,11 @@ class TestValidatorServiceIntegration:
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
             public_key = key_manager.get_public_key(validator_id)
-            message_bytes = signed_att.message.data_root_bytes()
+            message_bytes = signed_att.data.data_root_bytes()
 
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
-                slot=signed_att.message.slot,
+                slot=signed_att.data.slot,
                 message=message_bytes,
                 sig=signed_att.signature,
             )
@@ -619,7 +620,7 @@ class TestValidatorServiceIntegration:
         expected_source = store.latest_justified
 
         for signed_att in attestations_produced:
-            data = signed_att.message
+            data = signed_att.data
 
             # Verify head checkpoint references the store's head
             assert data.head.root == expected_head_root
@@ -711,7 +712,9 @@ class TestValidatorServiceIntegration:
             attestation_map[vid] = attestation_data
 
         proof = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(participants),
+            participants=AggregationBits.from_validator_indices(
+                ValidatorIndices(data=participants)
+            ),
             public_keys=public_keys,
             signatures=signatures,
             message=data_root,
@@ -774,7 +777,7 @@ class TestValidatorServiceIntegration:
         }
 
         async def capture_attestation(attestation: SignedAttestation) -> None:
-            attestations_by_slot[attestation.message.slot].append(attestation)
+            attestations_by_slot[attestation.data.slot].append(attestation)
 
         service = ValidatorService(
             sync_service=real_sync_service,
@@ -792,9 +795,9 @@ class TestValidatorServiceIntegration:
 
         # Attestations at each slot should have the correct slot value
         for att in attestations_by_slot[Slot(1)]:
-            assert att.message.slot == Slot(1)
+            assert att.data.slot == Slot(1)
         for att in attestations_by_slot[Slot(2)]:
-            assert att.message.slot == Slot(2)
+            assert att.data.slot == Slot(2)
 
     async def test_proposer_does_not_double_attest(
         self,
@@ -921,7 +924,7 @@ class TestValidatorServiceIntegration:
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
             public_key = key_manager.get_public_key(validator_id)
-            message_bytes = signed_att.message.data_root_bytes()
+            message_bytes = signed_att.data.data_root_bytes()
 
             # Verification must use the same slot that was used for signing
             is_valid = TARGET_SIGNATURE_SCHEME.verify(

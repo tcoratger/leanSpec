@@ -25,7 +25,7 @@ from cryptography.exceptions import InvalidTag
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes16
+from lean_spec.types import Bytes16, Bytes32, Bytes33
 
 from .codec import (
     DiscoveryMessage,
@@ -78,7 +78,7 @@ class PendingRequest:
     sent_at: float
     """Timestamp when request was sent."""
 
-    nonce: bytes
+    nonce: Nonce
     """Packet nonce (needed for WHOAREYOU handling)."""
 
     message: DiscoveryMessage
@@ -105,7 +105,7 @@ class PendingMultiRequest:
     sent_at: float
     """Timestamp when request was sent."""
 
-    nonce: bytes
+    nonce: Nonce
     """Packet nonce (needed for WHOAREYOU handling)."""
 
     message: DiscoveryMessage
@@ -129,7 +129,7 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
         transport_handler: Parent transport for packet handling.
     """
 
-    def __init__(self, transport_handler: DiscoveryTransport):
+    def __init__(self, transport_handler: DiscoveryTransport) -> None:
         """Initialize protocol handler."""
         self._handler = transport_handler
         self._transport: asyncio.DatagramTransport | None = None
@@ -172,7 +172,7 @@ class DiscoveryTransport:
     def __init__(
         self,
         local_node_id: NodeId,
-        local_private_key: bytes,
+        local_private_key: Bytes32,
         local_enr: ENR,
         config: DiscoveryConfig | None = None,
     ):
@@ -390,7 +390,7 @@ class DiscoveryTransport:
             request_id=request_id_bytes,
             dest_node_id=dest_node_id,
             sent_at=loop.time(),
-            nonce=bytes(nonce),
+            nonce=nonce,
             message=message,
             response_queue=response_queue,
             expected_total=None,
@@ -498,7 +498,7 @@ class DiscoveryTransport:
             request_id=request_id_bytes,
             dest_node_id=dest_node_id,
             sent_at=loop.time(),
-            nonce=bytes(nonce),
+            nonce=nonce,
             message=message,
             future=future,
         )
@@ -547,7 +547,7 @@ class DiscoveryTransport:
             return encode_packet(
                 dest_node_id=dest_node_id,
                 flag=PacketFlag.MESSAGE,
-                nonce=bytes(nonce),
+                nonce=nonce,
                 authdata=authdata,
                 message=message_bytes,
                 encryption_key=session.send_key,
@@ -565,11 +565,11 @@ class DiscoveryTransport:
         # This approach avoids the need for session negotiation
         # before sending the first message.
         self._handshake_manager.start_handshake(dest_node_id)
-        dummy_key = os.urandom(16)
+        dummy_key = Bytes16(os.urandom(16))
         return encode_packet(
             dest_node_id=dest_node_id,
             flag=PacketFlag.MESSAGE,
-            nonce=bytes(nonce),
+            nonce=nonce,
             authdata=authdata,
             message=message_bytes,
             encryption_key=dummy_key,
@@ -626,7 +626,7 @@ class DiscoveryTransport:
         # This links the challenge to the specific request that failed.
         pending = None
         for p in self._pending_requests.values():
-            if p.nonce == bytes(header.nonce):
+            if p.nonce == header.nonce:
                 pending = p
                 break
 
@@ -647,7 +647,7 @@ class DiscoveryTransport:
         # We use the unmasked header, which we can reconstruct from the decoded values.
         masking_iv = raw_packet[:16]
         static_header = encode_static_header(
-            PacketFlag.WHOAREYOU, bytes(header.nonce), len(header.authdata)
+            PacketFlag.WHOAREYOU, header.nonce, len(header.authdata)
         )
         challenge_data = masking_iv + static_header + header.authdata
 
@@ -660,7 +660,7 @@ class DiscoveryTransport:
             logger.debug("No ENR for %s, cannot complete handshake", remote_node_id.hex()[:16])
             return
 
-        remote_pubkey = bytes(remote_enr.public_key)
+        remote_pubkey = Bytes33(remote_enr.public_key)
 
         # Build and send the HANDSHAKE response.
         try:
@@ -685,7 +685,7 @@ class DiscoveryTransport:
             packet = encode_packet(
                 dest_node_id=remote_node_id,
                 flag=PacketFlag.HANDSHAKE,
-                nonce=bytes(nonce),
+                nonce=nonce,
                 authdata=authdata,
                 message=message_bytes,
                 encryption_key=send_key,
@@ -725,7 +725,7 @@ class DiscoveryTransport:
             if len(message_bytes) > 0:
                 plaintext = decrypt_message(
                     encryption_key=result.session.recv_key,
-                    nonce=bytes(header.nonce),
+                    nonce=header.nonce,
                     ciphertext=message_bytes,
                     message_ad=message_ad,
                 )
@@ -763,7 +763,7 @@ class DiscoveryTransport:
         try:
             plaintext = decrypt_message(
                 encryption_key=session.recv_key,
-                nonce=bytes(header.nonce),
+                nonce=header.nonce,
                 ciphertext=message_bytes,
                 message_ad=message_ad,
             )
@@ -828,11 +828,11 @@ class DiscoveryTransport:
         #
         # This IV is part of the challenge_data used for key derivation.
         # Both sides must use identical challenge_data to derive matching keys.
-        masking_iv = os.urandom(16)
+        masking_iv = Bytes16(os.urandom(16))
 
         id_nonce, authdata, nonce, challenge_data = self._handshake_manager.create_whoareyou(
             remote_node_id=remote_node_id,
-            request_nonce=bytes(request_nonce),
+            request_nonce=request_nonce,
             remote_enr_seq=remote_enr_seq,
             masking_iv=masking_iv,
         )
@@ -844,7 +844,7 @@ class DiscoveryTransport:
             authdata=authdata,
             message=b"",
             encryption_key=None,
-            masking_iv=Bytes16(masking_iv),
+            masking_iv=masking_iv,
         )
 
         self._transport.sendto(packet, addr)
@@ -893,7 +893,7 @@ class DiscoveryTransport:
         packet = encode_packet(
             dest_node_id=dest_node_id,
             flag=PacketFlag.MESSAGE,
-            nonce=bytes(nonce),
+            nonce=nonce,
             authdata=authdata,
             message=message_bytes,
             encryption_key=session.send_key,

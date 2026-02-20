@@ -7,14 +7,14 @@ from time import time
 from typing import TYPE_CHECKING
 
 from .transport import PeerId
-from .types import ConnectionState, Direction, Multiaddr
+from .types import ConnectionState, Direction, ForkDigest, Multiaddr
 
 if TYPE_CHECKING:
     from .enr import ENR
     from .reqresp import Status
 
 
-@dataclass
+@dataclass(slots=True)
 class PeerInfo:
     """
     Information about a known peer.
@@ -59,7 +59,7 @@ class PeerInfo:
         self.last_seen = time()
 
     @property
-    def fork_digest(self) -> bytes | None:
+    def fork_digest(self) -> ForkDigest | None:
         """
         Get the peer's fork_digest from cached ENR.
 
@@ -71,4 +71,4 @@ class PeerInfo:
         eth2_data = self.enr.eth2_data
         if eth2_data is None:
             return None
-        return bytes(eth2_data.fork_digest)
+        return eth2_data.fork_digest

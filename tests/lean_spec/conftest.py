@@ -71,8 +71,7 @@ def genesis_block(genesis_state: State) -> Block:
 @pytest.fixture
 def base_store(genesis_state: State, genesis_block: Block) -> Store:
     """Fork choice store initialized with genesis."""
-    return Store.get_forkchoice_store(
-        genesis_state,
+    return genesis_state.to_forkchoice_store(
         genesis_block,
         validator_id=ValidatorIndex(0),
     )
@@ -108,4 +107,4 @@ def keyed_store(keyed_genesis: GenesisData) -> Store:
 @pytest.fixture
 def observer_store(keyed_genesis_state: State, keyed_genesis_block: Block) -> Store:
     """Fork choice store with validator_id=None (non-validator observer)."""
-    return Store.get_forkchoice_store(keyed_genesis_state, keyed_genesis_block, validator_id=None)
+    return keyed_genesis_state.to_forkchoice_store(keyed_genesis_block, validator_id=None)

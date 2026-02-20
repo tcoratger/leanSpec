@@ -50,7 +50,7 @@ from lean_spec.subspecs.containers.state.types import (
     HistoricalBlockHashes,
     JustifiedSlots,
 )
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.types import Boolean
 from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
@@ -127,7 +127,7 @@ class TestProcessAttestationsBoundsCheck:
         attestation = AggregatedAttestation(
             # Two validators participate in this attestation.
             aggregation_bits=AggregationBits.from_validator_indices(
-                [ValidatorIndex(0), ValidatorIndex(1)]
+                ValidatorIndices(data=[ValidatorIndex(0), ValidatorIndex(1)])
             ),
             data=att_data,
         )
@@ -209,7 +209,7 @@ class TestProcessAttestationsBoundsCheck:
 
         attestation = AggregatedAttestation(
             aggregation_bits=AggregationBits.from_validator_indices(
-                [ValidatorIndex(0), ValidatorIndex(1)]
+                ValidatorIndices(data=[ValidatorIndex(0), ValidatorIndex(1)])
             ),
             data=att_data,
         )

@@ -103,6 +103,30 @@ from cryptography.hazmat.primitives.asymmetric import x25519
 
 This keeps code readable and avoids mental overhead of tracking renamed imports.
 
+### Type Annotations
+
+**Never quote type annotations when `from __future__ import annotations` is present.** With future annotations, all annotations are already lazy strings. Adding quotes is redundant and noisy.
+
+Bad:
+```python
+from __future__ import annotations
+
+def create(cls) -> "Store":
+    ...
+```
+
+Good:
+```python
+from __future__ import annotations
+
+def create(cls) -> Store:
+    ...
+```
+
+The only valid use of quoted annotations is in files that do NOT have `from __future__ import annotations` and need a forward reference. Prefer adding the future import instead.
+
+**Prefer narrow domain types over raw builtins.** Use `Bytes32`, `Bytes33`, `Bytes52` etc. instead of `bytes` in signatures. Spec code should never accept or return `bytes` when a more specific type exists.
+
 ### Module-Level Constants
 
 Use docstrings (not comments) to document module-level constants. Place the docstring immediately after the assignment.

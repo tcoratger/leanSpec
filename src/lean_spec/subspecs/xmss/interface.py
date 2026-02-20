@@ -62,7 +62,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
     """Random data generator for key generation."""
 
     @model_validator(mode="after")
-    def _validate_strict_types(self) -> "GeneralizedXmssScheme":
+    def _validate_strict_types(self) -> GeneralizedXmssScheme:
         """Reject subclasses to prevent type confusion attacks."""
         enforce_strict_types(
             self,

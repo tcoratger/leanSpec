@@ -79,9 +79,9 @@ class Signature(Container):
     def verify(
         self,
         public_key: PublicKey,
-        slot: "Slot",
-        message: "Bytes32",
-        scheme: "GeneralizedXmssScheme",
+        slot: Slot,
+        message: Bytes32,
+        scheme: GeneralizedXmssScheme,
     ) -> bool:
         """
         Verify the signature using XMSS verification algorithm.

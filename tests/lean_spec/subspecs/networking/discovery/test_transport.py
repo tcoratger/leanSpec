@@ -279,7 +279,7 @@ class TestDiscoveryTransport:
             request_id=b"\x01\x02\x03\x04",
             dest_node_id=NodeId(bytes(32)),
             sent_at=loop.time(),
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=MagicMock(),
             future=future,
         )
@@ -318,7 +318,7 @@ class TestPendingRequest:
             request_id=b"\x01\x02\x03\x04",
             dest_node_id=NodeId(bytes(32)),
             sent_at=123.456,
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=message,
             future=future,
         )
@@ -410,7 +410,7 @@ class TestMultiPacketNodesCollection:
             request_id=b"\x01\x02\x03\x04",
             dest_node_id=NodeId(bytes(32)),
             sent_at=123.456,
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=MagicMock(),
             response_queue=queue,
             expected_total=None,
@@ -433,7 +433,7 @@ class TestMultiPacketNodesCollection:
             request_id=b"\x01\x02\x03\x04",
             dest_node_id=NodeId(bytes(32)),
             sent_at=123.456,
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=MagicMock(),
             response_queue=queue,
             expected_total=None,
@@ -469,7 +469,7 @@ class TestMultiPacketNodesCollection:
                 request_id=b"\x01\x02\x03\x04",
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=123.456,
-                nonce=bytes(12),
+                nonce=Nonce(bytes(12)),
                 message=MagicMock(),
                 response_queue=queue,
                 expected_total=3,
@@ -575,7 +575,7 @@ class TestRequestResponseCorrelation:
             request_id=b"\x01\x02\x03\x04",
             dest_node_id=NodeId(bytes(32)),
             sent_at=123.456,
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=message,
             future=future,
         )
@@ -599,7 +599,7 @@ class TestRequestResponseCorrelation:
                 request_id=b"\x01",
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=loop.time(),
-                nonce=bytes(12),
+                nonce=Nonce(bytes(12)),
                 message=message,
                 future=future,
             )
@@ -635,7 +635,7 @@ class TestRequestResponseCorrelation:
             request_id=b"\x01",
             dest_node_id=NodeId(bytes(32)),
             sent_at=loop.time(),
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=message,
             future=future,
         )
@@ -666,7 +666,7 @@ class TestRequestResponseCorrelation:
             request_id=request_id_1,
             dest_node_id=NodeId(bytes(32)),
             sent_at=loop.time(),
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=message1,
             future=future1,
         )
@@ -675,7 +675,7 @@ class TestRequestResponseCorrelation:
             request_id=request_id_2,
             dest_node_id=NodeId(bytes(32)),
             sent_at=loop.time(),
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=message2,
             future=future2,
         )
@@ -699,7 +699,7 @@ class TestRequestResponseCorrelation:
         loop = asyncio.new_event_loop()
         future: asyncio.Future = loop.create_future()
 
-        nonce = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c"
+        nonce = Nonce(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c")
 
         message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
         pending = PendingRequest(
@@ -727,7 +727,7 @@ class TestRequestResponseCorrelation:
             request_id=b"\x01",
             dest_node_id=NodeId(bytes(32)),
             sent_at=loop.time(),
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=message,
             future=future,
         )
@@ -785,7 +785,7 @@ class TestPendingRequestsManagement:
                 request_id=bytes([i]),
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=loop.time(),
-                nonce=bytes(12),
+                nonce=Nonce(bytes(12)),
                 message=MagicMock(),
                 future=future,
             )
@@ -828,7 +828,7 @@ class TestPendingRequestsManagement:
                 request_id=bytes([i]),
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=loop.time(),
-                nonce=bytes(12),
+                nonce=Nonce(bytes(12)),
                 message=MagicMock(),
                 future=future,
             )
@@ -1092,7 +1092,7 @@ class TestHandleDecodedMessage:
             request_id=request_id,
             dest_node_id=remote_node_id,
             sent_at=loop.time(),
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=MagicMock(),
             future=future,
         )
@@ -1128,7 +1128,7 @@ class TestHandleDecodedMessage:
             request_id=request_id,
             dest_node_id=remote_node_id,
             sent_at=0.0,
-            nonce=bytes(12),
+            nonce=Nonce(bytes(12)),
             message=MagicMock(),
             response_queue=queue,
             expected_total=None,

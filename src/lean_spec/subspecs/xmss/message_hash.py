@@ -65,7 +65,7 @@ class MessageHasher(StrictBaseModel):
     """Poseidon hash engine."""
 
     @model_validator(mode="after")
-    def _validate_strict_types(self) -> "MessageHasher":
+    def _validate_strict_types(self) -> MessageHasher:
         """Reject subclasses to prevent type confusion attacks."""
         enforce_strict_types(self, config=XmssConfig, poseidon=PoseidonXmss)
         return self

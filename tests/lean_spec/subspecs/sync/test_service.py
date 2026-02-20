@@ -417,7 +417,7 @@ class TestAttestationGossipHandling:
         original_fn = sync_service.store.on_gossip_attestation
 
         def reject_unknown(signed_attestation, *, is_aggregator=False):
-            if signed_attestation.message.target.root == unknown_root:
+            if signed_attestation.data.target.root == unknown_root:
                 raise KeyError("Unknown block")
             return original_fn(signed_attestation, is_aggregator=is_aggregator)
 
