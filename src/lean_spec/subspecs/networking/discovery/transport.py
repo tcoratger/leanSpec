@@ -65,7 +65,7 @@ from .session import SessionCache
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True)
 class PendingRequest:
     """Tracks a pending request awaiting response."""
 
@@ -88,7 +88,7 @@ class PendingRequest:
     """Future to complete when response arrives."""
 
 
-@dataclass
+@dataclass(slots=True)
 class PendingMultiRequest:
     """Tracks a pending request that may receive multiple responses.
 

@@ -238,11 +238,11 @@ def test_equality_and_hashing() -> None:
     assert hash(u1) != hash(u3)
 
 
-def test_options_helper() -> None:
-    """Test options() class method."""
-    assert NumericUnion.options() == (Uint16, Uint32)
-    assert OptionalNumericUnion.options() == (None, Uint16, Uint32)
-    assert SimpleUnion.options() == (Uint16,)
+def test_options_class_var() -> None:
+    """Test OPTIONS class variable access."""
+    assert NumericUnion.OPTIONS == (Uint16, Uint32)
+    assert OptionalNumericUnion.OPTIONS == (None, Uint16, Uint32)
+    assert SimpleUnion.OPTIONS == (Uint16,)
 
 
 def test_is_fixed_size_helper() -> None:

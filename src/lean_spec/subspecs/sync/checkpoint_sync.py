@@ -19,12 +19,11 @@ or a well-known provider).
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import httpx
 
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
-from lean_spec.subspecs.containers import Slot, State
+from lean_spec.subspecs.containers import State
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,7 @@ class CheckpointSyncError(Exception):
     """
 
 
-async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
+async def fetch_finalized_state(url: str, state_class: type["State"]) -> "State":
     """
     Fetch finalized state from a node via checkpoint sync.
 
@@ -66,7 +65,7 @@ async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
     base_url = url.rstrip("/")
     full_url = f"{base_url}{FINALIZED_STATE_ENDPOINT}"
 
-    logger.info(f"Fetching finalized state from {full_url}")
+    logger.info("Fetching finalized state from %s", full_url)
 
     # Request SSZ binary format.
     #
@@ -80,14 +79,14 @@ async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
             response.raise_for_status()
 
             ssz_data = response.content
-            logger.info(f"Downloaded {len(ssz_data)} bytes of SSZ state data")
+            logger.info("Downloaded %d bytes of SSZ state data", len(ssz_data))
 
             # Deserialize from SSZ bytes.
             #
             # This validates the byte stream matches the expected schema.
             # Malformed data will raise an exception here.
             state = state_class.decode_bytes(ssz_data)
-            logger.info(f"Deserialized state at slot {state.slot}")
+            logger.info("Deserialized state at slot %s", state.slot)
 
             return state
 
@@ -103,7 +102,7 @@ async def fetch_finalized_state(url: str, state_class: type[Any]) -> "State":
         raise CheckpointSyncError(f"Failed to fetch state: {e}") from e
 
 
-async def verify_checkpoint_state(state: "State") -> bool:
+def verify_checkpoint_state(state: "State") -> bool:
     """
     Verify that a checkpoint state is structurally valid.
 
@@ -127,11 +126,6 @@ async def verify_checkpoint_state(state: "State") -> bool:
         True if valid, False otherwise.
     """
     try:
-        # Sanity check: slot must be non-negative.
-        if state.slot < Slot(0):
-            logger.error("Invalid state: negative slot")
-            return False
-
         # A state with no validators cannot produce blocks.
         validator_count = len(state.validators)
         if validator_count == 0:
@@ -141,8 +135,9 @@ async def verify_checkpoint_state(state: "State") -> bool:
         # Guard against oversized states that could exhaust memory.
         if validator_count > int(VALIDATOR_REGISTRY_LIMIT):
             logger.error(
-                f"Invalid state: validator count {validator_count} exceeds "
-                f"registry limit {VALIDATOR_REGISTRY_LIMIT}"
+                "Invalid state: validator count %d exceeds registry limit %s",
+                validator_count,
+                VALIDATOR_REGISTRY_LIMIT,
             )
             return False
 
@@ -151,9 +146,9 @@ async def verify_checkpoint_state(state: "State") -> bool:
         # If the data was corrupted, hashing will likely fail or produce
         # an unexpected result. We log the root for debugging.
         state_root = hash_tree_root(state)
-        logger.info(f"Checkpoint state verified: slot={state.slot}, root={state_root}...")
+        logger.info("Checkpoint state verified: slot=%s, root=%s...", state.slot, state_root)
         return True
 
     except Exception as e:
-        logger.error(f"State verification failed: {e}")
+        logger.error("State verification failed: %s", e)
         return False

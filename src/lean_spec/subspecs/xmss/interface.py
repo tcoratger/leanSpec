@@ -346,14 +346,6 @@ class GeneralizedXmssScheme(StrictBaseModel):
         boundary = (int(sk.left_bottom_tree_index) + 1) * leaves_per_bottom_tree
         bottom_tree = sk.left_bottom_tree if slot_int < boundary else sk.right_bottom_tree
 
-        # Ensure bottom tree exists
-        if bottom_tree is None:
-            raise ValueError(
-                f"Slot {slot} requires bottom tree but it is not available. "
-                f"Prepared interval may have been exceeded. Call advance_preparation() "
-                f"to slide the window forward."
-            )
-
         # Generate the combined authentication path
         path = combined_path(sk.top_tree, bottom_tree, slot)
 
@@ -410,7 +402,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         #
         # Return False instead of raising to avoid panic on invalid signatures.
         # The slot is attacker-controlled input.
-        if slot > self.config.LIFETIME:
+        if slot >= self.config.LIFETIME:
             return False
 
         # Re-encode the message using the randomness `rho` from the signature.

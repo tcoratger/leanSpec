@@ -50,7 +50,6 @@ __all__ = [
     # Configuration constants
     "MAX_BLOCKS_PER_REQUEST",
     "MAX_CONCURRENT_REQUESTS",
-    "REQUEST_TIMEOUT",
     "MAX_CACHED_BLOCKS",
     "MAX_BACKFILL_DEPTH",
 ]
@@ -67,7 +66,6 @@ from .config import (
     MAX_BLOCKS_PER_REQUEST,
     MAX_CACHED_BLOCKS,
     MAX_CONCURRENT_REQUESTS,
-    REQUEST_TIMEOUT,
 )
 from .head_sync import HeadSync, HeadSyncResult
 from .peer_manager import PeerManager, SyncPeer

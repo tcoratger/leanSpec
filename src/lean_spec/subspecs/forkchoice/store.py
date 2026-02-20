@@ -6,7 +6,6 @@ The Store tracks all information required for the LMD GHOST forkchoice algorithm
 
 __all__ = ["Store"]
 
-import copy
 from collections import defaultdict
 
 from lean_spec.subspecs.chain.clock import Interval
@@ -40,7 +39,6 @@ from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, Generaliz
 from lean_spec.types import (
     ZERO_HASH,
     Bytes32,
-    Uint64,
 )
 from lean_spec.types.container import Container
 
@@ -401,22 +399,17 @@ class Store(Container):
         ), "Signature verification failed"
 
         # Store signature and attestation data for later aggregation
-        new_commitee_sigs = dict(self.gossip_signatures)
+        new_committee_sigs = dict(self.gossip_signatures)
         new_attestation_data_by_root = dict(self.attestation_data_by_root)
         data_root = attestation_data.data_root_bytes()
 
         if is_aggregator:
             assert self.validator_id is not None, "Current validator ID must be set for aggregation"
-            current_validator_subnet = self.validator_id.compute_subnet_id(
-                ATTESTATION_COMMITTEE_COUNT
-            )
+            current_subnet = self.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
             attester_subnet = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-            if current_validator_subnet != attester_subnet:
-                # Not part of our committee; ignore for committee aggregation.
-                pass
-            else:
+            if current_subnet == attester_subnet:
                 sig_key = SignatureKey(validator_id, data_root)
-                new_commitee_sigs[sig_key] = signature
+                new_committee_sigs[sig_key] = signature
 
         # Store attestation data for later extraction
         new_attestation_data_by_root[data_root] = attestation_data
@@ -424,7 +417,7 @@ class Store(Container):
         # Return store with updated signature map and attestation data
         return self.model_copy(
             update={
-                "gossip_signatures": new_commitee_sigs,
+                "gossip_signatures": new_committee_sigs,
                 "attestation_data_by_root": new_attestation_data_by_root,
             }
         )
@@ -465,7 +458,7 @@ class Store(Container):
         # Ensure all participants exist in the active set
         validators = key_state.validators
         for validator_id in validator_ids:
-            assert validator_id < ValidatorIndex(len(validators)), (
+            assert validator_id.is_valid(len(validators)), (
                 f"Validator {validator_id} not found in state {data.target.root.hex()}"
             )
 
@@ -484,9 +477,10 @@ class Store(Container):
                 f"Committee aggregation signature verification failed: {exc}"
             ) from exc
 
-        # Copy the aggregated proof map for updates
-        # Must deep copy the lists to maintain immutability of previous store snapshots
-        new_aggregated_payloads = copy.deepcopy(self.latest_new_aggregated_payloads)
+        # Shallow-copy the dict and its list values to maintain immutability
+        new_aggregated_payloads = {
+            k: list(v) for k, v in self.latest_new_aggregated_payloads.items()
+        }
         data_root = data.data_root_bytes()
 
         # Store attestation data by root for later retrieval
@@ -577,20 +571,14 @@ class Store(Container):
         valid_signatures = signed_block_with_attestation.verify_signatures(parent_state, scheme)
 
         # Execute state transition function to compute post-block state
-        post_state = copy.deepcopy(parent_state).state_transition(block, valid_signatures)
+        post_state = parent_state.state_transition(block, valid_signatures)
 
-        # If post-state has a higher justified checkpoint, update it to the store.
-        latest_justified = (
-            post_state.latest_justified
-            if post_state.latest_justified.slot > self.latest_justified.slot
-            else self.latest_justified
+        # Propagate any checkpoint advances from the post-state.
+        latest_justified = max(
+            post_state.latest_justified, self.latest_justified, key=lambda c: c.slot
         )
-
-        # If post-state has a higher finalized checkpoint, update it to the store.
-        latest_finalized = (
-            post_state.latest_finalized
-            if post_state.latest_finalized.slot > self.latest_finalized.slot
-            else self.latest_finalized
+        latest_finalized = max(
+            post_state.latest_finalized, self.latest_finalized, key=lambda c: c.slot
         )
 
         # Create new store with the computed data.
@@ -612,11 +600,11 @@ class Store(Container):
         )
 
         # Copy the aggregated proof map for updates
-        # Must deep copy the lists to maintain immutability of previous store snapshots
+        # Shallow-copy the dict and its list values to maintain immutability
         # Block attestations go directly to "known" payloads (like is_from_block=True)
-        block_proofs: dict[SignatureKey, list[AggregatedSignatureProof]] = copy.deepcopy(
-            store.latest_known_aggregated_payloads
-        )
+        block_proofs: dict[SignatureKey, list[AggregatedSignatureProof]] = {
+            k: list(v) for k, v in store.latest_known_aggregated_payloads.items()
+        }
 
         # Store attestation data by root for later retrieval
         new_attestation_data_by_root = dict(store.attestation_data_by_root)
@@ -1040,14 +1028,9 @@ class Store(Container):
         )
 
         # Create list of aggregated attestations for broadcasting
-        new_aggregates: list[SignedAggregatedAttestation] = []
-        for aggregated_attestation, aggregated_signature in aggregated_results:
-            new_aggregates.append(
-                SignedAggregatedAttestation(
-                    data=aggregated_attestation.data,
-                    proof=aggregated_signature,
-                )
-            )
+        new_aggregates = [
+            SignedAggregatedAttestation(data=att.data, proof=sig) for att, sig in aggregated_results
+        ]
 
         # Compute new aggregated payloads
         new_gossip_sigs = dict(self.gossip_signatures)
@@ -1122,20 +1105,15 @@ class Store(Container):
         current_interval = store.time % INTERVALS_PER_SLOT
         new_aggregates: list[SignedAggregatedAttestation] = []
 
-        if current_interval == Uint64(0):
-            # Start of slot - process attestations if proposal exists
-            if has_proposal:
+        match int(current_interval):
+            case 0 if has_proposal:
                 store = store.accept_new_attestations()
-        elif current_interval == Uint64(2):
-            # Aggregation interval - aggregators create proofs
-            if is_aggregator:
+            case 2 if is_aggregator:
                 store, new_aggregates = store.aggregate_committee_signatures()
-        elif current_interval == Uint64(3):
-            # Fast confirm - update safe target based on received proofs
-            store = store.update_safe_target()
-        elif current_interval == Uint64(4):
-            # End of slot - accept accumulated attestations
-            store = store.accept_new_attestations()
+            case 3:
+                store = store.update_safe_target()
+            case 4:
+                store = store.accept_new_attestations()
 
         return store, new_aggregates
 
@@ -1384,22 +1362,18 @@ class Store(Container):
         # Locally produced blocks bypass normal block processing.
         # We must manually propagate any checkpoint advances.
         # Higher slots indicate more recent justified/finalized states.
-        latest_justified = (
-            final_post_state.latest_justified
-            if final_post_state.latest_justified.slot > store.latest_justified.slot
-            else store.latest_justified
+        latest_justified = max(
+            final_post_state.latest_justified, store.latest_justified, key=lambda c: c.slot
         )
-        latest_finalized = (
-            final_post_state.latest_finalized
-            if final_post_state.latest_finalized.slot > store.latest_finalized.slot
-            else store.latest_finalized
+        latest_finalized = max(
+            final_post_state.latest_finalized, store.latest_finalized, key=lambda c: c.slot
         )
 
         # Persist block and state immutably.
         new_store = store.model_copy(
             update={
-                "blocks": {**store.blocks, block_hash: final_block},
-                "states": {**store.states, block_hash: final_post_state},
+                "blocks": store.blocks | {block_hash: final_block},
+                "states": store.states | {block_hash: final_post_state},
                 "latest_justified": latest_justified,
                 "latest_finalized": latest_finalized,
             }

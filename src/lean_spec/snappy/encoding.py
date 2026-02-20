@@ -33,9 +33,7 @@ from .constants import (
     VARINT_DATA_MASK,
 )
 
-# ===========================================================================
 # Varint Encoding
-# ===========================================================================
 #
 # Varints encode integers using as few bytes as possible.
 #   - Small values use fewer bytes.
@@ -184,9 +182,7 @@ def decode_varint32(data: bytes, offset: int = 0) -> tuple[int, int]:
     return result, bytes_read
 
 
-# ===========================================================================
 # Tag Byte Encoding - Literals
-# ===========================================================================
 #
 # Literals are raw bytes that couldn't be compressed (no match found).
 # A literal tag tells the decoder: "copy the next N bytes as-is".
@@ -296,9 +292,7 @@ def encode_literal_tag(length: int) -> bytes:
         raise ValueError(f"Literal length too large: {length}")
 
 
-# ===========================================================================
 # Tag Byte Encoding - Copies
-# ===========================================================================
 #
 # Copies are backreferences to already-decompressed data.
 # A copy tag tells the decoder: "go back OFFSET bytes, copy LENGTH bytes".
@@ -540,9 +534,7 @@ def _encode_copy_4(length: int, offset: int) -> bytes:
     )
 
 
-# ===========================================================================
 # Tag Decoding
-# ===========================================================================
 #
 # Decoding is the inverse of encoding.
 # Given a compressed stream, we parse tags to reconstruct the original data.

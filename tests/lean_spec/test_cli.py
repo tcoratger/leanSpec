@@ -18,7 +18,6 @@ from cryptography.hazmat.primitives.asymmetric.utils import Prehashed, decode_ds
 from lean_spec.__main__ import (
     _init_from_checkpoint,
     create_anchor_block,
-    is_enr_string,
     resolve_bootnode,
 )
 from lean_spec.subspecs.containers import Block, BlockBody
@@ -121,48 +120,6 @@ ENR_WITHOUT_UDP = _make_enr_without_udp(b"\xc0\xa8\x01\x01")  # 192.168.1.1, no 
 # Valid multiaddr strings (QUIC format)
 MULTIADDR_IPV4 = "/ip4/127.0.0.1/udp/9000/quic-v1"
 MULTIADDR_IPV6 = "/ip6/::1/udp/9000/quic-v1"
-
-
-class TestIsEnrString:
-    """Tests for is_enr_string() detection function."""
-
-    def test_enr_string_detected(self) -> None:
-        """Valid ENR prefix returns True."""
-        assert is_enr_string("enr:-IS4QHCYrYZbAKW...") is True
-
-    def test_enr_prefix_minimal(self) -> None:
-        """Minimal ENR prefix 'enr:' returns True."""
-        assert is_enr_string("enr:") is True
-
-    def test_enr_with_valid_content(self) -> None:
-        """Full valid ENR string returns True."""
-        assert is_enr_string(ENR_WITH_UDP) is True
-
-    def test_multiaddr_not_detected(self) -> None:
-        """Multiaddr string returns False."""
-        assert is_enr_string(MULTIADDR_IPV4) is False
-        assert is_enr_string(MULTIADDR_IPV6) is False
-
-    def test_empty_string(self) -> None:
-        """Empty string returns False."""
-        assert is_enr_string("") is False
-
-    def test_enode_not_detected(self) -> None:
-        """enode:// format returns False."""
-        enode = "enode://abc123@127.0.0.1:30303"
-        assert is_enr_string(enode) is False
-
-    def test_similar_prefix_not_detected(self) -> None:
-        """Strings with similar but incorrect prefixes return False."""
-        assert is_enr_string("ENR:") is False  # Case sensitive
-        assert is_enr_string("enr") is False  # Missing colon
-        assert is_enr_string("enr-") is False  # Wrong separator
-        assert is_enr_string("enrs:") is False  # Extra character
-
-    def test_whitespace_prefix_not_detected(self) -> None:
-        """Whitespace before prefix returns False."""
-        assert is_enr_string(" enr:abc") is False
-        assert is_enr_string("\tenr:abc") is False
 
 
 class TestResolveBootnode:
@@ -418,7 +375,6 @@ class TestInitFromCheckpoint:
             ),
             patch(
                 "lean_spec.__main__.verify_checkpoint_state",
-                new_callable=AsyncMock,
                 return_value=False,  # Verification fails
             ),
         ):

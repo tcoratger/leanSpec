@@ -114,13 +114,6 @@ class Boolean(int, SSZType):
             raise SSZSerializationError(f"Boolean: expected 1 byte, got {len(data)}")
         return cls.decode_bytes(data)
 
-    def _raise_type_error(self, other: Any, op_symbol: str) -> None:
-        """Helper to raise a consistent TypeError for unsupported operations."""
-        raise TypeError(
-            f"Unsupported operand type(s) for {op_symbol}: "
-            f"'{type(self).__name__}' and '{type(other).__name__}'"
-        )
-
     def __add__(self, other: Any) -> Self:
         """Disable the addition operator (`+`)."""
         raise TypeError("Arithmetic operations are not supported for Boolean.")
@@ -140,7 +133,10 @@ class Boolean(int, SSZType):
     def __and__(self, other: Any) -> Self:
         """Handle the bitwise AND operator (`&`) strictly."""
         if not isinstance(other, type(self)):
-            self._raise_type_error(other, "&")
+            raise TypeError(
+                f"Unsupported operand type(s) for &: "
+                f"'{type(self).__name__}' and '{type(other).__name__}'"
+            )
         return type(self)(int(self) & int(other))
 
     def __rand__(self, other: Any) -> Self:
@@ -150,7 +146,10 @@ class Boolean(int, SSZType):
     def __or__(self, other: Any) -> Self:
         """Handle the bitwise OR operator (`|`) strictly."""
         if not isinstance(other, type(self)):
-            self._raise_type_error(other, "|")
+            raise TypeError(
+                f"Unsupported operand type(s) for |: "
+                f"'{type(self).__name__}' and '{type(other).__name__}'"
+            )
         return type(self)(int(self) | int(other))
 
     def __ror__(self, other: Any) -> Self:
@@ -160,7 +159,10 @@ class Boolean(int, SSZType):
     def __xor__(self, other: Any) -> Self:
         """Handle the bitwise XOR operator (`^`) strictly."""
         if not isinstance(other, type(self)):
-            self._raise_type_error(other, "^")
+            raise TypeError(
+                f"Unsupported operand type(s) for ^: "
+                f"'{type(self).__name__}' and '{type(other).__name__}'"
+            )
         return type(self)(int(self) ^ int(other))
 
     def __rxor__(self, other: Any) -> Self:
@@ -181,9 +183,8 @@ class Boolean(int, SSZType):
         """
         Handle the inequality operator (`!=`).
 
-        Allows comparison with native `bool` and `int` types (0 or 1).
-
-         It returns `True` for all other types.
+        Must be defined explicitly because `int.__ne__` would bypass
+        our custom `__eq__` type-checking logic.
         """
         return not self.__eq__(other)
 

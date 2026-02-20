@@ -55,7 +55,7 @@ REVALIDATION_INTERVAL_SECS = 300
 """Interval between node liveness revalidation (5 minutes)."""
 
 
-@dataclass
+@dataclass(slots=True)
 class LookupResult:
     """Result of a node lookup operation."""
 

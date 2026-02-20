@@ -22,7 +22,7 @@ class TestStateVerification:
 
     async def test_valid_state_passes_verification(self, genesis_state: State) -> None:
         """Valid state with validators passes verification checks."""
-        result = await verify_checkpoint_state(genesis_state)
+        result = verify_checkpoint_state(genesis_state)
         assert result is True
 
     async def test_state_without_validators_fails_verification(self, genesis_state: State) -> None:
@@ -40,7 +40,7 @@ class TestStateVerification:
             justifications_validators=genesis_state.justifications_validators,
         )
 
-        result = await verify_checkpoint_state(empty_state)
+        result = verify_checkpoint_state(empty_state)
         assert result is False
 
     async def test_state_exceeding_validator_limit_fails(self) -> None:
@@ -53,7 +53,7 @@ class TestStateVerification:
         mock_validators.__len__ = MagicMock(return_value=int(VALIDATOR_REGISTRY_LIMIT) + 1)
         mock_state.validators = mock_validators
 
-        result = await verify_checkpoint_state(mock_state)
+        result = verify_checkpoint_state(mock_state)
         assert result is False
 
 
@@ -73,7 +73,7 @@ class TestCheckpointSyncClientServerIntegration:
             assert state is not None
             assert state.slot == Slot(0)
 
-            is_valid = await verify_checkpoint_state(state)
+            is_valid = verify_checkpoint_state(state)
             assert is_valid is True
 
         finally:

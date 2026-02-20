@@ -40,7 +40,7 @@ async def handle_finalized(request: web.Request) -> web.Response:
     try:
         ssz_bytes = await asyncio.to_thread(state.encode_bytes)
     except Exception as e:
-        logger.error(f"Failed to encode state: {e}")
+        logger.error("Failed to encode state: %s", e)
         raise web.HTTPInternalServerError(reason="Encoding failed") from e
 
     return web.Response(body=ssz_bytes, content_type="application/octet-stream")

@@ -141,7 +141,7 @@ class ValidatorService:
                 and total_interval <= last_handled_total_interval
             )
             if already_handled:
-                await self._sleep_until_next_interval()
+                await self.clock.sleep_until_next_interval()
                 total_interval = self.clock.total_intervals()
 
             # Skip if we have no validators to manage.
@@ -585,16 +585,6 @@ class ValidatorService:
         self.registry.add(updated_entry)
 
         return updated_entry
-
-    async def _sleep_until_next_interval(self) -> None:
-        """
-        Sleep until the next interval boundary.
-
-        Uses the clock to calculate precise sleep duration.
-        """
-        sleep_time = self.clock.seconds_until_next_interval()
-        if sleep_time > 0:
-            await asyncio.sleep(sleep_time)
 
     def stop(self) -> None:
         """
