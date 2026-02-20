@@ -213,7 +213,7 @@ class TestIntervalSleep:
             captured_duration = duration
 
         with patch("asyncio.sleep", new=capture_sleep):
-            await service._sleep_until_next_interval()
+            await service.clock.sleep_until_next_interval()
 
         # Should sleep until next interval boundary
         expected = interval_seconds / 2
@@ -244,7 +244,7 @@ class TestIntervalSleep:
             captured_duration = duration
 
         with patch("asyncio.sleep", new=capture_sleep):
-            await service._sleep_until_next_interval()
+            await service.clock.sleep_until_next_interval()
 
         # Should sleep until genesis
         expected = float(genesis) - current_time  # 100 seconds

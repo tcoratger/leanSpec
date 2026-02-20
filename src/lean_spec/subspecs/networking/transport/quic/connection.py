@@ -21,6 +21,7 @@ References:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ssl
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -419,7 +420,9 @@ class QuicConnectionManager:
     _config: QuicConfiguration
     _connections: dict[PeerId, QuicConnection] = field(default_factory=dict)
     _temp_dir: Path | None = None
-    _context_managers: list = field(default_factory=list)
+    _context_managers: list[contextlib.AbstractAsyncContextManager[object]] = field(
+        default_factory=list
+    )
 
     @classmethod
     async def create(

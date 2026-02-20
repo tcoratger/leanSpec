@@ -437,10 +437,7 @@ class State(Container):
         start_slot = int(finalized_slot) + 1
         root_to_slot: dict[Bytes32, Slot] = {}
         for i in range(start_slot, len(self.historical_block_hashes)):
-            root = self.historical_block_hashes[i]
-            slot = Slot(i)
-            if root not in root_to_slot or slot > root_to_slot[root]:
-                root_to_slot[root] = slot
+            root_to_slot[self.historical_block_hashes[i]] = Slot(i)
 
         # Process each attestation independently.
         #
@@ -994,10 +991,5 @@ class State(Container):
                 )
                 remaining -= covered
 
-        # Final Assembly
-        if not results:
-            return [], []
-
         # Unzip the results into parallel lists.
-        aggregated_attestations, aggregated_proofs = zip(*results, strict=True)
-        return list(aggregated_attestations), list(aggregated_proofs)
+        return [att for att, _ in results], [proof for _, proof in results]

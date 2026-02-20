@@ -145,7 +145,7 @@ class TestIntervalTiming:
             captured_duration = duration
 
         with patch("asyncio.sleep", new=capture_sleep):
-            await chain_service._sleep_until_next_interval()
+            await chain_service.clock.sleep_until_next_interval()
 
         # Should sleep until next interval boundary.
         expected = float(genesis) + interval_secs - current_time
@@ -172,7 +172,7 @@ class TestIntervalTiming:
             captured_duration = duration
 
         with patch("asyncio.sleep", new=capture_sleep):
-            await chain_service._sleep_until_next_interval()
+            await chain_service.clock.sleep_until_next_interval()
 
         # At boundary, next boundary is one full interval away.
         expected = float(MILLISECONDS_PER_INTERVAL) / 1000.0
@@ -198,7 +198,7 @@ class TestIntervalTiming:
             captured_duration = duration
 
         with patch("asyncio.sleep", new=capture_sleep):
-            await chain_service._sleep_until_next_interval()
+            await chain_service.clock.sleep_until_next_interval()
 
         # Should sleep until genesis.
         expected = float(genesis) - current_time

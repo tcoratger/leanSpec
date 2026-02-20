@@ -61,18 +61,6 @@ GOSSIP_FORK_DIGEST = "devnet0"
 logger = logging.getLogger(__name__)
 
 
-def is_enr_string(bootnode: str) -> bool:
-    """
-    Check if bootnode string is an ENR (vs multiaddr).
-
-    Uses prefix detection rather than attempting full parsing.
-    This is both faster and avoids import overhead for simple checks.
-
-    Per EIP-778, all ENR strings begin with "enr:" followed by base64url content.
-    """
-    return bootnode.startswith("enr:")
-
-
 def resolve_bootnode(bootnode: str) -> str:
     """
     Resolve a bootnode string to a multiaddr.
@@ -92,7 +80,7 @@ def resolve_bootnode(bootnode: str) -> str:
     Raises:
         ValueError: If ENR is malformed or has no UDP connection info.
     """
-    if is_enr_string(bootnode):
+    if bootnode.startswith("enr:"):
         enr = ENR.from_string(bootnode)
 
         # Verify structural validity (correct scheme, public key present).
@@ -254,7 +242,7 @@ async def _init_from_checkpoint(
         #
         # This is defense in depth. We trust the source, but still verify
         # basic invariants before using the state.
-        if not await verify_checkpoint_state(state):
+        if not verify_checkpoint_state(state):
             logger.error("Checkpoint state verification failed")
             return None
 
@@ -675,14 +663,14 @@ def main() -> None:
     try:
         asyncio.run(
             run_node(
-                args.genesis,
-                args.bootnodes,
-                args.listen,
-                args.checkpoint_sync_url,
-                args.validator_keys,
-                args.node_id,
-                args.genesis_time_now,
-                args.is_aggregator,
+                genesis_path=args.genesis,
+                bootnodes=args.bootnodes,
+                listen_addr=args.listen,
+                checkpoint_sync_url=args.checkpoint_sync_url,
+                validator_keys_path=args.validator_keys,
+                node_id=args.node_id,
+                genesis_time_now=args.genesis_time_now,
+                is_aggregator=args.is_aggregator,
             )
         )
     except KeyboardInterrupt:

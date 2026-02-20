@@ -181,16 +181,8 @@ class ValidatorRegistry:
         """
         return self._validators.get(index)
 
-    def has(self, index: ValidatorIndex) -> bool:
-        """
-        Check if we control this validator.
-
-        Args:
-            index: Validator index to check.
-
-        Returns:
-            True if we have keys for this validator.
-        """
+    def __contains__(self, index: ValidatorIndex) -> bool:
+        """Check if we control this validator."""
         return index in self._validators
 
     def indices(self) -> ValidatorIndices:

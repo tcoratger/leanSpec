@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.containers import Block, Checkpoint, State, ValidatorIndex
 from lean_spec.subspecs.containers.attestation import AttestationData
@@ -30,9 +29,6 @@ from .namespaces import (
     SLOT_INDEX,
     STATES,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 class SQLiteDatabase:
@@ -376,7 +372,7 @@ class SQLiteDatabase:
     # Slot Index Operations
 
     #
-    # Slots are time intervals (12 seconds each).
+    # Slots are time intervals.
     # This index maps slot numbers to blocks, enabling historical queries.
     # Note: not every slot has a block (missed slots happen).
 

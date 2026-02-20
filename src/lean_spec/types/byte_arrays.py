@@ -39,8 +39,7 @@ def _coerce_to_bytes(value: Any) -> bytes:
     if isinstance(value, Iterable):
         # bytes(bytearray(iterable)) enforces each element is an int in 0..255
         return bytes(bytearray(value))
-    # Fall back to Python's bytes() constructor (will raise if unsupported)
-    return bytes(value)
+    raise TypeError(f"Cannot coerce {type(value).__name__} to bytes")
 
 
 class BaseBytes(bytes, SSZType):
@@ -52,6 +51,8 @@ class BaseBytes(bytes, SSZType):
 
     Instances are immutable byte objects with strict length checking.
     """
+
+    __slots__ = ()
 
     LENGTH: ClassVar[int]
     """The exact number of bytes (overridden by subclasses)."""

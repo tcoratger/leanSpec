@@ -80,7 +80,7 @@ class Fp(SSZType):
         Raises:
             TypeError: If value is not an integer.
         """
-        if not isinstance(value, int):
+        if not isinstance(value, int) or isinstance(value, bool):
             raise TypeError(f"Field value must be an integer, got {type(value).__name__}")
 
         # Normalize to [0, P) - handles negative values correctly
@@ -98,9 +98,8 @@ class Fp(SSZType):
 
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize the field element to a binary stream."""
-        data = self.value.to_bytes(P_BYTES, byteorder="little")
-        stream.write(data)
-        return len(data)
+        stream.write(self.value.to_bytes(P_BYTES, byteorder="little"))
+        return P_BYTES
 
     @classmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:

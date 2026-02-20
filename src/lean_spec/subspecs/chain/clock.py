@@ -8,6 +8,7 @@ model used by consensus. Every node must agree on slot boundaries to
 coordinate block proposals and attestations.
 """
 
+import asyncio
 from dataclasses import dataclass
 from time import time as wall_time
 from typing import Callable
@@ -94,3 +95,9 @@ class SlotClock:
         # Time until next boundary (may be 0 if exactly at boundary).
         ms_until_next = int(MILLISECONDS_PER_INTERVAL) - time_into_interval_ms
         return ms_until_next / 1000.0
+
+    async def sleep_until_next_interval(self) -> None:
+        """Sleep until the next interval boundary."""
+        sleep_time = self.seconds_until_next_interval()
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)

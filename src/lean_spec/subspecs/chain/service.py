@@ -104,7 +104,7 @@ class ChainService:
                 and total_interval <= last_handled_total_interval
             )
             if already_handled:
-                await self._sleep_until_next_interval()
+                await self.clock.sleep_until_next_interval()
                 # Check if stopped during sleep.
                 if not self._running:
                     break
@@ -213,17 +213,6 @@ class ChainService:
             return target_interval
 
         return None
-
-    async def _sleep_until_next_interval(self) -> None:
-        """
-        Sleep until the next interval boundary.
-
-        Uses the clock to calculate precise sleep duration, ensuring tick
-        timing is aligned with network consensus expectations.
-        """
-        sleep_time = self.clock.seconds_until_next_interval()
-        if sleep_time > 0:
-            await asyncio.sleep(sleep_time)
 
     def stop(self) -> None:
         """

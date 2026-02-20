@@ -118,5 +118,5 @@ class SSZModel(StrictBaseModel, SSZType):
         data: Sequence[Any] | None = getattr(self, "data", None)
         if data is not None:
             return f"{self.__class__.__name__}(data={list(data)!r})"
-        field_strs = [f"{name}={getattr(self, name)!r}" for name in type(self).model_fields.keys()]
+        field_strs = [f"{name}={getattr(self, name)!r}" for name in type(self).model_fields]
         return f"{self.__class__.__name__}({' '.join(field_strs)})"

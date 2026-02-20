@@ -291,9 +291,9 @@ class GossipHandler:
         # This prevents wasting CPU on malformed or cross-fork messages.
         try:
             topic = GossipTopic.from_string_validated(topic_str, self.fork_digest)
-        except (ValueError, ForkMismatchError) as e:
-            if isinstance(e, ForkMismatchError):
-                raise
+        except ForkMismatchError:
+            raise
+        except ValueError as e:
             raise GossipMessageError(f"Invalid topic: {e}") from e
 
         # Step 2: Decompress Snappy-framed data.
@@ -346,9 +346,9 @@ class GossipHandler:
         """
         try:
             return GossipTopic.from_string_validated(topic_str, self.fork_digest)
-        except (ValueError, ForkMismatchError) as e:
-            if isinstance(e, ForkMismatchError):
-                raise
+        except ForkMismatchError:
+            raise
+        except ValueError as e:
             raise GossipMessageError(f"Invalid topic: {e}") from e
 
 
