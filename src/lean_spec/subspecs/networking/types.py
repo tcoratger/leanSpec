@@ -73,37 +73,3 @@ class ConnectionState(IntEnum):
 
     DISCONNECTING = auto()
     """Graceful shutdown in progress (Goodbye sent/received)."""
-
-
-class GoodbyeReason(IntEnum):
-    """
-    Reason codes for the Goodbye request/response message.
-
-    Sent when gracefully disconnecting from a peer to indicate why
-    the connection is being closed.
-
-    **Official codes (from spec):**
-
-    +------+---------------------+
-    | Code | Meaning             |
-    +======+=====================+
-    | 1    | Client shutdown     |
-    +------+---------------------+
-    | 2    | Irrelevant network  |
-    +------+---------------------+
-    | 3    | Fault/error         |
-    +------+---------------------+
-
-    References:
-    -----------
-    - Goodbye spec: https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md#goodbye-v1
-    """
-
-    CLIENT_SHUTDOWN = 1
-    """Node is shutting down normally."""
-
-    IRRELEVANT_NETWORK = 2
-    """Peer is on a different fork or network."""
-
-    FAULT_OR_ERROR = 3
-    """Generic error detected in peer communication."""

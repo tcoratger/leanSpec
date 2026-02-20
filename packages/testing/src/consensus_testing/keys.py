@@ -289,10 +289,6 @@ class XmssKeyManager:
         """Get a validator's public key."""
         return self[idx].public
 
-    def get_all_public_keys(self) -> dict[ValidatorIndex, PublicKey]:
-        """Get all public keys (from base keys, not advanced state)."""
-        return {idx: kp.public for idx, kp in self.keys.items()}
-
     def sign_attestation_data(
         self,
         validator_id: ValidatorIndex,

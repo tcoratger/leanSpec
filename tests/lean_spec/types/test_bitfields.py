@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 from pydantic import BaseModel, ValidationError
-from typing_extensions import Tuple
 
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean
@@ -218,7 +217,7 @@ class TestBitfieldSerialization:
         ],
     )
     def test_bitvector_serialization_deserialization(
-        self, length: int, value: Tuple[bool, ...], expected_hex: str
+        self, length: int, value: tuple[bool, ...], expected_hex: str
     ) -> None:
         """Tests the round trip of serializing and deserializing for Bitvector."""
 
@@ -247,7 +246,7 @@ class TestBitfieldSerialization:
         ],
     )
     def test_bitlist_serialization_deserialization(
-        self, limit: int, value: Tuple[bool, ...], expected_hex: str
+        self, limit: int, value: tuple[bool, ...], expected_hex: str
     ) -> None:
         """Tests the round trip of serializing and deserializing for Bitlist."""
 
@@ -339,7 +338,7 @@ class TestBitfieldSSZ:
         ],
     )
     def test_bitvector_encode_decode(
-        self, length: int, value: Tuple[int, ...], expected_hex: str
+        self, length: int, value: tuple[int, ...], expected_hex: str
     ) -> None:
         class TestBitvector(BaseBitvector):
             LENGTH = length
@@ -375,7 +374,7 @@ class TestBitfieldSSZ:
         ],
     )
     def test_bitlist_encode_decode(
-        self, limit: int, value: Tuple[int, ...], expected_hex: str
+        self, limit: int, value: tuple[int, ...], expected_hex: str
     ) -> None:
         class TestBitlist(BaseBitlist):
             LIMIT = limit

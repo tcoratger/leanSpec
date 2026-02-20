@@ -197,17 +197,6 @@ class MeshState:
         mesh = self._meshes.pop(topic, None)
         return mesh.peers if mesh else set()
 
-    def is_subscribed(self, topic: TopicId) -> bool:
-        """Check if subscribed to a topic.
-
-        Args:
-            topic: Topic identifier to check.
-
-        Returns:
-            True if subscribed.
-        """
-        return topic in self._subscriptions
-
     def get_mesh_peers(self, topic: TopicId) -> set[PeerId]:
         """Get mesh peers for a topic.
 

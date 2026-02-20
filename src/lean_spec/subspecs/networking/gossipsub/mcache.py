@@ -236,10 +236,6 @@ class MessageCache:
         """Return the total number of cached messages."""
         return len(self._by_id)
 
-    def __contains__(self, msg_id: MessageId) -> bool:
-        """Check if a message ID is in the cache."""
-        return msg_id in self._by_id
-
 
 @dataclass(slots=True)
 class SeenCache:
@@ -328,7 +324,3 @@ class SeenCache:
     def __len__(self) -> int:
         """Return the number of seen message IDs."""
         return len(self._timestamps)
-
-    def __contains__(self, msg_id: MessageId) -> bool:
-        """Check if a message ID has been seen."""
-        return msg_id in self._timestamps

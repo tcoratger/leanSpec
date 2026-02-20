@@ -43,12 +43,10 @@ from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import PublicKey, Signature
+from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.types import (
     HashDigestList,
-    HashDigestVector,
     HashTreeOpening,
-    Parameter,
     Randomness,
 )
 from lean_spec.types import Bytes32, Bytes52, Uint64
@@ -59,18 +57,6 @@ from .mocks import MockForkchoiceStore, MockNetworkRequester
 def make_bytes32(seed: int) -> Bytes32:
     """Create a deterministic 32-byte value from a seed."""
     return Bytes32(bytes([seed % 256]) * 32)
-
-
-def make_public_key_bytes(seed: int) -> bytes:
-    """
-    Encode a deterministic XMSS public key.
-
-    Constructs valid root and parameter vectors seeded by the input.
-    """
-    root = HashDigestVector(data=[Fp(seed + i) for i in range(HashDigestVector.LENGTH)])
-    parameter = Parameter(data=[Fp(seed + 100 + i) for i in range(Parameter.LENGTH)])
-    public_key = PublicKey(root=root, parameter=parameter)
-    return public_key.encode_bytes()
 
 
 def make_mock_signature() -> Signature:
@@ -86,20 +72,6 @@ def make_mock_signature() -> Signature:
     )
 
 
-def make_signature(seed: int) -> Signature:
-    """
-    Create a deterministic XMSS signature from a seed.
-
-    Produces unique randomness values based on the seed.
-    """
-    randomness = Randomness(data=[Fp(seed + 200 + i) for i in range(Randomness.LENGTH)])
-    return Signature(
-        path=HashTreeOpening(siblings=HashDigestList(data=[])),
-        rho=randomness,
-        hashes=HashDigestList(data=[]),
-    )
-
-
 def make_validators(count: int) -> Validators:
     """
     Build a validator registry with null public keys.
@@ -108,19 +80,6 @@ def make_validators(count: int) -> Validators:
     """
     validators = [
         Validator(pubkey=Bytes52(b"\x00" * 52), index=ValidatorIndex(i)) for i in range(count)
-    ]
-    return Validators(data=validators)
-
-
-def make_validators_with_keys(count: int) -> Validators:
-    """
-    Build a validator registry with deterministic XMSS public keys.
-
-    Each validator gets a unique key derived from their index.
-    """
-    validators = [
-        Validator(pubkey=Bytes52(make_public_key_bytes(i)), index=ValidatorIndex(i))
-        for i in range(count)
     ]
     return Validators(data=validators)
 

@@ -42,7 +42,6 @@ from .topic import (
     ForkMismatchError,
     GossipTopic,
     TopicKind,
-    format_topic_string,
     parse_topic_string,
 )
 from .types import (
@@ -59,7 +58,6 @@ __all__ = [
     # Topic (commonly needed for Ethereum)
     "GossipTopic",
     "TopicKind",
-    "format_topic_string",
     "parse_topic_string",
     "ForkMismatchError",
     # Types

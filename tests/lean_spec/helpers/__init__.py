@@ -21,8 +21,6 @@ from .builders import (
     make_genesis_state,
     make_keyed_genesis_state,
     make_mock_signature,
-    make_public_key_bytes,
-    make_signature,
     make_signed_attestation,
     make_signed_block,
     make_signed_block_from_store,
@@ -33,9 +31,8 @@ from .builders import (
     make_test_status,
     make_validators,
     make_validators_from_key_manager,
-    make_validators_with_keys,
 )
-from .mocks import MockEventSource, MockForkchoiceStore, MockNetworkRequester, MockNoiseSession
+from .mocks import MockEventSource, MockForkchoiceStore, MockNetworkRequester
 
 TEST_VALIDATOR_ID = ValidatorIndex(0)
 
@@ -58,8 +55,6 @@ __all__ = [
     "make_genesis_state",
     "make_keyed_genesis_state",
     "make_mock_signature",
-    "make_public_key_bytes",
-    "make_signature",
     "make_signed_attestation",
     "make_signed_block",
     "make_signed_block_from_store",
@@ -70,12 +65,10 @@ __all__ = [
     "make_test_status",
     "make_validators",
     "make_validators_from_key_manager",
-    "make_validators_with_keys",
     # Mocks
     "MockEventSource",
     "MockForkchoiceStore",
     "MockNetworkRequester",
-    "MockNoiseSession",
     # Constants
     "TEST_VALIDATOR_ID",
 ]

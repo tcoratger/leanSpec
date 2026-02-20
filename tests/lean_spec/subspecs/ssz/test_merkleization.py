@@ -7,7 +7,6 @@ import pytest
 from lean_spec.subspecs.ssz.merkleization import (
     _zero_tree_root,
     merkleize,
-    merkleize_progressive,
     mix_in_length,
     mix_in_selector,
 )
@@ -150,43 +149,3 @@ def test_zero_tree_root_internal() -> None:
     assert _zero_tree_root(4) == Z[2]
     assert _zero_tree_root(8) == Z[3]
     assert _zero_tree_root(16) == Z[4]
-
-
-def test_merkleize_progressive_empty() -> None:
-    """Tests progressive merkleization of an empty list."""
-    assert merkleize_progressive([]) == ZERO_HASH
-
-
-def test_merkleize_progressive_single_chunk() -> None:
-    """Tests progressive merkleization of a single chunk."""
-    # right = merkleize([c[0]], 1) -> c[0]
-    # left = ZERO_HASH
-    expected = h(ZERO_HASH, c[0])
-    assert merkleize_progressive([c[0]], num_leaves=1) == expected
-
-
-def test_merkleize_progressive_five_chunks() -> None:
-    """
-    Tests progressive merkleization with multiple recursive steps.
-    Calculates the expected root manually by tracing the spec's logic.
-    """
-    chunks = c[0:5]
-
-    # Manually trace the recursion for `merkleize_progressive(chunks, 1)`:
-    # Step 1 (num_leaves=1):
-    # right1 = merkleize([c0], 1) -> c0
-    # left1 = merkleize_progressive([c1, c2, c3, c4], 4)
-    #
-    #   To calculate left1, recurse...
-    #   Step 2 (num_leaves=4):
-    #   right2 = merkleize([c1, c2, c3, c4], 4) -> h(h(c1,c2), h(c3,c4))
-    #   left2 = ZERO_HASH (no more chunks)
-    #   So, left1 = h(left2, right2) = h(Z[0], right2)
-    #
-    # Final result is h(left1, right1)
-    right2 = h(h(c[1], c[2]), h(c[3], c[4]))
-    left1 = h(Z[0], right2)
-    right1 = c[0]
-    expected = h(left1, right1)
-
-    assert merkleize_progressive(chunks, num_leaves=1) == expected

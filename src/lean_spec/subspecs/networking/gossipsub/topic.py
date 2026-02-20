@@ -170,14 +170,6 @@ class GossipTopic:
             topic_name = str(self.kind)
         return f"/{TOPIC_PREFIX}/{self.fork_digest}/{topic_name}/{ENCODING_POSTFIX}"
 
-    def __bytes__(self) -> bytes:
-        """Return the topic string as UTF-8 bytes.
-
-        Returns:
-            Topic string encoded as bytes.
-        """
-        return str(self).encode("utf-8")
-
     def validate_fork(self, expected_fork_digest: str) -> None:
         """
         Validate that the topic's fork_digest matches expected.
@@ -190,18 +182,6 @@ class GossipTopic:
         """
         if self.fork_digest != expected_fork_digest:
             raise ForkMismatchError(expected_fork_digest, self.fork_digest)
-
-    def is_fork_compatible(self, expected_fork_digest: str) -> bool:
-        """
-        Check if this topic is compatible with the expected fork.
-
-        Args:
-            expected_fork_digest: Expected fork digest (0x-prefixed hex).
-
-        Returns:
-            True if fork_digest matches, False otherwise.
-        """
-        return self.fork_digest == expected_fork_digest
 
     @classmethod
     def from_string(cls, topic_str: str) -> GossipTopic:
@@ -303,29 +283,6 @@ class GossipTopic:
             GossipTopic for attestation subnet messages.
         """
         return cls(kind=TopicKind.ATTESTATION_SUBNET, fork_digest=fork_digest, subnet_id=subnet_id)
-
-
-def format_topic_string(
-    topic_name: str,
-    fork_digest: str,
-    prefix: str = TOPIC_PREFIX,
-    encoding: str = ENCODING_POSTFIX,
-) -> str:
-    """Format a complete gossip topic string.
-
-    Low-level function for constructing topic strings.
-    Prefer the dataclass representation for most use cases.
-
-    Args:
-        topic_name: Message type (e.g., "block", "attestation").
-        fork_digest: Fork digest as 0x-prefixed hex string.
-        prefix: Network prefix (defaults to TOPIC_PREFIX).
-        encoding: Encoding suffix (defaults to ENCODING_POSTFIX).
-
-    Returns:
-        Formatted topic string.
-    """
-    return f"/{prefix}/{fork_digest}/{topic_name}/{encoding}"
 
 
 def parse_topic_string(topic_str: str) -> tuple[str, str, str, str]:

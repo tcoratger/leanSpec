@@ -1,10 +1,9 @@
 """Tests for the SSZVector and List types."""
 
-from typing import Any, Tuple
+from typing import Any
 
 import pytest
 from pydantic import BaseModel, ValidationError
-from typing_extensions import Type
 
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.types.boolean import Boolean
@@ -352,7 +351,7 @@ class TestSSZVectorSerialization:
         ],
     )
     def test_fixed_size_element_vector_serialization(
-        self, vector_type: Type[SSZVector], value: Tuple[Any, ...], expected_hex: str
+        self, vector_type: type[SSZVector], value: tuple[Any, ...], expected_hex: str
     ) -> None:
         """Tests the serialization of vectors with fixed-size elements."""
         instance = vector_type(data=value)
@@ -423,7 +422,7 @@ class TestSSZListSerialization:
         ],
     )
     def test_fixed_size_element_list_serialization(
-        self, list_type: Type[SSZList], value: Tuple[Any, ...], expected_hex: str
+        self, list_type: type[SSZList], value: tuple[Any, ...], expected_hex: str
     ) -> None:
         """Tests the serialization of lists with fixed-size elements."""
         instance = list_type(data=value)
