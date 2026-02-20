@@ -25,7 +25,7 @@ from lean_spec.subspecs.networking.enr.enr import ENR_PREFIX
 from lean_spec.subspecs.networking.types import SeqNumber
 from lean_spec.types import Bytes64, SSZValueError, Uint64
 from lean_spec.types.byte_arrays import Bytes4
-from lean_spec.types.rlp import encode_rlp
+from lean_spec.types.rlp import RLPItem, encode_rlp
 
 # From: https://eips.ethereum.org/EIPS/eip-778
 #
@@ -1218,7 +1218,7 @@ class TestSignatureVerification:
         )
 
         # Create content (keys must be sorted).
-        content_items: list[bytes] = [
+        content_items: list[RLPItem] = [
             b"\x01",
             b"id",
             b"v4",

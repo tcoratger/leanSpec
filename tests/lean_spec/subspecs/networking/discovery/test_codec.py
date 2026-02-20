@@ -8,7 +8,6 @@ from lean_spec.subspecs.networking.discovery.codec import (
     _decode_request_id,
     decode_message,
     encode_message,
-    generate_request_id,
 )
 from lean_spec.subspecs.networking.discovery.messages import (
     Distance,
@@ -337,13 +336,13 @@ class TestRequestIdGeneration:
 
     def test_generates_8_byte_id(self):
         """Test that generated request ID is 8 bytes."""
-        request_id = generate_request_id()
+        request_id = RequestId.generate()
         assert len(request_id) == 8
 
     def test_generates_different_ids(self):
         """Test that each generation produces a different ID."""
-        id1 = generate_request_id()
-        id2 = generate_request_id()
+        id1 = RequestId.generate()
+        id2 = RequestId.generate()
         assert id1 != id2
 
 

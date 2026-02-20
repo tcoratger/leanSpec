@@ -24,8 +24,8 @@ class BaseUint(int, SSZType):
         Create and validate a new Uint instance.
 
         Raises:
-            SSZTypeCoercionError: If `value` is not an int (rejects bool, string, float).
-            SSZOverflowError: If `value` is outside the allowed range [0, 2**BITS - 1].
+            SSZTypeError: If `value` is not an int (rejects bool, string, float).
+            SSZValueError: If `value` is outside the allowed range [0, 2**BITS - 1].
         """
         # We should accept only ints.
         if not isinstance(value, int) or isinstance(value, bool):

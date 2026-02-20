@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from typing import Final
 
 from Crypto.Hash import keccak
 
@@ -34,10 +35,10 @@ from lean_spec.types import Bytes16, Bytes32, Bytes33, Bytes65
 
 from .crypto import ecdh_agree, pubkey_to_uncompressed
 
-DISCV5_KEY_AGREEMENT_INFO = b"discovery v5 key agreement"
+DISCV5_KEY_AGREEMENT_INFO: Final = b"discovery v5 key agreement"
 """Info string used in HKDF expansion for Discovery v5 key derivation."""
 
-SESSION_KEY_SIZE = 16
+SESSION_KEY_SIZE: Final = 16
 """Size of each session key in bytes (AES-128)."""
 
 

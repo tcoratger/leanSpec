@@ -32,7 +32,6 @@ from .codec import (
     MessageDecodingError,
     decode_message,
     encode_message,
-    generate_request_id,
 )
 from .config import DiscoveryConfig
 from .handshake import HandshakeError, HandshakeManager
@@ -45,6 +44,7 @@ from .messages import (
     Ping,
     Pong,
     Port,
+    RequestId,
     TalkReq,
     TalkResp,
 )
@@ -58,7 +58,6 @@ from .packet import (
     encode_message_authdata,
     encode_packet,
     encode_static_header,
-    generate_nonce,
 )
 from .session import SessionCache
 
@@ -300,7 +299,7 @@ class DiscoveryTransport:
         Returns:
             PONG response or None on timeout.
         """
-        request_id = generate_request_id()
+        request_id = RequestId.generate()
         ping = Ping(
             request_id=request_id,
             enr_seq=SeqNumber(self._local_enr.seq),
@@ -332,7 +331,7 @@ class DiscoveryTransport:
         Returns:
             List of RLP-encoded ENRs from all NODES responses.
         """
-        request_id = generate_request_id()
+        request_id = RequestId.generate()
         findnode = FindNode(
             request_id=request_id,
             distances=[Distance(d) for d in distances],
@@ -376,7 +375,7 @@ class DiscoveryTransport:
         self._node_addresses[dest_node_id] = dest_addr
 
         # Build and send packet.
-        nonce = generate_nonce()
+        nonce = Nonce.generate()
         message_bytes = encode_message(message)
         packet = self._build_message_packet(dest_node_id, dest_addr, nonce, message_bytes)
 
@@ -455,7 +454,7 @@ class DiscoveryTransport:
         Returns:
             Response payload or None on timeout/error.
         """
-        request_id = generate_request_id()
+        request_id = RequestId.generate()
         talkreq = TalkReq(
             request_id=request_id,
             protocol=protocol,
@@ -485,7 +484,7 @@ class DiscoveryTransport:
         self._node_addresses[dest_node_id] = dest_addr
 
         # Build and send packet.
-        nonce = generate_nonce()
+        nonce = Nonce.generate()
         message_bytes = encode_message(message)
         packet = self._build_message_packet(dest_node_id, dest_addr, nonce, message_bytes)
 
@@ -680,7 +679,7 @@ class DiscoveryTransport:
             # and our original message (encrypted). This completes the
             # handshake and delivers the message in one round trip.
             message_bytes = encode_message(pending.message)
-            nonce = generate_nonce()
+            nonce = Nonce.generate()
 
             packet = encode_packet(
                 dest_node_id=remote_node_id,
@@ -886,7 +885,7 @@ class DiscoveryTransport:
             return False
 
         # Encode and encrypt the response.
-        nonce = generate_nonce()
+        nonce = Nonce.generate()
         message_bytes = encode_message(message)
         authdata = encode_message_authdata(self._local_node_id)
 

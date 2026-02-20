@@ -16,21 +16,22 @@ References:
 
 from __future__ import annotations
 
+import os
 from enum import IntEnum
-from typing import ClassVar
+from typing import ClassVar, Final, Self
 
 from lean_spec.subspecs.networking.types import SeqNumber
 from lean_spec.types import StrictBaseModel
 from lean_spec.types.byte_arrays import BaseByteList, BaseBytes
 from lean_spec.types.uint import Uint8, Uint16
 
-PROTOCOL_ID: bytes = b"discv5"
+PROTOCOL_ID: Final[bytes] = b"discv5"
 """Protocol identifier in packet header. 6 bytes."""
 
-PROTOCOL_VERSION: int = 0x0001
+PROTOCOL_VERSION: Final[int] = 0x0001
 """Current protocol version (v5.1)."""
 
-MAX_REQUEST_ID_LENGTH: int = 8
+MAX_REQUEST_ID_LENGTH: Final[int] = 8
 """Maximum length of request-id in bytes."""
 
 
@@ -43,6 +44,11 @@ class RequestId(BaseByteList):
     """
 
     LIMIT: ClassVar[int] = MAX_REQUEST_ID_LENGTH
+
+    @classmethod
+    def generate(cls) -> Self:
+        """Generate a random request ID."""
+        return cls(data=os.urandom(8))
 
 
 class IPv4(BaseBytes):
@@ -66,6 +72,11 @@ class IdNonce(BaseBytes):
 
     LENGTH: ClassVar[int] = 16
 
+    @classmethod
+    def generate(cls) -> Self:
+        """Generate a random 16-byte identity challenge nonce."""
+        return cls(os.urandom(16))
+
 
 class Nonce(BaseBytes):
     """
@@ -75,6 +86,11 @@ class Nonce(BaseBytes):
     """
 
     LENGTH: ClassVar[int] = 12
+
+    @classmethod
+    def generate(cls) -> Self:
+        """Generate a random 12-byte message nonce."""
+        return cls(os.urandom(cls.LENGTH))
 
 
 class Distance(Uint16):

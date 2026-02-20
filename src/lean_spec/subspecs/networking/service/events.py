@@ -129,7 +129,7 @@ class PeerDisconnectedEvent:
     """Peer that disconnected."""
 
 
-NetworkEvent = (
+type NetworkEvent = (
     GossipBlockEvent
     | GossipAttestationEvent
     | GossipAggregatedAttestationEvent

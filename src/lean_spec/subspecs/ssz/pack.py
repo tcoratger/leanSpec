@@ -6,7 +6,7 @@ Does not serialize objects; only arranges bytes into chunks per SSZ rules.
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from lean_spec.subspecs.ssz.constants import BITS_PER_BYTE, BYTES_PER_CHUNK
 from lean_spec.types.byte_arrays import Bytes32

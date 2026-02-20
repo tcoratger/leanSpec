@@ -37,7 +37,7 @@ from lean_spec.subspecs.xmss import SecretKey
 
 logger = logging.getLogger(__name__)
 
-NodeValidatorMapping = dict[str, list[int]]
+type NodeValidatorMapping = dict[str, list[int]]
 """Mapping from node identifier to list of validator indices."""
 
 

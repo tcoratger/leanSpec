@@ -1,18 +1,16 @@
 """Networking Configuration Constants."""
 
+from __future__ import annotations
+
 from typing import Final
 
 from .types import DomainType
-
-# --- Request/Response Limits ---
 
 MAX_REQUEST_BLOCKS: Final[int] = 2**10
 """Maximum number of blocks in a single request (1024)."""
 
 MAX_PAYLOAD_SIZE: Final[int] = 10 * 1024 * 1024
 """Maximum uncompressed payload size in bytes (10 MiB)."""
-
-# --- Timeouts (in seconds) ---
 
 TTFB_TIMEOUT: Final[float] = 5.0
 """Time-to-first-byte timeout.
@@ -28,8 +26,6 @@ Maximum total time to receive a complete response. This covers the entire
 response, including all chunks for multi-part responses like BlocksByRange.
 """
 
-# --- Gossip Message Domains ---
-
 MESSAGE_DOMAIN_INVALID_SNAPPY: Final[DomainType] = DomainType(b"\x00")
 """1-byte domain for gossip message-id isolation of invalid snappy messages.
 
@@ -41,8 +37,6 @@ MESSAGE_DOMAIN_VALID_SNAPPY: Final[DomainType] = DomainType(b"\x01")
 
 Per Ethereum spec, prepended to the message hash when decompression succeeds.
 """
-
-# --- Gossipsub Protocol IDs ---
 
 GOSSIPSUB_PROTOCOL_ID_V11: Final[str] = "/meshsub/1.1.0"
 """Gossipsub v1.1 protocol ID - peer scoring, extended validators.
@@ -60,8 +54,6 @@ Default protocol ID per Ethereum consensus spec requirements.
 The Ethereum consensus P2P spec states:
 "Clients MUST support the gossipsub v1 libp2p Protocol including the gossipsub v1.1 extension."
 """
-
-# --- Gossipsub Parameters ---
 
 PRUNE_BACKOFF: Final[int] = 60
 """Default PRUNE backoff duration in seconds.

@@ -23,6 +23,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from threading import Lock
+from typing import Final
 
 from lean_spec.subspecs.networking.types import NodeId
 from lean_spec.types import Bytes16
@@ -30,13 +31,13 @@ from lean_spec.types import Bytes16
 from .config import BOND_EXPIRY_SECS
 from .messages import Port
 
-_DEFAULT_PORT = Port(0)
+_DEFAULT_PORT: Final = Port(0)
 """Default port value for optional port parameters."""
 
-DEFAULT_SESSION_TIMEOUT_SECS = 86400
+DEFAULT_SESSION_TIMEOUT_SECS: Final = 86400
 """Default session timeout (24 hours)."""
 
-MAX_SESSIONS = 1000
+MAX_SESSIONS: Final = 1000
 """Maximum number of cached sessions to prevent memory exhaustion."""
 
 

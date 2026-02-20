@@ -38,9 +38,9 @@ References:
 
 from __future__ import annotations
 
-from typing import TypeAlias
+from typing import Final
 
-RLPItem: TypeAlias = bytes | list["RLPItem"]
+type RLPItem = bytes | list[RLPItem]
 """
 RLP-encodable item.
 
@@ -50,25 +50,25 @@ Either:
 """
 
 
-SINGLE_BYTE_MAX = 0x7F
+SINGLE_BYTE_MAX: Final = 0x7F
 """Boundary between single-byte encoding [0x00-0x7f] and string prefix."""
 
-SHORT_STRING_PREFIX = 0x80
+SHORT_STRING_PREFIX: Final = 0x80
 """Prefix for short strings (0-55 bytes). Final prefix = 0x80 + length."""
 
-SHORT_STRING_MAX_LEN = 55
+SHORT_STRING_MAX_LEN: Final = 55
 """Maximum string length for short encoding."""
 
-LONG_STRING_BASE = 0xB7
+LONG_STRING_BASE: Final = 0xB7
 """Base for long string prefix. Final prefix = 0xb7 + length_of_length."""
 
-SHORT_LIST_PREFIX = 0xC0
+SHORT_LIST_PREFIX: Final = 0xC0
 """Prefix for short lists (0-55 bytes payload). Final prefix = 0xc0 + length."""
 
-SHORT_LIST_MAX_LEN = 55
+SHORT_LIST_MAX_LEN: Final = 55
 """Maximum list payload length for short encoding."""
 
-LONG_LIST_BASE = 0xF7
+LONG_LIST_BASE: Final = 0xF7
 """Base for long list prefix. Final prefix = 0xf7 + length_of_length."""
 
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Self, Sequence
+from typing import Self
 
 from lean_multisig_py import (
     aggregate_signatures,
@@ -12,6 +13,7 @@ from lean_multisig_py import (
     verify_aggregated_signatures,
 )
 
+from lean_spec.config import LEAN_ENV
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
@@ -19,7 +21,6 @@ from lean_spec.types import Bytes32
 from lean_spec.types.byte_arrays import ByteListMiB
 from lean_spec.types.container import Container
 
-from .constants import LEAN_ENV
 from .containers import PublicKey, Signature
 
 

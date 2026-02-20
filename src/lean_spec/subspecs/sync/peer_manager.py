@@ -9,6 +9,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Final
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
@@ -17,19 +18,19 @@ from lean_spec.subspecs.networking.reqresp.message import Status
 
 from .config import MAX_CONCURRENT_REQUESTS
 
-INITIAL_PEER_SCORE: int = 100
+INITIAL_PEER_SCORE: Final = 100
 """Starting score for newly added peers."""
 
-MIN_PEER_SCORE: int = 0
+MIN_PEER_SCORE: Final = 0
 """Minimum peer score (floor)."""
 
-MAX_PEER_SCORE: int = 200
+MAX_PEER_SCORE: Final = 200
 """Maximum peer score (ceiling)."""
 
-SCORE_SUCCESS_BONUS: int = 10
+SCORE_SUCCESS_BONUS: Final = 10
 """Score increase for a successful request."""
 
-SCORE_FAILURE_PENALTY: int = 20
+SCORE_FAILURE_PENALTY: Final = 20
 """Score decrease for a failed request."""
 
 

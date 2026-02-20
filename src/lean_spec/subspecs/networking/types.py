@@ -1,5 +1,7 @@
 """Networking Types"""
 
+from __future__ import annotations
+
 from enum import IntEnum, auto
 
 from lean_spec.types import Uint64
@@ -32,10 +34,10 @@ class SeqNumber(Uint64):
     """Sequence number used in ENR records, metadata, and ping messages."""
 
 
-ProtocolId = str
+type ProtocolId = str
 """Libp2p protocol identifier, e.g. ``/eth2/beacon_chain/req/status/1/ssz_snappy``."""
 
-Multiaddr = str
+type Multiaddr = str
 """Multiaddress string, e.g. ``/ip4/192.168.1.1/udp/9000/quic-v1``."""
 
 

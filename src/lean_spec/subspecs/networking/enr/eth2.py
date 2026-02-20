@@ -16,7 +16,7 @@ Subnet subscription keys (SSZ Bitvectors):
 See: https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
 """
 
-from typing import ClassVar
+from typing import ClassVar, Final
 
 from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.networking.types import ForkDigest, Version
@@ -24,7 +24,7 @@ from lean_spec.types import StrictBaseModel, Uint64
 from lean_spec.types.bitfields import BaseBitvector
 from lean_spec.types.boolean import Boolean
 
-FAR_FUTURE_EPOCH = Uint64(2**64 - 1)
+FAR_FUTURE_EPOCH: Final = Uint64(2**64 - 1)
 """Sentinel value indicating no scheduled fork."""
 
 

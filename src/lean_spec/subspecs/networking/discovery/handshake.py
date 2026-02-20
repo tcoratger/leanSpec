@@ -29,6 +29,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from threading import Lock
+from typing import Final
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
@@ -48,17 +49,16 @@ from .packet import (
     encode_handshake_authdata,
     encode_static_header,
     encode_whoareyou_authdata,
-    generate_id_nonce,
 )
 from .session import Session, SessionCache
 
-_DEFAULT_PORT = Port(0)
+_DEFAULT_PORT: Final = Port(0)
 """Default port value for optional port parameters."""
 
-MAX_PENDING_HANDSHAKES = 100
+MAX_PENDING_HANDSHAKES: Final = 100
 """Hard cap on concurrent pending handshakes to prevent resource exhaustion."""
 
-MAX_ENR_CACHE = 1000
+MAX_ENR_CACHE: Final = 1000
 """Maximum number of cached ENRs."""
 
 
@@ -223,7 +223,7 @@ class HandshakeManager:
             - nonce: The request_nonce to use in the packet header
             - challenge_data: Full data for key derivation (masking-iv || static-header || authdata)
         """
-        id_nonce = generate_id_nonce()
+        id_nonce = IdNonce.generate()
         authdata = encode_whoareyou_authdata(id_nonce, remote_enr_seq)
 
         # Build challenge_data per spec: masking-iv || static-header || authdata.

@@ -1,5 +1,7 @@
 """Utility functions for the XMSS signature scheme."""
 
+from __future__ import annotations
+
 from ...types.uint import Uint64
 from ..koalabear import Fp, P
 from .rand import Rand

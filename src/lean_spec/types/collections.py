@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Iterator, Sequence
 from typing import (
     IO,
     Any,
     ClassVar,
     Generic,
-    Iterator,
     Self,
-    Sequence,
     TypeVar,
     cast,
     overload,
@@ -214,18 +213,6 @@ class SSZVector(SSZModel, Generic[T]):
                 elements.append(cls.ELEMENT_TYPE.deserialize(stream, end - start))
             return cls(data=elements)
 
-    def encode_bytes(self) -> bytes:
-        """Serializes the SSZVector to a byte string."""
-        with io.BytesIO() as stream:
-            self.serialize(stream)
-            return stream.getvalue()
-
-    @classmethod
-    def decode_bytes(cls, data: bytes) -> Self:
-        """Deserializes a byte string into an SSZVector instance."""
-        with io.BytesIO(data) as stream:
-            return cls.deserialize(stream, len(data))
-
     def __len__(self) -> int:
         """Return the number of elements in the vector."""
         return len(self.data)
@@ -427,18 +414,6 @@ class SSZList(SSZModel, Generic[T]):
                 elements.append(cls.ELEMENT_TYPE.deserialize(stream, end - start))
 
             return cls(data=elements)
-
-    def encode_bytes(self) -> bytes:
-        """Return the list's canonical SSZ byte representation."""
-        with io.BytesIO() as stream:
-            self.serialize(stream)
-            return stream.getvalue()
-
-    @classmethod
-    def decode_bytes(cls, data: bytes) -> Self:
-        """Deserializes a byte string into an SSZList instance."""
-        with io.BytesIO(data) as stream:
-            return cls.deserialize(stream, len(data))
 
     def __len__(self) -> int:
         """Return the number of elements in the list."""

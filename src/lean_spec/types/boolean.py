@@ -31,8 +31,8 @@ class Boolean(int, SSZType):
         Accepts only `True`, `False`, `1`, or `0`.
 
         Raises:
-            SSZTypeCoercionError: If `value` is not a bool or int.
-            SSZDecodeError: If `value` is an integer other than 0 or 1.
+            SSZTypeError: If `value` is not a bool or int.
+            SSZValueError: If `value` is an integer other than 0 or 1.
         """
         if not isinstance(value, int):
             raise SSZTypeError(f"Expected bool or int, got {type(value).__name__}")

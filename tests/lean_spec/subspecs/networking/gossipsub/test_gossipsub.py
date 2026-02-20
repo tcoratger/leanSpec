@@ -23,8 +23,6 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     ControlPrune,
     Message,
     SubOpts,
-    create_graft_rpc,
-    create_subscription_rpc,
 )
 
 
@@ -476,14 +474,14 @@ class TestRPCProtobufEncoding:
 
     def test_rpc_helper_functions(self) -> None:
         """Test RPC creation helper functions."""
-        assert create_subscription_rpc(["/topic1", "/topic2"], subscribe=True) == RPC(
+        assert RPC.subscription(["/topic1", "/topic2"], subscribe=True) == RPC(
             subscriptions=[
                 SubOpts(subscribe=True, topic_id="/topic1"),
                 SubOpts(subscribe=True, topic_id="/topic2"),
             ]
         )
 
-        assert create_graft_rpc(["/topic1"]) == RPC(
+        assert RPC.graft(["/topic1"]) == RPC(
             control=ControlMessage(graft=[ControlGraft(topic_id="/topic1")])
         )
 

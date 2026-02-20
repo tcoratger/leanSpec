@@ -1,5 +1,7 @@
 """Random data generator for the XMSS signature scheme."""
 
+from __future__ import annotations
+
 import secrets
 
 from pydantic import model_validator
@@ -19,7 +21,7 @@ class Rand(StrictBaseModel):
     """Configuration parameters for the random generator."""
 
     @model_validator(mode="after")
-    def _validate_strict_types(self) -> "Rand":
+    def _validate_strict_types(self) -> Rand:
         """Reject subclasses to prevent type confusion attacks."""
         enforce_strict_types(self, config=XmssConfig)
         return self

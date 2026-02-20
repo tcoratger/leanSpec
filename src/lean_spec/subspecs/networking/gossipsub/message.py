@@ -65,7 +65,7 @@ from lean_spec.subspecs.networking.config import (
 
 from .types import MessageId
 
-SnappyDecompressor = Callable[[bytes], bytes]
+type SnappyDecompressor = Callable[[bytes], bytes]
 """Callable that decompresses snappy-compressed data.
 
 Should raise an exception if decompression fails.

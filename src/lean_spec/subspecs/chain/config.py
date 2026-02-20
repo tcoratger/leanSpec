@@ -4,7 +4,7 @@ from typing import Final
 
 from lean_spec.types.uint import Uint64
 
-INTERVALS_PER_SLOT = Uint64(5)
+INTERVALS_PER_SLOT: Final = Uint64(5)
 """Number of intervals per slot for forkchoice processing."""
 
 SECONDS_PER_SLOT: Final = Uint64(4)
@@ -13,7 +13,7 @@ SECONDS_PER_SLOT: Final = Uint64(4)
 MILLISECONDS_PER_SLOT: Final = SECONDS_PER_SLOT * Uint64(1000)
 """The fixed duration of a single slot in milliseconds."""
 
-MILLISECONDS_PER_INTERVAL = MILLISECONDS_PER_SLOT // INTERVALS_PER_SLOT
+MILLISECONDS_PER_INTERVAL: Final = MILLISECONDS_PER_SLOT // INTERVALS_PER_SLOT
 """Milliseconds per forkchoice processing interval."""
 
 JUSTIFICATION_LOOKBACK_SLOTS: Final = Uint64(3)

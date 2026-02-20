@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AbstractSet, Collection, Iterable
+from collections.abc import Collection, Iterable
+from collections.abc import Set as AbstractSet
+from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT

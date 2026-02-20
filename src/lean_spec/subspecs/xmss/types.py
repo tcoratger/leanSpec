@@ -1,5 +1,7 @@
 """Base types for the XMSS signature scheme."""
 
+from typing import Final
+
 from lean_spec.subspecs.koalabear import Fp
 
 from ...types import Uint64
@@ -20,7 +22,7 @@ class PRFKey(BaseBytes):
     LENGTH = PRF_KEY_LENGTH
 
 
-HASH_DIGEST_LENGTH = TARGET_CONFIG.HASH_LEN_FE
+HASH_DIGEST_LENGTH: Final = TARGET_CONFIG.HASH_LEN_FE
 """
 The fixed length of a hash digest in field elements.
 
@@ -32,7 +34,7 @@ of the Poseidon2 hash function used in the XMSS scheme.
 # - A bottom tree has at most 2^(LOG_LIFETIME/2) leaves
 # - With padding, we may add up to 2 additional nodes
 # - To be generous and future-proof, we use 2^(LOG_LIFETIME/2 + 1)
-NODE_LIST_LIMIT = 1 << (TARGET_CONFIG.LOG_LIFETIME // 2 + 1)
+NODE_LIST_LIMIT: Final = 1 << (TARGET_CONFIG.LOG_LIFETIME // 2 + 1)
 """
 The maximum number of nodes that can be stored in a sparse Merkle tree layer.
 
@@ -125,7 +127,7 @@ class HashTreeLayer(Container):
     """SSZ-compliant list of hash digests stored for this layer."""
 
 
-LAYERS_LIMIT = TARGET_CONFIG.LOG_LIFETIME + 1
+LAYERS_LIMIT: Final = TARGET_CONFIG.LOG_LIFETIME + 1
 """
 The maximum number of layers in a subtree.
 

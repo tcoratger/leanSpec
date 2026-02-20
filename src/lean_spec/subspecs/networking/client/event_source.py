@@ -103,7 +103,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Protocol, Self
+from typing import Final, Protocol, Self
 
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
@@ -187,7 +187,7 @@ class GossipMessageError(Exception):
     """Raised when a gossip message cannot be processed."""
 
 
-SUPPORTED_PROTOCOLS: frozenset[str] = (
+SUPPORTED_PROTOCOLS: Final[frozenset[str]] = (
     frozenset({GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12}) | REQRESP_PROTOCOL_IDS
 )
 """Protocols supported for incoming stream negotiation.

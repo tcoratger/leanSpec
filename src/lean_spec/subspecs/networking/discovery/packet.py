@@ -32,6 +32,7 @@ from __future__ import annotations
 import os
 import struct
 from dataclasses import dataclass
+from typing import Final
 
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes12, Bytes16, Bytes33, Bytes64
@@ -40,7 +41,6 @@ from .config import MAX_PACKET_SIZE, MIN_PACKET_SIZE
 from .crypto import (
     AES_KEY_SIZE,
     CTR_IV_SIZE,
-    GCM_NONCE_SIZE,
     aes_ctr_decrypt,
     aes_ctr_encrypt,
     aes_gcm_decrypt,
@@ -48,16 +48,16 @@ from .crypto import (
 )
 from .messages import PROTOCOL_ID, PROTOCOL_VERSION, IdNonce, Nonce, PacketFlag
 
-STATIC_HEADER_SIZE = 23
+STATIC_HEADER_SIZE: Final = 23
 """Size of the static header in bytes: 6 + 2 + 1 + 12 + 2."""
 
-MESSAGE_AUTHDATA_SIZE = 32
+MESSAGE_AUTHDATA_SIZE: Final = 32
 """Authdata size for MESSAGE packets: src-id (32 bytes)."""
 
-WHOAREYOU_AUTHDATA_SIZE = 24
+WHOAREYOU_AUTHDATA_SIZE: Final = 24
 """Authdata size for WHOAREYOU packets: id-nonce (16) + enr-seq (8)."""
 
-HANDSHAKE_HEADER_SIZE = 34
+HANDSHAKE_HEADER_SIZE: Final = 34
 """Fixed portion of handshake authdata: src-id (32) + sig-size (1) + eph-key-size (1)."""
 
 
@@ -360,16 +360,6 @@ def encode_handshake_authdata(
         authdata += record
 
     return authdata
-
-
-def generate_nonce() -> Nonce:
-    """Generate a random 12-byte message nonce."""
-    return Nonce(os.urandom(GCM_NONCE_SIZE))
-
-
-def generate_id_nonce() -> IdNonce:
-    """Generate a random 16-byte identity challenge nonce."""
-    return IdNonce(os.urandom(16))
 
 
 def encode_static_header(flag: PacketFlag, nonce: Nonce, authdata_size: int) -> bytes:

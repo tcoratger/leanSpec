@@ -60,6 +60,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Final
 
 from lean_spec.subspecs.containers.validator import SubnetId
 
@@ -74,34 +75,34 @@ class ForkMismatchError(ValueError):
         super().__init__(f"Fork mismatch: expected {expected}, got {actual}")
 
 
-TOPIC_PREFIX: str = "leanconsensus"
+TOPIC_PREFIX: Final = "leanconsensus"
 """Network prefix for Lean consensus gossip topics.
 
 Identifies this network in topic strings. Different networks
 (mainnet, testnets) may use different prefixes.
 """
 
-ENCODING_POSTFIX: str = "ssz_snappy"
+ENCODING_POSTFIX: Final = "ssz_snappy"
 """Encoding suffix for SSZ with Snappy compression.
 
 All Ethereum consensus gossip messages use SSZ serialization
 with Snappy compression.
 """
 
-BLOCK_TOPIC_NAME: str = "block"
+BLOCK_TOPIC_NAME: Final = "block"
 """Topic name for block messages.
 
 Used in the topic string to identify signed beacon block messages.
 """
 
 
-ATTESTATION_SUBNET_TOPIC_PREFIX: str = "attestation"
+ATTESTATION_SUBNET_TOPIC_PREFIX: Final = "attestation"
 """Base prefix for attestation subnet topic names.
 
 Full topic names are formatted as "attestation_{subnet_id}".
 """
 
-AGGREGATED_ATTESTATION_TOPIC_NAME: str = "aggregation"
+AGGREGATED_ATTESTATION_TOPIC_NAME: Final = "aggregation"
 """Topic name for committee aggregation messages.
 
 Used in the topic string to identify committee's aggregation messages.

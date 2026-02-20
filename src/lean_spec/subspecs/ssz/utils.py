@@ -1,5 +1,7 @@
 """Generic helper functions for SSZ and Merkle proofs."""
 
+from __future__ import annotations
+
 import hashlib
 
 from lean_spec.types.byte_arrays import Bytes32

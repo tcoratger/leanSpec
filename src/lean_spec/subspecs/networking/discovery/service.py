@@ -30,6 +30,7 @@ import os
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Final
 
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
@@ -46,13 +47,13 @@ from .transport import DiscoveryTransport
 
 logger = logging.getLogger(__name__)
 
-LOOKUP_PARALLELISM = ALPHA
+LOOKUP_PARALLELISM: Final = ALPHA
 """Number of concurrent FINDNODE queries during lookup."""
 
-REFRESH_INTERVAL_SECS = 3600
+REFRESH_INTERVAL_SECS: Final = 3600
 """Interval between routing table refresh lookups (1 hour)."""
 
-REVALIDATION_INTERVAL_SECS = 300
+REVALIDATION_INTERVAL_SECS: Final = 300
 """Interval between node liveness revalidation (5 minutes)."""
 
 

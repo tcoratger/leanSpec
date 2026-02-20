@@ -9,32 +9,12 @@ Ethereum's serialization format.
 
 from __future__ import annotations
 
-import io
 from typing import IO, Any, Self
 
 from .constants import OFFSET_BYTE_LENGTH
 from .exceptions import SSZSerializationError, SSZTypeError
 from .ssz_base import SSZModel, SSZType
 from .uint import Uint32
-
-
-def _get_ssz_field_type(annotation: Any) -> type[SSZType]:
-    """
-    Extract the SSZType class from a field annotation, with validation.
-
-    Args:
-        annotation: The field type annotation.
-
-    Returns:
-        The SSZType class.
-
-    Raises:
-        SSZTypeCoercionError: If the annotation is not a valid SSZType class.
-    """
-    # Check if it's a class and is a subclass of SSZType
-    if not (isinstance(annotation, type) and issubclass(annotation, SSZType)):
-        raise SSZTypeError(f"Expected SSZType subclass, got {annotation}")
-    return annotation
 
 
 class Container(SSZModel):
@@ -60,6 +40,24 @@ class Container(SSZModel):
         [fixed_field_1][fixed_field_2]...[offset_1][offset_2]...[variable_data_1][variable_data_2]...
     """
 
+    @staticmethod
+    def _get_ssz_field_type(annotation: Any) -> type[SSZType]:
+        """
+        Extract the SSZType class from a field annotation, with validation.
+
+        Args:
+            annotation: The field type annotation.
+
+        Returns:
+            The SSZType class.
+
+        Raises:
+            SSZTypeError: If the annotation is not a valid SSZType class.
+        """
+        if not (isinstance(annotation, type) and issubclass(annotation, SSZType)):
+            raise SSZTypeError(f"Expected SSZType subclass, got {annotation}")
+        return annotation
+
     @classmethod
     def is_fixed_size(cls) -> bool:
         """
@@ -73,7 +71,7 @@ class Container(SSZModel):
         """
         # Check each field's type for fixed size property
         return all(
-            _get_ssz_field_type(field.annotation).is_fixed_size()
+            cls._get_ssz_field_type(field.annotation).is_fixed_size()
             for field in cls.model_fields.values()
         )
 
@@ -94,7 +92,7 @@ class Container(SSZModel):
 
         # Sum the byte lengths of all fixed-size fields
         return sum(
-            _get_ssz_field_type(field.annotation).get_byte_length()
+            cls._get_ssz_field_type(field.annotation).get_byte_length()
             for field in cls.model_fields.values()
         )
 
@@ -172,8 +170,7 @@ class Container(SSZModel):
             New container instance with deserialized values.
 
         Raises:
-            SSZStreamError: If stream ends unexpectedly.
-            SSZOffsetError: If offsets are invalid.
+            SSZSerializationError: If stream ends unexpectedly or offsets are invalid.
         """
         fields = {}  # Collected field values
         var_fields = []  # (name, type, offset) for variable fields
@@ -181,7 +178,7 @@ class Container(SSZModel):
 
         # Phase 1: Read fixed part
         for field_name, field_info in cls.model_fields.items():
-            field_type = _get_ssz_field_type(field_info.annotation)
+            field_type = cls._get_ssz_field_type(field_info.annotation)
 
             if field_type.is_fixed_size():
                 # Read and deserialize fixed field directly
@@ -236,28 +233,3 @@ class Container(SSZModel):
 
         # Construct container with all fields
         return cls(**fields)
-
-    def encode_bytes(self) -> bytes:
-        """
-        Encode container to bytes.
-
-        Returns:
-            Serialized container as bytes.
-        """
-        with io.BytesIO() as stream:
-            self.serialize(stream)
-            return stream.getvalue()
-
-    @classmethod
-    def decode_bytes(cls, data: bytes) -> Self:
-        """
-        Decode container from bytes.
-
-        Args:
-            data: Serialized container bytes.
-
-        Returns:
-            Deserialized container instance.
-        """
-        with io.BytesIO(data) as stream:
-            return cls.deserialize(stream, len(data))

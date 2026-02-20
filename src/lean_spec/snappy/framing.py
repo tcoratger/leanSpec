@@ -87,11 +87,13 @@ Reference:
 
 from __future__ import annotations
 
+from typing import Final
+
 from .compress import compress as raw_compress
 from .decompress import SnappyDecompressionError
 from .decompress import decompress as raw_decompress
 
-STREAM_IDENTIFIER: bytes = b"\xff\x06\x00\x00sNaPpY"
+STREAM_IDENTIFIER: Final = b"\xff\x06\x00\x00sNaPpY"
 """Stream identifier marking the start of a Snappy framed stream.
 
 Format: [type=0xff][length=6 as 3-byte LE][magic="sNaPpY"]
@@ -100,28 +102,28 @@ This 10-byte sequence MUST appear at the start of every framed stream.
 It may also appear later (e.g., when streams are concatenated).
 """
 
-CHUNK_TYPE_COMPRESSED: int = 0x00
+CHUNK_TYPE_COMPRESSED: Final = 0x00
 """Chunk type for Snappy-compressed data.
 
 Chunk data format: [masked_crc32c: 4 bytes LE][compressed_payload]
 The CRC covers the UNCOMPRESSED data, not the compressed payload.
 """
 
-CHUNK_TYPE_UNCOMPRESSED: int = 0x01
+CHUNK_TYPE_UNCOMPRESSED: Final = 0x01
 """Chunk type for uncompressed (raw) data.
 
 Chunk data format: [masked_crc32c: 4 bytes LE][raw_payload]
 Used when compression would expand the data (e.g., random bytes).
 """
 
-MAX_UNCOMPRESSED_CHUNK_SIZE: int = 65536
+MAX_UNCOMPRESSED_CHUNK_SIZE: Final = 65536
 """Maximum uncompressed data per chunk (64 KiB).
 
 This limit enables fixed-size decompression buffers.
 Chunks exceeding this limit are rejected.
 """
 
-CRC32C_MASK_DELTA: int = 0xA282EAD8
+CRC32C_MASK_DELTA: Final = 0xA282EAD8
 """Constant added during CRC masking.
 
 From the spec: "Rotate right by 15 bits, then add 0xa282ead8."
@@ -167,7 +169,7 @@ def _crc32c_table() -> list[int]:
 
 
 # Pre-compute the table at module load time.
-_CRC32C_TABLE: list[int] = _crc32c_table()
+_CRC32C_TABLE: tuple[int, ...] = tuple(_crc32c_table())
 
 
 def _crc32c(data: bytes) -> int:
