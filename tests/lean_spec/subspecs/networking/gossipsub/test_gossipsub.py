@@ -10,7 +10,6 @@ from lean_spec.subspecs.networking.gossipsub import (
     GossipsubParameters,
     GossipTopic,
     TopicKind,
-    format_topic_string,
     parse_topic_string,
 )
 from lean_spec.subspecs.networking.gossipsub.mesh import FanoutEntry, MeshState, TopicMesh
@@ -25,10 +24,6 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
     create_graft_rpc,
-    create_ihave_rpc,
-    create_iwant_rpc,
-    create_prune_rpc,
-    create_publish_rpc,
     create_subscription_rpc,
 )
 
@@ -75,16 +70,6 @@ class TestControlMessages:
 
 class TestTopicForkValidation:
     """Test suite for topic fork compatibility validation."""
-
-    def test_is_fork_compatible_matching(self) -> None:
-        """Test is_fork_compatible returns True for matching fork_digest."""
-        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
-        assert topic.is_fork_compatible("0x12345678")
-
-    def test_is_fork_compatible_mismatched(self) -> None:
-        """Test is_fork_compatible returns False for mismatched fork_digest."""
-        topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
-        assert not topic.is_fork_compatible("0xdeadbeef")
 
     def test_validate_fork_success(self) -> None:
         """Test validate_fork passes for matching fork_digest."""
@@ -145,11 +130,6 @@ class TestTopicFormatting:
             kind=TopicKind.ATTESTATION_SUBNET, fork_digest="0xabcd1234", subnet_id=SubnetId(0)
         )
 
-    def test_format_topic_string(self) -> None:
-        """Test topic string formatting."""
-        result = format_topic_string("block", "0x12345678")
-        assert result == "/leanconsensus/0x12345678/block/ssz_snappy"
-
     def test_parse_topic_string(self) -> None:
         """Test topic string parsing."""
         assert parse_topic_string("/leanconsensus/0x12345678/block/ssz_snappy") == (
@@ -188,11 +168,11 @@ class TestMeshState:
         mesh = MeshState(params=GossipsubParameters())
 
         mesh.subscribe("topic1")
-        assert mesh.is_subscribed("topic1")
-        assert not mesh.is_subscribed("topic2")
+        assert "topic1" in mesh.subscriptions
+        assert "topic2" not in mesh.subscriptions
 
         peers = mesh.unsubscribe("topic1")
-        assert not mesh.is_subscribed("topic1")
+        assert "topic1" not in mesh.subscriptions
         assert peers == set()
 
     def test_add_remove_mesh_peers(self) -> None:
@@ -505,24 +485,6 @@ class TestRPCProtobufEncoding:
 
         assert create_graft_rpc(["/topic1"]) == RPC(
             control=ControlMessage(graft=[ControlGraft(topic_id="/topic1")])
-        )
-
-        assert create_prune_rpc(["/topic1"], backoff=120) == RPC(
-            control=ControlMessage(prune=[ControlPrune(topic_id="/topic1", backoff=120)])
-        )
-
-        assert create_ihave_rpc("/topic1", [b"msg1", b"msg2"]) == RPC(
-            control=ControlMessage(
-                ihave=[ControlIHave(topic_id="/topic1", message_ids=[b"msg1", b"msg2"])]
-            )
-        )
-
-        assert create_iwant_rpc([b"msg1"]) == RPC(
-            control=ControlMessage(iwant=[ControlIWant(message_ids=[b"msg1"])])
-        )
-
-        assert create_publish_rpc("/topic1", b"data") == RPC(
-            publish=[Message(topic="/topic1", data=b"data")]
         )
 
     def test_wire_format_compatibility(self) -> None:

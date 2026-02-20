@@ -92,17 +92,6 @@ class GossipsubTestNetwork:
             for node_b in self.nodes[i + 1 :]:
                 await node_a.connect_to(node_b)
 
-    async def connect_star(self, center: int = 0) -> None:
-        """Connect all nodes to a central hub node.
-
-        All traffic flows through the hub. Useful for testing
-        single-point-of-failure and fan-out scenarios.
-        """
-        hub = self.nodes[center]
-        for i, node in enumerate(self.nodes):
-            if i != center:
-                await hub.connect_to(node)
-
     async def connect_chain(self) -> None:
         """Connect nodes in a linear chain: 0-1-2-...-N.
 

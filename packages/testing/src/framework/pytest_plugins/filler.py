@@ -305,10 +305,13 @@ def pytest_collection_modifyitems(config: pytest.Config, items: List[pytest.Item
         config.hook.pytest_deselected(items=deselected)
 
 
-def _is_test_item_valid_for_fork(item: pytest.Item, fork_class: Any, get_fork_by_name: Any) -> bool:
-    """Check if a test item is valid for the given fork based on validity markers."""
-    markers = list(item.iter_markers())
+def _check_markers_valid_for_fork(
+    markers: list[Any], fork_class: Any, get_fork_by_name: Any
+) -> bool:
+    """Check if test markers indicate validity for the given fork.
 
+    Shared logic for both collection-time and parametrization-time fork filtering.
+    """
     has_valid_from = False
     has_valid_until = False
     has_valid_at = False
@@ -352,6 +355,11 @@ def _is_test_item_valid_for_fork(item: pytest.Item, fork_class: Any, get_fork_by
         until_valid = any(fork_class <= until_fork for until_fork in valid_until_forks)
 
     return from_valid and until_valid
+
+
+def _is_test_item_valid_for_fork(item: pytest.Item, fork_class: Any, get_fork_by_name: Any) -> bool:
+    """Check if a test item is valid for the given fork based on validity markers."""
+    return _check_markers_valid_for_fork(list(item.iter_markers()), fork_class, get_fork_by_name)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -527,51 +535,9 @@ def _is_test_valid_for_fork(
     metafunc: pytest.Metafunc, fork_class: Any, get_fork_by_name: Any
 ) -> bool:
     """Check if a test is valid for the given fork based on validity markers."""
-    markers = list(metafunc.definition.iter_markers())
-
-    has_valid_from = False
-    has_valid_until = False
-    has_valid_at = False
-
-    valid_from_forks = []
-    valid_until_forks = []
-    valid_at_forks = []
-
-    for marker in markers:
-        if marker.name == "valid_from":
-            has_valid_from = True
-            for fork_name in marker.args:
-                target_fork = get_fork_by_name(fork_name)
-                if target_fork:
-                    valid_from_forks.append(target_fork)
-        elif marker.name == "valid_until":
-            has_valid_until = True
-            for fork_name in marker.args:
-                target_fork = get_fork_by_name(fork_name)
-                if target_fork:
-                    valid_until_forks.append(target_fork)
-        elif marker.name == "valid_at":
-            has_valid_at = True
-            for fork_name in marker.args:
-                target_fork = get_fork_by_name(fork_name)
-                if target_fork:
-                    valid_at_forks.append(target_fork)
-
-    if not (has_valid_from or has_valid_until or has_valid_at):
-        return True
-
-    if has_valid_at:
-        return fork_class in valid_at_forks
-
-    from_valid = True
-    if has_valid_from:
-        from_valid = any(fork_class >= from_fork for from_fork in valid_from_forks)
-
-    until_valid = True
-    if has_valid_until:
-        until_valid = any(fork_class <= until_fork for until_fork in valid_until_forks)
-
-    return from_valid and until_valid
+    return _check_markers_valid_for_fork(
+        list(metafunc.definition.iter_markers()), fork_class, get_fork_by_name
+    )
 
 
 def _register_layer_fixtures(config: pytest.Config, layer: str) -> None:

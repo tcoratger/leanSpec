@@ -56,14 +56,3 @@ async def two_nodes(
     await network.start_all()
     await nodes[0].connect_to(nodes[1])
     return nodes[0], nodes[1]
-
-
-@pytest.fixture
-async def three_nodes(
-    network: GossipsubTestNetwork,
-) -> list[GossipsubTestNode]:
-    """Three fully connected nodes with fast parameters."""
-    nodes = await network.create_nodes(3, fast_params())
-    await network.start_all()
-    await network.connect_full()
-    return nodes

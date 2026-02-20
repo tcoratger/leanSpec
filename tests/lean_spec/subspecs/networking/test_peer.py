@@ -9,7 +9,7 @@ from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp import Status
-from lean_spec.subspecs.networking.types import ConnectionState, Direction, GoodbyeReason, SeqNumber
+from lean_spec.subspecs.networking.types import ConnectionState, Direction, SeqNumber
 from lean_spec.types import Bytes32, Bytes64
 
 
@@ -27,16 +27,6 @@ class TestConnectionState:
         assert ConnectionState.CONNECTING == 2
         assert ConnectionState.CONNECTED == 3
         assert ConnectionState.DISCONNECTING == 4
-
-
-class TestGoodbyeReason:
-    """Tests for GoodbyeReason codes."""
-
-    def test_official_codes(self) -> None:
-        """Official spec codes have correct values."""
-        assert GoodbyeReason.CLIENT_SHUTDOWN == 1
-        assert GoodbyeReason.IRRELEVANT_NETWORK == 2
-        assert GoodbyeReason.FAULT_OR_ERROR == 3
 
 
 class TestDirection:

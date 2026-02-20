@@ -83,9 +83,6 @@ class NetworkService:
     _running: bool = field(default=False, repr=False)
     """Whether the event loop is running."""
 
-    _events_processed: int = field(default=0, repr=False)
-    """Counter for processed events (for monitoring)."""
-
     async def run(self) -> None:
         """
         Main event loop - route events until stopped.
@@ -109,7 +106,6 @@ class NetworkService:
                     break
 
                 await self._handle_event(event)
-                self._events_processed += 1
 
         except StopAsyncIteration:
             # Source exhausted - normal termination for finite event sources.
@@ -200,11 +196,6 @@ class NetworkService:
     def is_running(self) -> bool:
         """Check if the event loop is currently running."""
         return self._running
-
-    @property
-    def events_processed(self) -> int:
-        """Total events processed since creation."""
-        return self._events_processed
 
     async def publish_block(self, block: SignedBlockWithAttestation) -> None:
         """

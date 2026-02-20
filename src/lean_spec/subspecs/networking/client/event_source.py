@@ -154,7 +154,6 @@ from lean_spec.subspecs.networking.transport.quic.stream_adapter import (
 from lean_spec.subspecs.networking.varint import (
     VarintError,
     decode_varint,
-    encode_varint,
 )
 from lean_spec.types.exceptions import SSZSerializationError
 
@@ -1345,119 +1344,6 @@ class LiveNetworkEventSource:
             # The connection will be cleaned up elsewhere.
             logger.warning("Stream acceptor error for %s: %s", peer_id, e)
 
-    async def _handle_gossip_stream(self, peer_id: PeerId, stream: InboundStreamProtocol) -> None:
-        """
-        Handle an incoming gossip stream.
-
-        Reads the gossip message, decodes it, and emits the appropriate event.
-
-        Args:
-            peer_id: Peer that sent the message.
-            stream: QUIC stream containing the gossip message.
-
-
-        COMPLETE FLOW
-        -------------
-        A gossip message goes through these stages:
-
-        1. Read raw bytes from QUIC stream.
-        2. Parse topic string and data length (varints).
-        3. Decompress Snappy-framed data.
-        4. Decode SSZ bytes into typed object.
-        5. Emit event to the sync layer.
-
-        Any stage can fail. Failures are logged but don't crash the handler.
-
-
-        ERROR HANDLING STRATEGY
-        -----------------------
-        Gossip is best-effort. A single bad message should not:
-
-        - Crash the node.
-        - Disconnect the peer.
-        - Block other messages.
-
-        We log errors and continue. Peer scoring (not implemented here)
-        would track repeated failures for reputation management.
-
-
-        RESOURCE CLEANUP
-        ----------------
-        The stream MUST be closed in finally, even if errors occur.
-        Unclosed streams leak QUIC resources and can cause deadlocks.
-        """
-        try:
-            # Step 1: Read the gossip message from the stream.
-            #
-            # This parses the varint-prefixed topic and data fields.
-            # May fail if the message is truncated or malformed.
-            topic_str, compressed_data = await read_gossip_message(stream)
-
-            # Step 2: Decode the message.
-            #
-            # This performs:
-            #   - Topic validation (correct prefix, encoding, fork).
-            #   - Snappy decompression with CRC verification.
-            #   - SSZ decoding into the appropriate type.
-            message = self._gossip_handler.decode_message(topic_str, compressed_data)
-            topic = self._gossip_handler.get_topic(topic_str)
-
-            # Step 3: Emit the appropriate event based on message type.
-            #
-            # The topic determines the expected message type.
-            # We verify the decoded type matches to catch bugs.
-            match topic.kind:
-                case TopicKind.BLOCK:
-                    if isinstance(message, SignedBlockWithAttestation):
-                        await self._emit_gossip_block(message, peer_id)
-                    else:
-                        # Type mismatch indicates a bug in decode_message.
-                        logger.warning("Block topic but got %s", type(message).__name__)
-
-                case TopicKind.ATTESTATION_SUBNET:
-                    if isinstance(message, SignedAttestation):
-                        await self._emit_gossip_attestation(message, peer_id)
-                    else:
-                        # Type mismatch indicates a bug in decode_message.
-                        logger.warning("Attestation topic but got %s", type(message).__name__)
-
-                case TopicKind.AGGREGATED_ATTESTATION:
-                    if isinstance(message, SignedAggregatedAttestation):
-                        await self._emit_gossip_aggregated_attestation(message, peer_id)
-                    else:
-                        logger.warning(
-                            "Aggregated attestation topic but got %s",
-                            type(message).__name__,
-                        )
-
-            logger.debug("Received gossip %s from %s", topic.kind.value, peer_id)
-
-        except GossipMessageError as e:
-            # Expected error: malformed message, decompression failure, etc.
-            #
-            # This is not necessarily a bug. The peer may be misbehaving
-            # or there may be network corruption. Log and continue.
-            logger.warning("Gossip message error from %s: %s", peer_id, e)
-
-        except Exception as e:
-            # Unexpected error: likely a bug in our code.
-            #
-            # Log as warning to aid debugging. Don't crash.
-            logger.warning("Unexpected error handling gossip from %s: %s", peer_id, e)
-
-        finally:
-            # Always close the stream to release QUIC resources.
-            #
-            # Unclosed streams cause resource leaks and can deadlock
-            # the connection if too many accumulate.
-            #
-            # The try/except suppresses close errors. The stream may
-            # already be closed if the connection dropped.
-            try:
-                await stream.close()
-            except Exception:
-                pass
-
     async def publish(self, topic: str, data: bytes) -> None:
         """
         Broadcast a message to all connected peers on a topic.
@@ -1482,37 +1368,3 @@ class LiveNetworkEventSource:
             logger.debug("Published message to gossipsub topic %s", topic)
         except Exception as e:
             logger.warning("Failed to publish to gossipsub: %s", e)
-
-    async def _send_gossip_message(
-        self,
-        conn: QuicConnection,
-        topic: str,
-        data: bytes,
-    ) -> None:
-        """
-        Send a gossip message to a peer.
-
-        Opens a new stream for the gossip message and sends the data.
-
-        Args:
-            conn: QuicConnection to the peer.
-            topic: Topic string for the message.
-            data: Message bytes to send.
-        """
-        # Open a new outbound stream for gossip protocol.
-        stream = await conn.open_stream(GOSSIPSUB_DEFAULT_PROTOCOL_ID)
-
-        try:
-            # Format: topic length (varint) + topic + data length (varint) + data
-            topic_bytes = topic.encode("utf-8")
-
-            # Write topic length and topic.
-            await stream.write(encode_varint(len(topic_bytes)))
-            await stream.write(topic_bytes)
-
-            # Write data length and data.
-            await stream.write(encode_varint(len(data)))
-            await stream.write(data)
-
-        finally:
-            await stream.close()

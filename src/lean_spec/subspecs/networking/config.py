@@ -46,9 +46,6 @@ Per Ethereum spec, prepended to the message hash when decompression succeeds.
 
 # --- Gossipsub Protocol IDs ---
 
-GOSSIPSUB_PROTOCOL_ID_V10: Final[str] = "/meshsub/1.0.0"
-"""Gossipsub v1.0 protocol ID - basic mesh pubsub."""
-
 GOSSIPSUB_PROTOCOL_ID_V11: Final[str] = "/meshsub/1.1.0"
 """Gossipsub v1.1 protocol ID - peer scoring, extended validators.
 
@@ -73,12 +70,6 @@ PRUNE_BACKOFF: Final[int] = 60
 
 When a peer is pruned from the mesh, they must wait this duration
 before attempting to re-graft. This prevents rapid mesh churn.
-"""
-
-MESSAGE_ID_SIZE: Final[int] = 20
-"""Size of gossipsub message IDs in bytes.
-
-Per Ethereum spec, message IDs are the first 20 bytes of SHA256(domain + topic_len + topic + data).
 """
 
 MAX_ERROR_MESSAGE_SIZE: Final[int] = 256

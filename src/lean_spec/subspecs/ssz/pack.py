@@ -6,7 +6,7 @@ Does not serialize objects; only arranges bytes into chunks per SSZ rules.
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from lean_spec.subspecs.ssz.constants import BITS_PER_BYTE, BYTES_PER_CHUNK
 from lean_spec.types.byte_arrays import Bytes32
@@ -34,14 +34,6 @@ def _partition_chunks(b: bytes) -> list[Bytes32]:
     if len(b) % BYTES_PER_CHUNK != 0:
         raise ValueError("partition requires a multiple of BYTES_PER_CHUNK")
     return [Bytes32(b[i : i + BYTES_PER_CHUNK]) for i in range(0, len(b), BYTES_PER_CHUNK)]
-
-
-def pack_basic_serialized(serialized_basic_values: Iterable[bytes]) -> list[Bytes32]:
-    """Pack serialized basic values into chunks.
-
-    Concatenates and right-pads to produce chunks ready for merkleization.
-    """
-    return _partition_chunks(_right_pad_to_chunk(b"".join(serialized_basic_values)))
 
 
 def pack_bytes(data: bytes) -> list[Bytes32]:

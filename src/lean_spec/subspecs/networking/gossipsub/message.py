@@ -174,15 +174,6 @@ class GossipsubMessage:
 
         return Bytes20(hashlib.sha256(preimage).digest()[:20])
 
-    @property
-    def topic_str(self) -> str:
-        """Get the topic as a UTF-8 string.
-
-        Returns:
-            Topic decoded from bytes to string.
-        """
-        return self.topic.decode("utf-8")
-
     def __hash__(self) -> int:
         """Hash based on message ID.
 

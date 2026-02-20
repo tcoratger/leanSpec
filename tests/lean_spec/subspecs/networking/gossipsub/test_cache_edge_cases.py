@@ -169,14 +169,14 @@ class TestMessageCachePutAndGet:
         assert cache.put("t", msg) is False
         assert len(cache) == 1
 
-    def test_contains_operator(self) -> None:
-        """The __contains__ operator works for message IDs."""
+    def test_has_method(self) -> None:
+        """The has() method works for message IDs."""
         cache = MessageCache()
         msg = GossipsubMessage(topic=b"t", raw_data=b"data")
         cache.put("t", msg)
 
-        assert msg.id in cache
-        assert Bytes20(b"\x00" * 20) not in cache
+        assert cache.has(msg.id)
+        assert not cache.has(Bytes20(b"\x00" * 20))
 
 
 class TestSeenCache:
@@ -230,14 +230,14 @@ class TestSeenCache:
         seen.clear()
         assert len(seen) == 0
 
-    def test_contains_operator(self) -> None:
-        """The __contains__ operator works for seen message IDs."""
+    def test_has_method(self) -> None:
+        """The has() method works for seen message IDs."""
         seen = SeenCache()
         msg_id = Bytes20(b"12345678901234567890")
         seen.add(msg_id, time.time())
 
-        assert msg_id in seen
-        assert Bytes20(b"\x00" * 20) not in seen
+        assert seen.has(msg_id)
+        assert not seen.has(Bytes20(b"\x00" * 20))
 
 
 class TestGossipsubMessageId:
@@ -307,20 +307,6 @@ class TestGossipsubMessageId:
 
         # Both use INVALID_SNAPPY domain + raw data -> same ID.
         assert id_failed == id_none
-
-
-class TestGossipsubMessageTopicStr:
-    """Tests for GossipsubMessage.topic_str property."""
-
-    def test_topic_str_decodes_utf8(self) -> None:
-        """topic_str decodes bytes to UTF-8 string."""
-        msg = GossipsubMessage(topic=b"/eth2/topic", raw_data=b"data")
-        assert msg.topic_str == "/eth2/topic"
-
-    def test_topic_str_empty(self) -> None:
-        """topic_str handles empty topic bytes."""
-        msg = GossipsubMessage(topic=b"", raw_data=b"data")
-        assert msg.topic_str == ""
 
 
 class TestGossipsubMessageHash:

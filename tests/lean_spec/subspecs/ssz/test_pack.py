@@ -10,7 +10,6 @@ from lean_spec.subspecs.ssz.constants import BITS_PER_BYTE, BYTES_PER_CHUNK
 from lean_spec.subspecs.ssz.pack import (
     _partition_chunks,
     _right_pad_to_chunk,
-    pack_basic_serialized,
     pack_bits,
     pack_bytes,
 )
@@ -99,30 +98,6 @@ def test_pack_bytes(payload_hex: str, expected_chunks_hex: PyList[str]) -> None:
     out = pack_bytes(bytes.fromhex(payload_hex))
     # Compare the hex representation of the output chunks with the expected list.
     assert _hex_chunks(out) == expected_chunks_hex
-
-
-def test_pack_basic_serialized_empty() -> None:
-    assert pack_basic_serialized([]) == []
-
-
-def test_pack_basic_serialized_small_values() -> None:
-    # Two serialized Uint16 (little-endian): 0x4567 -> 67 45, 0x0123 -> 23 01
-    values = [b"\x67\x45", b"\x23\x01"]
-    out = pack_basic_serialized(values)
-    assert len(out) == 1
-    assert out[0].hex() == _pad32_hex("67452301")
-
-
-def test_pack_basic_serialized_multi_chunk() -> None:
-    # 40 bytes worth of already-serialized basic scalars (e.g., 40 x uint8)
-    values = [bytes([i]) for i in range(40)]
-    out = pack_basic_serialized(values)
-    assert len(out) == 2
-    # first chunk: 0..31
-    assert out[0].hex() == "".join(f"{i:02x}" for i in range(32))
-    # second chunk: 32..39 then padded
-    tail_hex = "".join(f"{i:02x}" for i in range(32, 40))
-    assert out[1].hex() == _pad32_hex(tail_hex)
 
 
 def test_pack_bits_empty() -> None:

@@ -273,15 +273,6 @@ class TestDerivePeerId:
 
         assert str(peer_id1) != str(peer_id2)
 
-    def test_derive_general_function(self) -> None:
-        """PeerId.derive() works with key data and type."""
-        key_data = bytes([0x02] + [0] * 32)  # secp256k1 compressed format
-        peer_id = PeerId.derive(key_data, KeyType.SECP256K1)
-
-        peer_id_str = str(peer_id)
-        assert len(peer_id_str) > 0
-        assert all(c in Base58.ALPHABET for c in peer_id_str)
-
     def test_from_secp256k1_invalid_length(self) -> None:
         """from_secp256k1 rejects invalid key lengths."""
         with pytest.raises(ValueError, match="must be 33 bytes"):
@@ -311,7 +302,7 @@ class TestPeerIdFormat:
         # Create a key type that produces > 42 bytes encoded
         # A 128-byte key should exceed the limit
         large_key = bytes(128)
-        peer_id = PeerId.derive(large_key, KeyType.RSA)
+        peer_id = PeerId.from_public_key(PublicKeyProto(key_type=KeyType.RSA, key_data=large_key))
 
         decoded = Base58.decode(str(peer_id))
 

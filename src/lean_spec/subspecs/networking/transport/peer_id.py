@@ -374,26 +374,6 @@ class PeerId:
         """Return detailed representation."""
         return f"PeerId({self!s})"
 
-    def to_base58(self) -> str:
-        """
-        Return Base58-encoded PeerId string.
-
-        This is the legacy format currently recommended by the libp2p spec.
-
-        Returns:
-            Base58-encoded string suitable for display or serialization.
-        """
-        return Base58.encode(self.multihash)
-
-    def to_bytes(self) -> bytes:
-        """
-        Return the raw multihash bytes.
-
-        Returns:
-            Multihash bytes (can be used for binary protocols).
-        """
-        return self.multihash
-
     @classmethod
     def from_base58(cls, s: str) -> PeerId:
         """
@@ -409,19 +389,6 @@ class PeerId:
             ValueError: If string is not valid Base58.
         """
         return cls(multihash=Base58.decode(s))
-
-    @classmethod
-    def from_bytes(cls, data: bytes) -> PeerId:
-        """
-        Create PeerId from raw multihash bytes.
-
-        Args:
-            data: Multihash bytes.
-
-        Returns:
-            PeerId wrapping the multihash.
-        """
-        return cls(multihash=data)
 
     @classmethod
     def from_public_key(cls, public_key: PublicKeyProto) -> PeerId:
@@ -464,19 +431,4 @@ class PeerId:
             )
 
         proto = PublicKeyProto(key_type=KeyType.SECP256K1, key_data=public_key_bytes)
-        return cls.from_public_key(proto)
-
-    @classmethod
-    def derive(cls, key_data: bytes, key_type: KeyType) -> PeerId:
-        """
-        Derive PeerId from raw key bytes and type.
-
-        Args:
-            key_data: Raw public key bytes.
-            key_type: Key algorithm type.
-
-        Returns:
-            Derived PeerId.
-        """
-        proto = PublicKeyProto(key_type=key_type, key_data=key_data)
         return cls.from_public_key(proto)

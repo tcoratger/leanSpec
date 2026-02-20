@@ -146,30 +146,6 @@ def _merkleize_efficient(chunks: list[Bytes32], width: int) -> Bytes32:
     return level[0] if level else _zero_tree_root(width)
 
 
-def merkleize_progressive(chunks: Sequence[Bytes32], num_leaves: int = 1) -> Bytes32:
-    """Progressive Merkleization (per spec).
-
-    Rare in practice; provided for completeness. Splits on `num_leaves`:
-    - right: merkleize the first up-to-`num_leaves` chunks using a fixed-width tree
-    - left: recurse on the remaining chunks, quadrupling the right's width at each step
-    """
-    if len(chunks) == 0:
-        return ZERO_HASH
-
-    # Right branch: fixed-width merkleization of the first `num_leaves` chunks
-    right = merkleize(chunks[:num_leaves], num_leaves)
-
-    # Left branch: recursively collapse everything beyond `num_leaves`
-    left = (
-        merkleize_progressive(chunks[num_leaves:], num_leaves * 4)
-        if len(chunks) > num_leaves
-        else ZERO_HASH
-    )
-
-    # Combine branches
-    return hash_nodes(left, right)
-
-
 def mix_in_length(root: Bytes32, length: int) -> Bytes32:
     """Mix the length (as uint256 little-endian) into a Merkle root."""
     if length < 0:

@@ -142,6 +142,3 @@ STATES = StateNamespace()
 CHECKPOINTS = CheckpointNamespace()
 ATTESTATIONS = AttestationNamespace()
 SLOT_INDEX = SlotIndexNamespace()
-
-ALL_NAMESPACES = [BLOCKS, STATES, CHECKPOINTS, ATTESTATIONS, SLOT_INDEX]
-"""All namespace definitions for schema initialization."""

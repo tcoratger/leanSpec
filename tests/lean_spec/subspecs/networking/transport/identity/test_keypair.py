@@ -101,7 +101,7 @@ class TestIdentityKeypair:
         keypair = IdentityKeypair.generate()
 
         peer_id = keypair.to_peer_id()
-        multihash = peer_id.to_bytes()
+        multihash = peer_id.multihash
 
         assert multihash[2] == 0x08
         assert multihash[3] == KeyType.SECP256K1
