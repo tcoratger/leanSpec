@@ -54,6 +54,7 @@ from lean_spec.subspecs.networking.types import ForkDigest, Multiaddr, NodeId, S
 from lean_spec.types import (
     Bytes33,
     Bytes64,
+    RLPItem,
     StrictBaseModel,
     Uint64,
     rlp,
@@ -203,7 +204,7 @@ class ENR(StrictBaseModel):
             return False
         return self_eth2.fork_digest == other_eth2.fork_digest
 
-    def _build_content_items(self) -> list[bytes]:
+    def _build_content_items(self) -> list[RLPItem]:
         """
         Build the list of content items for RLP encoding.
 
@@ -213,7 +214,7 @@ class ENR(StrictBaseModel):
 
         # Sequence number: minimal big-endian, empty bytes for zero.
         seq_bytes = self.seq.to_bytes(8, "big").lstrip(b"\x00") or b""
-        items: list[bytes] = [seq_bytes]
+        items: list[RLPItem] = [seq_bytes]
 
         for key in sorted_keys:
             items.append(key.encode("utf-8"))

@@ -28,7 +28,7 @@ from lean_spec.subspecs.node import Node
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
 from lean_spec.types import Bytes32, Uint64
-from lean_spec.types.rlp import encode_rlp
+from lean_spec.types.rlp import RLPItem, encode_rlp
 from tests.lean_spec.helpers import make_genesis_state
 
 # Generate a test keypair once for all ENR tests.
@@ -40,7 +40,7 @@ _TEST_COMPRESSED_PUBKEY = _TEST_PUBLIC_KEY.public_bytes(
 )
 
 
-def _sign_enr_content(content_items: list[bytes]) -> bytes:
+def _sign_enr_content(content_items: list[RLPItem]) -> bytes:
     """Sign ENR content and return 64-byte r||s signature."""
     content_rlp = encode_rlp(content_items)
 
@@ -56,7 +56,7 @@ def _sign_enr_content(content_items: list[bytes]) -> bytes:
 def _make_enr_with_udp(ip_bytes: bytes, udp_port: int) -> str:
     """Create a properly signed ENR string with IPv4 and UDP port."""
     # Content items (keys must be sorted).
-    content_items: list[bytes] = [
+    content_items: list[RLPItem] = [
         b"\x01",  # seq = 1
         b"id",
         b"v4",
@@ -76,7 +76,7 @@ def _make_enr_with_udp(ip_bytes: bytes, udp_port: int) -> str:
 
 def _make_enr_with_ipv6_udp(ip6_bytes: bytes, udp_port: int) -> str:
     """Create a properly signed ENR string with IPv6 and UDP port."""
-    content_items: list[bytes] = [
+    content_items: list[RLPItem] = [
         b"\x01",  # seq = 1
         b"id",
         b"v4",
@@ -96,7 +96,7 @@ def _make_enr_with_ipv6_udp(ip6_bytes: bytes, udp_port: int) -> str:
 
 def _make_enr_without_udp(ip_bytes: bytes) -> str:
     """Create a properly signed ENR string with IPv4 but no UDP port."""
-    content_items: list[bytes] = [
+    content_items: list[RLPItem] = [
         b"\x01",  # seq = 1
         b"id",
         b"v4",
