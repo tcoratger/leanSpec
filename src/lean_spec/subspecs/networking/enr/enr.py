@@ -50,16 +50,14 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
     encode_dss_signature,
 )
 
-from lean_spec.subspecs.networking.types import Multiaddr, NodeId, SeqNumber
+from lean_spec.subspecs.networking.types import ForkDigest, Multiaddr, NodeId, SeqNumber, Version
 from lean_spec.types import (
-    Bytes32,
     Bytes33,
     Bytes64,
     StrictBaseModel,
     Uint64,
     rlp,
 )
-from lean_spec.types.byte_arrays import Bytes4
 
 from . import keys
 from .eth2 import AttestationSubnets, Eth2Data, SyncCommitteeSubnets
@@ -159,8 +157,8 @@ class ENR(StrictBaseModel):
         eth2_bytes = self.get(keys.ETH2)
         if eth2_bytes and len(eth2_bytes) >= 16:
             return Eth2Data(
-                fork_digest=Bytes4(eth2_bytes[0:4]),
-                next_fork_version=Bytes4(eth2_bytes[4:8]),
+                fork_digest=ForkDigest(eth2_bytes[0:4]),
+                next_fork_version=Version(eth2_bytes[4:8]),
                 next_fork_epoch=Uint64(int.from_bytes(eth2_bytes[8:16], "little")),
             )
         return None
@@ -211,7 +209,7 @@ class ENR(StrictBaseModel):
 
         Returns [seq, k1, v1, k2, v2, ...] with keys sorted lexicographically.
         """
-        sorted_keys = sorted(self.pairs.keys())
+        sorted_keys = sorted(self.pairs)
 
         # Sequence number: minimal big-endian, empty bytes for zero.
         seq_bytes = self.seq.to_bytes(8, "big").lstrip(b"\x00") or b""
@@ -292,7 +290,7 @@ class ENR(StrictBaseModel):
             # Hash the 64-byte x||y (excluding 0x04 prefix).
             k = keccak.new(digest_bits=256)
             k.update(uncompressed[1:])
-            return Bytes32(k.digest())
+            return NodeId(k.digest())
         except (ValueError, TypeError):
             return None
 

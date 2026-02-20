@@ -44,7 +44,7 @@ class CheckpointSyncError(Exception):
     """
 
 
-async def fetch_finalized_state(url: str, state_class: type["State"]) -> "State":
+async def fetch_finalized_state(url: str, state_class: type[State]) -> State:
     """
     Fetch finalized state from a node via checkpoint sync.
 
@@ -102,7 +102,7 @@ async def fetch_finalized_state(url: str, state_class: type["State"]) -> "State"
         raise CheckpointSyncError(f"Failed to fetch state: {e}") from e
 
 
-def verify_checkpoint_state(state: "State") -> bool:
+def verify_checkpoint_state(state: State) -> bool:
     """
     Verify that a checkpoint state is structurally valid.
 

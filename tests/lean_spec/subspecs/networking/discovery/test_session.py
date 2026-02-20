@@ -2,8 +2,6 @@
 
 import time
 
-import pytest
-
 from lean_spec.subspecs.networking.discovery.messages import Port
 from lean_spec.subspecs.networking.discovery.session import (
     BondCache,
@@ -11,6 +9,9 @@ from lean_spec.subspecs.networking.discovery.session import (
     SessionCache,
 )
 from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.types import Bytes16
+
+ZERO_KEY = Bytes16(bytes(16))
 
 
 class TestSession:
@@ -20,8 +21,8 @@ class TestSession:
         """Test session creation."""
         session = Session(
             node_id=NodeId(bytes(32)),
-            send_key=bytes(16),
-            recv_key=bytes(16),
+            send_key=ZERO_KEY,
+            recv_key=ZERO_KEY,
             created_at=time.time(),
             last_seen=time.time(),
             is_initiator=True,
@@ -35,8 +36,8 @@ class TestSession:
         """Test that new session is not expired."""
         session = Session(
             node_id=NodeId(bytes(32)),
-            send_key=bytes(16),
-            recv_key=bytes(16),
+            send_key=ZERO_KEY,
+            recv_key=ZERO_KEY,
             created_at=time.time(),
             last_seen=time.time(),
             is_initiator=True,
@@ -48,8 +49,8 @@ class TestSession:
         """Test that old session is expired."""
         session = Session(
             node_id=NodeId(bytes(32)),
-            send_key=bytes(16),
-            recv_key=bytes(16),
+            send_key=ZERO_KEY,
+            recv_key=ZERO_KEY,
             created_at=time.time() - 7200,  # 2 hours ago
             last_seen=time.time() - 7200,
             is_initiator=True,
@@ -61,8 +62,8 @@ class TestSession:
         """Test that touch updates last_seen timestamp."""
         session = Session(
             node_id=NodeId(bytes(32)),
-            send_key=bytes(16),
-            recv_key=bytes(16),
+            send_key=ZERO_KEY,
+            recv_key=ZERO_KEY,
             created_at=time.time() - 100,
             last_seen=time.time() - 100,
             is_initiator=True,
@@ -81,8 +82,8 @@ class TestSessionCache:
         """Test creating and retrieving a session."""
         cache = SessionCache()
         node_id = NodeId(bytes.fromhex("aa" * 32))
-        send_key = bytes(16)
-        recv_key = bytes(16)
+        send_key = ZERO_KEY
+        recv_key = ZERO_KEY
 
         session = cache.create(node_id, send_key, recv_key, is_initiator=True)
 
@@ -101,7 +102,7 @@ class TestSessionCache:
         cache = SessionCache(timeout_secs=0.001)
         node_id = NodeId(bytes(32))
 
-        cache.create(node_id, bytes(16), bytes(16), is_initiator=True)
+        cache.create(node_id, ZERO_KEY, ZERO_KEY, is_initiator=True)
         time.sleep(0.01)
 
         assert cache.get(node_id) is None
@@ -112,7 +113,7 @@ class TestSessionCache:
         cache = SessionCache()
         node_id = NodeId(bytes(32))
 
-        cache.create(node_id, bytes(16), bytes(16), is_initiator=True)
+        cache.create(node_id, ZERO_KEY, ZERO_KEY, is_initiator=True)
         assert cache.remove(node_id)
         assert cache.get(node_id) is None
 
@@ -126,7 +127,7 @@ class TestSessionCache:
         cache = SessionCache()
         node_id = NodeId(bytes(32))
 
-        cache.create(node_id, bytes(16), bytes(16), is_initiator=True)
+        cache.create(node_id, ZERO_KEY, ZERO_KEY, is_initiator=True)
         assert cache.touch(node_id)
 
     def test_touch_nonexistent_returns_false(self):
@@ -140,18 +141,18 @@ class TestSessionCache:
 
         assert cache.count() == 0
 
-        cache.create(NodeId(bytes.fromhex("aa" * 32)), bytes(16), bytes(16), is_initiator=True)
+        cache.create(NodeId(bytes.fromhex("aa" * 32)), ZERO_KEY, ZERO_KEY, is_initiator=True)
         assert cache.count() == 1
 
-        cache.create(NodeId(bytes.fromhex("bb" * 32)), bytes(16), bytes(16), is_initiator=True)
+        cache.create(NodeId(bytes.fromhex("bb" * 32)), ZERO_KEY, ZERO_KEY, is_initiator=True)
         assert cache.count() == 2
 
     def test_cleanup_expired(self):
         """Test expired session cleanup."""
         cache = SessionCache(timeout_secs=0.001)
 
-        cache.create(NodeId(bytes.fromhex("aa" * 32)), bytes(16), bytes(16), is_initiator=True)
-        cache.create(NodeId(bytes.fromhex("bb" * 32)), bytes(16), bytes(16), is_initiator=True)
+        cache.create(NodeId(bytes.fromhex("aa" * 32)), ZERO_KEY, ZERO_KEY, is_initiator=True)
+        cache.create(NodeId(bytes.fromhex("bb" * 32)), ZERO_KEY, ZERO_KEY, is_initiator=True)
         time.sleep(0.01)
 
         removed = cache.cleanup_expired()
@@ -166,35 +167,19 @@ class TestSessionCache:
         node2 = NodeId(bytes.fromhex("02" + "00" * 31))
         node3 = NodeId(bytes.fromhex("03" + "00" * 31))
 
-        cache.create(node1, bytes(16), bytes(16), is_initiator=True)
+        cache.create(node1, ZERO_KEY, ZERO_KEY, is_initiator=True)
         time.sleep(0.01)  # Ensure different timestamps
-        cache.create(node2, bytes(16), bytes(16), is_initiator=True)
+        cache.create(node2, ZERO_KEY, ZERO_KEY, is_initiator=True)
 
         assert cache.count() == 2
 
         # Adding third should evict first
-        cache.create(node3, bytes(16), bytes(16), is_initiator=True)
+        cache.create(node3, ZERO_KEY, ZERO_KEY, is_initiator=True)
 
         assert cache.count() == 2
         assert cache.get(node1) is None  # Oldest should be evicted
         assert cache.get(node2) is not None
         assert cache.get(node3) is not None
-
-    def test_invalid_node_id_length_raises(self):
-        """Test that invalid node ID length raises ValueError."""
-        cache = SessionCache()
-        with pytest.raises(ValueError, match="Node ID must be 32 bytes"):
-            cache.create(bytes(31), bytes(16), bytes(16), is_initiator=True)  # type: ignore[arg-type]
-
-    def test_invalid_key_length_raises(self):
-        """Test that invalid key lengths raise ValueError."""
-        cache = SessionCache()
-
-        with pytest.raises(ValueError, match="Send key must be 16 bytes"):
-            cache.create(NodeId(bytes(32)), bytes(15), bytes(16), is_initiator=True)
-
-        with pytest.raises(ValueError, match="Recv key must be 16 bytes"):
-            cache.create(NodeId(bytes(32)), bytes(16), bytes(15), is_initiator=True)
 
     def test_endpoint_keying_separates_sessions(self):
         """Same node_id at different ip:port has separate sessions.
@@ -204,15 +189,15 @@ class TestSessionCache:
         """
         cache = SessionCache()
         node_id = NodeId(bytes.fromhex("aa" * 32))
-        send_key_1 = bytes([0x01] * 16)
-        send_key_2 = bytes([0x02] * 16)
+        send_key_1 = Bytes16(bytes([0x01] * 16))
+        send_key_2 = Bytes16(bytes([0x02] * 16))
 
         # Create sessions for same node at different endpoints.
         cache.create(
-            node_id, send_key_1, bytes(16), is_initiator=True, ip="10.0.0.1", port=Port(9000)
+            node_id, send_key_1, ZERO_KEY, is_initiator=True, ip="10.0.0.1", port=Port(9000)
         )
         cache.create(
-            node_id, send_key_2, bytes(16), is_initiator=True, ip="10.0.0.2", port=Port(9000)
+            node_id, send_key_2, ZERO_KEY, is_initiator=True, ip="10.0.0.2", port=Port(9000)
         )
 
         # Each endpoint retrieves its own session.

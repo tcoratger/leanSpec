@@ -45,8 +45,8 @@ crash. A single invalid block should not halt synchronization.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.forkchoice import Store

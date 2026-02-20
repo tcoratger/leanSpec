@@ -23,7 +23,7 @@ from lean_spec.subspecs.containers.block.types import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.state.state import State
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32
@@ -42,7 +42,7 @@ def _create_dummy_aggregated_proof(validator_ids: list[ValidatorIndex]) -> Aggre
     so it will fail verification.
     """
     return AggregatedSignatureProof(
-        participants=AggregationBits.from_validator_indices(validator_ids),
+        participants=AggregationBits.from_validator_indices(ValidatorIndices(data=validator_ids)),
         proof_data=ByteListMiB(data=b"\x00" * 32),  # Invalid proof bytes
     )
 
@@ -216,7 +216,9 @@ class VerifySignaturesTest(BaseConsensusFixture):
             data_root = attestation_data.data_root_bytes()
 
             # Create aggregated attestation claiming validator_ids as participants
-            aggregation_bits = AggregationBits.from_validator_indices(invalid_spec.validator_ids)
+            aggregation_bits = AggregationBits.from_validator_indices(
+                ValidatorIndices(data=invalid_spec.validator_ids)
+            )
             invalid_aggregated = AggregatedAttestation(
                 aggregation_bits=aggregation_bits,
                 data=attestation_data,
@@ -238,7 +240,9 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 ]
                 # Create valid aggregated proof from actual signers
                 valid_proof = AggregatedSignatureProof.aggregate(
-                    participants=AggregationBits.from_validator_indices(invalid_spec.signer_ids),
+                    participants=AggregationBits.from_validator_indices(
+                        ValidatorIndices(data=invalid_spec.signer_ids)
+                    ),
                     public_keys=signer_public_keys,
                     signatures=signer_signatures,
                     message=data_root,

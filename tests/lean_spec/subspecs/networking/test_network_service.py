@@ -171,7 +171,7 @@ class TestAttestationRoutingToForkchoice:
 
         attestation = SignedAttestation(
             validator_id=ValidatorIndex(42),
-            message=AttestationData(
+            data=AttestationData(
                 slot=Slot(1),
                 head=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
                 target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
@@ -218,7 +218,7 @@ class TestAttestationRoutingToForkchoice:
 
         attestation = SignedAttestation(
             validator_id=ValidatorIndex(99),
-            message=AttestationData(
+            data=AttestationData(
                 slot=Slot(1),
                 head=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
                 target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),

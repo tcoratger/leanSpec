@@ -157,7 +157,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 if isinstance(step, BlockStep):
                     max_slot_value = max(max_slot_value, step.block.slot)
                 elif isinstance(step, AttestationStep):
-                    max_slot_value = max(max_slot_value, step.attestation.message.slot)
+                    max_slot_value = max(max_slot_value, step.attestation.data.slot)
 
             self.max_slot = max_slot_value
 
@@ -219,9 +219,8 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # The Store is the node's local view of the chain.
         # It starts from a trusted anchor (usually genesis).
-        store = Store.get_forkchoice_store(
-            anchor_state=self.anchor_state,
-            anchor_block=self.anchor_block,
+        store = self.anchor_state.to_forkchoice_store(
+            self.anchor_block,
             validator_id=DEFAULT_VALIDATOR_ID,
         )
 
@@ -400,7 +399,7 @@ class ForkChoiceTest(BaseConsensusFixture):
             working_store = working_store.on_gossip_attestation(
                 SignedAttestation(
                     validator_id=attestation.validator_id,
-                    message=attestation.data,
+                    data=attestation.data,
                     signature=signature,
                 ),
                 scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],

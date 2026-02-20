@@ -30,7 +30,7 @@ from lean_spec.subspecs.containers.block import BlockSignatures
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations, AttestationSignatures
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
@@ -240,7 +240,9 @@ def make_aggregated_attestation(
     )
 
     return AggregatedAttestation(
-        aggregation_bits=AggregationBits.from_validator_indices(participant_ids),
+        aggregation_bits=AggregationBits.from_validator_indices(
+            ValidatorIndices(data=participant_ids)
+        ),
         data=data,
     )
 
@@ -264,7 +266,7 @@ def make_signed_attestation(
     )
     return SignedAttestation(
         validator_id=validator,
-        message=attestation_data,
+        data=attestation_data,
         signature=make_mock_signature(),
     )
 
@@ -326,7 +328,7 @@ def make_genesis_data(
         validators = make_validators(num_validators)
     genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
     genesis_block = make_genesis_block(genesis_state)
-    store = Store.get_forkchoice_store(genesis_state, genesis_block, validator_id=validator_id)
+    store = genesis_state.to_forkchoice_store(genesis_block, validator_id=validator_id)
     return GenesisData(store, genesis_state, genesis_block)
 
 
@@ -423,7 +425,7 @@ def make_aggregated_proof(
     """Create a valid aggregated signature proof for the given participants."""
     data_root = attestation_data.data_root_bytes()
     return AggregatedSignatureProof.aggregate(
-        participants=AggregationBits.from_validator_indices(participants),
+        participants=AggregationBits.from_validator_indices(ValidatorIndices(data=participants)),
         public_keys=[key_manager.get_public_key(vid) for vid in participants],
         signatures=[
             key_manager.sign_attestation_data(vid, attestation_data) for vid in participants

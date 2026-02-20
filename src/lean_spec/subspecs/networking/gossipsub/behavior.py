@@ -86,7 +86,7 @@ from lean_spec.subspecs.networking.gossipsub.types import MessageId
 from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.subspecs.networking.transport.quic.stream_adapter import QuicStreamAdapter
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
-from lean_spec.types import Bytes20, Uint16
+from lean_spec.types import Uint16
 
 logger = logging.getLogger(__name__)
 
@@ -676,7 +676,7 @@ class GossipsubBehavior:
             # Message IDs must be exactly 20 bytes (SHA256 truncated to 160 bits).
             if len(msg_id) != 20:
                 continue
-            msg_id_typed = Bytes20(msg_id)
+            msg_id_typed = MessageId(msg_id)
             if not self.seen_cache.has(msg_id_typed) and not self.message_cache.has(msg_id_typed):
                 wanted.append(msg_id)
 
@@ -695,7 +695,7 @@ class GossipsubBehavior:
         for msg_id in iwant.message_ids:
             if len(msg_id) != 20:
                 continue
-            msg_id_typed = Bytes20(msg_id)
+            msg_id_typed = MessageId(msg_id)
             cached = self.message_cache.get(msg_id_typed)
             if cached:
                 messages.append(Message(topic=cached.topic.decode("utf-8"), data=cached.raw_data))
@@ -718,7 +718,7 @@ class GossipsubBehavior:
         for msg_id in idontwant.message_ids:
             if len(msg_id) != 20:
                 continue
-            state.dont_want_ids.add(Bytes20(msg_id))
+            state.dont_want_ids.add(MessageId(msg_id))
 
     async def _heartbeat_loop(self) -> None:
         """Background heartbeat for mesh maintenance."""

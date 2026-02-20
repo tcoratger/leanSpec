@@ -6,7 +6,7 @@ import time
 
 from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.types import Bytes20
+from lean_spec.subspecs.networking.gossipsub.types import MessageId
 
 
 class TestMessageCacheShift:
@@ -158,7 +158,7 @@ class TestMessageCachePutAndGet:
     def test_get_returns_none_for_unknown(self) -> None:
         """get() returns None for an unknown message ID."""
         cache = MessageCache()
-        assert cache.get(Bytes20(b"\x00" * 20)) is None
+        assert cache.get(MessageId(b"\x00" * 20)) is None
 
     def test_put_duplicate_returns_false(self) -> None:
         """Putting the same message twice returns False on second call."""
@@ -176,7 +176,7 @@ class TestMessageCachePutAndGet:
         cache.put("t", msg)
 
         assert cache.has(msg.id)
-        assert not cache.has(Bytes20(b"\x00" * 20))
+        assert not cache.has(MessageId(b"\x00" * 20))
 
 
 class TestSeenCache:
@@ -185,13 +185,13 @@ class TestSeenCache:
     def test_add_returns_true_for_new(self) -> None:
         """add() returns True for a new message ID."""
         seen = SeenCache(ttl_seconds=120)
-        msg_id = Bytes20(b"12345678901234567890")
+        msg_id = MessageId(b"12345678901234567890")
         assert seen.add(msg_id, time.time()) is True
 
     def test_add_returns_false_for_duplicate(self) -> None:
         """add() returns False for an already-seen message ID."""
         seen = SeenCache(ttl_seconds=120)
-        msg_id = Bytes20(b"12345678901234567890")
+        msg_id = MessageId(b"12345678901234567890")
         seen.add(msg_id, time.time())
         assert seen.add(msg_id, time.time()) is False
 
@@ -200,8 +200,8 @@ class TestSeenCache:
         seen = SeenCache(ttl_seconds=10)
         now = time.time()
 
-        old_id = Bytes20(b"aaaaaaaaaaaaaaaaaaaa")
-        fresh_id = Bytes20(b"bbbbbbbbbbbbbbbbbbbb")
+        old_id = MessageId(b"aaaaaaaaaaaaaaaaaaaa")
+        fresh_id = MessageId(b"bbbbbbbbbbbbbbbbbbbb")
         seen.add(old_id, now - 20)
         seen.add(fresh_id, now)
 
@@ -214,7 +214,7 @@ class TestSeenCache:
         """cleanup() with no expired entries removes nothing."""
         seen = SeenCache(ttl_seconds=120)
         now = time.time()
-        seen.add(Bytes20(b"12345678901234567890"), now)
+        seen.add(MessageId(b"12345678901234567890"), now)
 
         removed = seen.cleanup(now)
         assert removed == 0
@@ -224,7 +224,7 @@ class TestSeenCache:
         """clear() removes all entries."""
         seen = SeenCache()
         for i in range(5):
-            seen.add(Bytes20(f"x{i:019d}".encode()), time.time())
+            seen.add(MessageId(f"x{i:019d}".encode()), time.time())
 
         assert len(seen) == 5
         seen.clear()
@@ -233,11 +233,11 @@ class TestSeenCache:
     def test_has_method(self) -> None:
         """The has() method works for seen message IDs."""
         seen = SeenCache()
-        msg_id = Bytes20(b"12345678901234567890")
+        msg_id = MessageId(b"12345678901234567890")
         seen.add(msg_id, time.time())
 
         assert seen.has(msg_id)
-        assert not seen.has(Bytes20(b"\x00" * 20))
+        assert not seen.has(MessageId(b"\x00" * 20))
 
 
 class TestGossipsubMessageId:
@@ -262,10 +262,10 @@ class TestGossipsubMessageId:
         assert msg1.id != msg2.id
 
     def test_id_is_20_bytes(self) -> None:
-        """Message ID is exactly 20 bytes (Bytes20)."""
+        """Message ID is exactly 20 bytes."""
         msg = GossipsubMessage(topic=b"t", raw_data=b"d")
         assert len(msg.id) == 20
-        assert isinstance(msg.id, Bytes20)
+        assert isinstance(msg.id, MessageId)
 
     def test_id_is_cached(self) -> None:
         """The ID is computed once and reused on subsequent accesses."""

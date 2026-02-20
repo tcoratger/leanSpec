@@ -135,9 +135,9 @@ class SyncCommitteeSubnets(BaseBitvector):
             raise ValueError(f"Sync subnet ID must be 0-3, got {subnet_id}")
         return bool(self.data[subnet_id])
 
-    def subscribed_subnets(self) -> list[int]:
+    def subscribed_subnets(self) -> list[SubnetId]:
         """List of subscribed sync subnet IDs."""
-        return [i for i in range(self.LENGTH) if self.data[i]]
+        return [SubnetId(i) for i in range(self.LENGTH) if self.data[i]]
 
     def subscription_count(self) -> int:
         """Number of subscribed sync subnets."""

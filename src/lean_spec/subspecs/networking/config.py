@@ -2,8 +2,6 @@
 
 from typing import Final
 
-from lean_spec.types.byte_arrays import Bytes1
-
 from .types import DomainType
 
 # --- Request/Response Limits ---
@@ -32,13 +30,13 @@ response, including all chunks for multi-part responses like BlocksByRange.
 
 # --- Gossip Message Domains ---
 
-MESSAGE_DOMAIN_INVALID_SNAPPY: Final[DomainType] = Bytes1(b"\x00")
+MESSAGE_DOMAIN_INVALID_SNAPPY: Final[DomainType] = DomainType(b"\x00")
 """1-byte domain for gossip message-id isolation of invalid snappy messages.
 
 Per Ethereum spec, prepended to the message hash when decompression fails.
 """
 
-MESSAGE_DOMAIN_VALID_SNAPPY: Final[DomainType] = Bytes1(b"\x01")
+MESSAGE_DOMAIN_VALID_SNAPPY: Final[DomainType] = DomainType(b"\x01")
 """1-byte domain for gossip message-id isolation of valid snappy messages.
 
 Per Ethereum spec, prepended to the message hash when decompression succeeds.

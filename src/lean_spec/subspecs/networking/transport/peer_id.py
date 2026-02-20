@@ -38,6 +38,7 @@ from enum import IntEnum
 from typing import Final
 
 from lean_spec.subspecs.networking import varint
+from lean_spec.types import Bytes33
 
 __all__ = [
     # Main types
@@ -408,7 +409,7 @@ class PeerId:
         return cls(multihash=mh.encode())
 
     @classmethod
-    def from_secp256k1(cls, public_key_bytes: bytes) -> PeerId:
+    def from_secp256k1(cls, public_key_bytes: Bytes33) -> PeerId:
         """
         Derive PeerId from a secp256k1 compressed public key.
 
@@ -421,14 +422,6 @@ class PeerId:
 
         Returns:
             Derived PeerId (starts with "16Uiu2..." for secp256k1).
-
-        Raises:
-            ValueError: If public key is not 33 bytes.
         """
-        if len(public_key_bytes) != 33:
-            raise ValueError(
-                f"secp256k1 compressed key must be 33 bytes, got {len(public_key_bytes)}"
-            )
-
         proto = PublicKeyProto(key_type=KeyType.SECP256K1, key_data=public_key_bytes)
         return cls.from_public_key(proto)

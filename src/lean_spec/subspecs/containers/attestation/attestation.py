@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Bytes32, Container
 
@@ -56,14 +56,8 @@ class Attestation(Container):
     """The attestation data produced by the validator."""
 
 
-class SignedAttestation(Container):
+class SignedAttestation(Attestation):
     """Validator attestation bundled with its signature."""
-
-    validator_id: ValidatorIndex
-    """The index of the validator making the attestation."""
-
-    message: AttestationData
-    """The attestation message signed by the validator."""
 
     signature: Signature
     """Signature aggregation produced by the leanVM (SNARKs in the future)."""
@@ -103,7 +97,9 @@ class AggregatedAttestation(Container):
 
         return [
             cls(
-                aggregation_bits=AggregationBits.from_validator_indices(validator_ids),
+                aggregation_bits=AggregationBits.from_validator_indices(
+                    ValidatorIndices(data=validator_ids)
+                ),
                 data=data,
             )
             for data, validator_ids in data_to_validator_ids.items()

@@ -47,7 +47,7 @@ class PoseidonXmss(StrictBaseModel):
     """Poseidon2 parameters for 24-width permutation."""
 
     @model_validator(mode="after")
-    def _validate_strict_types(self) -> "PoseidonXmss":
+    def _validate_strict_types(self) -> PoseidonXmss:
         """Reject subclasses to prevent type confusion attacks."""
         enforce_strict_types(self, params16=Poseidon2Params, params24=Poseidon2Params)
         return self

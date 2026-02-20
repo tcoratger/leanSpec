@@ -62,7 +62,6 @@ from lean_spec.subspecs.networking.config import (
     MESSAGE_DOMAIN_INVALID_SNAPPY,
     MESSAGE_DOMAIN_VALID_SNAPPY,
 )
-from lean_spec.types import Bytes20
 
 from .types import MessageId
 
@@ -172,7 +171,7 @@ class GossipsubMessage:
 
         preimage = bytes(domain) + len(topic).to_bytes(8, "little") + topic + data_for_hash
 
-        return Bytes20(hashlib.sha256(preimage).digest()[:20])
+        return MessageId(hashlib.sha256(preimage).digest()[:20])
 
     def __hash__(self) -> int:
         """Hash based on message ID.

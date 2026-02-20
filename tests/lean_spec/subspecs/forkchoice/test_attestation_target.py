@@ -157,7 +157,7 @@ class TestSafeTargetAdvancement:
             sig = key_manager.sign_attestation_data(vid, attestation_data)
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data,
+                data=attestation_data,
                 signature=sig,
             )
             # Process as gossip (requires aggregator flag)
@@ -202,7 +202,7 @@ class TestSafeTargetAdvancement:
             sig = key_manager.sign_attestation_data(vid, attestation_data)
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data,
+                data=attestation_data,
                 signature=sig,
             )
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
@@ -242,7 +242,7 @@ class TestSafeTargetAdvancement:
             sig = key_manager.sign_attestation_data(vid, attestation_data)
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data,
+                data=attestation_data,
                 signature=sig,
             )
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
@@ -296,7 +296,7 @@ class TestJustificationLogic:
             sig = key_manager.sign_attestation_data(vid, attestation_data)
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data,
+                data=attestation_data,
                 signature=sig,
             )
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
@@ -378,7 +378,7 @@ class TestJustificationLogic:
             sig = key_manager.sign_attestation_data(vid, attestation_data_head)
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data_head,
+                data=attestation_data_head,
                 signature=sig,
             )
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
@@ -427,7 +427,7 @@ class TestFinalizationFollowsJustification:
                     sig = key_manager.sign_attestation_data(vid, attestation_data)
                     signed_attestation = SignedAttestation(
                         validator_id=vid,
-                        message=attestation_data,
+                        data=attestation_data,
                         signature=sig,
                     )
                     store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
@@ -521,7 +521,7 @@ class TestIntegrationScenarios:
             sig = key_manager.sign_attestation_data(vid, attestation_data)
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data,
+                data=attestation_data,
                 signature=sig,
             )
             # Process as gossip

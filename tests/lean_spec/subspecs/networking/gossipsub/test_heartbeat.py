@@ -20,7 +20,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     ControlMessage,
     ControlPrune,
 )
-from lean_spec.types import Bytes20
+from lean_spec.subspecs.networking.gossipsub.types import MessageId
 
 from .conftest import add_peer, make_behavior, make_peer
 
@@ -255,7 +255,7 @@ class TestHeartbeatIntegration:
         behavior, _ = make_behavior()
         behavior.seen_cache = SeenCache(ttl_seconds=1)
 
-        msg_id = Bytes20(b"12345678901234567890")
+        msg_id = MessageId(b"12345678901234567890")
         behavior.seen_cache.add(msg_id, time.time() - 10)  # Already expired
 
         await behavior._heartbeat()
@@ -310,7 +310,7 @@ class TestHeartbeatIntegration:
         """Heartbeat clears per-peer IDONTWANT sets."""
         behavior, _ = make_behavior()
         pid = add_peer(behavior, "peer1")
-        behavior._peers[pid].dont_want_ids.add(Bytes20(b"12345678901234567890"))
+        behavior._peers[pid].dont_want_ids.add(MessageId(b"12345678901234567890"))
 
         assert len(behavior._peers[pid].dont_want_ids) == 1
 

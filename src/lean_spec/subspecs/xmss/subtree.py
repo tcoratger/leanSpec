@@ -325,14 +325,14 @@ class HashSubTree(Container):
     @classmethod
     def from_prf_key(
         cls,
-        prf: "Prf",
-        hasher: "TweakHasher",
-        rand: "Rand",
-        config: "XmssConfig",
+        prf: Prf,
+        hasher: TweakHasher,
+        rand: Rand,
+        config: XmssConfig,
         prf_key: PRFKey,
         bottom_tree_index: Uint64,
         parameter: Parameter,
-    ) -> "HashSubTree":
+    ) -> HashSubTree:
         """
         Generates a single bottom tree on-demand from the PRF key.
 
@@ -544,7 +544,7 @@ def combined_path(
 
 
 def verify_path(
-    hasher: "TweakHasher",
+    hasher: TweakHasher,
     parameter: Parameter,
     root: HashDigestVector,
     position: Uint64,

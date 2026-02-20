@@ -149,9 +149,7 @@ def _htr_list(value: SSZList) -> Bytes32:
 @hash_tree_root.register
 def _htr_container(value: Container) -> Bytes32:
     # Preserve declared field order from the Pydantic model
-    return merkleize(
-        [hash_tree_root(getattr(value, fname)) for fname in type(value).model_fields.keys()]
-    )
+    return merkleize([hash_tree_root(getattr(value, fname)) for fname in type(value).model_fields])
 
 
 @hash_tree_root.register

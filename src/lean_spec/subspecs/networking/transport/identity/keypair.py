@@ -16,6 +16,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from lean_spec.types import Bytes32, Bytes33
+
 from ..peer_id import KeyType, PeerId, PublicKeyProto
 
 __all__ = [
@@ -28,7 +30,7 @@ class IdentityKeypair:
     """
     secp256k1 keypair for libp2p identity.
 
-    Used to derive PeerId and sign identity proofs during Noise handshake.
+    Used to derive PeerId and sign identity proofs during QUIC TLS handshake.
 
     Attributes:
         private_key: The secp256k1 private key.
@@ -48,7 +50,7 @@ class IdentityKeypair:
         return cls(private_key=private_key)
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> IdentityKeypair:
+    def from_bytes(cls, data: Bytes32) -> IdentityKeypair:
         """
         Load keypair from raw private key bytes.
 
@@ -57,20 +59,14 @@ class IdentityKeypair:
 
         Returns:
             Identity keypair.
-
-        Raises:
-            ValueError: If data is not a valid secp256k1 private key.
         """
-        if len(data) != 32:
-            raise ValueError(f"Expected 32 bytes, got {len(data)}")
-
         private_key = ec.derive_private_key(
             int.from_bytes(data, "big"),
             ec.SECP256K1(),
         )
         return cls(private_key=private_key)
 
-    def private_key_bytes(self) -> bytes:
+    def private_key_bytes(self) -> Bytes32:
         """
         Return the raw 32-byte private key.
 
@@ -78,9 +74,9 @@ class IdentityKeypair:
             32-byte private key scalar.
         """
         private_numbers = self.private_key.private_numbers()
-        return private_numbers.private_value.to_bytes(32, "big")
+        return Bytes32(private_numbers.private_value.to_bytes(32, "big"))
 
-    def public_key_bytes(self) -> bytes:
+    def public_key_bytes(self) -> Bytes33:
         """
         Return the compressed secp256k1 public key (33 bytes).
 
@@ -91,9 +87,11 @@ class IdentityKeypair:
             33-byte compressed public key.
         """
         public_key = self.private_key.public_key()
-        return public_key.public_bytes(
-            encoding=serialization.Encoding.X962,
-            format=serialization.PublicFormat.CompressedPoint,
+        return Bytes33(
+            public_key.public_bytes(
+                encoding=serialization.Encoding.X962,
+                format=serialization.PublicFormat.CompressedPoint,
+            )
         )
 
     def sign(self, message: bytes) -> bytes:
@@ -128,7 +126,7 @@ class IdentityKeypair:
 
 
 def verify_signature(
-    public_key_bytes: bytes,
+    public_key_bytes: Bytes33,
     message: bytes,
     signature: bytes,
 ) -> bool:

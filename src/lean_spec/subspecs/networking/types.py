@@ -5,23 +5,27 @@ from enum import IntEnum, auto
 from lean_spec.types import Uint64
 from lean_spec.types.byte_arrays import Bytes1, Bytes4, Bytes32
 
-DomainType = Bytes1
-"""1-byte domain for message-id isolation in Gossipsub.
 
-The domain is a single byte prepended to the message hash to compute the gossip message ID.
+class DomainType(Bytes1):
+    """1-byte domain for message-id isolation in Gossipsub.
 
-- Valid messages use 0x01,
-- Invalid messages use 0x00.
-"""
+    The domain is a single byte prepended to the message hash to compute the gossip message ID.
 
-NodeId = Bytes32
-"""32-byte node identifier for Discovery v5, derived from ``keccak256(pubkey)``."""
+    - Valid messages use 0x01,
+    - Invalid messages use 0x00.
+    """
 
-ForkDigest = Bytes4
-"""4-byte fork identifier ensuring network isolation between forks."""
 
-Version = Bytes4
-"""4-byte fork version number (e.g., 0x01000000 for Phase0)."""
+class NodeId(Bytes32):
+    """32-byte node identifier for Discovery v5, derived from ``keccak256(pubkey)``."""
+
+
+class ForkDigest(Bytes4):
+    """4-byte fork identifier ensuring network isolation between forks."""
+
+
+class Version(Bytes4):
+    """4-byte fork version number (e.g., 0x01000000 for Phase0)."""
 
 
 class SeqNumber(Uint64):

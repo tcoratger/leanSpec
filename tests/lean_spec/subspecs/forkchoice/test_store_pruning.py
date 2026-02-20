@@ -2,7 +2,7 @@
 
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Bytes32
@@ -149,7 +149,9 @@ def test_prunes_related_structures_together(pruning_store: Store) -> None:
 
     # Create mock aggregated proof (empty proof data for testing)
     mock_proof = AggregatedSignatureProof(
-        participants=AggregationBits.from_validator_indices([ValidatorIndex(1)]),
+        participants=AggregationBits.from_validator_indices(
+            ValidatorIndices(data=[ValidatorIndex(1)])
+        ),
         proof_data=ByteListMiB(data=b""),
     )
 

@@ -21,14 +21,14 @@ from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_empty_block_body
 
 
 class TestGetForkchoiceStore:
-    """Test Store.get_forkchoice_store() time initialization."""
+    """Test State.to_forkchoice_store() time initialization."""
 
     @settings(max_examples=100)
     @given(anchor_slot=st.integers(min_value=0, max_value=10000))
     def test_store_time_from_anchor_slot(self, anchor_slot: int) -> None:
-        """get_forkchoice_store sets time = anchor_slot * INTERVALS_PER_SLOT."""
+        """to_forkchoice_store sets time = anchor_slot * INTERVALS_PER_SLOT."""
         # Must create its own state and block instead of using sample_store()
-        # because sample_store() bypasses get_forkchoice_store() with hardcoded time.
+        # because sample_store() bypasses to_forkchoice_store() with hardcoded time.
         state = State.generate_genesis(
             genesis_time=Uint64(1000),
             validators=Validators(data=[]),
@@ -43,9 +43,8 @@ class TestGetForkchoiceStore:
             body=make_empty_block_body(),
         )
 
-        store = Store.get_forkchoice_store(
-            anchor_state=state,
-            anchor_block=anchor_block,
+        store = state.to_forkchoice_store(
+            anchor_block,
             validator_id=TEST_VALIDATOR_ID,
         )
 

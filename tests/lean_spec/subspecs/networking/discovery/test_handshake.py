@@ -16,7 +16,7 @@ from lean_spec.subspecs.networking.discovery.handshake import (
     PendingHandshake,
 )
 from lean_spec.subspecs.networking.discovery.keys import compute_node_id
-from lean_spec.subspecs.networking.discovery.messages import IdNonce
+from lean_spec.subspecs.networking.discovery.messages import IdNonce, Nonce
 from lean_spec.subspecs.networking.discovery.packet import (
     HandshakeAuthdata,
     WhoAreYouAuthdata,
@@ -27,7 +27,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
 from lean_spec.subspecs.networking.discovery.session import SessionCache
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes32, Bytes33, Bytes64
+from lean_spec.types import Bytes16, Bytes32, Bytes33, Bytes64
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
 
@@ -143,9 +143,9 @@ class TestHandshakeManager:
     def test_create_whoareyou(self, manager):
         """Test creating a WHOAREYOU challenge."""
         remote_node_id = bytes(32)
-        request_nonce = bytes(12)
+        request_nonce = Nonce(bytes(12))
         remote_enr_seq = SeqNumber(0)
-        masking_iv = bytes(16)
+        masking_iv = Bytes16(bytes(16))
 
         id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
             remote_node_id, request_nonce, remote_enr_seq, masking_iv
@@ -188,28 +188,6 @@ class TestHandshakeManager:
         assert removed == 2
         assert manager.get_pending(remote1) is None
         assert manager.get_pending(remote2) is None
-
-    def test_invalid_local_node_id_raises(self):
-        """Test that invalid local node ID raises ValueError."""
-        with pytest.raises(ValueError, match="Local node ID must be 32 bytes"):
-            HandshakeManager(
-                local_node_id=bytes(31),  # type: ignore[arg-type]
-                local_private_key=bytes(32),
-                local_enr_rlp=b"enr",
-                local_enr_seq=SeqNumber(1),
-                session_cache=SessionCache(),
-            )
-
-    def test_invalid_local_private_key_raises(self):
-        """Test that invalid local private key raises ValueError."""
-        with pytest.raises(ValueError, match="Local private key must be 32 bytes"):
-            HandshakeManager(
-                local_node_id=NodeId(bytes(32)),
-                local_private_key=bytes(31),
-                local_enr_rlp=b"enr",
-                local_enr_seq=SeqNumber(1),
-                session_cache=SessionCache(),
-            )
 
 
 class TestHandshakeState:
@@ -270,9 +248,9 @@ class TestHandshakeStateTransitions:
         When we receive an undecryptable MESSAGE, we respond with WHOAREYOU.
         """
         remote_node_id = bytes(32)
-        request_nonce = bytes(12)
+        request_nonce = Nonce(bytes(12))
         remote_enr_seq = SeqNumber(0)
-        masking_iv = bytes(16)
+        masking_iv = Bytes16(bytes(16))
 
         id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
             remote_node_id, request_nonce, remote_enr_seq, masking_iv
@@ -288,9 +266,9 @@ class TestHandshakeStateTransitions:
     def test_sent_whoareyou_state_has_challenge_data(self, manager):
         """In SENT_WHOAREYOU state, all challenge data is stored."""
         remote_node_id = bytes(32)
-        request_nonce = bytes(12)
+        request_nonce = Nonce(bytes(12))
         remote_enr_seq = SeqNumber(5)
-        masking_iv = bytes(16)
+        masking_iv = Bytes16(bytes(16))
 
         manager.create_whoareyou(remote_node_id, request_nonce, remote_enr_seq, masking_iv)
 
@@ -330,8 +308,8 @@ class TestHandshakeValidation:
             src_id=NodeId(remote_node_id),
             sig_size=64,
             eph_key_size=33,
-            id_signature=bytes(64),
-            eph_pubkey=bytes(33),
+            id_signature=Bytes64(bytes(64)),
+            eph_pubkey=Bytes33(bytes(33)),
             record=None,
         )
 
@@ -350,8 +328,8 @@ class TestHandshakeValidation:
             src_id=NodeId(remote_node_id),
             sig_size=64,
             eph_key_size=33,
-            id_signature=bytes(64),
-            eph_pubkey=bytes(33),
+            id_signature=Bytes64(bytes(64)),
+            eph_pubkey=Bytes33(bytes(33)),
             record=None,
         )
 
@@ -366,9 +344,9 @@ class TestHandshakeValidation:
         # Set up WHOAREYOU state.
         manager.create_whoareyou(
             NodeId(remote_node_id),
-            bytes(12),
+            Nonce(bytes(12)),
             SeqNumber(0),
-            bytes(16),
+            Bytes16(bytes(16)),
         )
 
         # Create authdata with different src_id.
@@ -377,8 +355,8 @@ class TestHandshakeValidation:
             src_id=wrong_src_id,
             sig_size=64,
             eph_key_size=33,
-            id_signature=bytes(64),
-            eph_pubkey=bytes(33),
+            id_signature=Bytes64(bytes(64)),
+            eph_pubkey=Bytes33(bytes(33)),
             record=None,
         )
 
@@ -397,9 +375,9 @@ class TestHandshakeValidation:
         # Set up WHOAREYOU with enr_seq=0 (unknown).
         manager.create_whoareyou(
             NodeId(remote_node_id),
-            bytes(12),
+            Nonce(bytes(12)),
             SeqNumber(0),  # enr_seq = 0 means we don't know remote's ENR
-            bytes(16),
+            Bytes16(bytes(16)),
         )
 
         # Create authdata without ENR record.
@@ -407,8 +385,8 @@ class TestHandshakeValidation:
             src_id=NodeId(remote_node_id),
             sig_size=64,
             eph_key_size=33,
-            id_signature=bytes(64),
-            eph_pubkey=bytes(33),
+            id_signature=Bytes64(bytes(64)),
+            eph_pubkey=Bytes33(bytes(33)),
             record=None,  # No ENR included.
         )
 
@@ -426,9 +404,9 @@ class TestHandshakeValidation:
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Node A (manager) creates WHOAREYOU for remote.
-        masking_iv = bytes(16)
+        masking_iv = Bytes16(bytes(16))
         id_nonce, authdata, nonce, challenge_data = manager.create_whoareyou(
-            NodeId(remote_node_id), bytes(12), SeqNumber(0), masking_iv
+            NodeId(remote_node_id), Nonce(bytes(12)), SeqNumber(0), masking_iv
         )
 
         # Remote creates handshake response.
@@ -475,8 +453,8 @@ class TestHandshakeValidation:
         remote_priv, remote_pub, remote_node_id = remote_keypair
 
         # Set up WHOAREYOU state.
-        masking_iv = bytes(16)
-        manager.create_whoareyou(NodeId(remote_node_id), bytes(12), SeqNumber(0), masking_iv)
+        masking_iv = Bytes16(bytes(16))
+        manager.create_whoareyou(NodeId(remote_node_id), Nonce(bytes(12)), SeqNumber(0), masking_iv)
 
         # Generate ephemeral key.
         _eph_priv, eph_pub = generate_secp256k1_keypair()
@@ -490,7 +468,7 @@ class TestHandshakeValidation:
 
         authdata_bytes = encode_handshake_authdata(
             src_id=NodeId(remote_node_id),
-            id_signature=bytes(64),  # Wrong signature.
+            id_signature=Bytes64(bytes(64)),  # Wrong signature.
             eph_pubkey=eph_pub,
             record=remote_enr.to_rlp(),
         )
@@ -515,7 +493,7 @@ class TestHandshakeConcurrency:
         manager.start_handshake(remote2)
 
         # Create WHOAREYOU for third remote.
-        manager.create_whoareyou(remote3, bytes(12), SeqNumber(0), bytes(16))
+        manager.create_whoareyou(remote3, Nonce(bytes(12)), SeqNumber(0), Bytes16(bytes(16)))
 
         # All should have independent state.
         assert manager.get_pending(remote1).state == HandshakeState.SENT_ORDINARY
@@ -581,8 +559,10 @@ class TestHandshakeConcurrency:
         remote1 = bytes.fromhex("01" + "00" * 31)
         remote2 = bytes.fromhex("02" + "00" * 31)
 
-        id_nonce1, _, _, _ = manager.create_whoareyou(remote1, bytes(12), SeqNumber(0), bytes(16))
-        id_nonce2, _, _, _ = manager.create_whoareyou(remote2, bytes(12), SeqNumber(0), bytes(16))
+        nonce = Nonce(bytes(12))
+        iv = Bytes16(bytes(16))
+        id_nonce1, _, _, _ = manager.create_whoareyou(remote1, nonce, SeqNumber(0), iv)
+        id_nonce2, _, _, _ = manager.create_whoareyou(remote2, nonce, SeqNumber(0), iv)
 
         # Each challenge should have unique id_nonce.
         assert id_nonce1 != id_nonce2
@@ -619,7 +599,7 @@ class TestHandshakeEnrInclusion:
         authdata, _, _ = manager.create_handshake_response(
             remote_node_id=NodeId(remote_node_id),
             whoareyou=whoareyou,
-            remote_pubkey=bytes(remote_pub),
+            remote_pubkey=remote_pub,
             challenge_data=challenge_data,
         )
 
@@ -655,7 +635,7 @@ class TestHandshakeEnrInclusion:
         authdata, _, _ = manager.create_handshake_response(
             remote_node_id=NodeId(remote_node_id),
             whoareyou=whoareyou,
-            remote_pubkey=bytes(remote_pub),
+            remote_pubkey=remote_pub,
             challenge_data=challenge_data,
         )
 

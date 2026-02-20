@@ -17,7 +17,7 @@ def test_encode_decode_signed_attestation_roundtrip() -> None:
     )
     signed_attestation = SignedAttestation(
         validator_id=ValidatorIndex(0),
-        message=attestation_data,
+        data=attestation_data,
         signature=Signature(
             path=HashTreeOpening(siblings=HashDigestList(data=[])),
             rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),

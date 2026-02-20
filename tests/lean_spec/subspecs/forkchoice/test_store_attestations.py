@@ -16,7 +16,7 @@ from lean_spec.subspecs.containers.attestation import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
 from lean_spec.types import Bytes32, Uint64
 from tests.lean_spec.helpers import (
@@ -173,7 +173,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         signed_attestation = SignedAttestation(
             validator_id=attester_validator,
-            message=attestation_data,
+            data=attestation_data,
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
@@ -216,7 +216,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         signed_attestation = SignedAttestation(
             validator_id=attester_validator,
-            message=attestation_data,
+            data=attestation_data,
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
@@ -251,7 +251,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         signed_attestation = SignedAttestation(
             validator_id=attester_validator,
-            message=attestation_data,
+            data=attestation_data,
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
@@ -286,7 +286,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         signed_attestation = SignedAttestation(
             validator_id=attester_validator,
-            message=attestation_data,
+            data=attestation_data,
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
@@ -336,7 +336,9 @@ class TestOnGossipAggregatedAttestation:
 
         # Create valid aggregated proof
         proof = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(participants),
+            participants=AggregationBits.from_validator_indices(
+                ValidatorIndices(data=participants)
+            ),
             public_keys=[key_manager.get_public_key(vid) for vid in participants],
             signatures=[
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
@@ -377,7 +379,9 @@ class TestOnGossipAggregatedAttestation:
         data_root = attestation_data.data_root_bytes()
 
         proof = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(participants),
+            participants=AggregationBits.from_validator_indices(
+                ValidatorIndices(data=participants)
+            ),
             public_keys=[key_manager.get_public_key(vid) for vid in participants],
             signatures=[
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
@@ -413,7 +417,9 @@ class TestOnGossipAggregatedAttestation:
 
         # Create proof with WRONG signers (validator 3 signs instead of 2)
         proof = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(claimed_participants),
+            participants=AggregationBits.from_validator_indices(
+                ValidatorIndices(data=claimed_participants)
+            ),
             public_keys=[key_manager.get_public_key(vid) for vid in actual_signers],
             signatures=[
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in actual_signers
@@ -446,7 +452,9 @@ class TestOnGossipAggregatedAttestation:
         # First proof: validators 1 and 2
         participants_1 = [ValidatorIndex(1), ValidatorIndex(2)]
         proof_1 = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(participants_1),
+            participants=AggregationBits.from_validator_indices(
+                ValidatorIndices(data=participants_1)
+            ),
             public_keys=[key_manager.get_public_key(vid) for vid in participants_1],
             signatures=[
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants_1
@@ -458,7 +466,9 @@ class TestOnGossipAggregatedAttestation:
         # Second proof: validators 1 and 3 (validator 1 overlaps)
         participants_2 = [ValidatorIndex(1), ValidatorIndex(3)]
         proof_2 = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(participants_2),
+            participants=AggregationBits.from_validator_indices(
+                ValidatorIndices(data=participants_2)
+            ),
             public_keys=[key_manager.get_public_key(vid) for vid in participants_2],
             signatures=[
                 key_manager.sign_attestation_data(vid, attestation_data) for vid in participants_2
@@ -797,7 +807,7 @@ class TestEndToEndAggregationFlow:
         for vid in attesting_validators:
             signed_attestation = SignedAttestation(
                 validator_id=vid,
-                message=attestation_data,
+                data=attestation_data,
                 signature=key_manager.sign_attestation_data(vid, attestation_data),
             )
             store = store.on_gossip_attestation(

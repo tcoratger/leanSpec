@@ -345,7 +345,7 @@ class BlockCache:
         # parent P, we must process A before B.
         return sorted(children, key=lambda p: p.slot)
 
-    def get_processable(self, store: "Store") -> list[PendingBlock]:
+    def get_processable(self, store: Store) -> list[PendingBlock]:
         """
         Get blocks whose parents exist in the Store.
 

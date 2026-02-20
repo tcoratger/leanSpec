@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from threading import Lock
 
 from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.types import Bytes16
 
 from .config import BOND_EXPIRY_SECS
 from .messages import Port
@@ -51,10 +52,10 @@ class Session:
     node_id: NodeId
     """Peer's 32-byte node ID."""
 
-    send_key: bytes
+    send_key: Bytes16
     """16-byte key for encrypting messages to this peer."""
 
-    recv_key: bytes
+    recv_key: Bytes16
     """16-byte key for decrypting messages from this peer."""
 
     created_at: float
@@ -134,8 +135,8 @@ class SessionCache:
     def create(
         self,
         node_id: NodeId,
-        send_key: bytes,
-        recv_key: bytes,
+        send_key: Bytes16,
+        recv_key: Bytes16,
         is_initiator: bool,
         ip: str = "",
         port: Port = _DEFAULT_PORT,
@@ -157,13 +158,6 @@ class SessionCache:
         Returns:
             The newly created session.
         """
-        if len(node_id) != 32:
-            raise ValueError(f"Node ID must be 32 bytes, got {len(node_id)}")
-        if len(send_key) != 16:
-            raise ValueError(f"Send key must be 16 bytes, got {len(send_key)}")
-        if len(recv_key) != 16:
-            raise ValueError(f"Recv key must be 16 bytes, got {len(recv_key)}")
-
         key: SessionKey = (node_id, ip, port)
         now = time.time()
         session = Session(
@@ -257,7 +251,7 @@ class SessionCache:
         del self.sessions[oldest_key]
 
 
-@dataclass
+@dataclass(slots=True)
 class BondCache:
     """
     Cache tracking which nodes we have successfully bonded with.

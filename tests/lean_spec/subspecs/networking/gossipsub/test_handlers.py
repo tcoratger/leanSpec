@@ -24,7 +24,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
 )
-from lean_spec.types import Bytes20
+from lean_spec.subspecs.networking.gossipsub.types import MessageId
 
 from .conftest import add_peer, make_behavior, make_peer
 
@@ -217,7 +217,7 @@ class TestHandleIHave:
         """IHAVE for already-seen messages does not trigger IWANT."""
         behavior, capture = make_behavior()
         peer_id = add_peer(behavior, "peer1")
-        msg_id = Bytes20(b"12345678901234567890")
+        msg_id = MessageId(b"12345678901234567890")
 
         # Mark as seen
         behavior.seen_cache.add(msg_id, time.time())
@@ -233,7 +233,7 @@ class TestHandleIHave:
         behavior, capture = make_behavior()
         peer_id = add_peer(behavior, "peer1")
 
-        seen_id = Bytes20(b"seen_msg_id_1234seen")
+        seen_id = MessageId(b"seen_msg_id_1234seen")
         unseen_id = b"unseen_msg_id_12unse"
 
         behavior.seen_cache.add(seen_id, time.time())
@@ -535,7 +535,7 @@ class TestHandleIDontWant:
 
         state = behavior._peers[peer_id]
         for mid in msg_ids:
-            assert Bytes20(mid) in state.dont_want_ids
+            assert MessageId(mid) in state.dont_want_ids
 
     def test_idontwant_unknown_peer(self) -> None:
         """IDONTWANT for unknown peer is silently ignored."""

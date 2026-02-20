@@ -98,7 +98,7 @@ class SyncState(Enum):
     - Falls back to SYNCING if gaps appear
     """
 
-    def can_transition_to(self, target: "SyncState") -> bool:
+    def can_transition_to(self, target: SyncState) -> bool:
         """
         Check if transition to target state is valid.
 

@@ -87,7 +87,7 @@ class TweakHasher(StrictBaseModel):
     """Poseidon permutation instance for hashing."""
 
     @model_validator(mode="after")
-    def _validate_strict_types(self) -> "TweakHasher":
+    def _validate_strict_types(self) -> TweakHasher:
         """Reject subclasses to prevent type confusion attacks."""
         enforce_strict_types(self, config=XmssConfig, poseidon=PoseidonXmss)
         return self
