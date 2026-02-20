@@ -35,25 +35,25 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64, Bytes65
 
-COMPRESSED_PUBKEY_SIZE = 33
+COMPRESSED_PUBKEY_SIZE: Final = 33
 """Compressed secp256k1 public key: 0x02/0x03 + 32-byte x coordinate."""
 
-UNCOMPRESSED_PUBKEY_SIZE = 65
+UNCOMPRESSED_PUBKEY_SIZE: Final = 65
 """Uncompressed secp256k1 public key: 0x04 + 32-byte x + 32-byte y."""
 
-AES_KEY_SIZE = 16
+AES_KEY_SIZE: Final = 16
 """AES-128 key size in bytes."""
 
-GCM_NONCE_SIZE = 12
+GCM_NONCE_SIZE: Final = 12
 """AES-GCM nonce size in bytes."""
 
-GCM_TAG_SIZE = 16
+GCM_TAG_SIZE: Final = 16
 """AES-GCM authentication tag size in bytes."""
 
-CTR_IV_SIZE = 16
+CTR_IV_SIZE: Final = 16
 """AES-CTR initialization vector size in bytes."""
 
-ID_SIGNATURE_SIZE = 64
+ID_SIGNATURE_SIZE: Final = 64
 """secp256k1 signature size (r || s, each 32 bytes)."""
 
 ID_SIGNATURE_DOMAIN: Final = b"discovery v5 identity proof"

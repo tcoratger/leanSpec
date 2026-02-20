@@ -8,6 +8,7 @@ Each namespace represents a logical grouping of related data.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Final
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,8 +138,8 @@ class SlotIndexNamespace:
 
 
 # Singleton instances for convenient access
-BLOCKS = BlockNamespace()
-STATES = StateNamespace()
-CHECKPOINTS = CheckpointNamespace()
-ATTESTATIONS = AttestationNamespace()
-SLOT_INDEX = SlotIndexNamespace()
+BLOCKS: Final = BlockNamespace()
+STATES: Final = StateNamespace()
+CHECKPOINTS: Final = CheckpointNamespace()
+ATTESTATIONS: Final = AttestationNamespace()
+SLOT_INDEX: Final = SlotIndexNamespace()

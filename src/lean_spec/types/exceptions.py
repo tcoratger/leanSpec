@@ -1,5 +1,7 @@
 """Exception hierarchy for the SSZ type system."""
 
+from __future__ import annotations
+
 
 class SSZError(Exception):
     """Base exception for all SSZ-related errors."""

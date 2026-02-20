@@ -30,6 +30,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Final
 
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
@@ -55,7 +56,7 @@ from lean_spec.types import Bytes32, Uint64
 #
 # Must match the fork string used by ream and other clients.
 # For devnet, this is "devnet0".
-GOSSIP_FORK_DIGEST = "devnet0"
+GOSSIP_FORK_DIGEST: Final = "devnet0"
 
 logger = logging.getLogger(__name__)
 

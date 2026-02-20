@@ -7,7 +7,8 @@ Base types (HashDigestVector, Parameter, etc.) are defined in types.py.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Mapping, NamedTuple
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, NamedTuple
 
 from pydantic import model_serializer
 

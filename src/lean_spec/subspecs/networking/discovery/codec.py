@@ -20,8 +20,6 @@ References:
 
 from __future__ import annotations
 
-import os
-
 from lean_spec.subspecs.networking.types import SeqNumber
 from lean_spec.types import Uint64, decode_rlp, encode_rlp
 from lean_spec.types.rlp import RLPDecodingError
@@ -300,8 +298,3 @@ def _decode_talkresp(payload: bytes) -> TalkResp:
         request_id=_decode_request_id(items[0]),
         response=items[1],
     )
-
-
-def generate_request_id() -> RequestId:
-    """Generate a random request ID."""
-    return RequestId(data=os.urandom(8))

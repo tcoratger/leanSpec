@@ -8,6 +8,8 @@ model used by consensus. Every node must agree on slot boundaries to
 coordinate block proposals and attestations.
 """
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass

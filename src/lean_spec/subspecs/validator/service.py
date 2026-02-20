@@ -64,9 +64,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-BlockPublisher = Callable[[SignedBlockWithAttestation], Awaitable[None]]
+type BlockPublisher = Callable[[SignedBlockWithAttestation], Awaitable[None]]
 """Callback for publishing signed blocks with proposer attestations."""
-AttestationPublisher = Callable[[SignedAttestation], Awaitable[None]]
+type AttestationPublisher = Callable[[SignedAttestation], Awaitable[None]]
 """Callback for publishing produced attestations."""
 
 

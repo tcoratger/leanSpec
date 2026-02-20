@@ -36,8 +36,9 @@ import math
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import accumulate
+from typing import Final
 
-MAX_DIMENSION = 100
+MAX_DIMENSION: Final = 100
 """The maximum dimension `v` for which layer sizes will be precomputed."""
 
 

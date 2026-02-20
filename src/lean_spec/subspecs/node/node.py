@@ -16,6 +16,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Final
 
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
@@ -41,7 +42,7 @@ from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, S
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.types import Bytes32, Uint64
 
-_ZERO_TIME = Uint64(0)
+_ZERO_TIME: Final = Uint64(0)
 """Default genesis time for database loading when no genesis time is available."""
 
 

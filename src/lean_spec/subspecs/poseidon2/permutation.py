@@ -7,6 +7,8 @@ See https://eprint.iacr.org/2023/323.
 Uses numpy arrays for vectorized field operations.
 """
 
+from __future__ import annotations
+
 from typing import Final, Self
 
 import numpy as np

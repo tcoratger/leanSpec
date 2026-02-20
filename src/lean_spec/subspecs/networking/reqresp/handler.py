@@ -62,6 +62,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Final
 
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
@@ -116,7 +117,7 @@ class StreamResponseAdapter:
         await self._stream.close()
 
 
-BlockLookup = Callable[[Bytes32], Awaitable[SignedBlockWithAttestation | None]]
+type BlockLookup = Callable[[Bytes32], Awaitable[SignedBlockWithAttestation | None]]
 """Type alias for block lookup function.
 
 Takes a block root and returns the block if available, None otherwise.
@@ -220,7 +221,7 @@ class RequestHandler:
                 logger.warning("Error looking up block %s: %s", root.hex()[:8], e)
 
 
-REQRESP_PROTOCOL_IDS: frozenset[str] = frozenset(
+REQRESP_PROTOCOL_IDS: Final[frozenset[str]] = frozenset(
     {
         STATUS_PROTOCOL_V1,
         BLOCKS_BY_ROOT_PROTOCOL_V1,

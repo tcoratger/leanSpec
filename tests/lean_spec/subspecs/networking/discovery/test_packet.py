@@ -18,8 +18,6 @@ from lean_spec.subspecs.networking.discovery.packet import (
     encode_message_authdata,
     encode_packet,
     encode_whoareyou_authdata,
-    generate_id_nonce,
-    generate_nonce,
 )
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes16, Bytes33, Bytes64
@@ -30,18 +28,18 @@ class TestNonceGeneration:
 
     def test_generate_nonce_is_12_bytes(self):
         """Test that generated nonce is 12 bytes."""
-        nonce = generate_nonce()
+        nonce = Nonce.generate()
         assert len(nonce) == 12
 
     def test_generate_id_nonce_is_16_bytes(self):
         """Test that generated ID nonce is 16 bytes."""
-        id_nonce = generate_id_nonce()
+        id_nonce = IdNonce.generate()
         assert len(id_nonce) == 16
 
     def test_generates_different_nonces(self):
         """Test that each generation produces different nonces."""
-        nonce1 = generate_nonce()
-        nonce2 = generate_nonce()
+        nonce1 = Nonce.generate()
+        nonce2 = Nonce.generate()
         assert nonce1 != nonce2
 
 

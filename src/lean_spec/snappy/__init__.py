@@ -4,16 +4,6 @@ Snappy is a fast compression/decompression algorithm developed by Google.
 It prioritizes speed over compression ratio, making it ideal for real-time
 applications and network protocols.
 
-Usage::
-
-    from lean_spec.snappy import compress, decompress
-
-    # Compress data before sending
-    compressed = compress(data)
-
-    # Decompress received data
-    original = decompress(compressed)
-
 The implementation follows the Snappy format specification:
 https://github.com/google/snappy/blob/main/format_description.txt
 """

@@ -39,7 +39,7 @@ References:
 from __future__ import annotations
 
 import base64
-from typing import ClassVar, Self
+from typing import ClassVar, Final, Self
 
 from Crypto.Hash import keccak
 from cryptography.exceptions import InvalidSignature
@@ -63,7 +63,7 @@ from . import keys
 from .eth2 import AttestationSubnets, Eth2Data, SyncCommitteeSubnets
 from .keys import EnrKey
 
-ENR_PREFIX = "enr:"
+ENR_PREFIX: Final = "enr:"
 """Text prefix for ENR strings."""
 
 

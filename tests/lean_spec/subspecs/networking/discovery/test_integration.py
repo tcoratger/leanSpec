@@ -33,7 +33,6 @@ from lean_spec.subspecs.networking.discovery.packet import (
     decode_whoareyou_authdata,
     encode_message_authdata,
     encode_packet,
-    generate_nonce,
 )
 from lean_spec.subspecs.networking.discovery.routing import (
     NodeEntry,
@@ -93,7 +92,7 @@ class TestEncryptedPacketRoundtrip:
 
         # Create authdata.
         authdata = encode_message_authdata(node_a_keys["node_id"])
-        nonce = generate_nonce()
+        nonce = Nonce.generate()
 
         # Encode packet.
         packet = encode_packet(

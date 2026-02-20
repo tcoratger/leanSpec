@@ -83,7 +83,8 @@ class PoseidonXmss(StrictBaseModel):
             raise ValueError("Input vector is too short for requested output length.")
 
         # Select the correct permutation parameters based on the state width.
-        assert width in (16, 24), "Width must be 16 or 24"
+        if width not in (16, 24):
+            raise ValueError(f"Width must be 16 or 24, got {width}")
         params = self.params16 if width == 16 else self.params24
 
         # Create a padded input by extending with zeros to match the state width.
@@ -171,7 +172,8 @@ class PoseidonXmss(StrictBaseModel):
             raise ValueError("Capacity length must be smaller than the state width.")
 
         # Determine the permutation parameters and the size of the rate.
-        assert width in (16, 24), "Width must be 16 or 24"
+        if width not in (16, 24):
+            raise ValueError(f"Width must be 16 or 24, got {width}")
         params = self.params16 if width == 16 else self.params24
         rate = width - len(capacity_value)
 

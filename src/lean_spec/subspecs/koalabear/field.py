@@ -1,30 +1,32 @@
 """Core definition of the KoalaBear prime field Fp."""
 
-from typing import IO, Self
+from __future__ import annotations
+
+from typing import IO, Final, Self
 
 from lean_spec.types import SSZType
 
-P: int = 2**31 - 2**24 + 1
+P: Final = 2**31 - 2**24 + 1
 """
 The KoalaBear Prime: P = 2^31 - 2^24 + 1
 
 The prime is chosen because the cube map (x -> x^3) is an automorphism of the multiplicative group.
 """
 
-P_BITS: int = 31
+P_BITS: Final = 31
 """The number of bits in the prime P."""
 
-P_BYTES: int = (P_BITS + 7) // 8
+P_BYTES: Final = (P_BITS + 7) // 8
 """The size of a KoalaBear field element in bytes."""
 
-TWO_ADICITY: int = 24
+TWO_ADICITY: Final = 24
 """
 The largest integer n such that 2^n divides (P - 1).
 
 P - 1 = 2^24 * 127
 """
 
-TWO_ADIC_GENERATORS: list[int] = [
+TWO_ADIC_GENERATORS: Final[list[int]] = [
     0x1,
     0x7F000000,
     0x7E010002,

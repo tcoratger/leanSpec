@@ -19,6 +19,7 @@ or a well-known provider).
 from __future__ import annotations
 
 import logging
+from typing import Final
 
 import httpx
 
@@ -28,10 +29,10 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TIMEOUT = 60.0
+DEFAULT_TIMEOUT: Final = 60.0
 """HTTP request timeout in seconds. Large states may take time to transfer."""
 
-FINALIZED_STATE_ENDPOINT = "/lean/v0/states/finalized"
+FINALIZED_STATE_ENDPOINT: Final = "/lean/v0/states/finalized"
 """API endpoint for fetching finalized state. Follows Beacon API conventions."""
 
 

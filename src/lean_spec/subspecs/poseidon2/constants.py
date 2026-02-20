@@ -1,5 +1,7 @@
 """Round constants for the Poseidon2 permutation over the KoalaBear field."""
 
+from __future__ import annotations
+
 from ..koalabear.field import Fp
 
 # For width 16: 64 external_initial + 20 internal + 64 external_final = 148 constants

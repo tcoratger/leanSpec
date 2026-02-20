@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from lean_spec.subspecs.ssz.utils import get_power_of_two_ceil, hash_nodes
 from lean_spec.types import ZERO_HASH
@@ -11,7 +11,17 @@ from lean_spec.types.byte_arrays import Bytes32
 _MAX_ZERO_HASH_DEPTH: int = 64
 """Maximum depth of pre-computed zero hashes (supports trees up to 2^64 leaves)."""
 
-_ZERO_HASHES: list[Bytes32] = []
+
+def _precompute_zero_hashes() -> tuple[Bytes32, ...]:
+    """Pre-compute zero hashes at module load time for O(1) lookup."""
+    hashes: list[Bytes32] = [ZERO_HASH]
+    for _ in range(_MAX_ZERO_HASH_DEPTH):
+        prev = hashes[-1]
+        hashes.append(hash_nodes(prev, prev))
+    return tuple(hashes)
+
+
+_ZERO_HASHES: tuple[Bytes32, ...] = _precompute_zero_hashes()
 """Pre-computed zero hash roots at each depth level.
 
 Index i contains the root of a full zero tree with 2^i leaves:
@@ -21,18 +31,6 @@ Index i contains the root of a full zero tree with 2^i leaves:
 - Index 2: hash of two index-1 hashes (4 leaves)
 - And so on...
 """
-
-
-def _precompute_zero_hashes() -> None:
-    """Pre-compute zero hashes at module load time for O(1) lookup."""
-    global _ZERO_HASHES
-    _ZERO_HASHES = [ZERO_HASH]
-    for _ in range(_MAX_ZERO_HASH_DEPTH):
-        prev = _ZERO_HASHES[-1]
-        _ZERO_HASHES.append(hash_nodes(prev, prev))
-
-
-_precompute_zero_hashes()
 
 
 def _zero_tree_root(width_pow2: int) -> Bytes32:

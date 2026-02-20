@@ -62,7 +62,7 @@ import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from itertools import count
-from typing import ClassVar, cast
+from typing import ClassVar, Final, cast
 
 from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
 from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
@@ -79,8 +79,6 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     ControlPrune,
     Message,
     SubOpts,
-    create_graft_rpc,
-    create_subscription_rpc,
 )
 from lean_spec.subspecs.networking.gossipsub.types import MessageId
 from lean_spec.subspecs.networking.transport import PeerId
@@ -104,7 +102,7 @@ class GossipsubMessageEvent:
     data: bytes
     """Message payload (may be compressed)."""
 
-    message_id: bytes
+    message_id: MessageId
     """Computed message ID."""
 
 
@@ -122,7 +120,7 @@ class GossipsubPeerEvent:
     """True if peer subscribed, False if unsubscribed."""
 
 
-IDONTWANT_SIZE_THRESHOLD: int = 1024
+IDONTWANT_SIZE_THRESHOLD: Final = 1024
 """Minimum message size (bytes) to trigger IDONTWANT.
 
 Messages smaller than this are cheap to transmit and don't
@@ -383,7 +381,7 @@ class GossipsubBehavior:
                 logger.debug("Added outbound stream for peer %s", peer_id)
 
             if self.mesh.subscriptions:
-                rpc = create_subscription_rpc(list(self.mesh.subscriptions), subscribe=True)
+                rpc = RPC.subscription(list(self.mesh.subscriptions), subscribe=True)
                 await self._send_rpc(peer_id, rpc)
 
     def has_outbound_stream(self, peer_id: PeerId) -> bool:
@@ -795,7 +793,7 @@ class GossipsubBehavior:
             for peer_id in to_graft:
                 self.mesh.add_to_mesh(topic, peer_id)
 
-            rpc = create_graft_rpc([topic])
+            rpc = RPC.graft([topic])
             for peer_id in to_graft:
                 await self._send_rpc(peer_id, rpc)
 
@@ -954,7 +952,7 @@ class GossipsubBehavior:
             subscribe: True for subscribe, False for unsubscribe.
             prune_peers: Former mesh peers to PRUNE (unsubscribe only).
         """
-        rpc = create_subscription_rpc([topic], subscribe)
+        rpc = RPC.subscription([topic], subscribe)
         for peer_id, state in self._peers.items():
             if state.outbound_stream is not None:
                 await self._send_rpc(peer_id, rpc)
@@ -976,7 +974,7 @@ class GossipsubBehavior:
                 ][:needed]
 
                 if eligible:
-                    graft_rpc = create_graft_rpc([topic])
+                    graft_rpc = RPC.graft([topic])
                     for peer_id in eligible:
                         self.mesh.add_to_mesh(topic, peer_id)
                         await self._send_rpc(peer_id, graft_rpc)

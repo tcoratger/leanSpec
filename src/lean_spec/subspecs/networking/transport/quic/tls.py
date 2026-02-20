@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -33,10 +33,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 if TYPE_CHECKING:
     from ..identity import IdentityKeypair
 
-LIBP2P_EXTENSION_OID = x509.ObjectIdentifier("1.3.6.1.4.1.53594.1.1")
+LIBP2P_EXTENSION_OID: Final = x509.ObjectIdentifier("1.3.6.1.4.1.53594.1.1")
 """libp2p TLS extension OID (Protocol Labs assigned)."""
 
-SIGNATURE_PREFIX = b"libp2p-tls-handshake:"
+SIGNATURE_PREFIX: Final = b"libp2p-tls-handshake:"
 """
 Prefix for the signed payload.
 
@@ -45,7 +45,7 @@ Without a prefix, the signature could potentially be replayed in other contexts.
 """
 
 # Key type identifiers matching libp2p protobuf definitions
-KEY_TYPE_SECP256K1 = 2
+KEY_TYPE_SECP256K1: Final = 2
 """secp256k1 key type in libp2p protobuf."""
 
 
