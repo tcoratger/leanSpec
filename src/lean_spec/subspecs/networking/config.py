@@ -26,14 +26,14 @@ Maximum total time to receive a complete response. This covers the entire
 response, including all chunks for multi-part responses like BlocksByRange.
 """
 
-MESSAGE_DOMAIN_INVALID_SNAPPY: Final[DomainType] = DomainType(b"\x00")
-"""1-byte domain for gossip message-id isolation of invalid snappy messages.
+MESSAGE_DOMAIN_INVALID_SNAPPY: Final[DomainType] = DomainType(b"\x00\x00\x00\x00")
+"""4-byte domain for gossip message-id isolation of invalid snappy messages.
 
 Per Ethereum spec, prepended to the message hash when decompression fails.
 """
 
-MESSAGE_DOMAIN_VALID_SNAPPY: Final[DomainType] = DomainType(b"\x01")
-"""1-byte domain for gossip message-id isolation of valid snappy messages.
+MESSAGE_DOMAIN_VALID_SNAPPY: Final[DomainType] = DomainType(b"\x01\x00\x00\x00")
+"""4-byte domain for gossip message-id isolation of valid snappy messages.
 
 Per Ethereum spec, prepended to the message hash when decompression succeeds.
 """

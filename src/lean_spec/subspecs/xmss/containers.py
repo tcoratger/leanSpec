@@ -62,7 +62,10 @@ class Signature(Container):
     - rho: Vector[Fp, RAND_LEN_FE]
     - hashes: List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]
 
-    Serialization is handled automatically by SSZ.
+    This is a variable-size Container because path and hashes are variable-size
+    fields. The field dimensions are determined by the scheme parameters, so in
+    practice every valid signature serializes to the same byte count, but the SSZ
+    type system correctly classifies it as variable-size.
     """
 
     path: HashTreeOpening

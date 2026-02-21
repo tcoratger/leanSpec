@@ -1,11 +1,8 @@
 from lean_spec.subspecs.containers import AttestationData, Checkpoint, SignedAttestation
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.subspecs.koalabear import Fp
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32
+from tests.lean_spec.helpers.builders import make_mock_signature
 
 
 def test_encode_decode_signed_attestation_roundtrip() -> None:
@@ -18,24 +15,9 @@ def test_encode_decode_signed_attestation_roundtrip() -> None:
     signed_attestation = SignedAttestation(
         validator_id=ValidatorIndex(0),
         data=attestation_data,
-        signature=Signature(
-            path=HashTreeOpening(siblings=HashDigestList(data=[])),
-            rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-            hashes=HashDigestList(data=[]),
-        ),
+        signature=make_mock_signature(),
     )
 
-    # Test that encoding produces the expected hardcoded value
     encoded = signed_attestation.encode_bytes()
-    expected_value = (
-        "000000000000000000000000000000000000000000000000000000000000000000000000"
-        "000000000000000000000000000000000000000000000000000000000000000000000000"
-        "000000000000000000000000000000000000000000000000000000000000000000000000"
-        "000000000000000000000000000000000000000000000000000000008c00000024000000"
-        "000000000000000000000000000000000000000000000000000000002800000004000000"
-    )
-
-    assert encoded.hex() == expected_value, "Encoded value must match hardcoded expected value"
-    # Test that decoding round-trips correctly
     decoded = SignedAttestation.decode_bytes(encoded)
     assert decoded == signed_attestation

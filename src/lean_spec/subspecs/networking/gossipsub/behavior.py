@@ -64,6 +64,7 @@ from dataclasses import dataclass, field
 from itertools import count
 from typing import ClassVar, Final, cast
 
+from lean_spec.snappy import decompress as snappy_raw_decompress
 from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
 from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
 from lean_spec.subspecs.networking.gossipsub.mesh import MeshState
@@ -417,7 +418,7 @@ class GossipsubBehavior:
             data: Message payload.
         """
         msg = Message(topic=topic, data=data)
-        msg_id = GossipsubMessage.compute_id(topic.encode("utf-8"), data)
+        msg_id = GossipsubMessage.compute_id(topic.encode("utf-8"), data, snappy_raw_decompress)
 
         if self.seen_cache.has(msg_id):
             logger.debug("Skipping duplicate message %s", msg_id.hex()[:8])
@@ -425,7 +426,9 @@ class GossipsubBehavior:
 
         self.seen_cache.add(msg_id, time.time())
 
-        cache_msg = GossipsubMessage(topic=topic.encode("utf-8"), raw_data=data)
+        cache_msg = GossipsubMessage(
+            topic=topic.encode("utf-8"), raw_data=data, snappy_decompress=snappy_raw_decompress
+        )
         self.message_cache.put(topic, cache_msg)
 
         if topic in self.mesh.subscriptions:
@@ -547,7 +550,9 @@ class GossipsubBehavior:
         if not msg.topic:
             return
 
-        msg_id = GossipsubMessage.compute_id(msg.topic.encode("utf-8"), msg.data)
+        msg_id = GossipsubMessage.compute_id(
+            msg.topic.encode("utf-8"), msg.data, snappy_raw_decompress
+        )
 
         # Deduplicate: each message is processed at most once.
         if self.seen_cache.has(msg_id):
@@ -555,7 +560,11 @@ class GossipsubBehavior:
         self.seen_cache.add(msg_id, time.time())
 
         # Cache for IWANT responses to peers who receive our IHAVE gossip.
-        cache_msg = GossipsubMessage(topic=msg.topic.encode("utf-8"), raw_data=msg.data)
+        cache_msg = GossipsubMessage(
+            topic=msg.topic.encode("utf-8"),
+            raw_data=msg.data,
+            snappy_decompress=snappy_raw_decompress,
+        )
         self.message_cache.put(msg.topic, cache_msg)
 
         # Only forward on topics we participate in (have a mesh for).

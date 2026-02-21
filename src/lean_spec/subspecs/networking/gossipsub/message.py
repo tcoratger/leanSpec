@@ -33,8 +33,8 @@ Ethereum consensus uses a custom message ID function based on SHA256::
 
 **Domain Bytes:**
 
-- ``0x01`` (VALID_SNAPPY): Snappy decompression succeeded, use decompressed data
-- ``0x00`` (INVALID_SNAPPY): Decompression failed or no decompressor, use raw data
+- ``0x01000000`` (VALID_SNAPPY): Snappy decompression succeeded, use decompressed data
+- ``0x00000000`` (INVALID_SNAPPY): Decompression failed or no decompressor, use raw data
 
 This ensures messages with compression issues get different IDs,
 preventing cache pollution from invalid variants.

@@ -5,16 +5,17 @@ from __future__ import annotations
 from enum import IntEnum, auto
 
 from lean_spec.types import Uint64
-from lean_spec.types.byte_arrays import Bytes1, Bytes4, Bytes32
+from lean_spec.types.byte_arrays import Bytes4, Bytes32
 
 
-class DomainType(Bytes1):
-    """1-byte domain for message-id isolation in Gossipsub.
+class DomainType(Bytes4):
+    """4-byte domain for message-id isolation in Gossipsub.
 
-    The domain is a single byte prepended to the message hash to compute the gossip message ID.
+    Per the Ethereum consensus spec, DomainType is 4 bytes.
+    Prepended to the message hash to compute the gossip message ID.
 
-    - Valid messages use 0x01,
-    - Invalid messages use 0x00.
+    - Valid messages use 0x01000000,
+    - Invalid messages use 0x00000000.
     """
 
 

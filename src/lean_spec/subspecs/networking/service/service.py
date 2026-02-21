@@ -26,7 +26,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from lean_spec.snappy import frame_compress
+from lean_spec.snappy import compress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.containers.validator import SubnetId
@@ -209,7 +209,7 @@ class NetworkService:
         """
         topic = GossipTopic.block(self.fork_digest)
         ssz_bytes = block.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
 
         await self.event_source.publish(str(topic), compressed)
         logger.debug("Published block at slot %s", block.message.block.slot)
@@ -229,7 +229,7 @@ class NetworkService:
         """
         topic = GossipTopic.attestation_subnet(self.fork_digest, subnet_id)
         ssz_bytes = attestation.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
 
         await self.event_source.publish(str(topic), compressed)
         logger.debug("Published attestation for slot %s", attestation.data.slot)
@@ -245,7 +245,7 @@ class NetworkService:
         """
         topic = GossipTopic.committee_aggregation(self.fork_digest)
         ssz_bytes = signed_attestation.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
 
         await self.event_source.publish(str(topic), compressed)
         logger.debug("Published aggregated attestation for slot %s", signed_attestation.data.slot)

@@ -50,7 +50,7 @@ The message format is:
 +------------------+---------------------------------------------+
 | data_length      | Varint: byte length of compressed data      |
 +------------------+---------------------------------------------+
-| data             | Snappy-framed SSZ-encoded message           |
+| data             | Snappy-compressed SSZ-encoded message       |
 +------------------+---------------------------------------------+
 
 Varints use LEB128 encoding (1-10 bytes depending on value).
@@ -78,7 +78,7 @@ SSZ (Simple Serialize) is Ethereum's canonical serialization format:
 - Fixed overhead: Known sizes enable buffer pre-allocation.
 
 Snappy compression reduces bandwidth by 50-70% for typical blocks.
-The framing format adds CRC32C checksums for corruption detection.
+Gossip uses raw Snappy block format. Req-resp uses Snappy framing with CRC32C.
 
 
 GOSSIPSUB v1.1 REQUIREMENTS
@@ -105,7 +105,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Final, Protocol, Self
 
-from lean_spec.snappy import SnappyDecompressionError, frame_decompress
+from lean_spec.snappy import SnappyDecompressionError, decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.networking.config import (
@@ -218,7 +218,7 @@ class GossipHandler:
     Topics contain:
 
     - Fork digest: 4-byte identifier derived from genesis + fork version.
-    - Message type: "block" or "attestation".
+    - Message type: "blocks" or "attestation".
     - Encoding: Always "ssz_snappy" for Ethereum.
 
     Validating the topic prevents:
@@ -273,7 +273,7 @@ class GossipHandler:
         ForkMismatchError.
 
         Args:
-            topic_str: Full topic string (e.g., "/leanconsensus/0x.../block/ssz_snappy").
+            topic_str: Full topic string (e.g., "/leanconsensus/0x.../blocks/ssz_snappy").
             compressed_data: Snappy-compressed SSZ data.
 
         Returns:
@@ -296,19 +296,14 @@ class GossipHandler:
         except ValueError as e:
             raise GossipMessageError(f"Invalid topic: {e}") from e
 
-        # Step 2: Decompress Snappy-framed data.
+        # Step 2: Decompress raw Snappy data.
         #
-        # Ethereum uses Snappy framing format for gossip (same as req/resp).
-        # Framed Snappy includes stream identifier and CRC32C checksums.
-        #
-        # Decompression fails if:
-        #   - Stream identifier is missing or invalid.
-        #   - CRC checksum mismatch (data corruption).
-        #   - Compressed data is truncated.
+        # Gossip uses raw Snappy block format (not framing).
+        # This matches libp2p gossipsub's SnappyTransform behavior.
         #
         # Failed decompression indicates network corruption or a malicious peer.
         try:
-            ssz_bytes = frame_decompress(compressed_data)
+            ssz_bytes = decompress(compressed_data)
         except SnappyDecompressionError as e:
             raise GossipMessageError(f"Snappy decompression failed: {e}") from e
 
@@ -689,7 +684,7 @@ class LiveNetworkEventSource:
         in mesh management via GRAFT/PRUNE.
 
         Args:
-            topic: Full topic string (e.g., "/leanconsensus/0x.../block/ssz_snappy").
+            topic: Full topic string (e.g., "/leanconsensus/0x.../blocks/ssz_snappy").
         """
         self._gossipsub_behavior.subscribe(topic)
         logger.debug("Subscribed to gossip topic %s", topic)
