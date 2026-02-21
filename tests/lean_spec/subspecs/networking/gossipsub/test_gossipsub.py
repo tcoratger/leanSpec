@@ -86,7 +86,7 @@ class TestTopicForkValidation:
     def test_from_string_validated_success(self) -> None:
         """Test from_string_validated parses and validates successfully."""
         assert GossipTopic.from_string_validated(
-            "/leanconsensus/0x12345678/block/ssz_snappy",
+            "/leanconsensus/0x12345678/blocks/ssz_snappy",
             expected_fork_digest="0x12345678",
         ) == GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
 
@@ -94,7 +94,7 @@ class TestTopicForkValidation:
         """Test from_string_validated raises ForkMismatchError on mismatch."""
         with pytest.raises(ForkMismatchError):
             GossipTopic.from_string_validated(
-                "/leanconsensus/0x12345678/block/ssz_snappy",
+                "/leanconsensus/0x12345678/blocks/ssz_snappy",
                 expected_fork_digest="0xdeadbeef",
             )
 
@@ -111,11 +111,12 @@ class TestTopicFormatting:
         """Test GossipTopic creation."""
         topic = GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
         assert topic == GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
-        assert str(topic) == "/leanconsensus/0x12345678/block/ssz_snappy"
+        assert str(topic) == "/leanconsensus/0x12345678/blocks/ssz_snappy"
 
     def test_gossip_topic_from_string(self) -> None:
         """Test parsing topic string."""
-        assert GossipTopic.from_string("/leanconsensus/0x12345678/block/ssz_snappy") == GossipTopic(
+        topic_str = "/leanconsensus/0x12345678/blocks/ssz_snappy"
+        assert GossipTopic.from_string(topic_str) == GossipTopic(
             kind=TopicKind.BLOCK, fork_digest="0x12345678"
         )
 
@@ -130,10 +131,10 @@ class TestTopicFormatting:
 
     def test_parse_topic_string(self) -> None:
         """Test topic string parsing."""
-        assert parse_topic_string("/leanconsensus/0x12345678/block/ssz_snappy") == (
+        assert parse_topic_string("/leanconsensus/0x12345678/blocks/ssz_snappy") == (
             "leanconsensus",
             "0x12345678",
-            "block",
+            "blocks",
             "ssz_snappy",
         )
 
@@ -143,13 +144,13 @@ class TestTopicFormatting:
             GossipTopic.from_string("/invalid/topic")
 
         with pytest.raises(ValueError, match="Invalid prefix"):
-            GossipTopic.from_string("/wrongprefix/0x123/block/ssz_snappy")
+            GossipTopic.from_string("/wrongprefix/0x123/blocks/ssz_snappy")
 
     def test_topic_kind_enum(self) -> None:
         """Test TopicKind enum."""
-        assert TopicKind.BLOCK.value == "block"
+        assert TopicKind.BLOCK.value == "blocks"
         assert TopicKind.ATTESTATION_SUBNET.value == "attestation"
-        assert str(TopicKind.BLOCK) == "block"
+        assert str(TopicKind.BLOCK) == "blocks"
 
 
 class TestMeshState:
@@ -367,7 +368,7 @@ class TestRPCProtobufEncoding:
 
     def test_subopts_encode_decode(self) -> None:
         """Test SubOpts (subscription) encoding/decoding."""
-        sub = SubOpts(subscribe=True, topic_id="/leanconsensus/0x12345678/block/ssz_snappy")
+        sub = SubOpts(subscribe=True, topic_id="/leanconsensus/0x12345678/blocks/ssz_snappy")
         assert SubOpts.decode(sub.encode()) == sub
 
         unsub = SubOpts(subscribe=False, topic_id="/test/topic")
@@ -508,7 +509,7 @@ class TestGossipHandlerForkValidation:
         handler = GossipHandler(fork_digest="0x12345678")
 
         # Topic with different fork_digest
-        wrong_fork_topic = "/leanconsensus/0xdeadbeef/block/ssz_snappy"
+        wrong_fork_topic = "/leanconsensus/0xdeadbeef/blocks/ssz_snappy"
 
         with pytest.raises(ForkMismatchError) as exc_info:
             handler.decode_message(wrong_fork_topic, b"dummy_data")
@@ -532,6 +533,6 @@ class TestGossipHandlerForkValidation:
     def test_get_topic_accepts_matching_fork(self) -> None:
         """GossipHandler.get_topic() returns topic for matching fork."""
         handler = GossipHandler(fork_digest="0x12345678")
-        assert handler.get_topic("/leanconsensus/0x12345678/block/ssz_snappy") == GossipTopic(
+        assert handler.get_topic("/leanconsensus/0x12345678/blocks/ssz_snappy") == GossipTopic(
             kind=TopicKind.BLOCK, fork_digest="0x12345678"
         )

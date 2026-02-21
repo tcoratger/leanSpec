@@ -168,7 +168,10 @@ class SyncService:
     """Callback for publishing aggregated attestations to the network."""
 
     _state: SyncState = field(default=SyncState.IDLE)
-    """Current sync state."""
+    """Current sync state. Defaults to IDLE, awaiting peer status."""
+
+    genesis_start: bool = field(default=False)
+    """When True, start in SYNCING state to accept gossip without waiting for peers."""
 
     _backfill: BackfillSync | None = field(default=None)
     """Backfill syncer instance (created lazily)."""
@@ -212,6 +215,12 @@ class SyncService:
     def __post_init__(self) -> None:
         """Initialize sync components."""
         self._init_components()
+
+        # Genesis validators already hold the full genesis state so they
+        # should process gossip blocks immediately without waiting for a
+        # peer Status exchange.
+        if self.genesis_start:
+            self._state = SyncState.SYNCING
 
     def _init_components(self) -> None:
         """

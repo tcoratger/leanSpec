@@ -235,6 +235,7 @@ class Node:
             network=config.network,
             database=database,
             is_aggregator=config.is_aggregator,
+            genesis_start=True,
         )
 
         chain_service = ChainService(sync_service=sync_service, clock=clock)

@@ -64,7 +64,12 @@ from dataclasses import dataclass, field
 from itertools import count
 from typing import ClassVar, Final, cast
 
-from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
+from lean_spec.snappy import decompress as snappy_raw_decompress
+from lean_spec.subspecs.networking.config import (
+    MESSAGE_DOMAIN_INVALID_SNAPPY,
+    MESSAGE_DOMAIN_VALID_SNAPPY,
+    PRUNE_BACKOFF,
+)
 from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
 from lean_spec.subspecs.networking.gossipsub.mesh import MeshState
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
@@ -89,6 +94,22 @@ from lean_spec.types import Uint16
 logger = logging.getLogger(__name__)
 
 
+def _try_decompress(data: bytes) -> tuple[bytes, bytes]:
+    """Attempt Snappy decompression and return data with domain.
+
+    Decompress once upfront so that message ID computation and event delivery share the result.
+
+    Returns:
+        Tuple of (data_for_hash, domain_bytes).
+        On success: (decompressed_data, VALID_SNAPPY).
+        On failure: (raw_data, INVALID_SNAPPY).
+    """
+    try:
+        return snappy_raw_decompress(data), MESSAGE_DOMAIN_VALID_SNAPPY
+    except Exception:
+        return data, MESSAGE_DOMAIN_INVALID_SNAPPY
+
+
 @dataclass(slots=True)
 class GossipsubMessageEvent:
     """Event emitted when a valid message is received."""
@@ -100,7 +121,7 @@ class GossipsubMessageEvent:
     """Topic the message belongs to."""
 
     data: bytes
-    """Message payload (may be compressed)."""
+    """Message payload (decompressed if Snappy decompression succeeded)."""
 
     message_id: MessageId
     """Computed message ID."""
@@ -417,7 +438,16 @@ class GossipsubBehavior:
             data: Message payload.
         """
         msg = Message(topic=topic, data=data)
-        msg_id = GossipsubMessage.compute_id(topic.encode("utf-8"), data)
+        topic_bytes = topic.encode("utf-8")
+
+        # Decompress once for message ID computation.
+        #
+        # Data is decompressed before the message ID function runs.
+        # The domain indicates whether:
+        # - decompression succeeded (VALID_SNAPPY),
+        # - failed (INVALID_SNAPPY).
+        decompressed, domain = _try_decompress(data)
+        msg_id = GossipsubMessage.compute_id(topic_bytes, decompressed, domain=domain)
 
         if self.seen_cache.has(msg_id):
             logger.debug("Skipping duplicate message %s", msg_id.hex()[:8])
@@ -425,7 +455,9 @@ class GossipsubBehavior:
 
         self.seen_cache.add(msg_id, time.time())
 
-        cache_msg = GossipsubMessage(topic=topic.encode("utf-8"), raw_data=data)
+        # Cache stores compressed data for IWANT responses.
+        cache_msg = GossipsubMessage(topic=topic_bytes, raw_data=data)
+        cache_msg._cached_id = msg_id
         self.message_cache.put(topic, cache_msg)
 
         if topic in self.mesh.subscriptions:
@@ -547,15 +579,24 @@ class GossipsubBehavior:
         if not msg.topic:
             return
 
-        msg_id = GossipsubMessage.compute_id(msg.topic.encode("utf-8"), msg.data)
+        topic_bytes = msg.topic.encode("utf-8")
+
+        # Decompress once for message ID computation and event delivery.
+        #
+        # Data is decompressed before the message ID function runs.
+        # The decompressed data is also passed to the event consumer,
+        # eliminating a second decompression there.
+        decompressed, domain = _try_decompress(msg.data)
+        msg_id = GossipsubMessage.compute_id(topic_bytes, decompressed, domain=domain)
 
         # Deduplicate: each message is processed at most once.
         if self.seen_cache.has(msg_id):
             return
         self.seen_cache.add(msg_id, time.time())
 
-        # Cache for IWANT responses to peers who receive our IHAVE gossip.
-        cache_msg = GossipsubMessage(topic=msg.topic.encode("utf-8"), raw_data=msg.data)
+        # Cache stores compressed data for IWANT responses.
+        cache_msg = GossipsubMessage(topic=topic_bytes, raw_data=msg.data)
+        cache_msg._cached_id = msg_id
         self.message_cache.put(msg.topic, cache_msg)
 
         # Only forward on topics we participate in (have a mesh for).
@@ -584,8 +625,10 @@ class GossipsubBehavior:
                     if mesh_peer != peer_id:
                         await self._send_rpc(mesh_peer, idontwant_rpc)
 
+        # Event carries decompressed data for the consumer.
+        # This eliminates the need for a second decompression in the event handler.
         event = GossipsubMessageEvent(
-            peer_id=peer_id, topic=msg.topic, data=msg.data, message_id=msg_id
+            peer_id=peer_id, topic=msg.topic, data=decompressed, message_id=msg_id
         )
         await self._event_queue.put(event)
 

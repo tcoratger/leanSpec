@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.snappy import compress, frame_compress, frame_decompress
+from lean_spec.snappy import compress, decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
@@ -93,7 +93,7 @@ class MockStream:
 
 def make_block_topic(fork_digest: str = "0x00000000") -> str:
     """Create a valid block topic string."""
-    return f"/{TOPIC_PREFIX}/{fork_digest}/block/{ENCODING_POSTFIX}"
+    return f"/{TOPIC_PREFIX}/{fork_digest}/blocks/{ENCODING_POSTFIX}"
 
 
 def make_attestation_topic(fork_digest: str = "0x00000000", subnet_id: int = 0) -> str:
@@ -125,10 +125,10 @@ def build_gossip_message(topic: str, ssz_data: bytes) -> bytes:
 
     Format: [topic_len varint][topic][data_len varint][compressed_data]
 
-    Uses Snappy framed compression as required by Ethereum gossip protocol.
+    Uses raw Snappy compression as required by Ethereum gossip protocol.
     """
     topic_bytes = topic.encode("utf-8")
-    compressed_data = frame_compress(ssz_data)
+    compressed_data = compress(ssz_data)
 
     message = bytearray()
     message.extend(encode_varint(len(topic_bytes)))
@@ -164,7 +164,7 @@ class TestGossipHandlerGetTopic:
     def test_valid_block_topic(self) -> None:
         """Parses valid block topic string."""
         handler = GossipHandler(fork_digest="0x12345678")
-        topic_str = "/leanconsensus/0x12345678/block/ssz_snappy"
+        topic_str = "/leanconsensus/0x12345678/blocks/ssz_snappy"
 
         topic = handler.get_topic(topic_str)
 
@@ -195,14 +195,14 @@ class TestGossipHandlerGetTopic:
         handler = GossipHandler(fork_digest="0x00000000")
 
         with pytest.raises(GossipMessageError, match="Invalid topic"):
-            handler.get_topic("/wrongprefix/0x00000000/block/ssz_snappy")
+            handler.get_topic("/wrongprefix/0x00000000/blocks/ssz_snappy")
 
     def test_invalid_topic_format_wrong_encoding(self) -> None:
         """Raises GossipMessageError for wrong encoding suffix."""
         handler = GossipHandler(fork_digest="0x00000000")
 
         with pytest.raises(GossipMessageError, match="Invalid topic"):
-            handler.get_topic("/leanconsensus/0x00000000/block/ssz")
+            handler.get_topic("/leanconsensus/0x00000000/blocks/ssz")
 
     def test_invalid_topic_format_unknown_topic_name(self) -> None:
         """Raises GossipMessageError for unknown topic name."""
@@ -227,7 +227,7 @@ class TestGossipHandlerDecodeMessage:
         handler = GossipHandler(fork_digest="0x00000000")
         block = make_test_signed_block()
         ssz_bytes = block.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
         topic_str = make_block_topic()
 
         result = handler.decode_message(topic_str, compressed)
@@ -239,7 +239,7 @@ class TestGossipHandlerDecodeMessage:
         handler = GossipHandler(fork_digest="0x00000000")
         attestation = make_test_signed_attestation()
         ssz_bytes = attestation.encode_bytes()
-        compressed = frame_compress(ssz_bytes)
+        compressed = compress(ssz_bytes)
         topic_str = make_attestation_topic()
 
         result = handler.decode_message(topic_str, compressed)
@@ -269,8 +269,8 @@ class TestGossipHandlerDecodeMessage:
         """Raises GossipMessageError for invalid SSZ data."""
         handler = GossipHandler(fork_digest="0x00000000")
         topic_str = make_block_topic()
-        # Valid Snappy framing wrapping garbage SSZ
-        compressed = frame_compress(b"\xff\xff\xff\xff")
+        # Valid Snappy compression wrapping garbage SSZ
+        compressed = compress(b"\xff\xff\xff\xff")
 
         with pytest.raises(GossipMessageError, match="SSZ decode failed"):
             handler.decode_message(topic_str, compressed)
@@ -289,7 +289,7 @@ class TestGossipHandlerDecodeMessage:
         block = make_test_signed_block()
         ssz_bytes = block.encode_bytes()
         truncated = ssz_bytes[:10]  # Truncate SSZ data
-        compressed = frame_compress(truncated)
+        compressed = compress(truncated)
         topic_str = make_block_topic()
 
         with pytest.raises(GossipMessageError, match="SSZ decode failed"):
@@ -412,8 +412,8 @@ class TestReadGossipMessage:
         topic, compressed = await read_gossip_message(stream)
 
         assert topic == topic_str
-        # Verify the compressed data can be decompressed (framed format)
-        decompressed = frame_decompress(compressed)
+        # Verify the compressed data can be decompressed (raw Snappy format)
+        decompressed = decompress(compressed)
         assert decompressed == ssz_bytes
 
     async def test_read_single_byte_chunks(self) -> None:
@@ -511,7 +511,7 @@ class TestGossipReceptionEdgeCases:
         """Handler works with various fork digest formats."""
         for digest in ["0x00000000", "0xffffffff", "0x12345678", "0xabcdef01"]:
             handler = GossipHandler(fork_digest=digest)
-            topic_str = f"/{TOPIC_PREFIX}/{digest}/block/{ENCODING_POSTFIX}"
+            topic_str = f"/{TOPIC_PREFIX}/{digest}/blocks/{ENCODING_POSTFIX}"
             topic = handler.get_topic(topic_str)
             assert topic.fork_digest == digest
 
@@ -544,7 +544,7 @@ class TestGossipReceptionEdgeCases:
         """Handles messages with unusually long topic strings."""
         # Create a long but valid-format topic
         long_digest = "0x" + "a" * 100
-        topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
+        topic = f"/{TOPIC_PREFIX}/{long_digest}/blocks/{ENCODING_POSTFIX}"
         topic_bytes = topic.encode("utf-8")
         compressed = compress(b"test")
 
@@ -554,7 +554,7 @@ class TestGossipReceptionEdgeCases:
         stream = MockStream(data)
         parsed_topic, _ = await read_gossip_message(stream)
 
-        expected_topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
+        expected_topic = f"/{TOPIC_PREFIX}/{long_digest}/blocks/{ENCODING_POSTFIX}"
         assert parsed_topic == expected_topic
 
     @pytest.mark.parametrize(

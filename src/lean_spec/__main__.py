@@ -468,6 +468,12 @@ async def run_node(
 
     event_source = await LiveNetworkEventSource.create()
 
+    # Set the fork digest for incoming message validation.
+    #
+    # Without this, the event source defaults to "0x00000000" and rejects
+    # all messages from other clients that use "devnet0".
+    event_source.set_fork_digest(GOSSIP_FORK_DIGEST)
+
     # Subscribe to gossip topics.
     #
     # We subscribe before connecting to bootnodes so that when

@@ -42,10 +42,11 @@ from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG
+from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.types import (
     HashDigestList,
+    HashDigestVector,
     HashTreeOpening,
     Randomness,
 )
@@ -59,16 +60,27 @@ def make_bytes32(seed: int) -> Bytes32:
     return Bytes32(bytes([seed % 256]) * 32)
 
 
+def _zero_digest() -> HashDigestVector:
+    """Create a zero-filled hash digest vector."""
+    return HashDigestVector(data=[Fp(0)] * TARGET_CONFIG.HASH_LEN_FE)
+
+
 def make_mock_signature() -> Signature:
     """
-    Create a minimal mock XMSS signature.
+    Create a mock XMSS signature with correctly-sized fields.
 
-    Suitable for tests that require signature structure but skip verification.
+    Fills path, rho, and hashes with zeros at the exact dimensions
+    required by the active scheme. This ensures the signature serializes
+    to exactly SIGNATURE_LEN_BYTES, matching the fixed-size SSZ encoding.
     """
     return Signature(
-        path=HashTreeOpening(siblings=HashDigestList(data=[])),
-        rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-        hashes=HashDigestList(data=[]),
+        path=HashTreeOpening(
+            siblings=HashDigestList(
+                data=[_zero_digest() for _ in range(TARGET_CONFIG.LOG_LIFETIME)]
+            )
+        ),
+        rho=Randomness(data=[Fp(0)] * TARGET_CONFIG.RAND_LEN_FE),
+        hashes=HashDigestList(data=[_zero_digest() for _ in range(TARGET_CONFIG.DIMENSION)]),
     )
 
 

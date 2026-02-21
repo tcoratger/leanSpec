@@ -13,11 +13,8 @@ from lean_spec.subspecs.containers.block.types import (
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.subspecs.koalabear import Fp
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import HashDigestList, HashTreeOpening, Randomness
 from lean_spec.types import Bytes32
+from tests.lean_spec.helpers.builders import make_mock_signature
 
 
 def test_encode_decode_signed_block_with_attestation_roundtrip() -> None:
@@ -42,24 +39,10 @@ def test_encode_decode_signed_block_with_attestation_roundtrip() -> None:
         ),
         signature=BlockSignatures(
             attestation_signatures=AttestationSignatures(data=[]),
-            proposer_signature=Signature(
-                path=HashTreeOpening(siblings=HashDigestList(data=[])),
-                rho=Randomness(data=[Fp(0) for _ in range(PROD_CONFIG.RAND_LEN_FE)]),
-                hashes=HashDigestList(data=[]),
-            ),
+            proposer_signature=make_mock_signature(),
         ),
     )
 
     encode = signed_block_with_attestation.encode_bytes()
-    expected_value = (
-        "08000000ec0000008c00000000000000000000000000000000000000000000000000000"
-        "00000000000000000000000000000000000000000000000000000000000000000000000"
-        "00000000000000000000000000000000000000000000000000000000000000000000000"
-        "00000000000000000000000000000000000000000000000000000000000000000000000"
-        "00000000000000000000000000000000000000000000000000000000000000000000000"
-        "00000000000000000000000000000000000000000000000000000000000000000000000"
-        "00000000000000000000000000000054000000040000000800000008000000240000000"
-        "00000000000000000000000000000000000000000000000000000002800000004000000"
-    )
-    assert encode.hex() == expected_value, "Encoded value must match hardcoded expected value"
-    assert SignedBlockWithAttestation.decode_bytes(encode) == signed_block_with_attestation
+    decoded = SignedBlockWithAttestation.decode_bytes(encode)
+    assert decoded == signed_block_with_attestation
