@@ -135,6 +135,8 @@ class GossipsubMessage:
         topic: bytes,
         data: bytes,
         snappy_decompress: SnappyDecompressor | None = None,
+        *,
+        domain: bytes | None = None,
     ) -> MessageId:
         """Compute a 20-byte message ID from raw data.
 
@@ -145,6 +147,8 @@ class GossipsubMessage:
         Domain Selection
         ----------------
 
+        - If `domain` is explicitly provided:
+            use it directly (data is assumed pre-processed by the caller)
         - If `snappy_decompress` is provided and succeeds:
             domain = 0x01, use decompressed data
         - Otherwise:
@@ -154,11 +158,15 @@ class GossipsubMessage:
             topic: Topic string as bytes.
             data: Message payload (potentially compressed).
             snappy_decompress: Optional decompression function.
+            domain: Explicit domain bytes. When provided, data is used as-is.
 
         Returns:
             20-byte message ID.
         """
-        if snappy_decompress is not None:
+        if domain is not None:
+            # Caller already determined the domain (e.g., after pre-decompression).
+            data_for_hash = data
+        elif snappy_decompress is not None:
             try:
                 data_for_hash = snappy_decompress(data)
                 domain = MESSAGE_DOMAIN_VALID_SNAPPY

@@ -729,7 +729,8 @@ class LiveNetworkEventSource:
         """
         Handle a message received via GossipSub.
 
-        Decodes the message and emits the appropriate event type.
+        Event data is already decompressed by the gossipsub behavior.
+        Decodes SSZ bytes directly based on topic kind.
 
         Args:
             event: GossipSub message event from the behavior.
@@ -738,20 +739,23 @@ class LiveNetworkEventSource:
             # Parse the topic to determine message type.
             topic = self._gossip_handler.get_topic(event.topic)
 
-            # Decompress and decode the message.
-            message = self._gossip_handler.decode_message(event.topic, event.data)
-
-            # Emit the appropriate event.
-            match topic.kind:
-                case TopicKind.BLOCK:
-                    if isinstance(message, SignedBlockWithAttestation):
-                        await self._emit_gossip_block(message, event.peer_id)
-                case TopicKind.ATTESTATION_SUBNET:
-                    if isinstance(message, SignedAttestation):
-                        await self._emit_gossip_attestation(message, event.peer_id)
-                case TopicKind.AGGREGATED_ATTESTATION:
-                    if isinstance(message, SignedAggregatedAttestation):
-                        await self._emit_gossip_aggregated_attestation(message, event.peer_id)
+            # Decode SSZ bytes directly.
+            #
+            # The gossipsub behavior already decompressed the Snappy payload
+            # during message ID computation. The event carries decompressed data.
+            try:
+                match topic.kind:
+                    case TopicKind.BLOCK:
+                        block = SignedBlockWithAttestation.decode_bytes(event.data)
+                        await self._emit_gossip_block(block, event.peer_id)
+                    case TopicKind.ATTESTATION_SUBNET:
+                        att = SignedAttestation.decode_bytes(event.data)
+                        await self._emit_gossip_attestation(att, event.peer_id)
+                    case TopicKind.AGGREGATED_ATTESTATION:
+                        agg = SignedAggregatedAttestation.decode_bytes(event.data)
+                        await self._emit_gossip_aggregated_attestation(agg, event.peer_id)
+            except SSZSerializationError as e:
+                raise GossipMessageError(f"SSZ decode failed: {e}") from e
 
             logger.debug("Processed gossipsub message %s from %s", topic.kind.value, event.peer_id)
 
