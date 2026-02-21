@@ -97,8 +97,7 @@ logger = logging.getLogger(__name__)
 def _try_decompress(data: bytes) -> tuple[bytes, bytes]:
     """Attempt Snappy decompression and return data with domain.
 
-    Matches Ream's SnappyTransform pattern: decompress once upfront
-    so that message ID computation and event delivery share the result.
+    Decompress once upfront so that message ID computation and event delivery share the result.
 
     Returns:
         Tuple of (data_for_hash, domain_bytes).
@@ -443,9 +442,10 @@ class GossipsubBehavior:
 
         # Decompress once for message ID computation.
         #
-        # Matches Ream's SnappyTransform where data is decompressed before
-        # the message ID function runs. The domain indicates whether
-        # decompression succeeded (VALID_SNAPPY) or failed (INVALID_SNAPPY).
+        # Data is decompressed before the message ID function runs.
+        # The domain indicates whether:
+        # - decompression succeeded (VALID_SNAPPY),
+        # - failed (INVALID_SNAPPY).
         decompressed, domain = _try_decompress(data)
         msg_id = GossipsubMessage.compute_id(topic_bytes, decompressed, domain=domain)
 
@@ -583,9 +583,9 @@ class GossipsubBehavior:
 
         # Decompress once for message ID computation and event delivery.
         #
-        # Matches Ream's SnappyTransform where data is decompressed before
-        # the message ID function runs. The decompressed data is also passed
-        # to the event consumer, eliminating a second decompression there.
+        # Data is decompressed before the message ID function runs.
+        # The decompressed data is also passed to the event consumer,
+        # eliminating a second decompression there.
         decompressed, domain = _try_decompress(msg.data)
         msg_id = GossipsubMessage.compute_id(topic_bytes, decompressed, domain=domain)
 
