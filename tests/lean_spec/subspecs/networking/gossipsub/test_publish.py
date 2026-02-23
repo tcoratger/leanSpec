@@ -17,6 +17,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
 )
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 from .conftest import add_peer, make_behavior
 
@@ -28,7 +29,7 @@ class TestPublish:
     async def test_publish_to_subscribed_topic(self) -> None:
         """Published message reaches mesh peers for a subscribed topic."""
         behavior, capture = make_behavior(d=3, d_low=2, d_high=6)
-        topic = "testTopic"
+        topic = TopicId("testTopic")
         behavior.subscribe(topic)
 
         p1 = add_peer(behavior, "peerA", {topic})
@@ -47,7 +48,7 @@ class TestPublish:
         """Publishing to an unsubscribed topic uses fanout peers."""
         behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
 
-        topic = "fanoutTopic"
+        topic = TopicId("fanoutTopic")
         add_peer(behavior, "peerA", {topic})
         add_peer(behavior, "peerB", {topic})
 
@@ -62,7 +63,7 @@ class TestPublish:
     async def test_publish_duplicate_skipped(self) -> None:
         """Publishing the same message twice is a no-op the second time."""
         behavior, capture = make_behavior()
-        topic = "testTopic"
+        topic = TopicId("testTopic")
         behavior.subscribe(topic)
 
         p1 = add_peer(behavior, "peerA", {topic})
@@ -78,7 +79,7 @@ class TestPublish:
     async def test_publish_caches_message(self) -> None:
         """Published messages are added to the message cache."""
         behavior, _ = make_behavior()
-        topic = "testTopic"
+        topic = TopicId("testTopic")
         behavior.subscribe(topic)
 
         await behavior.publish(topic, b"cacheMe")
@@ -91,7 +92,7 @@ class TestPublish:
     async def test_publish_empty_mesh_no_crash(self) -> None:
         """Publishing to an empty mesh does not crash."""
         behavior, capture = make_behavior()
-        topic = "emptyTopic"
+        topic = TopicId("emptyTopic")
         behavior.subscribe(topic)
 
         # No peers added -- mesh is empty.
@@ -127,7 +128,7 @@ class TestBroadcastSubscription:
         behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
         behavior._running = True
 
-        topic = "graftTopic"
+        topic = TopicId("graftTopic")
         # These peers are already subscribed to the topic.
         add_peer(behavior, "peerA", {topic})
         add_peer(behavior, "peerB", {topic})
@@ -149,7 +150,7 @@ class TestBroadcastSubscription:
         behavior, capture = make_behavior(d=3, d_low=2, d_high=6)
         behavior._running = True
 
-        topic = "promoteTopic"
+        topic = TopicId("promoteTopic")
         p1 = add_peer(behavior, "peerA", {topic})
 
         # Create fanout first.
@@ -177,7 +178,7 @@ class TestBroadcastSubscription:
         behavior, capture = make_behavior()
         behavior._running = True
 
-        topic = "pruneTopic"
+        topic = TopicId("pruneTopic")
         behavior.subscribe(topic)
 
         p1 = add_peer(behavior, "peerA", {topic})

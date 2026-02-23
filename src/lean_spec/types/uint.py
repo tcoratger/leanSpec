@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import IO, Any, ClassVar, Literal, Self, SupportsIndex, SupportsInt
+from typing import IO, Any, ClassVar, Literal, Self, SupportsIndex, SupportsInt, override
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -69,6 +69,7 @@ class BaseUint(int, SSZType):
         )
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """
         Determine if this is a fixed-size type.
@@ -79,6 +80,7 @@ class BaseUint(int, SSZType):
         return True
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """
         Get the number of bytes for this Uint type.
@@ -88,6 +90,7 @@ class BaseUint(int, SSZType):
         """
         return cls.BITS // 8
 
+    @override
     def encode_bytes(self) -> bytes:
         """
         Serializes the Uint to its little-endian byte representation.
@@ -99,6 +102,7 @@ class BaseUint(int, SSZType):
         return self.to_bytes(length=self.get_byte_length(), byteorder="little")
 
     @classmethod
+    @override
     def decode_bytes(cls, data: bytes) -> Self:
         """
         Deserializes a byte string into a Uint instance.
@@ -121,6 +125,7 @@ class BaseUint(int, SSZType):
         # The `from_bytes` class method from `int` is used to convert the data.
         return cls(int.from_bytes(data, "little"))
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """
         Serializes the Uint and writes it to a binary stream.
@@ -139,6 +144,7 @@ class BaseUint(int, SSZType):
         return len(encoded_data)
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """
         Deserializes a Uint from a binary stream within a given scope.
@@ -266,7 +272,7 @@ class BaseUint(int, SSZType):
             self._raise_type_error(other, "%")
         return type(self)(int(other) % int(self))
 
-    def __pow__(self, exponent: Any, modulo: Any | None = None) -> Any:
+    def __pow__(self, exponent: Any, modulo: Any | None = None) -> Any:  # type: ignore[override]
         """Handle the exponentiation operator (`**`) and `pow(self, exp, mod)`."""
         self._validate_int_operand(exponent, "** or pow()")
         if modulo is not None:

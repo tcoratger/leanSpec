@@ -20,7 +20,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     ControlMessage,
     ControlPrune,
 )
-from lean_spec.subspecs.networking.gossipsub.types import MessageId
+from lean_spec.subspecs.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
 from .conftest import add_peer, make_behavior, make_peer
 
@@ -32,7 +32,7 @@ class TestMaintainMesh:
     async def test_grafts_when_below_d_low(self) -> None:
         """GRAFT peers when mesh is below d_low."""
         behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Exactly d=4 eligible peers so random.sample selects all deterministically.
@@ -53,7 +53,7 @@ class TestMaintainMesh:
     async def test_prunes_when_above_d_high(self) -> None:
         """PRUNE excess peers when mesh exceeds d_high."""
         behavior, capture = make_behavior(d=3, d_low=2, d_high=4)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Add 6 peers and put them all in mesh (exceeds d_high=4)
@@ -82,7 +82,7 @@ class TestMaintainMesh:
     async def test_respects_backoff(self) -> None:
         """Mesh maintenance does not GRAFT peers in backoff."""
         behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Add peer with backoff set
@@ -104,7 +104,7 @@ class TestMaintainMesh:
     async def test_skips_peers_without_outbound_stream(self) -> None:
         """Mesh maintenance skips peers without outbound streams."""
         behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Add peer without outbound stream
@@ -123,7 +123,7 @@ class TestMaintainMesh:
     async def test_noop_when_within_bounds(self) -> None:
         """No GRAFT or PRUNE when mesh is within [d_low, d_high]."""
         behavior, capture = make_behavior(d=4, d_low=3, d_high=6)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Put exactly 4 peers in mesh (== d, within [d_low=3, d_high=6])
@@ -142,7 +142,7 @@ class TestMaintainMesh:
     async def test_prune_sets_bidirectional_backoff(self) -> None:
         """When we PRUNE peers, we also set our own backoff for them."""
         behavior, capture = make_behavior(d=2, d_low=1, d_high=3)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Add 5 peers in mesh (> d_high=3)
@@ -172,7 +172,7 @@ class TestEmitGossip:
     async def test_sends_ihave_to_non_mesh_peers(self) -> None:
         """IHAVE is sent to non-mesh peers that are subscribed."""
         behavior, capture = make_behavior(d=2, d_low=1, d_high=4, d_lazy=2)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Add message to cache
@@ -201,7 +201,7 @@ class TestEmitGossip:
     async def test_skips_when_no_cached_messages(self) -> None:
         """No IHAVE sent when cache is empty."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         add_peer(behavior, "peer1", {topic})
@@ -214,7 +214,7 @@ class TestEmitGossip:
     async def test_skips_peers_without_outbound_stream(self) -> None:
         """Gossip skips peers without outbound streams."""
         behavior, capture = make_behavior(d_lazy=2)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         msg = GossipsubMessage(topic=topic.encode("utf-8"), raw_data=b"data")
@@ -237,7 +237,7 @@ class TestHeartbeatIntegration:
         behavior, _ = make_behavior()
 
         msg = GossipsubMessage(topic=b"topic", raw_data=b"data")
-        behavior.message_cache.put("topic", msg)
+        behavior.message_cache.put(TopicId("topic"), msg)
 
         initial_len = len(behavior.message_cache)
         assert initial_len == 1
@@ -256,7 +256,7 @@ class TestHeartbeatIntegration:
         behavior.seen_cache = SeenCache(ttl_seconds=1)
 
         msg_id = MessageId(b"12345678901234567890")
-        behavior.seen_cache.add(msg_id, time.time() - 10)  # Already expired
+        behavior.seen_cache.add(msg_id, Timestamp(time.time() - 10))  # Already expired
 
         await behavior._heartbeat()
 
@@ -267,8 +267,8 @@ class TestHeartbeatIntegration:
         """Heartbeat processes all subscribed topics."""
         behavior, capture = make_behavior(d=2, d_low=1, d_high=4)
 
-        topic1 = "topic1"
-        topic2 = "topic2"
+        topic1 = TopicId("topic1")
+        topic2 = TopicId("topic2")
         behavior.subscribe(topic1)
         behavior.subscribe(topic2)
 
@@ -292,7 +292,7 @@ class TestHeartbeatIntegration:
 
         # Create a stale fanout entry by publishing to an unsubscribed topic
         # Then manually make it stale
-        topic = "unsubscribed_topic"
+        topic = TopicId("unsubscribed_topic")
         available = {add_peer(behavior, "peer1", {topic})}
         behavior.mesh.update_fanout(topic, available)
 
@@ -324,11 +324,11 @@ class TestHeartbeatIntegration:
         behavior, capture = make_behavior(d_lazy=2)
 
         # Subscribe to one topic
-        sub_topic = "subscribed_topic"
+        sub_topic = TopicId("subscribed_topic")
         behavior.subscribe(sub_topic)
 
         # Create a fanout entry for an unsubscribed topic with cached messages
-        fan_topic = "fanout_topic"
+        fan_topic = TopicId("fanout_topic")
         fan_peer = add_peer(behavior, "fanPeer", {fan_topic})
         behavior.mesh.update_fanout(fan_topic, {fan_peer})
 

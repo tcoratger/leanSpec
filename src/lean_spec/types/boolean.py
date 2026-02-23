@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import IO, Any, Self
+from typing import IO, Any, Self, override
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
@@ -72,15 +72,18 @@ class Boolean(int, SSZType):
         )
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """Return whether the type is fixed-size."""
         return True
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Return the byte length of the type."""
         return 1
 
+    @override
     def encode_bytes(self) -> bytes:
         r"""
         Serializes the boolean to its SSZ byte representation.
@@ -90,6 +93,7 @@ class Boolean(int, SSZType):
         return b"\x01" if self else b"\x00"
 
     @classmethod
+    @override
     def decode_bytes(cls, data: bytes) -> Self:
         """Deserialize a single byte into a Boolean instance."""
         if len(data) != 1:
@@ -98,6 +102,7 @@ class Boolean(int, SSZType):
             raise SSZSerializationError(f"Boolean: byte must be 0x00 or 0x01, got {data[0]:#04x}")
         return cls(data[0])
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize the boolean to a binary stream."""
         encoded_data = self.encode_bytes()
@@ -105,6 +110,7 @@ class Boolean(int, SSZType):
         return len(encoded_data)
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Deserialize a boolean from a binary stream."""
         if scope != 1:

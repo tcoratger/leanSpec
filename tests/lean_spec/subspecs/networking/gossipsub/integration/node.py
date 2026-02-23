@@ -16,6 +16,7 @@ from lean_spec.subspecs.networking.gossipsub.behavior import (
     GossipsubPeerEvent,
 )
 from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 from .stream import create_stream_pair
 
@@ -172,7 +173,7 @@ class GossipsubTestNode:
 
     def get_mesh_peers(self, topic: str) -> set[PeerId]:
         """Get the set of mesh peers for a topic."""
-        return self.behavior.mesh.get_mesh_peers(topic)
+        return self.behavior.mesh.get_mesh_peers(TopicId(topic))
 
     def get_mesh_size(self, topic: str) -> int:
         """Get the number of mesh peers for a topic."""

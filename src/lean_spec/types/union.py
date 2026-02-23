@@ -9,6 +9,7 @@ from typing import (
     Final,
     Self,
     cast,
+    override,
 )
 
 from pydantic import model_validator
@@ -115,15 +116,18 @@ class SSZUnion(SSZModel):
         return self.OPTIONS[self.selector]
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """Union types are always variable-size in SSZ."""
         return False
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Union types are variable-size and don't have fixed length."""
         raise SSZTypeError(f"{cls.__name__}: variable-size union has no fixed byte length")
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize this Union to a byte stream in SSZ format."""
         # Write selector byte and return early for None
@@ -133,6 +137,7 @@ class SSZUnion(SSZModel):
         )
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Deserialize a Union from a byte stream using SSZ format."""
         # Validate scope for selector byte

@@ -9,7 +9,7 @@ Ethereum's serialization format.
 
 from __future__ import annotations
 
-from typing import IO, Any, Self
+from typing import IO, Any, Self, override
 
 from .constants import OFFSET_BYTE_LENGTH
 from .exceptions import SSZSerializationError, SSZTypeError
@@ -59,6 +59,7 @@ class Container(SSZModel):
         return annotation
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """
         Check if this container has a fixed byte length.
@@ -76,6 +77,7 @@ class Container(SSZModel):
         )
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """
         Calculate the exact byte length for fixed-size containers.
@@ -96,6 +98,7 @@ class Container(SSZModel):
             for field in cls.model_fields.values()
         )
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """
         Serialize container to bytes following SSZ specification.
@@ -154,6 +157,7 @@ class Container(SSZModel):
         return offset  # Total bytes written
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """
         Deserialize container from byte stream.

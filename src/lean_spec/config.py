@@ -7,15 +7,20 @@ This module contains environment-specific settings that apply across all subspec
 from __future__ import annotations
 
 import os
-from typing import Final
+from typing import Final, Literal, cast
 
-_SUPPORTED_LEAN_ENVS: list[str] = ["prod", "test"]
+type LeanEnvMode = Literal["test", "prod"]
+"""The supported environment modes."""
 
-LEAN_ENV: Final = os.environ.get("LEAN_ENV", "prod").lower()
-"""The environment flag ('prod' or 'test'). Defaults to 'prod' for the specs."""
+_SUPPORTED_LEAN_ENVS: set[str] = {"prod", "test"}
 
-if LEAN_ENV not in _SUPPORTED_LEAN_ENVS:
+_raw_env = os.environ.get("LEAN_ENV", "prod").lower()
+
+if _raw_env not in _SUPPORTED_LEAN_ENVS:
     raise ValueError(
-        f"Invalid LEAN_ENV environment variable: '{LEAN_ENV}'. "
-        f"Supported values: {_SUPPORTED_LEAN_ENVS}"
+        f"Invalid LEAN_ENV environment variable: '{_raw_env}'. "
+        f"Supported values: {sorted(_SUPPORTED_LEAN_ENVS)}"
     )
+
+LEAN_ENV: Final[LeanEnvMode] = cast("LeanEnvMode", _raw_env)
+"""The environment flag ('prod' or 'test'). Defaults to 'prod' for the specs."""

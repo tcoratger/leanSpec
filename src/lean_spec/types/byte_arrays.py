@@ -10,7 +10,7 @@ This module provides two parameterized SSZ types:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import IO, Any, ClassVar, Self, SupportsIndex
+from typing import IO, Any, ClassVar, Self, SupportsIndex, override
 
 from pydantic import Field, field_serializer, field_validator
 from pydantic.annotated_handlers import GetCoreSchemaHandler
@@ -86,15 +86,18 @@ class BaseBytes(bytes, SSZType):
         return cls(b"\x00" * cls.LENGTH)
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """ByteVector is fixed-size (length known at the type level)."""
         return True
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Get the byte length of this fixed-size type."""
         return cls.LENGTH
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """
         Write the raw bytes to `stream`.
@@ -106,6 +109,7 @@ class BaseBytes(bytes, SSZType):
         return len(self)
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """
         Read exactly `scope` bytes from `stream` and build an instance.
@@ -122,11 +126,13 @@ class BaseBytes(bytes, SSZType):
             raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
         return cls(data)
 
+    @override
     def encode_bytes(self) -> bytes:
         """Return the value's canonical SSZ byte representation."""
         return bytes(self)
 
     @classmethod
+    @override
     def decode_bytes(cls, data: bytes) -> Self:
         """
         Parse `data` as a value of this type.
@@ -287,15 +293,18 @@ class BaseByteList(SSZModel):
         return "0x" + value.hex()
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """ByteList is variable-size (length depends on the value)."""
         return False
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """ByteList is variable-size, so this should not be called."""
         raise SSZTypeError(f"{cls.__name__}: variable-size byte list has no fixed byte length")
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """
         Write the raw bytes to `stream`.
@@ -307,6 +316,7 @@ class BaseByteList(SSZModel):
         return len(self.data)
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """
         Read exactly `scope` bytes from `stream` and build an instance.
@@ -327,11 +337,13 @@ class BaseByteList(SSZModel):
             raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
         return cls(data=data)
 
+    @override
     def encode_bytes(self) -> bytes:
         """Return the value's canonical SSZ byte representation."""
         return self.data
 
     @classmethod
+    @override
     def decode_bytes(cls, data: bytes) -> Self:
         """
         Parse `data` as a value of this type.

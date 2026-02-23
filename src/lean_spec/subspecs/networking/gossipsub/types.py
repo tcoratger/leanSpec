@@ -15,22 +15,28 @@ class MessageId(Bytes20):
     The domain byte distinguishes valid/invalid snappy compression.
     """
 
-
-type TopicId = str
-"""Topic string identifier.
-
-Follows the Ethereum consensus format::
-
-    /{prefix}/{fork_digest}/{topic_name}/{encoding}
-"""
+    __slots__ = ()
 
 
-type Timestamp = float
-"""Unix timestamp in seconds since epoch.
+class TopicId(str):
+    """Topic string identifier.
 
-Used for:
+    Follows the Ethereum consensus format::
 
-- Message arrival times
-- Peer activity tracking
-- Seen cache expiry
-"""
+        /{prefix}/{fork_digest}/{topic_name}/{encoding}
+    """
+
+    __slots__ = ()
+
+
+class Timestamp(float):
+    """Unix timestamp in seconds since epoch.
+
+    Used for:
+
+    - Message arrival times
+    - Peer activity tracking
+    - Seen cache expiry
+    """
+
+    __slots__ = ()

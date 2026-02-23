@@ -24,6 +24,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
 )
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 
 def peer(name: str) -> PeerId:
@@ -166,48 +167,48 @@ class TestMeshState:
         """Test topic subscription."""
         mesh = MeshState(params=GossipsubParameters())
 
-        mesh.subscribe("topic1")
-        assert "topic1" in mesh.subscriptions
-        assert "topic2" not in mesh.subscriptions
+        mesh.subscribe(TopicId("topic1"))
+        assert TopicId("topic1") in mesh.subscriptions
+        assert TopicId("topic2") not in mesh.subscriptions
 
-        peers = mesh.unsubscribe("topic1")
-        assert "topic1" not in mesh.subscriptions
+        peers = mesh.unsubscribe(TopicId("topic1"))
+        assert TopicId("topic1") not in mesh.subscriptions
         assert peers == set()
 
     def test_add_remove_mesh_peers(self) -> None:
         """Test adding and removing peers from mesh."""
         mesh = MeshState(params=GossipsubParameters())
-        mesh.subscribe("topic1")
+        mesh.subscribe(TopicId("topic1"))
 
         peer1 = peer("peer1")
         peer2 = peer("peer2")
 
-        assert mesh.add_to_mesh("topic1", peer1)
-        assert mesh.add_to_mesh("topic1", peer2)
-        assert not mesh.add_to_mesh("topic1", peer1)  # Already in mesh
+        assert mesh.add_to_mesh(TopicId("topic1"), peer1)
+        assert mesh.add_to_mesh(TopicId("topic1"), peer2)
+        assert not mesh.add_to_mesh(TopicId("topic1"), peer1)  # Already in mesh
 
-        assert mesh.get_mesh_peers("topic1") == {peer1, peer2}
+        assert mesh.get_mesh_peers(TopicId("topic1")) == {peer1, peer2}
 
-        assert mesh.remove_from_mesh("topic1", peer1)
-        assert not mesh.remove_from_mesh("topic1", peer1)  # Already removed
+        assert mesh.remove_from_mesh(TopicId("topic1"), peer1)
+        assert not mesh.remove_from_mesh(TopicId("topic1"), peer1)  # Already removed
 
-        assert mesh.get_mesh_peers("topic1") == {peer2}
+        assert mesh.get_mesh_peers(TopicId("topic1")) == {peer2}
 
     def test_gossip_peer_selection(self) -> None:
         """Test selection of non-mesh peers for gossip."""
         params = GossipsubParameters(d_lazy=3)
         mesh = MeshState(params=params)
-        mesh.subscribe("topic1")
+        mesh.subscribe(TopicId("topic1"))
         peer1 = peer("peer1")
         peer2 = peer("peer2")
-        mesh.add_to_mesh("topic1", peer1)
-        mesh.add_to_mesh("topic1", peer2)
+        mesh.add_to_mesh(TopicId("topic1"), peer1)
+        mesh.add_to_mesh(TopicId("topic1"), peer2)
 
         # Exactly d_lazy=3 non-mesh peers → all returned deterministically.
         non_mesh = {peer("peer3"), peer("peer4"), peer("peer5")}
         all_peers = {peer1, peer2} | non_mesh
 
-        gossip_peers = mesh.select_peers_for_gossip("topic1", all_peers)
+        gossip_peers = mesh.select_peers_for_gossip(TopicId("topic1"), all_peers)
 
         assert set(gossip_peers) == non_mesh
 
@@ -247,7 +248,7 @@ class TestFanoutOperations:
     def test_update_fanout_creates_entry(self) -> None:
         """update_fanout creates a new fanout entry if none exists."""
         mesh = MeshState(params=GossipsubParameters(d=3))
-        topic = "fanout_topic"
+        topic = TopicId("fanout_topic")
 
         available = {peer("p1"), peer("p2"), peer("p3"), peer("p4")}
         result = mesh.update_fanout(topic, available)
@@ -258,7 +259,7 @@ class TestFanoutOperations:
     def test_update_fanout_returns_mesh_if_subscribed(self) -> None:
         """update_fanout returns mesh peers for subscribed topics."""
         mesh = MeshState(params=GossipsubParameters(d=3))
-        topic = "sub_topic"
+        topic = TopicId("sub_topic")
 
         mesh.subscribe(topic)
         p1 = peer("p1")
@@ -270,7 +271,7 @@ class TestFanoutOperations:
     def test_update_fanout_fills_to_d(self) -> None:
         """update_fanout fills fanout up to D peers."""
         mesh = MeshState(params=GossipsubParameters(d=4))
-        topic = "fanout_topic"
+        topic = TopicId("fanout_topic")
 
         names = ["pA", "pB", "pC", "pD", "pE", "pF", "pG", "pH", "pJ", "pK"]
         available = {peer(n) for n in names}
@@ -281,7 +282,7 @@ class TestFanoutOperations:
     def test_cleanup_fanouts_removes_stale(self) -> None:
         """cleanup_fanouts removes stale entries."""
         mesh = MeshState(params=GossipsubParameters())
-        topic = "old_topic"
+        topic = TopicId("old_topic")
 
         mesh.update_fanout(topic, {peer("p1")})
         # Make it stale
@@ -294,7 +295,7 @@ class TestFanoutOperations:
     def test_cleanup_fanouts_keeps_fresh(self) -> None:
         """cleanup_fanouts keeps recent entries."""
         mesh = MeshState(params=GossipsubParameters())
-        topic = "fresh_topic"
+        topic = TopicId("fresh_topic")
 
         mesh.update_fanout(topic, {peer("p1")})
         # last_published is set to time.time() by update_fanout
@@ -306,7 +307,7 @@ class TestFanoutOperations:
     def test_subscribe_promotes_fanout_to_mesh(self) -> None:
         """Subscribing to a topic promotes fanout peers to mesh."""
         mesh = MeshState(params=GossipsubParameters())
-        topic = "promote_topic"
+        topic = TopicId("promote_topic")
 
         p1 = peer("p1")
         mesh.update_fanout(topic, {p1})
@@ -321,7 +322,7 @@ class TestFanoutOperations:
     def test_unsubscribe_returns_mesh_peers(self) -> None:
         """Unsubscribing returns the set of mesh peers (for PRUNE)."""
         mesh = MeshState(params=GossipsubParameters())
-        topic = "unsub_topic"
+        topic = TopicId("unsub_topic")
 
         mesh.subscribe(topic)
         p1 = peer("p1")
@@ -336,11 +337,11 @@ class TestFanoutOperations:
         """Gossip peer selection returns at most d_lazy peers."""
         params = GossipsubParameters(d_lazy=2)
         mesh = MeshState(params=params)
-        mesh.subscribe("topic")
+        mesh.subscribe(TopicId("topic"))
 
         names = ["gA", "gB", "gC", "gD", "gE", "gF", "gG", "gH", "gJ", "gK"]
         all_peers = {peer(n) for n in names}
-        result = mesh.select_peers_for_gossip("topic", all_peers)
+        result = mesh.select_peers_for_gossip(TopicId("topic"), all_peers)
 
         assert len(result) <= 2
 
@@ -348,13 +349,13 @@ class TestFanoutOperations:
         """Gossip peer selection excludes mesh peers."""
         params = GossipsubParameters(d_lazy=5)
         mesh = MeshState(params=params)
-        mesh.subscribe("topic")
+        mesh.subscribe(TopicId("topic"))
 
         mesh_peer = peer("mesh1")
-        mesh.add_to_mesh("topic", mesh_peer)
+        mesh.add_to_mesh(TopicId("topic"), mesh_peer)
 
         all_peers = {mesh_peer, peer("p1"), peer("p2")}
-        result = mesh.select_peers_for_gossip("topic", all_peers)
+        result = mesh.select_peers_for_gossip(TopicId("topic"), all_peers)
 
         assert mesh_peer not in result
 

@@ -9,10 +9,13 @@ from typing import (
     Any,
     ClassVar,
     Generic,
+    Protocol,
     Self,
     TypeVar,
     cast,
     overload,
+    override,
+    runtime_checkable,
 )
 
 from pydantic import Field, field_serializer, field_validator
@@ -23,6 +26,17 @@ from .byte_arrays import BaseBytes
 from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 from .ssz_base import SSZModel, SSZType
 from .uint import Uint32
+
+
+@runtime_checkable
+class IntFieldElement(Protocol):
+    """Protocol for field elements with an integer value attribute.
+
+    Used for JSON serialization of field elements (e.g., Fp).
+    """
+
+    value: int
+
 
 T = TypeVar("T", bound=SSZType)
 """Generic type parameter for SSZ collection elements.
@@ -49,8 +63,7 @@ def _serialize_ssz_elements_to_json(value: Sequence[Any]) -> list[Any]:
     for item in value:
         if isinstance(item, BaseBytes):
             result.append("0x" + item.hex())
-        elif hasattr(item, "value") and isinstance(item.value, int):
-            # Handle field elements (Fp and similar) via duck typing
+        elif isinstance(item, IntFieldElement):
             result.append(item.value)
         else:
             result.append(item)
@@ -145,17 +158,20 @@ class SSZVector(SSZModel, Generic[T]):
         return typed_values
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """An SSZVector is fixed-size if and only if its elements are fixed-size."""
         return cls.ELEMENT_TYPE.is_fixed_size()
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Get the byte length if the SSZVector is fixed-size."""
         if not cls.is_fixed_size():
             raise SSZTypeError(f"{cls.__name__}: variable-size vector has no fixed byte length")
         return cls.ELEMENT_TYPE.get_byte_length() * cls.LENGTH
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize the vector to a binary stream."""
         # If elements are fixed-size, serialize them back-to-back.
@@ -177,6 +193,7 @@ class SSZVector(SSZModel, Generic[T]):
             return offset
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Deserialize a vector from a binary stream."""
         # If elements are fixed-size, read `LENGTH` elements of a fixed size.
@@ -330,15 +347,18 @@ class SSZList(SSZModel, Generic[T]):
         return type(self)(data=new_data)
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """An SSZList is never fixed-size (length varies from 0 to LIMIT)."""
         return False
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Lists are variable-size, so this raises an SSZTypeError."""
         raise SSZTypeError(f"{cls.__name__}: variable-size list has no fixed byte length")
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize the list to a binary stream."""
         # Lists are always variable-size, so we serialize offsets + data
@@ -360,6 +380,7 @@ class SSZList(SSZModel, Generic[T]):
             return offset
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Deserialize a list from a binary stream."""
         if cls.ELEMENT_TYPE.is_fixed_size():

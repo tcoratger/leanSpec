@@ -13,7 +13,7 @@ from lean_multisig_py import (
     verify_aggregated_signatures,
 )
 
-from lean_spec.config import LEAN_ENV
+from lean_spec.config import LEAN_ENV, LeanEnvMode
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
@@ -81,7 +81,7 @@ class AggregatedSignatureProof(Container):
         signatures: Sequence[Signature],
         message: Bytes32,
         slot: Slot,
-        mode: str | None = None,
+        mode: LeanEnvMode | None = None,
     ) -> Self:
         """
         Aggregate individual XMSS signatures into a single proof.
@@ -122,7 +122,7 @@ class AggregatedSignatureProof(Container):
         public_keys: Sequence[PublicKey],
         message: Bytes32,
         slot: Slot,
-        mode: str | None = None,
+        mode: LeanEnvMode | None = None,
     ) -> None:
         """
         Verify this aggregated signature proof.

@@ -6,7 +6,7 @@ import time
 
 from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.subspecs.networking.gossipsub.types import MessageId
+from lean_spec.subspecs.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
 
 class TestMessageCacheShift:
@@ -16,7 +16,7 @@ class TestMessageCacheShift:
         """shift() does not evict when fewer windows than mcache_len."""
         cache = MessageCache(mcache_len=6, mcache_gossip=3)
         msg = GossipsubMessage(topic=b"t", raw_data=b"data1")
-        cache.put("t", msg)
+        cache.put(TopicId("t"), msg)
 
         # Only 1 window used out of 6; shift should evict nothing.
         evicted = cache.shift()
@@ -29,7 +29,7 @@ class TestMessageCacheShift:
         cache = MessageCache(mcache_len=3, mcache_gossip=2)
 
         msg = GossipsubMessage(topic=b"t", raw_data=b"old")
-        cache.put("t", msg)
+        cache.put(TopicId("t"), msg)
 
         # Fill to capacity (3 windows total: initial + 2 shifts).
         cache.shift()
@@ -47,7 +47,7 @@ class TestMessageCacheShift:
         # Put 3 messages in the first window.
         msgs = [GossipsubMessage(topic=b"t", raw_data=f"d{i}".encode()) for i in range(3)]
         for m in msgs:
-            cache.put("t", m)
+            cache.put(TopicId("t"), m)
 
         # One shift: still within capacity (2 windows).
         evicted = cache.shift()
@@ -68,7 +68,7 @@ class TestMessageCacheClear:
         cache = MessageCache()
         for i in range(5):
             msg = GossipsubMessage(topic=b"t", raw_data=f"d{i}".encode())
-            cache.put("t", msg)
+            cache.put(TopicId("t"), msg)
 
         assert len(cache) == 5
         cache.clear()
@@ -78,11 +78,11 @@ class TestMessageCacheClear:
         """After clear(), new messages can be added normally."""
         cache = MessageCache()
         old_msg = GossipsubMessage(topic=b"t", raw_data=b"old")
-        cache.put("t", old_msg)
+        cache.put(TopicId("t"), old_msg)
         cache.clear()
 
         new_msg = GossipsubMessage(topic=b"t", raw_data=b"new")
-        assert cache.put("t", new_msg) is True
+        assert cache.put(TopicId("t"), new_msg) is True
         assert len(cache) == 1
 
 
@@ -95,7 +95,7 @@ class TestMessageCacheGetGossipIds:
 
         # Window 0: put msg_old.
         msg_old = GossipsubMessage(topic=b"t", raw_data=b"old")
-        cache.put("t", msg_old)
+        cache.put(TopicId("t"), msg_old)
 
         # Shift twice: msg_old is now in window 2 (outside gossip=2).
         cache.shift()
@@ -103,9 +103,9 @@ class TestMessageCacheGetGossipIds:
 
         # Window 0 (current): put msg_new.
         msg_new = GossipsubMessage(topic=b"t", raw_data=b"new")
-        cache.put("t", msg_new)
+        cache.put(TopicId("t"), msg_new)
 
-        ids = cache.get_gossip_ids("t")
+        ids = cache.get_gossip_ids(TopicId("t"))
         assert msg_new.id in ids
         assert msg_old.id not in ids
 
@@ -117,30 +117,30 @@ class TestMessageCacheGetGossipIds:
         msg2 = GossipsubMessage(topic=b"topic2", raw_data=b"data2")
         msg3 = GossipsubMessage(topic=b"topic1", raw_data=b"data3")
 
-        cache.put("topic1", msg1)
-        cache.put("topic2", msg2)
-        cache.put("topic1", msg3)
+        cache.put(TopicId("topic1"), msg1)
+        cache.put(TopicId("topic2"), msg2)
+        cache.put(TopicId("topic1"), msg3)
 
-        gossip_ids = cache.get_gossip_ids("topic1")
+        gossip_ids = cache.get_gossip_ids(TopicId("topic1"))
         assert msg1.id in gossip_ids
         assert msg3.id in gossip_ids
         assert msg2.id not in gossip_ids
 
-        assert cache.get_gossip_ids("topicUnknown") == []
+        assert cache.get_gossip_ids(TopicId("topicUnknown")) == []
 
     def test_iwant_after_gossip_window(self) -> None:
         """Messages outside gossip window are still retrievable via get()."""
         cache = MessageCache(mcache_len=4, mcache_gossip=1)
 
         msg = GossipsubMessage(topic=b"t", raw_data=b"data")
-        cache.put("t", msg)
+        cache.put(TopicId("t"), msg)
 
         # Shift past the gossip window but still within cache.
         cache.shift()
         cache.shift()
 
         # Not in gossip IDs anymore.
-        assert msg.id not in cache.get_gossip_ids("t")
+        assert msg.id not in cache.get_gossip_ids(TopicId("t"))
         # But still retrievable via IWANT.
         assert cache.get(msg.id) is not None
 
@@ -152,7 +152,7 @@ class TestMessageCachePutAndGet:
         """get() retrieves a message by ID after put()."""
         cache = MessageCache()
         msg = GossipsubMessage(topic=b"t", raw_data=b"data")
-        cache.put("t", msg)
+        cache.put(TopicId("t"), msg)
         assert cache.get(msg.id) == msg
 
     def test_get_returns_none_for_unknown(self) -> None:
@@ -165,15 +165,15 @@ class TestMessageCachePutAndGet:
         cache = MessageCache()
         msg = GossipsubMessage(topic=b"t", raw_data=b"data")
 
-        assert cache.put("t", msg) is True
-        assert cache.put("t", msg) is False
+        assert cache.put(TopicId("t"), msg) is True
+        assert cache.put(TopicId("t"), msg) is False
         assert len(cache) == 1
 
     def test_has_method(self) -> None:
         """The has() method works for message IDs."""
         cache = MessageCache()
         msg = GossipsubMessage(topic=b"t", raw_data=b"data")
-        cache.put("t", msg)
+        cache.put(TopicId("t"), msg)
 
         assert cache.has(msg.id)
         assert not cache.has(MessageId(b"\x00" * 20))
@@ -186,14 +186,14 @@ class TestSeenCache:
         """add() returns True for a new message ID."""
         seen = SeenCache(ttl_seconds=120)
         msg_id = MessageId(b"12345678901234567890")
-        assert seen.add(msg_id, time.time()) is True
+        assert seen.add(msg_id, Timestamp(time.time())) is True
 
     def test_add_returns_false_for_duplicate(self) -> None:
         """add() returns False for an already-seen message ID."""
         seen = SeenCache(ttl_seconds=120)
         msg_id = MessageId(b"12345678901234567890")
-        seen.add(msg_id, time.time())
-        assert seen.add(msg_id, time.time()) is False
+        seen.add(msg_id, Timestamp(time.time()))
+        assert seen.add(msg_id, Timestamp(time.time())) is False
 
     def test_cleanup_removes_expired(self) -> None:
         """cleanup() removes entries past TTL."""
@@ -202,8 +202,8 @@ class TestSeenCache:
 
         old_id = MessageId(b"aaaaaaaaaaaaaaaaaaaa")
         fresh_id = MessageId(b"bbbbbbbbbbbbbbbbbbbb")
-        seen.add(old_id, now - 20)
-        seen.add(fresh_id, now)
+        seen.add(old_id, Timestamp(now - 20))
+        seen.add(fresh_id, Timestamp(now))
 
         removed = seen.cleanup(now)
         assert removed == 1
@@ -214,7 +214,7 @@ class TestSeenCache:
         """cleanup() with no expired entries removes nothing."""
         seen = SeenCache(ttl_seconds=120)
         now = time.time()
-        seen.add(MessageId(b"12345678901234567890"), now)
+        seen.add(MessageId(b"12345678901234567890"), Timestamp(now))
 
         removed = seen.cleanup(now)
         assert removed == 0
@@ -224,7 +224,7 @@ class TestSeenCache:
         """clear() removes all entries."""
         seen = SeenCache()
         for i in range(5):
-            seen.add(MessageId(f"x{i:019d}".encode()), time.time())
+            seen.add(MessageId(f"x{i:019d}".encode()), Timestamp(time.time()))
 
         assert len(seen) == 5
         seen.clear()
@@ -234,7 +234,7 @@ class TestSeenCache:
         """The has() method works for seen message IDs."""
         seen = SeenCache()
         msg_id = MessageId(b"12345678901234567890")
-        seen.add(msg_id, time.time())
+        seen.add(msg_id, Timestamp(time.time()))
 
         assert seen.has(msg_id)
         assert not seen.has(MessageId(b"\x00" * 20))

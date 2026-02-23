@@ -20,6 +20,7 @@ from typing import (
     ClassVar,
     Self,
     overload,
+    override,
 )
 
 from pydantic import Field, field_validator
@@ -65,15 +66,18 @@ class BaseBitvector(SSZModel):
         return tuple(Boolean(bit) for bit in v)
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """A Bitvector is always fixed-size."""
         return True
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Get the byte length for the fixed-size bitvector."""
         return (cls.LENGTH + 7) // 8  # Ceiling division
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Write SSZ bytes to a binary stream."""
         encoded_data = self.encode_bytes()
@@ -81,6 +85,7 @@ class BaseBitvector(SSZModel):
         return len(encoded_data)
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Read SSZ bytes from a stream and return an instance."""
         expected_len = cls.get_byte_length()
@@ -93,6 +98,7 @@ class BaseBitvector(SSZModel):
             raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
         return cls.decode_bytes(data)
 
+    @override
     def encode_bytes(self) -> bytes:
         """
         Encode to SSZ bytes.
@@ -108,6 +114,7 @@ class BaseBitvector(SSZModel):
         return bytes(byte_array)
 
     @classmethod
+    @override
     def decode_bytes(cls, data: bytes) -> Self:
         """
         Decode from SSZ bytes.
@@ -184,15 +191,18 @@ class BaseBitlist(SSZModel):
         return type(self)(data=new_data)
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """A Bitlist is never fixed-size (length varies from 0 to LIMIT)."""
         return False
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Lists are variable-size, so this raises an SSZTypeError."""
         raise SSZTypeError(f"{cls.__name__}: variable-size bitlist has no fixed byte length")
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Write SSZ bytes to a binary stream."""
         encoded_data = self.encode_bytes()
@@ -200,6 +210,7 @@ class BaseBitlist(SSZModel):
         return len(encoded_data)
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Read SSZ bytes from a stream and return an instance."""
         data = stream.read(scope)
@@ -207,6 +218,7 @@ class BaseBitlist(SSZModel):
             raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
         return cls.decode_bytes(data)
 
+    @override
     def encode_bytes(self) -> bytes:
         """
         Encode to SSZ bytes with a trailing delimiter bit.
@@ -239,6 +251,7 @@ class BaseBitlist(SSZModel):
             return bytes(byte_array)
 
     @classmethod
+    @override
     def decode_bytes(cls, data: bytes) -> Self:
         """
         Decode from SSZ bytes with a delimiter bit.

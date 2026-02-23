@@ -24,7 +24,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
 )
-from lean_spec.subspecs.networking.gossipsub.types import MessageId
+from lean_spec.subspecs.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
 from .conftest import add_peer, make_behavior, make_peer
 
@@ -36,7 +36,7 @@ class TestHandleGraft:
     async def test_accept_graft_when_subscribed(self) -> None:
         """Accept GRAFT when we are subscribed and mesh has capacity."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -65,7 +65,7 @@ class TestHandleGraft:
     async def test_reject_graft_mesh_full(self) -> None:
         """Reject GRAFT with PRUNE when mesh is at d_high."""
         behavior, capture = make_behavior(d_high=2)
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         # Fill mesh to d_high
@@ -93,7 +93,7 @@ class TestHandleGraft:
     async def test_reject_graft_in_backoff(self) -> None:
         """Reject GRAFT when peer is in backoff period."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -117,7 +117,7 @@ class TestHandleGraft:
     async def test_graft_idempotent(self) -> None:
         """Double GRAFT is idempotent -- peer stays in mesh, no PRUNE."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -137,7 +137,7 @@ class TestHandlePrune:
     async def test_prune_removes_from_mesh(self) -> None:
         """PRUNE removes peer from mesh."""
         behavior, _ = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -153,7 +153,7 @@ class TestHandlePrune:
     async def test_prune_sets_backoff(self) -> None:
         """PRUNE sets backoff timer on peer state."""
         behavior, _ = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -171,7 +171,7 @@ class TestHandlePrune:
     async def test_prune_zero_backoff_no_timer(self) -> None:
         """PRUNE with zero backoff does not set a timer."""
         behavior, _ = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -186,7 +186,7 @@ class TestHandlePrune:
     async def test_prune_unknown_peer(self) -> None:
         """PRUNE for unknown peer does not crash."""
         behavior, _ = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         unknown_peer = make_peer("unknown")
@@ -220,7 +220,7 @@ class TestHandleIHave:
         msg_id = MessageId(b"12345678901234567890")
 
         # Mark as seen
-        behavior.seen_cache.add(msg_id, time.time())
+        behavior.seen_cache.add(msg_id, Timestamp(time.time()))
 
         ihave = ControlIHave(topic_id="topic", message_ids=[bytes(msg_id)])
         await behavior._handle_ihave(peer_id, ihave)
@@ -236,7 +236,7 @@ class TestHandleIHave:
         seen_id = MessageId(b"seen_msg_id_1234seen")
         unseen_id = b"unseen_msg_id_12unse"
 
-        behavior.seen_cache.add(seen_id, time.time())
+        behavior.seen_cache.add(seen_id, Timestamp(time.time()))
 
         ihave = ControlIHave(topic_id="topic", message_ids=[bytes(seen_id), unseen_id])
         await behavior._handle_ihave(peer_id, ihave)
@@ -273,7 +273,7 @@ class TestHandleIWant:
 
         # Put a message in cache
         msg = GossipsubMessage(topic=b"topic", raw_data=b"payload")
-        behavior.message_cache.put("topic", msg)
+        behavior.message_cache.put(TopicId("topic"), msg)
 
         iwant = ControlIWant(message_ids=[bytes(msg.id)])
         await behavior._handle_iwant(peer_id, iwant)
@@ -321,7 +321,7 @@ class TestHandleSubscription:
     async def test_unsubscribe_removes_and_cleans_mesh(self) -> None:
         """Unsubscribe removes topic and cleans mesh."""
         behavior, _ = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {"test_topic"})
@@ -354,7 +354,7 @@ class TestHandleMessage:
     async def test_new_message_forwarded_excluding_sender(self) -> None:
         """New message is forwarded to mesh peers, excluding sender."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         sender = add_peer(behavior, "senderX", {topic})
@@ -371,7 +371,7 @@ class TestHandleMessage:
     async def test_duplicate_message_ignored(self) -> None:
         """Duplicate message is ignored (not forwarded)."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         peer_id = add_peer(behavior, "peer1", {topic})
@@ -455,7 +455,7 @@ class TestHandleMessage:
     async def test_idontwant_sent_for_large_messages(self) -> None:
         """IDONTWANT is sent to mesh peers for messages >= threshold."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         sender = add_peer(behavior, "senderX", {topic})
@@ -484,7 +484,7 @@ class TestHandleMessage:
     async def test_idontwant_not_sent_for_small_messages(self) -> None:
         """IDONTWANT is NOT sent for messages below size threshold."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         sender = add_peer(behavior, "senderX", {topic})
@@ -502,7 +502,7 @@ class TestHandleMessage:
     async def test_message_not_forwarded_to_idontwant_peer(self) -> None:
         """Messages are not forwarded to peers who sent IDONTWANT."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
         sender = add_peer(behavior, "senderX", {topic})
@@ -554,7 +554,7 @@ class TestHandleRPC:
     async def test_dispatches_all_components(self) -> None:
         """RPC with subscriptions, messages, and control is fully dispatched."""
         behavior, capture = make_behavior()
-        topic = "test_topic"
+        topic = TopicId("test_topic")
         behavior.subscribe(topic)
         peer_id = add_peer(behavior, "peer1", {topic})
 
