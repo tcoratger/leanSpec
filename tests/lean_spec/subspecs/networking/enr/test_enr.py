@@ -22,9 +22,8 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 
 from lean_spec.subspecs.networking.enr import ENR, keys
 from lean_spec.subspecs.networking.enr.enr import ENR_PREFIX
-from lean_spec.subspecs.networking.types import SeqNumber
-from lean_spec.types import Bytes64, SSZValueError, Uint64
-from lean_spec.types.byte_arrays import Bytes4
+from lean_spec.subspecs.networking.types import Port, SeqNumber
+from lean_spec.types import Bytes4, Bytes64, SSZValueError, Uint64
 from lean_spec.types.rlp import RLPItem, encode_rlp
 
 # From: https://eips.ethereum.org/EIPS/eip-778
@@ -45,7 +44,7 @@ OFFICIAL_ENR_STRING = (
 OFFICIAL_NODE_ID = "a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7"
 OFFICIAL_SEQ = 1
 OFFICIAL_IPV4 = "127.0.0.1"
-OFFICIAL_UDP_PORT = 30303
+OFFICIAL_UDP_PORT = Port(30303)
 OFFICIAL_IDENTITY_SCHEME = "v4"
 OFFICIAL_SECP256K1_PUBKEY = bytes.fromhex(
     "03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138"
@@ -381,15 +380,15 @@ class TestPropertyAccessors:
             seq=SeqNumber(1),
             pairs={keys.ID: b"v4", keys.UDP: (30303).to_bytes(2, "big")},
         )
-        assert enr.udp_port == 30303
+        assert enr.udp_port == Port(30303)
 
     def test_udp_port_various_values(self) -> None:
         """udp_port handles various port values."""
         test_cases = [
-            (b"\x00\x01", 1),
-            (b"\xff\xff", 65535),
-            (b"\x23\x28", 9000),
-            (b"\x76\x5f", 30303),
+            (b"\x00\x01", Port(1)),
+            (b"\xff\xff", Port(65535)),
+            (b"\x23\x28", Port(9000)),
+            (b"\x76\x5f", Port(30303)),
         ]
         for port_bytes, expected in test_cases:
             enr = ENR(
@@ -676,7 +675,7 @@ class TestEdgeCases:
         enr = ENR.from_string(f"enr:{b64_content}")
         assert enr.ip4 is None
         assert enr.ip6 is not None
-        assert enr.udp_port == 9000
+        assert enr.udp_port == Port(9000)
         # multiaddr should use IPv6 with QUIC
         multiaddr = enr.multiaddr()
         assert multiaddr is not None
@@ -702,7 +701,7 @@ class TestEdgeCases:
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         enr = ENR.from_string(f"enr:{b64_content}")
-        assert enr.udp_port == 30303
+        assert enr.udp_port == Port(30303)
         assert enr.multiaddr() == "/ip4/192.168.1.1/udp/30303/quic-v1"
 
     def test_sequence_number_zero(self) -> None:
@@ -1182,7 +1181,7 @@ class TestRoundTripSerialization:
 
         assert enr1.seq == enr2.seq == Uint64(0x42)
         assert enr1.ip4 == enr2.ip4 == "192.168.1.1"
-        assert enr1.udp_port == enr2.udp_port == 9000
+        assert enr1.udp_port == enr2.udp_port == Port(9000)
         assert enr1.identity_scheme == enr2.identity_scheme == "v4"
 
     def test_to_string_produces_valid_enr_format(self) -> None:
@@ -1321,7 +1320,7 @@ class TestIPv6Ports:
                 keys.UDP6: (30304).to_bytes(2, "big"),
             },
         )
-        assert enr.udp6_port == 30304
+        assert enr.udp6_port == Port(30304)
 
     def test_udp6_port_returns_none_when_missing(self) -> None:
         """udp6_port returns None when udp6 key is absent."""
@@ -1343,5 +1342,5 @@ class TestIPv6Ports:
                 keys.UDP6: (30304).to_bytes(2, "big"),
             },
         )
-        assert enr.udp_port == 30303
-        assert enr.udp6_port == 30304
+        assert enr.udp_port == Port(30303)
+        assert enr.udp6_port == Port(30304)

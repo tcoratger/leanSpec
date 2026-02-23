@@ -11,8 +11,7 @@ from lean_spec.subspecs.ssz.merkleization import (
     mix_in_selector,
 )
 from lean_spec.subspecs.ssz.utils import hash_nodes
-from lean_spec.types import ZERO_HASH
-from lean_spec.types.byte_arrays import Bytes32
+from lean_spec.types import ZERO_HASH, Bytes32
 
 
 def h(a: Bytes32, b: Bytes32) -> Bytes32:

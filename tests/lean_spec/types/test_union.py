@@ -7,11 +7,11 @@ from typing import cast
 import pytest
 from pydantic import ValidationError, create_model
 
+from lean_spec.types import Uint8, Uint16, Uint32
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
 from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 from lean_spec.types.ssz_base import SSZType
-from lean_spec.types.uint import Uint8, Uint16, Uint32
 from lean_spec.types.union import SSZUnion
 
 

@@ -6,12 +6,11 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.subspecs.koalabear import Fp
+from lean_spec.types import Bytes32, Uint8, Uint16, Uint32
 from lean_spec.types.boolean import Boolean
-from lean_spec.types.byte_arrays import Bytes32
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
 from lean_spec.types.exceptions import SSZTypeError, SSZValueError
-from lean_spec.types.uint import Uint8, Uint16, Uint32
 
 # Type alias for errors that can be SSZValueError or wrapped in ValidationError
 ValueOrValidationError = (SSZValueError, ValidationError)

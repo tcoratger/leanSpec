@@ -8,7 +8,7 @@ from .codec import (
 )
 from .handler import (
     REQRESP_PROTOCOL_IDS,
-    BlockLookup,
+    AsyncBlockLookup,
     ReqRespServer,
     RequestHandler,
     StreamResponseAdapter,
@@ -36,7 +36,7 @@ __all__ = [
     "encode_request",
     "decode_request",
     # Inbound handlers
-    "BlockLookup",
+    "AsyncBlockLookup",
     "RequestHandler",
     "ReqRespServer",
     "StreamResponseAdapter",

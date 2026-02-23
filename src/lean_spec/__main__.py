@@ -479,7 +479,7 @@ async def run_node(
     # We subscribe before connecting to bootnodes so that when
     # we establish connections, we can immediately announce our
     # subscriptions to peers.
-    block_topic = str(GossipTopic.block(GOSSIP_FORK_DIGEST))
+    block_topic = GossipTopic.block(GOSSIP_FORK_DIGEST).to_topic_id()
     event_source.subscribe_gossip_topic(block_topic)
     # Subscribe to attestation subnet topics based on local validator id.
     validator_id = validator_registry.primary_index() if validator_registry else None
@@ -488,7 +488,9 @@ async def run_node(
         logger.info("No local validator id; subscribing to attestation subnet %d", subnet_id)
     else:
         subnet_id = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-    attestation_subnet_topic = str(GossipTopic.attestation_subnet(GOSSIP_FORK_DIGEST, subnet_id))
+    attestation_subnet_topic = GossipTopic.attestation_subnet(
+        GOSSIP_FORK_DIGEST, subnet_id
+    ).to_topic_id()
     event_source.subscribe_gossip_topic(attestation_subnet_topic)
     logger.info("Subscribed to gossip topics: %s, %s", block_topic, attestation_subnet_topic)
 

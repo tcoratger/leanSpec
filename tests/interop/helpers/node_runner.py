@@ -20,6 +20,7 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.types import ConnectionState
@@ -352,8 +353,8 @@ class NodeCluster:
 
         await event_source.start_gossipsub()
 
-        block_topic = f"/leanconsensus/{self.fork_digest}/blocks/ssz_snappy"
-        aggregation_topic = f"/leanconsensus/{self.fork_digest}/aggregation/ssz_snappy"
+        block_topic = TopicId(f"/leanconsensus/{self.fork_digest}/blocks/ssz_snappy")
+        aggregation_topic = TopicId(f"/leanconsensus/{self.fork_digest}/aggregation/ssz_snappy")
         event_source.subscribe_gossip_topic(block_topic)
         event_source.subscribe_gossip_topic(aggregation_topic)
 
@@ -364,7 +365,9 @@ class NodeCluster:
         if validator_indices:
             for idx in validator_indices:
                 subnet_id = int(idx) % int(ATTESTATION_COMMITTEE_COUNT)
-                topic = f"/leanconsensus/{self.fork_digest}/attestation_{subnet_id}/ssz_snappy"
+                topic = TopicId(
+                    f"/leanconsensus/{self.fork_digest}/attestation_{subnet_id}/ssz_snappy"
+                )
                 event_source.subscribe_gossip_topic(topic)
 
         # Optionally start the node's services.

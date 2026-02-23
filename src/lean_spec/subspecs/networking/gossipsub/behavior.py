@@ -117,7 +117,7 @@ class GossipsubMessageEvent:
     peer_id: PeerId
     """Peer that sent the message."""
 
-    topic: str
+    topic: TopicId
     """Topic the message belongs to."""
 
     data: bytes
@@ -134,7 +134,7 @@ class GossipsubPeerEvent:
     peer_id: PeerId
     """Peer whose subscription changed."""
 
-    topic: str
+    topic: TopicId
     """Topic affected."""
 
     subscribed: bool
@@ -256,7 +256,7 @@ class GossipsubBehavior:
         )
         self.seen_cache = SeenCache(ttl_seconds=self.params.seen_ttl_secs)
 
-    def subscribe(self, topic: str) -> None:
+    def subscribe(self, topic: TopicId) -> None:
         """Subscribe to a topic.
 
         Joining a topic means:
@@ -272,14 +272,14 @@ class GossipsubBehavior:
         if topic in self.mesh.subscriptions:
             return
 
-        self.mesh.subscribe(TopicId(topic))
+        self.mesh.subscribe(topic)
 
         logger.debug("Subscribed to topic %s", topic)
 
         if self._running:
             self._spawn_background_task(self._broadcast_subscription(topic, subscribe=True))
 
-    def unsubscribe(self, topic: str) -> None:
+    def unsubscribe(self, topic: TopicId) -> None:
         """Unsubscribe from a topic.
 
         Leaving a topic means:
@@ -296,7 +296,7 @@ class GossipsubBehavior:
 
         # Capture mesh peers before clearing mesh state.
         # These peers need PRUNE to learn we left the mesh.
-        mesh_peers = self.mesh.unsubscribe(TopicId(topic))
+        mesh_peers = self.mesh.unsubscribe(topic)
 
         logger.debug("Unsubscribed from topic %s", topic)
 
@@ -428,7 +428,7 @@ class GossipsubBehavior:
 
         logger.info("Removed gossipsub peer %s", peer_id)
 
-    async def publish(self, topic: str, data: bytes) -> None:
+    async def publish(self, topic: TopicId, data: bytes) -> None:
         """Publish a message to a topic.
 
         Sends the message to mesh peers, or fanout peers if not subscribed.
@@ -458,17 +458,17 @@ class GossipsubBehavior:
         # Cache stores compressed data for IWANT responses.
         cache_msg = GossipsubMessage(topic=topic_bytes, raw_data=data)
         cache_msg._cached_id = msg_id
-        self.message_cache.put(TopicId(topic), cache_msg)
+        self.message_cache.put(topic, cache_msg)
 
         if topic in self.mesh.subscriptions:
-            peers = self.mesh.get_mesh_peers(TopicId(topic))
+            peers = self.mesh.get_mesh_peers(topic)
         else:
             available = {
                 p
                 for p, s in self._peers.items()
                 if topic in s.subscriptions and s.outbound_stream is not None
             }
-            peers = self.mesh.update_fanout(TopicId(topic), available)
+            peers = self.mesh.update_fanout(topic, available)
 
         # Log mesh state when empty (helps debug mesh formation issues).
         if not peers:
@@ -660,7 +660,7 @@ class GossipsubBehavior:
         for idontwant in control.idontwant:
             self._handle_idontwant(peer_id, idontwant)
 
-    async def _reject_graft(self, peer_id: PeerId, topic: str) -> None:
+    async def _reject_graft(self, peer_id: PeerId, topic: TopicId) -> None:
         """Send a PRUNE rejection in response to an unacceptable GRAFT."""
         prune_rpc = RPC(
             control=ControlMessage(prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)])
@@ -687,12 +687,12 @@ class GossipsubBehavior:
                 return
 
         # Reject if mesh is already at capacity.
-        mesh_peers = self.mesh.get_mesh_peers(TopicId(topic))
+        mesh_peers = self.mesh.get_mesh_peers(topic)
         if len(mesh_peers) >= self.params.d_high:
             await self._reject_graft(peer_id, topic)
             return
 
-        self.mesh.add_to_mesh(TopicId(topic), peer_id)
+        self.mesh.add_to_mesh(topic, peer_id)
         logger.debug("Accepted GRAFT from %s for topic %s", peer_id, topic)
 
     async def _handle_prune(self, peer_id: PeerId, prune: ControlPrune) -> None:
@@ -700,7 +700,7 @@ class GossipsubBehavior:
         topic = prune.topic_id
         state = self._peers.get(peer_id)
 
-        self.mesh.remove_from_mesh(TopicId(topic), peer_id)
+        self.mesh.remove_from_mesh(topic, peer_id)
 
         # Honor the requested backoff to avoid re-grafting too soon.
         if state and prune.backoff > 0:
@@ -739,7 +739,8 @@ class GossipsubBehavior:
             msg_id_typed = MessageId(msg_id)
             cached = self.message_cache.get(msg_id_typed)
             if cached:
-                messages.append(Message(topic=cached.topic.decode("utf-8"), data=cached.raw_data))
+                topic_id = TopicId(cached.topic.decode("utf-8"))
+                messages.append(Message(topic=topic_id, data=cached.raw_data))
 
         if messages:
             rpc = RPC(publish=messages)
@@ -812,9 +813,9 @@ class GossipsubBehavior:
         for state in self._peers.values():
             state.dont_want_ids.clear()
 
-    async def _maintain_mesh(self, topic: str, now: float) -> None:
+    async def _maintain_mesh(self, topic: TopicId, now: float) -> None:
         """Maintain mesh size for a topic."""
-        mesh_peers = self.mesh.get_mesh_peers(TopicId(topic))
+        mesh_peers = self.mesh.get_mesh_peers(topic)
         mesh_size = len(mesh_peers)
 
         # Only consider peers with outbound streams.
@@ -834,7 +835,7 @@ class GossipsubBehavior:
             to_graft = random.sample(eligible, min(needed, len(eligible)))
 
             for peer_id in to_graft:
-                self.mesh.add_to_mesh(TopicId(topic), peer_id)
+                self.mesh.add_to_mesh(topic, peer_id)
 
             rpc = RPC.graft([topic])
             for peer_id in to_graft:
@@ -847,7 +848,7 @@ class GossipsubBehavior:
             to_prune = random.sample(list(mesh_peers), excess)
 
             for peer_id in to_prune:
-                self.mesh.remove_from_mesh(TopicId(topic), peer_id)
+                self.mesh.remove_from_mesh(topic, peer_id)
 
             # Set our own backoff to avoid premature re-GRAFT.
             prune_rpc = RPC(
@@ -861,9 +862,9 @@ class GossipsubBehavior:
 
             logger.debug("PRUNE %d peers for topic %s", len(to_prune), topic)
 
-    async def _emit_gossip(self, topic: str) -> None:
+    async def _emit_gossip(self, topic: TopicId) -> None:
         """Send IHAVE gossip to non-mesh peers."""
-        msg_ids = self.message_cache.get_gossip_ids(TopicId(topic))
+        msg_ids = self.message_cache.get_gossip_ids(topic)
         if not msg_ids:
             return
 
@@ -874,7 +875,7 @@ class GossipsubBehavior:
             if topic in state.subscriptions and state.outbound_stream is not None
         }
 
-        gossip_peers = self.mesh.select_peers_for_gossip(TopicId(topic), all_topic_peers)
+        gossip_peers = self.mesh.select_peers_for_gossip(topic, all_topic_peers)
         if not gossip_peers:
             return
 
@@ -978,7 +979,7 @@ class GossipsubBehavior:
 
     async def _broadcast_subscription(
         self,
-        topic: str,
+        topic: TopicId,
         subscribe: bool,
         prune_peers: set[PeerId] | None = None,
     ) -> None:
@@ -1004,7 +1005,7 @@ class GossipsubBehavior:
             # Seed the mesh with up to D peers that already know the topic.
             # Fanout peers were already promoted to mesh by subscribe(),
             # so only GRAFT enough additional peers to reach D.
-            current_mesh = self.mesh.get_mesh_peers(TopicId(topic))
+            current_mesh = self.mesh.get_mesh_peers(topic)
             needed = self.params.d - len(current_mesh)
 
             if needed > 0:
@@ -1019,7 +1020,7 @@ class GossipsubBehavior:
                 if eligible:
                     graft_rpc = RPC.graft([topic])
                     for peer_id in eligible:
-                        self.mesh.add_to_mesh(TopicId(topic), peer_id)
+                        self.mesh.add_to_mesh(topic, peer_id)
                         await self._send_rpc(peer_id, graft_rpc)
         else:
             # Former mesh peers must learn we left so they stop

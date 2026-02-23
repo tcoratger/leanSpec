@@ -26,7 +26,8 @@ from lean_spec.subspecs.networking.discovery.service import (
     LookupResult,
 )
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.subspecs.networking.enr.keys import EnrKey
+from lean_spec.subspecs.networking.types import NodeId, Port, SeqNumber
 from lean_spec.types import Bytes64
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
 
@@ -66,8 +67,8 @@ class TestDiscoveryServiceInit:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": bytes.fromhex(
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): bytes.fromhex(
                     "02a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7"
                 ),
             },
@@ -86,7 +87,7 @@ class TestDiscoveryServiceInit:
         enr_without_pubkey = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
 
         with pytest.raises(ValueError, match="must have a public key"):
@@ -307,16 +308,16 @@ class TestENRAddressExtraction:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": NODE_B_PUBKEY,
-                "ip": bytes([127, 0, 0, 1]),
-                "udp": (9000).to_bytes(2, "big"),
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): NODE_B_PUBKEY,
+                EnrKey("ip"): bytes([127, 0, 0, 1]),
+                EnrKey("udp"): (9000).to_bytes(2, "big"),
             },
         )
 
         # Check IPv4 extraction.
         assert enr.ip4 == "127.0.0.1"
-        assert enr.udp_port == 9000
+        assert enr.udp_port == Port(9000)
 
     def test_enr_ip6_extraction(self, local_private_key):
         """Extract IPv6 address from ENR."""
@@ -327,10 +328,10 @@ class TestENRAddressExtraction:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": NODE_B_PUBKEY,
-                "ip6": ipv6_bytes,
-                "udp6": (9000).to_bytes(2, "big"),
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): NODE_B_PUBKEY,
+                EnrKey("ip6"): ipv6_bytes,
+                EnrKey("udp6"): (9000).to_bytes(2, "big"),
             },
         )
 
@@ -346,12 +347,12 @@ class TestENRAddressExtraction:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": NODE_B_PUBKEY,
-                "ip": bytes([192, 168, 1, 1]),
-                "udp": (9000).to_bytes(2, "big"),
-                "ip6": ipv6_bytes,
-                "udp6": (9001).to_bytes(2, "big"),
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): NODE_B_PUBKEY,
+                EnrKey("ip"): bytes([192, 168, 1, 1]),
+                EnrKey("udp"): (9000).to_bytes(2, "big"),
+                EnrKey("ip6"): ipv6_bytes,
+                EnrKey("udp6"): (9001).to_bytes(2, "big"),
             },
         )
 
@@ -365,8 +366,8 @@ class TestENRAddressExtraction:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": NODE_B_PUBKEY,
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): NODE_B_PUBKEY,
             },
         )
 
@@ -487,12 +488,12 @@ class TestBootstrap:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": bytes.fromhex(
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): bytes.fromhex(
                     "02a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7"
                 ),
-                "ip": bytes([192, 168, 1, 1]),
-                "udp": (30303).to_bytes(2, "big"),
+                EnrKey("ip"): bytes([192, 168, 1, 1]),
+                EnrKey("udp"): (30303).to_bytes(2, "big"),
             },
         )
 
@@ -512,12 +513,12 @@ class TestBootstrap:
                 signature=Bytes64(bytes(64)),
                 seq=SeqNumber(i + 1),
                 pairs={
-                    "id": b"v4",
-                    "secp256k1": bytes.fromhex(
+                    EnrKey("id"): b"v4",
+                    EnrKey("secp256k1"): bytes.fromhex(
                         "02a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7"
                     ),
-                    "ip": bytes([192, 168, 1, i + 1]),
-                    "udp": (30303 + i).to_bytes(2, "big"),
+                    EnrKey("ip"): bytes([192, 168, 1, i + 1]),
+                    EnrKey("udp"): (30303 + i).to_bytes(2, "big"),
                 },
             )
             bootnodes.append(bootnode)
@@ -857,10 +858,10 @@ class TestBootstrapFlow:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": node_a_pubkey,
-                "ip": bytes([192, 168, 1, 1]),
-                "udp": (30303).to_bytes(2, "big"),
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): node_a_pubkey,
+                EnrKey("ip"): bytes([192, 168, 1, 1]),
+                EnrKey("udp"): (30303).to_bytes(2, "big"),
             },
         )
 
@@ -886,8 +887,8 @@ class TestBootstrapFlow:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": node_a_pubkey,
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): node_a_pubkey,
             },
         )
 
@@ -931,12 +932,12 @@ class TestProcessDiscoveredEnr:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": bytes.fromhex(
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): bytes.fromhex(
                     "02a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7"
                 ),
-                "ip": bytes([10, 0, 0, 1]),
-                "udp": (9000).to_bytes(2, "big"),
+                EnrKey("ip"): bytes([10, 0, 0, 1]),
+                EnrKey("udp"): (9000).to_bytes(2, "big"),
             },
         )
         enr_bytes = enr.to_rlp()

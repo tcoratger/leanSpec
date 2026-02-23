@@ -8,18 +8,12 @@ from typing import Iterable, Tuple, Type
 import pytest
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.types import BaseByteList, BaseBytes, Bytes32, Uint8, Uint16, Uint32, Uint64
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean
-from lean_spec.types.byte_arrays import BaseByteList, BaseBytes, Bytes32
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
-from lean_spec.types.uint import (
-    BaseUint,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-)
+from lean_spec.types.uint import BaseUint
 from lean_spec.types.union import SSZUnion
 
 

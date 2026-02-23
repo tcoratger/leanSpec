@@ -63,7 +63,7 @@ class TestControlMessages:
         empty_control = ControlMessage()
         assert empty_control.is_empty()
 
-        non_empty = ControlMessage(graft=[ControlGraft(topic_id="topic")])
+        non_empty = ControlMessage(graft=[ControlGraft(topic_id=TopicId("topic"))])
         assert not non_empty.is_empty()
 
 
@@ -369,10 +369,13 @@ class TestRPCProtobufEncoding:
 
     def test_subopts_encode_decode(self) -> None:
         """Test SubOpts (subscription) encoding/decoding."""
-        sub = SubOpts(subscribe=True, topic_id="/leanconsensus/0x12345678/blocks/ssz_snappy")
+        sub = SubOpts(
+            subscribe=True,
+            topic_id=TopicId("/leanconsensus/0x12345678/blocks/ssz_snappy"),
+        )
         assert SubOpts.decode(sub.encode()) == sub
 
-        unsub = SubOpts(subscribe=False, topic_id="/test/topic")
+        unsub = SubOpts(subscribe=False, topic_id=TopicId("/test/topic"))
         assert SubOpts.decode(unsub.encode()) == unsub
 
     def test_message_encode_decode(self) -> None:
@@ -381,7 +384,7 @@ class TestRPCProtobufEncoding:
             from_peer=b"peer123",
             data=b"hello world",
             seqno=b"\x00\x01\x02\x03\x04\x05\x06\x07",
-            topic="/test/topic",
+            topic=TopicId("/test/topic"),
             signature=b"sig" * 16,
             key=b"pubkey",
         )
@@ -389,23 +392,23 @@ class TestRPCProtobufEncoding:
 
     def test_message_minimal(self) -> None:
         """Test Message with only required fields."""
-        msg = Message(topic="/test/topic", data=b"payload")
+        msg = Message(topic=TopicId("/test/topic"), data=b"payload")
         assert Message.decode(msg.encode()) == msg
 
     def test_control_graft_encode_decode(self) -> None:
         """Test ControlGraft encoding/decoding."""
-        graft = ControlGraft(topic_id="/test/blocks")
+        graft = ControlGraft(topic_id=TopicId("/test/blocks"))
         assert ControlGraft.decode(graft.encode()) == graft
 
     def test_control_prune_encode_decode(self) -> None:
         """Test ControlPrune encoding/decoding with backoff."""
-        prune = ControlPrune(topic_id="/test/blocks", backoff=60)
+        prune = ControlPrune(topic_id=TopicId("/test/blocks"), backoff=60)
         assert ControlPrune.decode(prune.encode()) == prune
 
     def test_control_ihave_encode_decode(self) -> None:
         """Test ControlIHave encoding/decoding."""
         ihave = ControlIHave(
-            topic_id="/test/blocks",
+            topic_id=TopicId("/test/blocks"),
             message_ids=[b"msgid1234567890ab", b"msgid2345678901bc", b"msgid3456789012cd"],
         )
         assert ControlIHave.decode(ihave.encode()) == ihave
@@ -423,9 +426,9 @@ class TestRPCProtobufEncoding:
     def test_control_message_aggregate(self) -> None:
         """Test ControlMessage with multiple control types."""
         ctrl = ControlMessage(
-            graft=[ControlGraft(topic_id="/topic1")],
-            prune=[ControlPrune(topic_id="/topic2", backoff=30)],
-            ihave=[ControlIHave(topic_id="/topic1", message_ids=[b"msg123456789012"])],
+            graft=[ControlGraft(topic_id=TopicId("/topic1"))],
+            prune=[ControlPrune(topic_id=TopicId("/topic2"), backoff=30)],
+            ihave=[ControlIHave(topic_id=TopicId("/topic1"), message_ids=[b"msg123456789012"])],
         )
         assert ControlMessage.decode(ctrl.encode()) == ctrl
 
@@ -433,8 +436,8 @@ class TestRPCProtobufEncoding:
         """Test RPC with only subscriptions."""
         rpc = RPC(
             subscriptions=[
-                SubOpts(subscribe=True, topic_id="/topic1"),
-                SubOpts(subscribe=False, topic_id="/topic2"),
+                SubOpts(subscribe=True, topic_id=TopicId("/topic1")),
+                SubOpts(subscribe=False, topic_id=TopicId("/topic2")),
             ]
         )
         assert RPC.decode(rpc.encode()) == rpc
@@ -443,25 +446,27 @@ class TestRPCProtobufEncoding:
         """Test RPC with only published messages."""
         rpc = RPC(
             publish=[
-                Message(topic="/blocks", data=b"block_data_1"),
-                Message(topic="/attestations", data=b"attestation_data"),
+                Message(topic=TopicId("/blocks"), data=b"block_data_1"),
+                Message(topic=TopicId("/attestations"), data=b"attestation_data"),
             ]
         )
         assert RPC.decode(rpc.encode()) == rpc
 
     def test_rpc_control_only(self) -> None:
         """Test RPC with only control messages."""
-        rpc = RPC(control=ControlMessage(graft=[ControlGraft(topic_id="/blocks")]))
+        rpc = RPC(control=ControlMessage(graft=[ControlGraft(topic_id=TopicId("/blocks"))]))
         assert RPC.decode(rpc.encode()) == rpc
 
     def test_rpc_full_message(self) -> None:
         """Test RPC with all message types (full gossipsub exchange)."""
         rpc = RPC(
-            subscriptions=[SubOpts(subscribe=True, topic_id="/blocks")],
-            publish=[Message(topic="/blocks", data=b"block_payload")],
+            subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("/blocks"))],
+            publish=[Message(topic=TopicId("/blocks"), data=b"block_payload")],
             control=ControlMessage(
-                graft=[ControlGraft(topic_id="/blocks")],
-                ihave=[ControlIHave(topic_id="/blocks", message_ids=[b"msgid123456789ab"])],
+                graft=[ControlGraft(topic_id=TopicId("/blocks"))],
+                ihave=[
+                    ControlIHave(topic_id=TopicId("/blocks"), message_ids=[b"msgid123456789ab"])
+                ],
             ),
         )
         assert RPC.decode(rpc.encode()) == rpc
@@ -471,20 +476,20 @@ class TestRPCProtobufEncoding:
         empty_rpc = RPC()
         assert empty_rpc.is_empty()
 
-        non_empty = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="/topic")])
+        non_empty = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("/topic"))])
         assert not non_empty.is_empty()
 
     def test_rpc_helper_functions(self) -> None:
         """Test RPC creation helper functions."""
-        assert RPC.subscription(["/topic1", "/topic2"], subscribe=True) == RPC(
+        assert RPC.subscription([TopicId("/topic1"), TopicId("/topic2")], subscribe=True) == RPC(
             subscriptions=[
-                SubOpts(subscribe=True, topic_id="/topic1"),
-                SubOpts(subscribe=True, topic_id="/topic2"),
+                SubOpts(subscribe=True, topic_id=TopicId("/topic1")),
+                SubOpts(subscribe=True, topic_id=TopicId("/topic2")),
             ]
         )
 
-        assert RPC.graft(["/topic1"]) == RPC(
-            control=ControlMessage(graft=[ControlGraft(topic_id="/topic1")])
+        assert RPC.graft([TopicId("/topic1")]) == RPC(
+            control=ControlMessage(graft=[ControlGraft(topic_id=TopicId("/topic1"))])
         )
 
     def test_wire_format_compatibility(self) -> None:
@@ -493,12 +498,12 @@ class TestRPCProtobufEncoding:
         Verifies that our encoding produces bytes that round-trip
         correctly through decode, matching the original structure.
         """
-        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="test")])
+        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("test"))])
         assert RPC.decode(rpc.encode()) == rpc
 
     def test_large_message_encoding(self) -> None:
         """Test encoding of large messages (typical block size)."""
-        rpc = RPC(publish=[Message(topic="/blocks", data=b"x" * 100_000)])
+        rpc = RPC(publish=[Message(topic=TopicId("/blocks"), data=b"x" * 100_000)])
         assert RPC.decode(rpc.encode()) == rpc
 
 

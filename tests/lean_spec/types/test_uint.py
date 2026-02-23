@@ -7,14 +7,9 @@ from typing import Any, Type
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from lean_spec.types import Uint8, Uint16, Uint32, Uint64
 from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
-from lean_spec.types.uint import (
-    BaseUint,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-)
+from lean_spec.types.uint import BaseUint
 
 ALL_UINT_TYPES = (Uint8, Uint16, Uint32, Uint64)
 """A collection of all Uint types to test against."""

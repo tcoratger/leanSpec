@@ -318,7 +318,7 @@ class State(Container):
         # Ensures the block was proposed by the assigned validator for this round.
         assert block.proposer_index.is_proposer_for(
             slot=self.slot,
-            num_validators=len(self.validators),
+            num_validators=Uint64(len(self.validators)),
         ), "Incorrect block proposer"
 
         # Verify the chain link.

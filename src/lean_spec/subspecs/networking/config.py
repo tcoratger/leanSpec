@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from .types import DomainType
+from .types import DomainType, ProtocolId
 
 MAX_REQUEST_BLOCKS: Final[int] = 2**10
 """Maximum number of blocks in a single request (1024)."""
@@ -38,16 +38,16 @@ MESSAGE_DOMAIN_VALID_SNAPPY: Final[DomainType] = DomainType(b"\x01\x00\x00\x00")
 Per Ethereum spec, prepended to the message hash when decompression succeeds.
 """
 
-GOSSIPSUB_PROTOCOL_ID_V11: Final[str] = "/meshsub/1.1.0"
+GOSSIPSUB_PROTOCOL_ID_V11: Final = ProtocolId("/meshsub/1.1.0")
 """Gossipsub v1.1 protocol ID - peer scoring, extended validators.
 
 This is the minimum version required by the Ethereum consensus spec.
 """
 
-GOSSIPSUB_PROTOCOL_ID_V12: Final[str] = "/meshsub/1.2.0"
+GOSSIPSUB_PROTOCOL_ID_V12: Final = ProtocolId("/meshsub/1.2.0")
 """Gossipsub v1.2 protocol ID - IDONTWANT bandwidth optimization."""
 
-GOSSIPSUB_DEFAULT_PROTOCOL_ID: Final[str] = GOSSIPSUB_PROTOCOL_ID_V11
+GOSSIPSUB_DEFAULT_PROTOCOL_ID: Final = GOSSIPSUB_PROTOCOL_ID_V11
 """
 Default protocol ID per Ethereum consensus spec requirements.
 

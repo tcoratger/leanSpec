@@ -17,11 +17,12 @@ from lean_spec.subspecs.networking.gossipsub.behavior import (
     GossipsubMessageEvent,
 )
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 from .conftest import fast_params
 from .network import GossipsubTestNetwork
 
-TOPIC = "test/idontwant"
+TOPIC = TopicId("test/idontwant")
 
 
 @pytest.mark.asyncio

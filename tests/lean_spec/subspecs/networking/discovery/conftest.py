@@ -6,6 +6,7 @@ import pytest
 
 from lean_spec.subspecs.networking.discovery.messages import IdNonce
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes32, Bytes33, Bytes64
 
@@ -55,9 +56,9 @@ def local_enr() -> ENR:
         signature=Bytes64(bytes(64)),
         seq=SeqNumber(1),
         pairs={
-            "id": b"v4",
-            "secp256k1": NODE_B_PUBKEY,
-            "ip": bytes([127, 0, 0, 1]),
-            "udp": (9000).to_bytes(2, "big"),
+            EnrKey("id"): b"v4",
+            EnrKey("secp256k1"): NODE_B_PUBKEY,
+            EnrKey("ip"): bytes([127, 0, 0, 1]),
+            EnrKey("udp"): (9000).to_bytes(2, "big"),
         },
     )

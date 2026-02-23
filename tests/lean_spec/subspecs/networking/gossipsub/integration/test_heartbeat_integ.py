@@ -14,11 +14,12 @@ import pytest
 
 from lean_spec.subspecs.networking.gossipsub.behavior import IDONTWANT_SIZE_THRESHOLD
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 from .conftest import fast_params
 from .network import GossipsubTestNetwork
 
-TOPIC = "test/heartbeat"
+TOPIC = TopicId("test/heartbeat")
 
 
 @pytest.mark.asyncio

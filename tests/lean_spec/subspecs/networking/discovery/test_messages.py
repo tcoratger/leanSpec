@@ -39,7 +39,7 @@ from lean_spec.subspecs.networking.discovery.messages import (
 )
 from lean_spec.subspecs.networking.discovery.packet import WhoAreYouAuthdata
 from lean_spec.subspecs.networking.types import SeqNumber
-from lean_spec.types.uint import Uint8, Uint16, Uint64
+from lean_spec.types import Uint8, Uint16, Uint64
 from tests.lean_spec.subspecs.networking.discovery.conftest import SPEC_ID_NONCE
 
 

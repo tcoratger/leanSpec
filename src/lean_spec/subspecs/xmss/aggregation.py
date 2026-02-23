@@ -17,9 +17,7 @@ from lean_spec.config import LEAN_ENV, LeanEnvMode
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.types import Bytes32
-from lean_spec.types.byte_arrays import ByteListMiB
-from lean_spec.types.container import Container
+from lean_spec.types import ByteListMiB, Bytes32, Container
 
 from .containers import PublicKey, Signature
 

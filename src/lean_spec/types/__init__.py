@@ -5,6 +5,11 @@ from .bitfields import BaseBitlist
 from .boolean import Boolean
 from .byte_arrays import (
     ZERO_HASH,
+    BaseByteList,
+    BaseBytes,
+    ByteListMiB,
+    Bytes1,
+    Bytes4,
     Bytes12,
     Bytes16,
     Bytes20,
@@ -24,13 +29,19 @@ from .exceptions import (
 )
 from .rlp import RLPDecodingError, RLPItem, decode_rlp, decode_rlp_list, encode_rlp
 from .ssz_base import SSZType
-from .uint import Uint16, Uint64
+from .uint import Uint8, Uint16, Uint32, Uint64
 
 __all__ = [
     # Core types
     "BaseBitlist",
+    "Uint8",
     "Uint16",
+    "Uint32",
     "Uint64",
+    "BaseBytes",
+    "BaseByteList",
+    "Bytes1",
+    "Bytes4",
     "Bytes12",
     "Bytes16",
     "Bytes20",
@@ -39,6 +50,7 @@ __all__ = [
     "Bytes52",
     "Bytes64",
     "Bytes65",
+    "ByteListMiB",
     "ZERO_HASH",
     "CamelModel",
     "StrictBaseModel",

@@ -56,8 +56,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
 )
 from lean_spec.subspecs.networking.discovery.routing import log2_distance, xor_distance
 from lean_spec.subspecs.networking.types import SeqNumber
-from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64
-from lean_spec.types.uint import Uint8
+from lean_spec.types import Bytes12, Bytes16, Bytes32, Bytes33, Bytes64, Uint8
 from tests.lean_spec.helpers import make_challenge_data
 from tests.lean_spec.subspecs.networking.discovery.conftest import (
     NODE_A_ID,

@@ -33,14 +33,13 @@ from dataclasses import dataclass
 from typing import Final
 
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes32, Bytes33
-from lean_spec.types.uint import Uint8
+from lean_spec.subspecs.networking.types import NodeId, Port, SeqNumber
+from lean_spec.types import Bytes32, Bytes33, Uint8
 
 from .codec import DiscoveryMessage
 from .config import ALPHA, K_BUCKET_SIZE, DiscoveryConfig
 from .keys import compute_node_id
-from .messages import Distance, FindNode, IPv4, IPv6, Nodes, Ping, Pong, Port, TalkReq, TalkResp
+from .messages import Distance, FindNode, IPv4, IPv6, Nodes, Ping, Pong, TalkReq, TalkResp
 from .routing import NodeEntry, RoutingTable, log2_distance, xor_distance
 from .session import BondCache
 from .transport import DiscoveryTransport

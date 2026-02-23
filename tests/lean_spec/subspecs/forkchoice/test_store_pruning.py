@@ -5,8 +5,7 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, SignatureKey
-from lean_spec.types import Bytes32
-from lean_spec.types.byte_arrays import ByteListMiB
+from lean_spec.types import ByteListMiB, Bytes32
 from tests.lean_spec.helpers import (
     make_attestation_data,
     make_bytes32,

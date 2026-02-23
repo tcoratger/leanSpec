@@ -63,6 +63,7 @@ from enum import Enum
 from typing import Final
 
 from lean_spec.subspecs.containers.validator import SubnetId
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 
 class ForkMismatchError(ValueError):
@@ -157,8 +158,8 @@ class GossipTopic:
     subnet_id: SubnetId | None = None
     """Subnet id for attestation subnet topics (required for ATTESTATION_SUBNET)."""
 
-    def __str__(self) -> str:
-        """Return the full topic string.
+    def to_topic_id(self) -> TopicId:
+        """Return the full topic string as a TopicId.
 
         Returns:
             Topic in format `/{prefix}/{fork}/{name}/{encoding}`
@@ -169,7 +170,11 @@ class GossipTopic:
             topic_name = f"attestation_{self.subnet_id}"
         else:
             topic_name = str(self.kind)
-        return f"/{TOPIC_PREFIX}/{self.fork_digest}/{topic_name}/{ENCODING_POSTFIX}"
+        return TopicId(f"/{TOPIC_PREFIX}/{self.fork_digest}/{topic_name}/{ENCODING_POSTFIX}")
+
+    def __str__(self) -> str:
+        """Return the full topic string."""
+        return self.to_topic_id()
 
     def validate_fork(self, expected_fork_digest: str) -> None:
         """

@@ -17,10 +17,12 @@ import asyncio
 
 import pytest
 
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
+
 from .conftest import fast_params
 from .network import GossipsubTestNetwork
 
-TOPIC = "test/mesh"
+TOPIC = TopicId("test/mesh")
 
 
 def _all_meshes_in_bounds(network: GossipsubTestNetwork, params, topic: str) -> bool:  # type: ignore[no-untyped-def]

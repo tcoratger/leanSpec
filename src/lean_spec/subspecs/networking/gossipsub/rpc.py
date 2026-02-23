@@ -43,6 +43,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Final
 
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 WIRE_TYPE_VARINT: Final = 0
@@ -137,7 +138,7 @@ class SubOpts:
     subscribe: bool
     """True to subscribe, False to unsubscribe."""
 
-    topic_id: str
+    topic_id: TopicId
     """Topic identifier."""
 
     def encode(self) -> bytes:
@@ -151,7 +152,7 @@ class SubOpts:
     def decode(cls, data: bytes) -> SubOpts:
         """Decode from protobuf."""
         subscribe = False
-        topic_id = ""
+        topic_id = TopicId("")
         pos = 0
 
         while pos < len(data):
@@ -162,7 +163,7 @@ class SubOpts:
                 subscribe = value != 0
             elif field_num == 2 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
                 length, pos = _decode_length_at(data, pos)
-                topic_id = data[pos : pos + length].decode("utf-8")
+                topic_id = TopicId(data[pos : pos + length].decode("utf-8"))
                 pos += length
             else:
                 pos = _skip_field(data, pos, wire_type)
@@ -183,7 +184,7 @@ class Message:
     seqno: bytes = b""
     """Sequence number (optional)."""
 
-    topic: str = ""
+    topic: TopicId = TopicId("")
     """Topic this message belongs to."""
 
     signature: bytes = b""
@@ -230,7 +231,7 @@ class Message:
                 elif field_num == 3:
                     msg.seqno = field_data
                 elif field_num == 4:
-                    msg.topic = field_data.decode("utf-8")
+                    msg.topic = TopicId(field_data.decode("utf-8"))
                 elif field_num == 5:
                     msg.signature = field_data
                 elif field_num == 6:
@@ -245,7 +246,7 @@ class Message:
 class ControlIHave:
     """IHAVE control message - advertise cached message IDs."""
 
-    topic_id: str = ""
+    topic_id: TopicId = TopicId("")
     """Topic the messages belong to."""
 
     message_ids: list[bytes] = field(default_factory=list)
@@ -263,7 +264,7 @@ class ControlIHave:
     @classmethod
     def decode(cls, data: bytes) -> ControlIHave:
         """Decode from protobuf."""
-        topic_id = ""
+        topic_id = TopicId("")
         message_ids: list[bytes] = []
         pos = 0
 
@@ -276,7 +277,7 @@ class ControlIHave:
                 pos += length
 
                 if field_num == 1:
-                    topic_id = field_data.decode("utf-8")
+                    topic_id = TopicId(field_data.decode("utf-8"))
                 elif field_num == 2:
                     message_ids.append(field_data)
             else:
@@ -322,7 +323,7 @@ class ControlIWant:
 class ControlGraft:
     """GRAFT control message - request to join mesh for topic."""
 
-    topic_id: str = ""
+    topic_id: TopicId = TopicId("")
     """Topic to join mesh for."""
 
     def encode(self) -> bytes:
@@ -335,7 +336,7 @@ class ControlGraft:
     @classmethod
     def decode(cls, data: bytes) -> ControlGraft:
         """Decode from protobuf."""
-        topic_id = ""
+        topic_id = TopicId("")
         pos = 0
 
         while pos < len(data):
@@ -343,7 +344,7 @@ class ControlGraft:
 
             if field_num == 1 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
                 length, pos = _decode_length_at(data, pos)
-                topic_id = data[pos : pos + length].decode("utf-8")
+                topic_id = TopicId(data[pos : pos + length].decode("utf-8"))
                 pos += length
             else:
                 pos = _skip_field(data, pos, wire_type)
@@ -399,7 +400,7 @@ class PrunePeerInfo:
 class ControlPrune:
     """PRUNE control message - notification of mesh removal."""
 
-    topic_id: str = ""
+    topic_id: TopicId = TopicId("")
     """Topic being pruned from."""
 
     peers: list[PrunePeerInfo] = field(default_factory=list)
@@ -422,7 +423,7 @@ class ControlPrune:
     @classmethod
     def decode(cls, data: bytes) -> ControlPrune:
         """Decode from protobuf."""
-        topic_id = ""
+        topic_id = TopicId("")
         peers: list[PrunePeerInfo] = []
         backoff = 0
         pos = 0
@@ -432,7 +433,7 @@ class ControlPrune:
 
             if field_num == 1 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
                 length, pos = _decode_length_at(data, pos)
-                topic_id = data[pos : pos + length].decode("utf-8")
+                topic_id = TopicId(data[pos : pos + length].decode("utf-8"))
                 pos += length
             elif field_num == 2 and wire_type == WIRE_TYPE_LENGTH_DELIMITED:
                 length, pos = _decode_length_at(data, pos)
@@ -622,7 +623,7 @@ class RPC:
         )
 
     @classmethod
-    def subscription(cls, topics: list[str], subscribe: bool = True) -> RPC:
+    def subscription(cls, topics: list[TopicId], subscribe: bool = True) -> RPC:
         """
         Create an RPC with subscription messages.
 
@@ -633,7 +634,7 @@ class RPC:
         return cls(subscriptions=[SubOpts(subscribe=subscribe, topic_id=t) for t in topics])
 
     @classmethod
-    def graft(cls, topics: list[str]) -> RPC:
+    def graft(cls, topics: list[TopicId]) -> RPC:
         """
         Create an RPC with GRAFT control messages.
 

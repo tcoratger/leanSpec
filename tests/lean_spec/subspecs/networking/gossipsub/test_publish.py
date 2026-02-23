@@ -113,13 +113,13 @@ class TestBroadcastSubscription:
         p1 = add_peer(behavior, "peerA", set())
         p2 = add_peer(behavior, "peerB", set())
 
-        behavior.subscribe("newTopic")
+        behavior.subscribe(TopicId("newTopic"))
 
         # Let the background task run.
         for task in list(behavior._background_tasks):
             await task
 
-        sub_rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="newTopic")])
+        sub_rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("newTopic"))])
         assert capture.sent == [(p1, sub_rpc), (p2, sub_rpc)]
 
     @pytest.mark.asyncio

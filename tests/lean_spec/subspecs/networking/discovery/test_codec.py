@@ -24,7 +24,7 @@ from lean_spec.subspecs.networking.discovery.messages import (
     TalkResp,
 )
 from lean_spec.subspecs.networking.types import SeqNumber
-from lean_spec.types.uint import Uint8
+from lean_spec.types import Uint8
 
 
 class TestPingCodec:

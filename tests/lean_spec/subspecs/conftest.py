@@ -10,7 +10,7 @@ import pytest
 
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
-from lean_spec.subspecs.networking.types import ConnectionState
+from lean_spec.subspecs.networking.types import ConnectionState, Multiaddr
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def connected_peer_info(peer_id: PeerId) -> PeerInfo:
     return PeerInfo(
         peer_id=peer_id,
         state=ConnectionState.CONNECTED,
-        address="/ip4/192.168.1.1/udp/9000/quic-v1",
+        address=Multiaddr("/ip4/192.168.1.1/udp/9000/quic-v1"),
     )
 
 
@@ -47,5 +47,5 @@ def disconnected_peer_info(peer_id: PeerId) -> PeerInfo:
     return PeerInfo(
         peer_id=peer_id,
         state=ConnectionState.DISCONNECTED,
-        address="/ip4/192.168.1.2/udp/9000/quic-v1",
+        address=Multiaddr("/ip4/192.168.1.2/udp/9000/quic-v1"),
     )

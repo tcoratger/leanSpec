@@ -13,12 +13,13 @@ import pytest
 
 from lean_spec.subspecs.networking.gossipsub.behavior import GossipsubMessageEvent
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 from .conftest import fast_params
 from .network import GossipsubTestNetwork
 from .node import GossipsubTestNode
 
-TOPIC = "test/connectivity"
+TOPIC = TopicId("test/connectivity")
 
 
 @pytest.mark.asyncio

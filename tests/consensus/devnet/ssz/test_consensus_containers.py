@@ -35,8 +35,7 @@ from lean_spec.subspecs.containers.state.types import (
 )
 from lean_spec.subspecs.xmss import Signature
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Boolean, Bytes32, Bytes52, Uint64
-from lean_spec.types.byte_arrays import ByteListMiB
+from lean_spec.types import Boolean, ByteListMiB, Bytes32, Bytes52, Uint64
 
 pytestmark = pytest.mark.valid_until("Devnet")
 

@@ -243,9 +243,9 @@ class ValidatorService:
             logger.debug("Block production: no head state for slot %d", slot)
             return
 
-        num_validators = len(head_state.validators)
+        num_validators = Uint64(len(head_state.validators))
         my_indices = list(self.registry.indices())
-        expected_proposer = int(slot) % num_validators
+        expected_proposer = int(slot) % int(num_validators)
         logger.debug(
             "Block production check: slot=%d num_validators=%d expected_proposer=%d my_indices=%s",
             slot,
@@ -348,7 +348,7 @@ class ValidatorService:
         if head_state is None:
             return
 
-        num_validators = len(head_state.validators)
+        num_validators = Uint64(len(head_state.validators))
 
         for validator_index in self.registry.indices():
             # Skip proposer - they already attested within their block.

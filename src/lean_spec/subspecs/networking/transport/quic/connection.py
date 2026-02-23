@@ -40,6 +40,8 @@ from aioquic.quic.events import (
     StreamReset,
 )
 
+from lean_spec.subspecs.networking.types import ProtocolId
+
 from ..identity import IdentityKeypair
 from ..peer_id import PeerId
 from .stream_adapter import QuicStreamAdapter
@@ -66,7 +68,7 @@ class QuicStream:
     _closed: bool = False
     _write_closed: bool = False
     _read_closed: bool = False
-    _protocol_id: str = ""
+    _protocol_id: ProtocolId = ProtocolId("")
 
     @property
     def stream_id(self) -> int:
@@ -74,7 +76,7 @@ class QuicStream:
         return self._stream_id
 
     @property
-    def protocol_id(self) -> str:
+    def protocol_id(self) -> ProtocolId:
         """Negotiated protocol ID for this stream."""
         return self._protocol_id
 
@@ -196,7 +198,7 @@ class QuicConnection:
         """Remote address in multiaddr format."""
         return self._remote_addr
 
-    async def open_stream(self, protocol: str) -> QuicStream:
+    async def open_stream(self, protocol: ProtocolId) -> QuicStream:
         """
         Open a new stream for the given protocol.
 

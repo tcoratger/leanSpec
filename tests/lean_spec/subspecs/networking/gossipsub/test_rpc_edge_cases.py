@@ -23,6 +23,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     encode_bytes,
     encode_tag,
 )
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 
 class TestPrunePeerInfoRoundtrip:
@@ -51,7 +52,7 @@ class TestPruneWithPeerExchange:
     def test_prune_with_peers(self) -> None:
         """ControlPrune roundtrips with peer exchange info."""
         prune = ControlPrune(
-            topic_id="/topic",
+            topic_id=TopicId("/topic"),
             peers=[
                 PrunePeerInfo(peer_id=b"alt1", signed_peer_record=b"rec1"),
                 PrunePeerInfo(peer_id=b"alt2"),
@@ -62,7 +63,7 @@ class TestPruneWithPeerExchange:
 
     def test_prune_no_peers(self) -> None:
         """ControlPrune without peers field."""
-        prune = ControlPrune(topic_id="/topic", backoff=60)
+        prune = ControlPrune(topic_id=TopicId("/topic"), backoff=60)
         assert ControlPrune.decode(prune.encode()) == prune
 
 
@@ -125,7 +126,7 @@ class TestEmptyDecode:
 
     def test_subopts_decode_empty(self) -> None:
         """Decoding empty bytes returns default SubOpts."""
-        assert SubOpts.decode(b"") == SubOpts(subscribe=False, topic_id="")
+        assert SubOpts.decode(b"") == SubOpts(subscribe=False, topic_id=TopicId(""))
 
 
 class TestForwardCompatibility:
@@ -133,7 +134,7 @@ class TestForwardCompatibility:
 
     def test_rpc_with_unknown_varint_field(self) -> None:
         """RPC ignores unknown varint fields."""
-        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="topic")])
+        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("topic"))])
         data = bytearray(rpc.encode())
 
         # Append unknown field 99, wire type varint, value 42.
@@ -144,7 +145,7 @@ class TestForwardCompatibility:
 
     def test_message_with_unknown_field(self) -> None:
         """Message ignores unknown length-delimited fields."""
-        msg = Message(topic="t", data=b"d")
+        msg = Message(topic=TopicId("t"), data=b"d")
         data = bytearray(msg.encode())
 
         # Append unknown field 99.
@@ -179,9 +180,9 @@ class TestMultiTopicControl:
         """Multiple GRAFTs in one control message roundtrip correctly."""
         ctrl = ControlMessage(
             graft=[
-                ControlGraft(topic_id="/topicA"),
-                ControlGraft(topic_id="/topicB"),
-                ControlGraft(topic_id="/topicC"),
+                ControlGraft(topic_id=TopicId("/topicA")),
+                ControlGraft(topic_id=TopicId("/topicB")),
+                ControlGraft(topic_id=TopicId("/topicC")),
             ]
         )
         assert ControlMessage.decode(ctrl.encode()) == ctrl
@@ -189,10 +190,10 @@ class TestMultiTopicControl:
     def test_full_control_message_all_types(self) -> None:
         """Control message with all types in a single message."""
         ctrl = ControlMessage(
-            ihave=[ControlIHave(topic_id="/t", message_ids=[b"id12345678901234"])],
+            ihave=[ControlIHave(topic_id=TopicId("/t"), message_ids=[b"id12345678901234"])],
             iwant=[ControlIWant(message_ids=[b"id12345678901234"])],
-            graft=[ControlGraft(topic_id="/t")],
-            prune=[ControlPrune(topic_id="/t", backoff=30)],
+            graft=[ControlGraft(topic_id=TopicId("/t"))],
+            prune=[ControlPrune(topic_id=TopicId("/t"), backoff=30)],
         )
         assert ControlMessage.decode(ctrl.encode()) == ctrl
 
@@ -200,13 +201,13 @@ class TestMultiTopicControl:
         """RPC with multiple subscriptions and published messages."""
         rpc = RPC(
             subscriptions=[
-                SubOpts(subscribe=True, topic_id="/a"),
-                SubOpts(subscribe=False, topic_id="/b"),
-                SubOpts(subscribe=True, topic_id="/c"),
+                SubOpts(subscribe=True, topic_id=TopicId("/a")),
+                SubOpts(subscribe=False, topic_id=TopicId("/b")),
+                SubOpts(subscribe=True, topic_id=TopicId("/c")),
             ],
             publish=[
-                Message(topic="/a", data=b"msg1"),
-                Message(topic="/c", data=b"msg2"),
+                Message(topic=TopicId("/a"), data=b"msg1"),
+                Message(topic=TopicId("/c"), data=b"msg2"),
             ],
         )
         assert RPC.decode(rpc.encode()) == rpc

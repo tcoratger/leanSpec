@@ -211,7 +211,7 @@ class NetworkService:
         ssz_bytes = block.encode_bytes()
         compressed = compress(ssz_bytes)
 
-        await self.event_source.publish(str(topic), compressed)
+        await self.event_source.publish(topic.to_topic_id(), compressed)
         logger.debug("Published block at slot %s", block.message.block.slot)
 
     async def publish_attestation(
@@ -231,7 +231,7 @@ class NetworkService:
         ssz_bytes = attestation.encode_bytes()
         compressed = compress(ssz_bytes)
 
-        await self.event_source.publish(str(topic), compressed)
+        await self.event_source.publish(topic.to_topic_id(), compressed)
         logger.debug("Published attestation for slot %s", attestation.data.slot)
 
     async def publish_aggregated_attestation(
@@ -247,5 +247,5 @@ class NetworkService:
         ssz_bytes = signed_attestation.encode_bytes()
         compressed = compress(ssz_bytes)
 
-        await self.event_source.publish(str(topic), compressed)
+        await self.event_source.publish(topic.to_topic_id(), compressed)
         logger.debug("Published aggregated attestation for slot %s", signed_attestation.data.slot)

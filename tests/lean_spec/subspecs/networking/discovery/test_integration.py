@@ -40,6 +40,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
 )
 from lean_spec.subspecs.networking.discovery.session import Session, SessionCache
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes12, Bytes16, Bytes64
 
@@ -219,7 +220,7 @@ class TestHandshakeManagerIntegration:
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
 
         manager = HandshakeManager(
@@ -253,7 +254,7 @@ class TestHandshakeManagerIntegration:
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
 
         manager = HandshakeManager(
@@ -299,12 +300,12 @@ class TestFullHandshakeFlow:
         enr_a = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4", "secp256k1": node_a_keys["public_key"]},
+            pairs={EnrKey("id"): b"v4", EnrKey("secp256k1"): node_a_keys["public_key"]},
         )
         enr_b = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4", "secp256k1": node_b_keys["public_key"]},
+            pairs={EnrKey("id"): b"v4", EnrKey("secp256k1"): node_b_keys["public_key"]},
         )
 
         manager_a = HandshakeManager(

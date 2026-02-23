@@ -19,6 +19,7 @@ from lean_spec.subspecs.networking.discovery.routing import (
 )
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
+from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.types import ForkDigest, NodeId, SeqNumber
 from lean_spec.types import Bytes64
 
@@ -111,7 +112,7 @@ class TestNodeEntry:
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
 
         entry = NodeEntry(
@@ -462,7 +463,7 @@ class TestForkCompatibility:
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
         entry = NodeEntry(node_id=remote_node_id, enr=enr)
 
@@ -480,7 +481,7 @@ class TestForkCompatibility:
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"eth2": eth2_bytes, "id": b"v4"},
+            pairs={EnrKey("eth2"): eth2_bytes, EnrKey("id"): b"v4"},
         )
         entry = NodeEntry(node_id=remote_node_id, enr=enr)
 
@@ -502,7 +503,7 @@ class TestForkCompatibility:
         enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"eth2": eth2_bytes, "id": b"v4"},
+            pairs={EnrKey("eth2"): eth2_bytes, EnrKey("id"): b"v4"},
         )
         entry = NodeEntry(node_id=remote_node_id, enr=enr)
 
@@ -524,7 +525,7 @@ class TestForkCompatibility:
         compatible_enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"eth2": eth2_match, "id": b"v4"},
+            pairs={EnrKey("eth2"): eth2_match, EnrKey("id"): b"v4"},
         )
         compatible_entry = NodeEntry(node_id=NodeId(b"\x01" * 32), enr=compatible_enr)
         assert table.is_fork_compatible(compatible_entry)
@@ -538,7 +539,7 @@ class TestForkCompatibility:
         incompatible_enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"eth2": eth2_mismatch, "id": b"v4"},
+            pairs={EnrKey("eth2"): eth2_mismatch, EnrKey("id"): b"v4"},
         )
         incompatible_entry = NodeEntry(node_id=NodeId(b"\x02" * 32), enr=incompatible_enr)
         assert not table.is_fork_compatible(incompatible_entry)

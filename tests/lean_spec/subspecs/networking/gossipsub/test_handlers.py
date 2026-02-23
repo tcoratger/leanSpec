@@ -54,7 +54,7 @@ class TestHandleGraft:
         """Silently ignore GRAFT for unknown topics (v1.1 spec)."""
         behavior, capture = make_behavior()
         peer_id = add_peer(behavior, "peer1")
-        graft = ControlGraft(topic_id="unknown_topic")
+        graft = ControlGraft(topic_id=TopicId("unknown_topic"))
 
         await behavior._handle_graft(peer_id, graft)
 
@@ -205,7 +205,7 @@ class TestHandleIHave:
         peer_id = add_peer(behavior, "peer1")
         msg_id = b"12345678901234567890"
 
-        ihave = ControlIHave(topic_id="topic", message_ids=[msg_id])
+        ihave = ControlIHave(topic_id=TopicId("topic"), message_ids=[msg_id])
         await behavior._handle_ihave(peer_id, ihave)
 
         assert capture.sent == [
@@ -222,7 +222,7 @@ class TestHandleIHave:
         # Mark as seen
         behavior.seen_cache.add(msg_id, Timestamp(time.time()))
 
-        ihave = ControlIHave(topic_id="topic", message_ids=[bytes(msg_id)])
+        ihave = ControlIHave(topic_id=TopicId("topic"), message_ids=[bytes(msg_id)])
         await behavior._handle_ihave(peer_id, ihave)
 
         assert capture.sent == []
@@ -238,7 +238,7 @@ class TestHandleIHave:
 
         behavior.seen_cache.add(seen_id, Timestamp(time.time()))
 
-        ihave = ControlIHave(topic_id="topic", message_ids=[bytes(seen_id), unseen_id])
+        ihave = ControlIHave(topic_id=TopicId("topic"), message_ids=[bytes(seen_id), unseen_id])
         await behavior._handle_ihave(peer_id, ihave)
 
         assert capture.sent == [
@@ -255,7 +255,7 @@ class TestHandleIHave:
         peer_id = add_peer(behavior, "peer1")
 
         # Only wrong-length IDs
-        ihave = ControlIHave(topic_id="topic", message_ids=[b"short", b"toolong" * 10])
+        ihave = ControlIHave(topic_id=TopicId("topic"), message_ids=[b"short", b"toolong" * 10])
         await behavior._handle_ihave(peer_id, ihave)
 
         # No IWANT sent
@@ -278,7 +278,9 @@ class TestHandleIWant:
         iwant = ControlIWant(message_ids=[bytes(msg.id)])
         await behavior._handle_iwant(peer_id, iwant)
 
-        assert capture.sent == [(peer_id, RPC(publish=[Message(topic="topic", data=b"payload")]))]
+        assert capture.sent == [
+            (peer_id, RPC(publish=[Message(topic=TopicId("topic"), data=b"payload")]))
+        ]
 
     @pytest.mark.asyncio
     async def test_iwant_ignores_uncached(self) -> None:
@@ -312,10 +314,10 @@ class TestHandleSubscription:
         behavior, _ = make_behavior()
         peer_id = add_peer(behavior, "peer1")
 
-        sub = SubOpts(subscribe=True, topic_id="topic1")
+        sub = SubOpts(subscribe=True, topic_id=TopicId("topic1"))
         await behavior._handle_subscription(peer_id, sub)
 
-        assert "topic1" in behavior._peers[peer_id].subscriptions
+        assert TopicId("topic1") in behavior._peers[peer_id].subscriptions
 
     @pytest.mark.asyncio
     async def test_unsubscribe_removes_and_cleans_mesh(self) -> None:
@@ -324,7 +326,7 @@ class TestHandleSubscription:
         topic = TopicId("test_topic")
         behavior.subscribe(topic)
 
-        peer_id = add_peer(behavior, "peer1", {"test_topic"})
+        peer_id = add_peer(behavior, "peer1", {TopicId("test_topic")})
         behavior.mesh.add_to_mesh(topic, peer_id)
 
         sub = SubOpts(subscribe=False, topic_id=topic)
@@ -339,11 +341,11 @@ class TestHandleSubscription:
         behavior, _ = make_behavior()
         peer_id = add_peer(behavior, "peer1")
 
-        sub = SubOpts(subscribe=True, topic_id="topic1")
+        sub = SubOpts(subscribe=True, topic_id=TopicId("topic1"))
         await behavior._handle_subscription(peer_id, sub)
 
         assert behavior._event_queue.get_nowait() == GossipsubPeerEvent(
-            peer_id=peer_id, topic="topic1", subscribed=True
+            peer_id=peer_id, topic=TopicId("topic1"), subscribed=True
         )
 
 
@@ -390,12 +392,12 @@ class TestHandleMessage:
         behavior, _ = make_behavior()
         peer_id = add_peer(behavior, "peer1")
 
-        msg = Message(topic="topic", data=b"payload")
+        msg = Message(topic=TopicId("topic"), data=b"payload")
         await behavior._handle_message(peer_id, msg)
 
         assert behavior._event_queue.get_nowait() == GossipsubMessageEvent(
             peer_id=peer_id,
-            topic="topic",
+            topic=TopicId("topic"),
             data=b"payload",
             message_id=GossipsubMessage.compute_id(b"topic", b"payload"),
         )
@@ -409,13 +411,13 @@ class TestHandleMessage:
         received: list[GossipsubMessageEvent] = []
         behavior.set_message_handler(received.append)
 
-        msg = Message(topic="topic", data=b"data")
+        msg = Message(topic=TopicId("topic"), data=b"data")
         await behavior._handle_message(peer_id, msg)
 
         assert received == [
             GossipsubMessageEvent(
                 peer_id=peer_id,
-                topic="topic",
+                topic=TopicId("topic"),
                 data=b"data",
                 message_id=GossipsubMessage.compute_id(b"topic", b"data"),
             )
@@ -427,7 +429,7 @@ class TestHandleMessage:
         behavior, capture = make_behavior()
         peer_id = add_peer(behavior, "peer1")
 
-        msg = Message(topic="", data=b"data")
+        msg = Message(topic=TopicId(""), data=b"data")
         await behavior._handle_message(peer_id, msg)
 
         assert capture.sent == []
@@ -440,13 +442,13 @@ class TestHandleMessage:
         peer_id = add_peer(behavior, "peer1")
 
         # Not subscribed to "topic"
-        msg = Message(topic="topic", data=b"data")
+        msg = Message(topic=TopicId("topic"), data=b"data")
         await behavior._handle_message(peer_id, msg)
 
         assert capture.sent == []
         assert behavior._event_queue.get_nowait() == GossipsubMessageEvent(
             peer_id=peer_id,
-            topic="topic",
+            topic=TopicId("topic"),
             data=b"data",
             message_id=GossipsubMessage.compute_id(b"topic", b"data"),
         )
@@ -559,14 +561,14 @@ class TestHandleRPC:
         peer_id = add_peer(behavior, "peer1", {topic})
 
         rpc = RPC(
-            subscriptions=[SubOpts(subscribe=True, topic_id="new_topic")],
+            subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("new_topic"))],
             publish=[Message(topic=topic, data=b"data")],
             control=ControlMessage(graft=[ControlGraft(topic_id=topic)]),
         )
 
         await behavior._handle_rpc(peer_id, rpc)
 
-        assert "new_topic" in behavior._peers[peer_id].subscriptions
+        assert TopicId("new_topic") in behavior._peers[peer_id].subscriptions
         assert peer_id in behavior.mesh.get_mesh_peers(topic)
         assert capture.sent == []
 
@@ -574,7 +576,7 @@ class TestHandleRPC:
         while not behavior._event_queue.empty():
             events.append(behavior._event_queue.get_nowait())
         assert events == [
-            GossipsubPeerEvent(peer_id=peer_id, topic="new_topic", subscribed=True),
+            GossipsubPeerEvent(peer_id=peer_id, topic=TopicId("new_topic"), subscribed=True),
             GossipsubMessageEvent(
                 peer_id=peer_id,
                 topic=topic,
@@ -589,7 +591,7 @@ class TestHandleRPC:
         behavior, capture = make_behavior()
         unknown = make_peer("unknown")
 
-        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id="topic")])
+        rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("topic"))])
         await behavior._handle_rpc(unknown, rpc)
 
         assert capture.sent == []

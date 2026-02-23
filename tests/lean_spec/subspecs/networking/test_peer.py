@@ -7,9 +7,10 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
+from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp import Status
-from lean_spec.subspecs.networking.types import ConnectionState, Direction, SeqNumber
+from lean_spec.subspecs.networking.types import ConnectionState, Direction, Multiaddr, SeqNumber
 from lean_spec.types import Bytes32, Bytes64
 
 
@@ -56,7 +57,7 @@ class TestPeerInfo:
             peer_id=peer("16Uiu2HAk"),
             state=ConnectionState.CONNECTED,
             direction=Direction.INBOUND,
-            address="/ip4/192.168.1.1/udp/9000/quic-v1",
+            address=Multiaddr("/ip4/192.168.1.1/udp/9000/quic-v1"),
         )
         assert info.state == ConnectionState.CONNECTED
         assert info.direction == Direction.INBOUND
@@ -102,7 +103,7 @@ class TestPeerInfoForkDigest:
         return ENR(
             signature=Bytes64(b"\x00" * 64),
             seq=SeqNumber(1),
-            pairs={"eth2": eth2_bytes, "id": b"v4"},
+            pairs={EnrKey("eth2"): eth2_bytes, EnrKey("id"): b"v4"},
         )
 
     def test_fork_digest_none_without_enr(self) -> None:
@@ -116,7 +117,7 @@ class TestPeerInfoForkDigest:
         enr = ENR(
             signature=Bytes64(b"\x00" * 64),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
         info = PeerInfo(peer_id=peer("test"), enr=enr)
         assert info.fork_digest is None

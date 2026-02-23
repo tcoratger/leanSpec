@@ -2,13 +2,12 @@
 
 import time
 
-from lean_spec.subspecs.networking.discovery.messages import Port
 from lean_spec.subspecs.networking.discovery.session import (
     BondCache,
     Session,
     SessionCache,
 )
-from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.subspecs.networking.types import NodeId, Port
 from lean_spec.types import Bytes16
 
 ZERO_KEY = Bytes16(bytes(16))

@@ -14,7 +14,7 @@ from lean_spec.types.container import Container
 from ..config import MAX_REQUEST_BLOCKS
 from ..types import ProtocolId
 
-STATUS_PROTOCOL_V1: Final[ProtocolId] = "/leanconsensus/req/status/1/ssz_snappy"
+STATUS_PROTOCOL_V1: Final = ProtocolId("/leanconsensus/req/status/1/ssz_snappy")
 """The protocol ID for the Status v1 request/response message."""
 
 
@@ -40,7 +40,7 @@ class Status(Container):
     """The client's current head checkpoint."""
 
 
-BLOCKS_BY_ROOT_PROTOCOL_V1: Final[ProtocolId] = "/leanconsensus/req/blocks_by_root/1/ssz_snappy"
+BLOCKS_BY_ROOT_PROTOCOL_V1: Final = ProtocolId("/leanconsensus/req/blocks_by_root/1/ssz_snappy")
 """The protocol ID for the BlocksByRoot v1 request/response message."""
 
 

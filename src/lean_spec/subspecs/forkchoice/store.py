@@ -39,6 +39,7 @@ from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, Generaliz
 from lean_spec.types import (
     ZERO_HASH,
     Bytes32,
+    Uint64,
 )
 from lean_spec.types.container import Container
 
@@ -319,7 +320,7 @@ class Store(Container):
             f"No state available to verify attestation signature for target block "
             f"{attestation_data.target.root.hex()}"
         )
-        assert validator_id.is_valid(len(key_state.validators)), (
+        assert validator_id.is_valid(Uint64(len(key_state.validators))), (
             f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
         )
         public_key = key_state.validators[validator_id].get_pubkey()
@@ -388,7 +389,7 @@ class Store(Container):
         # Ensure all participants exist in the active set
         validators = key_state.validators
         for validator_id in validator_ids:
-            assert validator_id.is_valid(len(validators)), (
+            assert validator_id.is_valid(Uint64(len(validators))), (
                 f"Validator {validator_id} not found in state {data.target.root.hex()}"
             )
 
@@ -856,7 +857,7 @@ class Store(Container):
         # The validator registry in this state tells us how many active
         # validators exist. We need that count to compute the threshold.
         head_state = self.states[self.head]
-        num_validators = len(head_state.validators)
+        num_validators = Uint64(len(head_state.validators))
 
         # Compute the 2/3 supermajority threshold.
         #
@@ -1252,7 +1253,7 @@ class Store(Container):
         #
         # Only one validator may propose per slot.
         # Unauthorized proposals would be rejected by other nodes.
-        num_validators = len(head_state.validators)
+        num_validators = Uint64(len(head_state.validators))
         assert validator_index.is_proposer_for(slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )

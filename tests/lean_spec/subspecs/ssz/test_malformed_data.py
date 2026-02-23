@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from lean_spec.types import BaseByteList, Uint16, Uint32, Uint64
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
-from lean_spec.types.byte_arrays import BaseByteList
 from lean_spec.types.collections import SSZList, SSZVector
 from lean_spec.types.container import Container
 from lean_spec.types.exceptions import SSZSerializationError, SSZValueError
-from lean_spec.types.uint import Uint16, Uint32, Uint64
 from lean_spec.types.union import SSZUnion
 
 # Test type definitions

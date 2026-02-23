@@ -20,10 +20,8 @@ import os
 from enum import IntEnum
 from typing import ClassVar, Final, Self
 
-from lean_spec.subspecs.networking.types import SeqNumber
-from lean_spec.types import StrictBaseModel
-from lean_spec.types.byte_arrays import BaseByteList, BaseBytes
-from lean_spec.types.uint import Uint8, Uint16
+from lean_spec.subspecs.networking.types import Port, SeqNumber
+from lean_spec.types import BaseByteList, BaseBytes, StrictBaseModel, Uint8, Uint16
 
 PROTOCOL_ID: Final[bytes] = b"discv5"
 """Protocol identifier in packet header. 6 bytes."""
@@ -95,10 +93,6 @@ class Nonce(BaseBytes):
 
 class Distance(Uint16):
     """Log2 distance (0-256). Distance 0 returns the node's own ENR."""
-
-
-class Port(Uint16):
-    """UDP port number (0-65535)."""
 
 
 class PacketFlag(IntEnum):

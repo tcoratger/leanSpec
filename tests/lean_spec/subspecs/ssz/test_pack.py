@@ -13,7 +13,7 @@ from lean_spec.subspecs.ssz.pack import (
     pack_bits,
     pack_bytes,
 )
-from lean_spec.types.byte_arrays import Bytes32
+from lean_spec.types import Bytes32
 
 
 def _hex_chunks(chunks: PyList[Bytes32]) -> PyList[str]:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 
 from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 
 from .node import GossipsubTestNode
 
@@ -111,7 +112,7 @@ class GossipsubTestNetwork:
         if len(self.nodes) > 2:
             await self.nodes[-1].connect_to(self.nodes[0])
 
-    async def subscribe_all(self, topic: str) -> None:
+    async def subscribe_all(self, topic: TopicId) -> None:
         """Subscribe all nodes to a topic."""
         for node in self.nodes:
             node.subscribe(topic)

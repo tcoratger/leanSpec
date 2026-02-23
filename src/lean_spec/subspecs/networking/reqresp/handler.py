@@ -68,6 +68,7 @@ from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.containers import SignedBlockWithAttestation
 from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE
 from lean_spec.subspecs.networking.transport.protocols import InboundStreamProtocol
+from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import VarintError, decode_varint
 from lean_spec.types import Bytes32
 
@@ -117,7 +118,7 @@ class StreamResponseAdapter:
         await self._stream.close()
 
 
-type BlockLookup = Callable[[Bytes32], Awaitable[SignedBlockWithAttestation | None]]
+type AsyncBlockLookup = Callable[[Bytes32], Awaitable[SignedBlockWithAttestation | None]]
 """Type alias for block lookup function.
 
 Takes a block root and returns the block if available, None otherwise.
@@ -148,7 +149,7 @@ class RequestHandler:
     our_status: Status | None = None
     """Our current chain status for Status responses."""
 
-    block_lookup: BlockLookup | None = None
+    block_lookup: AsyncBlockLookup | None = None
     """Callback to look up blocks by root."""
 
     async def handle_status(self, response: StreamResponseAdapter) -> None:
@@ -221,7 +222,7 @@ class RequestHandler:
                 logger.warning("Error looking up block %s: %s", root.hex()[:8], e)
 
 
-REQRESP_PROTOCOL_IDS: Final[frozenset[str]] = frozenset(
+REQRESP_PROTOCOL_IDS: Final[frozenset[ProtocolId]] = frozenset(
     {
         STATUS_PROTOCOL_V1,
         BLOCKS_BY_ROOT_PROTOCOL_V1,
@@ -263,7 +264,7 @@ class ReqRespServer:
     handler: RequestHandler
     """Handler for processing requests."""
 
-    async def handle_stream(self, stream: InboundStreamProtocol, protocol_id: str) -> None:
+    async def handle_stream(self, stream: InboundStreamProtocol, protocol_id: ProtocolId) -> None:
         """
         Handle an incoming ReqResp stream.
 
@@ -389,7 +390,7 @@ class ReqRespServer:
 
     async def _dispatch(
         self,
-        protocol_id: str,
+        protocol_id: ProtocolId,
         ssz_bytes: bytes,
         response: StreamResponseAdapter,
     ) -> None:

@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Final
 
+from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 if TYPE_CHECKING:
@@ -146,7 +147,7 @@ class QuicStreamAdapter:
             self._write_buffer = b""
         await self._stream.finish_write()
 
-    async def negotiate_client(self, protocols: list[str]) -> str:
+    async def negotiate_client(self, protocols: list[ProtocolId]) -> ProtocolId:
         """Client-side protocol negotiation.
 
         Proposes protocols in order until one is accepted.
@@ -186,9 +187,9 @@ class QuicStreamAdapter:
 
     async def negotiate_server(
         self,
-        supported: set[str],
+        supported: set[ProtocolId],
         timeout: float = DEFAULT_TIMEOUT,
-    ) -> str:
+    ) -> ProtocolId:
         """Server-side protocol negotiation.
 
         Waits for client to propose protocols, accepts first supported one.
@@ -207,7 +208,7 @@ class QuicStreamAdapter:
         if not supported:
             raise NegotiationError("No supported protocols")
 
-        async def _do_negotiation() -> str:
+        async def _do_negotiation() -> ProtocolId:
             header = await self._read_negotiation_message()
 
             if header != MULTISTREAM_PROTOCOL_ID:
@@ -216,7 +217,7 @@ class QuicStreamAdapter:
             await self._write_negotiation_message(MULTISTREAM_PROTOCOL_ID)
 
             for _ in range(MAX_NEGOTIATION_ATTEMPTS):
-                proposal = await self._read_negotiation_message()
+                proposal = ProtocolId(await self._read_negotiation_message())
 
                 if proposal in supported:
                     await self._write_negotiation_message(proposal)
@@ -231,7 +232,7 @@ class QuicStreamAdapter:
         except asyncio.TimeoutError:
             raise NegotiationError(f"Negotiation timed out after {timeout}s") from None
 
-    async def negotiate_lazy_client(self, protocol: str) -> str:
+    async def negotiate_lazy_client(self, protocol: ProtocolId) -> ProtocolId:
         """Lazy client-side negotiation for single protocol.
 
         Sends both the multistream header and protocol proposal together,

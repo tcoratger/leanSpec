@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from enum import IntEnum, auto
 
-from lean_spec.types import Uint64
-from lean_spec.types.byte_arrays import Bytes4, Bytes32
+from lean_spec.types import Bytes4, Bytes32, Uint16, Uint64
 
 
 class DomainType(Bytes4):
@@ -35,11 +34,20 @@ class SeqNumber(Uint64):
     """Sequence number used in ENR records, metadata, and ping messages."""
 
 
-type ProtocolId = str
-"""Libp2p protocol identifier, e.g. ``/eth2/beacon_chain/req/status/1/ssz_snappy``."""
+class ProtocolId(str):
+    """Libp2p protocol identifier, e.g. ``/eth2/beacon_chain/req/status/1/ssz_snappy``."""
 
-type Multiaddr = str
-"""Multiaddress string, e.g. ``/ip4/192.168.1.1/udp/9000/quic-v1``."""
+    __slots__ = ()
+
+
+class Multiaddr(str):
+    """Multiaddress string, e.g. ``/ip4/192.168.1.1/udp/9000/quic-v1``."""
+
+    __slots__ = ()
+
+
+class Port(Uint16):
+    """UDP/TCP port number (0-65535)."""
 
 
 class Direction(IntEnum):

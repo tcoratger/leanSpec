@@ -4,6 +4,7 @@ import pytest
 
 from lean_spec.subspecs.containers import ValidatorIndex
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.types import Uint64
 
 
 class TestValidatorIndexIsProposerFor:
@@ -16,7 +17,7 @@ class TestValidatorIndexIsProposerFor:
         Validates that the round-robin proposer selection works correctly
         for basic cases with a small validator set.
         """
-        num_validators = 10
+        num_validators = Uint64(10)
 
         # At slot 0, validator 0 should be the proposer (0 % 10 == 0)
         assert ValidatorIndex(0).is_proposer_for(Slot(0), num_validators) is True
@@ -37,7 +38,7 @@ class TestValidatorIndexIsProposerFor:
         Validates that the modulo operation correctly handles slots
         greater than the number of validators.
         """
-        num_validators = 10
+        num_validators = Uint64(10)
 
         # At slot 10, wrap-around selects validator 0 (10 % 10 == 0)
         assert ValidatorIndex(0).is_proposer_for(Slot(10), num_validators) is True
@@ -57,7 +58,7 @@ class TestValidatorIndexIsProposerFor:
 
         Ensures the method works correctly with realistic blockchain parameters.
         """
-        num_validators = 1000
+        num_validators = Uint64(1000)
 
         # Test with large slot numbers
         assert ValidatorIndex(555).is_proposer_for(Slot(555), num_validators) is True
@@ -65,7 +66,7 @@ class TestValidatorIndexIsProposerFor:
 
         # Test wrap-around with large numbers
         slot = Slot(12345)
-        expected_proposer = ValidatorIndex(int(slot) % num_validators)  # 345
+        expected_proposer = ValidatorIndex(int(slot) % int(num_validators))  # 345
         assert expected_proposer.is_proposer_for(slot, num_validators) is True
         assert ValidatorIndex(0).is_proposer_for(slot, num_validators) is False
 
@@ -75,7 +76,7 @@ class TestValidatorIndexIsProposerFor:
 
         Edge case where there's only one validator in the system.
         """
-        num_validators = 1
+        num_validators = Uint64(1)
 
         # With only one validator, they should always be the proposer
         assert ValidatorIndex(0).is_proposer_for(Slot(0), num_validators) is True
@@ -89,7 +90,7 @@ class TestValidatorIndexIsProposerFor:
         Tests boundary conditions and unusual but valid inputs.
         """
         # Test with small validator sets
-        num_validators = 3
+        num_validators = Uint64(3)
 
         # Test all validators in a 3-validator system
         assert ValidatorIndex(0).is_proposer_for(Slot(0), num_validators) is True
@@ -107,7 +108,7 @@ class TestValidatorIndexIsProposerFor:
 
         Ensures false cases are properly handled across different scenarios.
         """
-        num_validators = 5
+        num_validators = Uint64(5)
 
         # Test that all non-proposer validators return False
         for slot_num in range(20):  # Test multiple cycles
@@ -130,7 +131,7 @@ class TestValidatorIndexIsProposerFor:
 
         Ensures the method handles the custom types properly.
         """
-        num_validators = 7
+        num_validators = Uint64(7)
 
         # Test with explicit type construction
         validator = ValidatorIndex(3)
@@ -149,18 +150,20 @@ class TestValidatorIndexIsProposerFor:
 
         Tests the method across various realistic validator counts.
         """
+        num_validators_u64 = Uint64(num_validators)
+
         # Test first few slots
         for slot_num in range(min(20, num_validators * 2)):
             slot = Slot(slot_num)
             expected_proposer = ValidatorIndex(slot_num % num_validators)
 
             # The expected proposer should return True
-            assert expected_proposer.is_proposer_for(slot, num_validators) is True
+            assert expected_proposer.is_proposer_for(slot, num_validators_u64) is True
 
             # A different validator should return False
             if num_validators > 1:
                 other_validator = ValidatorIndex((slot_num + 1) % num_validators)
-                assert other_validator.is_proposer_for(slot, num_validators) is False
+                assert other_validator.is_proposer_for(slot, num_validators_u64) is False
 
 
 class TestValidatorIndexIsValid:
@@ -168,7 +171,7 @@ class TestValidatorIndexIsValid:
 
     def test_is_valid_basic(self) -> None:
         """Test basic validity checks."""
-        num_validators = 10
+        num_validators = Uint64(10)
 
         # Valid indices (0 to 9)
         assert ValidatorIndex(0).is_valid(num_validators) is True
@@ -181,7 +184,7 @@ class TestValidatorIndexIsValid:
 
     def test_is_valid_boundary(self) -> None:
         """Test validity at boundary conditions."""
-        num_validators = 5
+        num_validators = Uint64(5)
 
         # Last valid index
         assert ValidatorIndex(4).is_valid(num_validators) is True
@@ -191,7 +194,7 @@ class TestValidatorIndexIsValid:
 
     def test_is_valid_single_validator(self) -> None:
         """Test validity with single validator set."""
-        num_validators = 1
+        num_validators = Uint64(1)
 
         assert ValidatorIndex(0).is_valid(num_validators) is True
         assert ValidatorIndex(1).is_valid(num_validators) is False

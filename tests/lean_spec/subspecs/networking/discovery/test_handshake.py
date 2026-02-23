@@ -26,6 +26,7 @@ from lean_spec.subspecs.networking.discovery.packet import (
 )
 from lean_spec.subspecs.networking.discovery.session import SessionCache
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.types import Bytes16, Bytes32, Bytes33, Bytes64
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
@@ -425,7 +426,7 @@ class TestHandshakeValidation:
         remote_enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4", "secp256k1": bytes(remote_pub)},
+            pairs={EnrKey("id"): b"v4", EnrKey("secp256k1"): bytes(remote_pub)},
         )
 
         authdata_bytes = encode_handshake_authdata(
@@ -463,7 +464,7 @@ class TestHandshakeValidation:
         remote_enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4", "secp256k1": bytes(remote_pub)},
+            pairs={EnrKey("id"): b"v4", EnrKey("secp256k1"): bytes(remote_pub)},
         )
 
         authdata_bytes = encode_handshake_authdata(
@@ -655,8 +656,8 @@ class TestHandshakeENRCache:
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
             pairs={
-                "id": b"v4",
-                "secp256k1": NODE_B_PUBKEY,
+                EnrKey("id"): b"v4",
+                EnrKey("secp256k1"): NODE_B_PUBKEY,
             },
         )
 

@@ -6,10 +6,12 @@ import asyncio
 
 import pytest
 
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
+
 from .conftest import fast_params
 from .network import GossipsubTestNetwork
 
-TOPIC = "test/subscription"
+TOPIC = TopicId("test/subscription")
 
 
 @pytest.mark.asyncio

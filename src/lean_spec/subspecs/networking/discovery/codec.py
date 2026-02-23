@@ -21,9 +21,15 @@ References:
 from __future__ import annotations
 
 from lean_spec.subspecs.networking.types import SeqNumber
-from lean_spec.types import RLPItem, Uint64, decode_rlp, decode_rlp_list, encode_rlp
-from lean_spec.types.rlp import RLPDecodingError
-from lean_spec.types.uint import Uint8
+from lean_spec.types import (
+    RLPDecodingError,
+    RLPItem,
+    Uint8,
+    Uint64,
+    decode_rlp,
+    decode_rlp_list,
+    encode_rlp,
+)
 
 from .messages import (
     Distance,

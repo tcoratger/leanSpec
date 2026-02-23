@@ -123,9 +123,10 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
     GossipTopic,
     TopicKind,
 )
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
-    BlockLookup,
+    AsyncBlockLookup,
     ReqRespServer,
     RequestHandler,
 )
@@ -151,6 +152,7 @@ from lean_spec.subspecs.networking.transport.quic.stream_adapter import (
     NegotiationError,
     QuicStreamAdapter,
 )
+from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import (
     VarintError,
     decode_varint,
@@ -178,7 +180,7 @@ class EventSource(Protocol):
         """Yield the next network event."""
         ...
 
-    async def publish(self, topic: str, data: bytes) -> None:
+    async def publish(self, topic: TopicId, data: bytes) -> None:
         """Broadcast a message to all peers on a topic."""
         ...
 
@@ -187,7 +189,7 @@ class GossipMessageError(Exception):
     """Raised when a gossip message cannot be processed."""
 
 
-SUPPORTED_PROTOCOLS: Final[frozenset[str]] = (
+SUPPORTED_PROTOCOLS: Final[frozenset[ProtocolId]] = (
     frozenset({GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12}) | REQRESP_PROTOCOL_IDS
 )
 """Protocols supported for incoming stream negotiation.
@@ -664,7 +666,7 @@ class LiveNetworkEventSource:
         self._fork_digest = fork_digest
         object.__setattr__(self, "_gossip_handler", GossipHandler(fork_digest=fork_digest))
 
-    def set_block_lookup(self, lookup: BlockLookup) -> None:
+    def set_block_lookup(self, lookup: AsyncBlockLookup) -> None:
         """
         Set the callback for looking up blocks by root.
 
@@ -676,7 +678,7 @@ class LiveNetworkEventSource:
         """
         self._reqresp_handler.block_lookup = lookup
 
-    def subscribe_gossip_topic(self, topic: str) -> None:
+    def subscribe_gossip_topic(self, topic: TopicId) -> None:
         """
         Subscribe to a gossip topic.
 
@@ -1343,7 +1345,7 @@ class LiveNetworkEventSource:
             # The connection will be cleaned up elsewhere.
             logger.warning("Stream acceptor error for %s: %s", peer_id, e)
 
-    async def publish(self, topic: str, data: bytes) -> None:
+    async def publish(self, topic: TopicId, data: bytes) -> None:
         """
         Broadcast a message to all connected peers on a topic.
 

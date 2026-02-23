@@ -25,6 +25,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
     RequestedBlockRoots,
     Status,
 )
+from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import encode_varint
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import make_test_block, make_test_status
@@ -486,7 +487,7 @@ class TestReqRespServer:
         request_bytes = encode_request(status.encode_bytes())
         stream = MockStream(request_data=request_bytes)
 
-        unknown_protocol = "/unknown/protocol/1/ssz_snappy"
+        unknown_protocol = ProtocolId("/unknown/protocol/1/ssz_snappy")
         await server.handle_stream(stream, unknown_protocol)
 
         assert stream.closed is True

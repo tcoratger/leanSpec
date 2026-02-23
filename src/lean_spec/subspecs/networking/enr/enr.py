@@ -50,7 +50,14 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
     encode_dss_signature,
 )
 
-from lean_spec.subspecs.networking.types import ForkDigest, Multiaddr, NodeId, SeqNumber, Version
+from lean_spec.subspecs.networking.types import (
+    ForkDigest,
+    Multiaddr,
+    NodeId,
+    Port,
+    SeqNumber,
+    Version,
+)
 from lean_spec.types import (
     Bytes33,
     Bytes64,
@@ -133,23 +140,23 @@ class ENR(StrictBaseModel):
         return None
 
     @property
-    def udp_port(self) -> int | None:
+    def udp_port(self) -> Port | None:
         """UDP port for discovery (applies to both unless udp6 is set)."""
-        port = self.get(keys.UDP)
-        return int.from_bytes(port, "big") if port else None
+        raw = self.get(keys.UDP)
+        return Port(int.from_bytes(raw, "big")) if raw else None
 
     @property
-    def udp6_port(self) -> int | None:
+    def udp6_port(self) -> Port | None:
         """IPv6-specific UDP port. Falls back to udp_port if not set."""
-        port = self.get(keys.UDP6)
-        return int.from_bytes(port, "big") if port else None
+        raw = self.get(keys.UDP6)
+        return Port(int.from_bytes(raw, "big")) if raw else None
 
     def multiaddr(self) -> Multiaddr | None:
         """Construct QUIC multiaddress from endpoint info."""
         if self.ip4 and self.udp_port:
-            return f"/ip4/{self.ip4}/udp/{self.udp_port}/quic-v1"
+            return Multiaddr(f"/ip4/{self.ip4}/udp/{self.udp_port}/quic-v1")
         if self.ip6 and self.udp_port:
-            return f"/ip6/{self.ip6}/udp/{self.udp_port}/quic-v1"
+            return Multiaddr(f"/ip6/{self.ip6}/udp/{self.udp_port}/quic-v1")
         return None
 
     @property
@@ -372,10 +379,10 @@ class ENR(StrictBaseModel):
         #
         # Keys are strings, values are arbitrary bytes.
         # EIP-778 requires keys to be lexicographically sorted.
-        pairs: dict[str, bytes] = {}
-        prev_key: str | None = None
+        pairs: dict[EnrKey, bytes] = {}
+        prev_key: EnrKey | None = None
         for i in range(2, len(items), 2):
-            key = items[i].decode("utf-8")
+            key = EnrKey(items[i].decode("utf-8"))
             if prev_key is not None and key <= prev_key:
                 raise ValueError(
                     f"ENR keys must be lexicographically sorted per EIP-778: "

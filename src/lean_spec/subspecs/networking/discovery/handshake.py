@@ -32,7 +32,7 @@ from threading import Lock
 from typing import Final
 
 from lean_spec.subspecs.networking.enr import ENR
-from lean_spec.subspecs.networking.types import NodeId, SeqNumber
+from lean_spec.subspecs.networking.types import NodeId, Port, SeqNumber
 from lean_spec.types import Bytes16, Bytes32, Bytes33
 
 from .config import HANDSHAKE_TIMEOUT_SECS
@@ -42,7 +42,7 @@ from .crypto import (
     verify_id_nonce_signature,
 )
 from .keys import derive_keys_from_pubkey
-from .messages import IdNonce, Nonce, PacketFlag, Port
+from .messages import IdNonce, Nonce, PacketFlag
 from .packet import (
     HandshakeAuthdata,
     WhoAreYouAuthdata,

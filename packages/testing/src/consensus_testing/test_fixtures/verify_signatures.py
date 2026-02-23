@@ -26,8 +26,7 @@ from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Bytes32
-from lean_spec.types.byte_arrays import ByteListMiB
+from lean_spec.types import ByteListMiB, Bytes32
 
 from ..keys import XmssKeyManager, create_dummy_signature, get_shared_key_manager
 from ..test_types import AggregatedAttestationSpec, BlockSpec

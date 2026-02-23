@@ -27,12 +27,13 @@ from lean_spec.subspecs.networking.transport.quic.stream_adapter import (
     NegotiationError,
     QuicStreamAdapter,
 )
+from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
-GOSSIPSUB_ID = "/meshsub/1.1.0"
-GOSSIPSUB_V12_ID = "/meshsub/1.2.0"
-STATUS_ID = "/leanconsensus/req/status/1/ssz_snappy"
-BLOCKS_BY_ROOT_ID = "/leanconsensus/req/blocks_by_root/1/ssz_snappy"
+GOSSIPSUB_ID = ProtocolId("/meshsub/1.1.0")
+GOSSIPSUB_V12_ID = ProtocolId("/meshsub/1.2.0")
+STATUS_ID = ProtocolId("/leanconsensus/req/status/1/ssz_snappy")
+BLOCKS_BY_ROOT_ID = ProtocolId("/leanconsensus/req/blocks_by_root/1/ssz_snappy")
 
 
 class TestConstants:
@@ -96,7 +97,7 @@ class TestNegotiateClient:
 
         task = asyncio.create_task(server_task())
         with pytest.raises(NegotiationError, match="No protocols accepted"):
-            await client.negotiate_client(["/proto1", "/proto2"])
+            await client.negotiate_client([ProtocolId("/proto1"), ProtocolId("/proto2")])
         await task
 
     async def test_client_empty_protocols(self) -> None:
@@ -198,7 +199,7 @@ class TestLazyClient:
 
         task = asyncio.create_task(server_task())
         with pytest.raises(NegotiationError, match="Protocol rejected"):
-            await client.negotiate_lazy_client("/unsupported")
+            await client.negotiate_lazy_client(ProtocolId("/unsupported"))
         await task
 
     async def test_lazy_client_invalid_header(self) -> None:

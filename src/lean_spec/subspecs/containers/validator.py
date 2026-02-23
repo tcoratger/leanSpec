@@ -16,19 +16,19 @@ class SubnetId(Uint64):
 class ValidatorIndex(Uint64):
     """Represents a validator's unique index as a 64-bit unsigned integer."""
 
-    def is_proposer_for(self, slot: Slot, num_validators: int) -> bool:
+    def is_proposer_for(self, slot: Slot, num_validators: Uint64) -> bool:
         """
         Check if this validator is the proposer for the given slot.
 
         Uses round-robin proposer selection per the lean protocol spec.
         """
-        return int(slot) % num_validators == int(self)
+        return int(slot) % int(num_validators) == int(self)
 
-    def is_valid(self, num_validators: int) -> bool:
+    def is_valid(self, num_validators: Uint64) -> bool:
         """Check if this index is within valid bounds for a registry of given size."""
-        return int(self) < num_validators
+        return int(self) < int(num_validators)
 
-    def compute_subnet_id(self, num_committees: int) -> SubnetId:
+    def compute_subnet_id(self, num_committees: Uint64) -> SubnetId:
         """Compute the attestation subnet id for this validator.
 
         Args:

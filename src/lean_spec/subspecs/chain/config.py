@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from lean_spec.types.uint import Uint64
+from lean_spec.types import Uint64
 
 INTERVALS_PER_SLOT: Final = Uint64(5)
 """Number of intervals per slot for forkchoice processing."""

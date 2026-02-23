@@ -203,7 +203,7 @@ class TestGenesisConfigValidation:
         )
         config = GenesisConfig.from_yaml(yaml_content)
 
-        assert config.num_validators == 2
+        assert config.num_validators == Uint64(2)
         assert len(config.genesis_validators) == 2
 
 

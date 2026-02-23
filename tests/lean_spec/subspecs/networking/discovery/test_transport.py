@@ -29,9 +29,9 @@ from lean_spec.subspecs.networking.discovery.transport import (
     PendingRequest,
 )
 from lean_spec.subspecs.networking.enr import ENR
+from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes64
-from lean_spec.types.uint import Uint8
+from lean_spec.types import Bytes64, Uint8
 
 
 class TestDiscoveryProtocol:
@@ -172,7 +172,7 @@ class TestDiscoveryTransport:
         remote_enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(1),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
 
         transport.register_enr(remote_node_id, remote_enr)
@@ -1334,7 +1334,7 @@ class TestSendWhoareyou:
         remote_enr = ENR(
             signature=Bytes64(bytes(64)),
             seq=SeqNumber(42),
-            pairs={"id": b"v4"},
+            pairs={EnrKey("id"): b"v4"},
         )
         transport.register_enr(remote_node_id, remote_enr)
 

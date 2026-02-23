@@ -23,13 +23,12 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Final
+from typing import Final, NamedTuple
 
-from lean_spec.subspecs.networking.types import NodeId
+from lean_spec.subspecs.networking.types import NodeId, Port
 from lean_spec.types import Bytes16
 
 from .config import BOND_EXPIRY_SECS
-from .messages import Port
 
 _DEFAULT_PORT: Final = Port(0)
 """Default port value for optional port parameters."""
@@ -77,12 +76,16 @@ class Session:
         self.last_seen = time.time()
 
 
-type SessionKey = tuple[NodeId, str, Port]
-"""Session cache key: (node_id, ip, port).
+class SessionKey(NamedTuple):
+    """Session cache key: (node_id, ip, port).
 
-Per spec, sessions are tied to a specific UDP endpoint.
-This prevents session confusion if a node changes IP or port.
-"""
+    Per spec, sessions are tied to a specific UDP endpoint.
+    This prevents session confusion if a node changes IP or port.
+    """
+
+    node_id: NodeId
+    ip: str
+    port: Port
 
 
 @dataclass
@@ -121,7 +124,7 @@ class SessionCache:
         Returns:
             Active session or None.
         """
-        key: SessionKey = (node_id, ip, port)
+        key = SessionKey(node_id, ip, port)
         with self._lock:
             session = self.sessions.get(key)
             if session is None:
@@ -159,7 +162,7 @@ class SessionCache:
         Returns:
             The newly created session.
         """
-        key: SessionKey = (node_id, ip, port)
+        key = SessionKey(node_id, ip, port)
         now = time.time()
         session = Session(
             node_id=node_id,
@@ -191,7 +194,7 @@ class SessionCache:
         Returns:
             True if session was removed, False if not found.
         """
-        key: SessionKey = (node_id, ip, port)
+        key = SessionKey(node_id, ip, port)
         with self._lock:
             if key in self.sessions:
                 del self.sessions[key]
@@ -213,7 +216,7 @@ class SessionCache:
         Returns:
             True if session was updated, False if not found.
         """
-        key: SessionKey = (node_id, ip, port)
+        key = SessionKey(node_id, ip, port)
         with self._lock:
             session = self.sessions.get(key)
             if session is not None and not session.is_expired(self.timeout_secs):

@@ -52,7 +52,7 @@ class GenesisConfig(StrictBaseModel):
     Immutable once the chain launches.
     """
 
-    num_validators: int | None = Field(default=None, alias="NUM_VALIDATORS")
+    num_validators: Uint64 | None = Field(default=None, alias="NUM_VALIDATORS")
     """
     Number of validators (optional).
 
@@ -96,7 +96,7 @@ class GenesisConfig(StrictBaseModel):
         """Verify num_validators matches actual count when provided."""
         if self.num_validators is not None:
             actual_count = len(self.genesis_validators)
-            if self.num_validators != actual_count:
+            if int(self.num_validators) != actual_count:
                 raise ValueError(
                     f"NUM_VALIDATORS ({self.num_validators}) does not match "
                     f"actual validator count ({actual_count})"

@@ -66,15 +66,15 @@ class GossipsubTestNode:
             except asyncio.CancelledError:
                 pass
 
-    def subscribe(self, topic: str) -> None:
+    def subscribe(self, topic: TopicId) -> None:
         """Subscribe to a topic."""
         self.behavior.subscribe(topic)
 
-    def unsubscribe(self, topic: str) -> None:
+    def unsubscribe(self, topic: TopicId) -> None:
         """Unsubscribe from a topic."""
         self.behavior.unsubscribe(topic)
 
-    async def publish(self, topic: str, data: bytes) -> None:
+    async def publish(self, topic: TopicId, data: bytes) -> None:
         """Publish a message to a topic."""
         await self.behavior.publish(topic, data)
 
