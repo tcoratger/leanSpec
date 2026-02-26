@@ -25,14 +25,18 @@ jobs:
     steps:
       - name: Checkout leanSpec
         uses: actions/checkout@v4
-      
-      - name: Install uv and Python ${{ matrix.python-version }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
-          python-version: ${{ matrix.python-version }}
-      
+
       - name: Run all quality checks via tox
         run: uvx tox -e all-checks
 
@@ -47,14 +51,18 @@ jobs:
     steps:
       - name: Checkout leanSpec
         uses: actions/checkout@v4
-      
-      - name: Install uv and Python ${{ matrix.python-version }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
-          python-version: ${{ matrix.python-version }}
-      
+
       - name: Run tests via tox
         run: uvx tox -e pytest
 
@@ -65,12 +73,16 @@ jobs:
       - name: Checkout leanSpec
         uses: actions/checkout@v4
 
-      - name: Install uv and Python 3.14
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
-          python-version: "3.14"
 
       - name: Sync dependencies
         run: uv sync --no-progress
@@ -86,12 +98,16 @@ jobs:
       - name: Checkout leanSpec
         uses: actions/checkout@v4
 
-      - name: Install uv and Python 3.12
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
-          python-version: "3.12"
 
       - name: Run interop tests
         run: |

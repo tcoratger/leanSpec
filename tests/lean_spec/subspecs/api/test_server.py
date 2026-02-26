@@ -79,8 +79,7 @@ class TestFinalizedStateEndpoint:
                 assert response.status_code == 503
 
         finally:
-            server.stop()
-            await asyncio.sleep(0.1)
+            await server.aclose()
 
 
 class TestJustifiedCheckpointEndpoint:
@@ -100,6 +99,7 @@ class TestJustifiedCheckpointEndpoint:
                 assert response.status_code == 503
 
         finally:
+            await server.aclose()
             server.stop()
             await asyncio.sleep(0.1)
 
