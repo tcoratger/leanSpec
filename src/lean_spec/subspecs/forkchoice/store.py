@@ -920,7 +920,7 @@ class Store(Container):
         for sig_key, proofs in self.latest_new_aggregated_payloads.items():
             if sig_key in all_payloads:
                 # Both pools have proofs for this key. Combine them.
-                all_payloads[sig_key] = [*all_payloads[sig_key], *proofs]
+                all_payloads[sig_key] = all_payloads[sig_key] + proofs
             else:
                 # Only "new" has proofs for this key. Add them directly.
                 all_payloads[sig_key] = proofs
@@ -996,9 +996,7 @@ class Store(Container):
             validator_ids = aggregated_signature.participants.to_validator_indices()
             for vid in validator_ids:
                 sig_key = SignatureKey(vid, data_root)
-                if sig_key not in new_aggregated_payloads:
-                    new_aggregated_payloads[sig_key] = []
-                new_aggregated_payloads[sig_key].append(aggregated_signature)
+                new_aggregated_payloads.setdefault(sig_key, []).append(aggregated_signature)
 
                 # Prune successfully aggregated signature from gossip map
                 if sig_key in new_gossip_sigs:
