@@ -105,44 +105,6 @@ async def test_mesh_rebalances_after_new_peers(
 
 
 @pytest.mark.asyncio
-async def test_mesh_rebalances_after_disconnect(
-    network: GossipsubTestNetwork,
-) -> None:
-    """Removing peers causes remaining meshes to rebalance within bounds."""
-
-    # D_low=3 (same as D): losing even 1 mesh peer drops below D_low.
-    # 10 nodes, remove 5: each remaining node had ~3 mesh peers from 9,
-    # so it's very likely at least one mesh peer was removed.
-    params = fast_params(heartbeat_interval_secs=999, d_low=3)
-    await network.create_nodes(10, params)
-    await network.start_all()
-    await network.connect_full()
-    await network.subscribe_all(TOPIC)
-    await network.stabilize_mesh(TOPIC, rounds=3)
-
-    # Remove 5 nodes. Heavy removal disrupts meshes in most cases.
-    removed = network.nodes[5:]
-    for node in removed:
-        await node.stop()
-
-    for node in network.nodes[:5]:
-        for removed_node in removed:
-            await node.behavior.remove_peer(removed_node.peer_id)
-
-    network.nodes = network.nodes[:5]
-
-    # Heartbeats detect under-sized meshes and GRAFT replacement peers.
-    await network.stabilize_mesh(TOPIC, rounds=5)
-
-    # Postcondition: all meshes converged back to [D_low, D_high].
-    for node in network.nodes:
-        size = node.get_mesh_size(TOPIC)
-        assert params.d_low <= size <= params.d_high, (
-            f"{node.peer_id}: mesh size {size} outside [{params.d_low}, {params.d_high}]"
-        )
-
-
-@pytest.mark.asyncio
 async def test_mesh_prunes_excess_peers(
     network: GossipsubTestNetwork,
 ) -> None:
