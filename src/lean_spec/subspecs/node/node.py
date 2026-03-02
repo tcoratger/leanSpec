@@ -472,6 +472,7 @@ class Node:
             f = store.latest_finalized
             j_root = j.root.hex()[:16] + "…" if hasattr(j.root, "hex") else str(j.root)[:20]
             f_root = f.root.hex()[:16] + "…" if hasattr(f.root, "hex") else str(f.root)[:20]
+            logger.info("=" * 64)
             logger.info(
                 "Peers=%s | Justified slot=%s root=%s | Finalized slot=%s root=%s",
                 peers_connected,
@@ -480,6 +481,7 @@ class Node:
                 f.slot,
                 f_root,
             )
+            logger.info("=" * 64)
 
     async def _wait_shutdown(self) -> None:
         """
