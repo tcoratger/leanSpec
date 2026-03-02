@@ -450,7 +450,7 @@ class SyncService:
             logger.info(
                 "Block processed slot=%s root=%s from peer %s",
                 slot,
-                block_root.hex()[:16] + "…",
+                block_root.hex(),
                 peer_id,
             )
             self.store = new_store

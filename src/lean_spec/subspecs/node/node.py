@@ -470,8 +470,8 @@ class Node:
             )
             j = store.latest_justified
             f = store.latest_finalized
-            j_root = j.root.hex()[:16] + "…" if hasattr(j.root, "hex") else str(j.root)[:20]
-            f_root = f.root.hex()[:16] + "…" if hasattr(f.root, "hex") else str(f.root)[:20]
+            j_root = j.root.hex() if hasattr(j.root, "hex") else str(j.root)
+            f_root = f.root.hex() if hasattr(f.root, "hex") else str(f.root)
             logger.info("=" * 64)
             logger.info(
                 "Peers=%s | Justified slot=%s root=%s | Finalized slot=%s root=%s",
