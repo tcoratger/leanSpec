@@ -340,7 +340,7 @@ def make_genesis_data(
         validators = make_validators(num_validators)
     genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
     genesis_block = make_genesis_block(genesis_state)
-    store = genesis_state.to_forkchoice_store(genesis_block, validator_id=validator_id)
+    store = Store.from_anchor(genesis_state, genesis_block, validator_id=validator_id)
     return GenesisData(store, genesis_state, genesis_block)
 
 

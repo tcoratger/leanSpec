@@ -6,8 +6,6 @@ from collections.abc import Collection, Iterable
 from collections.abc import Set as AbstractSet
 from typing import TYPE_CHECKING
 
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import PublicKey, Signature
@@ -35,7 +33,7 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from lean_spec.subspecs.forkchoice import GossipSignatureEntry, Store
+    from lean_spec.subspecs.forkchoice import GossipSignatureEntry
 
 
 class State(Container):
@@ -81,16 +79,11 @@ class State(Container):
         """
         Generate a genesis state with empty history and proper initial values.
 
-        Parameters
-        ----------
-        genesis_time : Uint64
-            The genesis timestamp.
-        validators : Validators
-            The list of validators in the genesis state.
+        Args:
+            genesis_time: The genesis timestamp.
+            validators: The list of validators in the genesis state.
 
         Returns:
-        -------
-        State
             A properly initialized genesis state.
         """
         # Configure the genesis state.
@@ -121,71 +114,6 @@ class State(Container):
             justifications_validators=JustificationValidators(data=[]),
         )
 
-    def to_forkchoice_store(
-        self,
-        anchor_block: Block,
-        validator_id: ValidatorIndex | None,
-    ) -> Store:
-        """
-        Initialize a forkchoice store from this state and an anchor block.
-
-        The anchor block and this state form the starting point for fork choice.
-        Both are treated as justified and finalized.
-
-        Args:
-            anchor_block: A trusted block (e.g. genesis or checkpoint).
-            validator_id: Index of the validator running this store.
-
-        Returns:
-            A new Store instance, ready to accept blocks and attestations.
-
-        Raises:
-            AssertionError:
-                If the anchor block's state root does not match the hash
-                of this state.
-        """
-        from lean_spec.subspecs.forkchoice import Store
-
-        # Compute the SSZ root of this state.
-        #
-        # This is the canonical hash that should appear in the block's state root.
-        computed_state_root = hash_tree_root(self)
-
-        # Check that the block actually points to this state.
-        #
-        # If this fails, the caller has supplied inconsistent inputs.
-        assert anchor_block.state_root == computed_state_root, (
-            "Anchor block state root must match anchor state hash"
-        )
-
-        # Compute the SSZ root of the anchor block itself.
-        #
-        # This root will be used as:
-        # - the key in the blocks/states maps,
-        # - the initial head,
-        # - the root of the initial checkpoints.
-        anchor_root = hash_tree_root(anchor_block)
-
-        # Read the slot at which the anchor block was proposed.
-        anchor_slot = anchor_block.slot
-
-        # Initialize checkpoints from this state.
-        #
-        # We explicitly set the root to the anchor block root.
-        # The state internally might have zero-hash checkpoints (if genesis),
-        # but the Store must treat the anchor block as the justified/finalized point.
-        return Store(
-            time=Interval(anchor_slot * INTERVALS_PER_SLOT),
-            config=self.config,
-            head=anchor_root,
-            safe_target=anchor_root,
-            latest_justified=self.latest_justified.model_copy(update={"root": anchor_root}),
-            latest_finalized=self.latest_finalized.model_copy(update={"root": anchor_root}),
-            blocks={anchor_root: anchor_block},
-            states={anchor_root: self},
-            validator_id=validator_id,
-        )
-
     def process_slots(self, target_slot: Slot) -> State:
         """
         Advance the state through empty slots up to, but not including, target_slot.
@@ -195,20 +123,14 @@ class State(Container):
           - Increments the slot counter after each call.
         The function returns a new state with slot == target_slot.
 
-        Parameters
-        ----------
-        target_slot : Slot
-            The slot to reach by processing empty slots.
+        Args:
+            target_slot: The slot to reach by processing empty slots.
 
         Returns:
-        -------
-        State
             A new state that has progressed to target_slot.
 
         Raises:
-        ------
-        AssertionError
-            If target_slot is not in the future.
+            AssertionError: If target_slot is not in the future.
         """
         # The target must be strictly greater than the current slot.
         assert self.slot < target_slot, "Target slot must be in the future"
@@ -278,20 +200,14 @@ class State(Container):
           - Insert ZERO_HASH entries for any skipped empty slots.
           - Set latest_block_header for the new block with an empty state_root.
 
-        Parameters
-        ----------
-        block : Block
-            The block whose header is being processed.
+        Args:
+            block: The block whose header is being processed.
 
         Returns:
-        -------
-        State
             A new state with header-related fields updated.
 
         Raises:
-        ------
-        AssertionError
-            If any header check fails.
+            AssertionError: If any header check fails.
         """
         # Validation
         #
@@ -414,20 +330,15 @@ class State(Container):
         """
         Apply full block processing including header and body.
 
-        Parameters
-        ----------
-        block : Block
-            The block to process.
+        Args:
+            block: The block to process.
 
         Returns:
-        -------
-        State
             A new state with the processed block.
 
         Raises:
-        ------
-        AssertionError
-            If block contains duplicate aggregated attestations with no unique participant.
+            AssertionError: If block contains duplicate aggregated attestations
+                with no unique participant.
         """
         # First process the block header.
         state = self.process_block_header(block)
@@ -447,14 +358,10 @@ class State(Container):
         2. Updates justified status for target checkpoints
         3. Applies finalization rules based on justified status
 
-        Parameters
-        ----------
-        attestations : Iterable[AggregatedAttestation]
-            The aggregated attestations to process.
+        Args:
+            attestations: The aggregated attestations to process.
 
         Returns:
-        -------
-        State
             A new state with updated justification/finalization.
         """
         # Reconstruct the vote-tracking structure
@@ -696,22 +603,15 @@ class State(Container):
         3. Process the block header and body
         4. Validate the computed state root
 
-        Parameters
-        ----------
-        block : Block
-            The block to apply to the state.
-        valid_signatures : bool, optional
-            Whether to validate block signatures. Defaults to True.
+        Args:
+            block: The block to apply to the state.
+            valid_signatures: Whether to validate block signatures. Defaults to True.
 
         Returns:
-        -------
-        State
             A new state after applying the block.
 
         Raises:
-        ------
-        AssertionError
-            If signature validation fails or state root is invalid.
+            AssertionError: If signature validation fails or state root is invalid.
         """
         # Validate signatures if required
         if not valid_signatures:
@@ -871,18 +771,13 @@ class State(Container):
         from the gossip network. These are fresh signatures that validators
         broadcast when they attest.
 
-        Parameters
-        ----------
-        attestations : Collection[Attestation]
-            Individual attestations to aggregate and sign.
-        gossip_signatures : dict[AttestationData, set[GossipSignatureEntry]] | None
-            Per-validator XMSS signatures learned from the gossip network,
-            keyed by the attestation data they signed.
+        Args:
+            attestations: Individual attestations to aggregate and sign.
+            gossip_signatures: Per-validator XMSS signatures learned from
+                the gossip network, keyed by the attestation data they signed.
 
         Returns:
-        -------
-        list[tuple[AggregatedAttestation, AggregatedSignatureProof]]
-            - List of (attestation, proof) pairs from gossip collection.
+            List of (attestation, proof) pairs from gossip collection.
         """
         results: list[tuple[AggregatedAttestation, AggregatedSignatureProof]] = []
 
@@ -955,16 +850,11 @@ class State(Container):
         For each attestation group, greedily pick proofs that cover the most
         remaining validators until all are covered or no more proofs exist.
 
-        Parameters:
-        ----------
-        attestations : list[Attestation]
-            Individual attestations to aggregate and sign.
-        aggregated_payloads : dict[AttestationData, set[AggregatedSignatureProof]] | None
-            Aggregated proofs keyed by attestation data.
+        Args:
+            attestations: Individual attestations to aggregate and sign.
+            aggregated_payloads: Aggregated proofs keyed by attestation data.
 
         Returns:
-        -------
-        tuple[list[AggregatedAttestation], list[AggregatedSignatureProof]]
             Paired attestations and their corresponding proofs.
         """
         results: list[tuple[AggregatedAttestation, AggregatedSignatureProof]] = []

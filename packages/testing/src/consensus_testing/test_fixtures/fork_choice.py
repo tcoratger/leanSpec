@@ -218,7 +218,8 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # The Store is the node's local view of the chain.
         # It starts from a trusted anchor (usually genesis).
-        store = self.anchor_state.to_forkchoice_store(
+        store = Store.from_anchor(
+            self.anchor_state,
             self.anchor_block,
             validator_id=DEFAULT_VALIDATOR_ID,
         )

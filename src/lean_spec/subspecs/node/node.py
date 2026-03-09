@@ -212,7 +212,7 @@ class Node:
             # Initialize forkchoice store.
             #
             # Genesis block is both justified and finalized.
-            store = state.to_forkchoice_store(block, validator_id)
+            store = Store.from_anchor(state, block, validator_id)
 
             # Persist genesis to database if available.
             #
