@@ -36,7 +36,14 @@ IP6: Final = EnrKey("ip6")
 """IPv6 address (16 bytes)."""
 
 UDP6: Final = EnrKey("udp6")
-"""IPv6-specific UDP port."""
+"""IPv6-specific UDP port (big-endian integer)."""
+
+# QUIC Keys
+QUIC: Final = EnrKey("quic")
+"""QUIC port for QUIC connections (big-endian integer)."""
+
+QUIC6: Final = EnrKey("quic6")
+"""IPv6-specific QUIC port (big-endian integer)."""
 
 # Ethereum Consensus Extensions
 ETH2: Final = EnrKey("eth2")
