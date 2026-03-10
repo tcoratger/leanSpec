@@ -30,6 +30,7 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
@@ -43,60 +44,6 @@ from lean_spec.types import (
     Uint64,
 )
 from lean_spec.types.base import StrictBaseModel
-
-try:
-    from lean_spec.subspecs.metrics.registry import (  # noqa: I001
-        _initialized as _metrics_initialized,
-        lean_fork_choice_block_processing_time_seconds,
-        lean_fork_choice_reorg_depth,
-        lean_fork_choice_reorgs_total,
-        lean_head_slot,
-        lean_latest_finalized_slot,
-        lean_latest_justified_slot,
-        lean_safe_target_slot,
-        lean_state_transition_time_seconds,
-    )
-except ImportError:
-    _metrics_initialized = False
-
-
-def _reorg_depth(blocks: BlockLookup, old_head: Bytes32, new_head: Bytes32) -> int:
-    """Compute reorg depth: blocks from old head back to common ancestor with new chain."""
-    ancestors_of_new: set[Bytes32] = set()
-    root = new_head
-    while root in blocks:
-        ancestors_of_new.add(root)
-        block = blocks[root]
-        if block.parent_root == ZERO_HASH:
-            break
-        root = block.parent_root
-    depth = 0
-    root = old_head
-    while root in blocks and root not in ancestors_of_new:
-        depth += 1
-        block = blocks[root]
-        if block.parent_root == ZERO_HASH:
-            break
-        root = block.parent_root
-    return depth
-
-
-def _record_metrics_after_block(
-    store_after: "Store",
-    old_head: Bytes32,
-    old_safe: Bytes32,
-) -> None:
-    """Update fork choice and reorg metrics after processing a block."""
-    if not _metrics_initialized:
-        return
-    lean_head_slot.set(int(store_after.blocks[store_after.head].slot))
-    lean_safe_target_slot.set(int(store_after.blocks[store_after.safe_target].slot))
-    lean_latest_justified_slot.set(int(store_after.latest_justified.slot))
-    lean_latest_finalized_slot.set(int(store_after.latest_finalized.slot))
-    if store_after.head != old_head:
-        lean_fork_choice_reorgs_total.inc()
-        depth = _reorg_depth(store_after.blocks, old_head, store_after.head)
-        lean_fork_choice_reorg_depth.observe(depth)
 
 
 class GossipSignatureEntry(NamedTuple):
@@ -168,7 +115,7 @@ class Store(StrictBaseModel):
     Fork choice will never revert finalized history.
     """
 
-    blocks: BlockLookup = {}
+    blocks: BlockLookup = BlockLookup()
     """
     Mapping from block root to Block objects.
 
@@ -275,7 +222,7 @@ class Store(StrictBaseModel):
             safe_target=anchor_root,
             latest_justified=state.latest_justified.model_copy(update={"root": anchor_root}),
             latest_finalized=state.latest_finalized.model_copy(update={"root": anchor_root}),
-            blocks={anchor_root: anchor_block},
+            blocks=BlockLookup({anchor_root: anchor_block}),
             states={anchor_root: state},
             validator_id=validator_id,
         )
@@ -576,7 +523,6 @@ class Store(StrictBaseModel):
 
         t0 = time.perf_counter()
         old_head = self.head
-        old_safe = self.safe_target
 
         # Verify parent chain is available
         #
@@ -594,8 +540,9 @@ class Store(StrictBaseModel):
         # Execute state transition function to compute post-block state
         state_transition_start = time.perf_counter()
         post_state = parent_state.state_transition(block, valid_signatures)
-        if _metrics_initialized:
-            lean_state_transition_time_seconds.observe(time.perf_counter() - state_transition_start)
+        metrics.lean_state_transition_time_seconds.observe(
+            time.perf_counter() - state_transition_start
+        )
 
         # Propagate any checkpoint advances from the post-state.
         latest_justified = max(
@@ -675,11 +622,31 @@ class Store(StrictBaseModel):
         if store.latest_finalized.slot > self.latest_finalized.slot:
             store = store.prune_stale_attestation_data()
 
-        if _metrics_initialized:
-            lean_fork_choice_block_processing_time_seconds.observe(time.perf_counter() - t0)
-        _record_metrics_after_block(store, old_head, old_safe)
+        metrics.lean_fork_choice_block_processing_time_seconds.observe(time.perf_counter() - t0)
+        store._record_metrics(old_head)
 
         return store
+
+    def _record_metrics(self, old_head: Bytes32) -> None:
+        """
+        Publish Prometheus metrics reflecting the current store state.
+
+        Called after every block processing round. Updates:
+
+        - Head and safe-target slot gauges
+        - Justified and finalized slot gauges
+        - Reorg counter and depth histogram (only when the head actually changed)
+        """
+        metrics.lean_head_slot.set(int(self.blocks[self.head].slot))
+        metrics.lean_safe_target_slot.set(int(self.blocks[self.safe_target].slot))
+        metrics.lean_latest_justified_slot.set(int(self.latest_justified.slot))
+        metrics.lean_latest_finalized_slot.set(int(self.latest_finalized.slot))
+
+        if self.head != old_head:
+            metrics.lean_fork_choice_reorgs_total.inc()
+            metrics.lean_fork_choice_reorg_depth.observe(
+                self.blocks.reorg_depth(old_head, self.head)
+            )
 
     def extract_attestations_from_aggregated_payloads(
         self, aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]]

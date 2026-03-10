@@ -5,9 +5,9 @@ Metric names and types follow the leanMetrics spec:
 https://github.com/leanEthereum/leanMetrics/blob/main/metrics.md
 """
 
-from .registry import get_metrics_output, init_metrics
+from .registry import get_metrics_output, registry
 
 __all__ = [
     "get_metrics_output",
-    "init_metrics",
+    "registry",
 ]
