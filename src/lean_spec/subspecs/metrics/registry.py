@@ -26,31 +26,31 @@ ATTESTATION_VALIDATION_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 1)
 STATE_TRANSITION_BUCKETS = (0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4)
 REORG_DEPTH_BUCKETS = (1, 2, 3, 5, 7, 10, 20, 30, 50, 100)
 
-# Node info (set once at start)
-lean_node_info: Gauge
-lean_node_start_time_seconds: Gauge
+# Node info (set once at start). None until init_metrics() runs.
+lean_node_info: Gauge | None = None
+lean_node_start_time_seconds: Gauge | None = None
 
 # Fork choice
-lean_head_slot: Gauge
-lean_current_slot: Gauge
-lean_safe_target_slot: Gauge
-lean_fork_choice_block_processing_time_seconds: Histogram
-lean_attestations_valid_total: Counter
-lean_attestations_invalid_total: Counter
-lean_attestation_validation_time_seconds: Histogram
-lean_fork_choice_reorgs_total: Counter
-lean_fork_choice_reorg_depth: Histogram
+lean_head_slot: Gauge | None = None
+lean_current_slot: Gauge | None = None
+lean_safe_target_slot: Gauge | None = None
+lean_fork_choice_block_processing_time_seconds: Histogram | None = None
+lean_attestations_valid_total: Counter | None = None
+lean_attestations_invalid_total: Counter | None = None
+lean_attestation_validation_time_seconds: Histogram | None = None
+lean_fork_choice_reorgs_total: Counter | None = None
+lean_fork_choice_reorg_depth: Histogram | None = None
 
 # State transition
-lean_latest_justified_slot: Gauge
-lean_latest_finalized_slot: Gauge
-lean_state_transition_time_seconds: Histogram
+lean_latest_justified_slot: Gauge | None = None
+lean_latest_finalized_slot: Gauge | None = None
+lean_state_transition_time_seconds: Histogram | None = None
 
 # Validator
-lean_validators_count: Gauge
+lean_validators_count: Gauge | None = None
 
 # Network
-lean_connected_peers: Gauge
+lean_connected_peers: Gauge | None = None
 
 _initialized = False
 
