@@ -43,6 +43,20 @@ from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, S
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.types import Bytes32, Uint64
 
+try:
+    from lean_spec.subspecs.metrics.registry import (  # noqa: I001
+        _initialized as _metrics_initialized,
+        lean_connected_peers,
+        lean_current_slot,
+        lean_head_slot,
+        lean_latest_finalized_slot,
+        lean_latest_justified_slot,
+        lean_safe_target_slot,
+        lean_validators_count,
+    )
+except ImportError:
+    _metrics_initialized = False
+
 logger = logging.getLogger(__name__)
 
 # Interval in seconds for periodic justified/finalized slot logging.
@@ -459,6 +473,8 @@ class Node:
 
         Runs every _JUSTIFIED_FINALIZED_LOG_INTERVAL_SEC seconds to aid
         monitoring and debugging of consensus progress.
+        Also updates Prometheus gauges for current_slot, connected_peers,
+        and validators_count (on scrape).
         """
         while not self._shutdown.is_set():
             await asyncio.sleep(_JUSTIFIED_FINALIZED_LOG_INTERVAL_SEC)
@@ -468,6 +484,19 @@ class Node:
             peers_connected = sum(
                 1 for p in self.sync_service.peer_manager.get_all_peers() if p.is_connected()
             )
+            if _metrics_initialized:
+                lean_current_slot.set(int(self.clock.current_slot()))
+                lean_connected_peers.set(peers_connected)
+                lean_head_slot.set(int(store.blocks[store.head].slot))
+                lean_safe_target_slot.set(int(store.blocks[store.safe_target].slot))
+                lean_latest_justified_slot.set(int(store.latest_justified.slot))
+                lean_latest_finalized_slot.set(int(store.latest_finalized.slot))
+                count = (
+                    len(self.validator_service.registry)
+                    if self.validator_service is not None
+                    else 0
+                )
+                lean_validators_count.set(count)
             j = store.latest_justified
             f = store.latest_finalized
             j_root = j.root.hex() if hasattr(j.root, "hex") else str(j.root)

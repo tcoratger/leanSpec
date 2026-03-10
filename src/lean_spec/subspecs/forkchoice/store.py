@@ -6,6 +6,7 @@ The Store tracks all information required for the LMD GHOST forkchoice algorithm
 
 __all__ = ["GossipSignatureEntry", "Store"]
 
+import time
 from collections import defaultdict
 from typing import NamedTuple
 
@@ -42,6 +43,60 @@ from lean_spec.types import (
     Uint64,
 )
 from lean_spec.types.base import StrictBaseModel
+
+try:
+    from lean_spec.subspecs.metrics.registry import (  # noqa: I001
+        _initialized as _metrics_initialized,
+        lean_fork_choice_block_processing_time_seconds,
+        lean_fork_choice_reorg_depth,
+        lean_fork_choice_reorgs_total,
+        lean_head_slot,
+        lean_latest_finalized_slot,
+        lean_latest_justified_slot,
+        lean_safe_target_slot,
+        lean_state_transition_time_seconds,
+    )
+except ImportError:
+    _metrics_initialized = False
+
+
+def _reorg_depth(blocks: BlockLookup, old_head: Bytes32, new_head: Bytes32) -> int:
+    """Compute reorg depth: blocks from old head back to common ancestor with new chain."""
+    ancestors_of_new: set[Bytes32] = set()
+    root = new_head
+    while root in blocks:
+        ancestors_of_new.add(root)
+        block = blocks[root]
+        if block.parent_root == ZERO_HASH:
+            break
+        root = block.parent_root
+    depth = 0
+    root = old_head
+    while root in blocks and root not in ancestors_of_new:
+        depth += 1
+        block = blocks[root]
+        if block.parent_root == ZERO_HASH:
+            break
+        root = block.parent_root
+    return depth
+
+
+def _record_metrics_after_block(
+    store_after: "Store",
+    old_head: Bytes32,
+    old_safe: Bytes32,
+) -> None:
+    """Update fork choice and reorg metrics after processing a block."""
+    if not _metrics_initialized:
+        return
+    lean_head_slot.set(int(store_after.blocks[store_after.head].slot))
+    lean_safe_target_slot.set(int(store_after.blocks[store_after.safe_target].slot))
+    lean_latest_justified_slot.set(int(store_after.latest_justified.slot))
+    lean_latest_finalized_slot.set(int(store_after.latest_finalized.slot))
+    if store_after.head != old_head:
+        lean_fork_choice_reorgs_total.inc()
+        depth = _reorg_depth(store_after.blocks, old_head, store_after.head)
+        lean_fork_choice_reorg_depth.observe(depth)
 
 
 class GossipSignatureEntry(NamedTuple):
@@ -519,6 +574,10 @@ class Store(StrictBaseModel):
         if block_root in self.blocks:
             return self
 
+        t0 = time.perf_counter()
+        old_head = self.head
+        old_safe = self.safe_target
+
         # Verify parent chain is available
         #
         # The parent state must exist before processing this block.
@@ -533,7 +592,10 @@ class Store(StrictBaseModel):
         valid_signatures = signed_block_with_attestation.verify_signatures(parent_state, scheme)
 
         # Execute state transition function to compute post-block state
+        state_transition_start = time.perf_counter()
         post_state = parent_state.state_transition(block, valid_signatures)
+        if _metrics_initialized:
+            lean_state_transition_time_seconds.observe(time.perf_counter() - state_transition_start)
 
         # Propagate any checkpoint advances from the post-state.
         latest_justified = max(
@@ -612,6 +674,10 @@ class Store(StrictBaseModel):
         # Prune stale attestation data when finalization advances
         if store.latest_finalized.slot > self.latest_finalized.slot:
             store = store.prune_stale_attestation_data()
+
+        if _metrics_initialized:
+            lean_fork_choice_block_processing_time_seconds.observe(time.perf_counter() - t0)
+        _record_metrics_after_block(store, old_head, old_safe)
 
         return store
 

@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -61,6 +62,17 @@ from .config import MAX_PENDING_ATTESTATIONS
 from .head_sync import HeadSync
 from .peer_manager import PeerManager
 from .states import SyncState
+
+try:
+    from lean_spec.subspecs.metrics.registry import (  # noqa: I001
+        _initialized as _metrics_initialized,
+        lean_attestation_validation_time_seconds,
+        lean_attestations_invalid_total,
+        lean_attestations_valid_total,
+    )
+except ImportError:
+    _metrics_initialized = False
+
 
 if TYPE_CHECKING:
     from lean_spec.subspecs.storage import Database
@@ -509,11 +521,15 @@ class SyncService:
         # The store validates the signature and updates branch weights.
         # Invalid attestations (bad signature, unknown target) are rejected.
         # Validation failures are logged but don't crash the event loop.
+        t0 = time.perf_counter()
         try:
             self.store = self.store.on_gossip_attestation(
                 signed_attestation=attestation,
                 is_aggregator=is_aggregator_role,
             )
+            if _metrics_initialized:
+                lean_attestation_validation_time_seconds.observe(time.perf_counter() - t0)
+                lean_attestations_valid_total.labels(source="gossip").inc()
             logger.info(
                 "Attestation from peer %s slot=%s validator=%s: validation and signature ok",
                 peer_str,
@@ -521,6 +537,8 @@ class SyncService:
                 validator_id,
             )
         except (AssertionError, KeyError) as e:
+            if _metrics_initialized:
+                lean_attestations_invalid_total.labels(source="gossip").inc()
             logger.warning(
                 "Attestation from peer %s slot=%s validator=%s: validation or signature failed: %s",
                 peer_str,
