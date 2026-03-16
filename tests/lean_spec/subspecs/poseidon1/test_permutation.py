@@ -20,7 +20,8 @@ from lean_spec.subspecs.poseidon1.permutation import (
 INPUT_16 = [Fp(value=i) for i in range(16)]
 
 # Expected output for width 16.
-# From Plonky3 test_poseidon_width_16.
+#
+# From Plonky3.
 EXPECTED_16 = [
     Fp(value=610090613),
     Fp(value=935319874),
@@ -44,7 +45,8 @@ EXPECTED_16 = [
 INPUT_24 = [Fp(value=i) for i in range(24)]
 
 # Expected output for width 24.
-# From Plonky3 test_poseidon_width_24.
+#
+# From Plonky3.
 EXPECTED_24 = [
     Fp(value=511672087),
     Fp(value=215882318),
