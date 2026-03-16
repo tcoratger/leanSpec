@@ -192,7 +192,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         # Verify signature NOW exists after calling the method
         sigs = updated_store.attestation_signatures.get(attestation_data, set())
-        assert any(entry.validator_id == attester_validator for entry in sigs), (
+        assert attester_validator in {entry.validator_id for entry in sigs}, (
             "Signature from same-subnet validator should be stored"
         )
 
@@ -228,7 +228,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         # Verify signature was NOT stored
         sigs = updated_store.attestation_signatures.get(attestation_data, set())
-        assert not any(entry.validator_id == attester_validator for entry in sigs), (
+        assert attester_validator not in {entry.validator_id for entry in sigs}, (
             "Signature from different-subnet validator should NOT be stored"
         )
 
@@ -262,7 +262,7 @@ class TestOnGossipAttestationSubnetFiltering:
 
         # Verify signature was NOT stored even though same subnet
         sigs = updated_store.attestation_signatures.get(attestation_data, set())
-        assert not any(entry.validator_id == attester_validator for entry in sigs), (
+        assert attester_validator not in {entry.validator_id for entry in sigs}, (
             "Non-aggregator should never store gossip signatures"
         )
 
@@ -814,10 +814,9 @@ class TestEndToEndAggregationFlow:
 
         # Verify signatures were stored
         sigs = store.attestation_signatures.get(attestation_data, set())
+        stored_validators = {entry.validator_id for entry in sigs}
         for vid in attesting_validators:
-            assert any(entry.validator_id == vid for entry in sigs), (
-                f"Signature for {vid} should be stored"
-            )
+            assert vid in stored_validators, f"Signature for {vid} should be stored"
 
         # Step 2: Advance to interval 2 (aggregation interval)
         store = store.model_copy(update={"time": Uint64(1)})

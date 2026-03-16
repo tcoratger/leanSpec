@@ -202,17 +202,17 @@ class HeadSync:
                 peer_id=peer_id,
                 store=store,
             )
-        else:
-            # Parent unknown. Cache and trigger backfill.
-            logger.debug(
-                "on_gossip_block: parent NOT found, caching. store has %d blocks",
-                len(store.blocks),
-            )
-            return await self._cache_and_backfill(
-                block=block,
-                peer_id=peer_id,
-                store=store,
-            )
+
+        # Parent unknown. Cache and trigger backfill.
+        logger.debug(
+            "on_gossip_block: parent NOT found, caching. store has %d blocks",
+            len(store.blocks),
+        )
+        return await self._cache_and_backfill(
+            block=block,
+            peer_id=peer_id,
+            store=store,
+        )
 
     async def _process_block_with_descendants(
         self,
@@ -336,10 +336,10 @@ class HeadSync:
                     )
                     processed_count += desc_count
 
-                except Exception:
+                except Exception as exc:
                     # Processing failed. Leave in cache for retry or discard.
                     # Do not cascade the error; continue with other children.
-                    pass
+                    logger.debug("Failed to process cached descendant: %s", exc)
 
             finally:
                 self._processing.discard(child_root)
@@ -421,8 +421,9 @@ class HeadSync:
                         processed_count += 1
                         self.block_cache.remove(pending.root)
 
-                    except Exception:
+                    except Exception as exc:
                         # Processing failed. Remove from cache to avoid infinite loop.
+                        logger.debug("Failed to process cached block: %s", exc)
                         self.block_cache.remove(pending.root)
 
                 finally:

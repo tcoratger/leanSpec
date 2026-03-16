@@ -35,7 +35,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal
 
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.containers import (
@@ -51,7 +51,7 @@ from lean_spec.subspecs.containers.block import (
 )
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
+from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.types import Bytes32, Uint64
@@ -450,7 +450,7 @@ class ValidatorService:
         entry: ValidatorEntry,
         slot: Slot,
         message: Bytes32,
-        key_field: str,
+        key_field: Literal["attestation_secret_key", "proposal_secret_key"],
     ) -> tuple[ValidatorEntry, Signature]:
         """
         Prepare an XMSS key for the given slot, sign, and update the registry.
@@ -470,7 +470,7 @@ class ValidatorService:
         Returns:
             Tuple of (updated entry, signature).
         """
-        scheme = cast(GeneralizedXmssScheme, TARGET_SIGNATURE_SCHEME)
+        scheme = TARGET_SIGNATURE_SCHEME
         secret_key = getattr(entry, key_field)
 
         slot_int = int(slot)
