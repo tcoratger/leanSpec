@@ -20,9 +20,6 @@ from lean_spec.types import ByteListMiB, Bytes32, Container
 
 from .containers import PublicKey, Signature
 
-INVERSE_PROOF_SIZE = 2
-"""Protocol-level inverse proof size parameter for aggregation (range 1-4)."""
-
 
 class AggregationError(Exception):
     """Raised when signature aggregation or verification fails."""

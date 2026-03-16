@@ -212,12 +212,10 @@ class TestSafeTargetAdvancement:
         # Update safe target
         store = store.update_safe_target()
 
-        # Safe target should advance to or beyond slot 1
-        safe_target_slot = store.blocks[store.safe_target].slot
-
-        # With sufficient attestations, safe_target should be at or beyond slot 1
-        # (it may be exactly at slot 1 if that block has enough weight)
-        assert safe_target_slot >= Slot(0)
+        # Verify the aggregation produced payloads and safe target was updated.
+        # Safe target advancement depends on the full 3SF-mini justification rules,
+        # which may require multiple slots. This test verifies the pipeline works.
+        assert store.safe_target in store.blocks
 
     def test_update_safe_target_uses_new_attestations(
         self,
@@ -252,9 +250,8 @@ class TestSafeTargetAdvancement:
         # Update safe target should use new aggregated payloads
         store = store.update_safe_target()
 
-        # Safe target should advance with new aggregated payloads
-        safe_slot = store.blocks[store.safe_target].slot
-        assert safe_slot >= Slot(0)
+        # Verify update_safe_target processes new aggregated payloads without error
+        assert store.safe_target in store.blocks
 
 
 class TestJustificationLogic:
@@ -313,9 +310,8 @@ class TestJustificationLogic:
         block_2_root = hash_tree_root(block_2)
         post_state = store.states[block_2_root]
 
-        # Justification should have advanced
-        # (the exact advancement depends on the 3SF-mini rules)
-        assert post_state.latest_justified.slot >= Slot(0)
+        # Justification should be present in the post-state
+        assert post_state.latest_justified.root in store.blocks
 
     def test_justification_requires_valid_source(
         self,
@@ -385,9 +381,8 @@ class TestJustificationLogic:
         store, _ = store.aggregate()
         store = store.update_safe_target()
 
-        # Neither target should be justified with only half validators
-        # Safe target reflects the heaviest path with sufficient weight
-        # Without 2/3 majority, progress is limited
+        # With only half the validators, safe target should not advance past genesis
+        assert store.blocks[store.safe_target].slot == Slot(0)
 
 
 class TestFinalizationFollowsJustification:
@@ -532,9 +527,8 @@ class TestIntegrationScenarios:
         # Phase 4: Update safe target
         store = store.update_safe_target()
 
-        # Safe target should have advanced
-        safe_target_slot = store.blocks[store.safe_target].slot
-        assert safe_target_slot >= Slot(0)
+        # Verify the full cycle completed: safe target is a valid block in the store
+        assert store.safe_target in store.blocks
 
         # Phase 5: Produce another block including attestations
         slot_2 = Slot(2)

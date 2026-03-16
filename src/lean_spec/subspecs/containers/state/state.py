@@ -758,8 +758,8 @@ class State(Container):
 
         return final_block, post_state, aggregated_attestations, aggregated_signatures
 
+    @staticmethod
     def _extend_proofs_greedily(
-        self,
         proofs: set[AggregatedSignatureProof] | None,
         selected: list[AggregatedSignatureProof],
         covered: set[ValidatorIndex],

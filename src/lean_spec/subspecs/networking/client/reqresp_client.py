@@ -288,9 +288,9 @@ class ReqRespClient:
 
             if code == ResponseCode.SUCCESS:
                 return Status.decode_bytes(ssz_bytes)
-            else:
-                logger.debug("Status error response: %s", code)
-                return None
+
+            logger.debug("Status error response: %s", code)
+            return None
 
         except Exception as e:
             # Retry once with a new stream if the first attempt fails.
