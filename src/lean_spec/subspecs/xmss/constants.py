@@ -79,7 +79,7 @@ class XmssConfig(StrictBaseModel):
     """The output length of the main tweakable hash function."""
 
     CAPACITY: int
-    """The capacity of the Poseidon2 sponge, defining its security level."""
+    """The capacity of the Poseidon1 sponge, defining its security level."""
 
     POS_OUTPUT_LEN_PER_INV_FE: int
     """Output length per invocation for the message hash."""

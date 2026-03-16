@@ -19,7 +19,7 @@ increases the target space, drastically reducing the number of retries the signe
 This process involves three main stages:
 1.  **Input Preparation**: All inputs (message, epoch, randomness, etc.) are
     unambiguously encoded into a uniform format (lists of field elements).
-2.  **Extended Hashing**: Poseidon2 is called iteratively to generate a long,
+2.  **Extended Hashing**: Poseidon1 is called iteratively to generate a long,
     pseudorandom output digest, effectively behaving like an eXtendable-Output
     Function (XOF).
 3.  **Mapping to Hypercube**: The long digest is treated as a large number, which
@@ -77,7 +77,7 @@ class MessageHasher(StrictBaseModel):
         The message bytes are interpreted as a single little-endian integer,
         which is then decomposed into its base-`P` representation, where `P`
         is the field prime. This provides a canonical mapping from bytes to
-        the algebraic structure required by Poseidon2.
+        the algebraic structure required by Poseidon1.
         """
         # Interpret the 32 little-endian bytes as a single large integer.
         acc = int.from_bytes(message, "little")
@@ -151,14 +151,14 @@ class MessageHasher(StrictBaseModel):
         Applies the full "Top Level" message hash and mapping procedure.
 
         This function generates a long pseudorandom digest by iteratively calling
-        Poseidon2 and then maps this digest to a candidate codeword (a vertex in
+        Poseidon1 and then maps this digest to a candidate codeword (a vertex in
         the hypercube).
 
         ### Hashing with Extended Output
 
-        A single Poseidon2 compression call produces a relatively short output. To
+        A single Poseidon1 compression call produces a relatively short output. To
         generate a sufficiently large random number for the hypercube mapping, this
-        function calls Poseidon2 multiple times in a loop. The iteration number `i`
+        function calls Poseidon1 multiple times in a loop. The iteration number `i`
         is used as a domain separator for each call, effectively creating a simple
         eXtendable-Output Function (XOF) from the fixed-output hash.
 
@@ -176,7 +176,7 @@ class MessageHasher(StrictBaseModel):
         message_fe = self.encode_message(message)
         epoch_fe = self.encode_epoch(epoch)
 
-        # Iteratively call Poseidon2 to generate a long hash output.
+        # Iteratively call Poseidon1 to generate a long hash output.
         #
         # The base input (rho || P || epoch || message) is reused each iteration.
         base_input = list(rho.data) + list(parameter.data) + epoch_fe + message_fe
