@@ -13,7 +13,7 @@ from lean_spec.subspecs.containers import (
     AttestationData,
     Block,
     SignedAttestation,
-    SignedBlockWithAttestation,
+    SignedBlock,
     ValidatorIndex,
     ValidatorIndices,
 )
@@ -50,7 +50,13 @@ def mock_registry() -> ValidatorRegistry:
     registry = ValidatorRegistry()
     for i in [0, 1]:
         mock_key = MagicMock()
-        registry.add(ValidatorEntry(index=ValidatorIndex(i), secret_key=mock_key))
+        registry.add(
+            ValidatorEntry(
+                index=ValidatorIndex(i),
+                attestation_secret_key=mock_key,
+                proposal_secret_key=mock_key,
+            )
+        )
     return registry
 
 
@@ -105,11 +111,17 @@ class TestValidatorServiceDuties:
         # Registry with validator 2 only
         registry = ValidatorRegistry()
         mock_key = MagicMock()
-        registry.add(ValidatorEntry(index=ValidatorIndex(2), secret_key=mock_key))
+        registry.add(
+            ValidatorEntry(
+                index=ValidatorIndex(2),
+                attestation_secret_key=mock_key,
+                proposal_secret_key=mock_key,
+            )
+        )
 
-        blocks_received: list[SignedBlockWithAttestation] = []
+        blocks_received: list[SignedBlock] = []
 
-        async def capture_block(block: SignedBlockWithAttestation) -> None:
+        async def capture_block(block: SignedBlock) -> None:
             blocks_received.append(block)
 
         service = ValidatorService(
@@ -253,18 +265,18 @@ class TestIntervalSleep:
         assert abs(captured_duration - expected) < 0.001
 
 
-class TestProposerSkipping:
-    """Tests for proposer skipping during attestation production."""
+class TestProposerGossipAttestation:
+    """Tests for proposer gossip attestation at interval 1."""
 
-    async def test_proposer_skipped_in_attestation_production(
+    async def test_proposer_also_attests_at_interval_1(
         self,
         sync_service: SyncService,
     ) -> None:
-        """Proposer is skipped when producing attestations at interval 1.
+        """Proposer produces a gossip attestation alongside all other validators.
 
-        At slot 0, validator 0 is the proposer (0 % 3 == 0).
-        When controlling validators 0 and 1, only validator 1 should produce an attestation
-        since validator 0 already attested within their block.
+        With dual keys, the proposer signs the block envelope with the proposal
+        key and gossips a separate attestation with the attestation key.
+        Both validators 0 and 1 should produce attestations.
         """
         clock = SlotClock(genesis_time=Uint64(0))
 
@@ -272,7 +284,13 @@ class TestProposerSkipping:
         registry = ValidatorRegistry()
         for i in [0, 1]:
             mock_key = MagicMock()
-            registry.add(ValidatorEntry(index=ValidatorIndex(i), secret_key=mock_key))
+            registry.add(
+                ValidatorEntry(
+                    index=ValidatorIndex(i),
+                    attestation_secret_key=mock_key,
+                    proposal_secret_key=mock_key,
+                )
+            )
 
         # Track which validators had _sign_attestation called.
         signed_validator_ids: list[ValidatorIndex] = []
@@ -292,6 +310,7 @@ class TestProposerSkipping:
         )
 
         # Slot 0: validator 0 is proposer (0 % 3 == 0).
+        # Both validators should produce gossip attestations.
         with patch.object(
             ValidatorService,
             "_sign_attestation",
@@ -299,66 +318,18 @@ class TestProposerSkipping:
         ):
             await service._produce_attestations(Slot(0))
 
-        # Only validator 1 should have signed an attestation.
-        assert len(signed_validator_ids) == 1
-        assert signed_validator_ids[0] == ValidatorIndex(1)
-        assert service.attestations_produced == 1
+        assert sorted(signed_validator_ids) == [ValidatorIndex(0), ValidatorIndex(1)]
+        assert service.attestations_produced == 2
 
-    async def test_non_proposer_still_attests(
+    async def test_all_validators_attest_including_proposer(
         self,
         sync_service: SyncService,
     ) -> None:
-        """Non-proposer validators still produce attestations.
-
-        At slot 1, validator 1 is the proposer (1 % 3 == 1).
-        Validator 0 is not the proposer so should produce an attestation.
-        """
-        clock = SlotClock(genesis_time=Uint64(0))
-
-        # Registry with only validator 0.
-        registry = ValidatorRegistry()
-        mock_key = MagicMock()
-        registry.add(ValidatorEntry(index=ValidatorIndex(0), secret_key=mock_key))
-
-        # Track which validators had _sign_attestation called.
-        signed_validator_ids: list[ValidatorIndex] = []
-
-        def mock_sign_attestation(
-            self: ValidatorService,  # noqa: ARG001
-            attestation_data: object,  # noqa: ARG001
-            validator_index: ValidatorIndex,
-        ) -> SignedAttestation:
-            signed_validator_ids.append(validator_index)
-            return MagicMock(spec=SignedAttestation, validator_id=validator_index)
-
-        service = ValidatorService(
-            sync_service=sync_service,
-            clock=clock,
-            registry=registry,
-        )
-
-        # Slot 1: validator 1 is proposer (1 % 3 == 1).
-        # Validator 0 is not proposer, should attest.
-        with patch.object(
-            ValidatorService,
-            "_sign_attestation",
-            mock_sign_attestation,
-        ):
-            await service._produce_attestations(Slot(1))
-
-        # Validator 0 should have signed an attestation.
-        assert len(signed_validator_ids) == 1
-        assert signed_validator_ids[0] == ValidatorIndex(0)
-        assert service.attestations_produced == 1
-
-    async def test_multiple_validators_only_non_proposers_attest(
-        self,
-        sync_service: SyncService,
-    ) -> None:
-        """With multiple validators, only non-proposers produce attestations.
+        """All validators produce gossip attestations, including the proposer.
 
         At slot 2, validator 2 is the proposer (2 % 3 == 2).
-        Controlling validators 0, 1, and 2, only validators 0 and 1 should attest.
+        All three validators (0, 1, 2) should produce gossip attestations
+        since the proposer uses a separate attestation key.
         """
         clock = SlotClock(genesis_time=Uint64(0))
 
@@ -366,7 +337,13 @@ class TestProposerSkipping:
         registry = ValidatorRegistry()
         for i in [0, 1, 2]:
             mock_key = MagicMock()
-            registry.add(ValidatorEntry(index=ValidatorIndex(i), secret_key=mock_key))
+            registry.add(
+                ValidatorEntry(
+                    index=ValidatorIndex(i),
+                    attestation_secret_key=mock_key,
+                    proposal_secret_key=mock_key,
+                )
+            )
 
         # Track which validators had _sign_attestation called.
         signed_validator_ids: list[ValidatorIndex] = []
@@ -386,6 +363,7 @@ class TestProposerSkipping:
         )
 
         # Slot 2: validator 2 is proposer (2 % 3 == 2).
+        # All validators should attest.
         with patch.object(
             ValidatorService,
             "_sign_attestation",
@@ -393,13 +371,13 @@ class TestProposerSkipping:
         ):
             await service._produce_attestations(Slot(2))
 
-        # Validators 0 and 1 should have signed attestations.
-        assert len(signed_validator_ids) == 2
-        assert set(signed_validator_ids) == {ValidatorIndex(0), ValidatorIndex(1)}
-        assert service.attestations_produced == 2
-
-        # Verify validator 2 (proposer) did not sign.
-        assert ValidatorIndex(2) not in signed_validator_ids
+        assert len(signed_validator_ids) == 3
+        assert set(signed_validator_ids) == {
+            ValidatorIndex(0),
+            ValidatorIndex(1),
+            ValidatorIndex(2),
+        }
+        assert service.attestations_produced == 3
 
 
 class TestSigningMissingValidator:
@@ -491,8 +469,14 @@ class TestValidatorServiceIntegration:
         registry = ValidatorRegistry()
         for i in range(6):
             validator_index = ValidatorIndex(i)
-            secret_key = key_manager[validator_index].secret
-            registry.add(ValidatorEntry(index=validator_index, secret_key=secret_key))
+            kp = key_manager[validator_index]
+            registry.add(
+                ValidatorEntry(
+                    index=validator_index,
+                    attestation_secret_key=kp.attestation_secret,
+                    proposal_secret_key=kp.proposal_secret,
+                )
+            )
         return registry
 
     async def test_produce_real_block_with_valid_signature(
@@ -507,9 +491,9 @@ class TestValidatorServiceIntegration:
         The signature must pass verification using the proposer's public key.
         """
         clock = SlotClock(genesis_time=Uint64(0))
-        blocks_produced: list[SignedBlockWithAttestation] = []
+        blocks_produced: list[SignedBlock] = []
 
-        async def capture_block(block: SignedBlockWithAttestation) -> None:
+        async def capture_block(block: SignedBlock) -> None:
             blocks_produced.append(block)
 
         service = ValidatorService(
@@ -526,19 +510,18 @@ class TestValidatorServiceIntegration:
         signed_block = blocks_produced[0]
 
         # Verify block structure
-        assert signed_block.message.block.slot == Slot(1)
-        assert signed_block.message.block.proposer_index == ValidatorIndex(1)
+        assert signed_block.message.slot == Slot(1)
+        assert signed_block.message.proposer_index == ValidatorIndex(1)
 
         # Verify proposer signature is cryptographically valid
-        proposer_index = signed_block.message.block.proposer_index
-        proposer_public_key = key_manager.get_public_key(proposer_index)
-        proposer_attestation_data = signed_block.message.proposer_attestation.data
-        message_bytes = proposer_attestation_data.data_root_bytes()
+        proposer_index = signed_block.message.proposer_index
+        block_root = hash_tree_root(signed_block.message)
+        proposer_public_key = key_manager[proposer_index].proposal_public
 
         is_valid = TARGET_SIGNATURE_SCHEME.verify(
             pk=proposer_public_key,
-            slot=signed_block.message.block.slot,
-            message=message_bytes,
+            slot=signed_block.message.slot,
+            message=block_root,
             sig=signed_block.signature.proposer_signature,
         )
         assert is_valid, "Proposer signature failed verification"
@@ -567,16 +550,15 @@ class TestValidatorServiceIntegration:
             on_attestation=capture_attestation,
         )
 
-        # Slot 1: proposer is validator 1, so validators 0, 2, 3, 4, 5 should attest
+        # Slot 1: all 6 validators should attest (including proposer 1)
         await service._produce_attestations(Slot(1))
 
-        # 5 validators should have attested (all except proposer 1)
-        assert len(attestations_produced) == 5
+        assert len(attestations_produced) == 6
 
         # Verify each attestation signature
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
-            public_key = key_manager.get_public_key(validator_id)
+            public_key = key_manager[validator_id].attestation_public
             message_bytes = signed_att.data.data_root_bytes()
 
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
@@ -631,22 +613,21 @@ class TestValidatorServiceIntegration:
             # Verify slot is correct
             assert data.slot == Slot(1)
 
-    async def test_proposer_attestation_bundled_in_block(
+    async def test_proposer_signature_in_block(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
         real_registry: ValidatorRegistry,
     ) -> None:
         """
-        Verify the proposer's attestation is correctly embedded in the block.
+        Verify the proposer's signature over the block root is valid.
 
-        The proposer attests at interval 0, and their attestation is bundled
-        inside the signed block with attestation wrapper.
+        The proposer signs the block root with the proposal key at interval 0.
         """
         clock = SlotClock(genesis_time=Uint64(0))
-        blocks_produced: list[SignedBlockWithAttestation] = []
+        blocks_produced: list[SignedBlock] = []
 
-        async def capture_block(block: SignedBlockWithAttestation) -> None:
+        async def capture_block(block: SignedBlock) -> None:
             blocks_produced.append(block)
 
         service = ValidatorService(
@@ -661,24 +642,14 @@ class TestValidatorServiceIntegration:
         assert len(blocks_produced) == 1
         signed_block = blocks_produced[0]
 
-        # Proposer attestation should be included
-        proposer_attestation = signed_block.message.proposer_attestation
-
-        # Verify proposer attestation matches block proposer
-        proposer_index = signed_block.message.block.proposer_index
-        assert proposer_attestation.validator_id == proposer_index
-
-        # Verify proposer attestation slot matches block slot
-        assert proposer_attestation.data.slot == signed_block.message.block.slot
-
-        # Verify proposer attestation signature is valid
-        public_key = key_manager.get_public_key(proposer_index)
-        message_bytes = proposer_attestation.data.data_root_bytes()
+        proposer_index = signed_block.message.proposer_index
+        block_root = hash_tree_root(signed_block.message)
+        public_key = key_manager[proposer_index].proposal_public
 
         is_valid = TARGET_SIGNATURE_SCHEME.verify(
             pk=public_key,
-            slot=signed_block.message.block.slot,
-            message=message_bytes,
+            slot=signed_block.message.slot,
+            message=block_root,
             sig=signed_block.signature.proposer_signature,
         )
         assert is_valid
@@ -708,15 +679,17 @@ class TestValidatorServiceIntegration:
         for vid in participants:
             sig = key_manager.sign_attestation_data(vid, attestation_data)
             signatures.append(sig)
-            public_keys.append(key_manager.get_public_key(vid))
+            public_keys.append(key_manager[vid].attestation_public)
             attestation_map[vid] = attestation_data
 
+        xmss_participants = AggregationBits.from_validator_indices(
+            ValidatorIndices(data=participants)
+        )
+        raw_xmss = list(zip(public_keys, signatures, strict=True))
         proof = AggregatedSignatureProof.aggregate(
-            participants=AggregationBits.from_validator_indices(
-                ValidatorIndices(data=participants)
-            ),
-            public_keys=public_keys,
-            signatures=signatures,
+            xmss_participants=xmss_participants,
+            children=[],
+            raw_xmss=raw_xmss,
             message=data_root,
             slot=attestation_data.slot,
         )
@@ -732,9 +705,9 @@ class TestValidatorServiceIntegration:
         real_sync_service.store = updated_store
 
         clock = SlotClock(genesis_time=Uint64(0))
-        blocks_produced: list[SignedBlockWithAttestation] = []
+        blocks_produced: list[SignedBlock] = []
 
-        async def capture_block(block: SignedBlockWithAttestation) -> None:
+        async def capture_block(block: SignedBlock) -> None:
             blocks_produced.append(block)
 
         service = ValidatorService(
@@ -751,7 +724,7 @@ class TestValidatorServiceIntegration:
         signed_block = blocks_produced[0]
 
         # Block should contain the pending attestations
-        body_attestations = signed_block.message.block.body.attestations
+        body_attestations = signed_block.message.body.attestations
         assert len(body_attestations) > 0
 
         # Verify the attestation signatures are included and valid
@@ -798,23 +771,23 @@ class TestValidatorServiceIntegration:
         for att in attestations_by_slot[Slot(2)]:
             assert att.data.slot == Slot(2)
 
-    async def test_proposer_does_not_double_attest(
+    async def test_proposer_also_gossips_attestation(
         self,
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
         real_registry: ValidatorRegistry,
     ) -> None:
         """
-        Verify proposer does not produce a separate attestation after producing a block.
+        Verify proposer also produces a gossip attestation at interval 1.
 
-        The proposer's attestation is bundled in the block at interval 0.
-        At interval 1, the proposer should be skipped to prevent double-attestation.
+        The proposer signs the block envelope with the proposal key at interval 0.
+        At interval 1, the proposer also gossips with the attestation key.
         """
         clock = SlotClock(genesis_time=Uint64(0))
-        blocks_produced: list[SignedBlockWithAttestation] = []
+        blocks_produced: list[SignedBlock] = []
         attestations_produced: list[SignedAttestation] = []
 
-        async def capture_block(block: SignedBlockWithAttestation) -> None:
+        async def capture_block(block: SignedBlock) -> None:
             blocks_produced.append(block)
 
         async def capture_attestation(attestation: SignedAttestation) -> None:
@@ -838,14 +811,11 @@ class TestValidatorServiceIntegration:
 
         # One block should be produced
         assert len(blocks_produced) == 1
-        assert blocks_produced[0].message.block.proposer_index == proposer_index
+        assert blocks_produced[0].message.proposer_index == proposer_index
 
-        # Proposer should NOT appear in attestations_produced
+        # ALL validators should have attested (including proposer)
         attestation_validator_ids = {att.validator_id for att in attestations_produced}
-        assert proposer_index not in attestation_validator_ids
-
-        # All other validators should have attested
-        expected_attesters = {ValidatorIndex(i) for i in range(6) if i != int(proposer_index)}
+        expected_attesters = {ValidatorIndex(i) for i in range(6)}
         assert attestation_validator_ids == expected_attesters
 
     async def test_block_state_root_is_valid(
@@ -860,9 +830,9 @@ class TestValidatorServiceIntegration:
         after applying the block to the parent state.
         """
         clock = SlotClock(genesis_time=Uint64(0))
-        blocks_produced: list[SignedBlockWithAttestation] = []
+        blocks_produced: list[SignedBlock] = []
 
-        async def capture_block(block: SignedBlockWithAttestation) -> None:
+        async def capture_block(block: SignedBlock) -> None:
             blocks_produced.append(block)
 
         service = ValidatorService(
@@ -875,7 +845,7 @@ class TestValidatorServiceIntegration:
         await service._maybe_produce_block(Slot(4))
 
         assert len(blocks_produced) == 1
-        produced_block = blocks_produced[0].message.block
+        produced_block = blocks_produced[0].message
 
         # The state root should not be zero (it was computed)
         assert produced_block.state_root != Bytes32.zero()
@@ -922,7 +892,7 @@ class TestValidatorServiceIntegration:
         # Verify each signature was created with the correct slot
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
-            public_key = key_manager.get_public_key(validator_id)
+            public_key = key_manager[validator_id].attestation_public
             message_bytes = signed_att.data.data_root_bytes()
 
             # Verification must use the same slot that was used for signing

@@ -11,11 +11,10 @@ from lean_spec.subspecs.containers import (
     Block,
     BlockBody,
     BlockHeader,
-    BlockWithAttestation,
     Checkpoint,
     Config,
     SignedAttestation,
-    SignedBlockWithAttestation,
+    SignedBlock,
     Slot,
     State,
     Validator,
@@ -248,25 +247,6 @@ def test_block_typical(ssz: SSZTestFiller) -> None:
     )
 
 
-# --- BlockWithAttestation ---
-
-
-def test_block_with_attestation_minimal(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for BlockWithAttestation with minimal values."""
-    block = Block(
-        slot=Slot(1),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=Bytes32.zero(),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-    attestation = Attestation(validator_id=ValidatorIndex(0), data=_zero_attestation_data())
-    ssz(
-        type_name="BlockWithAttestation",
-        value=BlockWithAttestation(block=block, proposer_attestation=attestation),
-    )
-
-
 # --- BlockSignatures ---
 
 
@@ -299,11 +279,11 @@ def test_block_signatures_with_attestation(ssz: SSZTestFiller) -> None:
     )
 
 
-# --- SignedBlockWithAttestation ---
+# --- SignedBlock ---
 
 
-def test_signed_block_with_attestation_minimal(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for SignedBlockWithAttestation with minimal values."""
+def test_signed_block_minimal(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for SignedBlock with minimal values."""
     block = Block(
         slot=Slot(1),
         proposer_index=ValidatorIndex(0),
@@ -311,15 +291,13 @@ def test_signed_block_with_attestation_minimal(ssz: SSZTestFiller) -> None:
         state_root=Bytes32.zero(),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
-    attestation = Attestation(validator_id=ValidatorIndex(0), data=_zero_attestation_data())
-    message = BlockWithAttestation(block=block, proposer_attestation=attestation)
     signature = BlockSignatures(
         attestation_signatures=AttestationSignatures(data=[]),
         proposer_signature=create_dummy_signature(),
     )
     ssz(
-        type_name="SignedBlockWithAttestation",
-        value=SignedBlockWithAttestation(message=message, signature=signature),
+        type_name="SignedBlock",
+        value=SignedBlock(message=block, signature=signature),
     )
 
 
@@ -343,7 +321,11 @@ def test_validator_zero(ssz: SSZTestFiller) -> None:
     """SSZ roundtrip for Validator with zero values."""
     ssz(
         type_name="Validator",
-        value=Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(0)),
+        value=Validator(
+            attestation_pubkey=Bytes52.zero(),
+            proposal_pubkey=Bytes52.zero(),
+            index=ValidatorIndex(0),
+        ),
     )
 
 
@@ -351,7 +333,11 @@ def test_validator_typical(ssz: SSZTestFiller) -> None:
     """SSZ roundtrip for Validator with typical values."""
     ssz(
         type_name="Validator",
-        value=Validator(pubkey=Bytes52(b"\xab" * 52), index=ValidatorIndex(42)),
+        value=Validator(
+            attestation_pubkey=Bytes52(b"\xab" * 52),
+            proposal_pubkey=Bytes52(b"\xab" * 52),
+            index=ValidatorIndex(42),
+        ),
     )
 
 
@@ -378,7 +364,15 @@ def test_state_minimal(ssz: SSZTestFiller) -> None:
             latest_finalized=zero_cp,
             historical_block_hashes=HistoricalBlockHashes(data=[]),
             justified_slots=JustifiedSlots(data=[]),
-            validators=Validators(data=[Validator(pubkey=Bytes52.zero(), index=ValidatorIndex(0))]),
+            validators=Validators(
+                data=[
+                    Validator(
+                        attestation_pubkey=Bytes52.zero(),
+                        proposal_pubkey=Bytes52.zero(),
+                        index=ValidatorIndex(0),
+                    )
+                ]
+            ),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         ),
@@ -407,10 +401,26 @@ def test_state_with_validators(ssz: SSZTestFiller) -> None:
             justified_slots=JustifiedSlots(data=[Boolean(True), Boolean(False), Boolean(True)]),
             validators=Validators(
                 data=[
-                    Validator(pubkey=Bytes52(b"\x01" * 52), index=ValidatorIndex(0)),
-                    Validator(pubkey=Bytes52(b"\x02" * 52), index=ValidatorIndex(1)),
-                    Validator(pubkey=Bytes52(b"\x03" * 52), index=ValidatorIndex(2)),
-                    Validator(pubkey=Bytes52(b"\x04" * 52), index=ValidatorIndex(3)),
+                    Validator(
+                        attestation_pubkey=Bytes52(b"\x01" * 52),
+                        proposal_pubkey=Bytes52(b"\x01" * 52),
+                        index=ValidatorIndex(0),
+                    ),
+                    Validator(
+                        attestation_pubkey=Bytes52(b"\x02" * 52),
+                        proposal_pubkey=Bytes52(b"\x02" * 52),
+                        index=ValidatorIndex(1),
+                    ),
+                    Validator(
+                        attestation_pubkey=Bytes52(b"\x03" * 52),
+                        proposal_pubkey=Bytes52(b"\x03" * 52),
+                        index=ValidatorIndex(2),
+                    ),
+                    Validator(
+                        attestation_pubkey=Bytes52(b"\x04" * 52),
+                        proposal_pubkey=Bytes52(b"\x04" * 52),
+                        index=ValidatorIndex(3),
+                    ),
                 ]
             ),
             justifications_roots=JustificationRoots(data=[Bytes32(b"\x20" * 32)]),

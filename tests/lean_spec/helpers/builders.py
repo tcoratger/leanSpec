@@ -14,14 +14,12 @@ from consensus_testing.keys import XmssKeyManager, get_shared_key_manager
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.containers import (
-    Attestation,
     AttestationData,
     Block,
     BlockBody,
-    BlockWithAttestation,
     Checkpoint,
     SignedAttestation,
-    SignedBlockWithAttestation,
+    SignedBlock,
     State,
     Validator,
 )
@@ -31,7 +29,7 @@ from lean_spec.subspecs.containers.block.types import AggregatedAttestations, At
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice import GossipSignatureEntry, Store
+from lean_spec.subspecs.forkchoice import AttestationSignatureEntry, Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
@@ -91,7 +89,12 @@ def make_validators(count: int) -> Validators:
     Validators are indexed 0 through count-1.
     """
     validators = [
-        Validator(pubkey=Bytes52(b"\x00" * 52), index=ValidatorIndex(i)) for i in range(count)
+        Validator(
+            attestation_pubkey=Bytes52(b"\x00" * 52),
+            proposal_pubkey=Bytes52(b"\x00" * 52),
+            index=ValidatorIndex(i),
+        )
+        for i in range(count)
     ]
     return Validators(data=validators)
 
@@ -101,7 +104,12 @@ def make_validators_from_key_manager(key_manager: XmssKeyManager, count: int) ->
     return Validators(
         data=[
             Validator(
-                pubkey=Bytes52(key_manager[ValidatorIndex(i)].public.encode_bytes()),
+                attestation_pubkey=Bytes52(
+                    key_manager[ValidatorIndex(i)].attestation_public.encode_bytes()
+                ),
+                proposal_pubkey=Bytes52(
+                    key_manager[ValidatorIndex(i)].proposal_public.encode_bytes()
+                ),
                 index=ValidatorIndex(i),
             )
             for i in range(count)
@@ -195,12 +203,8 @@ def make_signed_block(
     proposer_index: ValidatorIndex,
     parent_root: Bytes32,
     state_root: Bytes32,
-) -> SignedBlockWithAttestation:
-    """
-    Create a signed block with minimal valid structure.
-
-    Includes a proposer attestation pointing to the new block.
-    """
+) -> SignedBlock:
+    """Create a signed block with minimal valid structure."""
     block = Block(
         slot=slot,
         proposer_index=proposer_index,
@@ -209,23 +213,8 @@ def make_signed_block(
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
 
-    block_root = hash_tree_root(block)
-
-    attestation = Attestation(
-        validator_id=proposer_index,
-        data=AttestationData(
-            slot=slot,
-            head=Checkpoint(root=block_root, slot=slot),
-            target=Checkpoint(root=block_root, slot=slot),
-            source=Checkpoint(root=parent_root, slot=Slot(0)),
-        ),
-    )
-
-    return SignedBlockWithAttestation(
-        message=BlockWithAttestation(
-            block=block,
-            proposer_attestation=attestation,
-        ),
+    return SignedBlock(
+        message=block,
         signature=BlockSignatures(
             attestation_signatures=AttestationSignatures(data=[]),
             proposer_signature=make_mock_signature(),
@@ -291,8 +280,8 @@ def make_test_status() -> Status:
     )
 
 
-def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlockWithAttestation:
-    """Create a SignedBlockWithAttestation with convenient defaults for testing."""
+def make_test_block(slot: int = 1, seed: int = 0) -> SignedBlock:
+    """Create a SignedBlock with convenient defaults for testing."""
     return make_signed_block(
         slot=Slot(slot),
         proposer_index=ValidatorIndex(0),
@@ -375,7 +364,7 @@ def make_store_with_attestation_data(
     return store, attestation_data
 
 
-def make_store_with_gossip_signatures(
+def make_store_with_attestation_signatures(
     key_manager: XmssKeyManager,
     num_validators: int,
     validator_id: ValidatorIndex,
@@ -389,15 +378,15 @@ def make_store_with_gossip_signatures(
         validator_id,
         attestation_slot,
     )
-    gossip_signatures = {
+    attestation_signatures = {
         attestation_data: {
-            GossipSignatureEntry(vid, key_manager.sign_attestation_data(vid, attestation_data))
+            AttestationSignatureEntry(vid, key_manager.sign_attestation_data(vid, attestation_data))
             for vid in attesting_validators
         },
     }
     store = store.model_copy(
         update={
-            "gossip_signatures": gossip_signatures,
+            "attestation_signatures": attestation_signatures,
         }
     )
     return store, attestation_data
@@ -436,12 +425,18 @@ def make_aggregated_proof(
 ) -> AggregatedSignatureProof:
     """Create a valid aggregated signature proof for the given participants."""
     data_root = attestation_data.data_root_bytes()
+    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=participants))
+    raw_xmss = list(
+        zip(
+            [key_manager[vid].attestation_public for vid in participants],
+            [key_manager.sign_attestation_data(vid, attestation_data) for vid in participants],
+            strict=True,
+        )
+    )
     return AggregatedSignatureProof.aggregate(
-        participants=AggregationBits.from_validator_indices(ValidatorIndices(data=participants)),
-        public_keys=[key_manager.get_public_key(vid) for vid in participants],
-        signatures=[
-            key_manager.sign_attestation_data(vid, attestation_data) for vid in participants
-        ],
+        xmss_participants=xmss_participants,
+        children=[],
+        raw_xmss=raw_xmss,
         message=data_root,
         slot=attestation_data.slot,
     )
@@ -452,37 +447,18 @@ def make_signed_block_from_store(
     key_manager: XmssKeyManager,
     slot: Slot,
     proposer_index: ValidatorIndex,
-) -> tuple[Store, SignedBlockWithAttestation]:
+) -> tuple[Store, SignedBlock]:
     """Produce a signed block and advance the consumer store to accept it.
 
     Returns the updated store (with time advanced) and the signed block.
     """
     _, block, _ = store.produce_block_with_signatures(slot, proposer_index)
     block_root = hash_tree_root(block)
-    parent_state = store.states[block.parent_root]
-
-    proposer_attestation = Attestation(
-        validator_id=proposer_index,
-        data=AttestationData(
-            slot=slot,
-            head=Checkpoint(root=block_root, slot=slot),
-            target=Checkpoint(root=block_root, slot=slot),
-            source=Checkpoint(
-                root=block.parent_root,
-                slot=parent_state.latest_block_header.slot,
-            ),
-        ),
-    )
-    proposer_signature = key_manager.sign_attestation_data(
-        proposer_index, proposer_attestation.data
-    )
+    proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
     attestation_signatures = key_manager.build_attestation_signatures(block.body.attestations)
 
-    signed_block = SignedBlockWithAttestation(
-        message=BlockWithAttestation(
-            block=block,
-            proposer_attestation=proposer_attestation,
-        ),
+    signed_block = SignedBlock(
+        message=block,
         signature=BlockSignatures(
             attestation_signatures=attestation_signatures,
             proposer_signature=proposer_signature,

@@ -16,7 +16,7 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.forkchoice import GossipSignatureEntry, Store
+from lean_spec.subspecs.forkchoice import AttestationSignatureEntry, Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, Uint64
@@ -94,16 +94,16 @@ class TestBlockProduction:
 
         gossip_sigs = {}
         gossip_sigs.setdefault(signed_5.data, set()).add(
-            GossipSignatureEntry(ValidatorIndex(5), signed_5.signature)
+            AttestationSignatureEntry(ValidatorIndex(5), signed_5.signature)
         )
         gossip_sigs.setdefault(signed_6.data, set()).add(
-            GossipSignatureEntry(ValidatorIndex(6), signed_6.signature)
+            AttestationSignatureEntry(ValidatorIndex(6), signed_6.signature)
         )
 
         sample_store = sample_store.model_copy(
             update={
                 "latest_known_aggregated_payloads": known_payloads,
-                "gossip_signatures": gossip_sigs,
+                "attestation_signatures": gossip_sigs,
             }
         )
 
@@ -127,7 +127,7 @@ class TestBlockProduction:
         # Verify each aggregated signature proof
         for agg_att, proof in zip(block.body.attestations.data, signatures, strict=True):
             participants = proof.participants.to_validator_indices()
-            public_keys = [key_manager.get_public_key(vid) for vid in participants]
+            public_keys = [key_manager[vid].attestation_public for vid in participants]
             proof.verify(
                 public_keys=public_keys,
                 message=agg_att.data.data_root_bytes(),
@@ -223,8 +223,10 @@ class TestBlockProduction:
         sample_store = sample_store.model_copy(
             update={
                 "latest_known_aggregated_payloads": {signed_7.data: {proof_7}},
-                "gossip_signatures": {
-                    signed_7.data: {GossipSignatureEntry(ValidatorIndex(7), signed_7.signature)},
+                "attestation_signatures": {
+                    signed_7.data: {
+                        AttestationSignatureEntry(ValidatorIndex(7), signed_7.signature)
+                    },
                 },
             }
         )
@@ -242,7 +244,7 @@ class TestBlockProduction:
         # Verify each aggregated signature proof
         for agg_att, proof in zip(block.body.attestations.data, signatures, strict=True):
             participants = proof.participants.to_validator_indices()
-            public_keys = [key_manager.get_public_key(vid) for vid in participants]
+            public_keys = [key_manager[vid].attestation_public for vid in participants]
             proof.verify(
                 public_keys=public_keys,
                 message=agg_att.data.data_root_bytes(),

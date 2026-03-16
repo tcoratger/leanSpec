@@ -14,8 +14,7 @@ from lean_spec.subspecs.containers.attestation import (
 )
 from lean_spec.subspecs.containers.block import (
     BlockSignatures,
-    BlockWithAttestation,
-    SignedBlockWithAttestation,
+    SignedBlock,
 )
 from lean_spec.subspecs.containers.block.types import (
     AggregatedAttestations,
@@ -48,22 +47,22 @@ def _create_dummy_aggregated_proof(validator_ids: list[ValidatorIndex]) -> Aggre
 
 class VerifySignaturesTest(BaseConsensusFixture):
     """
-    Test fixture for verifying signatures on SignedBlockWithAttestation.
+    Test fixture for verifying signatures on SignedBlock.
 
     The fixture takes a BlockSpec and optional AggregatedAttestationSpec inputs and generates
-    a complete SignedBlockWithAttestation as the test output.
+    a complete SignedBlock as the test output.
 
     Use the generated test vectors to test that client implementation can verify signatures
-    of the generated signed block with attestation..
+    of the generated signed block.
 
     Structure:
         anchor_state: Initial trusted consensus state
-        signed_block_with_attestation: The generated SignedBlockWithAttestation
+        signed_block: The generated SignedBlock
         expect_exception: Expected exception for invalid tests
     """
 
     format_name: ClassVar[str] = "verify_signatures_test"
-    description: ClassVar[str] = "Tests signature verification for blocks with attestations."
+    description: ClassVar[str] = "Tests signature verification for signed blocks."
 
     anchor_state: State | None = None
     """
@@ -77,12 +76,12 @@ class VerifySignaturesTest(BaseConsensusFixture):
     Block specifications to generate signatures for.
 
     This defines the block parameters including attestations. The framework will
-    build a complete signed block with attestation with all necessary signatures.
+    build a complete signed block with all necessary signatures.
     """
 
-    signed_block_with_attestation: SignedBlockWithAttestation | None = None
+    signed_block: SignedBlock | None = None
     """
-    The generated signed block with attestation.
+    The generated signed block.
     """
 
     expect_exception: type[Exception] | None = None
@@ -107,7 +106,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         Generate the fixture by creating a signed block with attestations.
 
         Builds a block from BlockSpec, generates the relevant signatures to produce
-        SignedBlockWithAttestation, then verifies that the signatures are valid.
+        SignedBlock, then verifies that the signatures are valid.
 
         Returns:
         -------
@@ -125,7 +124,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         # Use shared key manager
         key_manager = get_shared_key_manager()
 
-        # Build the signed block with attestation
+        # Build the signed block
         signed_block = self._build_block_from_spec(self.block, self.anchor_state, key_manager)
 
         exception_raised: Exception | None = None
@@ -142,7 +141,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         finally:
             # Always store filled block for serialization, even if an exception occurred
             # This ensures the test fixture contains the signed block that consumer can test with
-            self.signed_block_with_attestation = signed_block
+            self.signed_block = signed_block
 
         # Validate exception expectations
         if self.expect_exception is not None:
@@ -163,9 +162,9 @@ class VerifySignaturesTest(BaseConsensusFixture):
         spec: BlockSpec,
         state: State,
         key_manager: XmssKeyManager,
-    ) -> SignedBlockWithAttestation:
+    ) -> SignedBlock:
         """
-        Build a complete SignedBlockWithAttestation from a BlockSpec.
+        Build a complete SignedBlock from a BlockSpec.
 
         This method combines:
             - spec logic (via the state block building logic),
@@ -183,7 +182,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
         Returns:
         -------
-        SignedBlockWithAttestation
+        SignedBlock
             A complete signed block with all attestations.
         """
         # Determine proposer index
@@ -231,19 +230,21 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 # Valid proof but from wrong validators
                 # Sign with signer_ids but claim validator_ids as participants
                 signer_public_keys = [
-                    key_manager.get_public_key(vid) for vid in invalid_spec.signer_ids
+                    key_manager[vid].attestation_public for vid in invalid_spec.signer_ids
                 ]
                 signer_signatures = [
                     key_manager.sign_attestation_data(vid, attestation_data)
                     for vid in invalid_spec.signer_ids
                 ]
                 # Create valid aggregated proof from actual signers
+                xmss_participants = AggregationBits.from_validator_indices(
+                    ValidatorIndices(data=invalid_spec.signer_ids)
+                )
+                raw_xmss = list(zip(signer_public_keys, signer_signatures, strict=True))
                 valid_proof = AggregatedSignatureProof.aggregate(
-                    participants=AggregationBits.from_validator_indices(
-                        ValidatorIndices(data=invalid_spec.signer_ids)
-                    ),
-                    public_keys=signer_public_keys,
-                    signatures=signer_signatures,
+                    xmss_participants=xmss_participants,
+                    children=[],
+                    raw_xmss=raw_xmss,
                     message=data_root,
                     slot=attestation_data.slot,
                 )
@@ -274,35 +275,21 @@ class VerifySignaturesTest(BaseConsensusFixture):
             data=aggregated_signatures,
         )
 
-        # Create proposer attestation for this block
-        block_root = hash_tree_root(final_block)
-        proposer_attestation = Attestation(
-            validator_id=proposer_index,
-            data=AttestationData(
-                slot=spec.slot,
-                head=Checkpoint(root=block_root, slot=spec.slot),
-                target=Checkpoint(root=block_root, slot=spec.slot),
-                source=Checkpoint(root=parent_root, slot=parent_state.latest_block_header.slot),
-            ),
-        )
-
-        # Sign proposer attestation - use valid or dummy signature based on spec
+        # Sign the block root with the proposer's proposal key
         if spec.valid_signature:
-            proposer_attestation_signature = key_manager.sign_attestation_data(
-                proposer_attestation.validator_id,
-                proposer_attestation.data,
+            proposer_signature = key_manager.sign_block_root(
+                proposer_index,
+                spec.slot,
+                hash_tree_root(final_block),
             )
         else:
-            proposer_attestation_signature = create_dummy_signature()
+            proposer_signature = create_dummy_signature()
 
-        return SignedBlockWithAttestation(
-            message=BlockWithAttestation(
-                block=final_block,
-                proposer_attestation=proposer_attestation,
-            ),
+        return SignedBlock(
+            message=final_block,
             signature=BlockSignatures(
                 attestation_signatures=attestation_signatures,
-                proposer_signature=proposer_attestation_signature,
+                proposer_signature=proposer_signature,
             ),
         )
 

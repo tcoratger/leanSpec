@@ -25,8 +25,7 @@ from lean_spec.subspecs.containers.block import (
     Block,
     BlockBody,
     BlockSignatures,
-    BlockWithAttestation,
-    SignedBlockWithAttestation,
+    SignedBlock,
 )
 from lean_spec.subspecs.containers.block.types import (
     AggregatedAttestations,
@@ -198,12 +197,16 @@ class ForkChoiceTest(BaseConsensusFixture):
         # Test states use placeholder pubkeys.
         # We must replace them with the key manager's actual keys.
         # Otherwise signature verification will fail.
-        updated_validators = [
-            validator.model_copy(
-                update={"pubkey": key_manager[ValidatorIndex(i)].public.encode_bytes()}
+        updated_validators = []
+        for i, validator in enumerate(self.anchor_state.validators):
+            idx = ValidatorIndex(i)
+            validator = validator.model_copy(
+                update={
+                    "attestation_pubkey": key_manager[idx].attestation_public.encode_bytes(),
+                    "proposal_pubkey": key_manager[idx].proposal_public.encode_bytes(),
+                }
             )
-            for i, validator in enumerate(self.anchor_state.validators)
-        ]
+            updated_validators.append(validator)
 
         # Updating validators changes the state root.
         # We must also update the anchor block to match.
@@ -258,9 +261,9 @@ class ForkChoiceTest(BaseConsensusFixture):
                             step.block, store, self._block_registry, key_manager
                         )
 
-                        # Store the filled Block for serialization
-                        block = signed_block.message.block
-                        step._filled_block = signed_block.message
+                        # Store the filled block for serialization.
+                        block = signed_block.message
+                        step._filled_block = block
 
                         # Register labeled blocks for fork building.
                         # Later blocks can reference this one as their parent.
@@ -282,11 +285,28 @@ class ForkChoiceTest(BaseConsensusFixture):
                         )
 
                         # Process the block through Store.
-                        # This validates, applies state transition, and updates head.
+                        # This validates, applies state transition, and updates the store's head.
                         store = store.on_block(
                             signed_block,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                         )
+
+                        # Optionally simulate the proposer's gossip attestation.
+                        if step.block.gossip_proposer_attestation:
+                            proposer_index = block.proposer_index
+                            proposer_att_data = store.produce_attestation_data(block.slot)
+                            proposer_gossip_att = SignedAttestation(
+                                validator_id=proposer_index,
+                                data=proposer_att_data,
+                                signature=key_manager.sign_attestation_data(
+                                    proposer_index, proposer_att_data
+                                ),
+                            )
+                            store = store.on_gossip_attestation(
+                                proposer_gossip_att,
+                                scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
+                                is_aggregator=True,
+                            )
 
                     case AttestationStep():
                         # Process a gossip attestation.
@@ -340,7 +360,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         store: Store,
         block_registry: dict[str, Block],
         key_manager: XmssKeyManager,
-    ) -> SignedBlockWithAttestation:
+    ) -> SignedBlock:
         """
         Build a complete signed block from a lightweight specification.
 
@@ -411,7 +431,7 @@ class ForkChoiceTest(BaseConsensusFixture):
 
         # Aggregate gossip signatures and merge into known payloads.
         # This makes recently gossiped attestations available for block construction.
-        aggregation_store, _ = working_store.aggregate_committee_signatures()
+        aggregation_store, _ = working_store.aggregate()
         merged_store = aggregation_store.accept_new_attestations()
 
         # Two sources of attestations:
@@ -449,56 +469,24 @@ class ForkChoiceTest(BaseConsensusFixture):
             aggregated_payloads=merged_store.latest_known_aggregated_payloads,
         )
 
-        # Create proposer attestation using the spec's attestation data production.
-        # Build a temporary store with the new block integrated so
-        # produce_attestation_data() sees the correct chain view.
-        block_root = hash_tree_root(final_block)
-        latest_justified = (
-            post_state.latest_justified
-            if post_state.latest_justified.slot > store.latest_justified.slot
-            else store.latest_justified
-        )
-        latest_finalized = (
-            post_state.latest_finalized
-            if post_state.latest_finalized.slot > store.latest_finalized.slot
-            else store.latest_finalized
-        )
-        temp_store = store.model_copy(
-            update={
-                "blocks": {**store.blocks, block_root: final_block},
-                "states": {**store.states, block_root: post_state},
-                "head": block_root,
-                "latest_justified": latest_justified,
-                "latest_finalized": latest_finalized,
-            }
-        )
-        proposer_attestation = Attestation(
-            validator_id=proposer_index,
-            data=temp_store.produce_attestation_data(spec.slot),
-        )
-
         # Sign everything
         #
-        # Aggregate signatures for all attestations in the block body.
-        # Sign the proposer's attestation separately.
+        # Aggregate signatures for attestations in the block body.
+        # Sign the block root with the proposer's proposal key.
         attestation_signatures_blob = key_manager.build_attestation_signatures(
             final_block.body.attestations,
             attestation_signatures,
         )
 
-        proposer_signature = key_manager.sign_attestation_data(
-            proposer_attestation.validator_id,
-            proposer_attestation.data,
+        proposer_signature = key_manager.sign_block_root(
+            proposer_index,
+            spec.slot,
+            hash_tree_root(final_block),
         )
 
-        # Assemble the signed block
-        #
-        # Combine block, proposer attestation, and all signatures.
-        return SignedBlockWithAttestation(
-            message=BlockWithAttestation(
-                block=final_block,
-                proposer_attestation=proposer_attestation,
-            ),
+        # Assemble the signed block.
+        return SignedBlock(
+            message=final_block,
             signature=BlockSignatures(
                 attestation_signatures=attestation_signatures_blob,
                 proposer_signature=proposer_signature,

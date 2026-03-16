@@ -13,9 +13,8 @@ from lean_spec.subspecs.chain.config import (
 from lean_spec.subspecs.containers import (
     Attestation,
     AttestationData,
-    BlockWithAttestation,
     Checkpoint,
-    SignedBlockWithAttestation,
+    SignedBlock,
 )
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.block import BlockSignatures
@@ -164,7 +163,7 @@ class TestSafeTargetAdvancement:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
-        store, _ = store.aggregate_committee_signatures()
+        store, _ = store.aggregate()
 
         # Update safe target (uses latest_new_aggregated_payloads)
         store = store.update_safe_target()
@@ -208,7 +207,7 @@ class TestSafeTargetAdvancement:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
-        store, _ = store.aggregate_committee_signatures()
+        store, _ = store.aggregate()
 
         # Update safe target
         store = store.update_safe_target()
@@ -248,7 +247,7 @@ class TestSafeTargetAdvancement:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate into new payloads
-        store, _ = store.aggregate_committee_signatures()
+        store, _ = store.aggregate()
 
         # Update safe target should use new aggregated payloads
         store = store.update_safe_target()
@@ -302,7 +301,7 @@ class TestJustificationLogic:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Aggregate signatures before producing the next block
-        store, _ = store.aggregate_committee_signatures()
+        store, _ = store.aggregate()
 
         # Produce block 2 which includes these attestations
         store, block_2, signatures = store.produce_block_with_signatures(slot_2, proposer_2)
@@ -383,7 +382,7 @@ class TestJustificationLogic:
             )
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
-        store, _ = store.aggregate_committee_signatures()
+        store, _ = store.aggregate()
         store = store.update_safe_target()
 
         # Neither target should be justified with only half validators
@@ -528,7 +527,7 @@ class TestIntegrationScenarios:
             store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
         # Phase 3: Aggregate signatures into payloads
-        store, _ = store.aggregate_committee_signatures()
+        store, _ = store.aggregate()
 
         # Phase 4: Update safe target
         store = store.update_safe_target()
@@ -561,26 +560,11 @@ class TestIntegrationScenarios:
         store, block, signatures = store.produce_block_with_signatures(slot_1, proposer_1)
         block_root = hash_tree_root(block)
 
-        # Get attestation data for the block's slot
-        proposer_attestation = Attestation(
-            validator_id=proposer_1,
-            data=AttestationData(
-                slot=slot_1,
-                head=Checkpoint(root=block_root, slot=slot_1),
-                target=Checkpoint(root=block_root, slot=slot_1),
-                source=store.latest_justified,
-            ),
-        )
-        proposer_signature = key_manager.sign_attestation_data(
-            proposer_attestation.validator_id,
-            proposer_attestation.data,
-        )
+        # Sign the block root with the proposal key
+        proposer_signature = key_manager.sign_block_root(proposer_1, slot_1, block_root)
 
-        signed_block = SignedBlockWithAttestation(
-            message=BlockWithAttestation(
-                block=block,
-                proposer_attestation=proposer_attestation,
-            ),
+        signed_block = SignedBlock(
+            message=block,
             signature=BlockSignatures(
                 attestation_signatures=AttestationSignatures(data=signatures),
                 proposer_signature=proposer_signature,
