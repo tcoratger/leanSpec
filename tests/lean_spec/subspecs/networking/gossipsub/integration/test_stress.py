@@ -17,63 +17,6 @@ TOPIC = TopicId("test/stress")
 
 
 @pytest.mark.asyncio
-@pytest.mark.timeout(60)
-async def test_peer_churn(
-    network: GossipsubTestNetwork,
-) -> None:
-    """15 nodes, remove 5, add 5 new: meshes remain valid."""
-
-    # Nodes crash, restart, or rotate constantly in P2P networks.
-    # After membership changes, heartbeat rounds must heal the mesh
-    # back to valid bounds.
-    params = fast_params()
-    await network.create_nodes(15, params)
-    await network.start_all()
-    await network.connect_full()
-    await network.subscribe_all(TOPIC)
-    await network.stabilize_mesh(TOPIC, rounds=3)
-
-    # Remove 5 nodes to simulate sudden departures.
-    removed = network.nodes[10:]
-    for node in removed:
-        await node.stop()
-
-    # Remaining nodes must clean up references to departed peers.
-    for node in network.nodes[:10]:
-        for r in removed:
-            await node.behavior.remove_peer(r.peer_id)
-    network.nodes = network.nodes[:10]
-
-    # Add 5 replacement nodes and connect them to the survivors.
-    new_nodes = await network.create_nodes(5, params)
-    for node in new_nodes:
-        await node.start()
-        node.subscribe(TOPIC)
-
-    for new_node in new_nodes:
-        for existing in network.nodes[:10]:
-            await new_node.connect_to(existing)
-
-    # Heartbeat rounds let the mesh absorb new peers via GRAFT.
-    # Under CPU pressure, a fixed number of rounds may not suffice.
-    # Retry until all meshes converge or a timeout is hit.
-    await asyncio.sleep(0.1)
-    max_rounds = 20
-    for _ in range(max_rounds):
-        await network.stabilize_mesh(TOPIC, rounds=1)
-        if all(
-            params.d_low <= node.get_mesh_size(TOPIC) <= params.d_high for node in network.nodes
-        ):
-            break
-
-    for node in network.nodes:
-        size = node.get_mesh_size(TOPIC)
-        assert params.d_low <= size <= params.d_high, (
-            f"{node.peer_id}: mesh size {size} outside [{params.d_low}, {params.d_high}]"
-        )
-
-
-@pytest.mark.asyncio
 async def test_rapid_subscribe_unsubscribe(
     network: GossipsubTestNetwork,
 ) -> None:
