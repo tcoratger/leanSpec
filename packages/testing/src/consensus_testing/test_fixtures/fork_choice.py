@@ -418,8 +418,6 @@ class ForkChoiceTest(BaseConsensusFixture):
         aggregation_store, _ = working_store.aggregate()
         merged_store = aggregation_store.accept_new_attestations()
 
-        available_attestations = attestations
-
         # Build the block using spec logic.
         #
         # State handles the core block construction.
@@ -429,8 +427,8 @@ class ForkChoiceTest(BaseConsensusFixture):
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
-            attestations=available_attestations,
-            available_attestations=available_attestations,
+            attestations=attestations,
+            available_attestations=attestations,
             aggregated_payloads=merged_store.latest_known_aggregated_payloads,
         )
 
