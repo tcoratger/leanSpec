@@ -1037,19 +1037,18 @@ class Store(StrictBaseModel):
             Tuple of (new store with advanced time, list of new signed aggregated attestation).
         """
         # Advance time by one interval
-        store = self.model_copy(update={"time": Interval(int(self.time) + 1)})
+        store = self.model_copy(update={"time": self.time + Interval(1)})
         current_interval = store.time % INTERVALS_PER_SLOT
         new_aggregates: list[SignedAggregatedAttestation] = []
 
-        match int(current_interval):
-            case 0 if has_proposal:
-                store = store.accept_new_attestations()
-            case 2 if is_aggregator:
-                store, new_aggregates = store.aggregate()
-            case 3:
-                store = store.update_safe_target()
-            case 4:
-                store = store.accept_new_attestations()
+        if current_interval == Interval(0) and has_proposal:
+            store = store.accept_new_attestations()
+        elif current_interval == Interval(2) and is_aggregator:
+            store, new_aggregates = store.aggregate()
+        elif current_interval == Interval(3):
+            store = store.update_safe_target()
+        elif current_interval == Interval(4):
+            store = store.accept_new_attestations()
 
         return store, new_aggregates
 
