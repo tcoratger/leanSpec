@@ -572,10 +572,10 @@ class Store(StrictBaseModel):
         - Justified and finalized slot gauges
         - Reorg counter and depth histogram (only when the head actually changed)
         """
-        metrics.lean_head_slot.set(int(self.blocks[self.head].slot))
-        metrics.lean_safe_target_slot.set(int(self.blocks[self.safe_target].slot))
-        metrics.lean_latest_justified_slot.set(int(self.latest_justified.slot))
-        metrics.lean_latest_finalized_slot.set(int(self.latest_finalized.slot))
+        metrics.lean_head_slot.set(self.blocks[self.head].slot)
+        metrics.lean_safe_target_slot.set(self.blocks[self.safe_target].slot)
+        metrics.lean_latest_justified_slot.set(self.latest_justified.slot)
+        metrics.lean_latest_finalized_slot.set(self.latest_finalized.slot)
 
         if self.head != old_head:
             metrics.lean_fork_choice_reorgs_total.inc()
