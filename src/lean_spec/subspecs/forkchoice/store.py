@@ -244,36 +244,28 @@ class Store(StrictBaseModel):
         Returns:
             New Store with stale attestation data removed.
         """
-        finalized_slot = self.latest_finalized.slot
-
         # Filter out stale entries from all attestation-related mappings.
         #
         # Each mapping is keyed by attestation data, so we check membership by slot
         # against the finalized slot.
 
-        new_attestation_sigs = {
-            attestation_data: sigs
-            for attestation_data, sigs in self.attestation_signatures.items()
-            if attestation_data.target.slot > finalized_slot
-        }
-
-        new_aggregated_new = {
-            attestation_data: proofs
-            for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
-            if attestation_data.target.slot > finalized_slot
-        }
-
-        new_aggregated_known = {
-            attestation_data: proofs
-            for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
-            if attestation_data.target.slot > finalized_slot
-        }
-
         return self.model_copy(
             update={
-                "attestation_signatures": new_attestation_sigs,
-                "latest_new_aggregated_payloads": new_aggregated_new,
-                "latest_known_aggregated_payloads": new_aggregated_known,
+                "attestation_signatures": {
+                    attestation_data: sigs
+                    for attestation_data, sigs in self.attestation_signatures.items()
+                    if attestation_data.target.slot > self.latest_finalized.slot
+                },
+                "latest_new_aggregated_payloads": {
+                    attestation_data: proofs
+                    for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
+                    if attestation_data.target.slot > self.latest_finalized.slot
+                },
+                "latest_known_aggregated_payloads": {
+                    attestation_data: proofs
+                    for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
+                    if attestation_data.target.slot > self.latest_finalized.slot
+                },
             }
         )
 
