@@ -481,7 +481,7 @@ class Store(StrictBaseModel):
         Raises:
             AssertionError: If parent block/state not found in store.
         """
-        block = signed_block.message
+        block = signed_block.block
         block_root = hash_tree_root(block)
 
         # Skip duplicate blocks (idempotent operation)
