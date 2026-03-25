@@ -42,7 +42,6 @@ from typing import Literal
 
 from lean_spec.config import LEAN_ENV
 from lean_spec.subspecs.containers import AttestationData, ValidatorIndex
-from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
@@ -69,10 +68,8 @@ SecretField = Literal["attestation_secret", "proposal_secret"]
 """The two secret key field names on ValidatorKeyPair."""
 
 __all__ = [
-    "CLI_DEFAULT_MAX_SLOT",
     "KEY_DOWNLOAD_URLS",
     "LEAN_ENV_TO_SCHEMES",
-    "LazyKeyDict",
     "NUM_VALIDATORS",
     "XmssKeyManager",
     "create_dummy_signature",
@@ -87,7 +84,7 @@ KEY_DOWNLOAD_URLS = {
 }
 """URLs for downloading pre-generated keys."""
 
-LEAN_ENV_TO_SCHEMES = {
+LEAN_ENV_TO_SCHEMES: dict[str, GeneralizedXmssScheme] = {
     "test": TEST_SIGNATURE_SCHEME,
     "prod": PROD_SIGNATURE_SCHEME,
 }
@@ -99,8 +96,8 @@ Mapping from short name to scheme objects. This mapping is useful for:
 - Caching key managers in test fixtures
 """
 
-_KEY_MANAGER_CACHE: dict[tuple[str, Slot], XmssKeyManager] = {}
-"""Cache for key managers: {(scheme_name, max_slot): XmssKeyManager}"""
+_KEY_MANAGER_CACHE: dict[str, XmssKeyManager] = {}
+"""One cached manager per scheme name; replaced when a larger max_slot is needed."""
 
 _SHARED_MANAGER_MAX_SLOT: Slot = Slot(10)
 """Default max slot for the shared key manager."""
@@ -114,17 +111,17 @@ def create_dummy_signature() -> Signature:
     but all values are zeros, so it will fail cryptographic verification.
     """
     # Create zero-filled hash digests with correct dimensions
-    zero_digest = HashDigestVector(data=[Fp(0) for _ in range(TARGET_CONFIG.HASH_LEN_FE)])
+    zero_digest = HashDigestVector(data=[Fp(0)] * TARGET_CONFIG.HASH_LEN_FE)
 
     # Path needs LOG_LIFETIME siblings for the Merkle authentication path
-    siblings = HashDigestList(data=[zero_digest for _ in range(TARGET_CONFIG.LOG_LIFETIME)])
+    siblings = HashDigestList(data=[zero_digest] * TARGET_CONFIG.LOG_LIFETIME)
 
     # Hashes need DIMENSION vectors for the Winternitz chain hashes
-    hashes = HashDigestList(data=[zero_digest for _ in range(TARGET_CONFIG.DIMENSION)])
+    hashes = HashDigestList(data=[zero_digest] * TARGET_CONFIG.DIMENSION)
 
     return Signature(
         path=HashTreeOpening(siblings=siblings),
-        rho=Randomness(data=[Fp(0) for _ in range(TARGET_CONFIG.RAND_LEN_FE)]),
+        rho=Randomness(data=[Fp(0)] * TARGET_CONFIG.RAND_LEN_FE),
         hashes=hashes,
     )
 
@@ -133,9 +130,7 @@ def get_shared_key_manager(max_slot: Slot = _SHARED_MANAGER_MAX_SLOT) -> XmssKey
     """
     Get a shared XMSS key manager for reusing keys across tests.
 
-    Implements caching that reuses key managers with sufficient capacity.
-    If a cached key manager exists with max slot >= the requested max slot, it will
-    be reused instead of creating a new one.
+    Keeps one manager per scheme. Replaces it when a larger max_slot is requested.
 
     Args:
         max_slot: Maximum slot for which XMSS keys should be valid. Defaults to 10 slots.
@@ -143,16 +138,12 @@ def get_shared_key_manager(max_slot: Slot = _SHARED_MANAGER_MAX_SLOT) -> XmssKey
     Returns:
         Shared XmssKeyManager instance for the target scheme that supports at least max slot.
     """
-    scheme = LEAN_ENV_TO_SCHEMES[LEAN_ENV]
+    cached = _KEY_MANAGER_CACHE.get(LEAN_ENV)
+    if cached is not None and cached.max_slot >= max_slot:
+        return cached
 
-    # Check if we have a cached key manager with sufficient capacity
-    for (cached_lean_env, cached_max_slot), manager in _KEY_MANAGER_CACHE.items():
-        if cached_lean_env == LEAN_ENV and cached_max_slot >= max_slot:
-            return manager
-
-    # No suitable cached manager found, create a new one
-    manager = XmssKeyManager(max_slot=max_slot, scheme=scheme)
-    _KEY_MANAGER_CACHE[(LEAN_ENV, max_slot)] = manager
+    manager = XmssKeyManager(max_slot=max_slot, scheme_name=LEAN_ENV)
+    _KEY_MANAGER_CACHE[LEAN_ENV] = manager
     return manager
 
 
@@ -169,60 +160,43 @@ def get_keys_dir(scheme_name: str) -> Path:
 
 
 class LazyKeyDict(Mapping[ValidatorIndex, ValidatorKeyPair]):
-    """Load pre-generated keys from disk (cached after first call)."""
+    """Load pre-generated keys from disk on demand."""
 
     def __init__(self, scheme_name: str) -> None:
         """Initialize with scheme name for locating key files."""
-        self._scheme_name = scheme_name
-        self._keys_dir = get_keys_dir(scheme_name)
-        self._cache: dict[ValidatorIndex, ValidatorKeyPair] = {}
-        self._public_cache: dict[ValidatorIndex, tuple[PublicKey, PublicKey]] = {}
-        self._raw_cache: dict[ValidatorIndex, dict[str, str]] = {}
-        self._available_indices: set[ValidatorIndex] | None = None
+        self.scheme_name = scheme_name
+        self.keys_dir = get_keys_dir(scheme_name)
+        self.json_cache: dict[ValidatorIndex, dict[str, str]] = {}
+        self.public_cache: dict[ValidatorIndex, tuple[PublicKey, PublicKey]] = {}
+        self.available_indices: set[ValidatorIndex] | None = None
 
-    def _ensure_dir_exists(self) -> None:
-        """Raise FileNotFoundError if the keys directory does not exist."""
-        if not self._keys_dir.exists():
-            raise FileNotFoundError(
-                f"Keys directory not found: {self._keys_dir} - "
-                f"Run: python -m consensus_testing.keys --scheme {self._scheme_name}"
-            )
-
-    def _get_available_indices(self) -> set[ValidatorIndex]:
-        """Scan directory for available key indices (cached)."""
-        if self._available_indices is None:
-            self._ensure_dir_exists()
-            self._available_indices = {
-                ValidatorIndex(int(f.stem)) for f in self._keys_dir.glob("*.json")
-            }
-            if not self._available_indices:
+    def scan_indices(self) -> set[ValidatorIndex]:
+        """Scan directory for available key indices (cached after first call)."""
+        if self.available_indices is None:
+            if not self.keys_dir.exists():
                 raise FileNotFoundError(
-                    f"No key files found in: {self._keys_dir} - "
-                    f"Run: python -m consensus_testing.keys --scheme {self._scheme_name}"
+                    f"Keys directory not found: {self.keys_dir} - "
+                    f"Run: python -m consensus_testing.keys --scheme {self.scheme_name}"
                 )
-        return self._available_indices
+            self.available_indices = {
+                ValidatorIndex(int(f.stem)) for f in self.keys_dir.glob("*.json")
+            }
+            if not self.available_indices:
+                raise FileNotFoundError(
+                    f"No key files found in: {self.keys_dir} - "
+                    f"Run: python -m consensus_testing.keys --scheme {self.scheme_name}"
+                )
+        return self.available_indices
 
-    def _load_raw(self, idx: ValidatorIndex) -> dict[str, str]:
+    def load_json(self, idx: ValidatorIndex) -> dict[str, str]:
         """Load raw JSON data from disk (cached)."""
-        if idx not in self._raw_cache:
-            key_file = self._keys_dir / f"{idx}.json"
+        if idx not in self.json_cache:
+            key_file = self.keys_dir / f"{idx}.json"
             try:
-                self._raw_cache[idx] = json.loads(key_file.read_text())
+                self.json_cache[idx] = json.loads(key_file.read_text())
             except FileNotFoundError:
                 raise KeyError(f"Key file not found: {key_file}") from None
-        return self._raw_cache[idx]
-
-    def _load_key(self, idx: ValidatorIndex) -> ValidatorKeyPair:
-        """Load a single key from disk."""
-        return ValidatorKeyPair.from_dict(self._load_raw(idx))
-
-    def _load_public_keys(self, idx: ValidatorIndex) -> tuple[PublicKey, PublicKey]:
-        """Load only public keys from disk, skipping expensive SecretKey deserialization."""
-        data = self._load_raw(idx)
-        return (
-            PublicKey.decode_bytes(bytes.fromhex(data["attestation_public"])),
-            PublicKey.decode_bytes(bytes.fromhex(data["proposal_public"])),
-        )
+        return self.json_cache[idx]
 
     def get_public_keys(self, idx: ValidatorIndex) -> tuple[PublicKey, PublicKey]:
         """
@@ -232,12 +206,13 @@ class LazyKeyDict(Mapping[ValidatorIndex, ValidatorKeyPair]):
         key portions from disk. Avoids deserializing the heavy SecretKey objects
         (each ~2.7KB raw with 3 HashSubTree structures) until signing is needed.
         """
-        if idx in self._cache:
-            kp = self._cache[idx]
-            return (kp.attestation_public, kp.proposal_public)
-        if idx not in self._public_cache:
-            self._public_cache[idx] = self._load_public_keys(idx)
-        return self._public_cache[idx]
+        if idx not in self.public_cache:
+            data = self.load_json(idx)
+            self.public_cache[idx] = (
+                PublicKey.decode_bytes(bytes.fromhex(data["attestation_public"])),
+                PublicKey.decode_bytes(bytes.fromhex(data["proposal_public"])),
+            )
+        return self.public_cache[idx]
 
     def get_secret_key(self, idx: ValidatorIndex, field: SecretField) -> SecretKey:
         """
@@ -246,37 +221,26 @@ class LazyKeyDict(Mapping[ValidatorIndex, ValidatorKeyPair]):
         Only the requested SecretKey is deserialized (~370 MB in Python objects).
         The other three fields remain as lightweight hex strings (~2.7 KB each).
         """
-        if idx in self._cache:
-            return getattr(self._cache[idx], field)
-        data = self._load_raw(idx)
+        data = self.load_json(idx)
         return SecretKey.decode_bytes(bytes.fromhex(data[field]))
 
     def __getitem__(self, idx: ValidatorIndex) -> ValidatorKeyPair:
-        """Get key pair by validator index, loading from disk if needed."""
-        if idx not in self._cache:
-            self._cache[idx] = self._load_key(idx)
-            # Full pair supersedes raw/public caches for this index.
-            self._raw_cache.pop(idx, None)
-            self._public_cache.pop(idx, None)
-        return self._cache[idx]
+        """Deserialize full key pair on the fly. Prefer get_public_keys() for lightweight access."""
+        return ValidatorKeyPair.from_dict(self.load_json(idx))
 
     def __contains__(self, idx: object) -> bool:
         """Check if a key exists for the given validator index."""
         if not isinstance(idx, ValidatorIndex):
             return False
-        return idx in self._get_available_indices()
+        return idx in self.scan_indices()
 
     def __len__(self) -> int:
         """Return the number of available keys."""
-        return len(self._get_available_indices())
+        return len(self.scan_indices())
 
     def __iter__(self) -> Iterator[ValidatorIndex]:
         """Iterate over available validator indices in sorted order."""
-        return iter(sorted(self._get_available_indices()))
-
-
-_LAZY_KEY_CACHE: dict[str, LazyKeyDict] = {}
-"""Cache for lazy key dictionaries by scheme name."""
+        return iter(sorted(self.scan_indices()))
 
 
 class XmssKeyManager:
@@ -291,38 +255,33 @@ class XmssKeyManager:
     def __init__(
         self,
         max_slot: Slot,
-        scheme: GeneralizedXmssScheme = TEST_SIGNATURE_SCHEME,
+        scheme_name: str = "test",
     ) -> None:
-        """Initialize the manager with optional custom configuration."""
+        """Initialize the manager with a scheme name and maximum slot."""
+        if scheme_name not in LEAN_ENV_TO_SCHEMES:
+            raise ValueError(f"Unknown scheme: {scheme_name!r}")
         self.max_slot = max_slot
-        self.scheme = scheme
+        self.scheme_name = scheme_name
+        self.scheme = LEAN_ENV_TO_SCHEMES[scheme_name]
+        self._keys: LazyKeyDict | None = None
+        # Advanced secret key state cached as raw SSZ bytes.
+        # Raw bytes (~2.7 KB each) instead of deserialized SecretKey objects
+        # (~370 MB each) to avoid holding massive Pydantic model trees in memory.
         self._secret_state: dict[tuple[ValidatorIndex, SecretField], bytes] = {}
-        """
-        Advanced secret key state cached as raw SSZ bytes.
-
-        Raw bytes (~2.7 KB each) instead of deserialized SecretKey objects
-        (~370 MB each) to avoid holding massive Pydantic model trees in memory.
-        """
-
-        try:
-            self.scheme_name = next(
-                name for name, obj in LEAN_ENV_TO_SCHEMES.items() if obj is scheme
-            )
-        except StopIteration:
-            raise ValueError(f"Unknown scheme: {scheme}") from None
 
     @property
     def keys(self) -> LazyKeyDict:
         """Lazy access to immutable base keys."""
-        if self.scheme_name not in _LAZY_KEY_CACHE:
-            _LAZY_KEY_CACHE[self.scheme_name] = LazyKeyDict(self.scheme_name)
-        return _LAZY_KEY_CACHE[self.scheme_name]
+        if self._keys is None:
+            self._keys = LazyKeyDict(self.scheme_name)
+        return self._keys
 
     def __getitem__(self, idx: ValidatorIndex) -> ValidatorKeyPair:
         """Get key pair. Prefer get_public_keys() or signing methods to avoid loading all keys."""
-        if idx not in self.keys:
-            raise KeyError(f"Validator {idx} not found (max: {len(self.keys) - 1})")
-        return self.keys[idx]
+        try:
+            return self.keys[idx]
+        except KeyError:
+            raise KeyError(f"Validator {idx} not found (available: {len(self.keys)})") from None
 
     def __contains__(self, idx: object) -> bool:
         """Check if validator index exists."""
@@ -476,12 +435,9 @@ class XmssKeyManager:
                 for vid in validator_ids
             ]
 
-            # If the caller supplied raw signatures and any are invalid,
-            # aggregation should fail with exception.
-            participants = AggregationBits.from_validator_indices(validator_ids)
             raw_xmss = list(zip(public_keys, signatures, strict=True))
             proof = AggregatedSignatureProof.aggregate(
-                xmss_participants=participants,
+                xmss_participants=agg.aggregation_bits,
                 children=[],
                 raw_xmss=raw_xmss,
                 message=message,
@@ -530,24 +486,15 @@ def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
         f"({num_slots} slots) using {num_workers} cores..."
     )
 
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        worker_func = partial(_generate_single_keypair, scheme, num_slots)
-        key_pairs = list(executor.map(worker_func, range(count)))
-
-    # Create keys directory (remove old one if it exists)
-    if keys_dir.exists():
-        shutil.rmtree(keys_dir)
     keys_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save each keypair to a separate file
-    for idx, key_pair in enumerate(key_pairs):
-        key_file = keys_dir / f"{idx}.json"
-        key_file.write_text(json.dumps(key_pair, indent=2))
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        worker_func = partial(_generate_single_keypair, scheme, num_slots)
+        for idx, key_pair in enumerate(executor.map(worker_func, range(count))):
+            key_file = keys_dir / f"{idx}.json"
+            key_file.write_text(json.dumps(key_pair, indent=2))
 
-    print(f"Saved {len(key_pairs)} key pairs to {keys_dir}/")
-
-    # Clear cache so new keys are loaded
-    _LAZY_KEY_CACHE.clear()
+    print(f"Saved {count} key pairs to {keys_dir}/")
 
 
 def download_keys(scheme: str) -> None:
@@ -567,39 +514,23 @@ def download_keys(scheme: str) -> None:
 
     # Download to a temporary file
     with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp_file:
+        tmp_path = Path(tmp_file.name)
         try:
             with urllib.request.urlopen(url) as response:
                 tmp_file.write(response.read())
-            tmp_path = tmp_file.name
-        except Exception as e:
-            print(f"Failed to download {scheme} keys: {e}")
-            return
 
-    # Extract the archive
-    try:
-        target_dir = base_dir / f"{scheme}_scheme"
+            target_dir = base_dir / f"{scheme}_scheme"
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            base_dir.mkdir(parents=True, exist_ok=True)
 
-        # Remove existing directory if present
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
+            with tarfile.open(tmp_path, "r:gz") as tar:
+                tar.extractall(path=base_dir, filter="data")
 
-        # Create parent directory
-        base_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Extracted {scheme} keys to {target_dir}/")
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
-        # Extract tar.gz
-        with tarfile.open(tmp_path, "r:gz") as tar:
-            tar.extractall(path=base_dir, filter="data")
-
-        print(f"Extracted {scheme} keys to {target_dir}/")
-
-    except Exception as e:
-        print(f"Failed to extract {scheme} keys: {e}")
-    finally:
-        # Clean up temporary file
-        os.unlink(tmp_path)
-
-    # Clear cache so new keys are loaded
-    _LAZY_KEY_CACHE.clear()
     print("Download complete!")
 
 
