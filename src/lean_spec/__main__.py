@@ -523,9 +523,9 @@ async def run_node(
     subscription_subnets: set[SubnetId] = set()
 
     # Always subscribe to validator-derived subnets regardless of aggregator flag.
+    # Loop over all registered validators so each one's subnet is covered.
     if validator_registry is not None:
-        validator_id = validator_registry.primary_index()
-        if validator_id is not None:
+        for validator_id in validator_registry.indices():
             subscription_subnets.add(validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT))
 
     # Explicit aggregate subnets are additive but only meaningful for aggregators.
