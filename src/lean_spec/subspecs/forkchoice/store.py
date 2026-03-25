@@ -30,7 +30,6 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
@@ -325,27 +324,23 @@ class Store(StrictBaseModel):
         signed_attestation: SignedAttestation,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
         is_aggregator: bool = False,
-        import_subnet_ids: tuple[SubnetId, ...] = (),
     ) -> "Store":
         """
         Process a signed attestation received via gossip network.
 
         This method:
         1. Verifies the XMSS signature
-        2. Stores the signature for aggregation under two conditions:
-           - Aggregator nodes store from validators sharing the same subnet
-           - Signatures from explicitly configured import subnets are always stored
+        2. Stores the signature when the node is in aggregator mode and the
+           attester is on the same subnet as the current validator
 
         Args:
             signed_attestation: The signed attestation from gossip.
             scheme: XMSS signature scheme for verification.
             is_aggregator: True if current validator holds aggregator role.
-            import_subnet_ids: Subnets whose attestations are stored regardless
-                of aggregator role. Allows proposer nodes to collect signatures
-                from specific subnets without enabling full aggregation.
+                Only aggregator nodes collect gossip attestation signatures.
 
         Returns:
-            New Store with attestation processed and signature stored.
+            New Store with attestation processed and signature stored if aggregating.
 
         Raises:
             ValueError: If validator not found in state.
@@ -380,19 +375,13 @@ class Store(StrictBaseModel):
 
         attester_subnet = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
 
-        # Two conditions for storing a gossip signature:
-        #
-        # 1. Aggregator path: aggregator collects from its own subnet.
-        # 2. Import-subnet path: explicit subnets are collected regardless of aggregator role.
-        #    This lets proposer nodes gather signatures from configured subnets to include
-        #    in blocks without enabling full aggregation.
+        # Aggregators collect signatures from validators sharing the same subnet.
+        # Non-aggregator nodes validate and drop — they never store gossip signatures.
         should_store = False
         if is_aggregator:
             assert self.validator_id is not None, "Current validator ID must be set for aggregation"
             current_subnet = self.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
             should_store = current_subnet == attester_subnet
-        if not should_store and import_subnet_ids:
-            should_store = attester_subnet in import_subnet_ids
 
         if should_store:
             new_committee_sigs.setdefault(attestation_data, set()).add(

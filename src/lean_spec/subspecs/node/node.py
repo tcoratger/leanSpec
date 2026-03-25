@@ -125,20 +125,15 @@ class NodeConfig:
     - The node runs in standard validator or passive mode
     """
 
-    import_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
     """
-    Additional attestation subnets to subscribe to and import from.
+    Additional attestation subnets to subscribe to and aggregate from.
 
-    Subscriptions to these subnets are established at the network layer,
-    conserving bandwidth on subnets this node has no interest in.
+    When set, the node subscribes to these subnets at the p2p layer in
+    addition to validator-derived subnets. Effective only when is_aggregator
+    is True — only aggregators import gossip attestations into forkchoice.
 
-    Attestations arriving on these subnets are always collected into the
-    signature pool regardless of the aggregator flag. This allows proposer
-    nodes to gather attestations from specific subnets for block inclusion
-    without enabling full aggregation mode.
-
-    These subnets are additive to the validator-derived subnet when
-    the node is also an aggregator.
+    Additive to the validator-derived subnet.
     """
 
 
@@ -265,7 +260,7 @@ class Node:
             network=config.network,
             database=database,
             is_aggregator=config.is_aggregator,
-            import_subnet_ids=config.import_subnet_ids,
+            aggregate_subnet_ids=config.aggregate_subnet_ids,
             genesis_start=True,
         )
 
@@ -275,7 +270,7 @@ class Node:
             event_source=config.event_source,
             fork_digest=config.fork_digest,
             is_aggregator=config.is_aggregator,
-            import_subnet_ids=config.import_subnet_ids,
+            aggregate_subnet_ids=config.aggregate_subnet_ids,
         )
 
         # Wire up aggregated attestation publishing.

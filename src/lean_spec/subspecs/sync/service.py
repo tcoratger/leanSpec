@@ -160,14 +160,13 @@ class SyncService:
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
 
-    import_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
     """
-    Subnets whose attestations are stored regardless of aggregator role.
+    Explicit subnet IDs to subscribe to and aggregate from.
 
-    Subscriptions to these subnets are established at the network layer.
-    Attestations arriving on these subnets are always collected into the
-    signature pool, allowing proposer nodes to gather material from specific
-    subnets without enabling full aggregation mode.
+    When set, the node subscribes to these subnets at the p2p layer in
+    addition to its validator-derived subnet. Only active when is_aggregator
+    is also True — non-aggregator nodes never import gossip attestations.
     """
 
     process_block: Callable[[Store, SignedBlock], Store] = field(default=default_block_processor)
@@ -525,7 +524,6 @@ class SyncService:
             self.store = self.store.on_gossip_attestation(
                 signed_attestation=attestation,
                 is_aggregator=is_aggregator_role,
-                import_subnet_ids=self.import_subnet_ids,
             )
             metrics.lean_attestation_validation_time_seconds.observe(time.perf_counter() - t0)
             metrics.lean_attestations_valid_total.labels(source="gossip").inc()
@@ -618,7 +616,6 @@ class SyncService:
                 self.store = self.store.on_gossip_attestation(
                     signed_attestation=attestation,
                     is_aggregator=is_aggregator_role,
-                    import_subnet_ids=self.import_subnet_ids,
                 )
             except (AssertionError, KeyError):
                 self._pending_attestations.append(attestation)
