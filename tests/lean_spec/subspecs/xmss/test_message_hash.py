@@ -62,16 +62,22 @@ def test_aborting_decode_known_decomposition() -> None:
     hasher = TEST_MESSAGE_HASHER
     config = TEST_CONFIG
 
-    # For TEST_CONFIG: Q=133169152, BASE=4, Z=2
-    # If A_i = Q * 5 = 665845760, then d_i = 5, digits = [5 % 4, 5 // 4] = [1, 1]
-    # If A_i = Q * 0 = 0, then d_i = 0, digits = [0, 0]
-    fe_list = [Fp(value=config.Q * 5), Fp(value=0)]
+    # Pick an arbitrary quotient multiplier to build a valid field element.
+    d_value = 5
+    fe_list = [Fp(value=config.Q * d_value)] * hasher.config.MH_HASH_LEN_FE
     result = hasher._aborting_decode(fe_list)
     assert result is not None
-    # First FE: d=5, digits (LSB first) = [1, 1]
-    # Second FE: d=0, digits (LSB first) = [0, 0]
-    # Take first DIMENSION=4 digits
-    assert result == [1, 1, 0, 0]
+    assert len(result) == config.DIMENSION
+
+    # Each FE decomposes d_value into Z base-BASE digits (LSB first),
+    # then the first DIMENSION digits are taken across all FEs.
+    digits_per_fe = []
+    remaining = d_value
+    for _ in range(config.Z):
+        digits_per_fe.append(remaining % config.BASE)
+        remaining //= config.BASE
+    all_digits = (digits_per_fe * hasher.config.MH_HASH_LEN_FE)[: config.DIMENSION]
+    assert result == all_digits
 
 
 def test_aborting_decode_boundary() -> None:
