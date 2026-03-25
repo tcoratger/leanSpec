@@ -456,6 +456,9 @@ async def run_node(
     if is_aggregator:
         logger.info("Aggregator mode enabled - node will perform attestation aggregation")
     if aggregate_subnet_ids:
+        if not is_aggregator:
+            logger.error("--aggregate-subnet-ids requires --is-aggregator to be set")
+            sys.exit(1)
         logger.info("Aggregate subnet IDs configured: %s", list(aggregate_subnet_ids))
 
     # Load validator keys if path provided.
