@@ -34,7 +34,7 @@ from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking import NetworkService
@@ -123,6 +123,17 @@ class NodeConfig:
 
     When False (default):
     - The node runs in standard validator or passive mode
+    """
+
+    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    """
+    Additional attestation subnets to subscribe to and aggregate from.
+
+    When set, the node subscribes to these subnets at the p2p layer in
+    addition to validator-derived subnets. Effective only when is_aggregator
+    is True — only aggregators import gossip attestations into forkchoice.
+
+    Additive to the validator-derived subnet.
     """
 
 
@@ -249,6 +260,7 @@ class Node:
             network=config.network,
             database=database,
             is_aggregator=config.is_aggregator,
+            aggregate_subnet_ids=config.aggregate_subnet_ids,
             genesis_start=True,
         )
 
@@ -258,6 +270,7 @@ class Node:
             event_source=config.event_source,
             fork_digest=config.fork_digest,
             is_aggregator=config.is_aggregator,
+            aggregate_subnet_ids=config.aggregate_subnet_ids,
         )
 
         # Wire up aggregated attestation publishing.

@@ -51,6 +51,7 @@ from lean_spec.subspecs.containers import (
     SignedBlock,
 )
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.reqresp.message import Status
@@ -158,6 +159,15 @@ class SyncService:
 
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
+
+    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    """
+    Explicit subnet IDs to subscribe to and aggregate from.
+
+    When set, the node subscribes to these subnets at the p2p layer in
+    addition to its validator-derived subnet. Only active when is_aggregator
+    is also True — non-aggregator nodes never import gossip attestations.
+    """
 
     process_block: Callable[[Store, SignedBlock], Store] = field(default=default_block_processor)
     """Block processor function. Defaults to the store's block processing."""

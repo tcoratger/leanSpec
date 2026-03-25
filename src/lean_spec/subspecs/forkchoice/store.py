@@ -12,7 +12,6 @@ from typing import NamedTuple
 
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
-    ATTESTATION_COMMITTEE_COUNT,
     INTERVALS_PER_SLOT,
     JUSTIFICATION_LOOKBACK_SLOTS,
 )
@@ -330,17 +329,20 @@ class Store(StrictBaseModel):
 
         This method:
         1. Verifies the XMSS signature
-        2. If current node is aggregator, stores the signature in the gossip
-           signature map if it belongs to the current validator's subnet
-        3. Processes the attestation data via on_attestation
+        2. Stores the signature when the node is in aggregator mode
+
+        Subnet filtering happens at the p2p subscription layer — only
+        attestations from subscribed subnets reach this method. No
+        additional subnet check is needed here.
 
         Args:
             signed_attestation: The signed attestation from gossip.
             scheme: XMSS signature scheme for verification.
             is_aggregator: True if current validator holds aggregator role.
+                Only aggregator nodes store gossip attestation signatures.
 
         Returns:
-            New Store with attestation processed and signature stored.
+            New Store with attestation processed and signature stored if aggregating.
 
         Raises:
             ValueError: If validator not found in state.
@@ -373,14 +375,14 @@ class Store(StrictBaseModel):
         # Copy the inner sets so we can add to them without mutating the previous store.
         new_committee_sigs = {k: set(v) for k, v in self.attestation_signatures.items()}
 
+        # Aggregators store all received gossip signatures.
+        # The p2p layer only delivers attestations from subscribed subnets,
+        # so subnet filtering happens at subscription time, not here.
+        # Non-aggregator nodes validate and drop — they never store gossip signatures.
         if is_aggregator:
-            assert self.validator_id is not None, "Current validator ID must be set for aggregation"
-            current_subnet = self.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-            attester_subnet = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-            if current_subnet == attester_subnet:
-                new_committee_sigs.setdefault(attestation_data, set()).add(
-                    AttestationSignatureEntry(validator_id, signature)
-                )
+            new_committee_sigs.setdefault(attestation_data, set()).add(
+                AttestationSignatureEntry(validator_id, signature)
+            )
 
         # Return store with updated signature map and attestation data
         return self.model_copy(
