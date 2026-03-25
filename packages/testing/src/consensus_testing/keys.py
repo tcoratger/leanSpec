@@ -142,6 +142,7 @@ def get_shared_key_manager(max_slot: Slot = _SHARED_MANAGER_MAX_SLOT) -> XmssKey
     if cached is not None and cached.max_slot >= max_slot:
         return cached
 
+    # No suitable cached manager found, create a new one
     manager = XmssKeyManager(max_slot=max_slot, scheme_name=LEAN_ENV)
     _KEY_MANAGER_CACHE[LEAN_ENV] = manager
     return manager
