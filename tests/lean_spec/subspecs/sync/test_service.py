@@ -416,10 +416,14 @@ class TestAttestationGossipHandling:
         # Override on_gossip_attestation to raise for unknown blocks.
         original_fn = sync_service.store.on_gossip_attestation
 
-        def reject_unknown(signed_attestation, *, is_aggregator=False):
+        def reject_unknown(signed_attestation, *, is_aggregator=False, import_subnet_ids=()):
             if signed_attestation.data.target.root == unknown_root:
                 raise KeyError("Unknown block")
-            return original_fn(signed_attestation, is_aggregator=is_aggregator)
+            return original_fn(
+                signed_attestation,
+                is_aggregator=is_aggregator,
+                import_subnet_ids=import_subnet_ids,
+            )
 
         sync_service.store.on_gossip_attestation = reject_unknown  # type: ignore[assignment]
 

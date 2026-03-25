@@ -130,6 +130,7 @@ class MockForkchoiceStore:
         signed_attestation: SignedAttestation,
         *,
         is_aggregator: bool = False,
+        import_subnet_ids: tuple = (),
     ) -> MockForkchoiceStore:
         """Track attestation additions. Returns self for assignment chaining."""
         self._attestations_received.append(signed_attestation)
