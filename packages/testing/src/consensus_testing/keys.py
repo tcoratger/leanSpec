@@ -163,6 +163,8 @@ def get_keys_dir(scheme_name: str) -> Path:
 class LazyKeyDict(Mapping[ValidatorIndex, ValidatorKeyPair]):
     """Load pre-generated keys from disk on demand."""
 
+    __slots__ = ("scheme_name", "keys_dir", "json_cache", "public_cache", "available_indices")
+
     def __init__(self, scheme_name: str) -> None:
         """Initialize with scheme name for locating key files."""
         self.scheme_name = scheme_name
@@ -194,7 +196,8 @@ class LazyKeyDict(Mapping[ValidatorIndex, ValidatorKeyPair]):
         if idx not in self.json_cache:
             key_file = self.keys_dir / f"{idx}.json"
             try:
-                self.json_cache[idx] = json.loads(key_file.read_text())
+                with key_file.open() as f:
+                    self.json_cache[idx] = json.load(f)
             except FileNotFoundError:
                 raise KeyError(f"Key file not found: {key_file}") from None
         return self.json_cache[idx]
@@ -252,6 +255,8 @@ class XmssKeyManager:
 
     Keys are lazily loaded from disk on first access.
     """
+
+    __slots__ = ("max_slot", "scheme_name", "scheme", "_keys", "_secret_state")
 
     def __init__(
         self,
@@ -419,13 +424,11 @@ class XmssKeyManager:
         For each aggregated attestation, collect the participating validators' public keys and
         signatures, then produce a single leanVM aggregated signature proof.
         """
-        lookup = signature_lookup or {}
+        lookup = signature_lookup if signature_lookup is not None else {}
 
         proofs: list[AggregatedSignatureProof] = []
         for agg in aggregated_attestations:
             validator_ids = agg.aggregation_bits.to_validator_indices()
-            message = agg.data.data_root_bytes()
-            slot = agg.data.slot
 
             # Look up pre-computed signatures by attestation data and validator ID.
             sigs_for_data = lookup.get(agg.data, {})
@@ -441,8 +444,8 @@ class XmssKeyManager:
                 xmss_participants=agg.aggregation_bits,
                 children=[],
                 raw_xmss=raw_xmss,
-                message=message,
-                slot=slot,
+                message=agg.data.data_root_bytes(),
+                slot=agg.data.slot,
             )
             proofs.append(proof)
 
@@ -518,7 +521,7 @@ def download_keys(scheme: str) -> None:
         tmp_path = Path(tmp_file.name)
         try:
             with urllib.request.urlopen(url) as response:
-                tmp_file.write(response.read())
+                shutil.copyfileobj(response, tmp_file)
 
             target_dir = base_dir / f"{scheme}_scheme"
             if target_dir.exists():
