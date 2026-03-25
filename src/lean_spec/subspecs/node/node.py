@@ -34,7 +34,7 @@ from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking import NetworkService
@@ -123,6 +123,22 @@ class NodeConfig:
 
     When False (default):
     - The node runs in standard validator or passive mode
+    """
+
+    import_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    """
+    Additional attestation subnets to subscribe to and import from.
+
+    Subscriptions to these subnets are established at the network layer,
+    conserving bandwidth on subnets this node has no interest in.
+
+    Attestations arriving on these subnets are always collected into the
+    signature pool regardless of the aggregator flag. This allows proposer
+    nodes to gather attestations from specific subnets for block inclusion
+    without enabling full aggregation mode.
+
+    These subnets are additive to the validator-derived subnet when
+    the node is also an aggregator.
     """
 
 
@@ -249,6 +265,7 @@ class Node:
             network=config.network,
             database=database,
             is_aggregator=config.is_aggregator,
+            import_subnet_ids=config.import_subnet_ids,
             genesis_start=True,
         )
 
@@ -258,6 +275,7 @@ class Node:
             event_source=config.event_source,
             fork_digest=config.fork_digest,
             is_aggregator=config.is_aggregator,
+            import_subnet_ids=config.import_subnet_ids,
         )
 
         # Wire up aggregated attestation publishing.

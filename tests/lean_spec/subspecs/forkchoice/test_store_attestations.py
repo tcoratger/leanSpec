@@ -16,7 +16,7 @@ from lean_spec.subspecs.containers.attestation import (
 )
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.forkchoice import AttestationSignatureEntry
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, Uint64
@@ -297,6 +297,134 @@ class TestOnGossipAttestationSubnetFiltering:
         # Verify no gossip entry was created for this attestation data
         assert attestation_data not in updated_store.attestation_signatures, (
             "Cross-subnet attestation should not create a attestation_signatures entry"
+        )
+
+    def test_import_subnet_stores_without_aggregator(self, key_manager: XmssKeyManager) -> None:
+        """
+        import_subnet_ids allows collecting signatures without aggregator role.
+
+        When a subnet is in import_subnet_ids, its attestations are stored
+        even when is_aggregator=False. This supports proposer nodes that need
+        attestation material from specific subnets for block inclusion.
+
+        With ATTESTATION_COMMITTEE_COUNT=4:
+        - Validator 1 is in subnet 1 (1 % 4 = 1)
+        - Non-aggregator with import_subnet_ids=(SubnetId(1),) stores it.
+        """
+        attester_validator = ValidatorIndex(1)  # Subnet 1
+
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=ValidatorIndex(0)
+        )
+
+        signed_attestation = SignedAttestation(
+            validator_id=attester_validator,
+            data=attestation_data,
+            signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
+        )
+
+        with mock.patch(
+            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
+        ):
+            updated_store = store.on_gossip_attestation(
+                signed_attestation,
+                is_aggregator=False,
+                import_subnet_ids=(SubnetId(1),),
+            )
+
+        sigs = updated_store.attestation_signatures.get(attestation_data, set())
+        assert attester_validator in {entry.validator_id for entry in sigs}, (
+            "import_subnet_ids should store signatures regardless of aggregator role"
+        )
+
+    def test_import_subnet_ignored_for_other_subnets(self, key_manager: XmssKeyManager) -> None:
+        """
+        import_subnet_ids only covers the explicitly listed subnets.
+
+        Attestations from subnets not in import_subnet_ids are not stored
+        when is_aggregator=False, even if import_subnet_ids is non-empty.
+
+        With ATTESTATION_COMMITTEE_COUNT=4:
+        - Validator 2 is in subnet 2 (2 % 4 = 2)
+        - import_subnet_ids=(SubnetId(1),) does not cover subnet 2.
+        """
+        attester_validator = ValidatorIndex(2)  # Subnet 2
+
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=ValidatorIndex(0)
+        )
+
+        signed_attestation = SignedAttestation(
+            validator_id=attester_validator,
+            data=attestation_data,
+            signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
+        )
+
+        with mock.patch(
+            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
+        ):
+            updated_store = store.on_gossip_attestation(
+                signed_attestation,
+                is_aggregator=False,
+                import_subnet_ids=(SubnetId(1),),
+            )
+
+        sigs = updated_store.attestation_signatures.get(attestation_data, set())
+        assert attester_validator not in {entry.validator_id for entry in sigs}, (
+            "Subnets not in import_subnet_ids should not be stored for non-aggregators"
+        )
+
+    def test_import_subnet_combined_with_aggregator(self, key_manager: XmssKeyManager) -> None:
+        """
+        import_subnet_ids and aggregator mode are additive.
+
+        When both flags are active, signatures are stored from both the
+        validator-derived aggregator subnet and the explicitly listed subnets.
+
+        With ATTESTATION_COMMITTEE_COUNT=4 and current validator 0 (subnet 0):
+        - Validator 4 is in subnet 0 — stored via aggregator path.
+        - Validator 1 is in subnet 1 — stored via import_subnet_ids path.
+        - Validator 2 is in subnet 2 — stored by neither; should be absent.
+        """
+        current_validator = ValidatorIndex(0)  # Subnet 0
+        same_subnet_validator = ValidatorIndex(4)  # Subnet 0
+        import_subnet_validator = ValidatorIndex(1)  # Subnet 1
+        other_subnet_validator = ValidatorIndex(2)  # Subnet 2
+
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=current_validator
+        )
+
+        def make_signed(v: ValidatorIndex) -> SignedAttestation:
+            return SignedAttestation(
+                validator_id=v,
+                data=attestation_data,
+                signature=key_manager.sign_attestation_data(v, attestation_data),
+            )
+
+        with mock.patch(
+            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
+        ):
+            updated = store
+            for v in (same_subnet_validator, import_subnet_validator, other_subnet_validator):
+                updated = updated.on_gossip_attestation(
+                    make_signed(v),
+                    is_aggregator=True,
+                    import_subnet_ids=(SubnetId(1),),
+                )
+
+        stored_ids = {
+            entry.validator_id
+            for entry in updated.attestation_signatures.get(attestation_data, set())
+        }
+        assert same_subnet_validator in stored_ids, (
+            "Same-subnet validator stored via aggregator path"
+        )
+        assert import_subnet_validator in stored_ids, (
+            "Import-subnet validator stored via import path"
+        )
+        assert other_subnet_validator not in stored_ids, (
+            "Other-subnet validator should not be stored"
         )
 
 

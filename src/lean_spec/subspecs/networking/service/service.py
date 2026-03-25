@@ -80,6 +80,9 @@ class NetworkService:
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
 
+    import_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    """Attestation subnets subscribed to and imported regardless of aggregator role."""
+
     _running: bool = field(default=False, repr=False)
     """Whether the event loop is running."""
 
