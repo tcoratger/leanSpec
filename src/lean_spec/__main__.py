@@ -535,7 +535,7 @@ async def run_node(
             subscription_subnets.add(SubnetId(0))
         subscription_subnets.update(aggregate_subnet_ids)
 
-    for subnet_id in sorted(subscription_subnets):
+    for subnet_id in subscription_subnets:
         attestation_subnet_topic = GossipTopic.attestation_subnet(
             GOSSIP_FORK_DIGEST, subnet_id
         ).to_topic_id()
