@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import NamedTuple, cast
 
-from consensus_testing.keys import XmssKeyManager, get_shared_key_manager
+from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
@@ -411,7 +411,7 @@ def make_keyed_genesis_state(
 ) -> State:
     """Create a genesis state with real XMSS keys from the shared key manager."""
     if key_manager is None:
-        key_manager = get_shared_key_manager()
+        key_manager = XmssKeyManager.shared()
     validators = make_validators_from_key_manager(key_manager, num_validators)
     return make_genesis_state(validators=validators)
 
