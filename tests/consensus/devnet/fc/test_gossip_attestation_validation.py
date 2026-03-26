@@ -399,7 +399,7 @@ def test_attestation_head_older_than_target_rejected(
     )
 
 
-def test_attestation_source_slot_exceeds_target_rejected(
+def test_attestation_source_slot_override_exceeds_target_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
