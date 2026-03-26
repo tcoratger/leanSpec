@@ -922,81 +922,45 @@ class Store(StrictBaseModel):
         # The head and attestation pools remain unchanged.
         return self.model_copy(update={"safe_target": safe_target})
 
-    def aggregate(
-        self, recursive: bool = False
-    ) -> tuple["Store", list[SignedAggregatedAttestation]]:
+    def aggregate(self) -> tuple["Store", list[SignedAggregatedAttestation]]:
         """
         Aggregate committee signatures and payloads together.
 
         This method aggregates signatures from the attestation_signatures map.
-
-        Args:
-            recursive: When True, previously produced payloads are only used as inputs
-                during recursive aggregation and are not carried forward to the next interval.
 
         Returns:
             Tuple of (new Store with updated payloads, list of new SignedAggregatedAttestation).
         """
         head_state = self.states[self.head]
 
-        if recursive:
-            # Recursive aggregation: state uses new/known payloads; do not carry
-            # forward existing new payloads. Once bindings support recursive aggregation,
-            # keep this path and remove the else block below.
-            aggregated_results = head_state.aggregate(
-                attestation_signatures=self.attestation_signatures,
-                new_payloads=self.latest_new_aggregated_payloads,
-                known_payloads=self.latest_known_aggregated_payloads,
-                recursive=True,
-            )
-            new_aggregates: list[SignedAggregatedAttestation] = []
-            new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
-            aggregated_attestation_data: set[AttestationData] = set()
-            for att, proof in aggregated_results:
-                aggregated_attestation_data.add(att.data)
-                new_aggregates.append(SignedAggregatedAttestation(data=att.data, proof=proof))
-                new_aggregated_payloads.setdefault(att.data, set()).add(proof)
-            remaining_attestation_signatures = {
-                attestation_data: signatures
-                for attestation_data, signatures in self.attestation_signatures.items()
-                if attestation_data not in aggregated_attestation_data
+        # Plain aggregation: only attestation_signatures; carry forward existing
+        # new payloads. Remove this block once bindings support recursive aggregation.
+        aggregated_results = head_state.aggregate(
+            attestation_signatures=self.attestation_signatures,
+            new_payloads=None,
+            known_payloads=None,
+        )
+        new_aggregates = []
+        new_aggregated_payloads = {
+            attestation_data: set(proofs)
+            for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
+        }
+        aggregated_attestation_data = set()
+        for att, proof in aggregated_results:
+            aggregated_attestation_data.add(att.data)
+            new_aggregates.append(SignedAggregatedAttestation(data=att.data, proof=proof))
+            new_aggregated_payloads.setdefault(att.data, set()).add(proof)
+        remaining_attestation_signatures = {
+            attestation_data: signatures
+            for attestation_data, signatures in self.attestation_signatures.items()
+            if attestation_data not in aggregated_attestation_data
+        }
+        return self.model_copy(
+            update={
+                "latest_new_aggregated_payloads": new_aggregated_payloads,
+                "attestation_signatures": remaining_attestation_signatures,
             }
-            return self.model_copy(
-                update={
-                    "latest_new_aggregated_payloads": new_aggregated_payloads,
-                    "attestation_signatures": remaining_attestation_signatures,
-                }
-            ), new_aggregates
-        else:
-            # Plain aggregation: only attestation_signatures; carry forward existing
-            # new payloads. Remove this block once bindings support recursive aggregation.
-            aggregated_results = head_state.aggregate(
-                attestation_signatures=self.attestation_signatures,
-                new_payloads=None,
-                known_payloads=None,
-                recursive=False,
-            )
-            new_aggregates = []
-            new_aggregated_payloads = {
-                attestation_data: set(proofs)
-                for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
-            }
-            aggregated_attestation_data = set()
-            for att, proof in aggregated_results:
-                aggregated_attestation_data.add(att.data)
-                new_aggregates.append(SignedAggregatedAttestation(data=att.data, proof=proof))
-                new_aggregated_payloads.setdefault(att.data, set()).add(proof)
-            remaining_attestation_signatures = {
-                attestation_data: signatures
-                for attestation_data, signatures in self.attestation_signatures.items()
-                if attestation_data not in aggregated_attestation_data
-            }
-            return self.model_copy(
-                update={
-                    "latest_new_aggregated_payloads": new_aggregated_payloads,
-                    "attestation_signatures": remaining_attestation_signatures,
-                }
-            ), new_aggregates
+        ), new_aggregates
 
     def tick_interval(
         self, has_proposal: bool, is_aggregator: bool = False

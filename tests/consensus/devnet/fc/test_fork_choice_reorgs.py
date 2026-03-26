@@ -880,16 +880,33 @@ def test_reorg_on_newly_justified_slot(
                 ),
             ),
             # Fork A: slot 3
-            # Fork A is the heaviest chain (2 blocks from justified slot)
+            # Includes attestations from validators 2, 3, 4 targeting fork_a_1,
+            # giving Fork A explicit weight advantage over any competing fork.
             BlockStep(
-                block=BlockSpec(slot=Slot(3), parent_label="fork_a_1", label="fork_a_2"),
+                block=BlockSpec(
+                    slot=Slot(3),
+                    parent_label="fork_a_1",
+                    label="fork_a_2",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[
+                                ValidatorIndex(2),
+                                ValidatorIndex(3),
+                                ValidatorIndex(4),
+                            ],
+                            slot=Slot(2),
+                            target_slot=Slot(2),
+                            target_root_label="fork_a_1",
+                        ),
+                    ],
+                ),
                 checks=StoreChecks(
                     head_slot=Slot(3),
                     head_root_label="fork_a_2",
                 ),
             ),
             # Fork A: slot 4
-            # Fork A is the heaviest chain (3 blocks from justified slot)
+            # Fork A is the heaviest chain (3 blocks + 3 attestation votes)
             BlockStep(
                 block=BlockSpec(slot=Slot(4), parent_label="fork_a_2", label="fork_a_3"),
                 checks=StoreChecks(

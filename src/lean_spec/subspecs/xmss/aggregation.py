@@ -20,6 +20,9 @@ from lean_spec.types import ByteListMiB, Bytes32, Container
 
 from .containers import PublicKey, Signature
 
+LOG_INV_RATE = 2
+"""Inverse rate exponent for proof generation (1-4, lower = faster but bigger proofs)."""
+
 
 class AggregationError(Exception):
     """Raised when signature aggregation or verification fails."""
@@ -44,14 +47,6 @@ class AggregatedSignatureProof(Container):
 
     proof_data: ByteListMiB
     """The raw aggregated proof bytes from leanVM."""
-
-    # TODO: Add bytecode-point claim data from recursive aggregation.
-    # bytecode_point: ByteListMiB | None = None
-    # """
-    # Serialized bytecode-point claim data from recursive aggregation.
-
-    # If the bytecode point is not provided, the proof is not recursive.
-    # """
 
     @classmethod
     def aggregate(
@@ -110,11 +105,14 @@ class AggregatedSignatureProof(Container):
         mode = mode or LEAN_ENV
         setup_prover(mode=mode)
         try:
+            children_bytes = [child.proof_data.encode_bytes() for child in children] or None
             proof_bytes = aggregate_signatures(
                 [pk.encode_bytes() for pk, _ in raw_xmss],
                 [sig.encode_bytes() for _, sig in raw_xmss],
                 message,
                 slot,
+                LOG_INV_RATE,
+                children_bytes=children_bytes,
                 mode=mode,
             )
             return cls(
@@ -135,7 +133,7 @@ class AggregatedSignatureProof(Container):
         Verify this aggregated signature proof.
 
         Args:
-            public_keys: Public keys of the participants (order must match participants bitfield).
+            public_keys: Public keys of the participants (reserved for future use).
             message: The 32-byte message that was signed.
             slot: The slot in which the signatures were created.
             mode: The mode to use for the verification (test or prod).
@@ -143,11 +141,13 @@ class AggregatedSignatureProof(Container):
         Raises:
             AggregationError: If verification fails.
         """
+        _ = public_keys
+
         mode = mode or LEAN_ENV
         setup_verifier(mode=mode)
+
         try:
             verify_aggregated_signatures(
-                [pk.encode_bytes() for pk in public_keys],
                 message,
                 self.proof_data.encode_bytes(),
                 slot,
