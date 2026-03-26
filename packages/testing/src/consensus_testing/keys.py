@@ -492,6 +492,10 @@ def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
 
     keys_dir.mkdir(parents=True, exist_ok=True)
 
+    # Remove stale key files from previous runs that may have generated more keys.
+    for old_file in keys_dir.glob("*.json"):
+        old_file.unlink()
+
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         worker_func = partial(_generate_single_keypair, scheme, num_slots)
         for idx, key_pair in enumerate(executor.map(worker_func, range(count))):
