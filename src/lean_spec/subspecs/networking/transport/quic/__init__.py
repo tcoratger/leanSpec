@@ -16,6 +16,7 @@ from .connection import (
     QuicConnection,
     QuicConnectionManager,
     QuicStream,
+    QuicStreamResetError,
     QuicTransportError,
     is_quic_multiaddr,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "QuicConnectionManager",
     "QuicStream",
     "QuicStreamAdapter",
+    "QuicStreamResetError",
     "QuicTransportError",
     "is_quic_multiaddr",
     "generate_libp2p_certificate",
