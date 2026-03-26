@@ -167,9 +167,9 @@ logger = logging.getLogger(__name__)
 class EventSource(Protocol):
     """Protocol for network event sources.
 
-    Defines the minimal interface needed by NetworkService.
-    LiveNetworkEventSource satisfies this with real network I/O.
-    MockEventSource satisfies this for testing.
+    Defines the minimal interface needed by the network service.
+    One implementation uses real network I/O.
+    Another is used for testing with controlled inputs.
     """
 
     def __aiter__(self) -> Self:
@@ -288,9 +288,8 @@ class GossipHandler:
         # Step 1: Parse topic to determine message type and validate fork.
         #
         # The topic string contains the fork digest and message kind.
-        # Invalid topics are rejected before any decompression work.
-        # Fork mismatch is checked early to prevent cross-fork attacks.
-        # This prevents wasting CPU on malformed or cross-fork messages.
+        # Invalid topics are rejected before decompression to avoid
+        # wasting CPU on malformed or cross-fork messages.
         try:
             topic = GossipTopic.from_string_validated(topic_str, self.fork_digest)
         except ForkMismatchError:
@@ -329,7 +328,10 @@ class GossipHandler:
 
     def get_topic(self, topic_str: str) -> GossipTopic:
         """
-        Parse and validate a topic string.
+        Parse and validate a topic string without decoding the payload.
+
+        Useful when only topic validation is needed (e.g., checking fork
+        digest before investing in decompression/deserialization).
 
         Args:
             topic_str: Full topic string.
@@ -477,7 +479,7 @@ async def read_gossip_message(stream: InboundStreamProtocol) -> tuple[str, bytes
     raise GossipMessageError("Truncated gossip message")
 
 
-@dataclass(slots=True)
+@dataclass
 class LiveNetworkEventSource:
     """
     Produces NetworkEvent objects from real network connections.
@@ -611,13 +613,11 @@ class LiveNetworkEventSource:
     """Background task forwarding gossipsub events to our event queue."""
 
     def __post_init__(self) -> None:
-        """Initialize handlers with current configuration."""
-        object.__setattr__(self, "_gossip_handler", GossipHandler(fork_digest=self._fork_digest))
-        object.__setattr__(self, "_reqresp_handler", RequestHandler())
-        object.__setattr__(self, "_reqresp_server", ReqRespServer(handler=self._reqresp_handler))
-        object.__setattr__(
-            self, "_gossipsub_behavior", GossipsubBehavior(params=GossipsubParameters())
-        )
+        """Wire up internal handlers from configuration."""
+        self._gossip_handler = GossipHandler(fork_digest=self._fork_digest)
+        self._reqresp_handler = RequestHandler()
+        self._reqresp_server = ReqRespServer(handler=self._reqresp_handler)
+        self._gossipsub_behavior = GossipsubBehavior(params=GossipsubParameters())
 
     @classmethod
     async def create(
@@ -664,7 +664,7 @@ class LiveNetworkEventSource:
             fork_digest: 4-byte fork identifier as hex string.
         """
         self._fork_digest = fork_digest
-        object.__setattr__(self, "_gossip_handler", GossipHandler(fork_digest=fork_digest))
+        self._gossip_handler = GossipHandler(fork_digest=fork_digest)
 
     def set_block_lookup(self, lookup: AsyncBlockLookup) -> None:
         """
@@ -793,8 +793,7 @@ class LiveNetworkEventSource:
         """
         Connect to a peer at the given multiaddr.
 
-        Establishes connection, exchanges Status, and emits events.
-        Establishes a QUIC connection to the peer.
+        Establishes a connection, exchanges Status, and emits events.
 
         Args:
             multiaddr: Address like "/ip4/127.0.0.1/udp/9000/quic-v1" or
@@ -854,8 +853,8 @@ class LiveNetworkEventSource:
         Called automatically before any QUIC operation.
         """
         if self.quic_manager is None:
-            # Reuse the same identity key from the connection manager.
-            # This ensures our peer ID is consistent across all connections.
+            # Reuse the same identity key for consistent peer ID.
+            # Accesses internal field; no public API exists for this.
             identity_key = self.connection_manager._identity_key
             self.quic_manager = await QuicConnectionManager.create(identity_key)
 
@@ -882,9 +881,11 @@ class LiveNetworkEventSource:
 
         Automatically detects transport type from multiaddr:
 
-        - QUIC: Routes to QUIC listener
+        - QUIC: Routes to the QUIC listener
+        - Other: Delegates to the connection manager
+
         Args:
-            multiaddr: QUIC address to listen on.
+            multiaddr: Address to listen on (e.g., "/ip4/0.0.0.0/udp/9000/quic-v1").
         """
         self._running = True
 
@@ -959,7 +960,11 @@ class LiveNetworkEventSource:
 
     async def _handle_inbound_connection(self, conn: QuicConnection) -> None:
         """
-        Handle a new inbound connection.
+        Handle a new inbound non-QUIC connection.
+
+        Registers the connection, emits a connected event, and starts
+        background stream acceptance. Status exchange and outbound
+        gossipsub setup are deferred to avoid race conditions.
 
         Args:
             conn: Established connection.
@@ -979,11 +984,13 @@ class LiveNetworkEventSource:
         task.add_done_callback(self._gossip_tasks.discard)
 
         # NOTE: Do NOT initiate status exchange on inbound connections.
-        # See _handle_inbound_quic_connection for explanation.
+        # Only the dialer sends a status request. The listener only responds.
+        # This matches ream's behavior and avoids simultaneous status streams.
 
         # NOTE: Do NOT set up outbound gossipsub stream immediately.
-        # See _handle_inbound_quic_connection for explanation.
-        # The outbound stream is set up when we receive the peer's inbound stream.
+        # Opening a stream while the dialer is doing status exchange causes
+        # aioquic to enter a bad state. The outbound stream is set up later,
+        # when we receive the peer's inbound gossipsub stream.
 
         logger.info("Accepted connection from peer %s", peer_id)
 
@@ -1301,12 +1308,12 @@ class LiveNetworkEventSource:
                     # Now that we've received the peer's inbound stream, set up our
                     # outbound stream if we don't have one yet.
                     #
-                    # For dialers: They already set up their outbound stream in dial(),
-                    # so this check prevents opening a duplicate stream.
+                    # For dialers: The outbound stream was already set up during
+                    # the dialing path, so this check prevents a duplicate.
                     #
-                    # For listeners: They don't set up an outbound stream immediately
-                    # (to avoid interfering with the dialer's status exchange), so this
-                    # is where their outbound stream gets set up.
+                    # For listeners: The outbound stream is NOT set up immediately
+                    # (to avoid interfering with the dialer's status exchange).
+                    # This is where the listener's outbound stream gets created.
                     #
                     # IMPORTANT: We add a small delay before setting up the outbound
                     # stream to allow the dialer to complete their operations first.
@@ -1317,11 +1324,10 @@ class LiveNetworkEventSource:
                         async def setup_outbound_with_delay() -> None:
                             try:
                                 await asyncio.sleep(0.1)  # Small delay to avoid contention
-                                # Re-check BEFORE opening a stream. The dialer path
-                                # (dial → _setup_gossipsub_stream) may have set up the
-                                # outbound stream while we were sleeping. Opening a second
-                                # gossipsub stream would cause the gossipsub handler to
-                                # replace its inbound reader with the new (orphan) stream.
+                                # Re-check BEFORE opening a stream. The dialing path
+                                # may have set up the outbound stream while we were
+                                # sleeping. Opening a duplicate gossipsub stream would
+                                # cause the handler to replace its reader with an orphan.
                                 if self._gossipsub_behavior.has_outbound_stream(peer_id):
                                     logger.info(
                                         "Peer %s already has outbound stream (set by dialer), "
