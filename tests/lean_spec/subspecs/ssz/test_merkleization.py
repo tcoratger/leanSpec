@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.subspecs.ssz.merkleization import (
+    _ZERO_HASHES,
+    _merkleize_efficient,
     _zero_tree_root,
     merkleize,
     mix_in_length,
@@ -148,3 +150,57 @@ def test_zero_tree_root_internal() -> None:
     assert _zero_tree_root(4) == Z[2]
     assert _zero_tree_root(8) == Z[3]
     assert _zero_tree_root(16) == Z[4]
+
+
+def test_zero_tree_root_fallback_beyond_precomputed_depth() -> None:
+    """Tests the fallback path for trees deeper than the pre-computed cache (depth >= 65)."""
+    # _ZERO_HASHES has 65 entries (indices 0..64).
+    # width_pow2 = 2**65 gives depth = 65, which equals len(_ZERO_HASHES),
+    # triggering the fallback that hashes upward from _ZERO_HASHES[-1].
+    width_pow2 = 2**65
+    result = _zero_tree_root(width_pow2)
+
+    # The fallback computes one extra hash step beyond the last cached value.
+    # depth=65, len(_ZERO_HASHES)=65, so range(65 - 65 + 1) = range(1) -> one iteration.
+    expected = h(_ZERO_HASHES[-1], _ZERO_HASHES[-1])
+    assert result == expected
+
+
+def test_zero_tree_root_fallback_two_steps_beyond_cache() -> None:
+    """Tests the fallback path with depth two steps beyond the pre-computed cache."""
+    # width_pow2 = 2**66 gives depth = 66, requiring two hash steps beyond cache.
+    width_pow2 = 2**66
+    result = _zero_tree_root(width_pow2)
+
+    step1 = h(_ZERO_HASHES[-1], _ZERO_HASHES[-1])
+    expected = h(step1, step1)
+    assert result == expected
+
+
+def test_merkleize_efficient_secondary_loop() -> None:
+    """
+    Tests the secondary reduction loop in efficient merkleization.
+
+    When called directly with more chunks than width (not possible through merkleize),
+    the main loop exits with multiple remaining nodes, triggering the secondary reduction loop.
+    """
+    # 4 chunks with width=2: main loop exits after subtree_size reaches 2,
+    # leaving level=[h(c0,c1), h(c2,c3)] with len=2, triggering secondary loop.
+    result = _merkleize_efficient([c[0], c[1], c[2], c[3]], width=2)
+    assert result == h(h(c[0], c[1]), h(c[2], c[3]))
+
+
+def test_merkleize_efficient_secondary_loop_odd_nodes() -> None:
+    """
+    Tests the secondary reduction loop with an odd number of remaining nodes.
+
+    Exercises the zero-padding branch when a node has no right sibling.
+    """
+    # 3 chunks with width=1: main loop never runs (subtree_size=1 >= width=1),
+    # so level stays as [c0, c1, c2] with len=3, triggering secondary loop.
+    #
+    # Secondary loop iteration 1: pairs (c0,c1)->h01, c2 has no right sibling
+    #   -> h(c2, _zero_tree_root(1)) = h(c2, Z[0]). Level=[h01, h2z], subtree_size=2.
+    # Secondary loop iteration 2: pairs -> h(h01, h2z). Level=[result].
+    result = _merkleize_efficient([c[0], c[1], c[2]], width=1)
+    assert result == h(h(c[0], c[1]), h(c[2], Z[0]))
