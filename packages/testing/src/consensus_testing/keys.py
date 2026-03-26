@@ -565,7 +565,8 @@ def _generate_single_keypair(
 
     # Generate two independent key pairs: one for attestations, one for proposals.
     #
-    # Separate keys allow signing both roles within the same slot without exhausting a one-time leaf.
+    # Separate keys allow signing both roles within the same slot
+    # without exhausting a one-time leaf.
     att_pk, att_sk = scheme.key_gen(Slot(0), Uint64(num_slots))
     prop_pk, prop_sk = scheme.key_gen(Slot(0), Uint64(num_slots))
 
