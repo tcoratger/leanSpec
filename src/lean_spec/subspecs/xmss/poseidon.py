@@ -182,28 +182,29 @@ class PoseidonXmss(StrictBaseModel):
         padded_input = input_vec + [Fp(value=0)] * num_extra
 
         # Initialize the state:
-        # - rate part is zero,
-        # - capacity part is the domain separator.
+        # - capacity part (domain separator) at the beginning,
+        # - rate part (zero) follows.
+        cap_len = len(capacity_value)
         state = [Fp(value=0)] * width
-        state[rate:] = capacity_value
+        state[:cap_len] = capacity_value
 
         # Create the engine once for efficiency.
         engine = Poseidon1(params)
 
-        # Absorb the input in rate-sized chunks.
+        # Absorb the input in rate-sized chunks via replacement.
         for i in range(0, len(padded_input), rate):
             chunk = padded_input[i : i + rate]
-            # Add the chunk to the rate part of the state.
+            # Replace the rate part of the state with the chunk.
             for j in range(rate):
-                state[j] += chunk[j]
+                state[cap_len + j] = chunk[j]
             # Apply the cryptographic permutation to mix the state.
             state = engine.permute(state)
 
         # Squeeze the output until enough elements have been generated.
         output: list[Fp] = []
         while len(output) < output_len:
-            # Extract the rate part of the state as output.
-            output.extend(state[:rate])
+            # Extract the rate part of the state (after capacity) as output.
+            output.extend(state[cap_len : cap_len + rate])
             # Permute the state.
             state = engine.permute(state)
 
