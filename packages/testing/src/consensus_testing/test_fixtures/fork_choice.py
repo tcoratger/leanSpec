@@ -44,7 +44,6 @@ from ..keys import (
     LEAN_ENV_TO_SCHEMES,
     XmssKeyManager,
     create_dummy_signature,
-    get_shared_key_manager,
 )
 from ..test_types import (
     AggregatedAttestationSpec,
@@ -191,7 +190,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         # XMSS keys are expensive to generate.
         # The shared key manager caches keys across tests.
         # Tests requiring higher max slot trigger key expansion.
-        key_manager = get_shared_key_manager(max_slot=self.max_slot)
+        key_manager = XmssKeyManager.shared(max_slot=self.max_slot)
 
         # Validator pubkey synchronization
         #
