@@ -791,17 +791,22 @@ class State(Container):
         new_payloads = new_payloads or {}
         known_payloads = known_payloads or {}
 
-        # Plain aggregation: only attestation_signatures. Remove this block once
-        # bindings support recursive aggregation.
-        attestation_keys = set(gossip_signatures.keys())
+        attestation_keys = set(new_payloads.keys()) | set(gossip_signatures.keys())
         if not attestation_keys:
             return results
         for data in attestation_keys:
+            child_proofs: list[AggregatedSignatureProof] = []
+            covered_validators: set[ValidatorIndex] = set()
+            self._extend_proofs_greedily(new_payloads.get(data), child_proofs, covered_validators)
+            self._extend_proofs_greedily(known_payloads.get(data), child_proofs, covered_validators)
             raw_entries = []
             for entry in sorted(gossip_signatures.get(data, set()), key=lambda e: e.validator_id):
+                if entry.validator_id in covered_validators:
+                    continue
                 public_key = self.validators[entry.validator_id].get_attestation_pubkey()
                 raw_entries.append((entry.validator_id, public_key, entry.signature))
-            if not raw_entries:
+                covered_validators.add(entry.validator_id)
+            if not raw_entries and len(child_proofs) < 2:
                 continue
             raw_entries = sorted(raw_entries, key=lambda e: e[0])
             raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
@@ -810,7 +815,7 @@ class State(Container):
             )
             proof = AggregatedSignatureProof.aggregate(
                 xmss_participants=xmss_participants,
-                children=[],
+                children=child_proofs,
                 raw_xmss=raw_xmss,
                 message=data.data_root_bytes(),
                 slot=data.slot,
