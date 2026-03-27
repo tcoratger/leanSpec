@@ -492,13 +492,17 @@ class TestLiveNetworkEventSourceDisconnect:
 
     async def test_disconnect_unregisters_reqresp(self) -> None:
         """Disconnecting also unregisters the peer from the reqresp client."""
-        es = _make_event_source()
+        mock_client = _make_mock_reqresp_client()
+        es = LiveNetworkEventSource(
+            connection_manager=_make_mock_connection_manager(),
+            reqresp_client=mock_client,
+        )
         peer_id = PeerId.from_base58("peerC")
         es._connections[peer_id] = AsyncMock()
 
         await es.disconnect(peer_id)
 
-        es.reqresp_client.unregister_connection.assert_called_once_with(peer_id)  # type: ignore[union-attr]
+        mock_client.unregister_connection.assert_called_once_with(peer_id)
 
 
 class TestLiveNetworkEventSourceStop:
