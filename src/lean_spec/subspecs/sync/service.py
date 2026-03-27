@@ -51,6 +51,7 @@ from lean_spec.subspecs.containers import (
     SignedBlock,
 )
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.reqresp.message import Status
@@ -158,6 +159,15 @@ class SyncService:
 
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
+
+    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    """
+    Explicit subnet IDs to subscribe to and aggregate from.
+
+    When set, the node subscribes to these subnets at the p2p layer in
+    addition to its validator-derived subnet. Only active when is_aggregator
+    is also True — non-aggregator nodes never import gossip attestations.
+    """
 
     process_block: Callable[[Store, SignedBlock], Store] = field(default=default_block_processor)
     """Block processor function. Defaults to the store's block processing."""
@@ -272,7 +282,7 @@ class SyncService:
         # This is write-through: data is persisted synchronously after processing.
         # The database call is optional - nodes can run without persistence.
         if self.database is not None:
-            self._persist_block(new_store, block.message)
+            self._persist_block(new_store, block.block)
 
         return new_store
 
@@ -423,7 +433,7 @@ class SyncService:
         logger.info(
             "Block received from peer %s slot=%s (state=%s)",
             peer_id,
-            block.message.slot,
+            block.block.slot,
             self._state.name,
         )
 
@@ -445,8 +455,8 @@ class SyncService:
         #
         # A block may be cached instead of processed if its parent is unknown.
         if result.processed:
-            slot = block.message.slot
-            block_root = hash_tree_root(block.message)
+            slot = block.block.slot
+            block_root = hash_tree_root(block.block)
             logger.info(
                 "Block processed slot=%s root=%s from peer %s",
                 slot,

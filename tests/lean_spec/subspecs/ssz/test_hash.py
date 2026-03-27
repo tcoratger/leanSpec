@@ -7,6 +7,7 @@ from typing import Iterable, Tuple, Type
 
 import pytest
 
+from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import BaseByteList, BaseBytes, Bytes32, Uint8, Uint16, Uint32, Uint64
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
@@ -830,3 +831,22 @@ def test_hash_tree_root_union_multi_other_arm() -> None:
     # The root is hash(root(value), chunk(selector=1)).
     expected = h(chunk("efbeadde"), chunk("01"))
     assert hash_tree_root(u).hex() == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [42, "hello", [1, 2, 3]],
+    ids=["int", "str", "list"],
+)
+def test_hash_tree_root_unsupported_type(value: object) -> None:
+    """Raises TypeError for types with no registered dispatch implementation."""
+    with pytest.raises(TypeError, match=r"hash_tree_root: unsupported value type"):
+        hash_tree_root(value)
+
+
+def test_hash_tree_root_fp() -> None:
+    """Computes the correct Merkle root for a KoalaBear field element."""
+    fp = Fp(42)
+    # Fp serializes as 4-byte little-endian: 42 = 0x2a -> "2a000000"
+    expected = chunk("2a000000")
+    assert hash_tree_root(fp).hex() == expected

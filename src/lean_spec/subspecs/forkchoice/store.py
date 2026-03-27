@@ -12,7 +12,6 @@ from typing import NamedTuple
 
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
-    ATTESTATION_COMMITTEE_COUNT,
     INTERVALS_PER_SLOT,
     JUSTIFICATION_LOOKBACK_SLOTS,
 )
@@ -244,36 +243,28 @@ class Store(StrictBaseModel):
         Returns:
             New Store with stale attestation data removed.
         """
-        finalized_slot = self.latest_finalized.slot
-
         # Filter out stale entries from all attestation-related mappings.
         #
         # Each mapping is keyed by attestation data, so we check membership by slot
         # against the finalized slot.
 
-        new_attestation_sigs = {
-            attestation_data: sigs
-            for attestation_data, sigs in self.attestation_signatures.items()
-            if attestation_data.target.slot > finalized_slot
-        }
-
-        new_aggregated_new = {
-            attestation_data: proofs
-            for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
-            if attestation_data.target.slot > finalized_slot
-        }
-
-        new_aggregated_known = {
-            attestation_data: proofs
-            for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
-            if attestation_data.target.slot > finalized_slot
-        }
-
         return self.model_copy(
             update={
-                "attestation_signatures": new_attestation_sigs,
-                "latest_new_aggregated_payloads": new_aggregated_new,
-                "latest_known_aggregated_payloads": new_aggregated_known,
+                "attestation_signatures": {
+                    attestation_data: sigs
+                    for attestation_data, sigs in self.attestation_signatures.items()
+                    if attestation_data.target.slot > self.latest_finalized.slot
+                },
+                "latest_new_aggregated_payloads": {
+                    attestation_data: proofs
+                    for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
+                    if attestation_data.target.slot > self.latest_finalized.slot
+                },
+                "latest_known_aggregated_payloads": {
+                    attestation_data: proofs
+                    for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
+                    if attestation_data.target.slot > self.latest_finalized.slot
+                },
             }
         )
 
@@ -338,17 +329,20 @@ class Store(StrictBaseModel):
 
         This method:
         1. Verifies the XMSS signature
-        2. If current node is aggregator, stores the signature in the gossip
-           signature map if it belongs to the current validator's subnet
-        3. Processes the attestation data via on_attestation
+        2. Stores the signature when the node is in aggregator mode
+
+        Subnet filtering happens at the p2p subscription layer — only
+        attestations from subscribed subnets reach this method. No
+        additional subnet check is needed here.
 
         Args:
             signed_attestation: The signed attestation from gossip.
             scheme: XMSS signature scheme for verification.
             is_aggregator: True if current validator holds aggregator role.
+                Only aggregator nodes store gossip attestation signatures.
 
         Returns:
-            New Store with attestation processed and signature stored.
+            New Store with attestation processed and signature stored if aggregating.
 
         Raises:
             ValueError: If validator not found in state.
@@ -381,14 +375,14 @@ class Store(StrictBaseModel):
         # Copy the inner sets so we can add to them without mutating the previous store.
         new_committee_sigs = {k: set(v) for k, v in self.attestation_signatures.items()}
 
+        # Aggregators store all received gossip signatures.
+        # The p2p layer only delivers attestations from subscribed subnets,
+        # so subnet filtering happens at subscription time, not here.
+        # Non-aggregator nodes validate and drop — they never store gossip signatures.
         if is_aggregator:
-            assert self.validator_id is not None, "Current validator ID must be set for aggregation"
-            current_subnet = self.validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-            attester_subnet = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-            if current_subnet == attester_subnet:
-                new_committee_sigs.setdefault(attestation_data, set()).add(
-                    AttestationSignatureEntry(validator_id, signature)
-                )
+            new_committee_sigs.setdefault(attestation_data, set()).add(
+                AttestationSignatureEntry(validator_id, signature)
+            )
 
         # Return store with updated signature map and attestation data
         return self.model_copy(
@@ -489,7 +483,7 @@ class Store(StrictBaseModel):
         Raises:
             AssertionError: If parent block/state not found in store.
         """
-        block = signed_block.message
+        block = signed_block.block
         block_root = hash_tree_root(block)
 
         # Skip duplicate blocks (idempotent operation)
@@ -580,10 +574,10 @@ class Store(StrictBaseModel):
         - Justified and finalized slot gauges
         - Reorg counter and depth histogram (only when the head actually changed)
         """
-        metrics.lean_head_slot.set(int(self.blocks[self.head].slot))
-        metrics.lean_safe_target_slot.set(int(self.blocks[self.safe_target].slot))
-        metrics.lean_latest_justified_slot.set(int(self.latest_justified.slot))
-        metrics.lean_latest_finalized_slot.set(int(self.latest_finalized.slot))
+        metrics.lean_head_slot.set(self.blocks[self.head].slot)
+        metrics.lean_safe_target_slot.set(self.blocks[self.safe_target].slot)
+        metrics.lean_latest_justified_slot.set(self.latest_justified.slot)
+        metrics.lean_latest_finalized_slot.set(self.latest_finalized.slot)
 
         if self.head != old_head:
             metrics.lean_fork_choice_reorgs_total.inc()
@@ -1009,19 +1003,18 @@ class Store(StrictBaseModel):
             Tuple of (new store with advanced time, list of new signed aggregated attestation).
         """
         # Advance time by one interval
-        store = self.model_copy(update={"time": Interval(int(self.time) + 1)})
+        store = self.model_copy(update={"time": self.time + Interval(1)})
         current_interval = store.time % INTERVALS_PER_SLOT
         new_aggregates: list[SignedAggregatedAttestation] = []
 
-        match int(current_interval):
-            case 0 if has_proposal:
-                store = store.accept_new_attestations()
-            case 2 if is_aggregator:
-                store, new_aggregates = store.aggregate()
-            case 3:
-                store = store.update_safe_target()
-            case 4:
-                store = store.accept_new_attestations()
+        if current_interval == Interval(0) and has_proposal:
+            store = store.accept_new_attestations()
+        elif current_interval == Interval(2) and is_aggregator:
+            store, new_aggregates = store.aggregate()
+        elif current_interval == Interval(3):
+            store = store.update_safe_target()
+        elif current_interval == Interval(4):
+            store = store.accept_new_attestations()
 
         return store, new_aggregates
 
@@ -1236,28 +1229,15 @@ class Store(StrictBaseModel):
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )
 
-        # Gather attestations from the store.
-        #
-        # Extract attestations from known aggregated payloads.
-        # These attestations have already influenced fork choice.
-        # Including them in the block makes them permanent on-chain.
-        attestation_data_map = store.extract_attestations_from_aggregated_payloads(
-            store.latest_known_aggregated_payloads
-        )
-        available_attestations = [
-            Attestation(validator_id=validator_id, data=attestation_data)
-            for validator_id, attestation_data in attestation_data_map.items()
-        ]
-
         # Build the block.
         #
-        # The builder iteratively collects valid attestations.
-        # It returns the final block, post-state, and signature proofs.
+        # The builder iteratively collects valid attestations from aggregated
+        # payloads matching the justified checkpoint. Each iteration may advance
+        # justification, unlocking more attestation data entries.
         final_block, final_post_state, collected_attestations, signatures = head_state.build_block(
             slot=slot,
             proposer_index=validator_index,
             parent_root=head_root,
-            available_attestations=available_attestations,
             known_block_roots=set(store.blocks.keys()),
             aggregated_payloads=store.latest_known_aggregated_payloads,
         )

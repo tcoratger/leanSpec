@@ -2,6 +2,7 @@
 
 import pytest
 from consensus_testing import (
+    AggregatedAttestationSpec,
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
@@ -9,6 +10,7 @@ from consensus_testing import (
 )
 
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -175,24 +177,23 @@ def test_head_with_two_competing_forks(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice selects head when two forks compete at the same slot.
+    Fork choice selects head when two forks compete with equal weight.
 
     Scenario
     --------
-    Create two competing blocks at slot 2, both building on slot 1.
+    Create two competing forks from a common ancestor, each with one block
+    at a distinct slot.
 
     Expected Behavior:
         - After slot 1: head = slot 1 (common ancestor)
-        - After fork A (slot 2): head = slot 2 (fork A, first seen)
-        - After fork B (slot 2): head = slot 2 (still fork A)
-        - Both forks have equal weight (1 proposer attestation each)
-        - Head breaks tie lexicographically by block root
+        - After fork A (slot 2): head = fork A (only fork)
+        - After fork B (slot 3): both forks have equal weight
+          (1 proposer attestation each), head chosen by lexicographic tiebreaker
 
     Why This Matters
     ----------------
-    This is an important fork choice scenario: two blocks competing for the
-    same slot. Even with equal attestation weight, fork choice must deterministically
-    select a head.
+    This is an important fork choice scenario: two forks of equal weight
+    competing for the head. Fork choice must deterministically select a head.
 
     The algorithm uses lexicographic order of block roots as a tie-breaker,
     ensuring all nodes agree on the same head even when forks have equal weight.
@@ -215,16 +216,18 @@ def test_head_with_two_competing_forks(
                 ),
                 checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
-            # Competing fork B at slot 2
+            # Fork B at slot 3 (same parent as fork A, equal weight)
             BlockStep(
                 block=BlockSpec(
-                    slot=Slot(2),
-                    parent_label="common",  # Same parent
+                    slot=Slot(3),
+                    parent_label="common",
                     label="fork_b",
                 ),
-                # Head determined by tie-breaker (lexicographic root order)
-                # The tie is broken by comparing block roots lexicographically
-                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
+                # Both forks have equal weight (1 proposer attestation each)
+                # Head determined by lexicographic tiebreaker on block roots
+                checks=StoreChecks(
+                    lexicographic_head_among=["fork_a", "fork_b"],
+                ),
             ),
         ],
     )
@@ -238,12 +241,13 @@ def test_head_switches_to_heavier_fork(
 
     Scenario
     --------
-    Create two forks at slot 2, then extend one fork to make it heavier.
+    Create two forks from a common ancestor at distinct slots, then extend
+    one fork to make it heavier.
 
     Expected Behavior:
-        - After fork A (slot 2): head = fork A
-        - After fork B (slot 2): head = still fork A (tie-breaker)
-        - After extending fork B (slot 3): head = slot 3 (fork B wins!)
+        - After fork A (slot 2): head = fork A (only fork)
+        - After fork B (slot 3): equal weight, tiebreaker decides
+        - After extending fork B (slot 4): head = fork B's child (fork B wins!)
 
     Why This Matters
     ----------------
@@ -274,23 +278,33 @@ def test_head_switches_to_heavier_fork(
                 ),
                 checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
-            # Competing fork B at slot 2
-            BlockStep(
-                block=BlockSpec(
-                    slot=Slot(2),
-                    parent_label="common",
-                    label="fork_b",
-                ),
-                checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
-            ),
-            # Extend fork B - gives it more weight
+            # Fork B at slot 3 (same parent, equal weight, tiebreaker decides)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
-                    parent_label="fork_b",  # Build on fork B
-                    label="fork_b_3",
+                    parent_label="common",
+                    label="fork_b",
                 ),
-                checks=StoreChecks(head_slot=Slot(3), head_root_label="fork_b_3"),
+                checks=StoreChecks(
+                    lexicographic_head_among=["fork_a", "fork_b"],
+                ),
+            ),
+            # Extend fork B with an attestation for fork_b → gives it more weight
+            BlockStep(
+                block=BlockSpec(
+                    slot=Slot(4),
+                    parent_label="fork_b",
+                    label="fork_b_4",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[ValidatorIndex(2)],
+                            slot=Slot(3),
+                            target_slot=Slot(3),
+                            target_root_label="fork_b",
+                        ),
+                    ],
+                ),
+                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_b_4"),
             ),
         ],
     )
@@ -304,12 +318,13 @@ def test_head_with_deep_fork_split(
 
     Scenario
     --------
-    Create two forks that diverge at slot 2 and extend to different depths.
+    Create two forks that diverge from a common ancestor but are built
+    at different slots (no duplicate slots).
 
     Expected Behavior:
-        - Fork A extends to slot 4
-        - Fork B extends to slot 5
-        - Head follows the longer (heavier) fork B
+        - Fork A extends earlier to slot 4
+        - Fork B starts later but extends to slot 8
+        - Head eventually follows the heavier fork B
 
     Why This Matters
     ----------------
@@ -330,35 +345,94 @@ def test_head_with_deep_fork_split(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
-            # Fork A: slots 2, 3, 4
+            # Fork A: earlier branch (slots 2 - 4)
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_a_2"),
                 checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a_2"),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(3), parent_label="fork_a_2", label="fork_a_3"),
+                block=BlockSpec(
+                    slot=Slot(3),
+                    parent_label="fork_a_2",
+                    label="fork_a_3",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[ValidatorIndex(2)],
+                            slot=Slot(2),
+                            target_slot=Slot(2),
+                            target_root_label="fork_a_2",
+                        ),
+                    ],
+                ),
                 checks=StoreChecks(head_slot=Slot(3), head_root_label="fork_a_3"),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(4), parent_label="fork_a_3", label="fork_a_4"),
+                block=BlockSpec(
+                    slot=Slot(4),
+                    parent_label="fork_a_3",
+                    label="fork_a_4",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[ValidatorIndex(3)],
+                            slot=Slot(3),
+                            target_slot=Slot(3),
+                            target_root_label="fork_a_3",
+                        ),
+                    ],
+                ),
                 checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
-            # Fork B: slots 2, 3, 4, 5 (longer)
+            # Fork B: competing branch starting later (slots 5 - 8)
             BlockStep(
-                block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_b_2"),
+                block=BlockSpec(slot=Slot(5), parent_label="common", label="fork_b_5"),
                 checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(3), parent_label="fork_b_2", label="fork_b_3"),
+                block=BlockSpec(
+                    slot=Slot(6),
+                    parent_label="fork_b_5",
+                    label="fork_b_6",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[ValidatorIndex(1)],
+                            slot=Slot(5),
+                            target_slot=Slot(5),
+                            target_root_label="fork_b_5",
+                        ),
+                    ],
+                ),
                 checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(4), parent_label="fork_b_3", label="fork_b_4"),
-                checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
+                block=BlockSpec(
+                    slot=Slot(7),
+                    parent_label="fork_b_6",
+                    label="fork_b_7",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[ValidatorIndex(0)],
+                            slot=Slot(6),
+                            target_slot=Slot(6),
+                            target_root_label="fork_b_6",
+                        ),
+                    ],
+                ),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(5), parent_label="fork_b_4", label="fork_b_5"),
-                checks=StoreChecks(head_slot=Slot(5), head_root_label="fork_b_5"),
+                block=BlockSpec(
+                    slot=Slot(8),
+                    parent_label="fork_b_7",
+                    label="fork_b_8",
+                    attestations=[
+                        AggregatedAttestationSpec(
+                            validator_ids=[ValidatorIndex(2)],
+                            slot=Slot(7),
+                            target_slot=Slot(7),
+                            target_root_label="fork_b_7",
+                        ),
+                    ],
+                ),
+                checks=StoreChecks(head_slot=Slot(8), head_root_label="fork_b_8"),
             ),
         ],
     )

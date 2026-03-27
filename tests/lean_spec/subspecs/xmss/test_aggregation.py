@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from consensus_testing.keys import XmssKeyManager, get_shared_key_manager
+from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
@@ -12,12 +12,6 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorInd
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, AggregationError
 from lean_spec.types import ByteListMiB
 from tests.lean_spec.helpers import make_attestation_data_simple, make_bytes32
-
-
-@pytest.fixture
-def key_manager() -> XmssKeyManager:
-    """Key manager with enough capacity for aggregation tests."""
-    return get_shared_key_manager(max_slot=Slot(20))
 
 
 def _sign_and_aggregate(

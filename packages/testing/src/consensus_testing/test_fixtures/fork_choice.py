@@ -44,7 +44,6 @@ from ..keys import (
     LEAN_ENV_TO_SCHEMES,
     XmssKeyManager,
     create_dummy_signature,
-    get_shared_key_manager,
 )
 from ..test_types import (
     AggregatedAttestationSpec,
@@ -52,6 +51,7 @@ from ..test_types import (
     BlockSpec,
     BlockStep,
     ForkChoiceStep,
+    GossipAttestationSpec,
     TickStep,
 )
 from .base import BaseConsensusFixture
@@ -155,7 +155,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 if isinstance(step, BlockStep):
                     max_slot_value = max(max_slot_value, step.block.slot)
                 elif isinstance(step, AttestationStep):
-                    max_slot_value = max(max_slot_value, step.attestation.data.slot)
+                    max_slot_value = max(max_slot_value, step.attestation.slot)
 
             self.max_slot = max_slot_value
 
@@ -190,7 +190,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         # XMSS keys are expensive to generate.
         # The shared key manager caches keys across tests.
         # Tests requiring higher max slot trigger key expansion.
-        key_manager = get_shared_key_manager(max_slot=self.max_slot)
+        key_manager = XmssKeyManager.shared(max_slot=self.max_slot)
 
         # Validator pubkey synchronization
         #
@@ -200,10 +200,11 @@ class ForkChoiceTest(BaseConsensusFixture):
         updated_validators = []
         for i, validator in enumerate(self.anchor_state.validators):
             idx = ValidatorIndex(i)
+            attestation_pubkey, proposal_pubkey = key_manager.get_public_keys(idx)
             validator = validator.model_copy(
                 update={
-                    "attestation_pubkey": key_manager[idx].attestation_public.encode_bytes(),
-                    "proposal_pubkey": key_manager[idx].proposal_public.encode_bytes(),
+                    "attestation_pubkey": attestation_pubkey.encode_bytes(),
+                    "proposal_pubkey": proposal_pubkey.encode_bytes(),
                 }
             )
             updated_validators.append(validator)
@@ -262,7 +263,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                         )
 
                         # Store the filled block for serialization.
-                        block = signed_block.message
+                        block = signed_block.block
                         step._filled_block = block
 
                         # Register labeled blocks for fork building.
@@ -291,29 +292,20 @@ class ForkChoiceTest(BaseConsensusFixture):
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                         )
 
-                        # Optionally simulate the proposer's gossip attestation.
-                        if step.block.gossip_proposer_attestation:
-                            proposer_index = block.proposer_index
-                            proposer_att_data = store.produce_attestation_data(block.slot)
-                            proposer_gossip_att = SignedAttestation(
-                                validator_id=proposer_index,
-                                data=proposer_att_data,
-                                signature=key_manager.sign_attestation_data(
-                                    proposer_index, proposer_att_data
-                                ),
-                            )
-                            store = store.on_gossip_attestation(
-                                proposer_gossip_att,
-                                scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
-                                is_aggregator=True,
-                            )
-
                     case AttestationStep():
                         # Process a gossip attestation.
                         # Gossip attestations arrive outside of blocks.
                         # They influence the fork choice weight calculation.
-                        store = store.on_gossip_attestation(
+                        signed_attestation = self._build_signed_attestation_from_spec(
                             step.attestation,
+                            self._block_registry,
+                            key_manager,
+                            store,
+                            step.valid,
+                        )
+                        step._filled_attestation = signed_attestation
+                        store = store.on_gossip_attestation(
+                            signed_attestation,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                         )
 
@@ -341,7 +333,14 @@ class ForkChoiceTest(BaseConsensusFixture):
                         f"Step {i} ({type(step).__name__}) failed unexpectedly: {e}"
                     ) from e
 
-                # Expected failure occurred. Continue to next step.
+                # Verify the failure reason matches when specified.
+                if step.expected_error is not None and step.expected_error not in str(e):
+                    raise AssertionError(
+                        f"Step {i} ({type(step).__name__}) failed with wrong error.\n"
+                        f"  Expected error containing: {step.expected_error!r}\n"
+                        f"  Actual error: {e!r}"
+                    ) from e
+
                 continue
 
             # Handle unexpected success.
@@ -434,38 +433,15 @@ class ForkChoiceTest(BaseConsensusFixture):
         aggregation_store, _ = working_store.aggregate()
         merged_store = aggregation_store.accept_new_attestations()
 
-        # Two sources of attestations:
-        # 1. Explicit attestations from the spec (always included)
-        # 2. Store attestations (only if include_store_attestations is True)
-        available_attestations: list[Attestation]
-        known_block_roots: set[Bytes32] | None = None
-
-        if spec.include_store_attestations:
-            # Extract from merged payloads (contains both known and newly aggregated)
-            attestation_map = merged_store.extract_attestations_from_aggregated_payloads(
-                merged_store.latest_known_aggregated_payloads
-            )
-            store_attestations = [
-                Attestation(validator_id=vid, data=data) for vid, data in attestation_map.items()
-            ]
-            available_attestations = store_attestations + attestations
-            known_block_roots = set(store.blocks.keys())
-        else:
-            # Use only explicit attestations from the spec
-            available_attestations = attestations
-
-        # Build the block using spec logic.
+        # Build the block using the same path as regular proposal.
         #
-        # State handles the core block construction.
-        # This includes state transition and root computation.
+        # block_payloads contains explicit spec attestations only.
         parent_state = store.states[parent_root]
         final_block, post_state, _, _ = parent_state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
-            attestations=available_attestations,
-            available_attestations=available_attestations,
-            known_block_roots=known_block_roots,
+            known_block_roots=set(store.blocks.keys()),
             aggregated_payloads=merged_store.latest_known_aggregated_payloads,
         )
 
@@ -486,7 +462,7 @@ class ForkChoiceTest(BaseConsensusFixture):
 
         # Assemble the signed block.
         return SignedBlock(
-            message=final_block,
+            block=final_block,
             signature=BlockSignatures(
                 attestation_signatures=attestation_signatures_blob,
                 proposer_signature=proposer_signature,
@@ -623,6 +599,35 @@ class ForkChoiceTest(BaseConsensusFixture):
 
         return attestations, signature_lookup, valid_attestations
 
+    def _resolve_checkpoint(
+        self,
+        label: str,
+        slot_override: Slot | None,
+        block_registry: dict[str, Block],
+    ) -> Checkpoint:
+        """
+        Resolve a block label and optional slot override into a Checkpoint.
+
+        Args:
+            label: Block label in the registry.
+            slot_override: When set, overrides the block's actual slot.
+            block_registry: Labeled blocks for lookup.
+
+        Returns:
+            Checkpoint with the block's root and resolved slot.
+
+        Raises:
+            ValueError: If label not found in registry.
+        """
+        if (block := block_registry.get(label)) is None:
+            raise ValueError(
+                f"label '{label}' not found - available: {list(block_registry.keys())}"
+            )
+        return Checkpoint(
+            root=hash_tree_root(block),
+            slot=block.slot if slot_override is None else slot_override,
+        )
+
     def _build_attestation_data_from_spec(
         self,
         spec: AggregatedAttestationSpec,
@@ -653,23 +658,134 @@ class ForkChoiceTest(BaseConsensusFixture):
         Raises:
             ValueError: If target label not found in registry.
         """
-        # Resolve target from label.
-        # The label references a block that will be the target checkpoint.
-        if (target_block := block_registry.get(spec.target_root_label)) is None:
-            raise ValueError(
-                f"target_root_label '{spec.target_root_label}' not found - "
-                f"available: {list(block_registry.keys())}"
-            )
+        target = self._resolve_checkpoint(spec.target_root_label, spec.target_slot, block_registry)
 
-        target_root = hash_tree_root(target_block)
-        target = Checkpoint(root=target_root, slot=spec.target_slot)
-
-        # Build the attestation data.
         # In simplified tests, head equals target for convenience.
+        #
         # Source is the state's last justified checkpoint (Casper FFG link).
         return AttestationData(
             slot=spec.slot,
             head=target,
             target=target,
             source=state.latest_justified,
+        )
+
+    def _build_signed_attestation_from_spec(
+        self,
+        spec: GossipAttestationSpec,
+        block_registry: dict[str, Block],
+        key_manager: XmssKeyManager,
+        store: Store,
+        expected_valid: bool,
+    ) -> SignedAttestation:
+        """
+        Build a signed attestation from a gossip attestation specification.
+
+        Two paths:
+
+        - Valid with no overrides: delegates to the spec's own attestation data
+          production. This ensures valid test vectors match what an honest validator
+          would produce.
+        - Invalid or with overrides: manually constructs checkpoints to create
+          specific non-standard attestations for validation testing.
+
+        Args:
+            spec: Gossip attestation specification.
+            block_registry: Labeled blocks for target resolution.
+            key_manager: XMSS key manager for signing.
+            store: Fork choice store for spec-based attestation data production.
+            expected_valid: Whether the step expects this attestation to succeed.
+
+        Returns:
+            Signed attestation ready for gossip processing.
+
+        Raises:
+            ValueError: If target label not found in registry.
+        """
+        has_overrides = (
+            spec.head_root_label is not None
+            or spec.head_slot is not None
+            or spec.source_root_label is not None
+            or spec.source_slot is not None
+            or spec.target_root_override is not None
+            or spec.head_root_override is not None
+            or spec.source_root_override is not None
+        )
+
+        if not expected_valid or has_overrides:
+            attestation_data = self._build_overridden_attestation_data(spec, block_registry)
+        else:
+            # Reuse the spec for honest attestations.
+            attestation_data = store.produce_attestation_data(spec.slot)
+
+        signature = (
+            key_manager.sign_attestation_data(spec.validator_id, attestation_data)
+            if spec.valid_signature
+            else create_dummy_signature()
+        )
+
+        return SignedAttestation(
+            validator_id=spec.validator_id,
+            data=attestation_data,
+            signature=signature,
+        )
+
+    def _build_overridden_attestation_data(
+        self,
+        spec: GossipAttestationSpec,
+        block_registry: dict[str, Block],
+    ) -> AttestationData:
+        """
+        Build attestation data with explicit checkpoint overrides.
+
+        Used for invalid or non-standard attestations where the test
+        intentionally creates mismatches for validation testing.
+
+        Args:
+            spec: Gossip attestation specification with override fields.
+            block_registry: Labeled blocks for target resolution.
+
+        Returns:
+            Attestation data with overridden checkpoints.
+        """
+        target = self._resolve_checkpoint(spec.target_root_label, spec.target_slot, block_registry)
+
+        # Resolve head checkpoint.
+        # Defaults to the target checkpoint when not overridden.
+        if spec.head_root_label is not None:
+            head = self._resolve_checkpoint(spec.head_root_label, spec.head_slot, block_registry)
+        else:
+            head = Checkpoint(
+                root=target.root,
+                slot=target.slot if spec.head_slot is None else spec.head_slot,
+            )
+
+        # Resolve source checkpoint.
+        #
+        # Defaults to the anchor (genesis) block when not overridden.
+        assert self.anchor_block is not None, "anchor_block must be set before building attestation"
+        if spec.source_root_label is not None:
+            source = self._resolve_checkpoint(
+                spec.source_root_label, spec.source_slot, block_registry
+            )
+        else:
+            source = Checkpoint(
+                root=hash_tree_root(self.anchor_block),
+                slot=self.anchor_block.slot if spec.source_slot is None else spec.source_slot,
+            )
+
+        # Apply raw root overrides.
+        # These inject roots not in the store for testing unknown block rejection.
+        if spec.target_root_override is not None:
+            target = Checkpoint(root=spec.target_root_override, slot=target.slot)
+        if spec.head_root_override is not None:
+            head = Checkpoint(root=spec.head_root_override, slot=head.slot)
+        if spec.source_root_override is not None:
+            source = Checkpoint(root=spec.source_root_override, slot=source.slot)
+
+        return AttestationData(
+            slot=spec.slot,
+            head=head,
+            target=target,
+            source=source,
         )

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest import mock
-
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
@@ -145,66 +143,18 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     )
 
 
-class TestOnGossipAttestationSubnetFiltering:
+class TestOnGossipAttestationImportGating:
     """
-    Unit tests for on_gossip_attestation with is_aggregator=True.
+    Unit tests for on_gossip_attestation import gating.
 
-    Tests subnet ID computation and cross-subnet filtering logic.
-    When is_aggregator=True, signatures should only be stored if the
-    attesting validator is in the same subnet as the current validator.
+    Subnet filtering happens at the p2p subscription layer — only attestations
+    from subscribed subnets are delivered to the store. The store's sole gate
+    is is_aggregator: aggregators store everything they receive, non-aggregators
+    drop everything.
     """
 
-    def test_same_subnet_stores_signature(self, key_manager: XmssKeyManager) -> None:
-        """
-        Aggregator stores signature when attester is in same subnet.
-
-        With ATTESTATION_COMMITTEE_COUNT=4:
-        - Validator 0 is in subnet 0 (0 % 4 = 0)
-        - Validator 4 is in subnet 0 (4 % 4 = 0)
-        - Current validator (0) should store signature from validator 4.
-        """
-        current_validator = ValidatorIndex(0)
-        attester_validator = ValidatorIndex(4)
-
-        store, attestation_data = make_store_with_attestation_data(
-            key_manager, num_validators=8, validator_id=current_validator
-        )
-
-        signed_attestation = SignedAttestation(
-            validator_id=attester_validator,
-            data=attestation_data,
-            signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
-        )
-
-        # Verify signature does NOT exist before calling the method
-        assert attestation_data not in store.attestation_signatures, (
-            "Precondition: signature should not exist before calling method"
-        )
-
-        # Patch ATTESTATION_COMMITTEE_COUNT to 4 so we can test subnet filtering
-        with mock.patch(
-            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
-        ):
-            updated_store = store.on_gossip_attestation(
-                signed_attestation,
-                is_aggregator=True,
-            )
-
-        # Verify signature NOW exists after calling the method
-        sigs = updated_store.attestation_signatures.get(attestation_data, set())
-        assert attester_validator in {entry.validator_id for entry in sigs}, (
-            "Signature from same-subnet validator should be stored"
-        )
-
-    def test_cross_subnet_ignores_signature(self, key_manager: XmssKeyManager) -> None:
-        """
-        Aggregator ignores signature when attester is in different subnet.
-
-        With ATTESTATION_COMMITTEE_COUNT=4:
-        - Validator 0 is in subnet 0 (0 % 4 = 0)
-        - Validator 1 is in subnet 1 (1 % 4 = 1)
-        - Current validator (0) should NOT store signature from validator 1.
-        """
+    def test_aggregator_stores_received_attestation(self, key_manager: XmssKeyManager) -> None:
+        """Aggregator stores any attestation that reaches the store."""
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)
 
@@ -218,29 +168,49 @@ class TestOnGossipAttestationSubnetFiltering:
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
-        with mock.patch(
-            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
-        ):
-            updated_store = store.on_gossip_attestation(
-                signed_attestation,
-                is_aggregator=True,
+        assert attestation_data not in store.attestation_signatures, (
+            "Precondition: no signatures before processing"
+        )
+
+        updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+
+        sigs = updated_store.attestation_signatures.get(attestation_data, set())
+        assert attester_validator in {entry.validator_id for entry in sigs}, (
+            "Aggregator should store any attestation it receives"
+        )
+
+    def test_aggregator_stores_multiple_attestations(self, key_manager: XmssKeyManager) -> None:
+        """Aggregator stores all attestations regardless of which validator sent them."""
+        current_validator = ValidatorIndex(0)
+        attesters = [ValidatorIndex(1), ValidatorIndex(2), ValidatorIndex(3)]
+
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=8, validator_id=current_validator
+        )
+
+        def make_signed(v: ValidatorIndex) -> SignedAttestation:
+            return SignedAttestation(
+                validator_id=v,
+                data=attestation_data,
+                signature=key_manager.sign_attestation_data(v, attestation_data),
             )
 
-        # Verify signature was NOT stored
-        sigs = updated_store.attestation_signatures.get(attestation_data, set())
-        assert attester_validator not in {entry.validator_id for entry in sigs}, (
-            "Signature from different-subnet validator should NOT be stored"
+        updated = store
+        for v in attesters:
+            updated = updated.on_gossip_attestation(make_signed(v), is_aggregator=True)
+
+        stored_ids = {
+            entry.validator_id
+            for entry in updated.attestation_signatures.get(attestation_data, set())
+        }
+        assert stored_ids == set(attesters), (
+            "Aggregator should store attestations from all received validators"
         )
 
     def test_non_aggregator_never_stores_signature(self, key_manager: XmssKeyManager) -> None:
-        """
-        Non-aggregator nodes never store gossip signatures.
-
-        When is_aggregator=False, the signature storage path is skipped
-        regardless of subnet membership.
-        """
+        """Non-aggregator nodes drop all gossip attestations regardless of sender."""
         current_validator = ValidatorIndex(0)
-        attester_validator = ValidatorIndex(4)  # Same subnet
+        attester_validator = ValidatorIndex(1)
 
         store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=8, validator_id=current_validator
@@ -252,29 +222,19 @@ class TestOnGossipAttestationSubnetFiltering:
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
-        with mock.patch(
-            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
-        ):
-            updated_store = store.on_gossip_attestation(
-                signed_attestation,
-                is_aggregator=False,  # Not an aggregator
-            )
+        updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=False)
 
-        # Verify signature was NOT stored even though same subnet
         sigs = updated_store.attestation_signatures.get(attestation_data, set())
         assert attester_validator not in {entry.validator_id for entry in sigs}, (
             "Non-aggregator should never store gossip signatures"
         )
 
-    def test_cross_subnet_does_not_create_gossip_entry(self, key_manager: XmssKeyManager) -> None:
-        """
-        Cross-subnet attestation does not create a attestation_signatures entry.
-
-        When the attester is in a different subnet, no entry is created
-        for that attestation data in attestation_signatures.
-        """
+    def test_non_aggregator_does_not_create_signatures_entry(
+        self, key_manager: XmssKeyManager
+    ) -> None:
+        """Non-aggregator leaves attestation_signatures unchanged."""
         current_validator = ValidatorIndex(0)
-        attester_validator = ValidatorIndex(1)  # Different subnet
+        attester_validator = ValidatorIndex(1)
 
         store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=8, validator_id=current_validator
@@ -286,17 +246,10 @@ class TestOnGossipAttestationSubnetFiltering:
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
-        with mock.patch(
-            "lean_spec.subspecs.forkchoice.store.ATTESTATION_COMMITTEE_COUNT", Uint64(4)
-        ):
-            updated_store = store.on_gossip_attestation(
-                signed_attestation,
-                is_aggregator=True,
-            )
+        updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=False)
 
-        # Verify no gossip entry was created for this attestation data
         assert attestation_data not in updated_store.attestation_signatures, (
-            "Cross-subnet attestation should not create a attestation_signatures entry"
+            "Non-aggregator should not create any attestation_signatures entry"
         )
 
 

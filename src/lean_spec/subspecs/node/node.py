@@ -34,7 +34,7 @@ from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking import NetworkService
@@ -123,6 +123,17 @@ class NodeConfig:
 
     When False (default):
     - The node runs in standard validator or passive mode
+    """
+
+    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
+    """
+    Additional attestation subnets to subscribe to and aggregate from.
+
+    When set, the node subscribes to these subnets at the p2p layer in
+    addition to validator-derived subnets. Effective only when is_aggregator
+    is True — only aggregators import gossip attestations into forkchoice.
+
+    Additive to the validator-derived subnet.
     """
 
 
@@ -249,6 +260,7 @@ class Node:
             network=config.network,
             database=database,
             is_aggregator=config.is_aggregator,
+            aggregate_subnet_ids=config.aggregate_subnet_ids,
             genesis_start=True,
         )
 
@@ -258,6 +270,7 @@ class Node:
             event_source=config.event_source,
             fork_digest=config.fork_digest,
             is_aggregator=config.is_aggregator,
+            aggregate_subnet_ids=config.aggregate_subnet_ids,
         )
 
         # Wire up aggregated attestation publishing.
@@ -472,12 +485,12 @@ class Node:
             peers_connected = sum(
                 1 for p in self.sync_service.peer_manager.get_all_peers() if p.is_connected()
             )
-            metrics.lean_current_slot.set(int(self.clock.current_slot()))
+            metrics.lean_current_slot.set(self.clock.current_slot())
             metrics.lean_connected_peers.set(peers_connected)
-            metrics.lean_head_slot.set(int(store.blocks[store.head].slot))
-            metrics.lean_safe_target_slot.set(int(store.blocks[store.safe_target].slot))
-            metrics.lean_latest_justified_slot.set(int(store.latest_justified.slot))
-            metrics.lean_latest_finalized_slot.set(int(store.latest_finalized.slot))
+            metrics.lean_head_slot.set(store.blocks[store.head].slot)
+            metrics.lean_safe_target_slot.set(store.blocks[store.safe_target].slot)
+            metrics.lean_latest_justified_slot.set(store.latest_justified.slot)
+            metrics.lean_latest_finalized_slot.set(store.latest_finalized.slot)
             count = (
                 len(self.validator_service.registry) if self.validator_service is not None else 0
             )

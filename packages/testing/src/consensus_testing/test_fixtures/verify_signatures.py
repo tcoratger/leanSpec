@@ -27,7 +27,7 @@ from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import ByteListMiB, Bytes32
 
-from ..keys import XmssKeyManager, create_dummy_signature, get_shared_key_manager
+from ..keys import XmssKeyManager, create_dummy_signature
 from ..test_types import AggregatedAttestationSpec, BlockSpec
 from .base import BaseConsensusFixture
 
@@ -122,7 +122,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         assert self.anchor_state is not None, "anchor state must be set before making the fixture"
 
         # Use shared key manager
-        key_manager = get_shared_key_manager()
+        key_manager = XmssKeyManager.shared()
 
         # Build the signed block
         signed_block = self._build_block_from_spec(self.block, self.anchor_state, key_manager)
@@ -199,13 +199,28 @@ class VerifySignaturesTest(BaseConsensusFixture):
             spec, state, key_manager
         )
 
-        # Use State.build_block for valid attestations (pure spec logic)
+        # Build block with valid attestations directly.
+        aggregated_attestations = AggregatedAttestation.aggregate_by_data(valid_attestations)
+        signature_lookup: dict[AttestationData, dict[ValidatorIndex, Any]] = {}
+        for attestation, signature in zip(valid_attestations, valid_signatures, strict=True):
+            signature_lookup.setdefault(attestation.data, {})[attestation.validator_id] = signature
+        attestation_signatures = key_manager.build_attestation_signatures(
+            AggregatedAttestations(data=aggregated_attestations),
+            signature_lookup=signature_lookup,
+        )
+        aggregated_payloads = {
+            aggregated_attestation.data: {proof}
+            for aggregated_attestation, proof in zip(
+                aggregated_attestations, attestation_signatures.data, strict=True
+            )
+        }
+
         final_block, _, _, aggregated_signatures = state.build_block(
             slot=spec.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
-            attestations=valid_attestations,
-            aggregated_payloads={},
+            known_block_roots={parent_root},
+            aggregated_payloads=aggregated_payloads,
         )
 
         # Create proofs for invalid attestation specs
@@ -230,7 +245,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 # Valid proof but from wrong validators
                 # Sign with signer_ids but claim validator_ids as participants
                 signer_public_keys = [
-                    key_manager[vid].attestation_public for vid in invalid_spec.signer_ids
+                    key_manager.get_public_keys(vid)[0] for vid in invalid_spec.signer_ids
                 ]
                 signer_signatures = [
                     key_manager.sign_attestation_data(vid, attestation_data)
@@ -286,7 +301,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
             proposer_signature = create_dummy_signature()
 
         return SignedBlock(
-            message=final_block,
+            block=final_block,
             signature=BlockSignatures(
                 attestation_signatures=attestation_signatures,
                 proposer_signature=proposer_signature,

@@ -6,7 +6,7 @@ from lean_spec.subspecs.containers.state import State, Validators
 from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex
 from lean_spec.types import Bytes52, Uint64
 
-from ..keys import get_shared_key_manager
+from ..keys import XmssKeyManager
 
 
 def generate_pre_state(**kwargs: Any) -> State:
@@ -24,7 +24,7 @@ def generate_pre_state(**kwargs: Any) -> State:
     genesis_time = kwargs.get("genesis_time", Uint64(0))
     num_validators = kwargs.get("num_validators", 4)
 
-    key_manager = get_shared_key_manager()
+    key_manager = XmssKeyManager.shared()
     available_keys = len(key_manager)
 
     assert num_validators <= available_keys, (
@@ -33,19 +33,17 @@ def generate_pre_state(**kwargs: Any) -> State:
         f"but the key manager has only {available_keys} keys",
     )
 
-    validators = Validators(
-        data=[
+    validator_list = []
+    for i in range(num_validators):
+        idx = ValidatorIndex(i)
+        attestation_pubkey, proposal_pubkey = key_manager.get_public_keys(idx)
+        validator_list.append(
             Validator(
-                attestation_pubkey=Bytes52(
-                    key_manager[ValidatorIndex(i)].attestation_public.encode_bytes()
-                ),
-                proposal_pubkey=Bytes52(
-                    key_manager[ValidatorIndex(i)].proposal_public.encode_bytes()
-                ),
-                index=ValidatorIndex(i),
+                attestation_pubkey=Bytes52(attestation_pubkey.encode_bytes()),
+                proposal_pubkey=Bytes52(proposal_pubkey.encode_bytes()),
+                index=idx,
             )
-            for i in range(num_validators)
-        ]
-    )
+        )
+    validators = Validators(data=validator_list)
 
     return State.generate_genesis(genesis_time=genesis_time, validators=validators)

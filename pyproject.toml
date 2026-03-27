@@ -118,6 +118,9 @@ timeout = 300
 source = ["src"]
 branch = true
 
+[tool.coverage.report]
+fail_under = 80
+
 [tool.mdformat]
 number = true
 wrap = 80

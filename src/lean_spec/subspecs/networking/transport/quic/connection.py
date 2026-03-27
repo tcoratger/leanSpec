@@ -55,6 +55,20 @@ class QuicTransportError(Exception):
     """Raised when QUIC connection operations fail."""
 
 
+class QuicStreamResetError(QuicTransportError):
+    """Raised when a QUIC stream is abruptly reset by the peer (RESET_STREAM).
+
+    Per RFC 9000 Section 3.2, RESET_STREAM indicates the peer cannot guarantee
+    delivery of stream data. Outstanding data may be lost.
+    """
+
+    def __init__(self, stream_id: int, error_code: int) -> None:
+        """Create a reset error with the stream ID and the peer's error code."""
+        self.stream_id = stream_id
+        self.error_code = error_code
+        super().__init__(f"Stream {stream_id} reset by peer (error_code={error_code})")
+
+
 @dataclass(slots=True)
 class QuicStream:
     """
@@ -71,6 +85,7 @@ class QuicStream:
     _closed: bool = False
     _write_closed: bool = False
     _read_closed: bool = False
+    _reset_error: QuicStreamResetError | None = None
     _protocol_id: ProtocolId = ProtocolId("")
 
     @property
@@ -88,17 +103,28 @@ class QuicStream:
         Read data from the stream.
 
         Blocks until data is available. Returns empty bytes when the peer
-        has closed their write side (half-close).
+        has closed their write side (half-close via FIN).
+
+        Raises:
+            QuicStreamResetError: If the stream was reset by the peer
+                (RESET_STREAM per RFC 9000 Section 3.2). Data may have been lost.
 
         Returns:
             Received data bytes, or empty bytes when stream is half-closed.
         """
         if self._read_closed:
+            # If the stream was reset, always raise.
+            if self._reset_error is not None:
+                raise self._reset_error
             return b""
 
         data = await self._read_buffer.get()
         if data == b"":
             self._read_closed = True
+            # If end-of-stream was caused by a reset, raise the error.
+            # Per RFC 9000 Section 3.2, RESET_STREAM means data may have been lost.
+            if self._reset_error is not None:
+                raise self._reset_error
             return b""
 
         return data
@@ -171,7 +197,18 @@ class QuicStream:
         self._read_buffer.put_nowait(data)
 
     def _receive_end(self) -> None:
-        """Internal: called when stream ends."""
+        """Internal: called when the peer sends FIN (graceful half-close)."""
+        self._read_buffer.put_nowait(b"")
+
+    def _receive_reset(self, error_code: int) -> None:
+        """Internal: called when the peer sends RESET_STREAM (abrupt termination).
+
+        Per RFC 9000 Section 3.2, RESET_STREAM indicates the sender cannot
+        guarantee delivery. Outstanding data may be lost. This is fundamentally
+        different from FIN, which guarantees all data was delivered.
+        """
+        self._reset_error = QuicStreamResetError(self._stream_id, error_code)
+        # Queue an empty sentinel to unblock any pending read.
         self._read_buffer.put_nowait(b"")
 
 
@@ -297,8 +334,10 @@ class QuicConnection:
                 self._streams[stream_id]._receive_end()
 
         elif isinstance(event, StreamReset):
+            # Per RFC 9000 Section 3.2, RESET_STREAM abruptly terminates a stream.
+            # This is NOT equivalent to FIN — data may have been lost.
             if event.stream_id in self._streams:
-                self._streams[event.stream_id]._receive_end()
+                self._streams[event.stream_id]._receive_reset(event.error_code)
 
         elif isinstance(event, ConnectionTerminated):
             self._closed = True
@@ -381,7 +420,9 @@ def is_quic_multiaddr(multiaddr: str) -> bool:
     Returns:
         True if the multiaddr uses QUIC, False otherwise.
     """
-    parts = multiaddr.lower().split("/")
+    # Multiaddr protocol names are case-sensitive per the multiaddr spec.
+    # Valid QUIC components are lowercase "quic" and "quic-v1".
+    parts = multiaddr.split("/")
     return "quic" in parts or "quic-v1" in parts
 
 
@@ -400,12 +441,12 @@ def parse_multiaddr(multiaddr: str) -> tuple[str, int, str | None, PeerId | None
 
     host = None
     port = None
-    transport = "quic"  # Default
+    transport: str | None = None
     peer_id = None
 
     i = 0
     while i < len(parts):
-        if parts[i] == "ip4" and i + 1 < len(parts):
+        if parts[i] in ("ip4", "ip6") and i + 1 < len(parts):
             host = parts[i + 1]
             i += 2
         elif parts[i] == "udp" and i + 1 < len(parts):

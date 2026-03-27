@@ -19,6 +19,7 @@ Options:
     --validator-keys       Path to validator keys directory
     --node-id              Node identifier for validator assignment (default: lean_spec_0)
     --is-aggregator        Enable aggregator mode for attestation aggregation (default: false)
+    --aggregate-subnet-ids Comma-separated extra subnet IDs to subscribe/aggregate (e.g. "0,1,2")
     --api-port             Port for API server and Prometheus /metrics (default: 5052, 0 to disable)
 """
 
@@ -164,6 +165,7 @@ def _init_from_genesis(
     event_source: LiveNetworkEventSource,
     validator_registry: ValidatorRegistry | None = None,
     is_aggregator: bool = False,
+    aggregate_subnet_ids: tuple[SubnetId, ...] = (),
     api_port: int | None = None,
 ) -> Node:
     """
@@ -174,6 +176,8 @@ def _init_from_genesis(
         event_source: Network transport for the node.
         validator_registry: Optional registry with validator secret keys.
         is_aggregator: Enable aggregator mode for attestation aggregation.
+        aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
+            Only effective when is_aggregator is also True.
         api_port: Port for API server and /metrics. None disables the API.
 
     Returns:
@@ -197,6 +201,7 @@ def _init_from_genesis(
         validator_registry=validator_registry,
         fork_digest=GOSSIP_FORK_DIGEST,
         is_aggregator=is_aggregator,
+        aggregate_subnet_ids=aggregate_subnet_ids,
         api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
     )
 
@@ -210,6 +215,7 @@ async def _init_from_checkpoint(
     event_source: LiveNetworkEventSource,
     validator_registry: ValidatorRegistry | None = None,
     is_aggregator: bool = False,
+    aggregate_subnet_ids: tuple[SubnetId, ...] = (),
     api_port: int | None = None,
 ) -> Node | None:
     """
@@ -238,6 +244,8 @@ async def _init_from_checkpoint(
         event_source: Network transport for the node.
         validator_registry: Optional registry with validator secret keys.
         is_aggregator: Enable aggregator mode for attestation aggregation.
+        aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
+            Only effective when is_aggregator is also True.
         api_port: Port for API server and /metrics. None disables the API.
 
     Returns:
@@ -306,6 +314,7 @@ async def _init_from_checkpoint(
             validator_registry=validator_registry,
             fork_digest=GOSSIP_FORK_DIGEST,
             is_aggregator=is_aggregator,
+            aggregate_subnet_ids=aggregate_subnet_ids,
             api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
         )
 
@@ -399,6 +408,7 @@ async def run_node(
     node_id: str = "lean_spec_0",
     genesis_time_now: bool = False,
     is_aggregator: bool = False,
+    aggregate_subnet_ids: tuple[SubnetId, ...] = (),
     api_port: int | None = 5052,
 ) -> None:
     """
@@ -413,6 +423,8 @@ async def run_node(
         node_id: Node identifier for validator assignment.
         genesis_time_now: Override genesis time to current time for testing.
         is_aggregator: Enable aggregator mode for attestation aggregation.
+        aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
+            Only effective when is_aggregator is also True.
         api_port: Port for API server (health, fork_choice, /metrics). None or 0 disables.
     """
     metrics.init(name="leanspec-node", version="0.0.1")
@@ -443,6 +455,8 @@ async def run_node(
     # Log aggregator mode if enabled
     if is_aggregator:
         logger.info("Aggregator mode enabled - node will perform attestation aggregation")
+    if aggregate_subnet_ids:
+        logger.info("Aggregate subnet IDs configured: %s", list(aggregate_subnet_ids))
 
     # Load validator keys if path provided.
     #
@@ -494,18 +508,44 @@ async def run_node(
     # subscriptions to peers.
     block_topic = GossipTopic.block(GOSSIP_FORK_DIGEST).to_topic_id()
     event_source.subscribe_gossip_topic(block_topic)
-    # Subscribe to attestation subnet topics based on local validator id.
-    validator_id = validator_registry.primary_index() if validator_registry else None
-    if validator_id is None:
-        subnet_id = SubnetId(0)
-        logger.info("No local validator id; subscribing to attestation subnet %d", subnet_id)
-    else:
-        subnet_id = validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)
-    attestation_subnet_topic = GossipTopic.attestation_subnet(
-        GOSSIP_FORK_DIGEST, subnet_id
-    ).to_topic_id()
-    event_source.subscribe_gossip_topic(attestation_subnet_topic)
-    logger.info("Subscribed to gossip topics: %s, %s", block_topic, attestation_subnet_topic)
+
+    # Determine attestation subnets to subscribe to.
+    #
+    # Subscribing to a subnet causes the p2p layer to receive all messages on it.
+    # Not subscribing saves bandwidth — messages arrive only if the node publishes
+    # to that subnet (via gossipsub fanout), not as a mesh member.
+    #
+    # Subscription rules:
+    # - All nodes with registered validators subscribe to their validator-derived subnets.
+    #   This forms the mesh network for attestation propagation.
+    # - Aggregator nodes additionally subscribe to any explicit aggregate-subnet-ids.
+    # - Non-aggregator nodes with no validators skip attestation subscriptions entirely.
+    subscription_subnets: set[SubnetId] = set()
+
+    # Always subscribe to validator-derived subnets regardless of aggregator flag.
+    # Loop over all registered validators so each one's subnet is covered.
+    if validator_registry is not None:
+        for validator_id in validator_registry.indices():
+            subscription_subnets.add(validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT))
+
+    # Explicit aggregate subnets are additive but only meaningful for aggregators.
+    if is_aggregator:
+        if not subscription_subnets:
+            # Aggregator with no registered validators — fall back to subnet 0.
+            subscription_subnets.add(SubnetId(0))
+        subscription_subnets.update(aggregate_subnet_ids)
+
+    for subnet_id in subscription_subnets:
+        attestation_subnet_topic = GossipTopic.attestation_subnet(
+            GOSSIP_FORK_DIGEST, subnet_id
+        ).to_topic_id()
+        event_source.subscribe_gossip_topic(attestation_subnet_topic)
+        logger.info("Subscribed to attestation subnet %d", subnet_id)
+
+    if not subscription_subnets:
+        logger.info("Not subscribing to any attestation subnet")
+
+    logger.info("Subscribed to block gossip topic: %s", block_topic)
 
     # Two initialization paths: checkpoint sync or genesis sync.
     #
@@ -528,6 +568,7 @@ async def run_node(
             event_source=event_source,
             validator_registry=validator_registry,
             is_aggregator=is_aggregator,
+            aggregate_subnet_ids=aggregate_subnet_ids,
             api_port=api_port_int,
         )
         if node is None:
@@ -542,6 +583,7 @@ async def run_node(
             event_source=event_source,
             validator_registry=validator_registry,
             is_aggregator=is_aggregator,
+            aggregate_subnet_ids=aggregate_subnet_ids,
             api_port=api_port_int,
         )
 
@@ -679,6 +721,17 @@ def main() -> None:
         help="Enable aggregator mode (node performs attestation aggregation)",
     )
     parser.add_argument(
+        "--aggregate-subnet-ids",
+        type=str,
+        default=None,
+        metavar="SUBNETS",
+        help=(
+            "Comma-separated attestation subnet IDs to additionally subscribe and aggregate "
+            "(e.g. '0,1,2'). Requires --is-aggregator. "
+            "Adds to the validator-derived subnet."
+        ),
+    )
+    parser.add_argument(
         "--api-port",
         type=int,
         default=5052,
@@ -689,6 +742,24 @@ def main() -> None:
     args = parser.parse_args()
 
     setup_logging(args.verbose, args.no_color)
+
+    # Parse --aggregate-subnet-ids from comma-separated string to tuple of SubnetId.
+    # Reject the flag upfront if --is-aggregator is not set.
+    aggregate_subnet_ids: tuple[SubnetId, ...] = ()
+    if args.aggregate_subnet_ids:
+        if not args.is_aggregator:
+            logger.error("--aggregate-subnet-ids requires --is-aggregator to be set")
+            sys.exit(1)
+        try:
+            aggregate_subnet_ids = tuple(
+                SubnetId(int(s.strip())) for s in args.aggregate_subnet_ids.split(",") if s.strip()
+            )
+        except ValueError:
+            logger.error(
+                "Invalid --aggregate-subnet-ids value: %r (expected comma-separated integers)",
+                args.aggregate_subnet_ids,
+            )
+            sys.exit(1)
 
     # Use asyncio.run with proper task cancellation on interrupt.
     # This ensures all tasks are cancelled and resources are released.
@@ -703,6 +774,7 @@ def main() -> None:
                 node_id=args.node_id,
                 genesis_time_now=args.genesis_time_now,
                 is_aggregator=args.is_aggregator,
+                aggregate_subnet_ids=aggregate_subnet_ids,
                 api_port=args.api_port,
             )
         )
