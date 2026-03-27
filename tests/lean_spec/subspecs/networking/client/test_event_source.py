@@ -31,6 +31,7 @@ from lean_spec.subspecs.networking.gossipsub.topic import (
     GossipTopic,
     TopicKind,
 )
+from lean_spec.subspecs.networking.gossipsub.types import TopicId
 from lean_spec.subspecs.networking.reqresp.handler import REQRESP_PROTOCOL_IDS
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport import PeerId
@@ -497,7 +498,7 @@ class TestLiveNetworkEventSourceDisconnect:
 
         await es.disconnect(peer_id)
 
-        es.reqresp_client.unregister_connection.assert_called_once_with(peer_id)
+        es.reqresp_client.unregister_connection.assert_called_once_with(peer_id)  # type: ignore[union-attr]
 
 
 class TestLiveNetworkEventSourceStop:
@@ -557,7 +558,7 @@ class TestLiveNetworkEventSourcePublish:
         assert len(es._connections) == 0
 
         # Should not raise
-        await es.publish("/some/topic", b"data")
+        await es.publish(TopicId("/some/topic"), b"data")
 
     async def test_publish_delegates_to_behavior(self) -> None:
         """Publishing with active connections delegates to gossipsub behavior."""
@@ -568,9 +569,9 @@ class TestLiveNetworkEventSourcePublish:
         with patch.object(
             es._gossipsub_behavior, "publish", new_callable=AsyncMock
         ) as mock_publish:
-            await es.publish("/test/topic", b"payload")
+            await es.publish(TopicId("/test/topic"), b"payload")
 
-            mock_publish.assert_awaited_once_with("/test/topic", b"payload")
+            mock_publish.assert_awaited_once_with(TopicId("/test/topic"), b"payload")
 
     async def test_publish_exception_is_caught(self) -> None:
         """Exceptions during publish are caught, not propagated."""
@@ -585,7 +586,7 @@ class TestLiveNetworkEventSourcePublish:
             side_effect=RuntimeError("network error"),
         ):
             # Should not raise
-            await es.publish("/test/topic", b"payload")
+            await es.publish(TopicId("/test/topic"), b"payload")
 
 
 class TestLiveNetworkEventSourceInit:
