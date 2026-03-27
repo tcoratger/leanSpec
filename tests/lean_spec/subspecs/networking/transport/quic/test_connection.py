@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lean_spec.subspecs.networking.config import LIBP2P_ALPN_PROTOCOL
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.networking.transport.quic.connection import (
     ConnectionTerminated,
@@ -174,6 +175,27 @@ class TestParseMultiaddr:
         """Multiaddr without quic/quic-v1 component returns None transport."""
         host, port, transport, _ = parse_multiaddr("/ip4/10.0.0.1/udp/3000")
         assert (host, port, transport) == ("10.0.0.1", 3000, None)
+
+
+# ---------------------------------------------------------------------------
+# ALPN protocol — per the libp2p TLS spec
+#
+# https://github.com/libp2p/specs/blob/master/tls/tls.md
+# "Endpoints MUST NOT send (and MUST NOT accept) any ALPN extension that
+#  does not include "libp2p" as the ALPN protocol string."
+# ---------------------------------------------------------------------------
+
+
+class TestAlpnProtocol:
+    """Verify the ALPN protocol value per the libp2p TLS spec."""
+
+    def test_alpn_is_libp2p(self) -> None:
+        """The ALPN value is 'libp2p' as mandated by the libp2p TLS spec.
+
+        Spec reference (https://github.com/libp2p/specs/blob/master/tls/tls.md):
+        the ALPN extension MUST include "libp2p" as the protocol string.
+        """
+        assert LIBP2P_ALPN_PROTOCOL == "libp2p"
 
 
 # ---------------------------------------------------------------------------

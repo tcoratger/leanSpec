@@ -64,3 +64,11 @@ before attempting to re-graft. This prevents rapid mesh churn.
 
 MAX_ERROR_MESSAGE_SIZE: Final[int] = 256
 """Maximum error message size in bytes per Ethereum P2P spec (ErrorMessage: List[byte, 256])."""
+
+LIBP2P_ALPN_PROTOCOL: Final[str] = "libp2p"
+"""ALPN protocol identifier for libp2p connections.
+
+Per the libp2p TLS spec (https://github.com/libp2p/specs/blob/master/tls/tls.md):
+"libp2p" is the Application-Layer Protocol Negotiation (ALPN) value used
+during the TLS 1.3 handshake to identify libp2p connections.
+"""

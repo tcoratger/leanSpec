@@ -41,6 +41,7 @@ from aioquic.quic.events import (
     StreamReset,
 )
 
+from lean_spec.subspecs.networking.config import LIBP2P_ALPN_PROTOCOL
 from lean_spec.subspecs.networking.types import ProtocolId
 
 from ..identity import IdentityKeypair
@@ -520,7 +521,7 @@ class QuicConnectionManager:
 
         # Configure QUIC.
         config = QuicConfiguration(
-            alpn_protocols=["libp2p"],
+            alpn_protocols=[LIBP2P_ALPN_PROTOCOL],
             is_client=True,
             verify_mode=ssl.CERT_NONE,  # We verify via libp2p extension, not CA
         )
@@ -640,7 +641,7 @@ class QuicConnectionManager:
 
         # Create server configuration.
         server_config = QuicConfiguration(
-            alpn_protocols=["libp2p"],
+            alpn_protocols=[LIBP2P_ALPN_PROTOCOL],
             is_client=False,
             verify_mode=ssl.CERT_NONE,  # We verify via libp2p extension
         )
