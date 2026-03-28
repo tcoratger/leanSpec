@@ -18,7 +18,7 @@ def _sign_and_aggregate(
     key_manager: XmssKeyManager,
     validator_ids: list[ValidatorIndex],
     att_data_args: tuple[Slot, int, int, Checkpoint],
-) -> tuple[AggregatedSignatureProof, list[ValidatorIndex]]:
+) -> AggregatedSignatureProof:
     """Sign attestation data with the given validators and aggregate."""
     slot, head, target, source = att_data_args
     att_data = make_attestation_data_simple(slot, make_bytes32(head), make_bytes32(target), source)
@@ -39,7 +39,7 @@ def _sign_and_aggregate(
         message=data_root,
         slot=att_data.slot,
     )
-    return proof, validator_ids
+    return proof
 
 
 def test_aggregate_rejects_empty_inputs() -> None:
@@ -96,7 +96,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
     )
 
     # Child: validators 0, 1
-    child, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(0), ValidatorIndex(1)], att_args)
+    child = _sign_and_aggregate(key_manager, [ValidatorIndex(0), ValidatorIndex(1)], att_args)
 
     # Additional raw signatures: validators 2, 3
     extra_vids = [ValidatorIndex(2), ValidatorIndex(3)]
@@ -111,7 +111,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
 
     parent = AggregatedSignatureProof.aggregate(
         xmss_participants=xmss_participants,
-        children=[child],
+        children=[(child, [key_manager[ValidatorIndex(i)].attestation_public for i in range(2)])],
         raw_xmss=raw_xmss,
         message=att_data.data_root_bytes(),
         slot=att_data.slot,
@@ -136,13 +136,17 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
         att_args[0], make_bytes32(att_args[1]), make_bytes32(att_args[2]), att_args[3]
     )
 
-    child_a, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
-    child_b, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
-    child_c, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
+    child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
+    child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
+    child_c = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
+
+    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
+    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
+    child_c_pks = [key_manager[ValidatorIndex(2)].attestation_public]
 
     parent = AggregatedSignatureProof.aggregate(
         xmss_participants=None,
-        children=[child_a, child_b, child_c],
+        children=[(child_a, child_a_pks), (child_b, child_b_pks), (child_c, child_c_pks)],
         raw_xmss=[],
         message=att_data.data_root_bytes(),
         slot=att_data.slot,
@@ -169,22 +173,27 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
     msg = att_data.data_root_bytes()
 
     # Level 0: four individual leaf proofs
-    leaf_a, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
-    leaf_b, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
-    leaf_c, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
-    leaf_d, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(3)], att_args)
+    leaf_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
+    leaf_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
+    leaf_c = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
+    leaf_d = _sign_and_aggregate(key_manager, [ValidatorIndex(3)], att_args)
+
+    leaf_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
+    leaf_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
+    leaf_c_pks = [key_manager[ValidatorIndex(2)].attestation_public]
+    leaf_d_pks = [key_manager[ValidatorIndex(3)].attestation_public]
 
     # Level 1: two intermediate proofs
     mid_ab = AggregatedSignatureProof.aggregate(
         xmss_participants=None,
-        children=[leaf_a, leaf_b],
+        children=[(leaf_a, leaf_a_pks), (leaf_b, leaf_b_pks)],
         raw_xmss=[],
         message=msg,
         slot=att_data.slot,
     )
     mid_cd = AggregatedSignatureProof.aggregate(
         xmss_participants=None,
-        children=[leaf_c, leaf_d],
+        children=[(leaf_c, leaf_c_pks), (leaf_d, leaf_d_pks)],
         raw_xmss=[],
         message=msg,
         slot=att_data.slot,
@@ -193,7 +202,7 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
     # Level 2: final root proof
     root = AggregatedSignatureProof.aggregate(
         xmss_participants=None,
-        children=[mid_ab, mid_cd],
+        children=[(mid_ab, leaf_a_pks + leaf_b_pks), (mid_cd, leaf_c_pks + leaf_d_pks)],
         raw_xmss=[],
         message=msg,
         slot=att_data.slot,
@@ -217,8 +226,11 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
     msg = att_data.data_root_bytes()
 
     # Two child proofs
-    child_a, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
-    child_b, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
+    child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
+    child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
+
+    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
+    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
 
     # Additional raw signatures from validators 2 and 3
     extra_vids = [ValidatorIndex(2), ValidatorIndex(3)]
@@ -233,7 +245,7 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
 
     proof = AggregatedSignatureProof.aggregate(
         xmss_participants=xmss_participants,
-        children=[child_a, child_b],
+        children=[(child_a, child_a_pks), (child_b, child_b_pks)],
         raw_xmss=raw_xmss,
         message=msg,
         slot=att_data.slot,
@@ -314,7 +326,7 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
     att_data = make_attestation_data_simple(Slot(3), make_bytes32(141), make_bytes32(142), source)
     vid = ValidatorIndex(2)
 
-    proof, _ = _sign_and_aggregate(
+    proof = _sign_and_aggregate(
         key_manager,
         [vid],
         (att_data.slot, 141, 142, source),
@@ -347,22 +359,25 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
     )
 
     # Child A signs message A
-    child_a, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args_a)
+    child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args_a)
     # Child B signs message B (different)
-    child_b, _ = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args_b)
+    child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args_b)
+
+    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
+    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
 
     # Aggregation rejects children that signed different messages
-    with pytest.raises(AggregationError, match="aggregation failed"):
+    with pytest.raises(AggregationError):
         AggregatedSignatureProof.aggregate(
             xmss_participants=None,
-            children=[child_a, child_b],
+            children=[(child_a, child_a_pks), (child_b, child_b_pks)],
             raw_xmss=[],
             message=att_data_b.data_root_bytes(),
             slot=att_data_b.slot,
         )
 
 
-def test_aggregate_rejects_single_child_without_raw() -> None:
+def test_aggregate_rejects_single_child_without_raw(key_manager: XmssKeyManager) -> None:
     """A single child without raw signatures is rejected (need at least two children)."""
     # Create a stub child proof without calling the Rust bindings
     stub_child = AggregatedSignatureProof(
@@ -375,7 +390,9 @@ def test_aggregate_rejects_single_child_without_raw() -> None:
     with pytest.raises(AggregationError, match="At least two child proofs"):
         AggregatedSignatureProof.aggregate(
             xmss_participants=None,
-            children=[stub_child],
+            children=[
+                (stub_child, [key_manager[ValidatorIndex(i)].attestation_public for i in range(1)])
+            ],
             raw_xmss=[],
             message=make_bytes32(0),
             slot=Slot(0),

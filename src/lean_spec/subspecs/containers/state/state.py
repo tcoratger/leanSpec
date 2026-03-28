@@ -813,9 +813,20 @@ class State(Container):
             xmss_participants = AggregationBits.from_validator_indices(
                 ValidatorIndices(data=[e[0] for e in raw_entries])
             )
+
+            children = [
+                (
+                    child,
+                    [
+                        self.validators[vid].get_attestation_pubkey()
+                        for vid in child.participants.to_validator_indices()
+                    ],
+                )
+                for child in child_proofs
+            ]
             proof = AggregatedSignatureProof.aggregate(
                 xmss_participants=xmss_participants,
-                children=child_proofs,
+                children=children,
                 raw_xmss=raw_xmss,
                 message=data.data_root_bytes(),
                 slot=data.slot,

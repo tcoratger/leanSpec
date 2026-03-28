@@ -37,10 +37,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     }
 
     results = state.aggregate(attestation_signatures=attestation_signatures)
-    aggregated_atts, aggregated_proofs = (
-        [att for att, _ in results],
-        [proof for _, proof in results],
-    )
+    aggregated_atts, aggregated_proofs = zip(*results, strict=True)
 
     assert len(aggregated_atts) == 1
     assert len(aggregated_proofs) == 1
@@ -174,10 +171,7 @@ def test_aggregated_signatures_with_multiple_data_groups(
     }
 
     results = state.aggregate(attestation_signatures=attestation_signatures)
-    aggregated_atts, aggregated_proofs = (
-        [att for att, _ in results],
-        [proof for _, proof in results],
-    )
+    aggregated_atts, aggregated_proofs = zip(*results, strict=True)
 
     assert len(aggregated_atts) == 2
     assert len(aggregated_proofs) == 2

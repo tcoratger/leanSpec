@@ -52,7 +52,7 @@ class AggregatedSignatureProof(Container):
     def aggregate(
         cls,
         xmss_participants: AggregationBits | None,
-        children: Sequence[Self],
+        children: Sequence[tuple[Self, Sequence[PublicKey]]],
         raw_xmss: Sequence[tuple[PublicKey, Signature]],
         message: Bytes32,
         slot: Slot,
@@ -61,11 +61,9 @@ class AggregatedSignatureProof(Container):
         """
         Aggregate raw_xmss signatures and children proofs into a single proof.
 
-        The API supports recursive aggregation but the bindings currently do not.
-
         Args:
             xmss_participants: Bitfield of validators whose raw_signatures are provided.
-            children: Sequence of child proofs to aggregate.
+            children: Sequence of (child_proof, public_keys) tuples to aggregate.
             raw_xmss: Sequence of (public key, signature) tuples to aggregate.
             message: The 32-byte message that was signed.
             slot: The slot in which the signatures were created.
@@ -96,17 +94,24 @@ class AggregatedSignatureProof(Container):
             raise AggregationError("Raw signature count does not match XMSS participant count")
 
         # Include child participants in the aggregated participants
-        for child in children:
-            aggregated_validator_ids.update(child.participants.to_validator_indices())
+        for child_proof, _ in children:
+            aggregated_validator_ids.update(child_proof.participants.to_validator_indices())
         participants = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=sorted(aggregated_validator_ids))
+            ValidatorIndices(data=list(aggregated_validator_ids))
         )
 
         mode = mode or LEAN_ENV
         setup_prover(mode=mode)
+
         try:
-            children_bytes = [child.proof_data.encode_bytes() for child in children] or None
-            proof_bytes = aggregate_signatures(
+            children_bytes = [
+                (
+                    [pk.encode_bytes() for pk in child_pks],
+                    child_proof.proof_data.encode_bytes(),
+                )
+                for child_proof, child_pks in children
+            ]
+            _, proof_bytes = aggregate_signatures(
                 [pk.encode_bytes() for pk, _ in raw_xmss],
                 [sig.encode_bytes() for _, sig in raw_xmss],
                 message,
@@ -133,7 +138,7 @@ class AggregatedSignatureProof(Container):
         Verify this aggregated signature proof.
 
         Args:
-            public_keys: Public keys of the participants (reserved for future use).
+            public_keys: Public keys of the participants.
             message: The 32-byte message that was signed.
             slot: The slot in which the signatures were created.
             mode: The mode to use for the verification (test or prod).
@@ -141,13 +146,12 @@ class AggregatedSignatureProof(Container):
         Raises:
             AggregationError: If verification fails.
         """
-        _ = public_keys
-
         mode = mode or LEAN_ENV
         setup_verifier(mode=mode)
 
         try:
             verify_aggregated_signatures(
+                [pk.encode_bytes() for pk in public_keys],
                 message,
                 self.proof_data.encode_bytes(),
                 slot,
