@@ -134,15 +134,25 @@ class StateTransitionTest(BaseConsensusFixture):
 
         # Initialize filled_blocks list that will be populated as we process blocks
         filled_blocks: list[Block] = []
+        block_registry: dict[str, Block] = {}
         try:
             state = self.pre
 
             for block_spec in self.blocks:
                 # Build block and optionally get cached post-state to avoid redundant transitions
-                block, cached_state = self._build_block_from_spec(block_spec, state)
+                block, cached_state = self._build_block_from_spec(block_spec, state, block_registry)
 
                 # Store the filled Block for serialization
                 filled_blocks.append(block)
+
+                # Register labeled blocks for parent resolution
+                if block_spec.label is not None:
+                    if block_spec.label in block_registry:
+                        raise ValueError(
+                            f"Duplicate label '{block_spec.label}' - "
+                            f"labels must be unique within a test"
+                        )
+                    block_registry[block_spec.label] = block
 
                 # Use cached state if available, otherwise run state transition
                 if cached_state is not None:
@@ -192,7 +202,12 @@ class StateTransitionTest(BaseConsensusFixture):
         # Return self (fixture is already complete)
         return self
 
-    def _build_block_from_spec(self, spec: BlockSpec, state: State) -> tuple[Block, State | None]:
+    def _build_block_from_spec(
+        self,
+        spec: BlockSpec,
+        state: State,
+        block_registry: dict[str, Block],
+    ) -> tuple[Block, State | None]:
         """
         Build a Block from a BlockSpec, optionally caching the post-state.
 
@@ -205,6 +220,8 @@ class StateTransitionTest(BaseConsensusFixture):
             Block specification with optional field overrides.
         state : State
             Current state to build against.
+        block_registry : dict[str, Block]
+            Map of labels to previously built blocks, used to resolve parent_label references.
 
         Returns:
         -------
@@ -220,9 +237,16 @@ class StateTransitionTest(BaseConsensusFixture):
         if not spec.skip_slot_processing:
             temp_state = state.process_slots(spec.slot)
 
-        # Use provided parent root or compute it
+        # Use provided parent root, resolve from label, or compute from state
         if spec.parent_root is not None:
             parent_root = spec.parent_root
+        elif spec.parent_label is not None:
+            if spec.parent_label not in block_registry:
+                raise ValueError(
+                    f"parent_label '{spec.parent_label}' not found - "
+                    f"available: {list(block_registry.keys())}"
+                )
+            parent_root = hash_tree_root(block_registry[spec.parent_label])
         else:
             source_state = temp_state or state
             parent_root = hash_tree_root(source_state.latest_block_header)
