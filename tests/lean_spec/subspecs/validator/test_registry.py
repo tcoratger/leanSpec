@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from lean_spec.subspecs.containers import ValidatorIndex
 from lean_spec.subspecs.validator import ValidatorRegistry
@@ -17,6 +18,8 @@ from lean_spec.subspecs.validator.registry import (
     ValidatorManifestEntry,
     load_node_validator_mapping,
 )
+from lean_spec.types import Bytes52
+from lean_spec.types.exceptions import SSZValueError
 
 
 def registry_state(registry: ValidatorRegistry) -> dict[ValidatorIndex, tuple[Any, Any]]:
@@ -107,71 +110,53 @@ class TestValidatorManifestEntry:
     def test_construction_stores_all_fields(self) -> None:
         """All fields are stored and accessible after construction."""
         entry = ValidatorManifestEntry(
-            index=3,
-            attestation_pubkey_hex="0x" + "aa" * 52,
-            proposal_pubkey_hex="0x" + "bb" * 52,
+            index=ValidatorIndex(3),
+            attestation_pubkey_hex=Bytes52("0x" + "aa" * 52),
+            proposal_pubkey_hex=Bytes52("0x" + "bb" * 52),
             attestation_privkey_file="att.ssz",
             proposal_privkey_file="prop.ssz",
         )
 
-        assert entry.index == 3
-        assert entry.attestation_pubkey_hex == "0x" + "aa" * 52
-        assert entry.proposal_pubkey_hex == "0x" + "bb" * 52
+        assert entry.index == ValidatorIndex(3)
+        assert entry.attestation_pubkey_hex == Bytes52("0x" + "aa" * 52)
+        assert entry.proposal_pubkey_hex == Bytes52("0x" + "bb" * 52)
         assert entry.attestation_privkey_file == "att.ssz"
         assert entry.proposal_privkey_file == "prop.ssz"
 
     def test_string_pubkey_hex_passthrough(self) -> None:
         """Hex string pubkeys are returned unchanged."""
         entry = ValidatorManifestEntry(
-            index=0,
-            attestation_pubkey_hex="0x" + "ab" * 52,
-            proposal_pubkey_hex="0x" + "cd" * 52,
+            index=ValidatorIndex(0),
+            attestation_pubkey_hex=Bytes52("0x" + "ab" * 52),
+            proposal_pubkey_hex=Bytes52("0x" + "cd" * 52),
             attestation_privkey_file="att.ssz",
             proposal_privkey_file="prop.ssz",
         )
 
-        assert entry.attestation_pubkey_hex == "0x" + "ab" * 52
-        assert entry.proposal_pubkey_hex == "0x" + "cd" * 52
+        assert entry.attestation_pubkey_hex == Bytes52("0x" + "ab" * 52)
+        assert entry.proposal_pubkey_hex == Bytes52("0x" + "cd" * 52)
 
-    def test_integer_pubkey_hex_conversion(self) -> None:
-        """Integer pubkeys are zero-padded to 52-byte (104-char) hex strings."""
-        entry = ValidatorManifestEntry(
-            index=0,
-            attestation_pubkey_hex=0x123,  # type: ignore[arg-type]
-            proposal_pubkey_hex=0x456,  # type: ignore[arg-type]
-            attestation_privkey_file="att.ssz",
-            proposal_privkey_file="prop.ssz",
-        )
+    def test_integer_pubkey_rejected(self) -> None:
+        """Integer pubkeys are rejected — only valid 52-byte hex strings accepted."""
+        with pytest.raises((TypeError, ValidationError)):
+            ValidatorManifestEntry(
+                index=ValidatorIndex(0),
+                attestation_pubkey_hex=0x123,  # type: ignore[arg-type]
+                proposal_pubkey_hex=Bytes52("0x" + "aa" * 52),
+                attestation_privkey_file="att.ssz",
+                proposal_privkey_file="prop.ssz",
+            )
 
-        assert entry.attestation_pubkey_hex == "0x" + "0" * 101 + "123"
-        assert entry.proposal_pubkey_hex == "0x" + "0" * 101 + "456"
-
-    def test_zero_integer_pubkey_hex(self) -> None:
-        """Zero integer produces an all-zeros hex string."""
-        entry = ValidatorManifestEntry(
-            index=0,
-            attestation_pubkey_hex=0,  # type: ignore[arg-type]
-            proposal_pubkey_hex=0,  # type: ignore[arg-type]
-            attestation_privkey_file="att.ssz",
-            proposal_privkey_file="prop.ssz",
-        )
-
-        assert entry.attestation_pubkey_hex == "0x" + "0" * 104
-        assert entry.proposal_pubkey_hex == "0x" + "0" * 104
-
-    def test_large_integer_pubkey_hex_fits_in_104_chars(self) -> None:
-        """Large integers are still padded to exactly 104 hex chars."""
-        large = int("ff" * 52, 16)
-        entry = ValidatorManifestEntry(
-            index=0,
-            attestation_pubkey_hex=large,  # type: ignore[arg-type]
-            proposal_pubkey_hex=large,  # type: ignore[arg-type]
-            attestation_privkey_file="att.ssz",
-            proposal_privkey_file="prop.ssz",
-        )
-
-        assert entry.attestation_pubkey_hex == "0x" + "ff" * 52
-        assert len(entry.attestation_pubkey_hex) == 2 + 104  # "0x" + 104 hex chars
+    def test_wrong_length_pubkey_rejected(self) -> None:
+        """Hex strings that don't decode to exactly 52 bytes are rejected."""
+        with pytest.raises((SSZValueError, ValidationError)):
+            ValidatorManifestEntry(
+                index=ValidatorIndex(0),
+                attestation_pubkey_hex=Bytes52("0x" + "aa" * 10),
+                proposal_pubkey_hex=Bytes52("0x" + "bb" * 52),
+                attestation_privkey_file="att.ssz",
+                proposal_privkey_file="prop.ssz",
+            )
 
 
 class TestValidatorManifest:
@@ -205,8 +190,8 @@ class TestValidatorManifest:
 
         assert len(manifest.validators) == 2
         assert all(isinstance(e, ValidatorManifestEntry) for e in manifest.validators)
-        assert manifest.validators[0].index == 0
-        assert manifest.validators[1].index == 1
+        assert manifest.validators[0].index == ValidatorIndex(0)
+        assert manifest.validators[1].index == ValidatorIndex(1)
 
     def test_from_yaml_file_entry_fields_preserved(self, tmp_path: Path) -> None:
         """All fields of a ValidatorManifestEntry are preserved when loaded."""
@@ -225,9 +210,9 @@ class TestValidatorManifest:
         manifest = ValidatorManifest.from_yaml_file(manifest_file)
 
         v = manifest.validators[0]
-        assert v.index == 5
-        assert v.attestation_pubkey_hex == "0x" + "5a" * 52
-        assert v.proposal_pubkey_hex == "0x" + "5b" * 52
+        assert v.index == ValidatorIndex(5)
+        assert v.attestation_pubkey_hex == Bytes52("0x" + "5a" * 52)
+        assert v.proposal_pubkey_hex == Bytes52("0x" + "5b" * 52)
         assert v.attestation_privkey_file == "att_5.ssz"
         assert v.proposal_privkey_file == "prop_5.ssz"
 
