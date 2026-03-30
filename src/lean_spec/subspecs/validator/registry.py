@@ -52,7 +52,7 @@ class ValidatorManifestEntry(BaseModel):
     """XMSS public key for signing attestations."""
 
     proposal_pubkey_hex: Bytes52
-    """XMSS public key for signing proposer attestations in blocks."""
+    """XMSS public key for signing block proposals."""
 
     attestation_privkey_file: str
     """Filename of the attestation private key file."""
@@ -159,7 +159,7 @@ class ValidatorEntry:
     """Secret key for signing attestations."""
 
     proposal_secret_key: SecretKey
-    """Secret key for signing proposer attestations in blocks."""
+    """Secret key for signing block proposals."""
 
 
 @dataclass(slots=True)
@@ -176,7 +176,10 @@ class ValidatorRegistry:
 
     def add(self, entry: ValidatorEntry) -> None:
         """
-        Add a validator entry to the registry.
+        Add or replace a validator entry in the registry.
+
+        Replaces any existing entry with the same index.
+        Used to persist updated key state after signing.
 
         Args:
             entry: Validator entry to add.

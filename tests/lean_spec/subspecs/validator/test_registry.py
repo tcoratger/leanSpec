@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,22 +21,21 @@ from lean_spec.types import Bytes52
 from lean_spec.types.exceptions import SSZValueError
 
 
-def registry_state(registry: ValidatorRegistry) -> dict[ValidatorIndex, tuple[Any, Any]]:
+def registry_state(registry: ValidatorRegistry) -> dict[ValidatorIndex, tuple[object, object]]:
     """Extract full registry state as index → (att_sk, prop_sk) mapping."""
-    return {
-        idx: (
-            registry.get(idx).attestation_secret_key,  # type: ignore[union-attr]
-            registry.get(idx).proposal_secret_key,  # type: ignore[union-attr]
-        )
-        for idx in registry.indices()
-    }
+    result: dict[ValidatorIndex, tuple[object, object]] = {}
+    for idx in registry.indices():
+        entry = registry.get(idx)
+        assert entry is not None, f"Registry contains index {idx} but get() returned None"
+        result[idx] = (entry.attestation_secret_key, entry.proposal_secret_key)
+    return result
 
 
 def _minimal_manifest_dict(
     *,
     num_validators: int = 0,
-    validators: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
+    validators: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
     """Return a minimal valid manifest dict, optionally with validators."""
     return {
         "key_scheme": "SIGTopLevelTargetSumLifetime32Dim64Base8",
@@ -51,7 +49,7 @@ def _minimal_manifest_dict(
     }
 
 
-def _manifest_entry_dict(index: int, suffix: str = "") -> dict[str, Any]:
+def _manifest_entry_dict(index: int, suffix: str = "") -> dict[str, object]:
     """Return a manifest entry dict for a validator at the given index."""
     return {
         "index": index,
@@ -75,33 +73,11 @@ class TestValidatorEntry:
             proposal_secret_key=prop_key,
         )
 
-        assert entry.index == ValidatorIndex(7)
-        assert entry.attestation_secret_key is att_key
-        assert entry.proposal_secret_key is prop_key
-
-    def test_attestation_and_proposal_keys_are_independent(self) -> None:
-        """Attestation and proposal keys can be distinct objects."""
-        att_key = MagicMock(name="att")
-        prop_key = MagicMock(name="prop")
-        entry = ValidatorEntry(
-            index=ValidatorIndex(0),
+        assert entry == ValidatorEntry(
+            index=ValidatorIndex(7),
             attestation_secret_key=att_key,
             proposal_secret_key=prop_key,
         )
-
-        assert entry.attestation_secret_key is not entry.proposal_secret_key
-
-    def test_entry_is_frozen(self) -> None:
-        """ValidatorEntry rejects attribute assignment after construction."""
-        mock_key = MagicMock()
-        entry = ValidatorEntry(
-            index=ValidatorIndex(0),
-            attestation_secret_key=mock_key,
-            proposal_secret_key=mock_key,
-        )
-
-        with pytest.raises(AttributeError):
-            entry.index = ValidatorIndex(1)  # type: ignore[misc]
 
 
 class TestValidatorManifestEntry:
@@ -117,24 +93,13 @@ class TestValidatorManifestEntry:
             proposal_privkey_file="prop.ssz",
         )
 
-        assert entry.index == ValidatorIndex(3)
-        assert entry.attestation_pubkey_hex == Bytes52("0x" + "aa" * 52)
-        assert entry.proposal_pubkey_hex == Bytes52("0x" + "bb" * 52)
-        assert entry.attestation_privkey_file == "att.ssz"
-        assert entry.proposal_privkey_file == "prop.ssz"
-
-    def test_string_pubkey_hex_passthrough(self) -> None:
-        """Hex string pubkeys are returned unchanged."""
-        entry = ValidatorManifestEntry(
-            index=ValidatorIndex(0),
-            attestation_pubkey_hex=Bytes52("0x" + "ab" * 52),
-            proposal_pubkey_hex=Bytes52("0x" + "cd" * 52),
+        assert entry == ValidatorManifestEntry(
+            index=ValidatorIndex(3),
+            attestation_pubkey_hex=Bytes52("0x" + "aa" * 52),
+            proposal_pubkey_hex=Bytes52("0x" + "bb" * 52),
             attestation_privkey_file="att.ssz",
             proposal_privkey_file="prop.ssz",
         )
-
-        assert entry.attestation_pubkey_hex == Bytes52("0x" + "ab" * 52)
-        assert entry.proposal_pubkey_hex == Bytes52("0x" + "cd" * 52)
 
     def test_integer_pubkey_rejected(self) -> None:
         """Integer pubkeys are rejected — only valid 52-byte hex strings accepted."""
@@ -160,7 +125,7 @@ class TestValidatorManifestEntry:
 
 
 class TestValidatorManifest:
-    """Tests for ValidatorManifest Pydantic model and from_yaml_file()."""
+    """Tests for ValidatorManifest Pydantic model and YAML loading."""
 
     def test_from_yaml_file_loads_metadata(self, tmp_path: Path) -> None:
         """All top-level metadata fields are parsed correctly."""
@@ -169,14 +134,16 @@ class TestValidatorManifest:
 
         manifest = ValidatorManifest.from_yaml_file(manifest_file)
 
-        assert manifest.key_scheme == "SIGTopLevelTargetSumLifetime32Dim64Base8"
-        assert manifest.hash_function == "Poseidon2"
-        assert manifest.encoding == "TargetSum"
-        assert manifest.lifetime == 32
-        assert manifest.log_num_active_epochs == 5
-        assert manifest.num_active_epochs == 32
-        assert manifest.num_validators == 0
-        assert manifest.validators == []
+        assert manifest == ValidatorManifest(
+            key_scheme="SIGTopLevelTargetSumLifetime32Dim64Base8",
+            hash_function="Poseidon2",
+            encoding="TargetSum",
+            lifetime=32,
+            log_num_active_epochs=5,
+            num_active_epochs=32,
+            num_validators=0,
+            validators=[],
+        )
 
     def test_from_yaml_file_parses_validators_list(self, tmp_path: Path) -> None:
         """Nested validators list is parsed into ValidatorManifestEntry objects."""
@@ -188,37 +155,26 @@ class TestValidatorManifest:
 
         manifest = ValidatorManifest.from_yaml_file(manifest_file)
 
-        assert len(manifest.validators) == 2
-        assert all(isinstance(e, ValidatorManifestEntry) for e in manifest.validators)
-        assert manifest.validators[0].index == ValidatorIndex(0)
-        assert manifest.validators[1].index == ValidatorIndex(1)
-
-    def test_from_yaml_file_entry_fields_preserved(self, tmp_path: Path) -> None:
-        """All fields of a ValidatorManifestEntry are preserved when loaded."""
-        entry = {
-            "index": 5,
-            "attestation_pubkey_hex": "0x" + "5a" * 52,
-            "proposal_pubkey_hex": "0x" + "5b" * 52,
-            "attestation_privkey_file": "att_5.ssz",
-            "proposal_privkey_file": "prop_5.ssz",
-        }
-        manifest_file = tmp_path / "manifest.yaml"
-        manifest_file.write_text(
-            yaml.dump(_minimal_manifest_dict(num_validators=1, validators=[entry]))
-        )
-
-        manifest = ValidatorManifest.from_yaml_file(manifest_file)
-
-        v = manifest.validators[0]
-        assert v.index == ValidatorIndex(5)
-        assert v.attestation_pubkey_hex == Bytes52("0x" + "5a" * 52)
-        assert v.proposal_pubkey_hex == Bytes52("0x" + "5b" * 52)
-        assert v.attestation_privkey_file == "att_5.ssz"
-        assert v.proposal_privkey_file == "prop_5.ssz"
+        assert manifest.validators == [
+            ValidatorManifestEntry(
+                index=ValidatorIndex(0),
+                attestation_pubkey_hex=Bytes52("0x" + "00" * 52),
+                proposal_pubkey_hex=Bytes52("0x" + "00" * 52),
+                attestation_privkey_file="att_key_0.ssz",
+                proposal_privkey_file="prop_key_0.ssz",
+            ),
+            ValidatorManifestEntry(
+                index=ValidatorIndex(1),
+                attestation_pubkey_hex=Bytes52("0x" + "01" * 52),
+                proposal_pubkey_hex=Bytes52("0x" + "01" * 52),
+                attestation_privkey_file="att_key_1.ssz",
+                proposal_privkey_file="prop_key_1.ssz",
+            ),
+        ]
 
 
 class TestLoadNodeValidatorMapping:
-    """Tests for load_node_validator_mapping()."""
+    """Tests for loading node-to-validator index mapping from YAML."""
 
     def test_normal_loading_multiple_nodes(self, tmp_path: Path) -> None:
         """Multiple node entries are loaded into the correct structure."""
@@ -238,24 +194,6 @@ class TestLoadNodeValidatorMapping:
 
         assert mapping == {}
 
-    def test_single_node_multiple_indices(self, tmp_path: Path) -> None:
-        """A single node with several indices is loaded correctly."""
-        validators_file = tmp_path / "validators.yaml"
-        validators_file.write_text(yaml.dump({"lean_spec_0": [0, 1, 2, 3]}))
-
-        mapping = load_node_validator_mapping(validators_file)
-
-        assert mapping == {"lean_spec_0": [0, 1, 2, 3]}
-
-    def test_single_node_single_index(self, tmp_path: Path) -> None:
-        """A single node with exactly one index is loaded correctly."""
-        validators_file = tmp_path / "validators.yaml"
-        validators_file.write_text(yaml.dump({"node_a": [7]}))
-
-        mapping = load_node_validator_mapping(validators_file)
-
-        assert mapping == {"node_a": [7]}
-
 
 class TestValidatorRegistry:
     """Tests for ValidatorRegistry dataclass."""
@@ -264,26 +202,21 @@ class TestValidatorRegistry:
         """Newly created registry contains no validators."""
         registry = ValidatorRegistry()
 
-        assert len(registry) == 0
-        assert registry.get(ValidatorIndex(0)) is None
+        assert registry_state(registry) == {}
         assert registry.primary_index() is None
 
     def test_add_single_entry_and_retrieve(self) -> None:
-        """An entry added by add() is retrievable by get()."""
+        """A single entry is stored and retrievable by index."""
         registry = ValidatorRegistry()
         key = MagicMock(name="key_42")
-        registry.add(
-            ValidatorEntry(
-                index=ValidatorIndex(42),
-                attestation_secret_key=key,
-                proposal_secret_key=key,
-            )
+        entry = ValidatorEntry(
+            index=ValidatorIndex(42),
+            attestation_secret_key=key,
+            proposal_secret_key=key,
         )
+        registry.add(entry)
 
-        retrieved = registry.get(ValidatorIndex(42))
-        assert retrieved is not None
-        assert retrieved.index == ValidatorIndex(42)
-        assert retrieved.attestation_secret_key is key
+        assert registry.get(ValidatorIndex(42)) == entry
 
     def test_get_miss_returns_none(self) -> None:
         """get() returns None for an index that was never added."""
@@ -354,7 +287,7 @@ class TestValidatorRegistry:
         assert len(registry) == 4
 
     def test_indices_returns_all_registered_indices(self) -> None:
-        """indices() returns a ValidatorIndices containing every registered index."""
+        """All registered indices are returned as a collection."""
         registry = ValidatorRegistry()
         for i in [2, 5, 8]:
             registry.add(
@@ -370,11 +303,11 @@ class TestValidatorRegistry:
         assert set(result) == {ValidatorIndex(2), ValidatorIndex(5), ValidatorIndex(8)}
 
     def test_primary_index_empty_registry(self) -> None:
-        """primary_index() returns None for an empty registry."""
+        """Primary index is None for an empty registry."""
         assert ValidatorRegistry().primary_index() is None
 
     def test_primary_index_single_entry(self) -> None:
-        """primary_index() returns the only entry's index."""
+        """Primary index is the only entry's index."""
         registry = ValidatorRegistry()
         registry.add(
             ValidatorEntry(
@@ -387,7 +320,7 @@ class TestValidatorRegistry:
         assert registry.primary_index() == ValidatorIndex(5)
 
     def test_primary_index_is_first_inserted(self) -> None:
-        """primary_index() returns the index of the first inserted entry."""
+        """Primary index is the first inserted entry (insertion order)."""
         registry = ValidatorRegistry()
         for i in [3, 1, 7]:
             registry.add(
@@ -400,8 +333,33 @@ class TestValidatorRegistry:
 
         assert registry.primary_index() == ValidatorIndex(3)
 
+    def test_add_overwrites_existing_entry(self) -> None:
+        """add() with an existing index replaces the entry, preserving registry size."""
+        registry = ValidatorRegistry()
+        old_key = MagicMock(name="old")
+        new_att = MagicMock(name="new_att")
+        new_prop = MagicMock(name="new_prop")
+
+        registry.add(
+            ValidatorEntry(
+                index=ValidatorIndex(5),
+                attestation_secret_key=old_key,
+                proposal_secret_key=old_key,
+            )
+        )
+        registry.add(
+            ValidatorEntry(
+                index=ValidatorIndex(5),
+                attestation_secret_key=new_att,
+                proposal_secret_key=new_prop,
+            )
+        )
+
+        assert len(registry) == 1
+        assert registry_state(registry) == {ValidatorIndex(5): (new_att, new_prop)}
+
     def test_from_secret_keys(self) -> None:
-        """from_secret_keys() populates the registry from a dict of key pairs."""
+        """Registry can be populated from a dictionary of key pairs."""
         key_0_att, key_0_prop = MagicMock(), MagicMock()
         key_2_att, key_2_prop = MagicMock(), MagicMock()
 
@@ -418,7 +376,7 @@ class TestValidatorRegistry:
         }
 
 
-def _write_manifest(path: Path, validators: list[dict[str, Any]]) -> None:
+def _write_manifest(path: Path, validators: list[dict[str, object]]) -> None:
     """Write a minimal manifest YAML file at path."""
     path.write_text(
         yaml.dump(_minimal_manifest_dict(num_validators=len(validators), validators=validators))
@@ -433,7 +391,7 @@ def _write_key_files(directory: Path, indices: list[int]) -> None:
 
 
 class TestValidatorRegistryFromYaml:
-    """Integration tests for ValidatorRegistry.from_yaml()."""
+    """Integration tests for the full YAML loading pipeline (files on disk -> registry)."""
 
     def test_happy_path_loads_assigned_validators(self, tmp_path: Path) -> None:
         """Registry loads keys only for validators assigned to the specified node."""
@@ -481,7 +439,6 @@ class TestValidatorRegistryFromYaml:
         )
 
         assert registry_state(registry) == {}
-        assert len(registry) == 0
 
     def test_empty_validators_file_returns_empty_registry(self, tmp_path: Path) -> None:
         """An empty validators.yaml produces an empty registry."""

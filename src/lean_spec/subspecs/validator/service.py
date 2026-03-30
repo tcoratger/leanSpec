@@ -229,9 +229,8 @@ class ValidatorService:
         Checks the proposer schedule against our validator registry.
         If one of our validators should propose, produces and emits the block.
 
-        The proposer's attestation is bundled into the block rather than
-        broadcast separately at interval 1. This ensures the proposer's vote
-        is included without network round-trip delays.
+        The proposer signs the block root with the proposal key.
+        Attestation happens separately at interval 1 using the attestation key.
 
         Args:
             slot: Current slot number.
@@ -243,6 +242,10 @@ class ValidatorService:
             return
 
         num_validators = Uint64(len(head_state.validators))
+        if num_validators == Uint64(0):
+            logger.debug("Block production: no validators in state for slot %d", slot)
+            return
+
         my_indices = list(self.registry.indices())
         expected_proposer = int(slot) % int(num_validators)
         logger.debug(
@@ -362,7 +365,12 @@ class ValidatorService:
                 )
             except Exception:
                 # Best-effort: the attestation always goes via gossip regardless.
-                pass
+                logger.debug(
+                    "on_gossip_attestation failed for validator %d at slot %d",
+                    validator_index,
+                    slot,
+                    exc_info=True,
+                )
 
             # Emit the attestation for network propagation.
             await self.on_attestation(signed_attestation)
@@ -417,7 +425,7 @@ class ValidatorService:
         """
         Sign an attestation for publishing.
 
-        Uses XMSS signature scheme with the validator's secret key.
+        Signs the attestation data root with the validator's attestation key.
 
         Args:
             attestation_data: The attestation data to sign.
