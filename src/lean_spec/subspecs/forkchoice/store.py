@@ -1186,15 +1186,15 @@ class Store(StrictBaseModel):
         """
         Produce attestation data for the given slot.
 
-        This method constructs an AttestationData object according to the lean protocol
-        specification. The attestation data represents the chain state view including
-        head, target, and source checkpoints.
+        Uses the head state's justified checkpoint as the attestation source,
+        matching the 3sf-mini reference (Staker.vote uses
+        post_states[head].latest_justified_hash). The store-wide
+        latest_justified is only used for fork choice, not for voting.
 
-        The algorithm:
-        1. Get the current head block
-        2. Calculate the appropriate attestation target using current forkchoice state
-        3. Use the store's latest justified checkpoint as the attestation source
-        4. Construct and return the complete AttestationData object
+        When building on genesis (slot 0), apply the same root correction
+        as process_block_header and build_block: the genesis state has a
+        zero-hash checkpoint root, but the actual genesis block root is
+        needed for attestation validation.
 
         Args:
             slot: The slot for which to produce the attestation data.
@@ -1202,21 +1202,28 @@ class Store(StrictBaseModel):
         Returns:
             A fully constructed AttestationData object.
         """
-        # Get the head block the validator sees for this slot
+        head_state = self.states[self.head]
+
+        # Genesis root correction: the stored genesis state has
+        # latest_justified.root = Bytes32.zero(), but attestation
+        # validation requires roots that exist in store.blocks.
+        if head_state.latest_block_header.slot == Slot(0):
+            source = head_state.latest_justified.model_copy(update={"root": self.head})
+        else:
+            source = head_state.latest_justified
+
         head_checkpoint = Checkpoint(
             root=self.head,
             slot=self.blocks[self.head].slot,
         )
 
-        # Calculate the target checkpoint for this attestation
         target_checkpoint = self.get_attestation_target()
 
-        # Construct attestation data
         return AttestationData(
             slot=slot,
             head=head_checkpoint,
             target=target_checkpoint,
-            source=self.latest_justified,
+            source=source,
         )
 
     def produce_block_with_signatures(
