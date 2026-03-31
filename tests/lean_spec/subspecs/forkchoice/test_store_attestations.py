@@ -21,6 +21,7 @@ from lean_spec.types import Bytes32, Uint64
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     make_aggregated_proof,
+    make_bytes32,
     make_signed_block_from_store,
     make_store,
     make_store_with_attestation_data,
@@ -790,3 +791,29 @@ class TestEndToEndAggregationFlow:
             message=data_root,
             slot=attestation_data.slot,
         )
+
+
+def test_produce_attestation_data_uses_head_state_justified(
+    key_manager: XmssKeyManager,
+) -> None:
+    """Attestation source comes from head state, not the store-wide max.
+
+    When a non-head fork advances store.latest_justified beyond
+    states[head].latest_justified, produce_attestation_data must still
+    use the head state's checkpoint. Otherwise build_block filters out
+    every attestation (source mismatch), producing 0-attestation blocks.
+    """
+    store = make_store(num_validators=3, key_manager=key_manager)
+
+    head_state = store.states[store.head]
+    head_justified = head_state.latest_justified.model_copy(update={"root": store.head})
+
+    # Simulate a non-head fork advancing store.latest_justified
+    higher_justified = Checkpoint(root=make_bytes32(99), slot=Slot(42))
+    diverged_store = store.model_copy(update={"latest_justified": higher_justified})
+
+    assert diverged_store.latest_justified.slot > head_justified.slot
+
+    attestation = diverged_store.produce_attestation_data(Slot(1))
+
+    assert attestation.source == head_justified
