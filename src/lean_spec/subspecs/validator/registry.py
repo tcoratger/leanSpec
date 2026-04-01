@@ -34,6 +34,7 @@ from pydantic import BaseModel, field_validator
 
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.xmss import SecretKey
+from lean_spec.types import Bytes52
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +45,14 @@ type NodeValidatorMapping = dict[str, list[int]]
 class ValidatorManifestEntry(BaseModel):
     """Single validator entry from the manifest file."""
 
-    index: int
+    index: ValidatorIndex
     """Validator index in the registry."""
 
-    attestation_pubkey_hex: str
-    """Attestation public key as hex string with 0x prefix."""
+    attestation_pubkey_hex: Bytes52
+    """XMSS public key for signing attestations."""
 
-    proposal_pubkey_hex: str
-    """Proposal public key as hex string with 0x prefix."""
+    proposal_pubkey_hex: Bytes52
+    """XMSS public key for signing block proposals."""
 
     attestation_privkey_file: str
     """Filename of the attestation private key file."""
@@ -61,16 +62,18 @@ class ValidatorManifestEntry(BaseModel):
 
     @field_validator("attestation_pubkey_hex", "proposal_pubkey_hex", mode="before")
     @classmethod
-    def parse_pubkey_hex(cls, v: str | int) -> str:
+    def parse_pubkey(cls, v: object) -> Bytes52:
         """
-        Convert integer to hex string if needed.
+        Convert hex strings to validated Bytes52 pubkeys.
 
-        YAML parsers may interpret 0x-prefixed values as integers.
+        Only accepts hex strings and existing Bytes52 instances.
+        Integers and other types are rejected.
         """
-        if isinstance(v, int):
-            # Convert to 0x-prefixed hex string, padded to 52 bytes (104 chars).
-            return f"0x{v:0104x}"
-        return v
+        if isinstance(v, Bytes52):
+            return v
+        if isinstance(v, str):
+            return Bytes52(v)
+        raise TypeError(f"Expected hex string or Bytes52, got {type(v).__name__}")
 
 
 class ValidatorManifest(BaseModel):
@@ -156,7 +159,7 @@ class ValidatorEntry:
     """Secret key for signing attestations."""
 
     proposal_secret_key: SecretKey
-    """Secret key for signing proposer attestations in blocks."""
+    """Secret key for signing block proposals."""
 
 
 @dataclass(slots=True)
@@ -173,7 +176,10 @@ class ValidatorRegistry:
 
     def add(self, entry: ValidatorEntry) -> None:
         """
-        Add a validator entry to the registry.
+        Add or replace a validator entry in the registry.
+
+        Replaces any existing entry with the same index.
+        Used to persist updated key state after signing.
 
         Args:
             entry: Validator entry to add.
@@ -270,7 +276,7 @@ class ValidatorRegistry:
         manifest_dir = manifest_path.parent
 
         for index in assigned_indices:
-            entry = manifest_by_index.get(index)
+            entry = manifest_by_index.get(ValidatorIndex(index))
             if entry is None:
                 # Validator index in validators.yaml but missing from manifest.
                 # This can happen if the manifest was regenerated with fewer validators.

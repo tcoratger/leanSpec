@@ -16,7 +16,6 @@ from lean_spec.subspecs.chain.config import (
     JUSTIFICATION_LOOKBACK_SLOTS,
 )
 from lean_spec.subspecs.containers import (
-    Attestation,
     AttestationData,
     Block,
     Checkpoint,
@@ -98,11 +97,14 @@ class Store(StrictBaseModel):
 
     latest_justified: Checkpoint
     """
-    Highest slot justified checkpoint known to the store.
+    Highest-slot justified checkpoint known to the store.
 
-    LMD GHOST starts from this checkpoint when computing the head.
-
+    This is the global maximum across all forks.
+    Used only for fork choice: LMD GHOST starts here when computing the head.
     Only descendants of this checkpoint are considered viable.
+
+    Attestation production does not use this field.
+    Validators vote with the justified checkpoint from the head state instead.
     """
 
     latest_finalized: Checkpoint
@@ -268,7 +270,7 @@ class Store(StrictBaseModel):
             }
         )
 
-    def validate_attestation(self, attestation: Attestation) -> None:
+    def validate_attestation(self, attestation_data: AttestationData) -> None:
         """
         Validate incoming attestation before processing.
 
@@ -280,12 +282,12 @@ class Store(StrictBaseModel):
             5. A vote cannot be for a future slot.
 
         Args:
-            attestation: Attestation to validate (unsigned).
+        attestation_data: AttestationData whose checkpoints and slot should be validated.
 
         Raises:
             AssertionError: If attestation fails validation.
         """
-        data = attestation.data
+        data = attestation_data
 
         # Availability Check
         #
@@ -354,8 +356,7 @@ class Store(StrictBaseModel):
 
         # Validate the attestation first so unknown blocks are rejected cleanly
         # (instead of raising a raw KeyError when state is missing).
-        attestation = Attestation(validator_id=validator_id, data=attestation_data)
-        self.validate_attestation(attestation)
+        self.validate_attestation(attestation_data)
 
         key_state = self.states.get(attestation_data.target.root)
         assert key_state is not None, (
@@ -413,6 +414,8 @@ class Store(StrictBaseModel):
         """
         data = signed_attestation.data
         proof = signed_attestation.proof
+
+        self.validate_attestation(data)
 
         # Get validator IDs who participated in this aggregation
         validator_ids = proof.participants.to_validator_indices()
@@ -1145,15 +1148,21 @@ class Store(StrictBaseModel):
         """
         Produce attestation data for the given slot.
 
-        This method constructs an AttestationData object according to the lean protocol
-        specification. The attestation data represents the chain state view including
-        head, target, and source checkpoints.
+        An attestation vote has four fields:
 
-        The algorithm:
-        1. Get the current head block
-        2. Calculate the appropriate attestation target using current forkchoice state
-        3. Use the store's latest justified checkpoint as the attestation source
-        4. Construct and return the complete AttestationData object
+        - **slot**: when this vote is cast
+        - **head**: the block at the tip of the chain
+        - **target**: the justification candidate (walked back from head)
+        - **source**: the last justified checkpoint *on the head chain*
+
+        The source anchors the vote to a trusted starting point. It must
+        come from the head state — not from the store-wide field — because
+        the block builder only accepts attestations whose source matches
+        the head state's justified checkpoint.
+
+        At genesis the head state has a zero-hash checkpoint root. Since
+        validation requires a root present in the block registry, the
+        actual genesis block root is substituted.
 
         Args:
             slot: The slot for which to produce the attestation data.
@@ -1161,7 +1170,18 @@ class Store(StrictBaseModel):
         Returns:
             A fully constructed AttestationData object.
         """
-        # Get the head block the validator sees for this slot
+        head_state = self.states[self.head]
+
+        # Derive the source from the head state's justified checkpoint.
+        #
+        # At genesis the checkpoint root is a placeholder zero-hash.
+        # Replace it with the real genesis block root so that attestation
+        # validation can look it up in the block registry.
+        if head_state.latest_block_header.slot == Slot(0):
+            source = head_state.latest_justified.model_copy(update={"root": self.head})
+        else:
+            source = head_state.latest_justified
+
         head_checkpoint = Checkpoint(
             root=self.head,
             slot=self.blocks[self.head].slot,
@@ -1175,7 +1195,7 @@ class Store(StrictBaseModel):
             slot=slot,
             head=head_checkpoint,
             target=target_checkpoint,
-            source=self.latest_justified,
+            source=source,
         )
 
     def produce_block_with_signatures(
