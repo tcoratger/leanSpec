@@ -97,11 +97,14 @@ class Store(StrictBaseModel):
 
     latest_justified: Checkpoint
     """
-    Highest slot justified checkpoint known to the store.
+    Highest-slot justified checkpoint known to the store.
 
-    LMD GHOST starts from this checkpoint when computing the head.
-
+    This is the global maximum across all forks.
+    Used only for fork choice: LMD GHOST starts here when computing the head.
     Only descendants of this checkpoint are considered viable.
+
+    Attestation production does not use this field.
+    Validators vote with the justified checkpoint from the head state instead.
     """
 
     latest_finalized: Checkpoint
@@ -1186,15 +1189,21 @@ class Store(StrictBaseModel):
         """
         Produce attestation data for the given slot.
 
-        This method constructs an AttestationData object according to the lean protocol
-        specification. The attestation data represents the chain state view including
-        head, target, and source checkpoints.
+        An attestation vote has four fields:
 
-        The algorithm:
-        1. Get the current head block
-        2. Calculate the appropriate attestation target using current forkchoice state
-        3. Use the store's latest justified checkpoint as the attestation source
-        4. Construct and return the complete AttestationData object
+        - **slot**: when this vote is cast
+        - **head**: the block at the tip of the chain
+        - **target**: the justification candidate (walked back from head)
+        - **source**: the last justified checkpoint *on the head chain*
+
+        The source anchors the vote to a trusted starting point. It must
+        come from the head state — not from the store-wide field — because
+        the block builder only accepts attestations whose source matches
+        the head state's justified checkpoint.
+
+        At genesis the head state has a zero-hash checkpoint root. Since
+        validation requires a root present in the block registry, the
+        actual genesis block root is substituted.
 
         Args:
             slot: The slot for which to produce the attestation data.
@@ -1202,7 +1211,18 @@ class Store(StrictBaseModel):
         Returns:
             A fully constructed AttestationData object.
         """
-        # Get the head block the validator sees for this slot
+        head_state = self.states[self.head]
+
+        # Derive the source from the head state's justified checkpoint.
+        #
+        # At genesis the checkpoint root is a placeholder zero-hash.
+        # Replace it with the real genesis block root so that attestation
+        # validation can look it up in the block registry.
+        if head_state.latest_block_header.slot == Slot(0):
+            source = head_state.latest_justified.model_copy(update={"root": self.head})
+        else:
+            source = head_state.latest_justified
+
         head_checkpoint = Checkpoint(
             root=self.head,
             slot=self.blocks[self.head].slot,
@@ -1216,7 +1236,7 @@ class Store(StrictBaseModel):
             slot=slot,
             head=head_checkpoint,
             target=target_checkpoint,
-            source=self.latest_justified,
+            source=source,
         )
 
     def produce_block_with_signatures(
