@@ -20,18 +20,18 @@ from lean_spec.types import ByteListMiB, Bytes32, Container
 
 from .containers import PublicKey, Signature
 
-LOG_INV_RATE = 2
+LOG_INV_RATE_TEST = 1
 """
-Inverse rate exponent for proof generation (valid range: 1-4).
+Inverse rate exponent for test mode (fastest, biggest proofs).
 
 This parameter is forwarded to `lean_multisig_py` prover and controls a performance/size trade-off:
 
 - Lower values generate proofs faster but increase proof size.
 - Higher values reduce proof size but increase prover work.
-
-The default value (`2`) is carried over from the reference implementation in `leanMultisig`,
-where it was chosen as a practical middle ground for typical aggregation workloads.
 """
+
+LOG_INV_RATE_PROD = 2
+"""Inverse rate exponent for production mode (balanced speed vs proof size)."""
 
 
 class AggregationError(Exception):
@@ -126,7 +126,7 @@ class AggregatedSignatureProof(Container):
                 [sig.encode_bytes() for _, sig in raw_xmss],
                 message,
                 slot,
-                LOG_INV_RATE,
+                LOG_INV_RATE_TEST if mode == "test" else LOG_INV_RATE_PROD,
                 children_bytes=children_bytes,
                 mode=mode,
             )
