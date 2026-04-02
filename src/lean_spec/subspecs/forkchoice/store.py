@@ -930,19 +930,15 @@ class Store(StrictBaseModel):
         """
         head_state = self.states[self.head]
 
-        # Plain aggregation: only attestation_signatures; carry forward existing
-        # new payloads. Remove this block once bindings support recursive aggregation.
         aggregated_results = head_state.aggregate(
             attestation_signatures=self.attestation_signatures,
-            new_payloads=None,
-            known_payloads=None,
+            new_payloads=self.latest_new_aggregated_payloads,
+            known_payloads=self.latest_known_aggregated_payloads,
         )
-        new_aggregates = []
-        new_aggregated_payloads = {
-            attestation_data: set(proofs)
-            for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
-        }
-        aggregated_attestation_data = set()
+
+        new_aggregates: list[SignedAggregatedAttestation] = []
+        new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
+        aggregated_attestation_data: set[AttestationData] = set()
         for att, proof in aggregated_results:
             aggregated_attestation_data.add(att.data)
             new_aggregates.append(SignedAggregatedAttestation(data=att.data, proof=proof))
@@ -952,6 +948,7 @@ class Store(StrictBaseModel):
             for attestation_data, signatures in self.attestation_signatures.items()
             if attestation_data not in aggregated_attestation_data
         }
+
         return self.model_copy(
             update={
                 "latest_new_aggregated_payloads": new_aggregated_payloads,
