@@ -47,7 +47,7 @@ This is the minimum version required by the Ethereum consensus spec.
 GOSSIPSUB_PROTOCOL_ID_V12: Final = ProtocolId("/meshsub/1.2.0")
 """Gossipsub v1.2 protocol ID - IDONTWANT bandwidth optimization."""
 
-GOSSIPSUB_DEFAULT_PROTOCOL_ID: Final = GOSSIPSUB_PROTOCOL_ID_V11
+GOSSIPSUB_DEFAULT_PROTOCOL_ID: Final = GOSSIPSUB_PROTOCOL_ID_V12
 """
 Default protocol ID per Ethereum consensus spec requirements.
 

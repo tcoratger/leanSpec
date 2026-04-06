@@ -29,7 +29,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.12.0,<3",
     "typing-extensions>=4.4",
-    "lean-multisig-py>=0.1.0",
+    "lean-multisig-py>=0.0.1",
     "httpx>=0.28.0,<1",
     "aiohttp>=3.11.0,<4",
     "cryptography>=46.0.0",
@@ -117,6 +117,8 @@ timeout = 300
 [tool.coverage.run]
 source = ["src"]
 branch = true
+
+[tool.coverage.report]
 fail_under = 80
 
 [tool.mdformat]
@@ -131,18 +133,18 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 lean-ethereum-testing = { workspace = true }
-lean-multisig-py = { git = "https://github.com/anshalshukla/leanMultisig-py", branch = "devnet2" }
+lean-multisig-py = { git = "https://github.com/anshalshukla/leanMultisig-py", branch = "devnet4" }
 
 [dependency-groups]
 test = [
     "pytest>=8.3.3,<9",
     "pytest-cov>=6.0.0,<7",
     "pytest-xdist>=3.6.1,<4",
-    "pytest-asyncio>=0.24.0,<1",
+    "pytest-asyncio>=1.0.0",
     "pytest-timeout>=2.2.0,<3",
     "hypothesis>=6.138.14",
     "lean-ethereum-testing",
-    "lean-multisig-py>=0.1.0",
+    "lean-multisig-py>=0.0.1",
     "pycryptodome>=3.20.0,<4",
 ]
 lint = [

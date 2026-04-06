@@ -17,7 +17,7 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.forkchoice import AttestationSignatureEntry
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import ByteListMiB, Bytes32, Uint64
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     make_aggregated_proof,
@@ -354,12 +354,11 @@ class TestOnGossipAggregatedAttestation:
 
     def test_invalid_proof_rejected(self, key_manager: XmssKeyManager) -> None:
         """
-        Invalid aggregated proof is rejected with AssertionError.
+        Corrupted aggregated proof is rejected with AssertionError.
 
-        A proof signed by different validators than claimed should fail verification.
+        A proof with tampered bytes should fail verification.
         """
-        claimed_participants = [ValidatorIndex(1), ValidatorIndex(2)]
-        actual_signers = [ValidatorIndex(1), ValidatorIndex(3)]  # Different!
+        signers = [ValidatorIndex(1), ValidatorIndex(2)]
 
         store, attestation_data = make_store_with_attestation_data(
             key_manager, num_validators=4, validator_id=ValidatorIndex(0)
@@ -367,17 +366,11 @@ class TestOnGossipAggregatedAttestation:
 
         data_root = attestation_data.data_root_bytes()
 
-        # Create proof with WRONG signers (validator 3 signs instead of 2)
-        xmss_participants = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=claimed_participants)
-        )
+        xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=signers))
         raw_xmss = list(
             zip(
-                [key_manager[vid].attestation_public for vid in actual_signers],
-                [
-                    key_manager.sign_attestation_data(vid, attestation_data)
-                    for vid in actual_signers
-                ],
+                [key_manager[vid].attestation_public for vid in signers],
+                [key_manager.sign_attestation_data(vid, attestation_data) for vid in signers],
                 strict=True,
             )
         )
@@ -389,9 +382,18 @@ class TestOnGossipAggregatedAttestation:
             slot=attestation_data.slot,
         )
 
+        # Corrupt the proof data
+        corrupted_data = bytearray(proof.proof_data.encode_bytes())
+        corrupted_data[10] ^= 0xFF
+        corrupted_data[20] ^= 0xFF
+        corrupted_proof = AggregatedSignatureProof(
+            participants=proof.participants,
+            proof_data=ByteListMiB(data=bytes(corrupted_data)),
+        )
+
         signed_aggregated = SignedAggregatedAttestation(
             data=attestation_data,
-            proof=proof,
+            proof=corrupted_proof,
         )
 
         with pytest.raises(AssertionError, match="signature verification failed"):

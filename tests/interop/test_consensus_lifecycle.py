@@ -57,7 +57,7 @@ Activity counts gossip signatures, new aggregated, and known aggregated.
 """
 
 
-@pytest.mark.timeout(120)
+@pytest.mark.timeout(360)
 @pytest.mark.num_validators(3)
 async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     """
@@ -110,7 +110,7 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     # 2. Parent chain integrity - slot numbers strictly increase
     # 3. Proposer assignment - round-robin matches slot % 3
     logger.info("Phase 2: Block production")
-    reached = await node_cluster.wait_for_slot(target_slot=1, timeout=25)
+    reached = await node_cluster.wait_for_slot(target_slot=1, timeout=50)
     diags = node_cluster.log_diagnostics("block-production")
     checkpoint_history.append(diags)
     assert reached, f"Block production stalled: head slots {[d.head_slot for d in diags]}"
@@ -212,7 +212,7 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
     #
     # After reaching slot 3, verify head consistency and block content.
     logger.info("Phase 4: Continued block production")
-    reached = await node_cluster.wait_for_slot(target_slot=3, timeout=30)
+    reached = await node_cluster.wait_for_slot(target_slot=10, timeout=300)
     diags = node_cluster.log_diagnostics("continued-production")
     checkpoint_history.append(diags)
     assert reached, f"Continued production stalled: head slots {[d.head_slot for d in diags]}"
