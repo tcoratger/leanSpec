@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from collections.abc import Set as AbstractSet
-from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
@@ -16,13 +15,13 @@ from lean_spec.types import (
     Uint64,
 )
 
-from ..attestation import AggregatedAttestation, AggregationBits, AttestationData
+from ..attestation import AggregatedAttestation, AttestationData
 from ..block import Block, BlockBody, BlockHeader
 from ..block.types import AggregatedAttestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
-from ..validator import ValidatorIndex, ValidatorIndices
+from ..validator import ValidatorIndex
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
@@ -30,9 +29,6 @@ from .types import (
     JustifiedSlots,
     Validators,
 )
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.forkchoice import AttestationSignatureEntry
 
 
 class State(Container):
@@ -692,7 +688,7 @@ class State(Container):
 
                     found_entries = True
 
-                    selected, _ = self._select_proofs_greedily(proofs)
+                    selected, _ = AggregatedSignatureProof.select_greedily(proofs)
                     aggregated_signatures.extend(selected)
                     for proof in selected:
                         aggregated_attestations.append(
@@ -725,16 +721,23 @@ class State(Container):
 
             # Compact: merge all proofs sharing the same AttestationData into one
             # using recursive children aggregation.
+            #
+            # During the fixed-point loop above, multiple proofs may have been
+            # selected for the same AttestationData across iterations. Group them
+            # and merge each group into a single recursive proof.
             proof_groups: dict[AttestationData, list[AggregatedSignatureProof]] = {}
             for att, sig in zip(aggregated_attestations, aggregated_signatures, strict=True):
                 proof_groups.setdefault(att.data, []).append(sig)
 
-            compacted_attestations: list[AggregatedAttestation] = []
-            compacted_signatures: list[AggregatedSignatureProof] = []
+            aggregated_attestations = []
+            aggregated_signatures = []
             for att_data, proofs in proof_groups.items():
                 if len(proofs) == 1:
-                    compacted_signatures.append(proofs[0])
+                    sig = proofs[0]
                 else:
+                    # Multiple proofs for the same data were aggregated separately.
+                    # Merge them into one recursive proof using children-only
+                    # aggregation (no new raw signatures).
                     children = [
                         (
                             proof,
@@ -745,23 +748,17 @@ class State(Container):
                         )
                         for proof in proofs
                     ]
-                    merged = AggregatedSignatureProof.aggregate(
+                    sig = AggregatedSignatureProof.aggregate(
                         xmss_participants=None,
                         children=children,
                         raw_xmss=[],
                         message=att_data.data_root_bytes(),
                         slot=att_data.slot,
                     )
-                    compacted_signatures.append(merged)
-                compacted_attestations.append(
-                    AggregatedAttestation(
-                        aggregation_bits=compacted_signatures[-1].participants,
-                        data=att_data,
-                    )
+                aggregated_signatures.append(sig)
+                aggregated_attestations.append(
+                    AggregatedAttestation(aggregation_bits=sig.participants, data=att_data)
                 )
-
-            aggregated_attestations = compacted_attestations
-            aggregated_signatures = compacted_signatures
 
         # Create the final block with selected attestations.
         final_block = Block(
@@ -779,116 +776,3 @@ class State(Container):
         final_block = final_block.model_copy(update={"state_root": hash_tree_root(post_state)})
 
         return final_block, post_state, aggregated_attestations, aggregated_signatures
-
-    @staticmethod
-    def _select_proofs_greedily(
-        *proof_sets: set[AggregatedSignatureProof] | None,
-    ) -> tuple[list[AggregatedSignatureProof], set[ValidatorIndex]]:
-        """
-        Greedy set-cover selection of signature proofs to maximize validator coverage.
-
-        Repeatedly selects the proof covering the most uncovered validators until
-        no proof adds new coverage. Earlier proof sets are prioritized.
-
-        Args:
-            proof_sets: Candidate proof sets in priority order.
-
-        Returns:
-            Selected proofs and the set of covered validator indices.
-        """
-        selected: list[AggregatedSignatureProof] = []
-        covered: set[ValidatorIndex] = set()
-        for proofs in proof_sets:
-            if not proofs:
-                continue
-            remaining = list(proofs)
-            while remaining:
-                # Pick the proof that covers the most new validators.
-                best = max(
-                    remaining,
-                    key=lambda p: len(set(p.participants.to_validator_indices()) - covered),
-                )
-                new_coverage = set(best.participants.to_validator_indices()) - covered
-                # Stop when no proof in this set adds new coverage.
-                if not new_coverage:
-                    break
-                selected.append(best)
-                covered.update(new_coverage)
-                remaining.remove(best)
-        return selected, covered
-
-    def aggregate(
-        self,
-        attestation_signatures: dict[AttestationData, set[AttestationSignatureEntry]] | None = None,
-        new_payloads: dict[AttestationData, set[AggregatedSignatureProof]] | None = None,
-        known_payloads: dict[AttestationData, set[AggregatedSignatureProof]] | None = None,
-    ) -> list[tuple[AggregatedAttestation, AggregatedSignatureProof]]:
-        """
-        Aggregate gossip signatures using new payloads, with known payloads as helpers.
-
-        Args:
-            attestation_signatures: Raw XMSS signatures from gossip, keyed by attestation data.
-            new_payloads: Aggregated proofs pending processing (child proofs).
-            known_payloads: Known aggregated proofs already accepted.
-
-        Returns:
-            List of (attestation, proof) pairs from aggregation.
-        """
-        gossip_sigs = attestation_signatures or {}
-        new = new_payloads or {}
-        known = known_payloads or {}
-
-        attestation_keys = new.keys() | gossip_sigs.keys()
-        if not attestation_keys:
-            return []
-
-        results: list[tuple[AggregatedAttestation, AggregatedSignatureProof]] = []
-
-        for data in attestation_keys:
-            # Phase 1: Greedily select child proofs for maximum validator coverage.
-            # New payloads are prioritized over known payloads.
-            child_proofs, covered = self._select_proofs_greedily(new.get(data), known.get(data))
-
-            # Phase 2: Collect raw XMSS signatures for validators not yet covered.
-            # Sorted by validator index for deterministic output.
-            raw_entries = [
-                (
-                    e.validator_id,
-                    self.validators[e.validator_id].get_attestation_pubkey(),
-                    e.signature,
-                )
-                for e in sorted(gossip_sigs.get(data, set()), key=lambda e: e.validator_id)
-                if e.validator_id not in covered
-            ]
-
-            # Need at least one raw signature, or two child proofs to aggregate.
-            if not raw_entries and len(child_proofs) < 2:
-                continue
-
-            xmss_participants = AggregationBits.from_validator_indices(
-                ValidatorIndices(data=[vid for vid, _, _ in raw_entries])
-            )
-            raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
-
-            # Phase 3: Build recursive children with their public keys from the registry.
-            children = [
-                (
-                    child,
-                    [
-                        self.validators[vid].get_attestation_pubkey()
-                        for vid in child.participants.to_validator_indices()
-                    ],
-                )
-                for child in child_proofs
-            ]
-            proof = AggregatedSignatureProof.aggregate(
-                xmss_participants=xmss_participants,
-                children=children,
-                raw_xmss=raw_xmss,
-                message=data.data_root_bytes(),
-                slot=data.slot,
-            )
-            attestation = AggregatedAttestation(aggregation_bits=proof.participants, data=data)
-            results.append((attestation, proof))
-
-        return results

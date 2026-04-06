@@ -1,4 +1,4 @@
-"""Tests for the State aggregation helpers introduced on the aggregation branch."""
+"""Tests for attestation signature aggregation and block building."""
 
 from __future__ import annotations
 
@@ -15,13 +15,15 @@ from tests.lean_spec.helpers import (
     make_attestation_data_simple,
     make_bytes32,
     make_keyed_genesis_state,
+    make_store,
 )
 
 
 def test_aggregated_signatures_prefers_full_gossip_payload(
     container_key_manager: XmssKeyManager,
 ) -> None:
-    state = make_keyed_genesis_state(2, container_key_manager)
+    store = make_store(num_validators=2, key_manager=container_key_manager)
+    head_state = store.states[store.head]
     source = Checkpoint(root=make_bytes32(1), slot=Slot(0))
     att_data = make_attestation_data_simple(
         Slot(2), make_bytes32(3), make_bytes32(4), source=source
@@ -36,18 +38,19 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
         }
     }
 
-    results = state.aggregate(attestation_signatures=attestation_signatures)
-    aggregated_atts, aggregated_proofs = zip(*results, strict=True)
+    store = store.model_copy(update={"attestation_signatures": attestation_signatures})
+    _, results = store.aggregate()
 
-    assert len(aggregated_atts) == 1
-    assert len(aggregated_proofs) == 1
-    assert set(aggregated_proofs[0].participants.to_validator_indices()) == {
+    assert len(results) == 1
+    assert set(results[0].proof.participants.to_validator_indices()) == {
         ValidatorIndex(0),
         ValidatorIndex(1),
     }
 
-    public_keys = [container_key_manager[ValidatorIndex(i)].attestation_public for i in range(2)]
-    aggregated_proofs[0].verify(
+    public_keys = [
+        head_state.validators[ValidatorIndex(i)].get_attestation_pubkey() for i in range(2)
+    ]
+    results[0].proof.verify(
         public_keys=public_keys,
         message=att_data.data_root_bytes(),
         slot=att_data.slot,
@@ -123,13 +126,12 @@ def test_build_block_skips_attestations_without_signatures(
     assert list(block.body.attestations.data) == []
 
 
-def test_aggregate_attestation_signatures_with_empty_attestations(
+def test_aggregate_with_empty_attestation_signatures(
     container_key_manager: XmssKeyManager,
 ) -> None:
     """Empty attestations list should return empty results."""
-    state = make_keyed_genesis_state(2, container_key_manager)
-
-    results = state.aggregate(attestation_signatures={})
+    store = make_store(num_validators=2, key_manager=container_key_manager)
+    _, results = store.aggregate()
 
     assert results == []
 
@@ -138,7 +140,8 @@ def test_aggregated_signatures_with_multiple_data_groups(
     container_key_manager: XmssKeyManager,
 ) -> None:
     """Multiple attestation data groups should be processed independently."""
-    state = make_keyed_genesis_state(4, container_key_manager)
+    store = make_store(num_validators=4, key_manager=container_key_manager)
+    head_state = store.states[store.head]
     source = Checkpoint(root=make_bytes32(22), slot=Slot(0))
     att_data1 = make_attestation_data_simple(
         Slot(9), make_bytes32(23), make_bytes32(24), source=source
@@ -170,19 +173,18 @@ def test_aggregated_signatures_with_multiple_data_groups(
         },
     }
 
-    results = state.aggregate(attestation_signatures=attestation_signatures)
-    aggregated_atts, aggregated_proofs = zip(*results, strict=True)
+    store = store.model_copy(update={"attestation_signatures": attestation_signatures})
+    _, results = store.aggregate()
 
-    assert len(aggregated_atts) == 2
-    assert len(aggregated_proofs) == 2
+    assert len(results) == 2
 
-    for agg_att, proof in zip(aggregated_atts, aggregated_proofs, strict=True):
-        participants = proof.participants.to_validator_indices()
-        public_keys = [container_key_manager[vid].attestation_public for vid in participants]
-        proof.verify(
+    for signed_att in results:
+        participants = signed_att.proof.participants.to_validator_indices()
+        public_keys = [head_state.validators[vid].get_attestation_pubkey() for vid in participants]
+        signed_att.proof.verify(
             public_keys=public_keys,
-            message=agg_att.data.data_root_bytes(),
-            slot=agg_att.data.slot,
+            message=signed_att.data.data_root_bytes(),
+            slot=signed_att.data.slot,
         )
 
 
@@ -345,18 +347,15 @@ def test_build_block_skips_unknown_head_root(
     assert aggregated_atts[0].data == att_data_known
 
 
-def test_gossip_none_and_aggregated_payloads_none(
+def test_aggregate_with_no_signatures(
     container_key_manager: XmssKeyManager,
 ) -> None:
     """
-    Test edge case where both attestation_signatures and aggregated_payloads are None.
+    Test edge case where the store has no attestation signatures or payloads.
 
-    Expected Behavior
-    -----------------
     Returns empty results (no attestations can be aggregated without signatures).
     """
-    state = make_keyed_genesis_state(2, container_key_manager)
-
-    results = state.aggregate(attestation_signatures=None)
+    store = make_store(num_validators=2, key_manager=container_key_manager)
+    _, results = store.aggregate()
 
     assert results == []
