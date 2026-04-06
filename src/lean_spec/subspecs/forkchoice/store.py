@@ -16,6 +16,7 @@ from lean_spec.subspecs.chain.config import (
     JUSTIFICATION_LOOKBACK_SLOTS,
 )
 from lean_spec.subspecs.containers import (
+    AggregationBits,
     AttestationData,
     Block,
     Checkpoint,
@@ -28,6 +29,7 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.validator import ValidatorIndices
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
@@ -928,32 +930,134 @@ class Store(StrictBaseModel):
 
     def aggregate(self) -> tuple["Store", list[SignedAggregatedAttestation]]:
         """
-        Aggregate committee signatures and payloads together.
+        Turn raw validator votes into compact aggregated attestations.
 
-        This method aggregates signatures from the attestation_signatures map.
+        Validators cast individual signatures over gossip. Before those
+        votes can influence fork choice or be included in a block, they
+        must be combined into compact cryptographic proofs.
+
+        The store holds three pools of attestation evidence:
+
+        - **Gossip signatures**: individual validator votes arriving in real-time.
+        - **New payloads**: aggregated proofs from the current round, not yet
+          committed to the chain.
+        - **Known payloads**: previously accepted proofs, reusable as building
+          blocks for deeper aggregation.
+
+        For each unique piece of attestation data the algorithm proceeds in three phases:
+
+        1. **Select** — greedily pick existing proofs that maximize
+           validator coverage (new before known).
+        2. **Fill** — collect raw gossip signatures for any validators
+           not yet covered.
+        3. **Aggregate** — delegate to the XMSS subspec to produce a
+           single cryptographic proof.
+
+        After aggregation the store is updated:
+
+        - Consumed gossip signatures are removed.
+        - Newly produced proofs are recorded for future reuse.
 
         Returns:
-            Tuple of (new Store with updated payloads, list of new SignedAggregatedAttestation).
+            Updated store and the list of freshly produced signed attestations.
         """
-        head_state = self.states[self.head]
-
-        aggregated_results = head_state.aggregate(
-            attestation_signatures=self.attestation_signatures,
-            new_payloads=self.latest_new_aggregated_payloads,
-            known_payloads=self.latest_known_aggregated_payloads,
-        )
+        validators = self.states[self.head].validators
+        gossip_sigs = self.attestation_signatures
+        new = self.latest_new_aggregated_payloads
+        known = self.latest_known_aggregated_payloads
 
         new_aggregates: list[SignedAggregatedAttestation] = []
+
+        # Only attestation data with a new payload or a raw gossip signature
+        # can trigger aggregation. Known payloads alone cannot — they exist
+        # only to help extend coverage when combined with fresh evidence.
+        for data in new.keys() | gossip_sigs.keys():
+            # Phase 1: Select
+            #
+            # Start with the cheapest option: reuse proofs that already
+            # cover many validators.
+            #
+            # Child proofs are aggregated signatures from prior rounds.
+            # Selecting them first keeps the final proof tree shallow
+            # and avoids redundant cryptographic work.
+            #
+            # New payloads go first because they represent uncommitted
+            # work — known payloads fill remaining gaps.
+            child_proofs, covered = AggregatedSignatureProof.select_greedily(
+                new.get(data), known.get(data)
+            )
+
+            # Phase 2: Fill
+            #
+            # For every validator not yet covered by a child proof,
+            # include its individual gossip signature.
+            #
+            # Sorting by validator index guarantees deterministic proof
+            # construction regardless of network arrival order.
+            raw_entries = [
+                (
+                    e.validator_id,
+                    validators[e.validator_id].get_attestation_pubkey(),
+                    e.signature,
+                )
+                for e in sorted(gossip_sigs.get(data, set()), key=lambda e: e.validator_id)
+                if e.validator_id not in covered
+            ]
+
+            # The XMSS layer enforces a minimum: either at least one raw
+            # signature, or at least two child proofs to merge.
+            #
+            # A lone child proof is already a valid proof — nothing to do.
+            if not raw_entries and len(child_proofs) < 2:
+                continue
+
+            # Encode the set of raw signers as a compact bitfield.
+            xmss_participants = AggregationBits.from_validator_indices(
+                ValidatorIndices(data=[vid for vid, _, _ in raw_entries])
+            )
+            raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
+
+            # Phase 3: Aggregate
+            #
+            # Build the recursive proof tree.
+            #
+            # Each child proof needs its participants' public keys so
+            # the XMSS prover can verify inner proofs while constructing
+            # the outer one.
+            children = [
+                (
+                    child,
+                    [
+                        validators[vid].get_attestation_pubkey()
+                        for vid in child.participants.to_validator_indices()
+                    ],
+                )
+                for child in child_proofs
+            ]
+
+            # Hand everything to the XMSS subspec.
+            # Out comes a single proof covering all selected validators.
+            proof = AggregatedSignatureProof.aggregate(
+                xmss_participants=xmss_participants,
+                children=children,
+                raw_xmss=raw_xmss,
+                message=data.data_root_bytes(),
+                slot=data.slot,
+            )
+            new_aggregates.append(SignedAggregatedAttestation(data=data, proof=proof))
+
+        # ── Store bookkeeping ────────────────────────────────────────
+        #
+        # Record freshly produced proofs so future rounds can reuse them.
+        # Remove gossip signatures that were consumed by this aggregation.
         new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
-        aggregated_attestation_data: set[AttestationData] = set()
-        for att, proof in aggregated_results:
-            aggregated_attestation_data.add(att.data)
-            new_aggregates.append(SignedAggregatedAttestation(data=att.data, proof=proof))
-            new_aggregated_payloads.setdefault(att.data, set()).add(proof)
+        for signed_att in new_aggregates:
+            new_aggregated_payloads.setdefault(signed_att.data, set()).add(signed_att.proof)
+
         remaining_attestation_signatures = {
-            attestation_data: signatures
-            for attestation_data, signatures in self.attestation_signatures.items()
-            if attestation_data not in aggregated_attestation_data
+            data: sigs
+            for data, sigs in self.attestation_signatures.items()
+            if data not in new_aggregated_payloads
         }
 
         return self.model_copy(

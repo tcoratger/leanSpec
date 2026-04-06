@@ -137,6 +137,62 @@ class AggregatedSignatureProof(Container):
         except Exception as exc:
             raise AggregationError(f"Signature aggregation failed: {exc}") from exc
 
+    @staticmethod
+    def select_greedily(
+        *proof_sets: set[AggregatedSignatureProof] | None,
+    ) -> tuple[list[AggregatedSignatureProof], set[ValidatorIndex]]:
+        """
+        Greedy set-cover selection of proofs to maximize validator coverage.
+
+        Repeatedly selects the proof covering the most uncovered validators
+        until no proof adds new coverage. Earlier proof sets are prioritized.
+
+        TODO: We should find a better place for this in the future.
+
+        Args:
+            proof_sets: Candidate proof sets in priority order.
+
+        Returns:
+            Selected proofs and the set of covered validator indices.
+        """
+        selected: list[AggregatedSignatureProof] = []
+        covered: set[ValidatorIndex] = set()
+
+        # Process each priority tier in order.
+        #
+        # Earlier sets are exhausted before moving to later ones.
+        # This ensures new (pending) proofs are preferred over known
+        # (already-accepted) proofs, reducing redundant work.
+        for proofs in proof_sets:
+            if not proofs:
+                continue
+
+            remaining = list(proofs)
+
+            # Greedy set-cover: repeatedly pick the proof that adds the
+            # most uncovered validators.
+            #
+            # The greedy approach guarantees a logarithmic approximation
+            # ratio, which is good enough for block building where we want
+            # maximum coverage with minimal proof count.
+            while remaining:
+                best = max(
+                    remaining,
+                    key=lambda p: len(set(p.participants.to_validator_indices()) - covered),
+                )
+                new_coverage = set(best.participants.to_validator_indices()) - covered
+
+                # No proof in this tier adds new coverage.
+                # Remaining proofs are fully redundant with what we already have.
+                if not new_coverage:
+                    break
+
+                selected.append(best)
+                covered |= new_coverage
+                remaining.remove(best)
+
+        return selected, covered
+
     def verify(
         self,
         public_keys: Sequence[PublicKey],
