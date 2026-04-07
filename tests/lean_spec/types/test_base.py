@@ -1,11 +1,4 @@
-"""Tests for CamelModel and StrictBaseModel base classes.
-
-CamelModel provides camelCase JSON serialization for all spec types.
-StrictBaseModel adds immutability and strict validation on top.
-
-These base classes underpin every test vector and spec container.
-Correct camelCase conversion is critical for cross-client compatibility.
-"""
+"""Tests for CamelModel and StrictBaseModel base classes."""
 
 import pytest
 from pydantic import ValidationError
