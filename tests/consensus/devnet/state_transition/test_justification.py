@@ -353,7 +353,7 @@ def test_repeated_validator_does_not_double_count_within_same_block(
             slot=Slot(2),
             latest_justified_slot=Slot(0),
             latest_finalized_slot=Slot(0),
-            justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(False)]}),
+            justified_slots=JustifiedSlots(data=[Boolean(False)]),
             justifications_validators=JustificationValidators(
                 data=[
                     Boolean(True),
@@ -518,9 +518,7 @@ def test_pending_justification_survives_finalization_rebase(
             slot=Slot(5),
             latest_justified_slot=Slot(2),
             latest_finalized_slot=Slot(1),
-            justified_slots=JustifiedSlots(data=[]).model_copy(
-                update={"data": [Boolean(True), Boolean(False), Boolean(False)]}
-            ),
+            justified_slots=JustifiedSlots(data=[Boolean(True), Boolean(False), Boolean(False)]),
             justifications_validators=JustificationValidators(
                 data=[
                     Boolean(True),
@@ -915,7 +913,7 @@ def test_split_supermajority_aggregations_in_same_block_justify(
             slot=Slot(2),
             latest_justified_slot=Slot(1),
             latest_finalized_slot=Slot(0),
-            justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(True)]}),
+            justified_slots=JustifiedSlots(data=[Boolean(True)]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         ),
@@ -967,7 +965,7 @@ def test_odd_validator_threshold_boundary_justifies(
             slot=Slot(2),
             latest_justified_slot=Slot(1),
             latest_finalized_slot=Slot(0),
-            justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(True)]}),
+            justified_slots=JustifiedSlots(data=[Boolean(True)]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         ),
@@ -1018,7 +1016,7 @@ def test_odd_validator_threshold_boundary_does_not_justify(
             slot=Slot(2),
             latest_justified_slot=Slot(0),
             latest_finalized_slot=Slot(0),
-            justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(False)]}),
+            justified_slots=JustifiedSlots(data=[Boolean(False)]),
             justifications_validators=JustificationValidators(
                 data=[
                     Boolean(True),
@@ -1160,9 +1158,7 @@ def test_justification_clears_only_the_resolved_target_votes(
             slot=Slot(4),
             latest_justified_slot=Slot(1),
             latest_finalized_slot=Slot(0),
-            justified_slots=JustifiedSlots(data=[]).model_copy(
-                update={"data": [Boolean(True), Boolean(False), Boolean(False)]}
-            ),
+            justified_slots=JustifiedSlots(data=[Boolean(True), Boolean(False), Boolean(False)]),
             justifications_validators=JustificationValidators(
                 data=[
                     Boolean(True),
@@ -1278,7 +1274,7 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
             slot=Slot(6),
             latest_justified_slot=Slot(5),
             latest_finalized_slot=Slot(4),
-            justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(True)]}),
+            justified_slots=JustifiedSlots(data=[Boolean(True)]),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
         ),
@@ -1384,16 +1380,14 @@ def test_target_at_or_before_source_is_ignored(
             slot=Slot(6),
             latest_justified_slot=Slot(4),
             latest_finalized_slot=Slot(0),
-            justified_slots=JustifiedSlots(data=[]).model_copy(
-                update={
-                    "data": [
-                        Boolean(True),
-                        Boolean(False),
-                        Boolean(False),
-                        Boolean(True),
-                        Boolean(False),
-                    ]
-                }
+            justified_slots=JustifiedSlots(
+                data=[
+                    Boolean(True),
+                    Boolean(False),
+                    Boolean(False),
+                    Boolean(True),
+                    Boolean(False),
+                ]
             ),
             justifications_validators=JustificationValidators(
                 data=[
