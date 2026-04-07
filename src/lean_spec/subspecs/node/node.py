@@ -199,7 +199,7 @@ class Node:
         validator_id = (
             config.validator_registry.primary_index() if config.validator_registry else None
         )
-        store = cls._try_load_from_database(
+        store = cls._try_load_store_from_database(
             database, validator_id, config.genesis_time, config.time_fn
         )
 
@@ -331,7 +331,7 @@ class Node:
         )
 
     @staticmethod
-    def _try_load_from_database(
+    def _try_load_store_from_database(
         database: Database | None,
         validator_id: ValidatorIndex | None,
         genesis_time: Uint64 | None = None,
