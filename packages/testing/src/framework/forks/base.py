@@ -1,7 +1,7 @@
 """Base fork class for Ethereum layer testing."""
 
 from abc import ABC, ABCMeta, abstractmethod
-from typing import ClassVar, Set, Type
+from typing import ClassVar
 
 
 class BaseForkMeta(ABCMeta):
@@ -42,25 +42,8 @@ class BaseForkMeta(ABCMeta):
 
     @staticmethod
     def _is_subclass_of(a: "BaseForkMeta", b: "BaseForkMeta") -> bool:
-        """
-        Check if fork `a` is a subclass of fork `b`.
-
-        For transition forks, checks if the destination fork is a subclass.
-        """
-        # Handle transition forks by checking their destination
-        a = BaseForkMeta._maybe_transitioned(a)
-        b = BaseForkMeta._maybe_transitioned(b)
+        """Check if fork `a` is a subclass of fork `b`."""
         return issubclass(a, b)
-
-    @staticmethod
-    def _maybe_transitioned(fork_cls: "BaseForkMeta") -> "BaseForkMeta":
-        """
-        Return the destination fork if this is a transition fork. Otherwise,
-        return the fork as-is.
-        """
-        if hasattr(fork_cls, "transitions_to"):
-            return fork_cls.transitions_to()  # type: ignore[no-any-return]
-        return fork_cls
 
 
 class BaseFork(ABC, metaclass=BaseForkMeta):
@@ -78,9 +61,6 @@ class BaseFork(ABC, metaclass=BaseForkMeta):
     _ignore: ClassVar[bool] = False
     """If True, this fork will be excluded from the primary fork set."""
 
-    _children: ClassVar[Set[Type["BaseFork"]]] = set()
-    """Set of forks that directly inherit from this fork."""
-
     def __init_subclass__(
         cls,
         *,
@@ -94,12 +74,6 @@ class BaseFork(ABC, metaclass=BaseForkMeta):
         """
         super().__init_subclass__()
         cls._ignore = ignore
-        cls._children = set()
-
-        # Track parent-child relationships
-        for base in cls.__bases__:
-            if base is not BaseFork and issubclass(base, BaseFork):
-                base._children.add(cls)
 
     @classmethod
     @abstractmethod
@@ -117,13 +91,3 @@ class BaseFork(ABC, metaclass=BaseForkMeta):
     def ignore(cls) -> bool:
         """Return whether this fork should be ignored in test generation."""
         return cls._ignore
-
-    @classmethod
-    def __str__(cls) -> str:
-        """Return string representation of the fork."""
-        return cls.name()
-
-    @classmethod
-    def __repr__(cls) -> str:
-        """Return repr of the fork."""
-        return f"Fork({cls.name()})"

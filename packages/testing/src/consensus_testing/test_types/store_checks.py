@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Literal
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel, Uint64
 
 if TYPE_CHECKING:
@@ -106,18 +107,8 @@ class StoreChecks(CamelModel):
     """
     Store state checks for fork choice tests.
 
-    All fields are optional - only specified fields are validated.
-    Uses Pydantic's model_fields_set to track which fields were explicitly set.
-
-    This allows test writers to specify only the fields they care about,
-    making tests more focused and maintainable.
-
-    Example:
-        # Only validate head slot and justified checkpoint
-        StoreChecks(
-            head_slot=Slot(5),
-            latest_justified_slot=Slot(4),
-        )
+    All fields are optional. Only specified fields are validated.
+    This allows tests to focus on the properties they care about.
     """
 
     time: Uint64 | None = None
@@ -134,11 +125,7 @@ class StoreChecks(CamelModel):
     Expected head block root by label reference.
 
     Alternative to head_root that uses the block label system.
-    The framework will resolve this label to the actual block root
-    and validate the head matches.
-
-    Example:
-        StoreChecks(head_root_label="fork_a")  # Validates head is fork_a block
+    The framework resolves this label to the actual block root.
     """
 
     latest_justified_slot: Slot | None = None
@@ -152,8 +139,7 @@ class StoreChecks(CamelModel):
     Expected latest justified checkpoint root by label reference.
 
     Alternative to latest_justified_root that uses the block label system.
-    The framework will resolve this label to the actual block root
-    and validate the latest justified checkpointroot matches.
+    The framework resolves this label to the actual block root.
     """
 
     latest_finalized_slot: Slot | None = None
@@ -166,9 +152,8 @@ class StoreChecks(CamelModel):
     """
     Expected latest finalized checkpoint root by label reference.
 
-    Alternative to `latest_justified_root` that uses the block label system.
-    The framework will resolve this label to the actual block root
-    and validate the latest finalized checkpoint root matches.
+    Alternative to latest_finalized_root that uses the block label system.
+    The framework resolves this label to the actual block root.
     """
 
     safe_target: Bytes32 | None = None
@@ -219,22 +204,6 @@ class StoreChecks(CamelModel):
     should be selected as the head.
     """
 
-    def fill_hash_from_label(self, block_registry: dict[str, "Block"]) -> None:
-        """Resolves block labels to root hashes for head, justified, and finalized checkpoints."""
-        from lean_spec.subspecs.ssz import hash_tree_root
-
-        # Mapping of {target_field: source_label_field}
-        checkpoints = {
-            "head_root": "head_root_label",
-            "latest_justified_root": "latest_justified_root_label",
-            "latest_finalized_root": "latest_finalized_root_label",
-        }
-
-        for root_attr, label_attr in checkpoints.items():
-            # If root is missing but label exists, resolve it
-            if getattr(self, root_attr) is None and (label := getattr(self, label_attr)):
-                setattr(self, root_attr, hash_tree_root(block_registry[label]))
-
     def validate_against_store(
         self,
         store: "Store",
@@ -246,390 +215,271 @@ class StoreChecks(CamelModel):
         Validate these checks against actual Store state.
 
         Only validates fields that were explicitly set by the test writer.
-        Uses Pydantic's model_fields_set to determine which fields to check.
 
-        Parameters:
-        ----------
-        store : Store
-            The fork choice store to validate against.
-        step_index : int
-            Index of the step being validated (for error messages).
-        block_registry : dict[str, Block] | None
-            Optional registry of labeled blocks for resolving head_root_label.
-        filled_block : Block | None
-            Optional filled block for validating block body attestations.
-            Required if block_attestation_count or block_attestations is set.
-
-        Raises:
-        ------
-        AssertionError
-            If any explicitly set field doesn't match the actual store value.
+        Args:
+            store: The fork choice store to validate against.
+            step_index: Index of the step being validated (for error messages).
+            block_registry: Optional labeled blocks for resolving label-based checks.
+            filled_block: Optional block for validating block body attestations.
         """
-        # Get the set of fields that were explicitly provided
-        fields_to_check = self.model_fields_set
+        fields = self.model_fields_set
 
-        for field_name in fields_to_check:
-            expected_value = getattr(self, field_name)
+        def _check(name: str, actual: object, expected: object) -> None:
+            if actual != expected:
+                raise AssertionError(f"Step {step_index}: {name} = {actual}, expected {expected}")
 
-            if field_name == "time":
-                actual = store.time
-                if actual != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: time = {actual}, expected {expected_value}"
-                    )
+        def _resolve_label(field_name: str, label: str) -> Bytes32:
+            if block_registry is None:
+                raise ValueError(
+                    f"Step {step_index}: {field_name}='{label}' specified "
+                    f"but block_registry not provided"
+                )
+            if label not in block_registry:
+                raise ValueError(
+                    f"Step {step_index}: {field_name}='{label}' not found "
+                    f"in block registry. Available: {list(block_registry.keys())}"
+                )
+            return hash_tree_root(block_registry[label])
 
-            elif field_name == "head_slot":
-                actual = store.blocks[store.head].slot
-                if actual != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: head.slot = {actual}, expected {expected_value}"
-                    )
+        # Scalar store fields
+        if "time" in fields:
+            _check("time", store.time, self.time)
+        if "head_slot" in fields:
+            _check("head.slot", store.blocks[store.head].slot, self.head_slot)
+        if "head_root" in fields:
+            _check("head.root", store.head, self.head_root)
+        if "latest_justified_slot" in fields:
+            _check("latest_justified.slot", store.latest_justified.slot, self.latest_justified_slot)
+        if "latest_justified_root" in fields:
+            _check("latest_justified.root", store.latest_justified.root, self.latest_justified_root)
+        if "latest_finalized_slot" in fields:
+            _check("latest_finalized.slot", store.latest_finalized.slot, self.latest_finalized_slot)
+        if "latest_finalized_root" in fields:
+            _check("latest_finalized.root", store.latest_finalized.root, self.latest_finalized_root)
+        if "safe_target" in fields:
+            _check("safe_target", store.safe_target, self.safe_target)
 
-            elif field_name == "head_root":
-                actual_root = store.head
-                if actual_root != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: head.root = 0x{actual_root.hex()}, "
-                        f"expected 0x{expected_value.hex()}"
-                    )
+        # Label-based root checks (resolve label -> root, then compare)
+        if "head_root_label" in fields:
+            assert self.head_root_label is not None
+            expected = _resolve_label("head_root_label", self.head_root_label)
+            _check("head.root", store.head, expected)
+        if "latest_justified_root_label" in fields:
+            assert self.latest_justified_root_label is not None
+            expected = _resolve_label(
+                "latest_justified_root_label", self.latest_justified_root_label
+            )
+            _check("latest_justified.root", store.latest_justified.root, expected)
 
-            elif field_name == "head_root_label":
-                # Resolve label to root
-                if block_registry is None:
-                    raise ValueError(
-                        f"Step {step_index}: head_root_label='{expected_value}' specified "
-                        f"but block_registry not provided to validate_against_store()"
-                    )
+        # Attestation target checkpoint (slot + root consistency)
+        if "attestation_target_slot" in fields:
+            target = store.get_attestation_target()
+            _check("attestation_target.slot", target.slot, self.attestation_target_slot)
 
-                if expected_value not in block_registry:
-                    available = list(block_registry.keys())
-                    raise ValueError(
-                        f"Step {step_index}: head_root_label='{expected_value}' not found "
-                        f"in block registry. Available labels: {available}"
-                    )
-
-                # Import hash_tree_root locally to avoid circular import
-                from lean_spec.subspecs.ssz import hash_tree_root
-
-                expected_block = block_registry[expected_value]
-                expected_root = hash_tree_root(expected_block)
-                actual_root = store.head
-
-                if actual_root != expected_root:
-                    raise AssertionError(
-                        f"Step {step_index}: head.root = 0x{actual_root.hex()}, "
-                        f"expected 0x{expected_root.hex()} "
-                        f"(label '{expected_value}')"
-                    )
-
-            elif field_name == "latest_justified_slot":
-                actual = store.latest_justified.slot
-                if actual != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: latest_justified.slot = {actual}, "
-                        f"expected {expected_value}"
-                    )
-
-            elif field_name == "latest_justified_root":
-                actual_root = store.latest_justified.root
-                if actual_root != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: latest_justified.root = 0x{actual_root.hex()}, "
-                        f"expected 0x{expected_value.hex()}"
-                    )
-
-            elif field_name == "latest_justified_root_label":
-                # Resolve label to root
-                if block_registry is None:
-                    raise ValueError(
-                        f"Step {step_index}: latest_justified_root_label='{expected_value}' "
-                        f"specified but block_registry not provided to validate_against_store()"
-                    )
-
-                if expected_value not in block_registry:
-                    available = list(block_registry.keys())
-                    raise ValueError(
-                        f"Step {step_index}: latest_justified_root_label='{expected_value}' "
-                        f"not found in block registry. Available labels: {available}"
-                    )
-
-                # Import hash_tree_root locally to avoid circular import
-                from lean_spec.subspecs.ssz import hash_tree_root
-
-                expected_block = block_registry[expected_value]
-                expected_root = hash_tree_root(expected_block)
-                actual_root = store.latest_justified.root
-
-                if actual_root != expected_root:
-                    raise AssertionError(
-                        f"Step {step_index}: latest_justified.root = 0x{actual_root.hex()}, "
-                        f"expected 0x{expected_root.hex()} "
-                        f"(label '{expected_value}')"
-                    )
-
-            elif field_name == "latest_finalized_slot":
-                actual = store.latest_finalized.slot
-                if actual != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: latest_finalized.slot = {actual}, "
-                        f"expected {expected_value}"
-                    )
-
-            elif field_name == "latest_finalized_root":
-                actual_root = store.latest_finalized.root
-                if actual_root != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: latest_finalized.root = 0x{actual_root.hex()}, "
-                        f"expected 0x{expected_value.hex()}"
-                    )
-
-            elif field_name == "safe_target":
-                actual_root = store.safe_target
-                if actual_root != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: safe_target = 0x{actual_root.hex()}, "
-                        f"expected 0x{expected_value.hex()}"
-                    )
-
-            elif field_name == "attestation_target_slot":
-                # Get attestation target and check slot
-                target = store.get_attestation_target()
-                actual_slot = target.slot
-                if actual_slot != expected_value:
-                    raise AssertionError(
-                        f"Step {step_index}: attestation_target.slot = {actual_slot}, "
-                        f"expected {expected_value}"
-                    )
-
-                # ALSO validate the root matches a block at this slot
-                #
-                # This ensures we're validating the complete checkpoint (root + slot)
-                block_found = False
-                for root, block in store.blocks.items():
-                    if block.slot == expected_value and root == target.root:
-                        block_found = True
-                        break
-
-                if not block_found:
-                    available = [
-                        f"0x{r.hex()[:16]}..."
-                        for r, b in store.blocks.items()
-                        if b.slot == expected_value
-                    ]
-                    raise AssertionError(
-                        f"Step {step_index}: attestation_target.root = "
-                        f"0x{target.root.hex()[:16]}... does not match any "
-                        f"block at slot {expected_value}. "
-                        f"Available blocks: {available}"
-                    )
-
-            elif field_name == "attestation_checks":
-                # Validate specific attestation contents
-                for check in expected_value:
-                    validator_idx = check.validator
-
-                    # Extract attestations from aggregated payloads
-                    if check.location == "new":
-                        extracted_attestations = (
-                            store.extract_attestations_from_aggregated_payloads(
-                                store.latest_new_aggregated_payloads
-                            )
-                        )
-                        if validator_idx not in extracted_attestations:
-                            raise AssertionError(
-                                f"Step {step_index}: validator {validator_idx} not found "
-                                f"in latest_new_aggregated_payloads"
-                            )
-                        attestation = extracted_attestations[validator_idx]
-                        check.validate_attestation(attestation, "in latest_new", step_index)
-
-                    else:  # check.location == "known"
-                        extracted_attestations = (
-                            store.extract_attestations_from_aggregated_payloads(
-                                store.latest_known_aggregated_payloads
-                            )
-                        )
-                        if validator_idx not in extracted_attestations:
-                            raise AssertionError(
-                                f"Step {step_index}: validator {validator_idx} not found "
-                                f"in latest_known_aggregated_payloads"
-                            )
-                        attestation = extracted_attestations[validator_idx]
-                        check.validate_attestation(attestation, "in latest_known", step_index)
-
-            elif field_name == "block_attestation_count":
-                # Validate the number of aggregated attestations in the block body
-                if filled_block is None:
-                    raise ValueError(
-                        f"Step {step_index}: block_attestation_count specified but "
-                        f"filled_block not provided to validate_against_store()"
-                    )
-
-                actual_count = len(filled_block.body.attestations.data)
-                if actual_count != expected_value:
-                    # Build detailed info for error message
-                    att_info = []
-                    for att in filled_block.body.attestations.data:
-                        participants = att.aggregation_bits.to_validator_indices()
-                        att_info.append(f"  - participants={list(participants)}")
-
-                    att_details = "\n".join(att_info) if att_info else "  (empty)"
-                    raise AssertionError(
-                        f"Step {step_index}: block body has {actual_count} aggregated "
-                        f"attestations, expected {expected_value}\n"
-                        f"Attestations in block:\n{att_details}"
-                    )
-
-            elif field_name == "block_attestations":
-                # Validate detailed attestation structure in the block body
-                if filled_block is None:
-                    raise ValueError(
-                        f"Step {step_index}: block_attestations specified but "
-                        f"filled_block not provided to validate_against_store()"
-                    )
-
-                actual_attestations = filled_block.body.attestations.data
-                actual_participants_list = [
-                    {int(v) for v in att.aggregation_bits.to_validator_indices()}
-                    for att in actual_attestations
+            block_found = any(
+                b.slot == self.attestation_target_slot and r == target.root
+                for r, b in store.blocks.items()
+            )
+            if not block_found:
+                available = [
+                    f"0x{r.hex()}"
+                    for r, b in store.blocks.items()
+                    if b.slot == self.attestation_target_slot
                 ]
+                raise AssertionError(
+                    f"Step {step_index}: attestation_target.root = "
+                    f"0x{target.root.hex()} does not match any "
+                    f"block at slot {self.attestation_target_slot}. "
+                    f"Available blocks: {available}"
+                )
 
-                # For each expected check, verify a matching attestation exists
-                for check in expected_value:
-                    expected_participants = check.participants
+        # Per-validator attestation content checks
+        if "attestation_checks" in fields:
+            assert self.attestation_checks is not None
+            for check in self.attestation_checks:
+                if check.location == "new":
+                    payloads = store.latest_new_aggregated_payloads
+                    label = "in latest_new"
+                else:
+                    payloads = store.latest_known_aggregated_payloads
+                    label = "in latest_known"
 
-                    # Find an attestation with matching participants
-                    matching_att = None
-                    matching_idx = None
-                    for idx, att in enumerate(actual_attestations):
-                        actual_participants = {
-                            int(v) for v in att.aggregation_bits.to_validator_indices()
-                        }
-                        if actual_participants == expected_participants:
-                            matching_att = att
-                            matching_idx = idx
-                            break
+                extracted = store.extract_attestations_from_aggregated_payloads(payloads)
+                if check.validator not in extracted:
+                    raise AssertionError(
+                        f"Step {step_index}: validator {check.validator} not found "
+                        f"{label}_aggregated_payloads"
+                    )
+                check.validate_attestation(extracted[check.validator], label, step_index)
 
-                    if matching_att is None:
-                        raise AssertionError(
-                            f"Step {step_index}: no aggregated attestation found with "
-                            f"participants={expected_participants}\n"
-                            f"Available attestations: {actual_participants_list}"
-                        )
+        # Block body attestation count
+        if "block_attestation_count" in fields:
+            if filled_block is None:
+                raise ValueError(
+                    f"Step {step_index}: block_attestation_count specified but "
+                    f"filled_block not provided"
+                )
+            actual_count = len(filled_block.body.attestations.data)
+            if actual_count != self.block_attestation_count:
+                att_info = [
+                    f"  - participants={list(att.aggregation_bits.to_validator_indices())}"
+                    for att in filled_block.body.attestations.data
+                ]
+                raise AssertionError(
+                    f"Step {step_index}: block body has {actual_count} aggregated "
+                    f"attestations, expected {self.block_attestation_count}\n"
+                    f"Attestations in block:\n" + ("\n".join(att_info) if att_info else "  (empty)")
+                )
 
-                    # Validate optional fields on the matching attestation
-                    if check.attestation_slot is not None:
-                        actual_slot = matching_att.data.slot
-                        if actual_slot != check.attestation_slot:
-                            raise AssertionError(
-                                f"Step {step_index}: attestation[{matching_idx}] with "
-                                f"participants={expected_participants} has slot={actual_slot}, "
-                                f"expected {check.attestation_slot}"
-                            )
+        # Detailed block body attestation structure
+        if "block_attestations" in fields:
+            if filled_block is None:
+                raise ValueError(
+                    f"Step {step_index}: block_attestations specified but filled_block not provided"
+                )
+            assert self.block_attestations is not None
+            StoreChecks._validate_block_attestations(
+                self.block_attestations, filled_block, step_index
+            )
 
-                    if check.target_slot is not None:
-                        actual_target = matching_att.data.target.slot
-                        if actual_target != check.target_slot:
-                            raise AssertionError(
-                                f"Step {step_index}: attestation[{matching_idx}] with "
-                                f"participants={expected_participants} has "
-                                f"target_slot={actual_target}, expected {check.target_slot}"
-                            )
+        # Lexicographic tiebreaker
+        if "lexicographic_head_among" in fields:
+            if block_registry is None:
+                raise ValueError(
+                    f"Step {step_index}: lexicographic_head_among specified "
+                    f"but block_registry not provided"
+                )
+            assert self.lexicographic_head_among is not None
+            StoreChecks._validate_lexicographic_head(
+                self.lexicographic_head_among, store, block_registry, step_index
+            )
 
-            elif field_name == "lexicographic_head_among":
-                # Validate lexicographic tiebreaker behavior
-                if block_registry is None:
-                    raise ValueError(
-                        f"Step {step_index}: lexicographic_head_among specified "
-                        f"but block_registry not provided to validate_against_store()"
+    @staticmethod
+    def _validate_block_attestations(
+        expected_checks: list["AggregatedAttestationCheck"],
+        filled_block: "Block",
+        step_index: int,
+    ) -> None:
+        """Validate detailed attestation structure in the block body."""
+        actual_attestations = filled_block.body.attestations.data
+        actual_participants_list = [
+            {int(v) for v in att.aggregation_bits.to_validator_indices()}
+            for att in actual_attestations
+        ]
+
+        for check in expected_checks:
+            matching_att = None
+            matching_idx = None
+            for idx, att in enumerate(actual_attestations):
+                actual_participants = {int(v) for v in att.aggregation_bits.to_validator_indices()}
+                if actual_participants == check.participants:
+                    matching_att = att
+                    matching_idx = idx
+                    break
+
+            if matching_att is None:
+                raise AssertionError(
+                    f"Step {step_index}: no aggregated attestation found with "
+                    f"participants={check.participants}\n"
+                    f"Available attestations: {actual_participants_list}"
+                )
+
+            if check.attestation_slot is not None:
+                if matching_att.data.slot != check.attestation_slot:
+                    raise AssertionError(
+                        f"Step {step_index}: attestation[{matching_idx}] with "
+                        f"participants={check.participants} has "
+                        f"slot={matching_att.data.slot}, expected {check.attestation_slot}"
                     )
 
-                # Require at least 2 forks to test tiebreaker
-                if len(expected_value) < 2:
-                    raise ValueError(
-                        f"Step {step_index}: lexicographic_head_among requires at least 2 forks "
-                        f"to test tiebreaker behavior, got {len(expected_value)}: {expected_value}"
+            if check.target_slot is not None:
+                if matching_att.data.target.slot != check.target_slot:
+                    raise AssertionError(
+                        f"Step {step_index}: attestation[{matching_idx}] with "
+                        f"participants={check.participants} has "
+                        f"target_slot={matching_att.data.target.slot}, "
+                        f"expected {check.target_slot}"
                     )
 
-                # Import hash_tree_root locally to avoid circular import
-                from lean_spec.subspecs.ssz import hash_tree_root
+    @staticmethod
+    def _validate_lexicographic_head(
+        fork_labels: list[str],
+        store: "Store",
+        block_registry: dict[str, "Block"],
+        step_index: int,
+    ) -> None:
+        """Validate lexicographic tiebreaker behavior."""
+        if len(fork_labels) < 2:
+            raise ValueError(
+                f"Step {step_index}: lexicographic_head_among requires at least 2 forks "
+                f"to test tiebreaker behavior, got {len(fork_labels)}: {fork_labels}"
+            )
 
-                # Resolve all fork labels to roots and compute their weights
-                # Map: label -> (root, slot, weight)
-                fork_data: dict[str, tuple[Bytes32, Slot, int]] = {}
-                for label in expected_value:
-                    if label not in block_registry:
-                        available = list(block_registry.keys())
-                        raise ValueError(
-                            f"Step {step_index}: lexicographic_head_among label '{label}' "
-                            f"not found in block registry. Available: {available}"
-                        )
+        # Resolve all fork labels to roots and compute their weights
+        fork_data: dict[str, tuple[Bytes32, Slot, int]] = {}
+        for label in fork_labels:
+            if label not in block_registry:
+                raise ValueError(
+                    f"Step {step_index}: lexicographic_head_among label '{label}' "
+                    f"not found in block registry. Available: {list(block_registry.keys())}"
+                )
 
-                    block = block_registry[label]
-                    root = hash_tree_root(block)
-                    slot = block.slot
+            block = block_registry[label]
+            root = hash_tree_root(block)
+            slot = block.slot
 
-                    # Calculate attestation weight: count attestations voting for this fork
-                    # An attestation votes for this fork if its head is this block or a descendant
-                    # Extract attestations from latest_known_aggregated_payloads
-                    known_attestations = store.extract_attestations_from_aggregated_payloads(
-                        store.latest_known_aggregated_payloads
-                    )
-                    weight = 0
-                    for attestation in known_attestations.values():
-                        att_head_root = attestation.head.root
-                        # Check if attestation head is this block or a descendant
-                        if att_head_root == root:
+            known_attestations = store.extract_attestations_from_aggregated_payloads(
+                store.latest_known_aggregated_payloads
+            )
+            weight = 0
+            for attestation in known_attestations.values():
+                att_head_root = attestation.head.root
+                if att_head_root == root:
+                    weight += 1
+                elif att_head_root in store.blocks:
+                    current = att_head_root
+                    while current in store.blocks and store.blocks[current].slot > slot:
+                        parent = store.blocks[current].parent_root
+                        if parent == root:
                             weight += 1
-                        elif att_head_root in store.blocks:
-                            # Walk back from attestation head to see if we reach this block
-                            current = att_head_root
-                            while current in store.blocks and store.blocks[current].slot > slot:
-                                parent = store.blocks[current].parent_root
-                                if parent == root:
-                                    weight += 1
-                                    break
-                                current = parent
+                            break
+                        current = parent
 
-                    fork_data[label] = (root, slot, weight)
+            fork_data[label] = (root, slot, weight)
 
-                # Verify all forks have equal weight
-                weights = [weight for _, _, weight in fork_data.values()]
-                if len(set(weights)) > 1:
-                    weight_info = {label: weight for label, (_, _, weight) in fork_data.items()}
-                    raise AssertionError(
-                        f"Step {step_index}: lexicographic_head_among forks have "
-                        f"unequal weights: {weight_info}. All forks must have equal "
-                        f"attestation weight for tiebreaker to apply.\n"
-                        f"This check tests the lexicographic tiebreaker, which only "
-                        f"applies when competing forks have identical weight."
-                    )
+        # Verify all forks have equal weight
+        weights = [weight for _, _, weight in fork_data.values()]
+        if len(set(weights)) > 1:
+            weight_info = {label: weight for label, (_, _, weight) in fork_data.items()}
+            raise AssertionError(
+                f"Step {step_index}: lexicographic_head_among forks have "
+                f"unequal weights: {weight_info}. All forks must have equal "
+                f"attestation weight for tiebreaker to apply.\n"
+                f"This check tests the lexicographic tiebreaker, which only "
+                f"applies when competing forks have identical weight."
+            )
 
-                # Find the lexicographically highest root among the equal-weight forks
-                fork_roots = {label: root for label, (root, _, _) in fork_data.items()}
-                expected_head_root = max(fork_roots.values())
+        fork_roots = {label: root for label, (root, _, _) in fork_data.items()}
+        expected_head_root = max(fork_roots.values())
 
-                # Verify the current head matches the lexicographically highest root
-                actual_head_root = store.head
-                if actual_head_root != expected_head_root:
-                    # Find which label has the highest root for error message
-                    highest_label = next(
-                        label for label, root in fork_roots.items() if root == expected_head_root
-                    )
-                    actual_label = next(
-                        (label for label, root in fork_roots.items() if root == actual_head_root),
-                        "unknown",
-                    )
-                    # Display all fork roots and weights for debugging
-                    fork_info = "\n".join(
-                        f"  {label}: root=0x{root.hex()[:16]}... weight={weight}"
-                        for label, (root, _, weight) in sorted(fork_data.items())
-                    )
-                    raise AssertionError(
-                        f"Step {step_index}: lexicographic tiebreaker failed.\n"
-                        f"Expected head: '{highest_label}' (0x{expected_head_root.hex()[:16]}...)\n"
-                        f"Actual head:   '{actual_label}' (0x{actual_head_root.hex()[:16]}...)\n"
-                        f"All competing forks (equal weight={weights[0]}):\n{fork_info}\n"
-                        f"When forks have equal weight, the fork with the lexicographically "
-                        f"highest root should be selected as head."
-                    )
+        actual_head_root = store.head
+        if actual_head_root != expected_head_root:
+            highest_label = next(
+                label for label, root in fork_roots.items() if root == expected_head_root
+            )
+            actual_label = next(
+                (label for label, root in fork_roots.items() if root == actual_head_root),
+                "unknown",
+            )
+            fork_info = "\n".join(
+                f"  {label}: root=0x{root.hex()} weight={weight}"
+                for label, (root, _, weight) in sorted(fork_data.items())
+            )
+            raise AssertionError(
+                f"Step {step_index}: lexicographic tiebreaker failed.\n"
+                f"Expected head: '{highest_label}' (0x{expected_head_root.hex()})\n"
+                f"Actual head:   '{actual_label}' (0x{actual_head_root.hex()})\n"
+                f"All competing forks (equal weight={weights[0]}):\n{fork_info}\n"
+                f"When forks have equal weight, the fork with the lexicographically "
+                f"highest root should be selected as head."
+            )

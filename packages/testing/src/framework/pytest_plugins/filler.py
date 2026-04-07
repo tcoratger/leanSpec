@@ -5,8 +5,9 @@ import json
 import shutil
 import sys
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 import pytest
 
@@ -26,7 +27,7 @@ class FixtureCollector:
         self.output_dir = output_dir
         self.fork = fork
         self.layer = layer
-        self.fixtures: List[tuple[str, str, Any, str]] = []
+        self.fixtures: list[tuple[str, str, Any, str]] = []
 
     def add_fixture(
         self,
@@ -110,8 +111,7 @@ class FixtureCollector:
             output_file = fixture_dir / f"{base_func_name}.json"
 
             all_tests = {}
-            for test_name, fixture, test_nodeid in fixtures_list:
-                del test_name
+            for _, fixture, test_nodeid in fixtures_list:
                 test_id = f"{test_nodeid}[fork_{self.fork}-{fixture_format}]"
                 fixture_dict = fixture.json_dict_with_info()
                 all_tests[test_id] = fixture_dict
@@ -260,9 +260,9 @@ def pytest_configure(config: pytest.Config) -> None:
     # Check output directory
     if output_dir.exists() and any(output_dir.iterdir()):
         if not clean:
-            contents = list(output_dir.iterdir())[:5]
-            summary = ", ".join(item.name for item in contents)
-            if len(list(output_dir.iterdir())) > 5:
+            contents = list(output_dir.iterdir())
+            summary = ", ".join(item.name for item in contents[:5])
+            if len(contents) > 5:
                 summary += ", ..."
             pytest.exit(
                 f"Output directory '{output_dir}' is not empty. "
@@ -279,7 +279,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config.test_fork_class = fork_class  # type: ignore[attr-defined]
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: List[pytest.Item]) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Modify collected test items to deselect tests not valid for the selected fork."""
     if not hasattr(config, "test_fork_class"):
         return
@@ -306,7 +306,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: List[pytest.Item
 
 
 def _check_markers_valid_for_fork(
-    markers: list[Any], fork_class: Any, get_fork_by_name: Any
+    markers: list[Any],
+    fork_class: type,
+    get_fork_by_name: Callable[[str], type | None],
 ) -> bool:
     """Check if test markers indicate validity for the given fork.
 
@@ -357,7 +359,11 @@ def _check_markers_valid_for_fork(
     return from_valid and until_valid
 
 
-def _is_test_item_valid_for_fork(item: pytest.Item, fork_class: Any, get_fork_by_name: Any) -> bool:
+def _is_test_item_valid_for_fork(
+    item: pytest.Item,
+    fork_class: type,
+    get_fork_by_name: Callable[[str], type | None],
+) -> bool:
     """Check if a test item is valid for the given fork based on validity markers."""
     return _check_markers_valid_for_fork(list(item.iter_markers()), fork_class, get_fork_by_name)
 
@@ -390,7 +396,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 
 @pytest.fixture
 def fork(request: pytest.FixtureRequest) -> Any:
-    """Parametrize test cases by fork (dynamically loaded based on layer)."""
+    """Placeholder overridden by pytest_generate_tests with the selected fork class."""
     pass
 
 

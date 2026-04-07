@@ -3,7 +3,7 @@
 import hashlib
 import json
 from functools import cached_property
-from typing import Any, ClassVar, Dict, Type
+from typing import Any, ClassVar
 
 from pydantic import Field
 
@@ -27,7 +27,7 @@ class BaseFixture(CamelModel):
     """
 
     # Class-level registry of all fixture formats
-    formats: ClassVar[Dict[str, Type["BaseFixture"]]] = {}
+    formats: ClassVar[dict[str, type["BaseFixture"]]] = {}
 
     # Fixture format metadata
     format_name: ClassVar[str] = ""
@@ -43,7 +43,7 @@ class BaseFixture(CamelModel):
     lean_env: str = Field(default=LEAN_ENV)
     """The target lean environment (e.g. 'test' or 'prod')."""
 
-    info: Dict[str, Any] = Field(default_factory=dict, alias="_info")
+    info: dict[str, Any] = Field(default_factory=dict, alias="_info")
     """Metadata about the test (description, fork, etc.)."""
 
     @classmethod
@@ -52,15 +52,13 @@ class BaseFixture(CamelModel):
         Auto-register fixture formats when subclasses are defined.
 
         This hook is called automatically when a new subclass is created.
-        If the subclass defines a `format_name`, it will be registered in
-        the `formats` dictionary for later lookup.
+        Registration is a no-op here; layer base classes (e.g. BaseConsensusFixture)
+        override this to register into their own separate registry.
         """
         super().__pydantic_init_subclass__(**kwargs)
-        if cls.format_name:
-            BaseFixture.formats[cls.format_name] = cls
 
     @cached_property
-    def json_dict(self) -> Dict[str, Any]:
+    def json_dict(self) -> dict[str, Any]:
         """
         Return the JSON representation of the fixture.
 
@@ -87,7 +85,7 @@ class BaseFixture(CamelModel):
         h = hashlib.sha256(json_str.encode("utf-8")).hexdigest()
         return f"0x{h}"
 
-    def json_dict_with_info(self, hash_only: bool = False) -> Dict[str, Any]:
+    def json_dict_with_info(self, hash_only: bool = False) -> dict[str, Any]:
         """
         Return JSON representation with the info field included.
 
@@ -125,19 +123,3 @@ class BaseFixture(CamelModel):
 
         # Set network field on the fixture itself
         self.network = fork.name()
-
-    @classmethod
-    def supports_fork(cls, fork: str) -> bool:
-        """
-        Check if this fixture format supports the given fork.
-
-        By default, all fixtures support all forks. Override in subclasses
-        to restrict to specific forks.
-
-        Args:
-            fork: The fork name (e.g., "devnet", "shanghai").
-
-        Returns:
-            True if the fixture supports this fork.
-        """
-        return True
