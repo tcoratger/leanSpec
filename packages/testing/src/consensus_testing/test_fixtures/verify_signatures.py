@@ -2,63 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from pydantic import Field, field_serializer
+from pydantic import Field
 
-from lean_spec.subspecs.containers.attestation import (
-    AggregatedAttestation,
-    AggregationBits,
-    Attestation,
-    AttestationData,
-)
 from lean_spec.subspecs.containers.block import (
-    BlockSignatures,
     SignedBlock,
 )
-from lean_spec.subspecs.containers.block.types import (
-    AggregatedAttestations,
-    AttestationSignatures,
-)
-from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.state.state import State
-from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import ByteListMiB, Bytes32
 
-from ..keys import XmssKeyManager, create_dummy_signature
-from ..test_types import AggregatedAttestationSpec, BlockSpec
+from ..keys import XmssKeyManager
+from ..test_types import BlockSpec
 from .base import BaseConsensusFixture
-
-
-def _create_dummy_aggregated_proof(validator_ids: list[ValidatorIndex]) -> AggregatedSignatureProof:
-    """
-    Create a dummy aggregated signature proof with invalid proof data.
-
-    The proof has the correct participants bitfield but invalid proof bytes,
-    so it will fail verification.
-    """
-    return AggregatedSignatureProof(
-        participants=AggregationBits.from_validator_indices(ValidatorIndices(data=validator_ids)),
-        proof_data=ByteListMiB(data=b"\x00" * 32),  # Invalid proof bytes
-    )
 
 
 class VerifySignaturesTest(BaseConsensusFixture):
     """
-    Test fixture for verifying signatures on SignedBlock.
+    Test fixture for verifying signatures on a signed block.
 
-    The fixture takes a BlockSpec and optional AggregatedAttestationSpec inputs and generates
-    a complete SignedBlock as the test output.
-
-    Use the generated test vectors to test that client implementation can verify signatures
-    of the generated signed block.
-
-    Structure:
-        anchor_state: Initial trusted consensus state
-        signed_block: The generated SignedBlock
-        expect_exception: Expected exception for invalid tests
+    Generates a complete signed block from the block specification,
+    then verifies that signatures pass or fail as expected.
     """
 
     format_name: ClassVar[str] = "verify_signatures_test"
@@ -84,39 +47,15 @@ class VerifySignaturesTest(BaseConsensusFixture):
     The generated signed block.
     """
 
-    expect_exception: type[Exception] | None = None
-    """
-    Expected exception type for invalid tests.
-
-    If provided, an exception of this type is expected during signature verification.
-    """
-
-    @field_serializer("expect_exception", when_used="json")
-    def serialize_exception(self, value: type[Exception] | None) -> str | None:
-        """Serialize exception type to string."""
-        if value is None:
-            return None
-        # Format: "ExceptionClassName" (just the class name for now)
-        # TODO: This can be used to map exceptions to expected exceptions from clients
-        # as in execution-spec-tests - e.g., "StateTransitionException.INVALID_SLOT"
-        return value.__name__
-
     def make_fixture(self) -> VerifySignaturesTest:
         """
-        Generate the fixture by creating a signed block with attestations.
-
-        Builds a block from BlockSpec, generates the relevant signatures to produce
-        SignedBlock, then verifies that the signatures are valid.
+        Generate the fixture by creating and verifying a signed block.
 
         Returns:
-        -------
-        SignatureTest
             The validated fixture.
 
         Raises:
-        ------
-        AssertionError
-            If signature verification fails.
+            AssertionError: If signature verification fails unexpectedly.
         """
         # Ensure anchor_state is set
         assert self.anchor_state is not None, "anchor state must be set before making the fixture"
@@ -125,7 +64,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         key_manager = XmssKeyManager.shared()
 
         # Build the signed block
-        signed_block = self._build_block_from_spec(self.block, self.anchor_state, key_manager)
+        signed_block = self.block.build_signed_block(self.anchor_state, key_manager)
 
         exception_raised: Exception | None = None
 
@@ -156,246 +95,3 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 )
 
         return self
-
-    def _build_block_from_spec(
-        self,
-        spec: BlockSpec,
-        state: State,
-        key_manager: XmssKeyManager,
-    ) -> SignedBlock:
-        """
-        Build a complete SignedBlock from a BlockSpec.
-
-        This method combines:
-            - spec logic (via the state block building logic),
-            - test-specific logic (signing),
-        to produce a complete signed block.
-
-        Parameters
-        ----------
-        spec : BlockSpec
-            The lightweight block specification.
-        state : State
-            The anchor state to build against.
-        key_manager : XmssKeyManager
-            The key manager for signing.
-
-        Returns:
-        -------
-        SignedBlock
-            A complete signed block with all attestations.
-        """
-        # Determine proposer index
-        proposer_index = spec.proposer_index or ValidatorIndex(
-            int(spec.slot) % len(state.validators)
-        )
-
-        # Resolve parent root
-        parent_state = state.process_slots(spec.slot)
-        parent_root = hash_tree_root(parent_state.latest_block_header)
-
-        # Build attestations from spec - only valid ones go through aggregation
-        valid_attestations, valid_signatures, invalid_specs = self._build_attestations_from_spec(
-            spec, state, key_manager
-        )
-
-        # Build block with valid attestations directly.
-        aggregated_attestations = AggregatedAttestation.aggregate_by_data(valid_attestations)
-        signature_lookup: dict[AttestationData, dict[ValidatorIndex, Any]] = {}
-        for attestation, signature in zip(valid_attestations, valid_signatures, strict=True):
-            signature_lookup.setdefault(attestation.data, {})[attestation.validator_id] = signature
-        attestation_signatures = key_manager.build_attestation_signatures(
-            AggregatedAttestations(data=aggregated_attestations),
-            signature_lookup=signature_lookup,
-        )
-        aggregated_payloads = {
-            aggregated_attestation.data: {proof}
-            for aggregated_attestation, proof in zip(
-                aggregated_attestations, attestation_signatures.data, strict=True
-            )
-        }
-
-        final_block, _, _, aggregated_signatures = state.build_block(
-            slot=spec.slot,
-            proposer_index=proposer_index,
-            parent_root=parent_root,
-            known_block_roots={parent_root},
-            aggregated_payloads=aggregated_payloads,
-        )
-
-        # Create proofs for invalid attestation specs
-        for invalid_spec in invalid_specs:
-            attestation_data = self._build_attestation_data_from_spec(invalid_spec, state)
-            data_root = attestation_data.data_root_bytes()
-
-            # Create aggregated attestation claiming validator_ids as participants
-            aggregation_bits = AggregationBits.from_validator_indices(
-                ValidatorIndices(data=invalid_spec.validator_ids)
-            )
-            invalid_aggregated = AggregatedAttestation(
-                aggregation_bits=aggregation_bits,
-                data=attestation_data,
-            )
-
-            # Determine proof type based on the invalidity scenario
-            if not invalid_spec.valid_signature:
-                # Cryptographically invalid proof (all zeros)
-                invalid_proof = _create_dummy_aggregated_proof(invalid_spec.validator_ids)
-            elif invalid_spec.signer_ids is not None:
-                # Valid proof but from wrong validators
-                # Sign with signer_ids but claim validator_ids as participants
-                signer_public_keys = [
-                    key_manager.get_public_keys(vid)[0] for vid in invalid_spec.signer_ids
-                ]
-                signer_signatures = [
-                    key_manager.sign_attestation_data(vid, attestation_data)
-                    for vid in invalid_spec.signer_ids
-                ]
-                # Create valid aggregated proof from actual signers
-                xmss_participants = AggregationBits.from_validator_indices(
-                    ValidatorIndices(data=invalid_spec.signer_ids)
-                )
-                raw_xmss = list(zip(signer_public_keys, signer_signatures, strict=True))
-                valid_proof = AggregatedSignatureProof.aggregate(
-                    xmss_participants=xmss_participants,
-                    children=[],
-                    raw_xmss=raw_xmss,
-                    message=data_root,
-                    slot=attestation_data.slot,
-                )
-                # Replace participants with claimed validator_ids (mismatch!)
-                invalid_proof = AggregatedSignatureProof(
-                    participants=aggregation_bits,
-                    proof_data=valid_proof.proof_data,
-                )
-            else:
-                # Fallback to dummy proof
-                invalid_proof = _create_dummy_aggregated_proof(invalid_spec.validator_ids)
-
-            # Add to block's attestations
-            final_block = final_block.model_copy(
-                update={
-                    "body": final_block.body.model_copy(
-                        update={
-                            "attestations": AggregatedAttestations(
-                                data=[*final_block.body.attestations.data, invalid_aggregated]
-                            )
-                        }
-                    )
-                }
-            )
-            aggregated_signatures.append(invalid_proof)
-
-        attestation_signatures = AttestationSignatures(
-            data=aggregated_signatures,
-        )
-
-        # Sign the block root with the proposer's proposal key
-        if spec.valid_signature:
-            proposer_signature = key_manager.sign_block_root(
-                proposer_index,
-                spec.slot,
-                hash_tree_root(final_block),
-            )
-        else:
-            proposer_signature = create_dummy_signature()
-
-        return SignedBlock(
-            block=final_block,
-            signature=BlockSignatures(
-                attestation_signatures=attestation_signatures,
-                proposer_signature=proposer_signature,
-            ),
-        )
-
-    def _build_attestations_from_spec(
-        self,
-        spec: BlockSpec,
-        state: State,
-        key_manager: XmssKeyManager,
-    ) -> tuple[list[Attestation], list[Any], list[AggregatedAttestationSpec]]:
-        """
-        Build attestations list from BlockSpec.
-
-        Returns:
-        -------
-        tuple of:
-            - valid_attestations: Attestations with valid signatures for aggregation
-            - valid_signatures: Corresponding signatures for valid attestations
-            - invalid_specs: Specs with valid_signature=False (handled separately)
-        """
-        if spec.attestations is None:
-            return [], [], []
-
-        valid_attestations = []
-        valid_signatures = []
-        invalid_specs = []
-
-        for aggregated_spec in spec.attestations:
-            # Check for invalid scenarios that need special handling
-            has_signer_mismatch = (
-                aggregated_spec.signer_ids is not None
-                and aggregated_spec.signer_ids != aggregated_spec.validator_ids
-            )
-
-            if not aggregated_spec.valid_signature or has_signer_mismatch:
-                # Defer invalid specs - they'll get special proofs created directly
-                invalid_specs.append(aggregated_spec)
-                continue
-
-            # Build attestation data (shared across all validators in this group)
-            attestation_data = self._build_attestation_data_from_spec(aggregated_spec, state)
-
-            # Create individual attestations and signatures for each validator
-            for validator_id in aggregated_spec.validator_ids:
-                valid_attestations.append(
-                    Attestation(
-                        validator_id=validator_id,
-                        data=attestation_data,
-                    )
-                )
-                signature = key_manager.sign_attestation_data(
-                    validator_id,
-                    attestation_data,
-                )
-                valid_signatures.append(signature)
-
-        return valid_attestations, valid_signatures, invalid_specs
-
-    def _build_attestation_data_from_spec(
-        self,
-        spec: AggregatedAttestationSpec,
-        state: State,
-    ) -> AttestationData:
-        """
-        Build AttestationData from an AggregatedAttestationSpec.
-
-        Parameters
-        ----------
-        spec : AggregatedAttestationSpec
-            The aggregated attestation specification.
-        state : State
-            The state to get latest_justified checkpoint from.
-
-        Returns:
-        -------
-        AttestationData
-            The attestation data shared by all validators in this aggregation.
-        """
-        # For this test, we use a dummy target since we're just testing signature generation
-        # In a real test, you would resolve target_root_label from a block registry
-        target_root = Bytes32.zero()
-        target_checkpoint = Checkpoint(root=target_root, slot=spec.target_slot)
-
-        # Derive head = target
-        head_checkpoint = target_checkpoint
-
-        # Derive source from state's latest justified checkpoint
-        source_checkpoint = state.latest_justified
-
-        return AttestationData(
-            slot=spec.slot,
-            head=head_checkpoint,
-            target=target_checkpoint,
-            source=source_checkpoint,
-        )

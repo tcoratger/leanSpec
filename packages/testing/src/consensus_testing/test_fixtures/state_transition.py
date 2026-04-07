@@ -1,17 +1,13 @@
 """State transition test fixture format."""
 
-from typing import Any, ClassVar, List
+from typing import Any, ClassVar
 
 from pydantic import ConfigDict, PrivateAttr, field_serializer
 
 from lean_spec.subspecs.containers.attestation import AttestationData
-from lean_spec.subspecs.containers.attestation.aggregation_bits import AggregationBits
 from lean_spec.subspecs.containers.block.block import Block, BlockBody
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.checkpoint import Checkpoint
-from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state.state import State
-from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32
@@ -52,7 +48,7 @@ class StateTransitionTest(BaseConsensusFixture):
     pre: State
     """The initial consensus state before processing."""
 
-    blocks: List[BlockSpec]
+    blocks: list[BlockSpec]
     """
     Block specifications to process through the spec.
 
@@ -63,7 +59,7 @@ class StateTransitionTest(BaseConsensusFixture):
 
     # TODO: We should figure out a configuration to raise if a private attr is
     #  attempted to be set during model initialization.
-    _filled_blocks: List[Block] = PrivateAttr(default_factory=list)
+    _filled_blocks: list[Block] = PrivateAttr(default_factory=list)
     """
     The filled Blocks, processed through the specs.
 
@@ -82,58 +78,34 @@ class StateTransitionTest(BaseConsensusFixture):
     If None, no post-state validation is performed (e.g., for invalid tests).
     """
 
-    expect_exception: type[Exception] | None = None
-    """Expected exception type for invalid tests."""
-
     expect_exception_message: str | None = None
     """Expected exception message for invalid tests."""
 
     @field_serializer("blocks", when_used="json")
-    def serialize_blocks(self, value: List[BlockSpec]) -> List[dict[str, Any]]:
+    def serialize_blocks(self, value: list[BlockSpec]) -> list[dict[str, Any]]:
         """
-        Serialize the filled `Block`s instead of the `BlockSpec`s.
+        Serialize filled blocks instead of the input specs.
 
-        This ensures the fixture output contains the complete `Blocks` that were
-        filled from the specs, not the input `BlockSpec`s.
+        Ensures fixture output contains complete blocks, not partial specs.
 
-        Parameters:
-        ----------
-        value : List[BlockSpec]
-            The BlockSpec list (ignored, we use _filled_blocks instead).
+        Args:
+            value: The BlockSpec list (ignored; filled blocks are used instead).
 
         Returns:
-        -------
-        List[dict[str, Any]]
-            The serialized Blocks.
+            The serialized blocks.
         """
         del value
         return [block.to_json() for block in self._filled_blocks]
-
-    @field_serializer("expect_exception", when_used="json")
-    def serialize_exception(self, value: type[Exception] | None) -> str | None:
-        """Serialize exception type to string."""
-        if value is None:
-            return None
-        # Format: "ExceptionClassName" (just the class name for now)
-        # TODO: This can be used to map exceptions to expected exceptions from clients
-        #  as in execution-spec-tests - e.g., "StateTransitionException.INVALID_SLOT"
-        return value.__name__
 
     def make_fixture(self) -> "StateTransitionTest":
         """
         Generate the fixture by running the spec.
 
-        Builds blocks from BlockSpec if needed, then processes them through state_transition.
-
         Returns:
-        -------
-        StateTransitionTest
             A validated fixture.
 
         Raises:
-        ------
-        AssertionError
-            If processing fails unexpectedly or validation fails.
+            AssertionError: If processing fails unexpectedly or validation fails.
         """
         actual_post_state: State | None = None
         exception_raised: Exception | None = None
@@ -217,46 +189,28 @@ class StateTransitionTest(BaseConsensusFixture):
         """
         Build a Block from a BlockSpec, optionally caching the post-state.
 
-        Returns both the block and the cached post-state (if computed) to avoid
-        redundant state transitions.
-
-        Parameters
-        ----------
-        spec : BlockSpec
-            Block specification with optional field overrides.
-        state : State
-            Current state to build against.
-        block_registry : dict[str, Block]
-            Map of labels to previously built blocks, used to resolve
-            parent_label and attestation target roots.
+        Args:
+            spec: Block specification with optional field overrides.
+            state: Current state to build against.
+            block_registry: Labels to previously built blocks for resolving parents
+                and attestation targets.
 
         Returns:
-        -------
-        tuple[Block, State | None]
             Block and cached post-state (None if not computed).
         """
-        # Use provided proposer index or compute it
-        proposer_index = spec.proposer_index or ValidatorIndex(
-            int(spec.slot) % len(state.validators)
-        )
+        proposer_index = spec.resolve_proposer_index(len(state.validators))
 
         temp_state: State | None = None
         if not spec.skip_slot_processing:
             temp_state = state.process_slots(spec.slot)
 
-        # Use provided parent root, resolve from label, or compute from state
-        if spec.parent_root is not None:
-            parent_root = spec.parent_root
-        elif spec.parent_label is not None:
-            if spec.parent_label not in block_registry:
-                raise ValueError(
-                    f"parent_label '{spec.parent_label}' not found - "
-                    f"available: {list(block_registry.keys())}"
-                )
-            parent_root = hash_tree_root(block_registry[spec.parent_label])
-        else:
-            source_state = temp_state or state
-            parent_root = hash_tree_root(source_state.latest_block_header)
+        # Resolve the parent root.
+        # The default is the latest block header from the slot-advanced state.
+        source_state = temp_state or state
+        parent_root = spec.resolve_parent_root(
+            block_registry,
+            default_root=hash_tree_root(source_state.latest_block_header),
+        )
 
         # Extract attestations from body if provided
         aggregated_attestations = (
@@ -287,7 +241,7 @@ class StateTransitionTest(BaseConsensusFixture):
         # Build aggregated payloads from spec.attestations if provided
         aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
         if spec.attestations:
-            aggregated_payloads = self._build_aggregated_payloads_from_spec(
+            aggregated_payloads = StateTransitionTest._build_aggregated_payloads_from_spec(
                 spec.attestations, state, block_registry
             )
 
@@ -303,8 +257,8 @@ class StateTransitionTest(BaseConsensusFixture):
         )
         return block, post_state
 
+    @staticmethod
     def _build_aggregated_payloads_from_spec(
-        self,
         attestation_specs: list[AggregatedAttestationSpec],
         state: State,
         block_registry: dict[str, Block],
@@ -312,22 +266,12 @@ class StateTransitionTest(BaseConsensusFixture):
         """
         Build aggregated signature payloads from attestation specifications.
 
-        For each AggregatedAttestationSpec, builds AttestationData, signs
-        individual attestations, and aggregates them into proofs that can
-        be passed to State.build_block().
-
-        Parameters
-        ----------
-        attestation_specs : list[AggregatedAttestationSpec]
-            Attestation specifications from the BlockSpec.
-        state : State
-            Current state for source checkpoint lookup.
-        block_registry : dict[str, Block]
-            Map of labels to blocks for resolving target roots.
+        Args:
+            attestation_specs: Attestation specifications from the block spec.
+            state: Current state for source checkpoint lookup.
+            block_registry: Labels to blocks for resolving target roots.
 
         Returns:
-        -------
-        dict[AttestationData, set[AggregatedSignatureProof]]
             Aggregated payloads keyed by attestation data.
         """
         # Compute max slot across all attestation specs for XMSS key lifetime.
@@ -344,99 +288,8 @@ class StateTransitionTest(BaseConsensusFixture):
             if spec.signer_ids is not None:
                 raise NotImplementedError("signer_ids not yet supported in StateTransitionTest")
 
-            attestation_data = self._build_attestation_data_from_spec(spec, block_registry, state)
-
-            # Sign each validator's attestation individually
-            public_keys = []
-            signatures = []
-            for validator_id in spec.validator_ids:
-                attestation_pubkey, _ = key_manager.get_public_keys(validator_id)
-                public_keys.append(attestation_pubkey)
-                signatures.append(key_manager.sign_attestation_data(validator_id, attestation_data))
-
-            # Aggregate into a single proof
-            xmss_participants = AggregationBits.from_validator_indices(
-                ValidatorIndices(data=spec.validator_ids)
-            )
-            proof = AggregatedSignatureProof.aggregate(
-                xmss_participants=xmss_participants,
-                children=[],
-                raw_xmss=list(zip(public_keys, signatures, strict=True)),
-                message=attestation_data.data_root_bytes(),
-                slot=attestation_data.slot,
-            )
-
+            attestation_data = spec.build_attestation_data(block_registry, state)
+            proof = key_manager.sign_and_aggregate(spec.validator_ids, attestation_data)
             payloads.setdefault(attestation_data, set()).add(proof)
 
         return payloads
-
-    def _resolve_checkpoint(
-        self,
-        label: str,
-        slot_override: Slot | None,
-        block_registry: dict[str, Block],
-    ) -> Checkpoint:
-        """
-        Resolve a block label and optional slot override into a Checkpoint.
-
-        Args:
-            label: Block label in the registry.
-            slot_override: When set, overrides the block's actual slot.
-            block_registry: Labeled blocks for lookup.
-
-        Returns:
-            Checkpoint with the block's root and resolved slot.
-
-        Raises:
-            ValueError: If label not found in registry.
-        """
-        if (block := block_registry.get(label)) is None:
-            raise ValueError(
-                f"label '{label}' not found - available: {list(block_registry.keys())}"
-            )
-        return Checkpoint(
-            root=hash_tree_root(block),
-            slot=block.slot if slot_override is None else slot_override,
-        )
-
-    def _build_attestation_data_from_spec(
-        self,
-        spec: AggregatedAttestationSpec,
-        block_registry: dict[str, Block],
-        state: State,
-    ) -> AttestationData:
-        """
-        Build attestation data from a specification.
-
-        Attestation data contains the validator's vote:
-
-        - slot: When the attestation was made
-        - head: What block the validator sees as head
-        - target: Checkpoint being voted for (epoch boundary)
-        - source: Previously justified checkpoint (link source)
-
-        Target is resolved from label.
-        Source comes from the parent state's justified checkpoint.
-
-        Args:
-            spec: Aggregated attestation specification.
-            block_registry: Labeled blocks for target resolution.
-            state: State for source checkpoint lookup.
-
-        Returns:
-            Attestation data shared by all validators in the aggregation.
-
-        Raises:
-            ValueError: If target label not found in registry.
-        """
-        target = self._resolve_checkpoint(spec.target_root_label, spec.target_slot, block_registry)
-
-        # In simplified tests, head equals target for convenience.
-        #
-        # Source is the state's last justified checkpoint (3SF-mini link).
-        return AttestationData(
-            slot=spec.slot,
-            head=target,
-            target=target,
-            source=state.latest_justified,
-        )

@@ -26,6 +26,8 @@ class BaseForkChoiceStep(CamelModel):
     - optional Store state checks to validate after processing
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     valid: bool = True
     """Whether this step is expected to succeed."""
 
@@ -73,8 +75,6 @@ class BlockStep(BaseForkChoiceStep):
     Input: BlockSpec (can be partial or fully specified).
     Output: Block object built and processed through the spec.
     """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     step_type: Literal["block"] = "block"
     """Discriminator field for serialization."""
@@ -141,8 +141,6 @@ class AttestationStep(BaseForkChoiceStep):
     step_type: Literal["attestation"] = "attestation"
     """Discriminator field for serialization."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     attestation: GossipAttestationSpec
     """
     Gossip attestation specification for this step.
@@ -191,8 +189,6 @@ class GossipAggregatedAttestationStep(BaseForkChoiceStep):
 
     step_type: Literal["gossipAggregatedAttestation"] = "gossipAggregatedAttestation"
     """Discriminator field for serialization."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     attestation: GossipAggregatedAttestationSpec
     """

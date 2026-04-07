@@ -40,7 +40,8 @@ from pathlib import Path
 from typing import ClassVar, Literal
 
 from lean_spec.config import LEAN_ENV
-from lean_spec.subspecs.containers import AttestationData, ValidatorIndex
+from lean_spec.subspecs.containers import AttestationData, ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.containers.attestation.aggregation_bits import AggregationBits
 from lean_spec.subspecs.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
@@ -484,6 +485,43 @@ class XmssKeyManager:
             ValueError: If the slot exceeds key lifetime.
         """
         return self._sign_with_secret(validator_id, slot, block_root, "proposal_secret")
+
+    def sign_and_aggregate(
+        self,
+        validator_ids: list[ValidatorIndex],
+        attestation_data: AttestationData,
+    ) -> AggregatedSignatureProof:
+        """
+        Sign attestation data with each validator and aggregate into a single proof.
+
+        Convenience method for the common sign-each-validator-then-aggregate pattern.
+
+        Args:
+            validator_ids: Validators to sign with.
+            attestation_data: The attestation data to sign.
+
+        Returns:
+            Aggregated signature proof combining all validators' signatures.
+        """
+        raw_xmss = [
+            (
+                self.get_public_keys(vid)[0],
+                self.sign_attestation_data(vid, attestation_data),
+            )
+            for vid in validator_ids
+        ]
+
+        xmss_participants = AggregationBits.from_validator_indices(
+            ValidatorIndices(data=validator_ids)
+        )
+
+        return AggregatedSignatureProof.aggregate(
+            xmss_participants=xmss_participants,
+            children=[],
+            raw_xmss=raw_xmss,
+            message=attestation_data.data_root_bytes(),
+            slot=attestation_data.slot,
+        )
 
     def build_attestation_signatures(
         self,

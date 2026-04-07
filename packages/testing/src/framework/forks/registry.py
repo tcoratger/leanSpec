@@ -1,7 +1,6 @@
 """Fork registry for discovering and looking up forks by name."""
 
 from types import ModuleType
-from typing import Type
 
 from framework.forks.base import BaseFork
 
@@ -27,6 +26,6 @@ class ForkRegistry:
         """All available non-ignored forks."""
         return self._forks
 
-    def get_fork_by_name(self, fork_name: str) -> Type[BaseFork] | None:
+    def get_fork_by_name(self, fork_name: str) -> type[BaseFork] | None:
         """Case-insensitive fork lookup."""
         return self._by_name.get(fork_name.lower())
