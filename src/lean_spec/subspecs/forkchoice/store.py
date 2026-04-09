@@ -372,7 +372,7 @@ class Store(StrictBaseModel):
         public_key = key_state.validators[validator_id].get_attestation_pubkey()
 
         assert signature.verify(
-            public_key, attestation_data.slot, attestation_data.data_root_bytes(), scheme
+            public_key, attestation_data.slot, hash_tree_root(attestation_data), scheme
         ), "Signature verification failed"
 
         # Store signature and attestation data for later aggregation.
@@ -444,7 +444,7 @@ class Store(StrictBaseModel):
         try:
             proof.verify(
                 public_keys=public_keys,
-                message=data.data_root_bytes(),
+                message=hash_tree_root(data),
                 slot=data.slot,
             )
         except AggregationError as exc:
@@ -1046,7 +1046,7 @@ class Store(StrictBaseModel):
                 xmss_participants=xmss_participants,
                 children=children,
                 raw_xmss=raw_xmss,
-                message=data.data_root_bytes(),
+                message=hash_tree_root(data),
                 slot=data.slot,
             )
             new_aggregates.append(SignedAggregatedAttestation(data=data, proof=proof))

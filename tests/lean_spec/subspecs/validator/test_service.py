@@ -226,7 +226,7 @@ class TestSignAttestation:
         assert TARGET_SIGNATURE_SCHEME.verify(
             pk=public_key,
             slot=att_data.slot,
-            message=att_data.data_root_bytes(),
+            message=hash_tree_root(att_data),
             sig=result.signature,
         )
 
@@ -242,7 +242,7 @@ class TestSignAttestation:
         assert TARGET_SIGNATURE_SCHEME.verify(
             pk=attestation_pk,
             slot=att_data.slot,
-            message=att_data.data_root_bytes(),
+            message=hash_tree_root(att_data),
             sig=result.signature,
         )
 
@@ -1010,7 +1010,7 @@ class TestValidatorServiceIntegration:
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
             public_key = key_manager[validator_id].attestation_public
-            message_bytes = signed_att.data.data_root_bytes()
+            message_bytes = hash_tree_root(signed_att.data)
 
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,
@@ -1107,7 +1107,7 @@ class TestValidatorServiceIntegration:
         """
         store = real_sync_service.store
         attestation_data = store.produce_attestation_data(Slot(0))
-        data_root = attestation_data.data_root_bytes()
+        data_root = hash_tree_root(attestation_data)
 
         participants = [ValidatorIndex(3), ValidatorIndex(4)]
         public_keys = []
@@ -1289,7 +1289,7 @@ class TestValidatorServiceIntegration:
         for signed_att in attestations_produced:
             validator_id = signed_att.validator_id
             public_key = key_manager[validator_id].attestation_public
-            message_bytes = signed_att.data.data_root_bytes()
+            message_bytes = hash_tree_root(signed_att.data)
 
             is_valid = TARGET_SIGNATURE_SCHEME.verify(
                 pk=public_key,

@@ -17,8 +17,7 @@ from collections import defaultdict
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Bytes32, Container
+from lean_spec.types import Container
 
 from ...xmss.aggregation import AggregatedSignatureProof
 from ...xmss.containers import Signature
@@ -40,10 +39,6 @@ class AttestationData(Container):
 
     source: Checkpoint
     """The checkpoint representing the source block as observed by the validator."""
-
-    def data_root_bytes(self) -> Bytes32:
-        """The root of the attestation data."""
-        return hash_tree_root(self)
 
 
 class Attestation(Container):

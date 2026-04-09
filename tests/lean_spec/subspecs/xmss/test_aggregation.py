@@ -8,6 +8,7 @@ from consensus_testing.keys import XmssKeyManager
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, AggregationError
 from lean_spec.types import ByteListMiB
 from tests.lean_spec.helpers import make_attestation_data_simple, make_bytes32
@@ -21,7 +22,7 @@ def _sign_and_aggregate(
     """Sign attestation data with the given validators and aggregate."""
     slot, head, target, source = att_data_args
     att_data = make_attestation_data_simple(slot, make_bytes32(head), make_bytes32(target), source)
-    data_root = att_data.data_root_bytes()
+    data_root = hash_tree_root(att_data)
 
     xmss_participants = ValidatorIndices(data=validator_ids).to_aggregation_bits()
     raw_xmss = list(
@@ -72,7 +73,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
         xmss_participants=xmss_participants,
         children=[],
         raw_xmss=raw_xmss,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -81,7 +82,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
     public_keys = [key_manager[vid].attestation_public for vid in vids]
     proof.verify(
         public_keys=public_keys,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -112,7 +113,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
         xmss_participants=xmss_participants,
         children=[(child, [key_manager[ValidatorIndex(i)].attestation_public for i in range(2)])],
         raw_xmss=raw_xmss,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -122,7 +123,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
     public_keys = [key_manager[ValidatorIndex(i)].attestation_public for i in range(4)]
     parent.verify(
         public_keys=public_keys,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -147,7 +148,7 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
         xmss_participants=None,
         children=[(child_a, child_a_pks), (child_b, child_b_pks), (child_c, child_c_pks)],
         raw_xmss=[],
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -157,7 +158,7 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
     public_keys = [key_manager[ValidatorIndex(i)].attestation_public for i in range(3)]
     parent.verify(
         public_keys=public_keys,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -169,7 +170,7 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
     att_data = make_attestation_data_simple(
         att_args[0], make_bytes32(att_args[1]), make_bytes32(att_args[2]), att_args[3]
     )
-    msg = att_data.data_root_bytes()
+    msg = hash_tree_root(att_data)
 
     # Level 0: four individual leaf proofs
     leaf_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
@@ -222,7 +223,7 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
     att_data = make_attestation_data_simple(
         att_args[0], make_bytes32(att_args[1]), make_bytes32(att_args[2]), att_args[3]
     )
-    msg = att_data.data_root_bytes()
+    msg = hash_tree_root(att_data)
 
     # Two child proofs
     child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
@@ -276,7 +277,7 @@ def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager)
         xmss_participants=xmss_participants,
         children=[],
         raw_xmss=raw_xmss,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
@@ -307,14 +308,14 @@ def test_aggregate_wrong_slot_fails_verification(key_manager: XmssKeyManager) ->
         xmss_participants=xmss_participants,
         children=[],
         raw_xmss=raw_xmss,
-        message=att_data.data_root_bytes(),
+        message=hash_tree_root(att_data),
         slot=att_data.slot,
     )
 
     with pytest.raises(AggregationError, match="verification failed"):
         proof.verify(
             public_keys=[key_manager[vid].attestation_public],
-            message=att_data.data_root_bytes(),
+            message=hash_tree_root(att_data),
             slot=Slot(99),
         )
 
@@ -343,7 +344,7 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
     with pytest.raises(AggregationError, match="verification failed"):
         corrupted_proof.verify(
             public_keys=[key_manager[vid].attestation_public],
-            message=att_data.data_root_bytes(),
+            message=hash_tree_root(att_data),
             slot=att_data.slot,
         )
 
@@ -371,7 +372,7 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
             xmss_participants=None,
             children=[(child_a, child_a_pks), (child_b, child_b_pks)],
             raw_xmss=[],
-            message=att_data_b.data_root_bytes(),
+            message=hash_tree_root(att_data_b),
             slot=att_data_b.slot,
         )
 
@@ -419,6 +420,6 @@ def test_aggregate_rejects_mismatched_participant_count(
             xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
-            message=att_data.data_root_bytes(),
+            message=hash_tree_root(att_data),
             slot=att_data.slot,
         )
