@@ -221,7 +221,7 @@ class Store(StrictBaseModel):
         # The state internally might have zero-hash checkpoints (if genesis),
         # but the Store must treat the anchor block as the justified/finalized point.
         return cls(
-            time=Interval(anchor_slot * INTERVALS_PER_SLOT),
+            time=Interval.from_slot(anchor_slot),
             config=state.config,
             head=anchor_root,
             safe_target=anchor_root,
@@ -1191,7 +1191,7 @@ class Store(StrictBaseModel):
             Tuple of (new Store with updated time, head root for building).
         """
         # Advance time to this slot's first interval
-        target_interval = Interval(slot * INTERVALS_PER_SLOT)
+        target_interval = Interval.from_slot(slot)
         store, _ = self.on_tick(target_interval, True)
 
         # Process any pending attestations before proposal

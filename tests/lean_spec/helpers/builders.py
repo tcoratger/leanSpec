@@ -12,7 +12,6 @@ from typing import Callable, NamedTuple, cast
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
-from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.containers import (
     AttestationData,
     Block,
@@ -464,7 +463,7 @@ def make_signed_block_from_store(
         ),
     )
 
-    target_interval = Interval(block.slot * INTERVALS_PER_SLOT)
+    target_interval = Interval.from_slot(block.slot)
     advanced_store, _ = store.on_tick(target_interval, has_proposal=True)
 
     return advanced_store, signed_block
