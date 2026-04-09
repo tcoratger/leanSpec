@@ -13,10 +13,8 @@ Attestations can be aggregated by common data to save space and bandwidth.
 
 from __future__ import annotations
 
-from collections import defaultdict
-
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Container
 
 from ...xmss.aggregation import AggregatedSignatureProof
@@ -70,33 +68,6 @@ class AggregatedAttestation(Container):
     Multiple validator attestations are aggregated here without the complexity of
     committee assignments.
     """
-
-    @classmethod
-    def aggregate_by_data(
-        cls,
-        attestations: list[Attestation],
-    ) -> list[AggregatedAttestation]:
-        """
-        Aggregate plain per-validator attestations by their shared AttestationData.
-
-        Args:
-            attestations: Attestations to aggregate.
-
-        Returns:
-            One AggregatedAttestation per unique AttestationData, with aggregation
-            bits set for all participating validators.
-        """
-        data_to_validator_ids: dict[AttestationData, list[ValidatorIndex]] = defaultdict(list)
-        for attestation in attestations:
-            data_to_validator_ids[attestation.data].append(attestation.validator_id)
-
-        return [
-            cls(
-                aggregation_bits=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
-                data=data,
-            )
-            for data, validator_ids in data_to_validator_ids.items()
-        ]
 
 
 class SignedAggregatedAttestation(Container):

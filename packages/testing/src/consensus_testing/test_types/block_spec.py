@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from lean_spec.subspecs.containers.attestation import (
@@ -21,7 +22,7 @@ from lean_spec.subspecs.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, CamelModel
@@ -331,8 +332,22 @@ class BlockSpec(CamelModel):
             state, block_registry, key_manager
         )
 
-        # Aggregate valid attestations into block body.
-        aggregated_attestations = AggregatedAttestation.aggregate_by_data(valid_attestations)
+        # Group attestations that share the same AttestationData.
+        # Validators seeing the same head/source/target produce identical data,
+        # so they can be merged into a single aggregated attestation.
+        data_to_validator_ids: dict[AttestationData, list[ValidatorIndex]] = defaultdict(list)
+        for attestation in valid_attestations:
+            data_to_validator_ids[attestation.data].append(attestation.validator_id)
+
+        # Build one AggregatedAttestation per unique data.
+        # Each carries a bitfield marking which validators participated.
+        aggregated_attestations = [
+            AggregatedAttestation(
+                aggregation_bits=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
+                data=data,
+            )
+            for data, validator_ids in data_to_validator_ids.items()
+        ]
         attestation_sigs = key_manager.build_attestation_signatures(
             AggregatedAttestations(data=aggregated_attestations),
             signature_lookup=signature_lookup,
