@@ -17,7 +17,6 @@ from lean_spec.subspecs.containers import (
     ValidatorIndex,
     ValidatorIndices,
 )
-from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -1119,9 +1118,7 @@ class TestValidatorServiceIntegration:
             signatures.append(sig)
             public_keys.append(key_manager[vid].attestation_public)
 
-        xmss_participants = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=participants)
-        )
+        xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
         proof = AggregatedSignatureProof.aggregate(
             xmss_participants=xmss_participants,
             children=[],

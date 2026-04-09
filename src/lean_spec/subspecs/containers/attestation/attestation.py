@@ -97,9 +97,7 @@ class AggregatedAttestation(Container):
 
         return [
             cls(
-                aggregation_bits=AggregationBits.from_validator_indices(
-                    ValidatorIndices(data=validator_ids)
-                ),
+                aggregation_bits=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
                 data=data,
             )
             for data, validator_ids in data_to_validator_ids.items()

@@ -39,12 +39,12 @@ class TestAggregationBits:
             data=[ValidatorIndex(0), ValidatorIndex(2), ValidatorIndex(3)]
         )
 
-    def test_from_validator_indices_roundtrip(self) -> None:
-        """Test that from_validator_indices and to_validator_indices are inverses."""
+    def test_to_aggregation_bits_roundtrip(self) -> None:
+        """Test that to_aggregation_bits and to_validator_indices are inverses."""
         original_indices = ValidatorIndices(
             data=[ValidatorIndex(1), ValidatorIndex(5), ValidatorIndex(7)]
         )
-        bits = AggregationBits.from_validator_indices(original_indices)
+        bits = original_indices.to_aggregation_bits()
         recovered_indices = bits.to_validator_indices()
         assert recovered_indices == original_indices
 
@@ -61,9 +61,7 @@ class TestAggregatedAttestation:
             source=Checkpoint(root=Bytes32.zero(), slot=Slot(2)),
         )
 
-        bits = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=[ValidatorIndex(2), ValidatorIndex(7)])
-        )
+        bits = ValidatorIndices(data=[ValidatorIndex(2), ValidatorIndex(7)]).to_aggregation_bits()
         agg = AggregatedAttestation(aggregation_bits=bits, data=att_data)
 
         # Verify we can extract validator indices
@@ -81,7 +79,7 @@ class TestAggregatedAttestation:
         )
 
         validator_ids = ValidatorIndices(data=[ValidatorIndex(i) for i in [0, 5, 10, 15, 20, 25]])
-        bits = AggregationBits.from_validator_indices(validator_ids)
+        bits = validator_ids.to_aggregation_bits()
         agg = AggregatedAttestation(aggregation_bits=bits, data=att_data)
 
         recovered = agg.aggregation_bits.to_validator_indices()
