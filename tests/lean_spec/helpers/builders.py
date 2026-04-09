@@ -420,7 +420,7 @@ def make_aggregated_proof(
     attestation_data: AttestationData,
 ) -> AggregatedSignatureProof:
     """Create a valid aggregated signature proof for the given participants."""
-    data_root = attestation_data.data_root_bytes()
+    data_root = hash_tree_root(attestation_data)
     xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
     raw_xmss = list(
         zip(

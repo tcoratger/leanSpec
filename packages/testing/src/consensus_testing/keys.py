@@ -47,6 +47,7 @@ from lean_spec.subspecs.containers.block.types import (
 )
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.koalabear import Fp
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
 from lean_spec.subspecs.xmss.containers import PublicKey, SecretKey, Signature, ValidatorKeyPair
@@ -456,7 +457,7 @@ class XmssKeyManager:
         return self._sign_with_secret(
             validator_id,
             attestation_data.slot,
-            attestation_data.data_root_bytes(),
+            hash_tree_root(attestation_data),
             "attestation_secret",
         )
 
@@ -516,7 +517,7 @@ class XmssKeyManager:
             xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
-            message=attestation_data.data_root_bytes(),
+            message=hash_tree_root(attestation_data),
             slot=attestation_data.slot,
         )
 
@@ -572,7 +573,7 @@ class XmssKeyManager:
                 xmss_participants=agg.aggregation_bits,
                 children=[],
                 raw_xmss=list(zip(public_keys, signatures, strict=True)),
-                message=agg.data.data_root_bytes(),
+                message=hash_tree_root(agg.data),
                 slot=agg.data.slot,
             )
             proofs.append(proof)
