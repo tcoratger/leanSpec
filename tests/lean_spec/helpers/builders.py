@@ -22,7 +22,7 @@ from lean_spec.subspecs.containers import (
     State,
     Validator,
 )
-from lean_spec.subspecs.containers.attestation import AggregatedAttestation, AggregationBits
+from lean_spec.subspecs.containers.attestation import AggregatedAttestation
 from lean_spec.subspecs.containers.block import BlockSignatures
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations, AttestationSignatures
 from lean_spec.subspecs.containers.slot import Slot
@@ -239,9 +239,7 @@ def make_aggregated_attestation(
     )
 
     return AggregatedAttestation(
-        aggregation_bits=AggregationBits.from_validator_indices(
-            ValidatorIndices(data=participant_ids)
-        ),
+        aggregation_bits=ValidatorIndices(data=participant_ids).to_aggregation_bits(),
         data=data,
     )
 
@@ -423,7 +421,7 @@ def make_aggregated_proof(
 ) -> AggregatedSignatureProof:
     """Create a valid aggregated signature proof for the given participants."""
     data_root = attestation_data.data_root_bytes()
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=participants))
+    xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
     raw_xmss = list(
         zip(
             [key_manager.get_public_keys(vid)[0] for vid in participants],

@@ -7,7 +7,6 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.containers.attestation import (
-    AggregationBits,
     AttestationData,
     SignedAggregatedAttestation,
     SignedAttestation,
@@ -277,9 +276,7 @@ class TestOnGossipAggregatedAttestation:
         data_root = attestation_data.data_root_bytes()
 
         # Create valid aggregated proof
-        xmss_participants = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=participants)
-        )
+        xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
         raw_xmss = list(
             zip(
                 [key_manager[vid].attestation_public for vid in participants],
@@ -324,9 +321,7 @@ class TestOnGossipAggregatedAttestation:
 
         data_root = attestation_data.data_root_bytes()
 
-        xmss_participants = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=participants)
-        )
+        xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
         raw_xmss = list(
             zip(
                 [key_manager[vid].attestation_public for vid in participants],
@@ -366,7 +361,7 @@ class TestOnGossipAggregatedAttestation:
 
         data_root = attestation_data.data_root_bytes()
 
-        xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=signers))
+        xmss_participants = ValidatorIndices(data=signers).to_aggregation_bits()
         raw_xmss = list(
             zip(
                 [key_manager[vid].attestation_public for vid in signers],
@@ -414,7 +409,7 @@ class TestOnGossipAggregatedAttestation:
 
         # First proof: validators 1 and 2
         participants_1 = [ValidatorIndex(1), ValidatorIndex(2)]
-        xmss_1 = AggregationBits.from_validator_indices(ValidatorIndices(data=participants_1))
+        xmss_1 = ValidatorIndices(data=participants_1).to_aggregation_bits()
         raw_xmss_1 = list(
             zip(
                 [key_manager[vid].attestation_public for vid in participants_1],
@@ -435,7 +430,7 @@ class TestOnGossipAggregatedAttestation:
 
         # Second proof: validators 1 and 3 (validator 1 overlaps)
         participants_2 = [ValidatorIndex(1), ValidatorIndex(3)]
-        xmss_2 = AggregationBits.from_validator_indices(ValidatorIndices(data=participants_2))
+        xmss_2 = ValidatorIndices(data=participants_2).to_aggregation_bits()
         raw_xmss_2 = list(
             zip(
                 [key_manager[vid].attestation_public for vid in participants_2],

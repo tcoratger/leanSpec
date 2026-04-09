@@ -17,7 +17,6 @@ from lean_spec.subspecs.chain.config import (
     MAX_ATTESTATIONS_DATA,
 )
 from lean_spec.subspecs.containers import (
-    AggregationBits,
     AttestationData,
     Block,
     Checkpoint,
@@ -1018,9 +1017,9 @@ class Store(StrictBaseModel):
                 continue
 
             # Encode the set of raw signers as a compact bitfield.
-            xmss_participants = AggregationBits.from_validator_indices(
-                ValidatorIndices(data=[vid for vid, _, _ in raw_entries])
-            )
+            xmss_participants = ValidatorIndices(
+                data=[vid for vid, _, _ in raw_entries]
+            ).to_aggregation_bits()
             raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
 
             # Phase 3: Aggregate

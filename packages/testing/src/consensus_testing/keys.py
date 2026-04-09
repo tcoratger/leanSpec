@@ -41,7 +41,6 @@ from typing import ClassVar, Literal
 
 from lean_spec.config import LEAN_ENV
 from lean_spec.subspecs.containers import AttestationData, ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.containers.attestation.aggregation_bits import AggregationBits
 from lean_spec.subspecs.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
@@ -511,9 +510,7 @@ class XmssKeyManager:
             for vid in validator_ids
         ]
 
-        xmss_participants = AggregationBits.from_validator_indices(
-            ValidatorIndices(data=validator_ids)
-        )
+        xmss_participants = ValidatorIndices(data=validator_ids).to_aggregation_bits()
 
         return AggregatedSignatureProof.aggregate(
             xmss_participants=xmss_participants,

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.subspecs.containers.attestation import AggregationBits
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
@@ -24,7 +23,7 @@ def _sign_and_aggregate(
     att_data = make_attestation_data_simple(slot, make_bytes32(head), make_bytes32(target), source)
     data_root = att_data.data_root_bytes()
 
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=validator_ids))
+    xmss_participants = ValidatorIndices(data=validator_ids).to_aggregation_bits()
     raw_xmss = list(
         zip(
             [key_manager[vid].attestation_public for vid in validator_ids],
@@ -60,7 +59,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
     att_data = make_attestation_data_simple(Slot(2), make_bytes32(11), make_bytes32(12), source)
     vids = [ValidatorIndex(i) for i in range(4)]
 
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=vids))
+    xmss_participants = ValidatorIndices(data=vids).to_aggregation_bits()
     raw_xmss = list(
         zip(
             [key_manager[vid].attestation_public for vid in vids],
@@ -100,7 +99,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
 
     # Additional raw signatures: validators 2, 3
     extra_vids = [ValidatorIndex(2), ValidatorIndex(3)]
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=extra_vids))
+    xmss_participants = ValidatorIndices(data=extra_vids).to_aggregation_bits()
     raw_xmss = list(
         zip(
             [key_manager[vid].attestation_public for vid in extra_vids],
@@ -234,7 +233,7 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
 
     # Additional raw signatures from validators 2 and 3
     extra_vids = [ValidatorIndex(2), ValidatorIndex(3)]
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=extra_vids))
+    xmss_participants = ValidatorIndices(data=extra_vids).to_aggregation_bits()
     raw_xmss = list(
         zip(
             [key_manager[vid].attestation_public for vid in extra_vids],
@@ -265,7 +264,7 @@ def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager)
     att_data = make_attestation_data_simple(Slot(1), make_bytes32(121), make_bytes32(122), source)
     vid = ValidatorIndex(0)
 
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=[vid]))
+    xmss_participants = ValidatorIndices(data=[vid]).to_aggregation_bits()
     raw_xmss = [
         (
             key_manager[vid].attestation_public,
@@ -296,7 +295,7 @@ def test_aggregate_wrong_slot_fails_verification(key_manager: XmssKeyManager) ->
     att_data = make_attestation_data_simple(Slot(2), make_bytes32(131), make_bytes32(132), source)
     vid = ValidatorIndex(1)
 
-    xmss_participants = AggregationBits.from_validator_indices(ValidatorIndices(data=[vid]))
+    xmss_participants = ValidatorIndices(data=[vid]).to_aggregation_bits()
     raw_xmss = [
         (
             key_manager[vid].attestation_public,
@@ -381,9 +380,7 @@ def test_aggregate_rejects_single_child_without_raw(key_manager: XmssKeyManager)
     """A single child without raw signatures is rejected (need at least two children)."""
     # Create a stub child proof without calling the Rust bindings
     stub_child = AggregatedSignatureProof(
-        participants=AggregationBits.from_validator_indices(
-            ValidatorIndices(data=[ValidatorIndex(0)])
-        ),
+        participants=ValidatorIndices(data=[ValidatorIndex(0)]).to_aggregation_bits(),
         proof_data=ByteListMiB(data=b"\x00"),
     )
 
@@ -407,9 +404,9 @@ def test_aggregate_rejects_mismatched_participant_count(
     att_data = make_attestation_data_simple(Slot(7), make_bytes32(61), make_bytes32(62), source)
 
     # Claim 2 participants but only provide 1 signature
-    xmss_participants = AggregationBits.from_validator_indices(
-        ValidatorIndices(data=[ValidatorIndex(0), ValidatorIndex(1)])
-    )
+    xmss_participants = ValidatorIndices(
+        data=[ValidatorIndex(0), ValidatorIndex(1)]
+    ).to_aggregation_bits()
     raw_xmss = [
         (
             key_manager[ValidatorIndex(0)].attestation_public,
