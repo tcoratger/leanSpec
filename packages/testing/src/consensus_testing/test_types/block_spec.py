@@ -412,13 +412,12 @@ class BlockSpec(CamelModel):
 
         # Build attestations from this spec's attestation fields.
         parent_state = store.states[parent_root]
-        attestations, attestation_signatures, valid_attestations = self.build_attestations(
+        _, attestation_signatures, valid_attestations = self.build_attestations(
             parent_state, block_registry, key_manager
         )
 
         # Gossip valid attestation signatures into the Store.
         # This runs signature verification through the spec's validation path.
-        working_store = store
         for attestation in valid_attestations:
             sigs_for_data = attestation_signatures.get(attestation.data)
             if (
@@ -426,7 +425,7 @@ class BlockSpec(CamelModel):
                 or (signature := sigs_for_data.get(attestation.validator_id)) is None
             ):
                 continue
-            working_store = working_store.on_gossip_attestation(
+            store = store.on_gossip_attestation(
                 SignedAttestation(
                     validator_id=attestation.validator_id,
                     data=attestation.data,
@@ -437,7 +436,7 @@ class BlockSpec(CamelModel):
             )
 
         # Trigger Store aggregation to merge gossip signatures into known payloads.
-        aggregation_store, _ = working_store.aggregate()
+        aggregation_store, _ = store.aggregate()
         merged_store = aggregation_store.accept_new_attestations()
 
         # Build the block through the spec's State.build_block().
