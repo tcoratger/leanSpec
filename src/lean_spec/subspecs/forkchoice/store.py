@@ -371,8 +371,8 @@ class Store(StrictBaseModel):
         )
         public_key = key_state.validators[validator_id].get_attestation_pubkey()
 
-        assert signature.verify(
-            public_key, attestation_data.slot, hash_tree_root(attestation_data), scheme
+        assert scheme.verify(
+            public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
         ), "Signature verification failed"
 
         # Store signature and attestation data for later aggregation.
@@ -510,7 +510,7 @@ class Store(StrictBaseModel):
         )
 
         # Validate cryptographic signatures
-        valid_signatures = signed_block.verify_signatures(parent_state, scheme)
+        valid_signatures = signed_block.verify_signatures(parent_state.validators, scheme)
 
         # Execute state transition function to compute post-block state
         state_transition_start = time.perf_counter()

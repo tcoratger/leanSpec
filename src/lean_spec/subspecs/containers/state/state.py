@@ -23,13 +23,12 @@ from ..block.types import AggregatedAttestations
 from ..checkpoint import Checkpoint
 from ..config import Config
 from ..slot import Slot
-from ..validator import ValidatorIndex
+from ..validator import ValidatorIndex, Validators
 from .types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
-    Validators,
 )
 
 

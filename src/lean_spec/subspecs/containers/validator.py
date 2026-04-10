@@ -99,3 +99,9 @@ class Validator(Container):
     def get_proposal_pubkey(self) -> PublicKey:
         """Get the XMSS public key used for proposer attestation verification."""
         return PublicKey.decode_bytes(bytes(self.proposal_pubkey))
+
+
+class Validators(SSZList[Validator]):
+    """Validator registry tracked in the state."""
+
+    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)

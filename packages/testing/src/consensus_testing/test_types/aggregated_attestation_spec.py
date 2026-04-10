@@ -2,22 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from lean_spec.subspecs.containers.attestation import AggregatedAttestation, AttestationData
 from lean_spec.subspecs.containers.block.block import Block
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import ByteListMiB, CamelModel
 
+from ..keys import XmssKeyManager
 from .utils import resolve_checkpoint
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.containers.state.state import State
-
-    from ..keys import XmssKeyManager
 
 
 class AggregatedAttestationSpec(CamelModel):

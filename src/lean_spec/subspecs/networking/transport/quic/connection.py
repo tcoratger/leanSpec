@@ -46,7 +46,6 @@ from lean_spec.subspecs.networking.types import ProtocolId
 
 from ..identity import IdentityKeypair
 from ..peer_id import PeerId
-from .stream_adapter import QuicStreamAdapter
 from .tls import generate_libp2p_certificate
 
 logger = logging.getLogger(__name__)
@@ -211,6 +210,12 @@ class QuicStream:
         self._reset_error = QuicStreamResetError(self._stream_id, error_code)
         # Queue an empty sentinel to unblock any pending read.
         self._read_buffer.put_nowait(b"")
+
+
+# TODO: Move QuicStream to its own module (e.g. quic/stream.py) to break the
+# circular import between connection.py and stream_adapter.py, then move this
+# import back to the top of the file. See https://github.com/leanEthereum/leanSpec/issues/552
+from .stream_adapter import QuicStreamAdapter  # noqa: E402
 
 
 @dataclass(slots=True)
