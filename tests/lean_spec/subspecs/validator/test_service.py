@@ -31,6 +31,7 @@ from lean_spec.types import Bytes32, Uint64
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     MockNetworkRequester,
+    make_aggregated_proof,
     make_signed_block,
     make_store,
 )
@@ -166,7 +167,8 @@ class TestSignBlock:
     ) -> None:
         """Aggregated attestation proofs passed in are present in the returned signature."""
         service, block = self._setup(sync_service, key_manager)
-        agg_proof = MagicMock(spec=AggregatedSignatureProof)
+        attestation_data = sync_service.store.produce_attestation_data(Slot(1))
+        agg_proof = make_aggregated_proof(key_manager, [ValidatorIndex(0)], attestation_data)
 
         result = service._sign_block(block, ValidatorIndex(0), [agg_proof])
 

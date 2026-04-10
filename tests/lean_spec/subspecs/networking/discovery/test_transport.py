@@ -7,6 +7,7 @@ Tests the DiscoveryTransport and DiscoveryProtocol classes.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -44,8 +45,34 @@ from lean_spec.subspecs.networking.discovery.transport import (
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
-from lean_spec.types import Bytes16, Bytes33, Bytes64, Uint8
+from lean_spec.types import Bytes16, Bytes32, Bytes33, Bytes64, Uint8
 from tests.lean_spec.subspecs.networking.discovery.conftest import NODE_B_PUBKEY
+
+
+@pytest.fixture
+async def started_transport(
+    local_node_id: NodeId,
+    local_private_key: Bytes32,
+    local_enr: ENR,
+) -> AsyncIterator[tuple[DiscoveryTransport, MagicMock]]:
+    """Start a DiscoveryTransport with a mocked UDP socket.
+
+    Yields (transport, mock_udp) where mock_udp is the DatagramTransport mock.
+    """
+    transport = DiscoveryTransport(
+        local_node_id=local_node_id,
+        local_private_key=local_private_key,
+        local_enr=local_enr,
+    )
+    mock_udp = MagicMock(spec=asyncio.DatagramTransport)
+    with patch.object(
+        asyncio.get_event_loop(),
+        "create_datagram_endpoint",
+        new=AsyncMock(return_value=(mock_udp, MagicMock(spec=DiscoveryProtocol))),
+    ):
+        await transport.start("127.0.0.1", 9000)
+    yield transport, mock_udp
+    await transport.stop()
 
 
 class TestDiscoveryProtocol:
@@ -244,57 +271,34 @@ class TestDiscoveryTransport:
         await transport.stop()
 
     @pytest.mark.anyio
-    async def test_stop_closes_transport(self, local_node_id, local_private_key, local_enr):
+    async def test_stop_closes_transport(
+        self, started_transport: tuple[DiscoveryTransport, MagicMock]
+    ):
         """Stopping transport closes UDP socket."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_transport_obj = MagicMock(spec=asyncio.DatagramTransport)
-        mock_protocol_obj = MagicMock(spec=DiscoveryProtocol)
-
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_transport_obj, mock_protocol_obj)),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, mock_udp = started_transport
 
         await transport.stop()
 
         assert not transport._running
-        mock_transport_obj.close.assert_called_once()
+        mock_udp.close.assert_called_once()
 
     @pytest.mark.anyio
-    async def test_stop_cancels_pending_requests(self, local_node_id, local_private_key, local_enr):
+    async def test_stop_cancels_pending_requests(
+        self, started_transport: tuple[DiscoveryTransport, MagicMock]
+    ):
         """Stopping transport cancels all pending requests."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_transport_obj = MagicMock(spec=asyncio.DatagramTransport)
-        mock_protocol_obj = MagicMock(spec=DiscoveryProtocol)
-
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_transport_obj, mock_protocol_obj)),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, _ = started_transport
 
         # Add a pending request.
         loop = asyncio.get_running_loop()
         future: asyncio.Future = loop.create_future()
+        request_id = RequestId(data=b"\x01\x02\x03\x04")
         pending = PendingRequest(
-            request_id=RequestId(data=b"\x01\x02\x03\x04"),
+            request_id=request_id,
             dest_node_id=NodeId(bytes(32)),
             sent_at=loop.time(),
             nonce=Nonce(bytes(12)),
-            message=MagicMock(),
+            message=Ping(request_id=request_id, enr_seq=SeqNumber(1)),
             future=future,
         )
         transport._pending_requests[pending.request_id] = pending
@@ -318,58 +322,17 @@ class TestDiscoveryTransport:
         await transport.stop()
 
 
-class TestPendingRequest:
-    """Tests for PendingRequest dataclass."""
-
-    def test_create_pending_request(self):
-        """PendingRequest stores all required fields."""
-        loop = asyncio.new_event_loop()
-        future: asyncio.Future = loop.create_future()
-
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
-
-        pending = PendingRequest(
-            request_id=RequestId(data=b"\x01\x02\x03\x04"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=123.456,
-            nonce=Nonce(bytes(12)),
-            message=message,
-            future=future,
-        )
-
-        assert pending.request_id == RequestId(data=b"\x01\x02\x03\x04")
-        assert pending.dest_node_id == bytes(32)
-        assert pending.sent_at == 123.456
-        assert pending.nonce == bytes(12)
-        assert pending.message is message
-        assert pending.future is future
-
-        loop.close()
-
-
 class TestSendResponse:
     """Tests for sending response messages."""
 
     @pytest.mark.anyio
     async def test_send_response_without_session_returns_false(
-        self, local_node_id, local_private_key, local_enr, remote_node_id
+        self,
+        started_transport: tuple[DiscoveryTransport, MagicMock],
+        remote_node_id: NodeId,
     ):
         """Sending response without session fails gracefully."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_transport_obj = MagicMock(spec=asyncio.DatagramTransport)
-        mock_protocol_obj = MagicMock(spec=DiscoveryProtocol)
-
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_transport_obj, mock_protocol_obj)),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, _ = started_transport
 
         pong = Pong(
             request_id=RequestId(data=b"\x01"),
@@ -381,8 +344,6 @@ class TestSendResponse:
         result = await transport.send_response(remote_node_id, ("192.168.1.1", 30303), pong)
 
         assert result is False
-
-        await transport.stop()
 
     @pytest.mark.anyio
     async def test_send_response_without_transport_returns_false(
@@ -414,62 +375,6 @@ class TestMultiPacketNodesCollection:
     multiple packets. The `total` field indicates expected count.
     """
 
-    def test_pending_multi_request_creation(self, local_node_id, local_private_key, local_enr):
-        """PendingMultiRequest stores all required fields."""
-
-        loop = asyncio.new_event_loop()
-        queue: asyncio.Queue = asyncio.Queue()
-
-        pending = PendingMultiRequest(
-            request_id=RequestId(data=b"\x01\x02\x03\x04"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=123.456,
-            nonce=Nonce(bytes(12)),
-            message=MagicMock(),
-            response_queue=queue,
-            expected_total=None,
-            received_count=0,
-        )
-
-        assert pending.request_id == RequestId(data=b"\x01\x02\x03\x04")
-        assert pending.expected_total is None
-        assert pending.received_count == 0
-
-        loop.close()
-
-    def test_pending_multi_request_expected_total_tracking(self):
-        """expected_total is set from first NODES response."""
-
-        loop = asyncio.new_event_loop()
-        queue: asyncio.Queue = asyncio.Queue()
-
-        pending = PendingMultiRequest(
-            request_id=RequestId(data=b"\x01\x02\x03\x04"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=123.456,
-            nonce=Nonce(bytes(12)),
-            message=MagicMock(),
-            response_queue=queue,
-            expected_total=None,
-            received_count=0,
-        )
-
-        # Simulate receiving first NODES message with total=3.
-        pending.expected_total = 3
-        pending.received_count = 1
-
-        assert pending.expected_total == 3
-        assert pending.received_count == 1
-
-        # Simulate receiving more.
-        pending.received_count = 2
-        assert pending.received_count < pending.expected_total
-
-        pending.received_count = 3
-        assert pending.received_count >= pending.expected_total
-
-        loop.close()
-
     def test_pending_multi_request_queue_usage(self):
         """Response queue collects multiple messages."""
 
@@ -479,12 +384,13 @@ class TestMultiPacketNodesCollection:
         async def test_queue():
             queue: asyncio.Queue = asyncio.Queue()
 
+            request_id = RequestId(data=b"\x01\x02\x03\x04")
             pending = PendingMultiRequest(
-                request_id=RequestId(data=b"\x01\x02\x03\x04"),
+                request_id=request_id,
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=123.456,
                 nonce=Nonce(bytes(12)),
-                message=MagicMock(),
+                message=FindNode(request_id=request_id, distances=[Distance(256)]),
                 response_queue=queue,
                 expected_total=3,
                 received_count=0,
@@ -578,89 +484,6 @@ class TestNodesResponseAccumulation:
 class TestRequestResponseCorrelation:
     """Request ID matching and timeout handling tests."""
 
-    def test_pending_request_stores_request_id(self):
-        """PendingRequest stores request_id for matching."""
-        loop = asyncio.new_event_loop()
-        future: asyncio.Future = loop.create_future()
-
-        message = Ping(request_id=RequestId(data=b"\x01\x02\x03\x04"), enr_seq=SeqNumber(1))
-
-        pending = PendingRequest(
-            request_id=RequestId(data=b"\x01\x02\x03\x04"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=123.456,
-            nonce=Nonce(bytes(12)),
-            message=message,
-            future=future,
-        )
-
-        # Request ID should be stored for matching.
-        assert pending.request_id == RequestId(data=b"\x01\x02\x03\x04")
-        assert pending.message.request_id == RequestId(data=b"\x01\x02\x03\x04")
-
-        loop.close()
-
-    def test_pending_request_future_completion(self):
-        """Pending request future can be completed with result."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        async def test_future():
-            future: asyncio.Future = loop.create_future()
-
-            message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
-            pending = PendingRequest(
-                request_id=RequestId(data=b"\x01"),
-                dest_node_id=NodeId(bytes(32)),
-                sent_at=loop.time(),
-                nonce=Nonce(bytes(12)),
-                message=message,
-                future=future,
-            )
-
-            # Future should not be done yet.
-            assert not pending.future.done()
-
-            # Complete the future with a response.
-            response = Pong(
-                request_id=RequestId(data=b"\x01"),
-                enr_seq=SeqNumber(2),
-                recipient_ip=IPv4(b"\x7f\x00\x00\x01"),
-                recipient_port=Port(9000),
-            )
-            pending.future.set_result(response)
-
-            # Future should be done and contain response.
-            assert pending.future.done()
-            result = await pending.future
-            assert result == response
-
-        loop.run_until_complete(test_future())
-        loop.close()
-
-    def test_pending_request_future_cancellation(self):
-        """Pending request future can be cancelled."""
-        loop = asyncio.new_event_loop()
-
-        future: asyncio.Future = loop.create_future()
-
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
-        pending = PendingRequest(
-            request_id=RequestId(data=b"\x01"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=loop.time(),
-            nonce=Nonce(bytes(12)),
-            message=message,
-            future=future,
-        )
-
-        # Cancel the future.
-        pending.future.cancel()
-
-        assert pending.future.cancelled()
-
-        loop.close()
-
     def test_request_id_bytes_for_dict_lookup(self):
         """Request ID bytes work as dict key for lookup."""
         pending_requests: dict[bytes, PendingRequest] = {}
@@ -705,53 +528,6 @@ class TestRequestResponseCorrelation:
 
         loop.close()
 
-    def test_pending_request_stores_nonce_for_whoareyou_matching(self):
-        """Pending request stores nonce for WHOAREYOU matching.
-
-        When WHOAREYOU is received, we match it to pending request via nonce.
-        """
-        loop = asyncio.new_event_loop()
-        future: asyncio.Future = loop.create_future()
-
-        nonce = Nonce(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c")
-
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(1))
-        pending = PendingRequest(
-            request_id=RequestId(data=b"\x01"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=loop.time(),
-            nonce=nonce,
-            message=message,
-            future=future,
-        )
-
-        # Nonce should be stored for WHOAREYOU matching.
-        assert pending.nonce == nonce
-        assert len(pending.nonce) == 12
-
-        loop.close()
-
-    def test_pending_request_stores_message_for_retransmission(self):
-        """Pending request stores original message for retransmission after handshake."""
-        loop = asyncio.new_event_loop()
-        future: asyncio.Future = loop.create_future()
-
-        message = Ping(request_id=RequestId(data=b"\x01"), enr_seq=SeqNumber(42))
-        pending = PendingRequest(
-            request_id=RequestId(data=b"\x01"),
-            dest_node_id=NodeId(bytes(32)),
-            sent_at=loop.time(),
-            nonce=Nonce(bytes(12)),
-            message=message,
-            future=future,
-        )
-
-        # Original message should be available for retransmission.
-        assert pending.message is message
-        assert int(pending.message.enr_seq) == 42
-
-        loop.close()
-
 
 class TestPendingRequestsManagement:
     """Tests for pending requests dict management."""
@@ -772,35 +548,22 @@ class TestPendingRequestsManagement:
 
     @pytest.mark.anyio
     async def test_pending_requests_cleared_on_stop(
-        self, local_node_id, local_private_key, local_enr
+        self, started_transport: tuple[DiscoveryTransport, MagicMock]
     ):
         """Stop clears all pending requests."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_transport_obj = MagicMock(spec=asyncio.DatagramTransport)
-        mock_protocol_obj = MagicMock(spec=DiscoveryProtocol)
-
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_transport_obj, mock_protocol_obj)),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, _ = started_transport
 
         # Add some pending requests.
         loop = asyncio.get_running_loop()
         for i in range(3):
             future: asyncio.Future = loop.create_future()
+            request_id = RequestId(data=bytes([i]))
             pending = PendingRequest(
-                request_id=RequestId(data=bytes([i])),
+                request_id=request_id,
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=loop.time(),
                 nonce=Nonce(bytes(12)),
-                message=MagicMock(),
+                message=Ping(request_id=request_id, enr_seq=SeqNumber(i)),
                 future=future,
             )
             transport._pending_requests[pending.request_id] = pending
@@ -814,36 +577,23 @@ class TestPendingRequestsManagement:
 
     @pytest.mark.anyio
     async def test_pending_request_futures_cancelled_on_stop(
-        self, local_node_id, local_private_key, local_enr
+        self, started_transport: tuple[DiscoveryTransport, MagicMock]
     ):
         """Stop cancels all pending request futures."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_transport_obj = MagicMock(spec=asyncio.DatagramTransport)
-        mock_protocol_obj = MagicMock(spec=DiscoveryProtocol)
-
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_transport_obj, mock_protocol_obj)),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, _ = started_transport
 
         loop = asyncio.get_running_loop()
         futures = []
         for i in range(3):
             future: asyncio.Future = loop.create_future()
             futures.append(future)
+            request_id = RequestId(data=bytes([i]))
             pending = PendingRequest(
-                request_id=RequestId(data=bytes([i])),
+                request_id=request_id,
                 dest_node_id=NodeId(bytes(32)),
                 sent_at=loop.time(),
                 nonce=Nonce(bytes(12)),
-                message=MagicMock(),
+                message=Ping(request_id=request_id, enr_seq=SeqNumber(i)),
                 future=future,
             )
             transport._pending_requests[pending.request_id] = pending
@@ -1107,7 +857,7 @@ class TestHandleDecodedMessage:
             dest_node_id=remote_node_id,
             sent_at=loop.time(),
             nonce=Nonce(bytes(12)),
-            message=MagicMock(),
+            message=Ping(request_id=request_id, enr_seq=SeqNumber(1)),
             future=future,
         )
         transport._pending_requests[request_id] = pending
@@ -1143,7 +893,7 @@ class TestHandleDecodedMessage:
             dest_node_id=remote_node_id,
             sent_at=0.0,
             nonce=Nonce(bytes(12)),
-            message=MagicMock(),
+            message=FindNode(request_id=request_id, distances=[Distance(256)]),
             response_queue=queue,
             expected_total=None,
             received_count=0,
@@ -1303,30 +1053,18 @@ class TestSendWhoareyou:
 
     @pytest.mark.anyio
     async def test_send_whoareyou_sends_packet(
-        self, local_node_id, local_private_key, local_enr, remote_node_id
+        self,
+        started_transport: tuple[DiscoveryTransport, MagicMock],
+        remote_node_id: NodeId,
     ):
         """_send_whoareyou sends a WHOAREYOU packet via UDP."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_udp = MagicMock(spec=asyncio.DatagramTransport)
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_udp, MagicMock(spec=DiscoveryProtocol))),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, mock_udp = started_transport
 
         await transport._send_whoareyou(remote_node_id, Nonce(bytes(12)), ("192.168.1.1", 30303))
 
         mock_udp.sendto.assert_called_once()
         args = mock_udp.sendto.call_args
         assert args[0][1] == ("192.168.1.1", 30303)
-
-        await transport.stop()
 
     @pytest.mark.anyio
     async def test_send_whoareyou_uses_cached_enr_seq(
@@ -1766,22 +1504,12 @@ class TestBuildMessagePacketDummyKey:
 
     @pytest.mark.anyio
     async def test_build_message_packet_uses_dummy_key_without_session(
-        self, local_node_id, local_private_key, local_enr, remote_node_id
+        self,
+        started_transport: tuple[DiscoveryTransport, MagicMock],
+        remote_node_id: NodeId,
     ):
         """_build_message_packet uses dummy key when no session exists."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_udp = MagicMock(spec=asyncio.DatagramTransport)
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_udp, MagicMock(spec=DiscoveryProtocol))),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, _ = started_transport
 
         with patch.object(
             transport._handshake_manager,
@@ -1797,26 +1525,14 @@ class TestBuildMessagePacketDummyKey:
             mock_start.assert_called_once_with(remote_node_id)
             assert packet is not None
 
-        await transport.stop()
-
     @pytest.mark.anyio
     async def test_build_message_packet_uses_session_key_with_session(
-        self, local_node_id, local_private_key, local_enr, remote_node_id
+        self,
+        started_transport: tuple[DiscoveryTransport, MagicMock],
+        remote_node_id: NodeId,
     ):
         """_build_message_packet uses session key when session exists."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_udp = MagicMock(spec=asyncio.DatagramTransport)
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_udp, MagicMock(spec=DiscoveryProtocol))),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, _ = started_transport
 
         transport._session_cache.create(
             remote_node_id,
@@ -1840,8 +1556,6 @@ class TestBuildMessagePacketDummyKey:
 
             mock_start.assert_not_called()
             assert packet is not None
-
-        await transport.stop()
 
 
 class TestHandlePacketRouting:
@@ -1958,12 +1672,13 @@ class TestHandleWhoareyou:
         loop = asyncio.get_running_loop()
         nonce = Nonce(bytes(12))
         future: asyncio.Future = loop.create_future()
+        request_id = RequestId(data=b"\x01")
         pending = PendingRequest(
-            request_id=RequestId(data=b"\x01"),
+            request_id=request_id,
             dest_node_id=remote_node_id,
             sent_at=loop.time(),
             nonce=nonce,
-            message=MagicMock(),
+            message=Ping(request_id=request_id, enr_seq=SeqNumber(1)),
             future=future,
         )
         transport._pending_requests[pending.request_id] = pending
@@ -1989,23 +1704,13 @@ class TestHandleWhoareyou:
 
     @pytest.mark.anyio
     async def test_handle_whoareyou_matching_request_sends_handshake(
-        self, local_node_id, local_private_key, local_enr, remote_node_id
+        self,
+        started_transport: tuple[DiscoveryTransport, MagicMock],
+        local_node_id: NodeId,
+        remote_node_id: NodeId,
     ):
         """_handle_whoareyou sends HANDSHAKE when pending request matches."""
-        transport = DiscoveryTransport(
-            local_node_id=local_node_id,
-            local_private_key=local_private_key,
-            local_enr=local_enr,
-        )
-
-        mock_udp = MagicMock(spec=asyncio.DatagramTransport)
-        mock_protocol = MagicMock(spec=DiscoveryProtocol)
-        with patch.object(
-            asyncio.get_event_loop(),
-            "create_datagram_endpoint",
-            new=AsyncMock(return_value=(mock_udp, mock_protocol)),
-        ):
-            await transport.start("127.0.0.1", 9000)
+        transport, mock_udp = started_transport
 
         nonce_bytes = bytes(12)
         loop = asyncio.get_running_loop()
@@ -2062,8 +1767,6 @@ class TestHandleWhoareyou:
 
             mock_udp.sendto.assert_called()
 
-        await transport.stop()
-
     @pytest.mark.anyio
     async def test_handle_whoareyou_handshake_error(
         self, local_node_id, local_private_key, local_enr, remote_node_id
@@ -2078,12 +1781,13 @@ class TestHandleWhoareyou:
         loop = asyncio.get_running_loop()
         nonce = Nonce(bytes(12))
         future: asyncio.Future = loop.create_future()
+        request_id = RequestId(data=b"\x01")
         pending = PendingRequest(
-            request_id=RequestId(data=b"\x01"),
+            request_id=request_id,
             dest_node_id=remote_node_id,
             sent_at=loop.time(),
             nonce=nonce,
-            message=MagicMock(),
+            message=Ping(request_id=request_id, enr_seq=SeqNumber(1)),
             future=future,
         )
         transport._pending_requests[pending.request_id] = pending
@@ -2134,12 +1838,13 @@ class TestHandleWhoareyou:
         loop = asyncio.get_running_loop()
         nonce = Nonce(bytes(12))
         future: asyncio.Future = loop.create_future()
+        request_id = RequestId(data=b"\x01")
         pending = PendingRequest(
-            request_id=RequestId(data=b"\x01"),
+            request_id=request_id,
             dest_node_id=remote_node_id,
             sent_at=loop.time(),
             nonce=nonce,
-            message=MagicMock(),
+            message=Ping(request_id=request_id, enr_seq=SeqNumber(1)),
             future=future,
         )
         transport._pending_requests[pending.request_id] = pending
