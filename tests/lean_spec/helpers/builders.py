@@ -22,7 +22,10 @@ from lean_spec.subspecs.containers import (
     State,
     Validator,
 )
-from lean_spec.subspecs.containers.attestation import AggregatedAttestation
+from lean_spec.subspecs.containers.attestation import (
+    AggregatedAttestation,
+    SignedAggregatedAttestation,
+)
 from lean_spec.subspecs.containers.block import BlockSignatures
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations, AttestationSignatures
 from lean_spec.subspecs.containers.slot import Slot
@@ -436,6 +439,27 @@ def make_aggregated_proof(
         message=data_root,
         slot=attestation_data.slot,
     )
+
+
+def make_signed_aggregated_attestation(
+    key_manager: XmssKeyManager | None = None,
+    participants: list[ValidatorIndex] | None = None,
+    attestation_data: AttestationData | None = None,
+) -> "SignedAggregatedAttestation":
+    """Create a valid signed aggregated attestation with real XMSS keys."""
+    if key_manager is None:
+        key_manager = XmssKeyManager.shared()
+    if participants is None:
+        participants = [ValidatorIndex(0)]
+    if attestation_data is None:
+        attestation_data = AttestationData(
+            slot=Slot(1),
+            head=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
+            target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
+            source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
+        )
+    proof = make_aggregated_proof(key_manager, participants, attestation_data)
+    return SignedAggregatedAttestation(data=attestation_data, proof=proof)
 
 
 def make_signed_block_from_store(

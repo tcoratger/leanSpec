@@ -10,7 +10,6 @@ from lean_spec.snappy import compress
 from lean_spec.subspecs.containers import (
     AttestationData,
     Checkpoint,
-    SignedAggregatedAttestation,
 )
 from lean_spec.subspecs.containers.attestation import SignedAttestation
 from lean_spec.subspecs.containers.slot import Slot
@@ -35,6 +34,7 @@ from tests.lean_spec.helpers import (
     MockEventSource,
     create_mock_sync_service,
     make_mock_signature,
+    make_signed_aggregated_attestation,
     make_signed_block,
 )
 
@@ -174,7 +174,7 @@ class TestAggregatedAttestationDispatch:
 
         sync_service = create_mock_sync_service(peer_id)
 
-        signed_agg = MagicMock(spec=SignedAggregatedAttestation)
+        signed_agg = make_signed_aggregated_attestation()
         topic = GossipTopic.committee_aggregation(FORK_DIGEST)
         events: list[NetworkEvent] = [
             GossipAggregatedAttestationEvent(
@@ -405,11 +405,7 @@ class TestPublishAggregatedAttestation:
         """Aggregated attestation is encoded, compressed, and published."""
         svc, source = _make_network_service([], peer_id=peer_id)
 
-        # Use a plain MagicMock (no spec) so we can freely set data.slot.
-        signed_agg = MagicMock()
-        fake_ssz = b"\xde\xad\xbe\xef"
-        signed_agg.encode_bytes.return_value = fake_ssz
-        signed_agg.data.slot = Slot(10)
+        signed_agg = make_signed_aggregated_attestation()
 
         await svc.publish_aggregated_attestation(signed_agg)
 
@@ -418,7 +414,7 @@ class TestPublishAggregatedAttestation:
 
         expected_topic = GossipTopic.committee_aggregation(FORK_DIGEST).to_topic_id()
         assert topic_id == expected_topic
-        assert data == compress(fake_ssz)
+        assert data == compress(signed_agg.encode_bytes())
 
 
 # ---------------------------------------------------------------------------

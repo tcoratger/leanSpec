@@ -8,6 +8,7 @@ import signal
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
+from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import (
@@ -35,6 +36,7 @@ from lean_spec.subspecs.containers.state.types import (
 )
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.types import Bytes32, Uint64
@@ -46,10 +48,10 @@ GENESIS_TIME = Uint64(1704067200)
 _DEFAULT_TEST_SLOT = Slot(10)
 
 
-def _make_mock_db_data(
+def _make_populated_db(
     test_slot: Slot = _DEFAULT_TEST_SLOT,
-) -> tuple[MagicMock, Block, State, Checkpoint]:
-    """Build a mock database with consistent block/state/checkpoint data."""
+) -> tuple[SQLiteDatabase, Block, State, Checkpoint]:
+    """Build a real in-memory database populated with block/state/checkpoint data."""
     head_root = Bytes32(b"\x01" * 32)
     block = Block(
         slot=test_slot,
@@ -80,13 +82,29 @@ def _make_mock_db_data(
         justifications_validators=JustificationValidators(data=[]),
     )
 
+    db = SQLiteDatabase(":memory:")
+    db.put_block(block, head_root)
+    db.put_state(state, head_root)
+    db.put_head_root(head_root)
+    db.put_justified_checkpoint(checkpoint)
+    db.put_finalized_checkpoint(checkpoint)
+    return db, block, state, checkpoint
+
+
+def _make_mock_db_with_partial_data() -> MagicMock:
+    """Build a mock database pre-populated with valid data for negative-path tests.
+
+    Returns a MagicMock so individual methods can be overridden to return None,
+    simulating partial DB corruption.
+    """
+    db, block, state, checkpoint = _make_populated_db()
     mock_db = MagicMock()
-    mock_db.get_head_root.return_value = head_root
+    mock_db.get_head_root.return_value = Bytes32(b"\x01" * 32)
     mock_db.get_block.return_value = block
     mock_db.get_state.return_value = state
     mock_db.get_justified_checkpoint.return_value = checkpoint
     mock_db.get_finalized_checkpoint.return_value = checkpoint
-    return mock_db, block, state, checkpoint
+    return mock_db
 
 
 @pytest.fixture
@@ -102,13 +120,15 @@ def node_config() -> NodeConfig:
 
 
 def _make_validator_registry() -> ValidatorRegistry:
-    """Create a minimal validator registry with one entry."""
+    """Create a minimal validator registry with one entry using real XMSS keys."""
+    key_manager = XmssKeyManager.shared()
+    kp = key_manager[ValidatorIndex(0)]
     registry = ValidatorRegistry()
     registry.add(
         ValidatorEntry(
             index=ValidatorIndex(0),
-            attestation_secret_key=MagicMock(),
-            proposal_secret_key=MagicMock(),
+            attestation_secret_key=kp.attestation_secret,
+            proposal_secret_key=kp.proposal_secret,
         )
     )
     return registry
@@ -188,28 +208,27 @@ class TestDatabaseLoading:
 
     def test_returns_none_when_justified_missing(self) -> None:
         """Missing justified checkpoint returns None."""
-        mock_db, block, state, _ = _make_mock_db_data()
+        mock_db = _make_mock_db_with_partial_data()
         mock_db.get_justified_checkpoint.return_value = None
 
         assert Node._try_load_store_from_database(mock_db, validator_id=None) is None
 
     def test_returns_none_when_finalized_missing(self) -> None:
         """Missing finalized checkpoint returns None."""
-        mock_db, block, state, _ = _make_mock_db_data()
+        mock_db = _make_mock_db_with_partial_data()
         mock_db.get_finalized_checkpoint.return_value = None
-        mock_db.get_justified_checkpoint.return_value = MagicMock()
 
         assert Node._try_load_store_from_database(mock_db, validator_id=None) is None
 
     def test_successful_load_uses_wall_clock_time(self) -> None:
         """Store time uses wall clock when it exceeds block-based time."""
         test_slot = Slot(10)
-        mock_db, _, _, _ = _make_mock_db_data(test_slot)
+        db, _, _, _ = _make_populated_db(test_slot)
 
         # Simulate 100 seconds after genesis (well past slot 10 at 4s/slot = 40s).
         wall_time = float(GENESIS_TIME) + 100.0
         store = Node._try_load_store_from_database(
-            mock_db,
+            db,
             validator_id=ValidatorIndex(0),
             genesis_time=GENESIS_TIME,
             time_fn=lambda: wall_time,
@@ -227,12 +246,12 @@ class TestDatabaseLoading:
     def test_load_uses_block_time_when_wall_clock_behind(self) -> None:
         """Store time floors to block-based time if wall clock is behind."""
         test_slot = Slot(100)
-        mock_db, _, _, _ = _make_mock_db_data(test_slot)
+        db, _, _, _ = _make_populated_db(test_slot)
 
         # Simulate wall clock only 10 seconds after genesis (slot 100 is at 400s).
         wall_time = float(GENESIS_TIME) + 10.0
         store = Node._try_load_store_from_database(
-            mock_db,
+            db,
             validator_id=ValidatorIndex(0),
             genesis_time=GENESIS_TIME,
             time_fn=lambda: wall_time,
@@ -370,19 +389,18 @@ class TestDatabaseGenesisTimeFallback:
         genesis time, identical to passing it explicitly.
         """
         test_slot = Slot(10)
-        mock_db, _, _, _ = _make_mock_db_data(test_slot)
-        mock_db.get_genesis_time.return_value = GENESIS_TIME
+        db, _, _, _ = _make_populated_db(test_slot)
+        db.put_genesis_time(GENESIS_TIME)
 
         wall_time = float(GENESIS_TIME) + 100.0
         store = Node._try_load_store_from_database(
-            mock_db,
+            db,
             validator_id=None,
             genesis_time=None,
             time_fn=lambda: wall_time,
         )
 
         assert store is not None
-        mock_db.get_genesis_time.assert_called_once()
 
         # Same math as test_successful_load_uses_wall_clock_time:
         # wall clock 100s * 5 intervals / 4 seconds = 125 intervals.
@@ -392,12 +410,11 @@ class TestDatabaseGenesisTimeFallback:
     def test_zero_genesis_time_when_database_returns_none(self) -> None:
         """When both genesis_time param and database return None, falls back to zero."""
         test_slot = Slot(5)
-        mock_db, _, _, _ = _make_mock_db_data(test_slot)
-        mock_db.get_genesis_time.return_value = None
+        db, _, _, _ = _make_populated_db(test_slot)
 
         wall_time = 200.0
         store = Node._try_load_store_from_database(
-            mock_db,
+            db,
             validator_id=None,
             genesis_time=None,
             time_fn=lambda: wall_time,
