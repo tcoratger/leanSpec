@@ -1,16 +1,14 @@
 """Store checks model for selective validation in fork choice tests."""
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from lean_spec.subspecs.containers import AttestationData
+from lean_spec.subspecs.containers.block.block import Block
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel, Uint64
-
-if TYPE_CHECKING:
-    from lean_spec.subspecs.containers import AttestationData
-    from lean_spec.subspecs.containers.block.block import Block
-    from lean_spec.subspecs.forkchoice.store import Store
 
 
 class AggregatedAttestationCheck(CamelModel):
