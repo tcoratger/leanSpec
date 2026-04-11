@@ -1,16 +1,4 @@
-"""Fork Choice: Block Production — Fixed-Point Justification Loop
-
-The block builder in ``State.build_block`` uses a fixed-point loop to select
-attestation data from the store's aggregated payloads. Only entries whose
-``source`` matches the *current* justified checkpoint are eligible. When
-processing selected attestations justifies a new slot, the loop repeats and
-entries that were previously ineligible may now match.
-
-No existing spec test filler exercises this multi-pass behavior through the
-fork-choice block-production path.
-
-Reference: https://github.com/leanEthereum/leanSpec/issues/564
-"""
+"""Fork Choice: Block Production — Fixed-Point Justification Loop"""
 
 import pytest
 from consensus_testing import (
