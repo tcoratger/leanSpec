@@ -1,4 +1,4 @@
-"""Fork Choice: Block Production — Fixed-Point Justification Loop"""
+"""Fork Choice: Block Production"""
 
 import pytest
 from consensus_testing import (
@@ -32,64 +32,36 @@ def test_block_builder_fixed_point_advances_justification(
 
         genesis(0) -> block_1(1) -> block_2(2) -> block_3(3) -> block_4(4)
 
-    At slot 3 a supermajority attestation justifies slot 1, setting the
-    baseline for the fixed-point test.
+    Two gossip attestations with different sources:
 
-    Then two aggregated attestations are submitted via gossip:
+    - A: source=1, target=2, validators {0, 1, 2}
+    - B: source=2, target=4, validators {1, 2, 3}
 
-    - Attestation A: source=slot 1 (block_1), target=slot 2 (block_2)
-      Validators {0, 1, 2} — supermajority with 4 validators.
-    - Attestation B: source=slot 2 (block_2), target=slot 4 (block_4)
-      Validators {1, 2, 3} — supermajority, but source slot 2 is NOT
-      justified when the builder starts.
+    B's source (slot 2) is not yet justified when the builder starts.
 
-    Delivery mechanism: ``GossipAggregatedAttestationStep`` puts payloads
-    into ``latest_new_aggregated_payloads``.  A ``TickStep`` advances time
-    past interval 4 of the slot, triggering ``accept_new_attestations``
-    which migrates the payloads to ``latest_known_aggregated_payloads``.
-    The subsequent ``BlockStep`` at slot 5 calls
-    ``build_signed_block_with_store`` which passes
-    ``latest_known_aggregated_payloads`` to ``State.build_block``.
+    Fixed-point loop
+    ----------------
+    The builder iterates until no new attestations match::
 
-    A bare ``BlockStep`` at slot 5 (no ``attestations`` field) triggers
-    block production.
+        Pass 1: justified=1 -> A matches -> justifies 2, finalizes 1
+        Pass 2: justified=2 -> B matches -> justifies 4
+        Pass 3: nothing new  -> done
 
-    Fixed-point behavior inside ``build_block``:
-
-    1. Pass 1 — current_justified = slot 1.
-       A matches (source=1 == current_justified). Selected.
-       Candidate STF processes A → justifies slot 2, finalizes slot 1.
-       current_justified advances to slot 2. Loop continues.
-    2. Pass 2 — current_justified = slot 2.
-       B matches (source=2 == current_justified). Selected.
-       Candidate STF processes B → justifies slot 4.
-       current_justified advances to slot 4. Loop continues.
-    3. Pass 3 — no new matching entries. Break.
-
-    Post-state assertions:
-
-    - ``latest_justified_slot = 4`` (B's target).
-    - ``latest_finalized_slot = 1`` (A justifies slot 2 with source=1;
-      no gap between 1 and 2 → finalizes slot 1.  B does NOT advance
-      finalization because slot 3, at delta=2 from finalized_slot=1, is
-      justifiable (pronic: 1×2) and creates a gap.)
-    - The block body contains two distinct aggregated attestations matching
-      the participant sets of A and B.
-
-    Why ``GossipAggregatedAttestationStep`` with tick-based migration:
-
-    ``AggregatedAttestationSpec`` derives ``source`` from the parent
-    state's ``latest_justified``, so both A and B would receive the same
-    source and the fixed-point loop would never be exercised.  Raw gossip
-    via ``AttestationStep`` is validated but not stored (non-aggregator).
-    ``GossipAggregatedAttestationStep`` stores proofs in
-    ``latest_new_aggregated_payloads``; a tick to interval 4 migrates them
-    to ``latest_known_aggregated_payloads`` where ``build_block`` reads
-    them, avoiding the ``aggregate()`` lone-proof drop.
+    Expected post-state
+    -------------------
+    - Justified slot: 4
+    - Finalized slot: 1
+    - Block body: 2 aggregated attestations (A and B)
     """
     fork_choice_test(
         steps=[
-            # ── Build linear chain ────────────────────────────────────
+            # Chain setup
+            # ===========
+            #
+            #   genesis(0) -> block_1(1) -> block_2(2) -> block_3(3) -> block_4(4)
+            #
+            # Slot 3 carries a supermajority attestation that justifies slot 1.
+            # This establishes the baseline: justified=1, finalized=0.
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(head_slot=Slot(1)),
@@ -98,7 +70,8 @@ def test_block_builder_fixed_point_advances_justification(
                 block=BlockSpec(slot=Slot(2), label="block_2"),
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
-            # Justify slot 1: supermajority (3/4) attestation in-block.
+            # Justify slot 1: 3 of 4 validators attest.
+            # Threshold: 3 * count >= 2 * total -> 3*3=9 >= 2*4=8 -> passes.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -123,20 +96,37 @@ def test_block_builder_fixed_point_advances_justification(
                     latest_finalized_slot=Slot(0),
                 ),
             ),
+            # Extend to slot 4. No attestations, no checkpoint change.
             BlockStep(
                 block=BlockSpec(slot=Slot(4), label="block_4"),
-                checks=StoreChecks(head_slot=Slot(4)),
+                checks=StoreChecks(
+                    head_slot=Slot(4),
+                    latest_justified_slot=Slot(1),
+                ),
             ),
-            # ── Tick past aggregate interval ──────────────────────────
-            # Store is at interval 20 (slot 4, interval 0).
-            # Tick to 18s = interval 22 (slot 4, interval 2).
-            # This passes through the aggregate interval (22 % 5 = 2)
-            # while latest_new_aggregated_payloads is still empty,
-            # so nothing gets dropped.
+            # Attestation delivery
+            # ====================
+            #
+            # Why gossip instead of in-block attestations?
+            # In-block specs derive the source from the parent state's
+            # justified checkpoint. Both A and B would get source=1,
+            # and the fixed-point loop would never fire.
+            #
+            # Gossip aggregated steps let us set explicit source overrides,
+            # so B can have source=2 (not yet justified).
+            #
+            # Timing:
+            #
+            #   18s = interval 22 = slot 4, interval 2 (aggregate interval)
+            #   The attestation pool is empty here, so nothing is lost.
+            #
+            #   20s = interval 25 = slot 5, interval 0
+            #   Passes through interval 24 (slot 4, interval 4) which
+            #   migrates attestations from the "new" pool to "known".
+            # Advance past the aggregate interval while the pool is empty.
             TickStep(time=18),
-            # ── Gossip aggregated attestation A: source=1, target=2 ──
-            # Validators {0, 1, 2}. Immediately selectable by the
-            # builder because current_justified = slot 1.
+            # Attestation A: source=1, target=2
+            # 3/4 validators. Matches justified=1 on the first pass.
             GossipAggregatedAttestationStep(
                 attestation=GossipAggregatedAttestationSpec(
                     validator_ids=[
@@ -151,9 +141,9 @@ def test_block_builder_fixed_point_advances_justification(
                     source_slot=Slot(1),
                 ),
             ),
-            # ── Gossip aggregated attestation B: source=2, target=4 ──
-            # Validators {1, 2, 3}. Source slot 2 is NOT yet justified;
-            # only unlocked after A's supermajority justifies slot 2.
+            # Attestation B: source=2, target=4
+            # 3/4 validators. Source slot 2 is NOT justified yet.
+            # Only unlocked after A justifies slot 2 on the first pass.
             GossipAggregatedAttestationStep(
                 attestation=GossipAggregatedAttestationSpec(
                     validator_ids=[
@@ -168,13 +158,14 @@ def test_block_builder_fixed_point_advances_justification(
                     source_slot=Slot(2),
                 ),
             ),
-            # ── Tick to accept new attestations ───────────────────────
-            # Tick from interval 22 to interval 25 (= 20s with
-            # genesis_time=0). This passes through interval 24
-            # (slot 4, interval 4) which triggers
-            # accept_new_attestations(), migrating A and B from
-            # latest_new_aggregated_payloads to
-            # latest_known_aggregated_payloads.
+            # Migrate attestations: tick to 20s (interval 24 fires acceptance).
+            #
+            # Invariant: justified is still slot 1.
+            # Attestations are stored but not processed until a block is built.
+            #
+            # We check two validators unique to each attestation:
+            # - V0 appears only in A (source=1, target=2)
+            # - V3 appears only in B (source=2, target=4)
             TickStep(
                 time=20,
                 checks=StoreChecks(
@@ -195,9 +186,28 @@ def test_block_builder_fixed_point_advances_justification(
                     ],
                 ),
             ),
-            # ── Produce block at slot 5 ───────────────────────────────
-            # No explicit attestations — the builder picks up the
-            # already-known aggregated payloads in build_block.
+            # Fixed-point block production
+            # ============================
+            #
+            # No explicit attestations -- the builder reads from the
+            # "known" pool and iterates:
+            #
+            #   Pass 1: justified=1 -> A selected -> justifies 2
+            #           Finalization: range(1+1, 2) is empty -> finalizes 1
+            #           justified advances to 2
+            #
+            #   Pass 2: justified=2 -> B selected -> justifies 4
+            #           Finalization: range(2+1, 4) = [3]
+            #           Slot 3 is justifiable (delta=2 from finalized=1, within
+            #           the immediate window of 5) -> gap exists -> no advance
+            #           justified advances to 4
+            #
+            #   Pass 3: nothing new -> break
+            #
+            # Result:
+            #   justified = 4
+            #   finalized = 1
+            #   block body = 2 aggregated attestations
             BlockStep(
                 block=BlockSpec(slot=Slot(5), label="block_5"),
                 checks=StoreChecks(
@@ -210,10 +220,12 @@ def test_block_builder_fixed_point_advances_justification(
                     block_attestations=[
                         AggregatedAttestationCheck(
                             participants={0, 1, 2},
+                            attestation_slot=Slot(5),
                             target_slot=Slot(2),
                         ),
                         AggregatedAttestationCheck(
                             participants={1, 2, 3},
+                            attestation_slot=Slot(5),
                             target_slot=Slot(4),
                         ),
                     ],
