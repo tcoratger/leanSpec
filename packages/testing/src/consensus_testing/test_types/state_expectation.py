@@ -166,15 +166,14 @@ class StateExpectation(CamelModel):
 
         if "justifications_roots_labels" in fields:
             assert self.justifications_roots_labels is not None
-            expected_roots = JustificationRoots(
-                data=sorted(
-                    _resolve_label("justifications_roots_labels", label)
-                    for label in self.justifications_roots_labels
-                )
+            expected_sorted = sorted(
+                _resolve_label("justifications_roots_labels", label)
+                for label in self.justifications_roots_labels
             )
-            actual_roots = state.justifications_roots
-            if actual_roots != expected_roots:
+            actual_sorted = sorted(state.justifications_roots.data)
+            if actual_sorted != expected_sorted:
                 raise AssertionError(
                     "State validation failed: justifications_roots = "
-                    f"{actual_roots}, expected {expected_roots}"
+                    f"{state.justifications_roots}, expected "
+                    f"{JustificationRoots(data=expected_sorted)}"
                 )
