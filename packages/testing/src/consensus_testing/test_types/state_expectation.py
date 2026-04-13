@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from lean_spec.subspecs.containers.block.block import Block
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import State
 from lean_spec.subspecs.containers.state.types import (
@@ -11,6 +12,7 @@ from lean_spec.subspecs.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel
 
 
@@ -102,6 +104,14 @@ class StateExpectation(CamelModel):
     justifications_roots: JustificationRoots | None = None
     """Expected justifications roots collection."""
 
+    justifications_roots_labels: list[str] | None = None
+    """
+    Expected pending justification roots by label reference.
+
+    Alternative to justifications_roots that uses the block label system.
+    The framework resolves each label to the actual block root.
+    """
+
     justifications_roots_count: int | None = None
     """Expected number of pending justification target roots."""
 
@@ -111,7 +121,11 @@ class StateExpectation(CamelModel):
     justifications_validators_count: int | None = None
     """Expected number of entries in the flat justification voters bitlist."""
 
-    def validate_against_state(self, state: "State") -> None:
+    def validate_against_state(
+        self,
+        state: "State",
+        block_registry: dict[str, Block] | None = None,
+    ) -> None:
         """
         Validate this expectation against actual State.
 
@@ -120,11 +134,26 @@ class StateExpectation(CamelModel):
 
         Args:
             state: The actual state to validate against.
+            block_registry: Optional labeled blocks for resolving label-based checks.
 
         Raises:
             AssertionError: If any explicitly set field doesn't match the actual state value.
         """
-        for field_name in self.model_fields_set:
+        fields = self.model_fields_set
+
+        def _resolve_label(field_name: str, label: str) -> Bytes32:
+            if block_registry is None:
+                raise ValueError(
+                    f"{field_name}='{label}' specified but block_registry not provided"
+                )
+            if label not in block_registry:
+                raise ValueError(
+                    f"{field_name}='{label}' not found in block registry. "
+                    f"Available: {list(block_registry.keys())}"
+                )
+            return hash_tree_root(block_registry[label])
+
+        for field_name in fields - {"justifications_roots_labels"}:
             accessor = self._ACCESSORS.get(field_name)
             if accessor is None:
                 raise ValueError(f"No accessor defined for field: {field_name}")
@@ -133,4 +162,19 @@ class StateExpectation(CamelModel):
             if actual != expected:
                 raise AssertionError(
                     f"State validation failed: {field_name} = {actual}, expected {expected}"
+                )
+
+        if "justifications_roots_labels" in fields:
+            assert self.justifications_roots_labels is not None
+            expected_roots = JustificationRoots(
+                data=sorted(
+                    _resolve_label("justifications_roots_labels", label)
+                    for label in self.justifications_roots_labels
+                )
+            )
+            actual_roots = state.justifications_roots
+            if actual_roots != expected_roots:
+                raise AssertionError(
+                    "State validation failed: justifications_roots = "
+                    f"{actual_roots}, expected {expected_roots}"
                 )

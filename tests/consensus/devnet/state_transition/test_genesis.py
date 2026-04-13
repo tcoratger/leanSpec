@@ -242,12 +242,12 @@ def test_first_post_genesis_block_sets_checkpoint_anchor_roots(
     -----------------
     1. The post-state slot is 1
     2. latest_justified.slot and latest_finalized.slot remain 0
-    3. latest_justified.root and latest_finalized.root equal the genesis header root
+    3. latest_justified.root and latest_finalized.root equal the parent root of block 1
     4. historical_block_hashes contains that root once
     5. justified_slots is empty
     """
     pre = generate_pre_state()
-    anchor_root = hash_tree_root(pre.latest_block_header)
+    anchor_root = hash_tree_root(pre.process_slots(Slot(1)).latest_block_header)
 
     state_transition_test(
         pre=pre,

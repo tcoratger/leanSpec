@@ -110,7 +110,8 @@ def test_pending_justification_survives_finalization_rebase(
     2. latest_justified_slot is 2
     3. latest_finalized_slot is 1
     4. justified_slots equals [True, False, False] relative to finalized slot 1
-    5. justifications_validators contains a single 1-of-4 pending tally
+    5. justifications_roots contains block_3
+    6. justifications_validators contains a single 1-of-4 pending tally
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -175,6 +176,7 @@ def test_pending_justification_survives_finalization_rebase(
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={"data": [Boolean(True), Boolean(False), Boolean(False)]}
             ),
+            justifications_roots_labels=["block_3"],
             justifications_validators=JustificationValidators(
                 data=[
                     Boolean(True),
@@ -204,12 +206,12 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
     1. The post-state slot is 5
     2. latest_justified_slot is 4
     3. latest_finalized_slot remains 0
-    4. latest_finalized_root stays at the genesis anchor root
+    4. latest_finalized_root stays at the parent root of block 1
     5. justified_slots marks slots 1 and 4 as justified
     6. There are no pending justifications
     """
     pre = generate_pre_state()
-    anchor_root = hash_tree_root(pre.latest_block_header)
+    anchor_root = hash_tree_root(pre.process_slots(Slot(1)).latest_block_header)
 
     state_transition_test(
         pre=pre,
@@ -876,7 +878,8 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
     2. latest_justified_slot is 10
     3. latest_finalized_slot is 7
     4. justified_slots equals [False, False, True, False, False, False] relative to slot 7
-    5. justifications_validators contains a single 1-of-4 pending tally
+    5. justifications_roots contains block_13
+    6. justifications_validators contains a single 1-of-4 pending tally
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -992,6 +995,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                     ]
                 }
             ),
+            justifications_roots_labels=["block_13"],
             justifications_validators=JustificationValidators(
                 data=[
                     Boolean(True),
