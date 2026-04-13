@@ -34,13 +34,6 @@ class StateExpectation(CamelModel):
         )
     """
 
-    _LABEL_FIELDS: ClassVar[set[str]] = {
-        "latest_justified_root_label",
-        "latest_finalized_root_label",
-        "justifications_roots_labels",
-    }
-    """Fields that resolve block labels to roots via the block registry."""
-
     _ACCESSORS: ClassVar[dict[str, Callable[["State"], Any]]] = {
         "slot": lambda s: s.slot,
         "latest_justified_slot": lambda s: s.latest_justified.slot,
@@ -177,10 +170,8 @@ class StateExpectation(CamelModel):
                 )
             return hash_tree_root(block_registry[label])
 
-        for field_name in fields - self._LABEL_FIELDS:
-            accessor = self._ACCESSORS.get(field_name)
-            if accessor is None:
-                raise ValueError(f"No accessor defined for field: {field_name}")
+        for field_name in fields & self._ACCESSORS.keys():
+            accessor = self._ACCESSORS[field_name]
             expected = getattr(self, field_name)
             actual = accessor(state)
             if actual != expected:
