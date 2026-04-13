@@ -12,8 +12,9 @@ from lean_spec.subspecs.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel
+
+from .utils import resolve_block_root
 
 
 class StateExpectation(CamelModel):
@@ -158,17 +159,10 @@ class StateExpectation(CamelModel):
         """
         fields = self.model_fields_set
 
-        def _resolve_label(field_name: str, label: str) -> Bytes32:
+        def _resolve(label: str) -> Bytes32:
             if block_registry is None:
-                raise ValueError(
-                    f"{field_name}='{label}' specified but block_registry not provided"
-                )
-            if label not in block_registry:
-                raise ValueError(
-                    f"{field_name}='{label}' not found in block registry. "
-                    f"Available: {list(block_registry.keys())}"
-                )
-            return hash_tree_root(block_registry[label])
+                raise ValueError(f"label '{label}' specified but block_registry not provided")
+            return resolve_block_root(label, block_registry)
 
         for field_name in fields & self._ACCESSORS.keys():
             accessor = self._ACCESSORS[field_name]
@@ -181,34 +175,25 @@ class StateExpectation(CamelModel):
 
         if "latest_justified_root_label" in fields:
             assert self.latest_justified_root_label is not None
-            expected = _resolve_label(
-                "latest_justified_root_label", self.latest_justified_root_label
-            )
-            actual = state.latest_justified.root
-            if actual != expected:
+            expected = _resolve(self.latest_justified_root_label)
+            if state.latest_justified.root != expected:
                 raise AssertionError(
-                    f"State validation failed: latest_justified.root = {actual}, "
-                    f"expected {expected}"
+                    f"State validation failed: latest_justified.root = "
+                    f"{state.latest_justified.root}, expected {expected}"
                 )
 
         if "latest_finalized_root_label" in fields:
             assert self.latest_finalized_root_label is not None
-            expected = _resolve_label(
-                "latest_finalized_root_label", self.latest_finalized_root_label
-            )
-            actual = state.latest_finalized.root
-            if actual != expected:
+            expected = _resolve(self.latest_finalized_root_label)
+            if state.latest_finalized.root != expected:
                 raise AssertionError(
-                    f"State validation failed: latest_finalized.root = {actual}, "
-                    f"expected {expected}"
+                    f"State validation failed: latest_finalized.root = "
+                    f"{state.latest_finalized.root}, expected {expected}"
                 )
 
         if "justifications_roots_labels" in fields:
             assert self.justifications_roots_labels is not None
-            expected_sorted = sorted(
-                _resolve_label("justifications_roots_labels", label)
-                for label in self.justifications_roots_labels
-            )
+            expected_sorted = sorted(_resolve(label) for label in self.justifications_roots_labels)
             actual_sorted = sorted(state.justifications_roots.data)
             if actual_sorted != expected_sorted:
                 raise AssertionError(
