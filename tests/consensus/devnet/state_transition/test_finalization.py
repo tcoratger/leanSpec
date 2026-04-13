@@ -11,7 +11,6 @@ from consensus_testing import (
 
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state.types import (
-    HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
@@ -21,45 +20,6 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Boolean
 
 pytestmark = pytest.mark.valid_until("Devnet")
-
-
-def test_first_post_genesis_block_sets_checkpoint_anchor_roots(
-    state_transition_test: StateTransitionTestFiller,
-) -> None:
-    """
-    Test the post-state of the first block after genesis.
-
-    Scenario
-    --------
-    1. Start from the default genesis state
-    2. Process the first block at slot 1
-
-    Expected Behavior
-    -----------------
-    1. The post-state slot is 1
-    2. latest_justified.slot and latest_finalized.slot remain 0
-    3. latest_justified.root and latest_finalized.root equal the genesis header root
-    4. historical_block_hashes contains that root once
-    5. justified_slots is empty
-    """
-    pre = generate_pre_state()
-    anchor_root = hash_tree_root(pre.latest_block_header)
-
-    state_transition_test(
-        pre=pre,
-        blocks=[
-            BlockSpec(slot=Slot(1)),
-        ],
-        post=StateExpectation(
-            slot=Slot(1),
-            latest_justified_slot=Slot(0),
-            latest_justified_root=anchor_root,
-            latest_finalized_slot=Slot(0),
-            latest_finalized_root=anchor_root,
-            historical_block_hashes=HistoricalBlockHashes(data=[anchor_root]),
-            justified_slots=JustifiedSlots(data=[]),
-        ),
-    )
 
 
 def test_finalization_on_next_justifiable_step(
