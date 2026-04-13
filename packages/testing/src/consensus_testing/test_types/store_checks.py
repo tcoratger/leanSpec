@@ -10,6 +10,8 @@ from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel, Uint64
 
+from .utils import resolve_block_root
+
 
 class AggregatedAttestationCheck(CamelModel):
     """
@@ -251,18 +253,12 @@ class StoreChecks(CamelModel):
             if actual != expected:
                 raise AssertionError(f"Step {step_index}: {name} = {actual}, expected {expected}")
 
-        def _resolve_label(field_name: str, label: str) -> Bytes32:
+        def _resolve(label: str) -> Bytes32:
             if block_registry is None:
                 raise ValueError(
-                    f"Step {step_index}: {field_name}='{label}' specified "
-                    f"but block_registry not provided"
+                    f"Step {step_index}: label '{label}' specified but block_registry not provided"
                 )
-            if label not in block_registry:
-                raise ValueError(
-                    f"Step {step_index}: {field_name}='{label}' not found "
-                    f"in block registry. Available: {list(block_registry.keys())}"
-                )
-            return hash_tree_root(block_registry[label])
+            return resolve_block_root(label, block_registry)
 
         # Scalar store fields
         if "time" in fields:
@@ -285,19 +281,15 @@ class StoreChecks(CamelModel):
         # Label-based root checks (resolve label -> root, then compare)
         if "head_root_label" in fields:
             assert self.head_root_label is not None
-            expected = _resolve_label("head_root_label", self.head_root_label)
+            expected = _resolve(self.head_root_label)
             _check("head.root", store.head, expected)
         if "latest_justified_root_label" in fields:
             assert self.latest_justified_root_label is not None
-            expected = _resolve_label(
-                "latest_justified_root_label", self.latest_justified_root_label
-            )
+            expected = _resolve(self.latest_justified_root_label)
             _check("latest_justified.root", store.latest_justified.root, expected)
         if "latest_finalized_root_label" in fields:
             assert self.latest_finalized_root_label is not None
-            expected = _resolve_label(
-                "latest_finalized_root_label", self.latest_finalized_root_label
-            )
+            expected = _resolve(self.latest_finalized_root_label)
             _check("latest_finalized.root", store.latest_finalized.root, expected)
 
         # Attestation target checkpoint (slot + root consistency)
@@ -398,7 +390,7 @@ class StoreChecks(CamelModel):
         if "labels_in_store" in fields:
             assert self.labels_in_store is not None
             for label in self.labels_in_store:
-                root = _resolve_label("labels_in_store", label)
+                root = _resolve(label)
                 if root not in store.blocks:
                     raise AssertionError(
                         f"Step {step_index}: block '{label}' (root=0x{root.hex()}) "
