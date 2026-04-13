@@ -810,7 +810,7 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
     )
 
 
-def test_mid_block_resolved_target_does_not_reopen_pending_votes(
+def test_merged_attestations_for_same_target_justify_and_finalize_cleanly(
     state_transition_test: StateTransitionTestFiller,
 ) -> None:
     """
@@ -819,8 +819,13 @@ def test_mid_block_resolved_target_does_not_reopen_pending_votes(
     Scenario
     --------
     1. Justify block_1 in block_2
-    2. Process block_3 with one supermajority attestation to block_2
-       and one later single-validator attestation to the same target
+    2. Process block_3 with two attestation specs both targeting block_2:
+       one supermajority (V0-V2) and one single-validator (V3)
+
+    The block builder merges both specs into a single aggregated
+    attestation covering all 4 validators (same AttestationData).
+    The merged attestation justifies slot 2 and finalizes slot 1
+    in one step. No pending votes remain.
 
     Expected Behavior
     -----------------
