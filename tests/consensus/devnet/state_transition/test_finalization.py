@@ -38,9 +38,11 @@ def test_finalization_on_next_justifiable_step(
     -----------------
     1. The post-state slot is 3
     2. latest_justified_slot is 2
-    3. latest_finalized_slot is 1
-    4. justified_slots contains a single justified entry for slot 2
-    5. There are no pending justifications
+    3. latest_justified_root is block_2
+    4. latest_finalized_slot is 1
+    5. latest_finalized_root is block_1
+    6. justified_slots contains a single justified entry for slot 2
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -83,7 +85,9 @@ def test_finalization_on_next_justifiable_step(
         post=StateExpectation(
             slot=Slot(3),
             latest_justified_slot=Slot(2),
+            latest_justified_root_label="block_2",
             latest_finalized_slot=Slot(1),
+            latest_finalized_root_label="block_1",
             justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(True)]}),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
@@ -108,10 +112,12 @@ def test_pending_justification_survives_finalization_rebase(
     -----------------
     1. The post-state slot is 5
     2. latest_justified_slot is 2
-    3. latest_finalized_slot is 1
-    4. justified_slots equals [True, False, False] relative to finalized slot 1
-    5. justifications_roots contains block_3
-    6. justifications_validators contains a single 1-of-4 pending tally
+    3. latest_justified_root is block_2
+    4. latest_finalized_slot is 1
+    5. latest_finalized_root is block_1
+    6. justified_slots equals [True, False, False] relative to finalized slot 1
+    7. justifications_roots contains block_3
+    8. justifications_validators contains a single 1-of-4 pending tally
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -172,7 +178,9 @@ def test_pending_justification_survives_finalization_rebase(
         post=StateExpectation(
             slot=Slot(5),
             latest_justified_slot=Slot(2),
+            latest_justified_root_label="block_2",
             latest_finalized_slot=Slot(1),
+            latest_finalized_root_label="block_1",
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={"data": [Boolean(True), Boolean(False), Boolean(False)]}
             ),
@@ -205,10 +213,11 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
     -----------------
     1. The post-state slot is 5
     2. latest_justified_slot is 4
-    3. latest_finalized_slot remains 0
-    4. latest_finalized_root stays at the parent root of block 1
-    5. justified_slots marks slots 1 and 4 as justified
-    6. There are no pending justifications
+    3. latest_justified_root is block_4
+    4. latest_finalized_slot remains 0
+    5. latest_finalized_root stays at the parent root of block 1
+    6. justified_slots marks slots 1 and 4 as justified
+    7. There are no pending justifications
     """
     pre = generate_pre_state()
     anchor_root = hash_tree_root(pre.process_slots(Slot(1)).latest_block_header)
@@ -264,6 +273,7 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
         post=StateExpectation(
             slot=Slot(5),
             latest_justified_slot=Slot(4),
+            latest_justified_root_label="block_4",
             latest_finalized_slot=Slot(0),
             latest_finalized_root=anchor_root,
             justified_slots=JustifiedSlots(data=[]).model_copy(
@@ -291,9 +301,11 @@ def test_mid_block_finalized_slot_visibility(
     -----------------
     1. The post-state slot is 8
     2. latest_justified_slot is 7
-    3. latest_finalized_slot is 1
-    4. justified_slots marks slots 2 and 7 as justified relative to slot 1
-    5. There are no pending justifications
+    3. latest_justified_root is block_7
+    4. latest_finalized_slot is 1
+    5. latest_finalized_root is block_1
+    6. justified_slots marks slots 2 and 7 as justified relative to slot 1
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -351,7 +363,9 @@ def test_mid_block_finalized_slot_visibility(
         post=StateExpectation(
             slot=Slot(8),
             latest_justified_slot=Slot(7),
+            latest_justified_root_label="block_7",
             latest_finalized_slot=Slot(1),
+            latest_finalized_root_label="block_1",
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={
                     "data": [
@@ -387,9 +401,11 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
     -----------------
     1. The post-state slot is 6
     2. latest_justified_slot is 5
-    3. latest_finalized_slot is 4
-    4. justified_slots contains a single justified entry for slot 5
-    5. There are no pending justifications
+    3. latest_justified_root is block_5
+    4. latest_finalized_slot is 4
+    5. latest_finalized_root is block_4
+    6. justified_slots contains a single justified entry for slot 5
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -470,7 +486,9 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
         post=StateExpectation(
             slot=Slot(6),
             latest_justified_slot=Slot(5),
+            latest_justified_root_label="block_5",
             latest_finalized_slot=Slot(4),
+            latest_finalized_root_label="block_4",
             justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(True)]}),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
@@ -495,9 +513,11 @@ def test_non_adjacent_justification_finalizes_across_non_justifiable_gap(
     -----------------
     1. The post-state slot is 10
     2. latest_justified_slot is 9
-    3. latest_finalized_slot is 6
-    4. justified_slots equals [False, False, True] relative to slot 6
-    5. There are no pending justifications
+    3. latest_justified_root is block_9
+    4. latest_finalized_slot is 6
+    5. latest_finalized_root is block_6
+    6. justified_slots equals [False, False, True] relative to slot 6
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -547,7 +567,9 @@ def test_non_adjacent_justification_finalizes_across_non_justifiable_gap(
         post=StateExpectation(
             slot=Slot(10),
             latest_justified_slot=Slot(9),
+            latest_justified_root_label="block_9",
             latest_finalized_slot=Slot(6),
+            latest_finalized_root_label="block_6",
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={"data": [Boolean(False), Boolean(False), Boolean(True)]}
             ),
@@ -574,9 +596,11 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
     -----------------
     1. The post-state slot is 14
     2. latest_justified_slot is 13
-    3. latest_finalized_slot is 1
-    4. justified_slots contains justified entries for slots 2, 7, and 13
-    5. There are no pending justifications
+    3. latest_justified_root is block_13
+    4. latest_finalized_slot is 1
+    5. latest_finalized_root is block_1
+    6. justified_slots contains justified entries for slots 2, 7, and 13
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -656,7 +680,9 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
         post=StateExpectation(
             slot=Slot(14),
             latest_justified_slot=Slot(13),
+            latest_justified_root_label="block_13",
             latest_finalized_slot=Slot(1),
+            latest_finalized_root_label="block_1",
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={
                     "data": [
@@ -697,9 +723,11 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
     -----------------
     1. The post-state slot is 10
     2. latest_justified_slot is 2
-    3. latest_finalized_slot is 1
-    4. justified_slots contains a single justified entry for slot 2 relative to slot 1
-    5. There are no pending justifications
+    3. latest_justified_root is block_2
+    4. latest_finalized_slot is 1
+    5. latest_finalized_root is block_1
+    6. justified_slots contains a single justified entry for slot 2 relative to slot 1
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -759,7 +787,9 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
         post=StateExpectation(
             slot=Slot(10),
             latest_justified_slot=Slot(2),
+            latest_justified_root_label="block_2",
             latest_finalized_slot=Slot(1),
+            latest_finalized_root_label="block_1",
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={
                     "data": [
@@ -796,9 +826,11 @@ def test_mid_block_resolved_target_does_not_reopen_pending_votes(
     -----------------
     1. The post-state slot is 3
     2. latest_justified_slot is 2
-    3. latest_finalized_slot is 1
-    4. justified_slots contains a single justified entry for slot 2
-    5. There are no pending justifications
+    3. latest_justified_root is block_2
+    4. latest_finalized_slot is 1
+    5. latest_finalized_root is block_1
+    6. justified_slots contains a single justified entry for slot 2
+    7. There are no pending justifications
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -849,7 +881,9 @@ def test_mid_block_resolved_target_does_not_reopen_pending_votes(
         post=StateExpectation(
             slot=Slot(3),
             latest_justified_slot=Slot(2),
+            latest_justified_root_label="block_2",
             latest_finalized_slot=Slot(1),
+            latest_finalized_root_label="block_1",
             justified_slots=JustifiedSlots(data=[]).model_copy(update={"data": [Boolean(True)]}),
             justifications_roots=JustificationRoots(data=[]),
             justifications_validators=JustificationValidators(data=[]),
@@ -876,10 +910,12 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
     -----------------
     1. The post-state slot is 14
     2. latest_justified_slot is 10
-    3. latest_finalized_slot is 7
-    4. justified_slots equals [False, False, True, False, False, False] relative to slot 7
-    5. justifications_roots contains block_13
-    6. justifications_validators contains a single 1-of-4 pending tally
+    3. latest_justified_root is block_10
+    4. latest_finalized_slot is 7
+    5. latest_finalized_root is block_7
+    6. justified_slots equals [False, False, True, False, False, False] relative to slot 7
+    7. justifications_roots contains block_13
+    8. justifications_validators contains a single 1-of-4 pending tally
     """
     state_transition_test(
         pre=generate_pre_state(),
@@ -982,7 +1018,9 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
         post=StateExpectation(
             slot=Slot(14),
             latest_justified_slot=Slot(10),
+            latest_justified_root_label="block_10",
             latest_finalized_slot=Slot(7),
+            latest_finalized_root_label="block_7",
             justified_slots=JustifiedSlots(data=[]).model_copy(
                 update={
                     "data": [

@@ -34,6 +34,13 @@ class StateExpectation(CamelModel):
         )
     """
 
+    _LABEL_FIELDS: ClassVar[set[str]] = {
+        "latest_justified_root_label",
+        "latest_finalized_root_label",
+        "justifications_roots_labels",
+    }
+    """Fields that resolve block labels to roots via the block registry."""
+
     _ACCESSORS: ClassVar[dict[str, Callable[["State"], Any]]] = {
         "slot": lambda s: s.slot,
         "latest_justified_slot": lambda s: s.latest_justified.slot,
@@ -55,6 +62,7 @@ class StateExpectation(CamelModel):
         "justifications_validators": lambda s: s.justifications_validators,
         "justifications_validators_count": lambda s: len(s.justifications_validators),
     }
+    """Field name to accessor function for reading expected values from a State."""
 
     slot: Slot | None = None
     """Expected current slot."""
@@ -65,11 +73,27 @@ class StateExpectation(CamelModel):
     latest_justified_root: Bytes32 | None = None
     """Expected latest justified checkpoint root."""
 
+    latest_justified_root_label: str | None = None
+    """
+    Expected latest justified checkpoint root by label reference.
+
+    Alternative to latest_justified_root that uses the block label system.
+    The framework resolves this label to the actual block root.
+    """
+
     latest_finalized_slot: Slot | None = None
     """Expected latest finalized checkpoint slot."""
 
     latest_finalized_root: Bytes32 | None = None
     """Expected latest finalized checkpoint root."""
+
+    latest_finalized_root_label: str | None = None
+    """
+    Expected latest finalized checkpoint root by label reference.
+
+    Alternative to latest_finalized_root that uses the block label system.
+    The framework resolves this label to the actual block root.
+    """
 
     validator_count: int | None = None
     """Expected number of validators."""
@@ -153,7 +177,7 @@ class StateExpectation(CamelModel):
                 )
             return hash_tree_root(block_registry[label])
 
-        for field_name in fields - {"justifications_roots_labels"}:
+        for field_name in fields - self._LABEL_FIELDS:
             accessor = self._ACCESSORS.get(field_name)
             if accessor is None:
                 raise ValueError(f"No accessor defined for field: {field_name}")
@@ -162,6 +186,30 @@ class StateExpectation(CamelModel):
             if actual != expected:
                 raise AssertionError(
                     f"State validation failed: {field_name} = {actual}, expected {expected}"
+                )
+
+        if "latest_justified_root_label" in fields:
+            assert self.latest_justified_root_label is not None
+            expected = _resolve_label(
+                "latest_justified_root_label", self.latest_justified_root_label
+            )
+            actual = state.latest_justified.root
+            if actual != expected:
+                raise AssertionError(
+                    f"State validation failed: latest_justified.root = {actual}, "
+                    f"expected {expected}"
+                )
+
+        if "latest_finalized_root_label" in fields:
+            assert self.latest_finalized_root_label is not None
+            expected = _resolve_label(
+                "latest_finalized_root_label", self.latest_finalized_root_label
+            )
+            actual = state.latest_finalized.root
+            if actual != expected:
+                raise AssertionError(
+                    f"State validation failed: latest_finalized.root = {actual}, "
+                    f"expected {expected}"
                 )
 
         if "justifications_roots_labels" in fields:
