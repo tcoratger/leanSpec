@@ -18,6 +18,11 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
 )
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.subspecs.networking.reqresp.codec import (
+    ResponseCode,
+    decode_request,
+    encode_request,
+)
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 from .base import BaseConsensusFixture
@@ -71,6 +76,10 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_gossip_message_id()
             case "gossipsub_rpc":
                 output = self._make_gossipsub_rpc()
+            case "reqresp_request":
+                output = self._make_reqresp_request()
+            case "reqresp_response":
+                output = self._make_reqresp_response()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
         return self.model_copy(update={"output": output})
@@ -122,6 +131,30 @@ class NetworkingCodecTest(BaseConsensusFixture):
         # Decode and re-encode must produce identical bytes.
         re_encoded = RPC.decode(encoded).encode()
         assert encoded == re_encoded, "RPC roundtrip produced different bytes"
+
+        return {"encoded": _to_hex(encoded)}
+
+    def _make_reqresp_request(self) -> dict[str, Any]:
+        """Encode an SSZ request as varint + snappy, decode it back, assert roundtrip."""
+        ssz_data = _from_hex(self.input["sszData"])
+        encoded = encode_request(ssz_data)
+
+        # Decode must recover the original SSZ bytes.
+        decoded = decode_request(encoded)
+        assert decoded == ssz_data, "Request roundtrip produced different bytes"
+
+        return {"encoded": _to_hex(encoded)}
+
+    def _make_reqresp_response(self) -> dict[str, Any]:
+        """Encode an SSZ response with code, decode it back, assert roundtrip."""
+        code = ResponseCode(self.input["responseCode"])
+        ssz_data = _from_hex(self.input["sszData"])
+        encoded = code.encode(ssz_data)
+
+        # Decode must recover both the response code and SSZ bytes.
+        decoded_code, decoded_data = ResponseCode.decode(encoded)
+        assert decoded_code == code, f"Code mismatch: {decoded_code} != {code}"
+        assert decoded_data == ssz_data, "Response roundtrip produced different bytes"
 
         return {"encoded": _to_hex(encoded)}
 
