@@ -13,6 +13,7 @@ from lean_spec.subspecs.containers import (
     BlockHeader,
     Checkpoint,
     Config,
+    SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
     Slot,
@@ -43,15 +44,18 @@ pytestmark = pytest.mark.valid_until("Devnet")
 
 
 def _zero_checkpoint() -> Checkpoint:
+    """Build a checkpoint with all-zero root and slot zero."""
     return Checkpoint(root=Bytes32.zero(), slot=Slot(0))
 
 
 def _zero_attestation_data() -> AttestationData:
+    """Build attestation data with all checkpoints and slot at zero."""
     zero_cp = _zero_checkpoint()
     return AttestationData(slot=Slot(0), head=zero_cp, target=zero_cp, source=zero_cp)
 
 
 def _typical_attestation_data() -> AttestationData:
+    """Build attestation data with distinct non-zero checkpoints at realistic slots."""
     head = Checkpoint(root=Bytes32(b"\x01" * 32), slot=Slot(100))
     target = Checkpoint(root=Bytes32(b"\x02" * 32), slot=Slot(99))
     source = Checkpoint(root=Bytes32(b"\x03" * 32), slot=Slot(50))
@@ -426,6 +430,174 @@ def test_state_with_validators(ssz: SSZTestFiller) -> None:
             justifications_roots=JustificationRoots(data=[Bytes32(b"\x20" * 32)]),
             justifications_validators=JustificationValidators(
                 data=[Boolean(True), Boolean(True), Boolean(False), Boolean(True)]
+            ),
+        ),
+    )
+
+
+# --- SignedAggregatedAttestation ---
+
+
+def test_signed_aggregated_attestation_minimal(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for SignedAggregatedAttestation with one participant and empty proof."""
+    ssz(
+        type_name="SignedAggregatedAttestation",
+        value=SignedAggregatedAttestation(
+            data=_zero_attestation_data(),
+            proof=AggregatedSignatureProof(
+                participants=AggregationBits(data=[Boolean(True)]),
+                proof_data=ByteListMiB(data=b""),
+            ),
+        ),
+    )
+
+
+def test_signed_aggregated_attestation_typical(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for SignedAggregatedAttestation with mixed participation bits."""
+    ssz(
+        type_name="SignedAggregatedAttestation",
+        value=SignedAggregatedAttestation(
+            data=_typical_attestation_data(),
+            proof=AggregatedSignatureProof(
+                participants=AggregationBits(
+                    data=[Boolean(True), Boolean(False), Boolean(True), Boolean(True)]
+                ),
+                proof_data=ByteListMiB(data=b"\xca\xfe\xba\xbe\xde\xad"),
+            ),
+        ),
+    )
+
+
+# --- Boundary-value tests ---
+
+
+def test_checkpoint_max_slot(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for Checkpoint at the maximum 64-bit slot and all-0xff root."""
+    ssz(
+        type_name="Checkpoint",
+        value=Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(2**64 - 1)),
+    )
+
+
+def test_block_body_max_attestations(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for BlockBody with four attestations of varying aggregation sizes."""
+    ssz(
+        type_name="BlockBody",
+        value=BlockBody(
+            attestations=AggregatedAttestations(
+                data=[
+                    AggregatedAttestation(
+                        aggregation_bits=AggregationBits(data=[Boolean(True)]),
+                        data=_zero_attestation_data(),
+                    ),
+                    AggregatedAttestation(
+                        aggregation_bits=AggregationBits(data=[Boolean(True), Boolean(True)]),
+                        data=_typical_attestation_data(),
+                    ),
+                    AggregatedAttestation(
+                        aggregation_bits=AggregationBits(
+                            data=[Boolean(False), Boolean(True), Boolean(True)]
+                        ),
+                        data=_zero_attestation_data(),
+                    ),
+                    AggregatedAttestation(
+                        aggregation_bits=AggregationBits(
+                            data=[
+                                Boolean(True),
+                                Boolean(False),
+                                Boolean(True),
+                                Boolean(False),
+                            ]
+                        ),
+                        data=_typical_attestation_data(),
+                    ),
+                ]
+            )
+        ),
+    )
+
+
+def test_validator_max_index(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for Validator at the maximum 64-bit index with all-0xff public keys."""
+    ssz(
+        type_name="Validator",
+        value=Validator(
+            attestation_pubkey=Bytes52(b"\xff" * 52),
+            proposal_pubkey=Bytes52(b"\xff" * 52),
+            index=ValidatorIndex(2**64 - 1),
+        ),
+    )
+
+
+def test_state_with_full_history(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for State with five block hashes, eight justification bits, and three roots."""
+    ssz(
+        type_name="State",
+        value=State(
+            config=Config(genesis_time=Uint64(1700000000)),
+            slot=Slot(500),
+            latest_block_header=BlockHeader(
+                slot=Slot(499),
+                proposer_index=ValidatorIndex(7),
+                parent_root=Bytes32(b"\xaa" * 32),
+                state_root=Bytes32(b"\xbb" * 32),
+                body_root=Bytes32(b"\xcc" * 32),
+            ),
+            latest_justified=Checkpoint(root=Bytes32(b"\xdd" * 32), slot=Slot(480)),
+            latest_finalized=Checkpoint(root=Bytes32(b"\xee" * 32), slot=Slot(450)),
+            historical_block_hashes=HistoricalBlockHashes(
+                data=[
+                    Bytes32(b"\x10" * 32),
+                    Bytes32(b"\x11" * 32),
+                    Bytes32(b"\x12" * 32),
+                    Bytes32(b"\x13" * 32),
+                    Bytes32(b"\x14" * 32),
+                ]
+            ),
+            justified_slots=JustifiedSlots(
+                data=[
+                    Boolean(True),
+                    Boolean(True),
+                    Boolean(False),
+                    Boolean(True),
+                    Boolean(False),
+                    Boolean(True),
+                    Boolean(True),
+                    Boolean(True),
+                ]
+            ),
+            validators=Validators(
+                data=[
+                    Validator(
+                        attestation_pubkey=Bytes52(b"\x01" * 52),
+                        proposal_pubkey=Bytes52(b"\x01" * 52),
+                        index=ValidatorIndex(0),
+                    ),
+                    Validator(
+                        attestation_pubkey=Bytes52(b"\x02" * 52),
+                        proposal_pubkey=Bytes52(b"\x02" * 52),
+                        index=ValidatorIndex(1),
+                    ),
+                ]
+            ),
+            justifications_roots=JustificationRoots(
+                data=[
+                    Bytes32(b"\x20" * 32),
+                    Bytes32(b"\x21" * 32),
+                    Bytes32(b"\x22" * 32),
+                ]
+            ),
+            justifications_validators=JustificationValidators(
+                data=[
+                    Boolean(True),
+                    Boolean(True),
+                    Boolean(False),
+                    Boolean(True),
+                    Boolean(True),
+                    Boolean(False),
+                    Boolean(True),
+                    Boolean(False),
+                ]
             ),
         ),
     )
