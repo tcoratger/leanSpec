@@ -4,61 +4,66 @@ from typing import Any, ClassVar
 
 from pydantic import field_serializer
 
-from lean_spec.types.container import Container
+from lean_spec.subspecs.koalabear.field import Fp
+from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.types.base import CamelModel
+from lean_spec.types.boolean import Boolean
+from lean_spec.types.ssz_base import SSZType
 
 from .base import BaseConsensusFixture
 
 
 class SSZTest(BaseConsensusFixture):
-    """
-    Test fixture for SSZ serialization/deserialization conformance.
+    """Fixture for SSZ conformance testing.
 
-    Tests roundtrip serialization for SSZ containers.
+    Verifies roundtrip serialization and Merkleization for any SSZ type.
 
-    Structure:
-        type_name: Name of the container class
-        value: The container instance
-        serialized: Hex-encoded SSZ bytes (computed)
+    JSON output: typeName, value, serialized, root.
     """
 
     format_name: ClassVar[str] = "ssz"
-    description: ClassVar[str] = "Tests SSZ serialization roundtrip"
+    description: ClassVar[str] = "Tests SSZ serialization roundtrip and hash_tree_root"
 
     type_name: str
-    """Name of the container class being tested."""
+    """SSZ type class name."""
 
-    value: Container
-    """The container instance to test."""
+    value: SSZType
+    """The SSZ value under test."""
 
     serialized: str = ""
-    """Hex-encoded SSZ serialized bytes (computed during make_fixture)."""
+    """Hex SSZ bytes. Empty until fixture generation fills it."""
+
+    root: str = ""
+    """Hex hash_tree_root. Empty until fixture generation fills it."""
 
     @field_serializer("value", when_used="json")
-    def serialize_value(self, value: Container) -> dict[str, Any]:
-        """Serialize the container value to JSON using its native serialization."""
-        return value.to_json()
+    def serialize_value(self, value: SSZType) -> Any:
+        """Convert an SSZ value to a JSON-safe representation."""
+        if isinstance(value, CamelModel):
+            return value.to_json()
+        # Boolean before int — Boolean subclasses int.
+        if isinstance(value, Boolean):
+            return bool(value)
+        if isinstance(value, bytes):
+            return "0x" + value.hex()
+        if isinstance(value, int):
+            return str(value)
+        if isinstance(value, Fp):
+            return str(value.value)
+        return str(value)
 
     def make_fixture(self) -> "SSZTest":
-        """
-        Generate the fixture by testing SSZ roundtrip.
-
-        1. Serialize the value to SSZ bytes
-        2. Deserialize the bytes back to a container
-        3. Verify the roundtrip produces the same value
+        """Verify SSZ roundtrip and produce the reference encoding and root.
 
         Returns:
-            SSZTest with computed serialized field.
+            A copy of this fixture with serialized and root populated.
 
         Raises:
-            AssertionError: If roundtrip fails.
+            AssertionError: If decode(encode(value)) != value.
         """
-        # Serialize to SSZ bytes
         ssz_bytes = self.value.encode_bytes()
-
-        # Deserialize back
         decoded = self.value.decode_bytes(ssz_bytes)
 
-        # Verify roundtrip
         assert decoded == self.value, (
             f"SSZ roundtrip failed for {self.type_name}: "
             f"original != decoded\n"
@@ -66,5 +71,11 @@ class SSZTest(BaseConsensusFixture):
             f"Decoded: {decoded}"
         )
 
-        # Return fixture with computed serialized field
-        return self.model_copy(update={"serialized": "0x" + ssz_bytes.hex()})
+        root = hash_tree_root(self.value)
+
+        return self.model_copy(
+            update={
+                "serialized": "0x" + ssz_bytes.hex(),
+                "root": "0x" + root.hex(),
+            }
+        )

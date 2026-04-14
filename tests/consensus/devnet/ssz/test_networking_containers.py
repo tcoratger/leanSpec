@@ -68,3 +68,13 @@ def test_blocks_by_root_request_multiple(ssz: SSZTestFiller) -> None:
             )
         ),
     )
+
+
+def test_blocks_by_root_request_max_roots(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for BlocksByRootRequest with ten distinct roots."""
+    ssz(
+        type_name="BlocksByRootRequest",
+        value=BlocksByRootRequest(
+            roots=RequestedBlockRoots(data=[Bytes32(bytes([i]) * 32) for i in range(1, 11)])
+        ),
+    )
