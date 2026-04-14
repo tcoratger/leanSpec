@@ -3,6 +3,20 @@
 from typing import Any, ClassVar
 
 from lean_spec.subspecs.containers.validator import SubnetId
+from lean_spec.subspecs.networking.discovery.codec import decode_message, encode_message
+from lean_spec.subspecs.networking.discovery.messages import (
+    Distance,
+    FindNode,
+    IPv4,
+    IPv6,
+    Nodes,
+    Ping,
+    Pong,
+    Port,
+    RequestId,
+    TalkReq,
+    TalkResp,
+)
 from lean_spec.subspecs.networking.enr.enr import ENR
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 from lean_spec.subspecs.networking.gossipsub.rpc import (
@@ -25,6 +39,7 @@ from lean_spec.subspecs.networking.reqresp.codec import (
     encode_request,
 )
 from lean_spec.subspecs.networking.transport.peer_id import KeyType, PeerId, PublicKeyProto
+from lean_spec.subspecs.networking.types import SeqNumber
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 from .base import BaseConsensusFixture
@@ -86,6 +101,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_enr()
             case "peer_id":
                 output = self._make_peer_id()
+            case "discv5_message":
+                output = self._make_discv5_message()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
         return self.model_copy(update={"output": output})
@@ -241,6 +258,60 @@ class NetworkingCodecTest(BaseConsensusFixture):
             "protobufEncoded": _to_hex(encoded_proto),
             "peerId": peer_id_str,
         }
+
+    def _make_discv5_message(self) -> dict[str, Any]:
+        """Encode a discv5 message as type byte + RLP, decode it back, assert roundtrip."""
+        msg = _build_discv5_message(self.input)
+        encoded = encode_message(msg)
+
+        # Decode and re-encode must produce identical bytes.
+        re_encoded = encode_message(decode_message(encoded))
+        assert encoded == re_encoded, "Discv5 message roundtrip produced different bytes"
+
+        return {"encoded": _to_hex(encoded)}
+
+
+def _build_discv5_message(
+    d: dict[str, Any],
+) -> Ping | Pong | FindNode | Nodes | TalkReq | TalkResp:
+    """Build a discv5 message dataclass from a JSON-friendly dict."""
+    request_id = RequestId(data=_from_hex(d["requestId"]))
+    match d["type"]:
+        case "ping":
+            return Ping(request_id=request_id, enr_seq=SeqNumber(d["enrSeq"]))
+        case "pong":
+            ip_bytes = _from_hex(d["recipientIp"])
+            ip = IPv4(ip_bytes) if len(ip_bytes) == 4 else IPv6(ip_bytes)
+            return Pong(
+                request_id=request_id,
+                enr_seq=SeqNumber(d["enrSeq"]),
+                recipient_ip=ip,
+                recipient_port=Port(d["recipientPort"]),
+            )
+        case "findnode":
+            return FindNode(
+                request_id=request_id,
+                distances=[Distance(x) for x in d["distances"]],
+            )
+        case "nodes":
+            return Nodes(
+                request_id=request_id,
+                total=d["total"],
+                enrs=[_from_hex(e) for e in d.get("enrs", [])],
+            )
+        case "talkreq":
+            return TalkReq(
+                request_id=request_id,
+                protocol=_from_hex(d["protocol"]),
+                request=_from_hex(d["request"]),
+            )
+        case "talkresp":
+            return TalkResp(
+                request_id=request_id,
+                response=_from_hex(d["response"]),
+            )
+        case _:
+            raise ValueError(f"Unknown discv5 message type: {d['type']}")
 
 
 def _build_rpc(d: dict[str, Any]) -> RPC:
