@@ -13,13 +13,14 @@ OFFICIAL_ENR = (
 """Official EIP-778 test vector with valid signature."""
 
 ENR_WITH_EXTENSIONS = (
-    "enr:-NK4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "enr:-PK4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFh2F0dG5ldHOIgQAAAAAAAICEZXRoMpASNF"
     "Z4q83vAGQAAAAAAAAAgmlkgnY0gmlwhAoAAAGDaXA2kCABDbgAAAAAAAAAAAAAAAG"
-    "EcXVpY4IjKYlzZWNwMjU2azGhA8pjTK4NSay0Adikxrb-jFW3DRFb9AB2nMFADzJY"
-    "zTE4iHN5bmNuZXRzCoN1ZHCCdl8"
+    "NaXNfYWdncmVnYXRvcgGEcXVpY4IjKYVxdWljNoIjKolzZWNwMjU2azGhA8pjTK4N"
+    "Say0Adikxrb-jFW3DRFb9AB2nMFADzJYzTE4iHN5bmNuZXRzCoN1ZHCCdl-EdWRwN"
+    "oJ2YA"
 )
-"""Constructed ENR with eth2 data, attestation subnets, sync subnets, IPv6, and QUIC."""
+"""Constructed ENR with all EIP-778 + consensus extension keys."""
 
 ENR_MINIMAL = (
     "enr:-HW4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -38,7 +39,7 @@ def test_enr_official_eip778(networking_codec: NetworkingCodecTestFiller) -> Non
 
 
 def test_enr_with_extensions(networking_codec: NetworkingCodecTestFiller) -> None:
-    """ENR with eth2 data, attestation subnets, sync subnets, IPv6, and QUIC port."""
+    """ENR with all extension keys: eth2, subnets, IPv6, QUIC, udp6, quic6, is_aggregator."""
     networking_codec(codec_name="enr", input={"enrString": ENR_WITH_EXTENSIONS})
 
 

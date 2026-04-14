@@ -191,10 +191,14 @@ class NetworkingCodecTest(BaseConsensusFixture):
             output["ip4"] = enr.ip4
         if enr.udp_port is not None:
             output["udpPort"] = int(enr.udp_port)
+        if enr.udp6_port is not None:
+            output["udp6Port"] = int(enr.udp6_port)
         if enr.ip6:
             output["ip6"] = enr.ip6
         if enr.quic_port is not None:
             output["quicPort"] = int(enr.quic_port)
+        if enr.quic6_port is not None:
+            output["quic6Port"] = int(enr.quic6_port)
         if (ma := enr.multiaddr()) is not None:
             output["multiaddr"] = str(ma)
         if (eth2 := enr.eth2_data) is not None:
@@ -207,6 +211,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
             output["attestationSubnets"] = [int(s) for s in subnets.subscribed_subnets()]
         if (sync := enr.sync_committee_subnets) is not None:
             output["syncCommitteeSubnets"] = [int(s) for s in sync.subscribed_subnets()]
+        output["isAggregator"] = enr.is_aggregator
         output["signatureValid"] = enr.verify_signature()
         output["isValid"] = enr.is_valid()
 
