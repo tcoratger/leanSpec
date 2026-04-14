@@ -3,6 +3,7 @@
 from typing import Any, ClassVar
 
 from lean_spec.subspecs.containers.validator import SubnetId
+from lean_spec.subspecs.networking.enr.enr import ENR
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 from lean_spec.subspecs.networking.gossipsub.rpc import (
     RPC,
@@ -23,6 +24,7 @@ from lean_spec.subspecs.networking.reqresp.codec import (
     decode_request,
     encode_request,
 )
+from lean_spec.subspecs.networking.transport.peer_id import KeyType, PeerId, PublicKeyProto
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 from .base import BaseConsensusFixture
@@ -80,6 +82,10 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_reqresp_request()
             case "reqresp_response":
                 output = self._make_reqresp_response()
+            case "enr":
+                output = self._make_enr()
+            case "peer_id":
+                output = self._make_peer_id()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
         return self.model_copy(update={"output": output})
@@ -157,6 +163,84 @@ class NetworkingCodecTest(BaseConsensusFixture):
         assert decoded_data == ssz_data, "Response roundtrip produced different bytes"
 
         return {"encoded": _to_hex(encoded)}
+
+    def _make_enr(self) -> dict[str, Any]:
+        """Parse an ENR string, re-serialize, assert roundtrip, extract properties."""
+        enr_string = self.input["enrString"]
+        enr = ENR.from_string(enr_string)
+
+        # Text roundtrip: parse → serialize → must match original.
+        assert enr.to_string() == enr_string, "ENR text roundtrip failed"
+
+        # RLP roundtrip: serialize → parse → serialize → must match.
+        rlp_bytes = enr.to_rlp()
+        assert ENR.from_rlp(rlp_bytes).to_rlp() == rlp_bytes, "ENR RLP roundtrip failed"
+
+        # Extract all properties into the output.
+        output: dict[str, Any] = {
+            "rlp": _to_hex(rlp_bytes),
+            "seq": int(enr.seq),
+            "identityScheme": enr.identity_scheme,
+        }
+
+        if enr.node_id:
+            output["nodeId"] = _to_hex(enr.node_id)
+        if enr.public_key:
+            output["publicKey"] = _to_hex(enr.public_key)
+        if enr.ip4:
+            output["ip4"] = enr.ip4
+        if enr.udp_port is not None:
+            output["udpPort"] = int(enr.udp_port)
+        if enr.udp6_port is not None:
+            output["udp6Port"] = int(enr.udp6_port)
+        if enr.ip6:
+            output["ip6"] = enr.ip6
+        if enr.quic_port is not None:
+            output["quicPort"] = int(enr.quic_port)
+        if enr.quic6_port is not None:
+            output["quic6Port"] = int(enr.quic6_port)
+        if (ma := enr.multiaddr()) is not None:
+            output["multiaddr"] = str(ma)
+        if (eth2 := enr.eth2_data) is not None:
+            output["eth2Data"] = {
+                "forkDigest": _to_hex(eth2.fork_digest),
+                "nextForkVersion": _to_hex(eth2.next_fork_version),
+                "nextForkEpoch": int(eth2.next_fork_epoch),
+            }
+        if (subnets := enr.attestation_subnets) is not None:
+            output["attestationSubnets"] = [int(s) for s in subnets.subscribed_subnets()]
+        if (sync := enr.sync_committee_subnets) is not None:
+            output["syncCommitteeSubnets"] = [int(s) for s in sync.subscribed_subnets()]
+        output["isAggregator"] = enr.is_aggregator
+        output["signatureValid"] = enr.verify_signature()
+        output["isValid"] = enr.is_valid()
+
+        return output
+
+    def _make_peer_id(self) -> dict[str, Any]:
+        """Derive a PeerId from a public key, output protobuf encoding and Base58 string."""
+        key_type_map = {
+            "ed25519": KeyType.ED25519,
+            "secp256k1": KeyType.SECP256K1,
+            "ecdsa": KeyType.ECDSA,
+            "rsa": KeyType.RSA,
+        }
+        key_type = key_type_map[self.input["keyType"]]
+        key_data = _from_hex(self.input["publicKey"])
+
+        proto = PublicKeyProto(key_type=key_type, key_data=key_data)
+        encoded_proto = proto.encode()
+        peer_id = PeerId.from_public_key(proto)
+        peer_id_str = str(peer_id)
+
+        # Roundtrip: Base58 decode → re-encode must match.
+        roundtrip = PeerId.from_base58(peer_id_str)
+        assert roundtrip == peer_id, "PeerId Base58 roundtrip failed"
+
+        return {
+            "protobufEncoded": _to_hex(encoded_proto),
+            "peerId": peer_id_str,
+        }
 
 
 def _build_rpc(d: dict[str, Any]) -> RPC:
