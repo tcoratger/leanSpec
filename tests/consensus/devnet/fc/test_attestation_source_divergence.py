@@ -1,13 +1,12 @@
-"""Attestation Source Divergence"""
+"""Fork Choice: Attestation Source Under Justified Divergence"""
 
 import pytest
 from consensus_testing import (
+    AggregatedAttestationCheck,
     AggregatedAttestationSpec,
-    AttestationStep,
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAttestationSpec,
     StoreChecks,
 )
 
@@ -17,51 +16,58 @@ from lean_spec.subspecs.containers.validator import ValidatorIndex
 pytestmark = pytest.mark.valid_until("Devnet")
 
 
-def test_gossip_attestation_accepted_after_fork_advances_justified(
+def test_justified_divergence_self_heals_in_next_block(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Gossip attestation is valid when the global justified diverges from head.
+    Store justified advances from a minority fork; the next block catches up.
 
     Scenario
     --------
-    Four validators. The chain forks at slot 1::
+    Four validators. Two forks diverge from a common ancestor::
 
-        genesis ── slot 1 ("common") ─┬── slot 2 ── slot 3  (head, V0 weight)
-                                      └── slot 4            (fork, V1+V2+V3 justify "common")
+        genesis -> common(1) -> block_2(2) -> block_3(3)   (head, V0 weight)
+                              \\
+                               -> fork_4(4)                (V1+V2+V3 justify slot 1)
 
-    The fork block carries attestations from 3 of 4 validators for the fork
-    point. This crosses the 2/3 threshold and advances the store-wide justified
-    checkpoint to slot 1.
+    After fork_4:
 
-    The head chain has not seen those votes, so its state still holds the
-    genesis justified checkpoint (slot 0). After the fork is processed:
+    - store.latest_justified = slot 1 (from fork B)
+    - head = block_3 (fork A)
+    - head_state.latest_justified = slot 0 (divergence)
 
-    - Store-wide justified: slot 1
-    - Head state justified: slot 0
+    Self-healing
+    ------------
+    Block 5 is built on the head chain (no explicit attestations).
+    The builder's fixed-point loop resolves the divergence:
 
-    A gossip attestation is then produced at slot 5. The attestation target
-    walks back 3 slots from head (slot 3) and lands on genesis (slot 0).
+    1. Pool contains fork B's attestations (source=0, target=1)
+    2. Builder starts with current_justified=0 (head state)
+    3. Fork B's attestations match (source=0). Included. Justifies slot 1.
+    4. Divergence closed in one block.
 
-    The source must come from the head state (slot 0) so that the
-    monotonicity invariant holds (source.slot <= target.slot). Using the
-    store-wide value (slot 1) would violate it and be rejected.
+    Expected post-state
+    -------------------
+    - After fork_4: store justified=1, head state justified=0
+    - After block_5: both agree on justified=1
     """
     fork_choice_test(
         steps=[
-            # Common ancestor — the fork point for both chains.
+            # Fork point for both chains.
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(head_slot=Slot(1)),
             ),
-            # Main chain, first extension.
+            # Fork A: head chain
+            #
+            #   common(1) -> block_2(2) -> block_3(3)
+            #
+            # V0 attests in block_3 targeting block_2.
+            # This keeps fork A as head after fork B arrives.
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="common", label="block_2"),
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
-            # Main chain, second extension.
-            # V0 attests for block_2, giving this branch LMD-GHOST weight
-            # so that it stays head after the fork block arrives.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -78,15 +84,26 @@ def test_gossip_attestation_accepted_after_fork_advances_justified(
                 ),
                 checks=StoreChecks(head_slot=Slot(3)),
             ),
-            # Minority fork. V1, V2, V3 attest for the fork point.
-            # 3 of 4 validators cross the 2/3 threshold, advancing the
-            # store-wide justified checkpoint to slot 1. Head stays on
-            # the main chain thanks to V0's weight.
+            # Fork B: minority fork that justifies slot 1
+            #
+            #   common(1) -> fork_4(4)
+            #
+            # V1+V2+V3 attest to slot 1.
+            # Threshold: 3*3=9 >= 2*4=8 -> justifies slot 1.
+            #
+            # The store propagates: justified = max(1, 0) = 1.
+            # Head stays on block_3 (V0 weight).
+            #
+            # This creates the divergence:
+            #   store justified = 1, head state justified = 0.
+            #
+            # Why: the attestations that justified slot 1 are in fork_4's
+            # block body. The head chain never processed them.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
                     parent_label="common",
-                    label="fork_block",
+                    label="fork_4",
                     attestations=[
                         AggregatedAttestationSpec(
                             validator_ids=[
@@ -103,21 +120,58 @@ def test_gossip_attestation_accepted_after_fork_advances_justified(
                 checks=StoreChecks(
                     head_slot=Slot(3),
                     head_root_label="block_3",
+                    # Store justified advanced from fork B.
                     latest_justified_slot=Slot(1),
                     latest_justified_root_label="common",
                 ),
             ),
-            # Gossip attestation from V3 at slot 5.
+            # Self-healing block on the head chain.
             #
-            # This exercises the attestation production code path.
-            # The target walks back to genesis (slot 0). The source must
-            # be slot 0 (head state) so that source <= target holds.
-            AttestationStep(
-                attestation=GossipAttestationSpec(
-                    validator_id=ValidatorIndex(3),
-                    slot=Slot(5),
-                    target_slot=Slot(3),
-                    target_root_label="block_3",
+            # No explicit attestations. The builder reads from the pool.
+            #
+            # The pool has fork B's attestations (source=0, target=1)
+            # because on_block added them when processing fork_4.
+            #
+            # Fixed-point loop:
+            #   Pass 1: justified=0 -> fork B's attestations match (source=0)
+            #           3/4 supermajority -> justifies slot 1
+            #           justified advances to 1
+            #   Pass 2: nothing new -> break
+            #
+            # Divergence closed: head state justified = 1 = store justified.
+            #
+            # The produced block MUST carry the justifying attestations so that
+            # other nodes processing it also advance their justified checkpoint.
+            # Block production asserts this invariant.
+            BlockStep(
+                block=BlockSpec(slot=Slot(5), label="block_5"),
+                checks=StoreChecks(
+                    head_slot=Slot(5),
+                    head_root_label="block_5",
+                    # Both store and head agree: justified = slot 1.
+                    latest_justified_slot=Slot(1),
+                    latest_justified_root_label="common",
+                    # The block body must contain fork B's attestations.
+                    #
+                    # The builder picks up all pool entries whose source matches
+                    # the current justified checkpoint (genesis). Two match:
+                    #
+                    # 1. V1+V2+V3 targeting slot 1 — the minority fork's
+                    #    justifying attestation. This is the one that closes
+                    #    the divergence.
+                    # 2. V0 targeting slot 2 — originally in block_3's body,
+                    #    still in the attestation pool.
+                    block_attestation_count=2,
+                    block_attestations=[
+                        AggregatedAttestationCheck(
+                            participants={1, 2, 3},
+                            target_slot=Slot(1),
+                        ),
+                        AggregatedAttestationCheck(
+                            participants={0},
+                            target_slot=Slot(2),
+                        ),
+                    ],
                 ),
             ),
         ],

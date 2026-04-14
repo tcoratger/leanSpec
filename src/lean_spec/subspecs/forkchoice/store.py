@@ -100,14 +100,11 @@ class Store(StrictBaseModel):
 
     latest_justified: Checkpoint
     """
-    Highest-slot justified checkpoint known to the store.
+    Highest slot justified checkpoint known to the store.
 
-    This is the global maximum across all forks.
-    Used only for fork choice: LMD GHOST starts here when computing the head.
+    LMD GHOST starts from this checkpoint when computing the head.
+
     Only descendants of this checkpoint are considered viable.
-
-    Attestation production does not use this field.
-    Validators vote with the justified checkpoint from the head state instead.
     """
 
     latest_finalized: Checkpoint
@@ -750,36 +747,29 @@ class Store(StrictBaseModel):
         """
         Compute updated store with new canonical head.
 
-        This method implements the core fork choice algorithm, selecting the canonical
-        chain head based on:
-        1. Latest justified checkpoint (from state analysis)
-        2. LMD-GHOST fork choice rule (heaviest subtree)
-        3. Finalization status (from head state)
+        Selects the canonical chain head using:
 
-        Algorithm
-        ---------
-        1. **Fork Choice**: Run LMD-GHOST from justified root using attestation weights
-        2. **Return**: New Store instance with updated head
+        1. Latest justified checkpoint as the starting root
+        2. LMD-GHOST fork choice rule (heaviest subtree by attestation weight)
 
         Returns:
             New Store with updated head.
-
         """
         # Extract attestations from known aggregated payloads
         attestations = self.extract_attestations_from_aggregated_payloads(
             self.latest_known_aggregated_payloads
         )
 
-        # Run LMD-GHOST fork choice algorithm
+        # Run LMD-GHOST fork choice algorithm.
         #
-        # Selects canonical head by walking the tree from the justified root,
-        # choosing the heaviest child at each fork based on attestation weights.
+        # Starts from the justified root and greedily descends to the heaviest
+        # leaf. The result is always a descendant of the justified root by
+        # construction: the walk only follows child edges within the subtree.
         new_head = self._compute_lmd_ghost_head(
             start_root=self.latest_justified.root,
             attestations=attestations,
         )
 
-        # Return new Store instance with updated values (immutable update)
         return self.model_copy(
             update={
                 "head": new_head,
@@ -1261,21 +1251,15 @@ class Store(StrictBaseModel):
         """
         Produce attestation data for the given slot.
 
-        An attestation vote has four fields:
+        This method constructs an AttestationData object according to the lean protocol
+        specification. The attestation data represents the chain state view including
+        head, target, and source checkpoints.
 
-        - **slot**: when this vote is cast
-        - **head**: the block at the tip of the chain
-        - **target**: the justification candidate (walked back from head)
-        - **source**: the last justified checkpoint *on the head chain*
-
-        The source anchors the vote to a trusted starting point. It must
-        come from the head state — not from the store-wide field — because
-        the block builder only accepts attestations whose source matches
-        the head state's justified checkpoint.
-
-        At genesis the head state has a zero-hash checkpoint root. Since
-        validation requires a root present in the block registry, the
-        actual genesis block root is substituted.
+        The algorithm:
+        1. Get the current head block
+        2. Calculate the appropriate attestation target using current forkchoice state
+        3. Use the store's latest justified checkpoint as the attestation source
+        4. Construct and return the complete AttestationData object
 
         Args:
             slot: The slot for which to produce the attestation data.
@@ -1283,18 +1267,7 @@ class Store(StrictBaseModel):
         Returns:
             A fully constructed AttestationData object.
         """
-        head_state = self.states[self.head]
-
-        # Derive the source from the head state's justified checkpoint.
-        #
-        # At genesis the checkpoint root is a placeholder zero-hash.
-        # Replace it with the real genesis block root so that attestation
-        # validation can look it up in the block registry.
-        if head_state.latest_block_header.slot == Slot(0):
-            source = head_state.latest_justified.model_copy(update={"root": self.head})
-        else:
-            source = head_state.latest_justified
-
+        # Get the head block the validator sees for this slot
         head_checkpoint = Checkpoint(
             root=self.head,
             slot=self.blocks[self.head].slot,
@@ -1308,7 +1281,7 @@ class Store(StrictBaseModel):
             slot=slot,
             head=head_checkpoint,
             target=target_checkpoint,
-            source=source,
+            source=self.latest_justified,
         )
 
     def produce_block_with_signatures(
@@ -1344,7 +1317,9 @@ class Store(StrictBaseModel):
             - Signature proofs aligned with block attestations
 
         Raises:
-            AssertionError: If validator is not the proposer for this slot.
+            AssertionError: If validator is not the proposer for this slot,
+                or if the produced block fails to close a justified divergence
+                between the store and the head chain.
         """
         # Retrieve parent block.
         #
@@ -1373,6 +1348,23 @@ class Store(StrictBaseModel):
             parent_root=head_root,
             known_block_roots=set(store.blocks.keys()),
             aggregated_payloads=store.latest_known_aggregated_payloads,
+        )
+
+        # Invariant: the produced block must close any justified divergence.
+        #
+        # The store may have advanced its justified checkpoint from attestations
+        # on a minority fork that the head state never processed. The fixed-point
+        # loop above must incorporate those attestations from the pool, advancing
+        # the block's justified checkpoint to at least match the store.
+        #
+        # Without this, other nodes processing the block would never see the
+        # justification advance, degrading consensus liveness: only nodes that
+        # happened to receive the minority fork would know justification moved.
+        block_justified = final_post_state.latest_justified.slot
+        store_justified = store.latest_justified.slot
+        assert block_justified >= store_justified, (
+            f"Produced block justified={block_justified} < store justified="
+            f"{store_justified}. Fixed-point attestation loop did not converge."
         )
 
         # Compute block hash for storage.
