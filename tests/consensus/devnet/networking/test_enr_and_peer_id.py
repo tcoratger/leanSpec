@@ -10,15 +10,41 @@ OFFICIAL_ENR = (
     "CBOonrkTfj499SZuOh8R33Ls8RRcy5wBgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQ"
     "PKY0yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOIN1ZHCCdl8"
 )
-"""Official EIP-778 test vector."""
+"""Official EIP-778 test vector with valid signature."""
+
+ENR_WITH_EXTENSIONS = (
+    "enr:-NK4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFh2F0dG5ldHOIgQAAAAAAAICEZXRoMpASNF"
+    "Z4q83vAGQAAAAAAAAAgmlkgnY0gmlwhAoAAAGDaXA2kCABDbgAAAAAAAAAAAAAAAG"
+    "EcXVpY4IjKYlzZWNwMjU2azGhA8pjTK4NSay0Adikxrb-jFW3DRFb9AB2nMFADzJY"
+    "zTE4iHN5bmNuZXRzCoN1ZHCCdl8"
+)
+"""Constructed ENR with eth2 data, attestation subnets, sync subnets, IPv6, and QUIC."""
+
+ENR_MINIMAL = (
+    "enr:-HW4QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgmlkgnY0iXNlY3AyNTZrMaEDymNMrg1JrL"
+    "QB2KTGtv6MVbcNEVv0AHacwUAPMljNMTg"
+)
+"""Minimal ENR with seq=0 and only required keys."""
 
 
 # --- ENR ---
 
 
 def test_enr_official_eip778(networking_codec: NetworkingCodecTestFiller) -> None:
-    """Official EIP-778 test vector. Verifies text/RLP roundtrip and all properties."""
+    """Official EIP-778 vector. Exercises node_id, ip4, udp_port, multiaddr, signature."""
     networking_codec(codec_name="enr", input={"enrString": OFFICIAL_ENR})
+
+
+def test_enr_with_extensions(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with eth2 data, attestation subnets, sync subnets, IPv6, and QUIC port."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_WITH_EXTENSIONS})
+
+
+def test_enr_minimal_seq_zero(networking_codec: NetworkingCodecTestFiller) -> None:
+    """Minimal ENR with seq=0. Only required keys (id + secp256k1)."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_MINIMAL})
 
 
 # --- PeerId ---
@@ -47,7 +73,7 @@ def test_peer_id_secp256k1(networking_codec: NetworkingCodecTestFiller) -> None:
 
 
 def test_peer_id_ecdsa(networking_codec: NetworkingCodecTestFiller) -> None:
-    """ECDSA PeerId from libp2p spec. 91-byte key, crosses 42-byte threshold, SHA256 multihash."""
+    """ECDSA PeerId from libp2p spec. 91-byte key, SHA256 multihash (over 42 bytes)."""
     networking_codec(
         codec_name="peer_id",
         input={
