@@ -497,11 +497,12 @@ def test_attestation_target_walkback_bounded_by_lookback(
 
     Why This Matters
     ----------------
-    The walkback bound prevents validators from always targeting the same
-    old block when the head runs far ahead of safe target.
+    The walkback bound keeps the attestation target conservatively behind
+    head, anchored toward safe target.
 
-    Without the bound, the target would collapse to genesis and the
-    justification frontier would never advance.
+    Without the bound, validators would target blocks too close to head,
+    bypassing the safe target governor and attesting to blocks without
+    sufficient supermajority endorsement.
     """
     lookback = int(JUSTIFICATION_LOOKBACK_SLOTS)
 
