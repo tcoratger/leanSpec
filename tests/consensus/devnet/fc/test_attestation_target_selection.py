@@ -9,6 +9,7 @@ from consensus_testing import (
     StoreChecks,
 )
 
+from lean_spec.subspecs.chain.config import JUSTIFICATION_LOOKBACK_SLOTS
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 
@@ -471,4 +472,57 @@ def test_attestation_target_justifiable_constraint(
             )
         )
 
+    fork_choice_test(steps=steps)
+
+
+def test_attestation_target_walkback_bounded_by_lookback(
+    fork_choice_test: ForkChoiceTestFiller,
+) -> None:
+    """
+    Attestation target walks back at most JUSTIFICATION_LOOKBACK_SLOTS from head.
+
+    Scenario
+    --------
+    Build a long chain (10+ blocks) with no attestations so the safe target
+    stays at genesis. Pick the smallest such head where
+    (head - JUSTIFICATION_LOOKBACK_SLOTS) is justifiable from genesis, so the
+    bounded walk lands cleanly without the secondary justifiability walk
+    altering the result.
+
+    Expected:
+        - Head far ahead of safe target
+        - Safe target at genesis (slot 0)
+        - Attestation target at (head - JUSTIFICATION_LOOKBACK_SLOTS)
+        - NOT at the safe target (slot 0)
+
+    Why This Matters
+    ----------------
+    The walkback bound keeps the attestation target conservatively behind
+    head, anchored toward safe target.
+
+    Without the bound, validators would target blocks too close to head,
+    bypassing the safe target governor and attesting to blocks without
+    sufficient supermajority endorsement.
+    """
+    lookback = int(JUSTIFICATION_LOOKBACK_SLOTS)
+
+    # Smallest "long chain" head where the bounded walk lands on a
+    # justifiable slot, so the secondary justifiability walk is a no-op.
+    head = 10
+    while not Slot(head - lookback).is_justifiable_after(Slot(0)):
+        head += 1
+    head_slot = Slot(head)
+    target_slot = Slot(head - lookback)
+
+    steps = [
+        BlockStep(
+            block=BlockSpec(slot=Slot(s), label=f"block_{s}"),
+            checks=(
+                StoreChecks(head_slot=head_slot, attestation_target_slot=target_slot)
+                if Slot(s) == head_slot
+                else None
+            ),
+        )
+        for s in range(1, head + 1)
+    ]
     fork_choice_test(steps=steps)
