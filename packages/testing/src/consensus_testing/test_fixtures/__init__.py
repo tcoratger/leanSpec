@@ -2,6 +2,7 @@
 
 from .base import BaseConsensusFixture
 from .fork_choice import ForkChoiceTest
+from .gossipsub_handler import GossipsubHandlerTest
 from .networking_codec import NetworkingCodecTest
 from .ssz import SSZTest
 from .state_transition import StateTransitionTest
@@ -14,4 +15,5 @@ __all__ = [
     "VerifySignaturesTest",
     "SSZTest",
     "NetworkingCodecTest",
+    "GossipsubHandlerTest",
 ]
