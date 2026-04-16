@@ -10,6 +10,7 @@ from .test_fixtures import (
     DiscoveryCryptoTest,
     ForkChoiceTest,
     GossipsubHandlerTest,
+    JustifiabilityTest,
     NetworkingCodecTest,
     SlotClockTest,
     SSZTest,
@@ -42,6 +43,7 @@ GossipsubHandlerTestFiller = Type[GossipsubHandlerTest]
 ApiEndpointTestFiller = Type[ApiEndpointTest]
 SlotClockTestFiller = Type[SlotClockTest]
 DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
+JustifiabilityTestFiller = Type[JustifiabilityTest]
 
 __all__ = [
     # Public API
@@ -63,6 +65,7 @@ __all__ = [
     "ApiEndpointTest",
     "SlotClockTest",
     "DiscoveryCryptoTest",
+    "JustifiabilityTest",
     # Test types
     "BaseForkChoiceStep",
     "TickStep",
@@ -84,4 +87,5 @@ __all__ = [
     "ApiEndpointTestFiller",
     "SlotClockTestFiller",
     "DiscoveryCryptoTestFiller",
+    "JustifiabilityTestFiller",
 ]
