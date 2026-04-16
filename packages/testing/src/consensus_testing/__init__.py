@@ -7,6 +7,7 @@ from .genesis import generate_pre_state
 from .test_fixtures import (
     ApiEndpointTest,
     BaseConsensusFixture,
+    DiscoveryCryptoTest,
     ForkChoiceTest,
     GossipsubHandlerTest,
     NetworkingCodecTest,
@@ -38,6 +39,7 @@ SSZTestFiller = Type[SSZTest]
 NetworkingCodecTestFiller = Type[NetworkingCodecTest]
 GossipsubHandlerTestFiller = Type[GossipsubHandlerTest]
 ApiEndpointTestFiller = Type[ApiEndpointTest]
+DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
 
 __all__ = [
     # Public API
@@ -57,6 +59,7 @@ __all__ = [
     "NetworkingCodecTest",
     "GossipsubHandlerTest",
     "ApiEndpointTest",
+    "DiscoveryCryptoTest",
     # Test types
     "BaseForkChoiceStep",
     "TickStep",
@@ -76,4 +79,5 @@ __all__ = [
     "NetworkingCodecTestFiller",
     "GossipsubHandlerTestFiller",
     "ApiEndpointTestFiller",
+    "DiscoveryCryptoTestFiller",
 ]

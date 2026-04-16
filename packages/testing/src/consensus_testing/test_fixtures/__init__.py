@@ -2,6 +2,7 @@
 
 from .api_endpoint import ApiEndpointTest
 from .base import BaseConsensusFixture
+from .discovery_crypto import DiscoveryCryptoTest
 from .fork_choice import ForkChoiceTest
 from .gossipsub_handler import GossipsubHandlerTest
 from .networking_codec import NetworkingCodecTest
@@ -18,4 +19,5 @@ __all__ = [
     "NetworkingCodecTest",
     "GossipsubHandlerTest",
     "ApiEndpointTest",
+    "DiscoveryCryptoTest",
 ]
