@@ -29,6 +29,56 @@ ENR_MINIMAL = (
 )
 """Minimal ENR with seq=0 and only required keys."""
 
+ENR_NO_ETH2 = (
+    "enr:-IS4QDohXCCn6lWtmPJGwLPaUz9uZbIcvDotMiTRS2RpRLLaExazyVAAWYwB"
+    "gZu_w8M-3NHdkIC7dKuyKgxbxV8mr0cBgmlkgnY0gmlwhAoAAAGJc2VjcDI1NmsxoQ"
+    "PKY0yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOIN1ZHCCdl8"
+)
+"""ENR with ip4 + udp but no eth2, attnets, or syncnets keys."""
+
+ENR_ETH2_FAR_FUTURE = (
+    "enr:-Iu4QH9jczrZFmQYFzYOnzvoHr0x_oqo6uiVwYyfW4JqmzieRFUycscJpHoQ"
+    "oAudebpIM0ty96ktM0ZdV0Cb_Xc_oD4BhGV0aDKQEjRWeAAAAAD__________4JpZI"
+    "J2NIlzZWNwMjU2azGhA8pjTK4NSay0Adikxrb-jFW3DRFb9AB2nMFADzJYzTE4"
+)
+"""ENR with eth2 key where next_fork_epoch = 0xFFFFFFFFFFFFFFFF (far future)."""
+
+ENR_ATTNETS_ALL_ZEROS = (
+    "enr:-Ia4QFsi_88hNR5d3KfyPKuHFo9ED0vFol9U3Nwaax848VdNSwaX3URcX3ap"
+    "fTnK88gKRyr76KV948B3NAW4k419194Bh2F0dG5ldHOIAAAAAAAAAACCaWSCdjSJc2"
+    "VjcDI1NmsxoQPKY0yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOA"
+)
+"""ENR with attnets bitfield all zeros (no subscribed subnets)."""
+
+ENR_ATTNETS_ALL_ONES = (
+    "enr:-Ia4QCqe1oTI3hKJukNRiknmVCjHYZaLdgZeUGjS0A3uF1CgbnlM-Meg6FrQ"
+    "L8WOH0pTY0OltuMufXVnqvcPu3Y7xh8Bh2F0dG5ldHOI__________-CaWSCdjSJc2"
+    "VjcDI1NmsxoQPKY0yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOA"
+)
+"""ENR with attnets bitfield all ones (all 64 subnets subscribed)."""
+
+ENR_SYNCNETS_ONLY = (
+    "enr:-H-4QE_YuRp32SAUCRWpLtCZnfsZWnD8SrO0SJE8T3x6XdYJvBKI9eW79Vy9"
+    "AEIjRGL8jLSgCV2BpEJ4-5NQSksSvyEBgmlkgnY0iXNlY3AyNTZrMaEDymNMrg1JrL"
+    "QB2KTGtv6MVbcNEVv0AHacwUAPMljNMTiIc3luY25ldHMK"
+)
+"""ENR with syncnets key (subnets 1, 3) but no eth2 or attnets."""
+
+ENR_IPV6_ONLY = (
+    "enr:-JK4QGjix5Zy3h0NXP7WkXobaBJtkv_bAMf5pkq17EIThF7rSvyRoBA_dQ93_u"
+    "-icZRoK_-vdEy2RM1AKuAKArf2z3UBgmlkgnY0g2lwNpAgAQ24AAAAAAAAAAAAAAAB"
+    "iXNlY3AyNTZrMaEDymNMrg1JrLQB2KTGtv6MVbcNEVv0AHacwUAPMljNMTiEdWRwNo"
+    "IjKQ"
+)
+"""ENR with IPv6 address (2001:db8::1) and udp6 port, no IPv4."""
+
+ENR_HIGH_SEQ = (
+    "enr:-Hm4QIijml7AMdlciWFY1S7qh7egBawTx_IqvFhHI4xQh6jdDEJv9Slx_lVG"
+    "PznU65wh0BzwxMGkbEpzuzO2K7Z_xfSE_____4JpZIJ2NIlzZWNwMjU2azGhA8pjTK"
+    "4NSay0Adikxrb-jFW3DRFb9AB2nMFADzJYzTE4"
+)
+"""ENR with high sequence number (2^32 - 1)."""
+
 
 # --- ENR ---
 
@@ -46,6 +96,41 @@ def test_enr_with_extensions(networking_codec: NetworkingCodecTestFiller) -> Non
 def test_enr_minimal_seq_zero(networking_codec: NetworkingCodecTestFiller) -> None:
     """Minimal ENR with seq=0. Only required keys (id + secp256k1)."""
     networking_codec(codec_name="enr", input={"enrString": ENR_MINIMAL})
+
+
+def test_enr_no_eth2_field(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with ip4 + udp but no eth2, attnets, or syncnets. Verifies absent optional fields."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_NO_ETH2})
+
+
+def test_enr_eth2_far_future_fork(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with eth2 where next_fork_epoch is max uint64 (far future). Verifies large epoch."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_ETH2_FAR_FUTURE})
+
+
+def test_enr_attnets_all_zeros(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with attnets bitfield all zeros. Verifies empty subscribed subnet list."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_ATTNETS_ALL_ZEROS})
+
+
+def test_enr_attnets_all_ones(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with attnets bitfield all ones. Verifies all 64 subnets are subscribed."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_ATTNETS_ALL_ONES})
+
+
+def test_enr_syncnets_only(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with syncnets (subnets 1, 3) but no eth2 or attnets. Verifies independent parsing."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_SYNCNETS_ONLY})
+
+
+def test_enr_ipv6_only(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with IPv6 address (2001:db8::1) and udp6 port, no IPv4."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_IPV6_ONLY})
+
+
+def test_enr_high_seq(networking_codec: NetworkingCodecTestFiller) -> None:
+    """ENR with high sequence number (2^32 - 1). Verifies large seq parsing."""
+    networking_codec(codec_name="enr", input={"enrString": ENR_HIGH_SEQ})
 
 
 # --- PeerId ---
