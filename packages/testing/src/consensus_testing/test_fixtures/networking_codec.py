@@ -18,6 +18,7 @@ from lean_spec.subspecs.networking.discovery.messages import (
     TalkReq,
     TalkResp,
 )
+from lean_spec.subspecs.networking.discovery.routing import log2_distance, xor_distance
 from lean_spec.subspecs.networking.enr.enr import ENR
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 from lean_spec.subspecs.networking.gossipsub.rpc import (
@@ -40,7 +41,7 @@ from lean_spec.subspecs.networking.reqresp.codec import (
     encode_request,
 )
 from lean_spec.subspecs.networking.transport.peer_id import KeyType, PeerId, PublicKeyProto
-from lean_spec.subspecs.networking.types import SeqNumber
+from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
 
 from .base import BaseConsensusFixture
@@ -108,6 +109,10 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_snappy_block()
             case "snappy_frame":
                 output = self._make_snappy_frame()
+            case "xor_distance":
+                output = self._make_xor_distance()
+            case "log2_distance":
+                output = self._make_log2_distance()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
         return self.model_copy(update={"output": output})
@@ -213,6 +218,20 @@ class NetworkingCodecTest(BaseConsensusFixture):
             "framedLength": len(framed),
             "uncompressedLength": len(data),
         }
+
+    def _make_xor_distance(self) -> dict[str, Any]:
+        """Compute XOR distance between two node IDs."""
+        node_a = NodeId(_from_hex(self.input["nodeA"]))
+        node_b = NodeId(_from_hex(self.input["nodeB"]))
+        distance = xor_distance(node_a, node_b)
+        return {"distance": hex(distance)}
+
+    def _make_log2_distance(self) -> dict[str, Any]:
+        """Compute log2 of XOR distance for k-bucket assignment."""
+        node_a = NodeId(_from_hex(self.input["nodeA"]))
+        node_b = NodeId(_from_hex(self.input["nodeB"]))
+        distance = int(log2_distance(node_a, node_b))
+        return {"distance": distance}
 
     def _make_enr(self) -> dict[str, Any]:
         """Parse an ENR string, re-serialize, assert roundtrip, extract properties."""
