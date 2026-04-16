@@ -2,6 +2,7 @@
 
 from typing import Any, ClassVar
 
+from lean_spec.snappy import compress, decompress, frame_compress, frame_decompress
 from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.networking.discovery.codec import decode_message, encode_message
 from lean_spec.subspecs.networking.discovery.messages import (
@@ -103,6 +104,10 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_peer_id()
             case "discv5_message":
                 output = self._make_discv5_message()
+            case "snappy_block":
+                output = self._make_snappy_block()
+            case "snappy_frame":
+                output = self._make_snappy_frame()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
         return self.model_copy(update={"output": output})
@@ -180,6 +185,34 @@ class NetworkingCodecTest(BaseConsensusFixture):
         assert decoded_data == ssz_data, "Response roundtrip produced different bytes"
 
         return {"encoded": _to_hex(encoded)}
+
+    def _make_snappy_block(self) -> dict[str, Any]:
+        """Compress with raw Snappy block format, decompress, assert roundtrip."""
+        data = _from_hex(self.input["data"])
+        compressed = compress(data)
+
+        decompressed = decompress(compressed)
+        assert decompressed == data, "Snappy block roundtrip produced different bytes"
+
+        return {
+            "compressed": _to_hex(compressed),
+            "compressedLength": len(compressed),
+            "uncompressedLength": len(data),
+        }
+
+    def _make_snappy_frame(self) -> dict[str, Any]:
+        """Compress with Snappy framing format (Ethereum wire format), decompress, roundtrip."""
+        data = _from_hex(self.input["data"])
+        framed = frame_compress(data)
+
+        decompressed = frame_decompress(framed)
+        assert decompressed == data, "Snappy frame roundtrip produced different bytes"
+
+        return {
+            "framed": _to_hex(framed),
+            "framedLength": len(framed),
+            "uncompressedLength": len(data),
+        }
 
     def _make_enr(self) -> dict[str, Any]:
         """Parse an ENR string, re-serialize, assert roundtrip, extract properties."""
