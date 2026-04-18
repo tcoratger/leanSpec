@@ -20,7 +20,7 @@ from lean_spec.subspecs.xmss.types import (
 )
 from lean_spec.types import Boolean, ByteListMiB, Bytes32, Uint64
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 # --- Helper functions ---

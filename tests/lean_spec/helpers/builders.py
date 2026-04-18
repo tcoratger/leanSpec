@@ -11,6 +11,7 @@ from typing import Callable, NamedTuple, cast
 
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.forks.devnet4 import AttestationSignatureEntry, State, Store
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.containers import (
     AttestationData,
@@ -19,7 +20,6 @@ from lean_spec.subspecs.containers import (
     Checkpoint,
     SignedAttestation,
     SignedBlock,
-    State,
     Validator,
 )
 from lean_spec.subspecs.containers.attestation import (
@@ -31,7 +31,6 @@ from lean_spec.subspecs.containers.block.types import AggregatedAttestations, At
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice import AttestationSignatureEntry, Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo

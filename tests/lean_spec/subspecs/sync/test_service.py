@@ -9,6 +9,7 @@ from typing import cast
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.forks.devnet4.store import Store
 from lean_spec.subspecs.containers import (
     SignedAggregatedAttestation,
     SignedBlock,
@@ -16,7 +17,6 @@ from lean_spec.subspecs.containers import (
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.ssz.hash import hash_tree_root

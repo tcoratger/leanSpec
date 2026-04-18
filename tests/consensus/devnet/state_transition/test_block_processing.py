@@ -13,7 +13,7 @@ from lean_spec.subspecs.containers.state.types import JustifiedSlots
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Boolean, Bytes32
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 def test_process_first_block_after_genesis(

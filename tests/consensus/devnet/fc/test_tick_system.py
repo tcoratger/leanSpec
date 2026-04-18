@@ -16,7 +16,7 @@ from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Uint64
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 def test_tick_interval_progression_through_full_slot(

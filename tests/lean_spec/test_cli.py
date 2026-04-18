@@ -20,6 +20,7 @@ from lean_spec.__main__ import (
     create_anchor_block,
     resolve_bootnode,
 )
+from lean_spec.forks.devnet4.spec import Devnet4Spec
 from lean_spec.subspecs.containers import Block, BlockBody
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
@@ -340,6 +341,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
+                fork=Devnet4Spec(),
             )
 
         # Returns None due to genesis time mismatch
@@ -374,6 +376,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
+                fork=Devnet4Spec(),
             )
 
         # Assert
@@ -401,6 +404,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
+                fork=Devnet4Spec(),
             )
 
         # Assert
@@ -432,6 +436,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
+                fork=Devnet4Spec(),
             )
 
         assert result is not None
@@ -462,6 +467,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
+                fork=Devnet4Spec(),
             )
 
         # Assert

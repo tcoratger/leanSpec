@@ -11,7 +11,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Protocol
 
-from lean_spec.subspecs.containers import Block, Checkpoint, State
+from lean_spec.forks import State
+from lean_spec.subspecs.containers import Block, Checkpoint
 from lean_spec.subspecs.containers.attestation import AttestationData
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex

@@ -16,7 +16,7 @@ from consensus_testing import (
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 def test_equivocating_proposer_two_blocks_at_same_slot(

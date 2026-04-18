@@ -23,7 +23,6 @@ from lean_spec.subspecs.containers import (
     Config,
     SignedAttestation,
     SignedBlock,
-    State,
     ValidatorIndex,
 )
 from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
@@ -45,6 +44,8 @@ from lean_spec.types import (
     Uint64,
 )
 from lean_spec.types.base import StrictBaseModel
+
+from .state import State
 
 
 class AttestationSignatureEntry(NamedTuple):

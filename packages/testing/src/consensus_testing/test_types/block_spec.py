@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from lean_spec.forks.devnet4.state import State
+from lean_spec.forks.devnet4.store import Store
 from lean_spec.subspecs.containers.attestation import (
     AggregatedAttestation,
     Attestation,
@@ -21,9 +23,7 @@ from lean_spec.subspecs.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state.state import State
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature

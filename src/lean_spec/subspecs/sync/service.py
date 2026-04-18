@@ -42,6 +42,7 @@ import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 
+from lean_spec.forks import Store
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.containers import (
     Block,
@@ -51,7 +52,6 @@ from lean_spec.subspecs.containers import (
 )
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import SubnetId
-from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId

@@ -3,11 +3,11 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from lean_spec.forks.devnet4 import Store
+from lean_spec.forks.devnet4.state import State
 from lean_spec.subspecs.containers import BlockBody, Slot, ValidatorIndex
 from lean_spec.subspecs.containers.block import Block
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.state import State
-from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 

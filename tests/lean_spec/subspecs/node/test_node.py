@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.forks.devnet4 import State
+from lean_spec.forks.devnet4.spec import Devnet4Spec
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import (
     ATTESTATION_COMMITTEE_COUNT,
@@ -20,7 +22,6 @@ from lean_spec.subspecs.chain.config import (
 from lean_spec.subspecs.containers import (
     Block,
     BlockBody,
-    State,
 )
 from lean_spec.subspecs.containers.block import BlockHeader
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
@@ -82,7 +83,7 @@ def _make_populated_db(
         justifications_validators=JustificationValidators(data=[]),
     )
 
-    db = SQLiteDatabase(":memory:")
+    db = SQLiteDatabase(":memory:", State)
     db.put_block(block, head_root)
     db.put_state(state, head_root)
     db.put_head_root(head_root)
@@ -115,6 +116,7 @@ def node_config() -> NodeConfig:
         validators=make_validators(3),
         event_source=MockEventSource(),
         network=MockNetworkRequester(),
+        fork=Devnet4Spec(),
         time_fn=lambda: 1704067200.0,
     )
 

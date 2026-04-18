@@ -6,10 +6,10 @@ from typing import ClassVar
 
 from pydantic import Field
 
+from lean_spec.forks.devnet4.state import State
 from lean_spec.subspecs.containers.block import (
     SignedBlock,
 )
-from lean_spec.subspecs.containers.state.state import State
 
 from ..keys import XmssKeyManager
 from ..test_types import BlockSpec

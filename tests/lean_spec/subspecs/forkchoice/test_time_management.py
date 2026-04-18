@@ -3,6 +3,7 @@
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from lean_spec.forks.devnet4 import State, Store
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
@@ -10,11 +11,10 @@ from lean_spec.subspecs.chain.config import (
     MILLISECONDS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
-from lean_spec.subspecs.containers import Block, State
+from lean_spec.subspecs.containers import Block
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
-from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_empty_block_body

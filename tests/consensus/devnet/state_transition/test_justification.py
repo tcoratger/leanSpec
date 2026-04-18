@@ -18,7 +18,7 @@ from lean_spec.subspecs.containers.state.types import (
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import ZERO_HASH, Boolean, Bytes32
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 def test_supermajority_attestations_justify_block(

@@ -11,7 +11,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
 )
 from lean_spec.types import Bytes32
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 # --- Status ---

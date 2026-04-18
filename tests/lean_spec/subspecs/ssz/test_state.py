@@ -1,6 +1,4 @@
-from lean_spec.subspecs.containers import (
-    State,
-)
+from lean_spec.forks.devnet4 import State
 from lean_spec.subspecs.containers.block.block import (
     BlockHeader,
 )

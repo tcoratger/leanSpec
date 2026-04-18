@@ -25,7 +25,7 @@ from lean_spec.subspecs.chain.config import (
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 def test_block_builder_fixed_point_advances_justification(

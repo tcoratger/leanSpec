@@ -5,6 +5,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 from collections.abc import Set as AbstractSet
 
+from lean_spec.subspecs.chain.config import MAX_ATTESTATIONS_DATA
+from lean_spec.subspecs.containers.attestation import AggregatedAttestation, AttestationData
+from lean_spec.subspecs.containers.block import Block, BlockBody, BlockHeader
+from lean_spec.subspecs.containers.block.types import AggregatedAttestations
+from lean_spec.subspecs.containers.checkpoint import Checkpoint
+from lean_spec.subspecs.containers.config import Config
+from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.subspecs.containers.state.types import (
+    HistoricalBlockHashes,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
+)
+from lean_spec.subspecs.containers.validator import ValidatorIndex, Validators
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import (
@@ -14,21 +28,6 @@ from lean_spec.types import (
     Container,
     Uint8,
     Uint64,
-)
-
-from ...chain.config import MAX_ATTESTATIONS_DATA
-from ..attestation import AggregatedAttestation, AttestationData
-from ..block import Block, BlockBody, BlockHeader
-from ..block.types import AggregatedAttestations
-from ..checkpoint import Checkpoint
-from ..config import Config
-from ..slot import Slot
-from ..validator import ValidatorIndex, Validators
-from .types import (
-    HistoricalBlockHashes,
-    JustificationRoots,
-    JustificationValidators,
-    JustifiedSlots,
 )
 
 

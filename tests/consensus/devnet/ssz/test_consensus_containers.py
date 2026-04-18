@@ -4,6 +4,7 @@ import pytest
 from consensus_testing import SSZTestFiller
 from consensus_testing.keys import create_dummy_signature
 
+from lean_spec.forks.devnet4 import State
 from lean_spec.subspecs.containers import (
     AggregatedAttestation,
     Attestation,
@@ -17,7 +18,6 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     SignedBlock,
     Slot,
-    State,
     Validator,
     ValidatorIndex,
 )
@@ -37,7 +37,7 @@ from lean_spec.subspecs.containers.validator import Validators
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Boolean, ByteListMiB, Bytes32, Bytes52, Uint64
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 # --- Helper functions ---

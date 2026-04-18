@@ -34,13 +34,13 @@ import time
 from pathlib import Path
 from typing import Final
 
+from lean_spec.forks import FORK_SEQUENCE, ForkProtocol, SpecRunner, State
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
-from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint, State
+from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint
 from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import SubnetId
-from lean_spec.subspecs.forkchoice import Store
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
@@ -163,6 +163,7 @@ def create_anchor_block(state: State) -> Block:
 def _init_from_genesis(
     genesis: GenesisConfig,
     event_source: LiveNetworkEventSource,
+    fork: ForkProtocol,
     validator_registry: ValidatorRegistry | None = None,
     is_aggregator: bool = False,
     aggregate_subnet_ids: tuple[SubnetId, ...] = (),
@@ -174,6 +175,7 @@ def _init_from_genesis(
     Args:
         genesis: Genesis configuration with time and validators.
         event_source: Network transport for the node.
+        fork: Fork specification for state/store construction.
         validator_registry: Optional registry with validator secret keys.
         is_aggregator: Enable aggregator mode for attestation aggregation.
         aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
@@ -198,6 +200,7 @@ def _init_from_genesis(
         validators=genesis.to_validators(),
         event_source=event_source,
         network=event_source.reqresp_client,
+        fork=fork,
         validator_registry=validator_registry,
         fork_digest=GOSSIP_FORK_DIGEST,
         is_aggregator=is_aggregator,
@@ -213,6 +216,7 @@ async def _init_from_checkpoint(
     checkpoint_sync_url: str,
     genesis: GenesisConfig,
     event_source: LiveNetworkEventSource,
+    fork: ForkProtocol,
     validator_registry: ValidatorRegistry | None = None,
     is_aggregator: bool = False,
     aggregate_subnet_ids: tuple[SubnetId, ...] = (),
@@ -242,6 +246,7 @@ async def _init_from_checkpoint(
         checkpoint_sync_url: URL of the node to fetch checkpoint state from.
         genesis: Local genesis configuration for validation.
         event_source: Network transport for the node.
+        fork: Fork specification for state/store construction.
         validator_registry: Optional registry with validator secret keys.
         is_aggregator: Enable aggregator mode for attestation aggregation.
         aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
@@ -253,7 +258,7 @@ async def _init_from_checkpoint(
     """
     try:
         logger.info("Fetching checkpoint state from %s", checkpoint_sync_url)
-        state = await fetch_finalized_state(checkpoint_sync_url, State)
+        state = await fetch_finalized_state(checkpoint_sync_url, fork.state_class)
 
         # Structural validation catches corrupted or malformed states.
         #
@@ -288,7 +293,7 @@ async def _init_from_checkpoint(
         # The store treats this as the new "genesis" for fork choice purposes.
         # All blocks before the checkpoint are effectively pruned.
         validator_id = validator_registry.primary_index() if validator_registry else None
-        store = Store.from_anchor(state, anchor_block, validator_id)
+        store = fork.create_store(state, anchor_block, validator_id)
         logger.info(
             "Initialized from checkpoint at slot %d (finalized=%s)",
             state.slot,
@@ -311,6 +316,7 @@ async def _init_from_checkpoint(
             validators=state.validators,
             event_source=event_source,
             network=event_source.reqresp_client,
+            fork=fork,
             validator_registry=validator_registry,
             fork_digest=GOSSIP_FORK_DIGEST,
             is_aggregator=is_aggregator,
@@ -427,6 +433,9 @@ async def run_node(
             Only effective when is_aggregator is also True.
         api_port: Port for API server (health, fork_choice, /metrics). None or 0 disables.
     """
+    spec_runner = SpecRunner([fork_cls() for fork_cls in FORK_SEQUENCE])
+    fork = spec_runner.current
+
     metrics.init(name="leanspec-node", version="0.0.1")
     logger.info("Loading genesis from %s", genesis_path)
     genesis = GenesisConfig.from_yaml_file(genesis_path)
@@ -566,6 +575,7 @@ async def run_node(
             checkpoint_sync_url=checkpoint_sync_url,
             genesis=genesis,
             event_source=event_source,
+            fork=fork,
             validator_registry=validator_registry,
             is_aggregator=is_aggregator,
             aggregate_subnet_ids=aggregate_subnet_ids,
@@ -581,6 +591,7 @@ async def run_node(
         node = _init_from_genesis(
             genesis=genesis,
             event_source=event_source,
+            fork=fork,
             validator_registry=validator_registry,
             is_aggregator=is_aggregator,
             aggregate_subnet_ids=aggregate_subnet_ids,

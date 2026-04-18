@@ -2,7 +2,7 @@
 
 import httpx
 
-from lean_spec.subspecs.containers import State
+from lean_spec.forks.devnet4 import State
 
 
 def get_finalized_state(server_url: str) -> httpx.Response:

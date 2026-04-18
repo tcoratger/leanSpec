@@ -15,7 +15,7 @@ from consensus_testing import (
 
 from lean_spec.subspecs.containers.slot import Slot
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Devnet4")
 
 
 def test_equal_weight_forks_use_lexicographic_tiebreaker(
