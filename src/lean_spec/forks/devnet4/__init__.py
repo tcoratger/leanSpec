@@ -1,6 +1,6 @@
-"""Devnet4 fork — State, Store, and supporting types."""
+"""Devnet4 fork"""
 
-from .state import State
+from .containers.state import State
 from .store import AttestationSignatureEntry, Store
 
 __all__ = ["AttestationSignatureEntry", "State", "Store"]

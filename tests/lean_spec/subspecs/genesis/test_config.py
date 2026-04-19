@@ -8,8 +8,8 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from lean_spec.forks.devnet4.containers.slot import Slot
 from lean_spec.forks.devnet4.spec import Devnet4Spec
-from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.types import Bytes52, SSZValueError, Uint64
 

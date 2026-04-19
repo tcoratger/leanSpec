@@ -8,9 +8,7 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.devnet4 import Store
-from lean_spec.subspecs.chain.clock import SlotClock
-from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
-from lean_spec.subspecs.containers import (
+from lean_spec.forks.devnet4.containers import (
     AttestationData,
     Block,
     SignedAttestation,
@@ -18,7 +16,9 @@ from lean_spec.subspecs.containers import (
     ValidatorIndex,
     ValidatorIndices,
 )
-from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.subspecs.chain.clock import SlotClock
+from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager

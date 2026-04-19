@@ -12,9 +12,9 @@ from consensus_testing import (
 )
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.config import MAX_ATTESTATIONS_DATA
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet4")
 

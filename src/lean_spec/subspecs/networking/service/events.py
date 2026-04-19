@@ -23,8 +23,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lean_spec.subspecs.containers import SignedBlock
-from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
+from lean_spec.forks.devnet4.containers import SignedBlock
+from lean_spec.forks.devnet4.containers.attestation import (
+    SignedAggregatedAttestation,
+    SignedAttestation,
+)
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport import PeerId

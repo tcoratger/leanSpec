@@ -105,9 +105,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import Final, Protocol, Self
 
+from lean_spec.forks.devnet4.containers import SignedBlock
+from lean_spec.forks.devnet4.containers.attestation import (
+    SignedAggregatedAttestation,
+    SignedAttestation,
+)
 from lean_spec.snappy import SnappyDecompressionError, decompress
-from lean_spec.subspecs.containers import SignedBlock
-from lean_spec.subspecs.containers.attestation import SignedAggregatedAttestation, SignedAttestation
 from lean_spec.subspecs.networking.config import (
     GOSSIPSUB_DEFAULT_PROTOCOL_ID,
     GOSSIPSUB_PROTOCOL_ID_V12,

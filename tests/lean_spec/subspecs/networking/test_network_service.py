@@ -6,13 +6,13 @@ from typing import cast
 
 import pytest
 
-from lean_spec.subspecs.containers import (
+from lean_spec.forks.devnet4.containers import (
     AttestationData,
     Checkpoint,
 )
-from lean_spec.subspecs.containers.attestation import SignedAttestation
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.forks.devnet4.containers.attestation import SignedAttestation
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.reqresp.message import Status

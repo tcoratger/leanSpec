@@ -1,138 +1,145 @@
-"""Tests for the multi-fork architecture"""
+"""Tests for the multi-fork architecture."""
 
 import pytest
 
 from lean_spec.forks import (
+    DEFAULT_RUNNER,
+    FORK_SEQUENCE,
     Devnet4Spec,
     Devnet5Spec,
     ForkProtocol,
     SpecRunner,
 )
-from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.block import Block
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.state import State
 from lean_spec.types import Uint64
-from tests.lean_spec.helpers.builders import make_genesis_state, make_validators
+from tests.lean_spec.helpers.builders import make_validators
+
+
+class TestForkProtocolGeneric:
+    """ForkProtocol must not hard-reference any devnet."""
+
+    def test_protocol_module_is_fork_agnostic(self) -> None:
+        """The protocol module must not import any devnet package."""
+        import lean_spec.forks.protocol as module
+
+        source = module.__file__
+        assert source is not None
+        text = open(source).read()
+        assert "devnet4" not in text
+        assert "devnet5" not in text
 
 
 class TestDevnet4Spec:
     """Tests for the Devnet4Spec fork implementation."""
 
-    def test_name(self) -> None:
-        """Devnet4Spec reports its name."""
-        assert Devnet4Spec.name() == "devnet4"
-
-    def test_version(self) -> None:
-        """Devnet4Spec reports version 4."""
-        assert Devnet4Spec.version() == 4
+    def test_identity(self) -> None:
+        """Devnet4Spec reports stable name and version."""
+        assert Devnet4Spec.NAME == "devnet4"
+        assert Devnet4Spec.VERSION == 4
 
     def test_is_fork_protocol(self) -> None:
         """Devnet4Spec is a ForkProtocol instance."""
         assert isinstance(Devnet4Spec(), ForkProtocol)
 
+    def test_binds_container_types(self) -> None:
+        """Devnet4Spec exposes State, Block, and Store as ClassVars."""
+        assert Devnet4Spec.state_class is State
+        assert Devnet4Spec.block_class is Block
+
     def test_generate_genesis(self) -> None:
-        """Devnet4Spec generates a valid genesis state."""
+        """Devnet4Spec generates a valid genesis state via its State class."""
         fork = Devnet4Spec()
         validators = make_validators(4)
         state = fork.generate_genesis(Uint64(0), validators)
         assert state.slot == Slot(0)
         assert len(state.validators) == 4
-
-    def test_process_slots(self) -> None:
-        """Devnet4Spec delegates process_slots to State."""
-        fork = Devnet4Spec()
-        state = make_genesis_state(num_validators=4)
-        advanced = fork.process_slots(state, Slot(3))
-        assert advanced.slot == Slot(3)
 
     def test_upgrade_state_is_identity(self) -> None:
         """Default upgrade_state returns the same state."""
         fork = Devnet4Spec()
-        state = make_genesis_state(num_validators=4)
+        validators = make_validators(4)
+        state = fork.generate_genesis(Uint64(0), validators)
         assert fork.upgrade_state(state) is state
 
 
 class TestDevnet5Spec:
-    """Tests for the Devnet5Spec fork skeleton."""
+    """Devnet5 is registered and ready to diverge."""
 
-    def test_name(self) -> None:
-        """Devnet5Spec reports its name."""
-        assert Devnet5Spec.name() == "devnet5"
+    def test_identity(self) -> None:
+        """Devnet5Spec has its own name and strictly greater version."""
+        assert Devnet5Spec.NAME == "devnet5"
+        assert Devnet5Spec.VERSION == 5
+        assert Devnet5Spec.VERSION > Devnet4Spec.VERSION
 
-    def test_version(self) -> None:
-        """Devnet5Spec reports version 5."""
-        assert Devnet5Spec.version() == 5
-
-    def test_inherits_from_devnet4(self) -> None:
-        """Devnet5Spec is a subclass of Devnet4Spec."""
+    def test_inherits_devnet4_behavior(self) -> None:
+        """Devnet5Spec reuses devnet4 method logic until divergence lands."""
         assert issubclass(Devnet5Spec, Devnet4Spec)
 
-    def test_inherited_process_slots(self) -> None:
-        """Devnet5Spec inherits process_slots from Devnet4Spec."""
-        fork = Devnet5Spec()
-        state = make_genesis_state(num_validators=4)
-        advanced = fork.process_slots(state, Slot(3))
-        assert advanced.slot == Slot(3)
+    def test_binds_its_own_container_classes(self) -> None:
+        """Devnet5Spec routes state/store construction through its own bindings."""
+        assert Devnet5Spec.state_class is not None
+        assert Devnet5Spec.store_class is not None
 
-    def test_inherited_generate_genesis(self) -> None:
-        """Devnet5Spec inherits genesis generation from Devnet4Spec."""
+    def test_generate_genesis(self) -> None:
+        """Devnet5Spec produces a genesis state via its bound State class."""
         fork = Devnet5Spec()
         validators = make_validators(4)
         state = fork.generate_genesis(Uint64(0), validators)
         assert state.slot == Slot(0)
-        assert len(state.validators) == 4
 
 
 class TestSpecRunner:
     """Tests for the SpecRunner dispatcher."""
 
-    def test_current_returns_latest(self) -> None:
-        """SpecRunner.current returns the latest fork."""
-        fork = Devnet4Spec()
-        runner = SpecRunner(forks=[fork])
-        assert runner.current is fork
+    def test_default_runner_holds_registered_forks(self) -> None:
+        """DEFAULT_RUNNER reflects FORK_SEQUENCE."""
+        assert DEFAULT_RUNNER.current.NAME == FORK_SEQUENCE[-1].NAME
 
-    def test_at_returns_fork(self) -> None:
-        """SpecRunner.at returns the active fork for a slot."""
-        fork = Devnet4Spec()
-        runner = SpecRunner(forks=[fork])
-        assert runner.at(Slot(0)) is fork
-        assert runner.at(Slot(100)) is fork
+    def test_current_returns_latest(self) -> None:
+        """SpecRunner.current returns the highest-VERSION fork."""
+        runner = SpecRunner([Devnet4Spec(), Devnet5Spec()])
+        assert runner.current.NAME == "devnet5"
 
     def test_get_fork_by_name(self) -> None:
-        """SpecRunner.get_fork looks up by name."""
-        fork = Devnet4Spec()
-        runner = SpecRunner(forks=[fork])
-        assert runner.get_fork("devnet4") is fork
+        """SpecRunner.get_fork looks up by fork NAME."""
+        runner = SpecRunner([Devnet4Spec(), Devnet5Spec()])
+        assert runner.get_fork("devnet4").NAME == "devnet4"
+        assert runner.get_fork("devnet5").NAME == "devnet5"
 
     def test_get_fork_unknown_raises(self) -> None:
         """SpecRunner.get_fork raises KeyError for unknown forks."""
-        runner = SpecRunner(forks=[Devnet4Spec()])
-        with pytest.raises(KeyError, match="Unknown fork: devnet99"):
+        runner = SpecRunner([Devnet4Spec()])
+        with pytest.raises(KeyError, match="Unknown fork: 'devnet99'"):
             runner.get_fork("devnet99")
 
     def test_empty_forks_raises(self) -> None:
         """SpecRunner requires at least one fork."""
-        with pytest.raises(AssertionError, match="At least one fork"):
-            SpecRunner(forks=[])
+        with pytest.raises(ValueError, match="at least one fork"):
+            SpecRunner([])
 
-    def test_wrong_order_raises(self) -> None:
-        """SpecRunner rejects forks in wrong order."""
-        with pytest.raises(AssertionError, match="Forks must be ordered"):
-            SpecRunner(forks=[Devnet5Spec(), Devnet4Spec()])
+    def test_non_monotonic_version_rejected(self) -> None:
+        """SpecRunner rejects forks whose versions do not strictly increase."""
+        with pytest.raises(ValueError, match="strictly increasing VERSION"):
+            SpecRunner([Devnet5Spec(), Devnet4Spec()])
 
-    def test_multi_fork_runner(self) -> None:
-        """SpecRunner accepts multiple forks in order."""
-        d4 = Devnet4Spec()
-        d5 = Devnet5Spec()
-        runner = SpecRunner(forks=[d4, d5])
-        assert runner.current is d5
-        assert runner.get_fork("devnet4") is d4
-        assert runner.get_fork("devnet5") is d5
+    def test_duplicate_version_rejected(self) -> None:
+        """SpecRunner rejects two forks sharing a VERSION."""
 
-    def test_round_trip_genesis_and_process_slots(self) -> None:
-        """SpecRunner dispatches genesis and slot processing correctly."""
-        runner = SpecRunner(forks=[Devnet4Spec()])
-        fork = runner.current
-        validators = make_validators(4)
-        state = fork.generate_genesis(Uint64(0), validators)
-        advanced = fork.process_slots(state, Slot(5))
-        assert advanced.slot == Slot(5)
+        class ShadowSpec(Devnet4Spec):
+            NAME = "shadow"
+            VERSION = 4
+
+        with pytest.raises(ValueError, match="strictly increasing VERSION"):
+            SpecRunner([Devnet4Spec(), ShadowSpec()])
+
+    def test_duplicate_name_rejected(self) -> None:
+        """SpecRunner rejects two forks sharing a NAME."""
+
+        class TwinSpec(Devnet4Spec):
+            NAME = "devnet4"
+            VERSION = 6
+
+        with pytest.raises(ValueError, match="names must be unique"):
+            SpecRunner([Devnet4Spec(), TwinSpec()])

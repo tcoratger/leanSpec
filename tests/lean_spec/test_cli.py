@@ -20,10 +20,10 @@ from lean_spec.__main__ import (
     create_anchor_block,
     resolve_bootnode,
 )
+from lean_spec.forks.devnet4.containers import Block, BlockBody
+from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
+from lean_spec.forks.devnet4.containers.slot import Slot
 from lean_spec.forks.devnet4.spec import Devnet4Spec
-from lean_spec.subspecs.containers import Block, BlockBody
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.node import Node
 from lean_spec.subspecs.ssz.hash import hash_tree_root

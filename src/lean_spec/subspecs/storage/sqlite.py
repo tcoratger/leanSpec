@@ -24,9 +24,9 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from lean_spec.forks import State
-from lean_spec.subspecs.containers import Block, Checkpoint, ValidatorIndex
-from lean_spec.subspecs.containers.attestation import AttestationData
-from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.forks.devnet4.containers import Block, Checkpoint, ValidatorIndex
+from lean_spec.forks.devnet4.containers.attestation import AttestationData
+from lean_spec.forks.devnet4.containers.slot import Slot
 from lean_spec.types import Bytes32, Uint64
 
 from .exceptions import StorageCorruptionError, StorageReadError, StorageWriteError

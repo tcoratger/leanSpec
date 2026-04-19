@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.containers.block.block import Block, BlockBody, BlockLookup
-from lean_spec.subspecs.containers.block.types import (
+from lean_spec.forks.devnet4.containers.block.block import Block, BlockBody, BlockLookup
+from lean_spec.forks.devnet4.containers.block.types import (
     AggregatedAttestations,
 )
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.types import ZERO_HASH, Bytes32
 
 

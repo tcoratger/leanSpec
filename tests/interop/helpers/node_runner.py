@@ -13,12 +13,12 @@ from dataclasses import dataclass, field
 from typing import cast
 
 from lean_spec.forks.devnet4 import Store
+from lean_spec.forks.devnet4.containers import Checkpoint, Validator
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.state import Validators
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.forks.devnet4.spec import Devnet4Spec
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
-from lean_spec.subspecs.containers import Checkpoint, Validator
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.gossipsub.types import TopicId

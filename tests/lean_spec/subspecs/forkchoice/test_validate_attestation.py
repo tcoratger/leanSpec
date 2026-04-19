@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.forks.devnet4 import Store
-from lean_spec.subspecs.containers import Attestation, AttestationData, Checkpoint
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.forks.devnet4.containers import Attestation, AttestationData, Checkpoint
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 
 

@@ -35,12 +35,12 @@ from pathlib import Path
 from typing import Final
 
 from lean_spec.forks import FORK_SEQUENCE, ForkProtocol, SpecRunner, State
+from lean_spec.forks.devnet4.containers import Block, BlockBody, Checkpoint
+from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import SubnetId
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
-from lean_spec.subspecs.containers import Block, BlockBody, Checkpoint
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
@@ -433,7 +433,7 @@ async def run_node(
             Only effective when is_aggregator is also True.
         api_port: Port for API server (health, fork_choice, /metrics). None or 0 disables.
     """
-    spec_runner = SpecRunner([fork_cls() for fork_cls in FORK_SEQUENCE])
+    spec_runner = SpecRunner(FORK_SEQUENCE)
     fork = spec_runner.current
 
     metrics.init(name="leanspec-node", version="0.0.1")

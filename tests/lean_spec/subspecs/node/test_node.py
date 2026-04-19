@@ -11,6 +11,23 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.devnet4 import State
+from lean_spec.forks.devnet4.containers import (
+    Block,
+    BlockBody,
+)
+from lean_spec.forks.devnet4.containers.block import BlockHeader
+from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
+from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
+from lean_spec.forks.devnet4.containers.config import Config
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.state import Validators
+from lean_spec.forks.devnet4.containers.state.types import (
+    HistoricalBlockHashes,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
+)
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.forks.devnet4.spec import Devnet4Spec
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import (
@@ -19,23 +36,6 @@ from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
-from lean_spec.subspecs.containers import (
-    Block,
-    BlockBody,
-)
-from lean_spec.subspecs.containers.block import BlockHeader
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.checkpoint import Checkpoint
-from lean_spec.subspecs.containers.config import Config
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.state.types import (
-    HistoricalBlockHashes,
-    JustificationRoots,
-    JustificationValidators,
-    JustifiedSlots,
-)
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
 from lean_spec.subspecs.validator import ValidatorRegistry

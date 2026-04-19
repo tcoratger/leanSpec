@@ -13,7 +13,7 @@ from consensus_testing import (
     StoreChecks,
 )
 
-from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.slot import Slot
 
 pytestmark = pytest.mark.valid_until("Devnet4")
 

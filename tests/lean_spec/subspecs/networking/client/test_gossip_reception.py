@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import pytest
 
+from lean_spec.forks.devnet4.containers import SignedBlock
+from lean_spec.forks.devnet4.containers.attestation import SignedAttestation
+from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.snappy import compress, decompress
-from lean_spec.subspecs.containers import SignedBlock
-from lean_spec.subspecs.containers.attestation import SignedAttestation
-from lean_spec.subspecs.containers.checkpoint import Checkpoint
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking.client.event_source import (
     GossipHandler,
     GossipMessageError,

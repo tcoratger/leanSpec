@@ -2,7 +2,8 @@
 
 Each fork class connects the test framework to the spec layer:
 
-- Inherits from the previous fork for ordering (Devnet5 > Devnet4).
+- Inherits from the previous fork so the metaclass ordering (Devnet5 > Devnet4)
+  works via issubclass comparisons.
 - Points to the ForkProtocol implementation via spec_class().
 - Points to the State container via state_class().
 
@@ -10,13 +11,12 @@ Adding a new fork requires three things:
 
 1. A class here that inherits from the previous fork.
 2. spec_class() pointing to the ForkProtocol implementation.
-3. state_class() pointing to the State container (if it changed).
+3. state_class() pointing to the State container (if it changed for this fork).
 """
 
 from framework.forks import BaseFork
 
 from lean_spec.forks.devnet4.spec import Devnet4Spec
-from lean_spec.forks.devnet4.state import State
 from lean_spec.forks.devnet5.spec import Devnet5Spec
 
 
@@ -34,13 +34,13 @@ class Devnet4(BaseFork):
         return Devnet4Spec
 
     @classmethod
-    def state_class(cls) -> type[State]:
+    def state_class(cls) -> type:
         """Return the State container class for this fork."""
-        return State
+        return Devnet4Spec.state_class
 
 
 class Devnet5(Devnet4):
-    """Devnet5 fork — inherits from Devnet4, overrides what changes."""
+    """Devnet5 fork — inherits from Devnet4; override state_class when divergence lands."""
 
     @classmethod
     def name(cls) -> str:
@@ -53,9 +53,6 @@ class Devnet5(Devnet4):
         return Devnet5Spec
 
     @classmethod
-    def state_class(cls) -> type[State]:
-        """Return the State container class for this fork.
-
-        When Devnet5State exists, change this to return Devnet5State.
-        """
-        return State
+    def state_class(cls) -> type:
+        """Return the State container class for this fork."""
+        return Devnet5Spec.state_class

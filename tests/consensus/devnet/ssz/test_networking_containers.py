@@ -3,7 +3,7 @@
 import pytest
 from consensus_testing import SSZTestFiller
 
-from lean_spec.subspecs.containers import Checkpoint, Slot
+from lean_spec.forks.devnet4.containers import Checkpoint, Slot
 from lean_spec.subspecs.networking.reqresp.message import (
     BlocksByRootRequest,
     RequestedBlockRoots,

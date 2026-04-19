@@ -10,13 +10,7 @@ import time
 from collections import defaultdict
 from typing import NamedTuple
 
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import (
-    INTERVALS_PER_SLOT,
-    JUSTIFICATION_LOOKBACK_SLOTS,
-    MAX_ATTESTATIONS_DATA,
-)
-from lean_spec.subspecs.containers import (
+from lean_spec.forks.devnet4.containers import (
     AttestationData,
     Block,
     Checkpoint,
@@ -25,10 +19,16 @@ from lean_spec.subspecs.containers import (
     SignedBlock,
     ValidatorIndex,
 )
-from lean_spec.subspecs.containers.attestation.attestation import SignedAggregatedAttestation
-from lean_spec.subspecs.containers.block import BlockLookup
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndices
+from lean_spec.forks.devnet4.containers.attestation.attestation import SignedAggregatedAttestation
+from lean_spec.forks.devnet4.containers.block import BlockLookup
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndices
+from lean_spec.subspecs.chain.clock import Interval
+from lean_spec.subspecs.chain.config import (
+    INTERVALS_PER_SLOT,
+    JUSTIFICATION_LOOKBACK_SLOTS,
+    MAX_ATTESTATIONS_DATA,
+)
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
@@ -45,7 +45,7 @@ from lean_spec.types import (
 )
 from lean_spec.types.base import StrictBaseModel
 
-from .state import State
+from .containers.state import State
 
 
 class AttestationSignatureEntry(NamedTuple):

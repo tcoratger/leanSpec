@@ -16,14 +16,14 @@ from consensus_testing import (
     TickStep,
 )
 
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
     MAX_ATTESTATIONS_DATA,
     MILLISECONDS_PER_INTERVAL,
     SECONDS_PER_SLOT,
 )
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Devnet4")
 

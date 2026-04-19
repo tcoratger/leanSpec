@@ -20,18 +20,18 @@ from pathlib import Path
 from typing import Final
 
 from lean_spec.forks import ForkProtocol, Store
+from lean_spec.forks.devnet4.containers import Block, BlockBody, SignedBlock
+from lean_spec.forks.devnet4.containers.attestation import SignedAttestation
+from lean_spec.forks.devnet4.containers.block import BlockLookup
+from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.state import Validators
+from lean_spec.forks.devnet4.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.api import AggregatorController, ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.chain.service import ChainService
-from lean_spec.subspecs.containers import Block, BlockBody, SignedBlock
-from lean_spec.subspecs.containers.attestation import SignedAttestation
-from lean_spec.subspecs.containers.block import BlockLookup
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking import NetworkService
 from lean_spec.subspecs.networking.client.event_source import EventSource

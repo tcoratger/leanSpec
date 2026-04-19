@@ -1,9 +1,8 @@
 """Consensus layer pre-state generation."""
 
-from lean_spec.forks.devnet4.state import State
+from lean_spec.forks.devnet4.containers.state import State, Validators
+from lean_spec.forks.devnet4.containers.validator import Validator, ValidatorIndex
 from lean_spec.forks.protocol import ForkProtocol
-from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import Validator, ValidatorIndex
 from lean_spec.types import Bytes52, Uint64
 
 from .keys import XmssKeyManager
@@ -45,7 +44,7 @@ def generate_pre_state(
 
     When a fork is provided, genesis is generated through the fork's
     protocol implementation. This ensures each fork produces its own
-    correct genesis state (e.g. Devnet5 may add new State fields).
+    correct genesis state when a later fork introduces new State fields.
 
     Args:
         genesis_time: The genesis timestamp.

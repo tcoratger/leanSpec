@@ -5,20 +5,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 from collections.abc import Set as AbstractSet
 
-from lean_spec.subspecs.chain.config import MAX_ATTESTATIONS_DATA
-from lean_spec.subspecs.containers.attestation import AggregatedAttestation, AttestationData
-from lean_spec.subspecs.containers.block import Block, BlockBody, BlockHeader
-from lean_spec.subspecs.containers.block.types import AggregatedAttestations
-from lean_spec.subspecs.containers.checkpoint import Checkpoint
-from lean_spec.subspecs.containers.config import Config
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state.types import (
+from lean_spec.forks.devnet4.containers.attestation import AggregatedAttestation, AttestationData
+from lean_spec.forks.devnet4.containers.block import Block, BlockBody, BlockHeader
+from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
+from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
+from lean_spec.forks.devnet4.containers.config import Config
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.subspecs.containers.validator import ValidatorIndex, Validators
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, Validators
+from lean_spec.subspecs.chain.config import MAX_ATTESTATIONS_DATA
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import (

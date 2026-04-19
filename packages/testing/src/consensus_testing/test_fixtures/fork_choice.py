@@ -12,18 +12,17 @@ from typing import ClassVar, Self
 from pydantic import model_validator
 
 from lean_spec.forks.devnet4 import Store
-from lean_spec.forks.devnet4.state import State
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.containers.block import (
+from lean_spec.forks.devnet4.containers.block import (
     Block,
     BlockBody,
 )
-from lean_spec.subspecs.containers.block.types import (
+from lean_spec.forks.devnet4.containers.block.types import (
     AggregatedAttestations,
 )
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.state import Validators
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.state import State, Validators
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Uint64
 

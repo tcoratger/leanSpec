@@ -12,8 +12,8 @@ from consensus_testing import (
     TickStep,
 )
 
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.types import Uint64
 
 pytestmark = pytest.mark.valid_until("Devnet4")

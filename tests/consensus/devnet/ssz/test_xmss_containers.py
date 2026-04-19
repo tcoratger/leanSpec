@@ -4,9 +4,9 @@ import pytest
 from consensus_testing import SSZTestFiller
 from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 
-from lean_spec.subspecs.containers import ValidatorIndex
-from lean_spec.subspecs.containers.attestation import AggregationBits
-from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.forks.devnet4.containers import ValidatorIndex
+from lean_spec.forks.devnet4.containers.attestation import AggregationBits
+from lean_spec.forks.devnet4.containers.slot import Slot
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss import PublicKey
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof

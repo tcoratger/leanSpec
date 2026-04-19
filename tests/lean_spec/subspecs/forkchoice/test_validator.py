@@ -4,8 +4,7 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.devnet4 import AttestationSignatureEntry, Store
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.containers import (
+from lean_spec.forks.devnet4.containers import (
     Attestation,
     AttestationData,
     Block,
@@ -15,8 +14,9 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     ValidatorIndex,
 )
-from lean_spec.subspecs.containers.block import BlockLookup
-from lean_spec.subspecs.containers.slot import Slot
+from lean_spec.forks.devnet4.containers.block import BlockLookup
+from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, Uint64
