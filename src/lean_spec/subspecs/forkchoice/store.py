@@ -516,12 +516,19 @@ class Store(StrictBaseModel):
             time.perf_counter() - state_transition_start
         )
 
-        # Propagate any checkpoint advances from the post-state.
+        # Propagate checkpoint advances from the post-state.
+        #
+        # Keep the checkpoint with the higher slot.
+        # On slot ties, prefer the store's own checkpoint.
+        #
+        # The store's checkpoint is pinned to the anchor block root at init.
+        # The anchor state may hold a pre-anchor root.
+        # On ties the store's view is authoritative.
         latest_justified = max(
-            post_state.latest_justified, self.latest_justified, key=lambda c: c.slot
+            self.latest_justified, post_state.latest_justified, key=lambda c: c.slot
         )
         latest_finalized = max(
-            post_state.latest_finalized, self.latest_finalized, key=lambda c: c.slot
+            self.latest_finalized, post_state.latest_finalized, key=lambda c: c.slot
         )
 
         store = self.model_copy(
