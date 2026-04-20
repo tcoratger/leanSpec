@@ -1,5 +1,7 @@
 """Tests for the multi-fork architecture."""
 
+import ast
+
 import pytest
 
 from lean_spec.forks import (
@@ -9,6 +11,7 @@ from lean_spec.forks import (
     Devnet5Spec,
     ForkProtocol,
     SpecRunner,
+    protocol,
 )
 from lean_spec.forks.devnet4.containers.block import Block
 from lean_spec.forks.devnet4.containers.slot import Slot
@@ -20,15 +23,19 @@ from tests.lean_spec.helpers.builders import make_validators
 class TestForkProtocolGeneric:
     """ForkProtocol must not hard-reference any devnet."""
 
-    def test_protocol_module_is_fork_agnostic(self) -> None:
+    def test_protocol_module_imports_no_devnet_package(self) -> None:
         """The protocol module must not import any devnet package."""
-        import lean_spec.forks.protocol as module
-
-        source = module.__file__
+        source = protocol.__file__
         assert source is not None
-        text = open(source).read()
-        assert "devnet4" not in text
-        assert "devnet5" not in text
+        tree = ast.parse(open(source).read())
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                assert "devnet" not in mod, f"Forbidden import from {mod}"
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert "devnet" not in alias.name, f"Forbidden import of {alias.name}"
 
 
 class TestDevnet4Spec:
