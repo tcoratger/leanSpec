@@ -62,6 +62,10 @@ class VerifySignaturesTest(BaseConsensusFixture):
       the block's proposer_index field. Use this to exercise the
       validator-bounds check that the builder skips because its round-
       robin selection stays within range by construction.
+    - ``{"operation": "clear_first_attestation_bits"}``: Replace the
+      first body attestation with one whose aggregation_bits carry no
+      set bit. Exercises the empty-participants check inside
+      signature verification.
 
     Tampered blocks bypass the builder's structural invariants. The
     resulting fixture pins the exact rejection a client must raise when
@@ -163,5 +167,25 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 update={"proposer_index": ValidatorIndex(int(value))}
             )
             return signed_block.model_copy(update={"block": tampered_block})
+
+        if operation == "clear_first_attestation_bits":
+            from lean_spec.subspecs.containers.attestation import AggregatedAttestation
+            from lean_spec.subspecs.containers.attestation.aggregation_bits import (
+                AggregationBits,
+            )
+            from lean_spec.subspecs.containers.block.types import AggregatedAttestations
+            from lean_spec.types import Boolean
+
+            body = signed_block.block.body
+            original = body.attestations.data
+            if not original:
+                raise ValueError("clear_first_attestation_bits requires at least one attestation")
+            first = original[0]
+            empty_bits = AggregationBits(data=[Boolean(False)] * len(first.aggregation_bits.data))
+            cleared = AggregatedAttestation(aggregation_bits=empty_bits, data=first.data)
+            new_attestations = AggregatedAttestations(data=[cleared, *original[1:]])
+            new_body = body.model_copy(update={"attestations": new_attestations})
+            new_block = signed_block.block.model_copy(update={"body": new_body})
+            return signed_block.model_copy(update={"block": new_block})
 
         raise ValueError(f"Unknown tamper operation: {operation!r}")
