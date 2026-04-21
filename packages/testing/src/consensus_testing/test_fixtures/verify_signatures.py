@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pydantic import Field
 
 from lean_spec.subspecs.containers.block import (
     SignedBlock,
 )
+from lean_spec.subspecs.containers.block.types import AttestationSignatures
 from lean_spec.subspecs.containers.state.state import State
 
 from ..keys import XmssKeyManager
@@ -22,6 +23,11 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
     Generates a complete signed block from the block specification,
     then verifies that signatures pass or fail as expected.
+
+    An optional ``tamper`` hook mutates the built signed block before
+    verification runs. This is the only supported way to exercise
+    signature-verification rejection paths that lie behind structural
+    invariants the block builder normally upholds.
     """
 
     format_name: ClassVar[str] = "verify_signatures_test"
@@ -40,6 +46,22 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
     This defines the block parameters including attestations. The framework will
     build a complete signed block with all necessary signatures.
+    """
+
+    tamper: dict[str, Any] | None = Field(default=None, exclude=True)
+    """
+    Optional post-build mutation applied before verification.
+
+    Supported operations:
+
+    - ``{"operation": "drop_last_signature"}``: Remove the last entry
+      from the block's attestation_signatures list. Produces a signed
+      block whose signature-group count is one less than its
+      attestation count.
+
+    Tampered blocks bypass the builder's structural invariants. The
+    resulting fixture pins the exact rejection a client must raise when
+    receiving such a block from a peer.
     """
 
     signed_block: SignedBlock | None = None
@@ -65,6 +87,12 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
         # Build the signed block
         signed_block = self.block.build_signed_block(self.anchor_state, key_manager)
+
+        # Apply optional post-build tamper before verification runs.
+        # This is the only way to exercise rejection paths the builder would
+        # otherwise prevent by construction.
+        if self.tamper is not None:
+            signed_block = self._apply_tamper(signed_block)
 
         exception_raised: Exception | None = None
 
@@ -95,3 +123,30 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 )
 
         return self
+
+    def _apply_tamper(self, signed_block: SignedBlock) -> SignedBlock:
+        """Apply the configured post-build mutation to a signed block.
+
+        Args:
+            signed_block: The validly built signed block.
+
+        Returns:
+            A new signed block with the requested mutation applied.
+
+        Raises:
+            ValueError: If the operation is unknown or cannot be applied.
+        """
+        assert self.tamper is not None
+        operation = self.tamper.get("operation")
+
+        if operation == "drop_last_signature":
+            original = signed_block.signature.attestation_signatures.data
+            if not original:
+                raise ValueError("drop_last_signature requires at least one attestation signature")
+            truncated = AttestationSignatures(data=list(original[:-1]))
+            tampered_signatures = signed_block.signature.model_copy(
+                update={"attestation_signatures": truncated}
+            )
+            return signed_block.model_copy(update={"signature": tampered_signatures})
+
+        raise ValueError(f"Unknown tamper operation: {operation!r}")
