@@ -58,6 +58,10 @@ class VerifySignaturesTest(BaseConsensusFixture):
       from the block's attestation_signatures list. Produces a signed
       block whose signature-group count is one less than its
       attestation count.
+    - ``{"operation": "set_proposer_index", "value": int}``: Rewrite
+      the block's proposer_index field. Use this to exercise the
+      validator-bounds check that the builder skips because its round-
+      robin selection stays within range by construction.
 
     Tampered blocks bypass the builder's structural invariants. The
     resulting fixture pins the exact rejection a client must raise when
@@ -148,5 +152,16 @@ class VerifySignaturesTest(BaseConsensusFixture):
                 update={"attestation_signatures": truncated}
             )
             return signed_block.model_copy(update={"signature": tampered_signatures})
+
+        if operation == "set_proposer_index":
+            from lean_spec.subspecs.containers.validator import ValidatorIndex
+
+            value = self.tamper.get("value")
+            if value is None:
+                raise ValueError("set_proposer_index requires a value")
+            tampered_block = signed_block.block.model_copy(
+                update={"proposer_index": ValidatorIndex(int(value))}
+            )
+            return signed_block.model_copy(update={"block": tampered_block})
 
         raise ValueError(f"Unknown tamper operation: {operation!r}")
