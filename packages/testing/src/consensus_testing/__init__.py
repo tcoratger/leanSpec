@@ -16,6 +16,7 @@ from .test_fixtures import (
     SSZTest,
     StateTransitionTest,
     VerifySignaturesTest,
+    XmssChainTest,
 )
 from .test_types import (
     AggregatedAttestationCheck,
@@ -44,6 +45,7 @@ ApiEndpointTestFiller = Type[ApiEndpointTest]
 SlotClockTestFiller = Type[SlotClockTest]
 DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
 JustifiabilityTestFiller = Type[JustifiabilityTest]
+XmssChainTestFiller = Type[XmssChainTest]
 
 __all__ = [
     # Public API
@@ -67,6 +69,7 @@ __all__ = [
     "SlotClockTest",
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
+    "XmssChainTest",
     # Test types
     "BaseForkChoiceStep",
     "TickStep",
@@ -89,4 +92,5 @@ __all__ = [
     "SlotClockTestFiller",
     "DiscoveryCryptoTestFiller",
     "JustifiabilityTestFiller",
+    "XmssChainTestFiller",
 ]

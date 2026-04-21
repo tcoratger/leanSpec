@@ -11,6 +11,7 @@ from .slot_clock import SlotClockTest
 from .ssz import SSZTest
 from .state_transition import StateTransitionTest
 from .verify_signatures import VerifySignaturesTest
+from .xmss_chain import XmssChainTest
 
 __all__ = [
     "BaseConsensusFixture",
@@ -24,4 +25,5 @@ __all__ = [
     "SlotClockTest",
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
+    "XmssChainTest",
 ]
