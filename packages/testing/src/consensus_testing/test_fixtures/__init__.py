@@ -10,6 +10,7 @@ from .networking_codec import NetworkingCodecTest
 from .slot_clock import SlotClockTest
 from .ssz import SSZTest
 from .state_transition import StateTransitionTest
+from .tweak_hash import TweakHashTest
 from .verify_signatures import VerifySignaturesTest
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "SlotClockTest",
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
+    "TweakHashTest",
 ]

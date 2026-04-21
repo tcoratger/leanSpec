@@ -15,6 +15,7 @@ from .test_fixtures import (
     SlotClockTest,
     SSZTest,
     StateTransitionTest,
+    TweakHashTest,
     VerifySignaturesTest,
 )
 from .test_types import (
@@ -44,6 +45,7 @@ ApiEndpointTestFiller = Type[ApiEndpointTest]
 SlotClockTestFiller = Type[SlotClockTest]
 DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
 JustifiabilityTestFiller = Type[JustifiabilityTest]
+TweakHashTestFiller = Type[TweakHashTest]
 
 __all__ = [
     # Public API
@@ -67,6 +69,7 @@ __all__ = [
     "SlotClockTest",
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
+    "TweakHashTest",
     # Test types
     "BaseForkChoiceStep",
     "TickStep",
@@ -89,4 +92,5 @@ __all__ = [
     "SlotClockTestFiller",
     "DiscoveryCryptoTestFiller",
     "JustifiabilityTestFiller",
+    "TweakHashTestFiller",
 ]
