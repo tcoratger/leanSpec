@@ -16,6 +16,7 @@ from .test_fixtures import (
     SlotClockTest,
     SSZTest,
     StateTransitionTest,
+    SyncTest,
     VerifySignaturesTest,
 )
 from .test_types import (
@@ -46,6 +47,7 @@ SlotClockTestFiller = Type[SlotClockTest]
 DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
 JustifiabilityTestFiller = Type[JustifiabilityTest]
 PoseidonPermutationTestFiller = Type[PoseidonPermutationTest]
+SyncTestFiller = Type[SyncTest]
 
 __all__ = [
     # Public API
@@ -70,6 +72,7 @@ __all__ = [
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
     "PoseidonPermutationTest",
+    "SyncTest",
     # Test types
     "BaseForkChoiceStep",
     "TickStep",
@@ -93,4 +96,5 @@ __all__ = [
     "DiscoveryCryptoTestFiller",
     "JustifiabilityTestFiller",
     "PoseidonPermutationTestFiller",
+    "SyncTestFiller",
 ]
