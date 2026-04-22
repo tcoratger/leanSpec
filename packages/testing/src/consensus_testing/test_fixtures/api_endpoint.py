@@ -121,6 +121,46 @@ def _aggregator_status_response(_store: Store, fixture: "ApiEndpointTest") -> di
     }
 
 
+def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
+    """Prometheus-format metrics scrape.
+
+    The body of /metrics is dynamic (counters accumulate, timestamps shift)
+    so the fixture pins only the stable contract: status, content-type,
+    and the full list of metric names clients must expose.
+    """
+    from lean_spec.subspecs.metrics.registry import registry as metrics_registry
+
+    # Names enumerated from the leanMetrics spec. Any change to this list
+    # is a cross-client-visible metrics surface change and should be
+    # reflected in the spec first.
+    required_metric_names = [
+        "lean_node_info",
+        "lean_node_start_time_seconds",
+        "lean_head_slot",
+        "lean_current_slot",
+        "lean_safe_target_slot",
+        "lean_fork_choice_block_processing_time_seconds",
+        "lean_attestations_valid_total",
+        "lean_attestations_invalid_total",
+        "lean_attestation_validation_time_seconds",
+        "lean_fork_choice_reorgs_total",
+        "lean_fork_choice_reorg_depth",
+        "lean_latest_justified_slot",
+        "lean_latest_finalized_slot",
+        "lean_state_transition_time_seconds",
+        "lean_validators_count",
+        "lean_connected_peers",
+    ]
+    # Touch the module import so spec refactors that remove the registry
+    # trip the fixture instead of failing silently.
+    assert metrics_registry is not None
+    return {
+        "expected_status_code": 200,
+        "expected_content_type": "text/plain; version=0.0.4; charset=utf-8",
+        "expected_body": {"required_metric_names": required_metric_names},
+    }
+
+
 def _aggregator_toggle_response(_store: Store, fixture: "ApiEndpointTest") -> dict[str, Any]:
     """Expected response after toggling the aggregator role.
 
@@ -152,6 +192,7 @@ _ENDPOINT_HANDLERS: dict[tuple[str, str], EndpointHandler] = {
     ("GET", "/lean/v0/fork_choice"): _fork_choice_response,
     ("GET", "/lean/v0/admin/aggregator"): _aggregator_status_response,
     ("POST", "/lean/v0/admin/aggregator"): _aggregator_toggle_response,
+    ("GET", "/metrics"): _metrics_response,
 }
 """Maps (method, path) tuples to response builders."""
 
