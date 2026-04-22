@@ -6,7 +6,6 @@ The Store tracks all information required for the LMD GHOST forkchoice algorithm
 
 __all__ = ["AttestationSignatureEntry", "Store"]
 
-import time
 from collections import defaultdict
 from typing import NamedTuple
 
@@ -30,7 +29,7 @@ from lean_spec.subspecs.containers.attestation.attestation import SignedAggregat
 from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndices
-from lean_spec.subspecs.metrics import registry as metrics
+from lean_spec.subspecs.observability import observe_on_attestation, observe_on_block
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
@@ -116,7 +115,7 @@ class Store(StrictBaseModel):
     Fork choice will never revert finalized history.
     """
 
-    blocks: BlockLookup = BlockLookup()
+    blocks: BlockLookup = {}
     """
     Mapping from block root to Block objects.
 
@@ -223,7 +222,7 @@ class Store(StrictBaseModel):
             safe_target=anchor_root,
             latest_justified=state.latest_justified.model_copy(update={"root": anchor_root}),
             latest_finalized=state.latest_finalized.model_copy(update={"root": anchor_root}),
-            blocks=BlockLookup({anchor_root: anchor_block}),
+            blocks={anchor_root: anchor_block},
             states={anchor_root: state},
             validator_id=validator_id,
         )
@@ -350,47 +349,48 @@ class Store(StrictBaseModel):
             ValueError: If validator not found in state.
             AssertionError: If signature verification fails.
         """
-        validator_id = signed_attestation.validator_id
-        attestation_data = signed_attestation.data
-        signature = signed_attestation.signature
+        with observe_on_attestation():
+            validator_id = signed_attestation.validator_id
+            attestation_data = signed_attestation.data
+            signature = signed_attestation.signature
 
-        # Validate the attestation first so unknown blocks are rejected cleanly
-        # (instead of raising a raw KeyError when state is missing).
-        self.validate_attestation(attestation_data)
+            # Validate the attestation first so unknown blocks are rejected cleanly
+            # (instead of raising a raw KeyError when state is missing).
+            self.validate_attestation(attestation_data)
 
-        key_state = self.states.get(attestation_data.target.root)
-        assert key_state is not None, (
-            f"No state available to verify attestation signature for target block "
-            f"{attestation_data.target.root.hex()}"
-        )
-        assert validator_id.is_valid(Uint64(len(key_state.validators))), (
-            f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
-        )
-        public_key = key_state.validators[validator_id].get_attestation_pubkey()
-
-        assert scheme.verify(
-            public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
-        ), "Signature verification failed"
-
-        # Store signature and attestation data for later aggregation.
-        # Copy the inner sets so we can add to them without mutating the previous store.
-        new_committee_sigs = {k: set(v) for k, v in self.attestation_signatures.items()}
-
-        # Aggregators store all received gossip signatures.
-        # The p2p layer only delivers attestations from subscribed subnets,
-        # so subnet filtering happens at subscription time, not here.
-        # Non-aggregator nodes validate and drop — they never store gossip signatures.
-        if is_aggregator:
-            new_committee_sigs.setdefault(attestation_data, set()).add(
-                AttestationSignatureEntry(validator_id, signature)
+            key_state = self.states.get(attestation_data.target.root)
+            assert key_state is not None, (
+                f"No state available to verify attestation signature for target block "
+                f"{attestation_data.target.root.hex()}"
             )
+            assert validator_id.is_valid(Uint64(len(key_state.validators))), (
+                f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
+            )
+            public_key = key_state.validators[validator_id].get_attestation_pubkey()
 
-        # Return store with updated signature map and attestation data
-        return self.model_copy(
-            update={
-                "attestation_signatures": new_committee_sigs,
-            }
-        )
+            assert scheme.verify(
+                public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
+            ), "Signature verification failed"
+
+            # Store signature and attestation data for later aggregation.
+            # Copy the inner sets so we can add to them without mutating the previous store.
+            new_committee_sigs = {k: set(v) for k, v in self.attestation_signatures.items()}
+
+            # Aggregators store all received gossip signatures.
+            # The p2p layer only delivers attestations from subscribed subnets,
+            # so subnet filtering happens at subscription time, not here.
+            # Non-aggregator nodes validate and drop — they never store gossip signatures.
+            if is_aggregator:
+                new_committee_sigs.setdefault(attestation_data, set()).add(
+                    AttestationSignatureEntry(validator_id, signature)
+                )
+
+            # Return store with updated signature map and attestation data
+            return self.model_copy(
+                update={
+                    "attestation_signatures": new_committee_sigs,
+                }
+            )
 
     def on_gossip_aggregated_attestation(
         self, signed_attestation: SignedAggregatedAttestation
@@ -486,125 +486,96 @@ class Store(StrictBaseModel):
         Raises:
             AssertionError: If parent block/state not found in store.
         """
-        block = signed_block.block
-        block_root = hash_tree_root(block)
+        with observe_on_block():
+            block = signed_block.block
+            block_root = hash_tree_root(block)
 
-        # Skip duplicate blocks (idempotent operation)
-        if block_root in self.blocks:
-            return self
+            # Skip duplicate blocks (idempotent operation)
+            if block_root in self.blocks:
+                return self
 
-        t0 = time.perf_counter()
-        old_head = self.head
-
-        # Verify parent chain is available
-        #
-        # The parent state must exist before processing this block.
-        # If missing, the node must sync the parent chain first.
-        parent_state = self.states.get(block.parent_root)
-        assert parent_state is not None, (
-            f"Parent state not found (root={block.parent_root.hex()}). "
-            f"Sync parent chain before processing block at slot {block.slot}."
-        )
-
-        # Validate cryptographic signatures
-        valid_signatures = signed_block.verify_signatures(parent_state.validators, scheme)
-
-        # Execute state transition function to compute post-block state
-        state_transition_start = time.perf_counter()
-        post_state = parent_state.state_transition(block, valid_signatures)
-        metrics.lean_state_transition_time_seconds.observe(
-            time.perf_counter() - state_transition_start
-        )
-
-        # Propagate checkpoint advances from the post-state.
-        #
-        # Keep the checkpoint with the higher slot.
-        # On slot ties, prefer the store's own checkpoint.
-        #
-        # The store's checkpoint is pinned to the anchor block root at init.
-        # The anchor state may hold a pre-anchor root.
-        # On ties the store's view is authoritative.
-        latest_justified = max(
-            self.latest_justified, post_state.latest_justified, key=lambda c: c.slot
-        )
-        latest_finalized = max(
-            self.latest_finalized, post_state.latest_finalized, key=lambda c: c.slot
-        )
-
-        store = self.model_copy(
-            update={
-                "blocks": self.blocks | {block_root: block},
-                "states": self.states | {block_root: post_state},
-                "latest_justified": latest_justified,
-                "latest_finalized": latest_finalized,
-            }
-        )
-
-        # Process block body attestations and their signatures
-        # Block attestations go directly to "known" payloads
-        aggregated_attestations = block.body.attestations
-        attestation_signatures = signed_block.signature.attestation_signatures
-
-        assert len(aggregated_attestations) == len(attestation_signatures), (
-            "Attestation signature groups must match aggregated attestations"
-        )
-
-        # Each unique AttestationData must appear at most once per block.
-        att_data_set = {att.data for att in aggregated_attestations}
-        assert len(att_data_set) == len(aggregated_attestations), (
-            "Block contains duplicate AttestationData entries; "
-            "each AttestationData must appear at most once"
-        )
-        assert Uint8(len(att_data_set)) <= MAX_ATTESTATIONS_DATA, (
-            f"Block contains {len(att_data_set)} distinct AttestationData entries; "
-            f"maximum is {MAX_ATTESTATIONS_DATA}"
-        )
-
-        # Copy the aggregated proof map for updates
-        # Shallow-copy the dict and its inner sets to preserve immutability
-        # Block attestations go directly to "known" payloads (like is_from_block=True in the spec)
-        block_proofs: dict[AttestationData, set[AggregatedSignatureProof]] = {
-            k: set(v) for k, v in store.latest_known_aggregated_payloads.items()
-        }
-
-        for att, proof in zip(aggregated_attestations, attestation_signatures, strict=True):
-            block_proofs.setdefault(att.data, set()).add(proof)
-
-        # Update store with new aggregated proofs and attestation data
-        store = store.model_copy(update={"latest_known_aggregated_payloads": block_proofs})
-
-        # Update forkchoice head based on new block and attestations
-        store = store.update_head()
-
-        # Prune stale attestation data when finalization advances
-        if store.latest_finalized.slot > self.latest_finalized.slot:
-            store = store.prune_stale_attestation_data()
-
-        metrics.lean_fork_choice_block_processing_time_seconds.observe(time.perf_counter() - t0)
-        store._record_metrics(old_head)
-
-        return store
-
-    def _record_metrics(self, old_head: Bytes32) -> None:
-        """
-        Publish Prometheus metrics reflecting the current store state.
-
-        Called after every block processing round. Updates:
-
-        - Head and safe-target slot gauges
-        - Justified and finalized slot gauges
-        - Reorg counter and depth histogram (only when the head actually changed)
-        """
-        metrics.lean_head_slot.set(self.blocks[self.head].slot)
-        metrics.lean_safe_target_slot.set(self.blocks[self.safe_target].slot)
-        metrics.lean_latest_justified_slot.set(self.latest_justified.slot)
-        metrics.lean_latest_finalized_slot.set(self.latest_finalized.slot)
-
-        if self.head != old_head:
-            metrics.lean_fork_choice_reorgs_total.inc()
-            metrics.lean_fork_choice_reorg_depth.observe(
-                self.blocks.reorg_depth(old_head, self.head)
+            # Verify parent chain is available
+            #
+            # The parent state must exist before processing this block.
+            # If missing, the node must sync the parent chain first.
+            parent_state = self.states.get(block.parent_root)
+            assert parent_state is not None, (
+                f"Parent state not found (root={block.parent_root.hex()}). "
+                f"Sync parent chain before processing block at slot {block.slot}."
             )
+
+            # Validate cryptographic signatures
+            valid_signatures = signed_block.verify_signatures(parent_state.validators, scheme)
+
+            # Execute state transition function to compute post-block state
+            post_state = parent_state.state_transition(block, valid_signatures)
+
+            # Propagate checkpoint advances from the post-state.
+            #
+            # Keep the checkpoint with the higher slot.
+            # On slot ties, prefer the store's own checkpoint.
+            #
+            # The store's checkpoint is pinned to the anchor block root at init.
+            # The anchor state may hold a pre-anchor root.
+            # On ties the store's view is authoritative.
+            latest_justified = max(
+                self.latest_justified, post_state.latest_justified, key=lambda c: c.slot
+            )
+            latest_finalized = max(
+                self.latest_finalized, post_state.latest_finalized, key=lambda c: c.slot
+            )
+
+            store = self.model_copy(
+                update={
+                    "blocks": self.blocks | {block_root: block},
+                    "states": self.states | {block_root: post_state},
+                    "latest_justified": latest_justified,
+                    "latest_finalized": latest_finalized,
+                }
+            )
+
+            # Process block body attestations and their signatures
+            # Block attestations go directly to "known" payloads
+            aggregated_attestations = block.body.attestations
+            attestation_signatures = signed_block.signature.attestation_signatures
+
+            assert len(aggregated_attestations) == len(attestation_signatures), (
+                "Attestation signature groups must match aggregated attestations"
+            )
+
+            # Each unique AttestationData must appear at most once per block.
+            att_data_set = {att.data for att in aggregated_attestations}
+            assert len(att_data_set) == len(aggregated_attestations), (
+                "Block contains duplicate AttestationData entries; "
+                "each AttestationData must appear at most once"
+            )
+            assert Uint8(len(att_data_set)) <= MAX_ATTESTATIONS_DATA, (
+                f"Block contains {len(att_data_set)} distinct AttestationData entries; "
+                f"maximum is {MAX_ATTESTATIONS_DATA}"
+            )
+
+            # Copy the aggregated proof map for updates
+            # Shallow-copy the dict and its inner sets to preserve immutability
+            # Block attestations go directly to "known" payloads
+            # (like is_from_block=True in the spec)
+            block_proofs: dict[AttestationData, set[AggregatedSignatureProof]] = {
+                k: set(v) for k, v in store.latest_known_aggregated_payloads.items()
+            }
+
+            for att, proof in zip(aggregated_attestations, attestation_signatures, strict=True):
+                block_proofs.setdefault(att.data, set()).add(proof)
+
+            # Update store with new aggregated proofs and attestation data
+            store = store.model_copy(update={"latest_known_aggregated_payloads": block_proofs})
+
+            # Update forkchoice head based on new block and attestations
+            store = store.update_head()
+
+            # Prune stale attestation data when finalization advances
+            if store.latest_finalized.slot > self.latest_finalized.slot:
+                store = store.prune_stale_attestation_data()
+
+            return store
 
     def extract_attestations_from_aggregated_payloads(
         self, aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]]

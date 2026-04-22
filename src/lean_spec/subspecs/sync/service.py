@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 
@@ -49,6 +48,7 @@ from lean_spec.subspecs.containers import (
     SignedAttestation,
     SignedBlock,
 )
+from lean_spec.subspecs.containers.block import BlockLookup
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import SubnetId
 from lean_spec.subspecs.forkchoice.store import Store
@@ -57,6 +57,7 @@ from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database
+from lean_spec.types import ZERO_HASH, Bytes32
 
 from .backfill_sync import BackfillSync, NetworkRequester
 from .block_cache import BlockCache
@@ -68,12 +69,47 @@ from .states import SyncState
 logger = logging.getLogger(__name__)
 
 
+def _ancestor_set(blocks: BlockLookup, head: Bytes32) -> set[Bytes32]:
+    """Walk parent links from head and collect every reachable block root."""
+    seen: set[Bytes32] = set()
+    root = head
+    while root in blocks:
+        seen.add(root)
+        parent = blocks[root].parent_root
+        if parent == ZERO_HASH:
+            break
+        root = parent
+    return seen
+
+
 def default_block_processor(
     store: Store,
     block: SignedBlock,
 ) -> Store:
-    """Default block processor using store block processing."""
-    return store.on_block(block)
+    """
+    Default block processor.
+
+    Wraps the pure spec entry point with caller-side fork-choice telemetry.
+    State transition and block processing timings are emitted by the spec
+    itself through the observer, wired at node startup. Everything else
+    here is derived by diffing pre- and post-stores.
+    """
+    new_store = store.on_block(block)
+
+    metrics.lean_head_slot.set(new_store.blocks[new_store.head].slot)
+    metrics.lean_safe_target_slot.set(new_store.blocks[new_store.safe_target].slot)
+    metrics.lean_latest_justified_slot.set(new_store.latest_justified.slot)
+    metrics.lean_latest_finalized_slot.set(new_store.latest_finalized.slot)
+
+    if new_store.head != store.head:
+        depth = len(
+            _ancestor_set(new_store.blocks, store.head)
+            - _ancestor_set(new_store.blocks, new_store.head)
+        )
+        metrics.lean_fork_choice_reorgs_total.inc()
+        metrics.lean_fork_choice_reorg_depth.observe(depth)
+
+    return new_store
 
 
 async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> None:
@@ -516,13 +552,11 @@ class SyncService:
         # The store validates the signature and updates branch weights.
         # Invalid attestations (bad signature, unknown target) are rejected.
         # Validation failures are logged but don't crash the event loop.
-        t0 = time.perf_counter()
         try:
             self.store = self.store.on_gossip_attestation(
                 signed_attestation=attestation,
                 is_aggregator=is_aggregator_role,
             )
-            metrics.lean_attestation_validation_time_seconds.observe(time.perf_counter() - t0)
             metrics.lean_attestations_valid_total.labels(source="gossip").inc()
             logger.info(
                 "Attestation from peer %s slot=%s validator=%s: validation and signature ok",
