@@ -7,9 +7,11 @@ from .fork_choice import ForkChoiceTest
 from .gossipsub_handler import GossipsubHandlerTest
 from .justifiability import JustifiabilityTest
 from .networking_codec import NetworkingCodecTest
+from .poseidon_permutation import PoseidonPermutationTest
 from .slot_clock import SlotClockTest
 from .ssz import SSZTest
 from .state_transition import StateTransitionTest
+from .sync import SyncTest
 from .verify_signatures import VerifySignaturesTest
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "SlotClockTest",
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
+    "PoseidonPermutationTest",
+    "SyncTest",
 ]

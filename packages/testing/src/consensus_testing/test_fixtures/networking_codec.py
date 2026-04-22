@@ -113,9 +113,78 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_xor_distance()
             case "log2_distance":
                 output = self._make_log2_distance()
+            case "decode_failure":
+                output = self._make_decode_failure()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
         return self.model_copy(update={"output": output})
+
+    def _make_decode_failure(self) -> dict[str, Any]:
+        """Assert that decoding ``input.bytes`` with ``input.decoder`` raises.
+
+        Dispatches to one of the wire-format decoders and confirms that the
+        expected exception (on :attr:`expect_exception`) is raised. Used to
+        generate negative-path test vectors for client decoders.
+
+        The input record carries two fields:
+
+        - ``decoder``: name of the target decoder (``varint``, ``snappy_frame``,
+          ``gossipsub_rpc``, ``reqresp_request``, ``reqresp_response``,
+          ``discv5_message``, ``enr``).
+        - ``bytes``: hex-encoded malformed input.
+
+        Returns:
+            A dict echoing the decoder name along with the error type and
+            message for reproducibility.
+
+        Raises:
+            AssertionError: If the decoder succeeds or raises a mismatched
+                exception type.
+            ValueError: If ``expect_exception`` is unset or the decoder is
+                unknown.
+        """
+        if self.expect_exception is None:
+            raise ValueError("decode_failure codec requires expect_exception to be set")
+
+        decoder_name = self.input["decoder"]
+        raw = _from_hex(self.input["bytes"])
+
+        decoders: dict[str, Any] = {
+            "varint": decode_varint,
+            "snappy_frame": frame_decompress,
+            "snappy_block": decompress,
+            "gossipsub_rpc": RPC.decode,
+            "reqresp_request": decode_request,
+            "reqresp_response": ResponseCode.decode,
+            "discv5_message": decode_message,
+            "enr": ENR.from_rlp,
+        }
+        if decoder_name not in decoders:
+            raise ValueError(f"Unknown decoder for decode_failure: {decoder_name!r}")
+
+        decoder = decoders[decoder_name]
+        exception_raised: Exception | None = None
+        try:
+            decoder(raw)
+        except Exception as exc:
+            exception_raised = exc
+
+        if exception_raised is None:
+            raise AssertionError(
+                f"Expected {self.expect_exception.__name__} from "
+                f"{decoder_name!r} decode, but decode succeeded"
+            )
+        if not isinstance(exception_raised, self.expect_exception):
+            raise AssertionError(
+                f"Expected {self.expect_exception.__name__} but got "
+                f"{type(exception_raised).__name__}: {exception_raised}"
+            )
+
+        return {
+            "decoder": decoder_name,
+            "errorType": type(exception_raised).__name__,
+            "errorMessage": str(exception_raised),
+        }
 
     def _make_varint(self) -> dict[str, Any]:
         """Encode a value as LEB128, decode it back, assert roundtrip."""

@@ -3,7 +3,7 @@
 from typing import Type
 
 from . import forks
-from .genesis import generate_pre_state
+from .genesis import build_anchor, generate_pre_state
 from .test_fixtures import (
     ApiEndpointTest,
     BaseConsensusFixture,
@@ -12,9 +12,11 @@ from .test_fixtures import (
     GossipsubHandlerTest,
     JustifiabilityTest,
     NetworkingCodecTest,
+    PoseidonPermutationTest,
     SlotClockTest,
     SSZTest,
     StateTransitionTest,
+    SyncTest,
     VerifySignaturesTest,
 )
 from .test_types import (
@@ -44,6 +46,8 @@ ApiEndpointTestFiller = Type[ApiEndpointTest]
 SlotClockTestFiller = Type[SlotClockTest]
 DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
 JustifiabilityTestFiller = Type[JustifiabilityTest]
+PoseidonPermutationTestFiller = Type[PoseidonPermutationTest]
+SyncTestFiller = Type[SyncTest]
 
 __all__ = [
     # Public API
@@ -52,6 +56,7 @@ __all__ = [
     "GossipAttestationSpec",
     "BlockSpec",
     "forks",
+    "build_anchor",
     "generate_pre_state",
     # Base types
     # Fixture classes
@@ -66,6 +71,8 @@ __all__ = [
     "SlotClockTest",
     "DiscoveryCryptoTest",
     "JustifiabilityTest",
+    "PoseidonPermutationTest",
+    "SyncTest",
     # Test types
     "BaseForkChoiceStep",
     "TickStep",
@@ -88,4 +95,6 @@ __all__ = [
     "SlotClockTestFiller",
     "DiscoveryCryptoTestFiller",
     "JustifiabilityTestFiller",
+    "PoseidonPermutationTestFiller",
+    "SyncTestFiller",
 ]

@@ -42,12 +42,14 @@ from lean_spec.forks.devnet4.containers.validator import SubnetId
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.genesis import GenesisConfig
+from lean_spec.subspecs.metrics import PrometheusObserver
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.gossipsub import GossipTopic
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.observability import set_observer
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import (
     CheckpointSyncError,
@@ -437,6 +439,7 @@ async def run_node(
     fork = spec_runner.current
 
     metrics.init(name="leanspec-node", version="0.0.1")
+    set_observer(PrometheusObserver())
     logger.info("Loading genesis from %s", genesis_path)
     genesis = GenesisConfig.from_yaml_file(genesis_path)
 

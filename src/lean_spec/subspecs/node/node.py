@@ -22,7 +22,6 @@ from typing import Final
 from lean_spec.forks import ForkProtocol, Store
 from lean_spec.forks.devnet4.containers import Block, BlockBody, SignedBlock
 from lean_spec.forks.devnet4.containers.attestation import SignedAttestation
-from lean_spec.forks.devnet4.containers.block import BlockLookup
 from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
 from lean_spec.forks.devnet4.containers.slot import Slot
 from lean_spec.forks.devnet4.containers.state import Validators
@@ -428,7 +427,7 @@ class Node:
             safe_target=head_root,
             latest_justified=justified,
             latest_finalized=finalized,
-            blocks=BlockLookup({head_root: head_block}),
+            blocks={head_root: head_block},
             states={head_root: head_state},
             validator_id=validator_id,
         )
