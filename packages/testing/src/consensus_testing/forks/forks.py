@@ -1,18 +1,4 @@
-"""Consensus fork definitions for test fixture generation.
-
-Each fork class connects the test framework to the spec layer:
-
-- Inherits from the previous fork so the metaclass ordering (Devnet5 > Devnet4)
-  works via issubclass comparisons.
-- Points to the ForkProtocol implementation via spec_class().
-- Points to the State container via state_class().
-
-Adding a new fork requires three things:
-
-1. A class here that inherits from the previous fork.
-2. spec_class() pointing to the ForkProtocol implementation.
-3. state_class() pointing to the State container (if it changed for this fork).
-"""
+"""Consensus fork definitions for test fixture generation."""
 
 from framework.forks import BaseFork
 
