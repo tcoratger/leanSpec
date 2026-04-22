@@ -11,7 +11,7 @@ from lean_spec.subspecs.forkchoice.store import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 
-from ..genesis import generate_pre_state
+from ..genesis import build_anchor, generate_pre_state
 from .base import BaseConsensusFixture
 
 EndpointHandler = Callable[[Store, "ApiEndpointTest"], dict[str, Any]]
@@ -34,11 +34,31 @@ def _make_genesis_block(state: State) -> Block:
     )
 
 
-def _build_store(num_validators: int, genesis_time: int) -> Store:
-    """Build a deterministic genesis-only store. Same params always produce same roots."""
-    state = generate_pre_state(genesis_time=Uint64(genesis_time), num_validators=num_validators)
-    block = _make_genesis_block(state)
-    # No validator identity — fixture only reads store data, never signs.
+def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -> Store:
+    """Build a deterministic store rooted at genesis or at an advanced anchor.
+
+    At anchor_slot 0 the store is genesis-only. At higher slots the store
+    is seeded with a real (state, block) pair produced by advancing an
+    empty chain through anchor_slot; the store then carries non-empty
+    historical block hashes but leaves justification and finalization at
+    genesis (no attestations are injected). This is enough to exercise
+    endpoint responses whose shape depends on post-genesis slot numbers,
+    historical roots, and multi-node fork-choice trees.
+    """
+    if anchor_slot == 0:
+        state = generate_pre_state(genesis_time=Uint64(genesis_time), num_validators=num_validators)
+        block = _make_genesis_block(state)
+        # No validator identity — fixture only reads store data, never signs.
+        return Store.from_anchor(state, block, validator_id=None)
+
+    # Walk the chain from genesis through anchor_slot using empty blocks.
+    # The returned pair (state, block) is internally consistent with the
+    # historical chain the fixture wants to present to the endpoint.
+    state, block = build_anchor(
+        num_validators=num_validators,
+        anchor_slot=Slot(anchor_slot),
+        genesis_time=Uint64(genesis_time),
+    )
     return Store.from_anchor(state, block, validator_id=None)
 
 
@@ -173,7 +193,13 @@ class ApiEndpointTest(BaseConsensusFixture):
     """HTTP method under test. Defaults to GET for read-only endpoints."""
 
     genesis_params: dict[str, int]
-    """Genesis store inputs: numValidators and genesisTime."""
+    """Genesis store inputs.
+
+    - numValidators: validator-set size (defaults to 4 when absent).
+    - genesisTime: unix genesis timestamp (defaults to 0 when absent).
+    - anchorSlot: optional post-genesis slot to advance the chain to
+      before building the store. Defaults to 0 (genesis-only).
+    """
 
     request_body: Any = None
     """Optional request body for non-GET methods. JSON-serializable.
@@ -208,5 +234,6 @@ class ApiEndpointTest(BaseConsensusFixture):
         store = _build_store(
             num_validators=self.genesis_params.get("numValidators", 4),
             genesis_time=self.genesis_params.get("genesisTime", 0),
+            anchor_slot=self.genesis_params.get("anchorSlot", 0),
         )
         return self.model_copy(update=handler(store, self))
