@@ -113,6 +113,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_reqresp_request()
             case "reqresp_response":
                 output = self._make_reqresp_response()
+            case "reqresp_response_stream":
+                output = self._make_reqresp_response_stream()
             case "enr":
                 output = self._make_enr()
             case "peer_id":
@@ -295,6 +297,38 @@ class NetworkingCodecTest(BaseConsensusFixture):
         assert decoded_data == ssz_data, "Response roundtrip produced different bytes"
 
         return {"encoded": _to_hex(encoded)}
+
+    def _make_reqresp_response_stream(self) -> dict[str, Any]:
+        """Encode a sequence of response chunks as a concatenated stream.
+
+        Multi-chunk responses (for example BlocksByRoot returning N blocks)
+        send their chunks back-to-back on a single libp2p stream: each
+        chunk is its own [code][varint][snappy_frame] triple, and the
+        receiver reads them in order until EOF.
+
+        Input keys:
+
+        - ``chunks``: ordered list of ``{"responseCode": int, "sszData": hex}``.
+          Each entry is encoded independently with ResponseCode.encode
+          and the resulting bytes are concatenated.
+
+        Output:
+
+        - ``encoded``: concatenated stream hex. Clients reproduce the
+          same bytes and their multi-chunk reader must yield the same
+          sequence of (code, ssz_data) records.
+        - ``chunkCount``: number of chunks in the stream.
+        """
+        raw_chunks = self.input["chunks"]
+        buffer = bytearray()
+        for entry in raw_chunks:
+            code = ResponseCode(entry["responseCode"])
+            ssz_data = _from_hex(entry["sszData"])
+            buffer.extend(code.encode(ssz_data))
+        return {
+            "encoded": _to_hex(bytes(buffer)),
+            "chunkCount": len(raw_chunks),
+        }
 
     def _make_snappy_block(self) -> dict[str, Any]:
         """Compress with raw Snappy block format, decompress, assert roundtrip."""
