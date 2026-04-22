@@ -219,7 +219,13 @@ class NetworkingCodecTest(BaseConsensusFixture):
         return {"encoded": _to_hex(encoded), "byteLength": byte_length}
 
     def _make_gossip_topic(self) -> dict[str, Any]:
-        """Build a topic string from components, parse it back, assert roundtrip."""
+        """Build a topic string from components, parse it back, assert roundtrip.
+
+        When the input carries ``expectedForkDigest``, also run validate_fork
+        against the parsed topic and report whether the fork digest matched.
+        This pins the accept / reject branches clients must agree on when
+        deciding which mesh to admit a topic into.
+        """
         kind = TopicKind(self.input["kind"])
         fork_digest = self.input["forkDigest"]
         raw_subnet = self.input.get("subnetId")
@@ -232,7 +238,17 @@ class NetworkingCodecTest(BaseConsensusFixture):
         parsed = GossipTopic.from_string(topic_string)
         assert parsed == topic, f"Topic roundtrip: {topic} -> {topic_string!r} -> {parsed}"
 
-        return {"topicString": topic_string}
+        output: dict[str, Any] = {"topicString": topic_string}
+
+        expected_fork_digest = self.input.get("expectedForkDigest")
+        if expected_fork_digest is not None:
+            try:
+                parsed.validate_fork(expected_fork_digest)
+                output["forkValid"] = True
+            except ValueError:
+                output["forkValid"] = False
+
+        return output
 
     def _make_gossip_message_id(self) -> dict[str, Any]:
         """Compute a 20-byte gossipsub message ID from topic, data, and domain."""
