@@ -945,7 +945,7 @@ class GossipsubBehavior:
         """Process incoming RPCs from a peer for the lifetime of the connection.
 
         Each RPC is length-prefixed with a varint, matching the libp2p
-        framing convention: ``[varint length][RPC payload] ...``
+        framing convention: `[varint length][RPC payload] ...`
 
         On disconnect or stream error, the peer is cleaned up automatically.
         Corrupted data clears the buffer to prevent cascading parse failures.

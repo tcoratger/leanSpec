@@ -20,7 +20,7 @@ class SyncTest(BaseConsensusFixture):
 
     Currently supports one operation:
 
-    - ``verify_checkpoint``: emits the SSZ-encoded anchor state plus the
+    - `verify_checkpoint`: emits the SSZ-encoded anchor state plus the
       verification verdict a client must produce.
 
     JSON output: operation, input, output.
@@ -58,19 +58,19 @@ class SyncTest(BaseConsensusFixture):
 
         Input keys:
 
-        - ``numValidators``: number of validators in the state.
-        - ``anchorSlot``: optional slot to advance the chain through before
+        - `numValidators`: number of validators in the state.
+        - `anchorSlot`: optional slot to advance the chain through before
           verifying. Zero (default) yields a genesis state; positive values
           walk an empty-block chain through the slot so historical_block_hashes
           reflects a real advanced anchor.
 
         Output:
 
-        - ``valid``: result of verify_checkpoint_state on the built state.
-        - ``stateBytes``: SSZ-encoded state hex, so clients can deserialize
+        - `valid`: result of verify_checkpoint_state on the built state.
+        - `stateBytes`: SSZ-encoded state hex, so clients can deserialize
           and run their own verify_checkpoint_state.
-        - ``validatorCount``: echoed for diagnostic clarity.
-        - ``anchorSlot``: echoed so consumers see exactly which state was verified.
+        - `validatorCount`: echoed for diagnostic clarity.
+        - `anchorSlot`: echoed so consumers see exactly which state was verified.
         """
         num_validators = int(self.input["numValidators"])
         anchor_slot = int(self.input.get("anchorSlot", 0))

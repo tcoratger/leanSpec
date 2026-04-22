@@ -41,7 +41,7 @@ async def node_cluster(
     """
     Provide a node cluster with automatic cleanup.
 
-    Validator count is configurable via the ``num_validators`` marker.
+    Validator count is configurable via the `num_validators` marker.
     Default: 3 validators.
     """
     marker = request.node.get_closest_marker("num_validators")
