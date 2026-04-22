@@ -309,7 +309,7 @@ def get_metrics_output(registry: CollectorRegistry | None = None) -> bytes:
     """
     Serialize all registered metrics into Prometheus text exposition format.
 
-    Typically called by an HTTP handler to serve the ``/metrics`` endpoint.
+    Typically called by an HTTP handler to serve the `/metrics` endpoint.
     The output is ready to return as a response body.
 
     Args:

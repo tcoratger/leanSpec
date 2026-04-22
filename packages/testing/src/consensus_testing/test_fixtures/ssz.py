@@ -18,12 +18,12 @@ class SSZTest(BaseConsensusFixture):
 
     Supports two modes:
 
-    - Roundtrip mode (default): encode ``value``, decode back, verify equality
-      and compute ``hash_tree_root``. JSON output: typeName, value, serialized, root.
-    - Decode-failure mode: when ``expect_exception`` is set, ``raw_bytes`` holds
-      the malformed input. The fixture decodes the input as ``type(value)`` and
+    - Roundtrip mode (default): encode `value`, decode back, verify equality
+      and compute `hash_tree_root`. JSON output: typeName, value, serialized, root.
+    - Decode-failure mode: when `expect_exception` is set, `raw_bytes` holds
+      the malformed input. The fixture decodes the input as `type(value)` and
       asserts the expected exception is raised. JSON output keeps the same
-      shape; ``serialized`` holds the malformed bytes and ``root`` is empty.
+      shape; `serialized` holds the malformed bytes and `root` is empty.
     """
 
     format_name: ClassVar[str] = "ssz"
@@ -45,8 +45,8 @@ class SSZTest(BaseConsensusFixture):
     """
     Hex-encoded malformed input for decode-failure mode.
 
-    Only consulted when ``expect_exception`` is set. The fixture decodes these
-    bytes using ``type(value).decode_bytes`` and asserts the decoder raises.
+    Only consulted when `expect_exception` is set. The fixture decodes these
+    bytes using `type(value).decode_bytes` and asserts the decoder raises.
     """
 
     serialized: str = ""
@@ -75,11 +75,11 @@ class SSZTest(BaseConsensusFixture):
         """Verify SSZ roundtrip or decode-failure and produce the reference output.
 
         Returns:
-            A copy of this fixture with ``serialized`` and ``root`` populated.
+            A copy of this fixture with `serialized` and `root` populated.
 
         Raises:
             AssertionError:
-                - In roundtrip mode, if ``decode(encode(value)) != value``.
+                - In roundtrip mode, if `decode(encode(value)) != value`.
                 - In decode-failure mode, if the decoder does not raise the
                   expected exception type.
         """
@@ -106,14 +106,14 @@ class SSZTest(BaseConsensusFixture):
         )
 
     def _make_decode_failure(self) -> "SSZTest":
-        """Run the decode-failure path: assert decoding ``raw_bytes`` raises.
+        """Run the decode-failure path: assert decoding `raw_bytes` raises.
 
-        The class of ``value`` is used as the decoder. ``serialized`` carries
+        The class of `value` is used as the decoder. `serialized` carries
         the malformed bytes verbatim so consumers can reproduce the input.
 
         Raises:
             AssertionError: If the decoder succeeds or raises a different type.
-            ValueError: If ``raw_bytes`` is missing.
+            ValueError: If `raw_bytes` is missing.
         """
         assert self.expect_exception is not None
         if self.raw_bytes is None:

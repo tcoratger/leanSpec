@@ -138,7 +138,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
         return self.model_copy(update={"output": output})
 
     def _make_decode_failure(self) -> dict[str, Any]:
-        """Assert that decoding ``input.bytes`` with ``input.decoder`` raises.
+        """Assert that decoding `input.bytes` with `input.decoder` raises.
 
         Dispatches to one of the wire-format decoders and confirms that the
         expected exception (on :attr:`expect_exception`) is raised. Used to
@@ -146,10 +146,10 @@ class NetworkingCodecTest(BaseConsensusFixture):
 
         The input record carries two fields:
 
-        - ``decoder``: name of the target decoder (``varint``, ``snappy_frame``,
-          ``gossipsub_rpc``, ``reqresp_request``, ``reqresp_response``,
-          ``discv5_message``, ``enr``).
-        - ``bytes``: hex-encoded malformed input.
+        - `decoder`: name of the target decoder (`varint`, `snappy_frame`,
+          `gossipsub_rpc`, `reqresp_request`, `reqresp_response`,
+          `discv5_message`, `enr`).
+        - `bytes`: hex-encoded malformed input.
 
         Returns:
             A dict echoing the decoder name along with the error type and
@@ -158,7 +158,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
         Raises:
             AssertionError: If the decoder succeeds or raises a mismatched
                 exception type.
-            ValueError: If ``expect_exception`` is unset or the decoder is
+            ValueError: If `expect_exception` is unset or the decoder is
                 unknown.
         """
         if self.expect_exception is None:
@@ -223,7 +223,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
     def _make_gossip_topic(self) -> dict[str, Any]:
         """Build a topic string from components, parse it back, assert roundtrip.
 
-        When the input carries ``expectedForkDigest``, also run validate_fork
+        When the input carries `expectedForkDigest`, also run validate_fork
         against the parsed topic and report whether the fork digest matched.
         This pins the accept / reject branches clients must agree on when
         deciding which mesh to admit a topic into.
@@ -308,16 +308,16 @@ class NetworkingCodecTest(BaseConsensusFixture):
 
         Input keys:
 
-        - ``chunks``: ordered list of ``{"responseCode": int, "sszData": hex}``.
+        - `chunks`: ordered list of `{"responseCode": int, "sszData": hex}`.
           Each entry is encoded independently with ResponseCode.encode
           and the resulting bytes are concatenated.
 
         Output:
 
-        - ``encoded``: concatenated stream hex. Clients reproduce the
+        - `encoded`: concatenated stream hex. Clients reproduce the
           same bytes and their multi-chunk reader must yield the same
           sequence of (code, ssz_data) records.
-        - ``chunkCount``: number of chunks in the stream.
+        - `chunkCount`: number of chunks in the stream.
         """
         raw_chunks = self.input["chunks"]
         buffer = bytearray()
@@ -466,29 +466,29 @@ class NetworkingCodecTest(BaseConsensusFixture):
 
         Input keys (all hex unless noted):
 
-        - ``packetType``: "message", "whoareyou", or "handshake".
-        - ``destNodeId``: 32-byte destination node ID. Masking key
+        - `packetType`: "message", "whoareyou", or "handshake".
+        - `destNodeId`: 32-byte destination node ID. Masking key
           derives from its first 16 bytes; clients also use this as the
           local node id when decoding.
-        - ``nonce``: 12-byte message nonce.
-        - ``maskingIv``: 16-byte header-masking IV, supplied explicitly
+        - `nonce`: 12-byte message nonce.
+        - `maskingIv`: 16-byte header-masking IV, supplied explicitly
           so the produced bytes are deterministic.
-        - ``message``: message payload (empty for WHOAREYOU, otherwise
+        - `message`: message payload (empty for WHOAREYOU, otherwise
           the already-encrypted ciphertext bytes).
-        - ``encryptionKey``: 16-byte AES-GCM key for non-WHOAREYOU.
+        - `encryptionKey`: 16-byte AES-GCM key for non-WHOAREYOU.
 
         Packet-type-specific input keys:
 
-        - message: ``srcId``.
-        - whoareyou: ``idNonce``, ``enrSeq`` (uint64 integer).
-        - handshake: ``srcId``, ``idSignature``, ``ephPubkey``, optional
-          ``record`` (RLP-encoded ENR).
+        - message: `srcId`.
+        - whoareyou: `idNonce`, `enrSeq` (uint64 integer).
+        - handshake: `srcId`, `idSignature`, `ephPubkey`, optional
+          `record` (RLP-encoded ENR).
 
         Output:
 
-        - ``encoded``: full packet hex.
-        - ``flag``: numeric flag (0/1/2) recovered via decode.
-        - ``authdataSize``: size of authdata in bytes.
+        - `encoded`: full packet hex.
+        - `flag`: numeric flag (0/1/2) recovered via decode.
+        - `authdataSize`: size of authdata in bytes.
         """
         packet_type = self.input["packetType"]
         dest_node_id = NodeId(_from_hex(self.input["destNodeId"]))

@@ -13,9 +13,9 @@ def test_varint_truncated_mid_stream_rejected(
 ) -> None:
     """A varint whose final byte still has the continuation bit set is rejected.
 
-    Two bytes (``0x80 0x80``) each carry the continuation bit but there are no
+    Two bytes (`0x80 0x80`) each carry the continuation bit but there are no
     further bytes to complete the value. The decoder must raise
-    ``VarintError("Truncated varint")``.
+    `VarintError("Truncated varint")`.
     """
     networking_codec(
         codec_name="decode_failure",
@@ -31,7 +31,7 @@ def test_varint_longer_than_ten_bytes_rejected(
 
     A uint64 fits in at most ten varint bytes (70 bits with 6 unused). Eleven
     continuation bytes means the decoder cannot represent the value and must
-    raise ``VarintError("Varint too long")``.
+    raise `VarintError("Varint too long")`.
     """
     networking_codec(
         codec_name="decode_failure",

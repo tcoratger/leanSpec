@@ -103,8 +103,8 @@ class MockForkchoiceStore:
     forkchoice logic. Methods return self so the SyncService can assign
     the result back (matching the real Store's immutable-update pattern).
 
-    Optional ``reject_*`` predicates return True to simulate validation
-    failure (``KeyError``), e.g. unknown attestation target.
+    Optional `reject_*` predicates return True to simulate validation
+    failure (`KeyError`), e.g. unknown attestation target.
     """
 
     def __init__(self, head_slot: int = 0) -> None:
@@ -186,7 +186,7 @@ class RecordingSyncDatabase:
         )
 
     def calls_inside_batch(self) -> list[RecordedCall]:
-        """Calls between the first ``batch_write_enter`` and matching ``batch_write_exit``."""
+        """Calls between the first `batch_write_enter` and matching `batch_write_exit`."""
         collected: list[RecordedCall] = []
         in_batch = False
         for call in self.calls:
