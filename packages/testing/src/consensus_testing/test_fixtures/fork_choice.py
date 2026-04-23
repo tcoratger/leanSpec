@@ -276,9 +276,14 @@ class ForkChoiceTest(BaseConsensusFixture):
 
                         # Process the block through Store.
                         # This validates, applies state transition, and updates the store's head.
+                        #
+                        # trust_proofs mirrors the spec's valid_signature flag.
+                        # True: fresh proof, skip STARK verify.
+                        # False: explicit invalid test, keep verify to reject.
                         store = store.on_block(
                             signed_block,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
+                            trust_proofs=step.block.valid_signature,
                         )
 
                     case AttestationStep():
@@ -306,7 +311,13 @@ class ForkChoiceTest(BaseConsensusFixture):
                             key_manager,
                         )
                         step._filled_attestation = signed_aggregated
-                        store = store.on_gossip_aggregated_attestation(signed_aggregated)
+                        # trust_proof mirrors the spec's valid_signature flag.
+                        # True: fresh proof, skip STARK verify.
+                        # False: explicit invalid test, keep verify to reject.
+                        store = store.on_gossip_aggregated_attestation(
+                            signed_aggregated,
+                            trust_proof=step.attestation.valid_signature,
+                        )
 
                     case _:
                         raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")

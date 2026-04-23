@@ -98,6 +98,8 @@ class SignedBlock(Container):
         self,
         validators: Validators,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
+        *,
+        skip_aggregate_verify: bool = False,
     ) -> bool:
         """
         Verify all XMSS signatures in this signed block.
@@ -110,6 +112,10 @@ class SignedBlock(Container):
         Args:
             validators: Validator registry providing public keys for verification.
             scheme: XMSS signature scheme for verification.
+            skip_aggregate_verify: Skip the STARK aggregate verify when True.
+                Intended for fixture generation on fresh proofs.
+                Structural checks and proposer verify still run.
+                Defaults to False.
 
         Returns:
             True if all signatures are valid.
@@ -137,13 +143,18 @@ class SignedBlock(Container):
             # The aggregation bits encode validator indices as a bitfield.
             validator_ids = aggregated_attestation.aggregation_bits.to_validator_indices()
 
-            # The signed message is the attestation data root.
-            # All validators in this group signed this exact data.
-            attestation_data_root = hash_tree_root(aggregated_attestation.data)
-
             for validator_id in validator_ids:
                 num_validators = Uint64(len(validators))
                 assert validator_id.is_valid(num_validators), "Validator index out of range"
+
+            # Trusted path: caller vouches for this fresh proof.
+            # Structural checks above have already run.
+            if skip_aggregate_verify:
+                continue
+
+            # The signed message is the attestation data root.
+            # All validators in this group signed this exact data.
+            attestation_data_root = hash_tree_root(aggregated_attestation.data)
 
             # Collect attestation public keys for all participating validators.
             # Order matters: must match the order in the aggregated signature.

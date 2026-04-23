@@ -65,6 +65,30 @@ def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyMan
     assert extracted_attestations[ValidatorIndex(2)] == attestation_data
 
 
+def test_on_block_trust_proofs_skips_stark_verify(
+    key_manager: XmssKeyManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """trust_proofs=True must not invoke AggregatedSignatureProof.verify."""
+    base_store = make_store(num_validators=3, key_manager=key_manager)
+    attestation_data = base_store.produce_attestation_data(Slot(1))
+    proof = make_aggregated_proof(
+        key_manager, [ValidatorIndex(1), ValidatorIndex(2)], attestation_data
+    )
+    producer_store = base_store.model_copy(
+        update={"latest_known_aggregated_payloads": {attestation_data: {proof}}}
+    )
+    consumer_store, signed_block = make_signed_block_from_store(
+        producer_store, key_manager, Slot(1), ValidatorIndex(1)
+    )
+
+    def _raise_if_called(*args: object, **kwargs: object) -> None:
+        pytest.fail("AggregatedSignatureProof.verify must not be called")
+
+    monkeypatch.setattr(AggregatedSignatureProof, "verify", _raise_if_called)
+
+    consumer_store.on_block(signed_block, trust_proofs=True)
+
+
 def test_on_block_preserves_immutability_of_aggregated_payloads(
     key_manager: XmssKeyManager,
 ) -> None:
@@ -393,6 +417,26 @@ class TestOnGossipAggregatedAttestation:
 
         with pytest.raises(AssertionError, match="signature verification failed"):
             store.on_gossip_aggregated_attestation(signed_aggregated)
+
+    def test_trust_proof_skips_stark_verify(
+        self, key_manager: XmssKeyManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """trust_proof=True must not invoke AggregatedSignatureProof.verify."""
+        store, attestation_data = make_store_with_attestation_data(
+            key_manager, num_validators=4, validator_id=ValidatorIndex(0)
+        )
+        proof = make_aggregated_proof(
+            key_manager, [ValidatorIndex(1), ValidatorIndex(2)], attestation_data
+        )
+        signed_aggregated = SignedAggregatedAttestation(data=attestation_data, proof=proof)
+
+        def _raise_if_called(*args: object, **kwargs: object) -> None:
+            pytest.fail("AggregatedSignatureProof.verify must not be called")
+
+        monkeypatch.setattr(AggregatedSignatureProof, "verify", _raise_if_called)
+
+        updated = store.on_gossip_aggregated_attestation(signed_aggregated, trust_proof=True)
+        assert attestation_data in updated.latest_new_aggregated_payloads
 
     def test_multiple_proofs_accumulate(self, key_manager: XmssKeyManager) -> None:
         """

@@ -396,7 +396,10 @@ class Store(StrictBaseModel):
             )
 
     def on_gossip_aggregated_attestation(
-        self, signed_attestation: SignedAggregatedAttestation
+        self,
+        signed_attestation: SignedAggregatedAttestation,
+        *,
+        trust_proof: bool = False,
     ) -> "Store":
         """
         Process a signed aggregated attestation received via aggregation topic
@@ -407,6 +410,10 @@ class Store(StrictBaseModel):
 
         Args:
             signed_attestation: The signed aggregated attestation from committee aggregation.
+            trust_proof: Skip the STARK aggregate verify when True.
+                Intended for fixture generation on fresh proofs.
+                Structural checks still run.
+                Defaults to False.
 
         Returns:
             New Store with aggregation processed and stored.
@@ -437,20 +444,22 @@ class Store(StrictBaseModel):
                 f"Validator {validator_id} not found in state {data.target.root.hex()}"
             )
 
-        # Prepare public keys for verification
-        public_keys = [validators[vid].get_attestation_pubkey() for vid in validator_ids]
+        # Trusted path: caller vouches for this fresh proof.
+        if not trust_proof:
+            # Prepare public keys for verification
+            public_keys = [validators[vid].get_attestation_pubkey() for vid in validator_ids]
 
-        # Verify the leanVM aggregated proof
-        try:
-            proof.verify(
-                public_keys=public_keys,
-                message=hash_tree_root(data),
-                slot=data.slot,
-            )
-        except AggregationError as exc:
-            raise AssertionError(
-                f"Committee aggregation signature verification failed: {exc}"
-            ) from exc
+            # Verify the leanVM aggregated proof
+            try:
+                proof.verify(
+                    public_keys=public_keys,
+                    message=hash_tree_root(data),
+                    slot=data.slot,
+                )
+            except AggregationError as exc:
+                raise AssertionError(
+                    f"Committee aggregation signature verification failed: {exc}"
+                ) from exc
 
         # Shallow-copy the dict and its inner sets to preserve immutability.
         new_aggregated_payloads = {
@@ -469,6 +478,8 @@ class Store(StrictBaseModel):
         self,
         signed_block: SignedBlock,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
+        *,
+        trust_proofs: bool = False,
     ) -> "Store":
         """
         Process a new block and update the forkchoice state.
@@ -482,6 +493,10 @@ class Store(StrictBaseModel):
         Args:
             signed_block: Complete signed block.
             scheme: XMSS signature scheme to use for signature verification.
+            trust_proofs: Skip the STARK aggregate verify when True.
+                Intended for fixture generation on fresh proofs.
+                Proposer-signature verify and structural checks still run.
+                Defaults to False.
 
         Returns:
             New Store with block integrated and head updated.
@@ -508,7 +523,11 @@ class Store(StrictBaseModel):
             )
 
             # Validate cryptographic signatures
-            valid_signatures = signed_block.verify_signatures(parent_state.validators, scheme)
+            valid_signatures = signed_block.verify_signatures(
+                parent_state.validators,
+                scheme,
+                skip_aggregate_verify=trust_proofs,
+            )
 
             # Execute state transition function to compute post-block state
             post_state = parent_state.state_transition(block, valid_signatures)
