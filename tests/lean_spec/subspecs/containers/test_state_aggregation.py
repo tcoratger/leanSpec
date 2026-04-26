@@ -10,7 +10,7 @@ from lean_spec.subspecs.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice import AttestationSignatureEntry
+from lean_spec.subspecs.forkchoice import AttestationPool, AttestationSignatureEntry
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers import (
@@ -41,7 +41,9 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
         }
     }
 
-    store = store.model_copy(update={"attestation_signatures": attestation_signatures})
+    store = store.model_copy(
+        update={"attestation_pool": AttestationPool(signatures=attestation_signatures)}
+    )
     _, results = store.aggregate()
 
     assert len(results) == 1
@@ -176,7 +178,9 @@ def test_aggregated_signatures_with_multiple_data_groups(
         },
     }
 
-    store = store.model_copy(update={"attestation_signatures": attestation_signatures})
+    store = store.model_copy(
+        update={"attestation_pool": AttestationPool(signatures=attestation_signatures)}
+    )
     _, results = store.aggregate()
 
     assert len(results) == 2

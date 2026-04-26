@@ -391,10 +391,10 @@ class StoreChecks(CamelModel):
             assert self.attestation_checks is not None
             for check in self.attestation_checks:
                 if check.location == "new":
-                    payloads = store.latest_new_aggregated_payloads
+                    payloads = store.attestation_pool.new_proofs
                     label = "in latest_new"
                 else:
-                    payloads = store.latest_known_aggregated_payloads
+                    payloads = store.attestation_pool.known_proofs
                     label = "in latest_known"
 
                 extracted = store.extract_attestations_from_aggregated_payloads(payloads)
@@ -407,19 +407,19 @@ class StoreChecks(CamelModel):
 
         if "attestation_signature_target_slots" in fields:
             assert self.attestation_signature_target_slots is not None
-            actual = sorted({data.target.slot for data in store.attestation_signatures})
+            actual = sorted({data.target.slot for data in store.attestation_pool.signatures})
             expected = sorted(self.attestation_signature_target_slots)
             _check("attestation_signatures.target_slots", actual, expected)
 
         if "latest_new_aggregated_target_slots" in fields:
             assert self.latest_new_aggregated_target_slots is not None
-            actual = sorted({data.target.slot for data in store.latest_new_aggregated_payloads})
+            actual = sorted({data.target.slot for data in store.attestation_pool.new_proofs})
             expected = sorted(self.latest_new_aggregated_target_slots)
             _check("latest_new_aggregated_payloads.target_slots", actual, expected)
 
         if "latest_known_aggregated_target_slots" in fields:
             assert self.latest_known_aggregated_target_slots is not None
-            actual = sorted({data.target.slot for data in store.latest_known_aggregated_payloads})
+            actual = sorted({data.target.slot for data in store.attestation_pool.known_proofs})
             expected = sorted(self.latest_known_aggregated_target_slots)
             _check("latest_known_aggregated_payloads.target_slots", actual, expected)
 
@@ -562,7 +562,7 @@ class StoreChecks(CamelModel):
             slot = block.slot
 
             known_attestations = store.extract_attestations_from_aggregated_payloads(
-                store.latest_known_aggregated_payloads
+                store.attestation_pool.known_proofs
             )
             weight = 0
             for attestation in known_attestations.values():

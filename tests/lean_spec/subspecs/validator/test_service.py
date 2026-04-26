@@ -18,7 +18,7 @@ from lean_spec.subspecs.containers import (
     ValidatorIndices,
 )
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.forkchoice import Store
+from lean_spec.subspecs.forkchoice import AttestationPool, Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager
@@ -1130,7 +1130,9 @@ class TestValidatorServiceIntegration:
         )
 
         updated_store = store.model_copy(
-            update={"latest_known_aggregated_payloads": {attestation_data: {proof}}}
+            update={
+                "attestation_pool": AttestationPool(known_proofs={attestation_data: {proof}}),
+            }
         )
         real_sync_service.store = updated_store
 

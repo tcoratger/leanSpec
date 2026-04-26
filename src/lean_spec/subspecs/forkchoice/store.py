@@ -4,10 +4,9 @@ Forkchoice store for tracking chain state and attestations.
 The Store tracks all information required for the LMD GHOST forkchoice algorithm.
 """
 
-__all__ = ["AttestationSignatureEntry", "Store"]
+__all__ = ["Store"]
 
 from collections import defaultdict
-from typing import NamedTuple
 
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
@@ -35,7 +34,6 @@ from lean_spec.subspecs.xmss.aggregation import (
     AggregatedSignatureProof,
     AggregationError,
 )
-from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
 from lean_spec.types import (
     ZERO_HASH,
@@ -45,17 +43,7 @@ from lean_spec.types import (
 )
 from lean_spec.types.base import StrictBaseModel
 
-
-class AttestationSignatureEntry(NamedTuple):
-    """
-    Single validator's XMSS signature for an attestation.
-
-    Used as an element in the attestation_signatures map: one entry per validator
-    that attested to the same AttestationData.
-    """
-
-    validator_id: ValidatorIndex
-    signature: Signature
+from .attestation_pool import AttestationPool, AttestationSignatureEntry
 
 
 class Store(StrictBaseModel):
@@ -137,28 +125,12 @@ class Store(StrictBaseModel):
     validator_id: ValidatorIndex | None
     """Index of the validator running this store instance."""
 
-    attestation_signatures: dict[AttestationData, set[AttestationSignatureEntry]] = {}
-    """
-    Per-validator XMSS signatures learned from committee attesters.
+    attestation_pool: AttestationPool = AttestationPool()
+    """Three-stage attestation evidence: gossip signatures, new proofs, known proofs.
 
-    Keyed by AttestationData.
-    """
-
-    latest_new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
-    """
-    Aggregated signature proofs pending processing.
-
-    These payloads are "new" and do not yet contribute to fork choice.
-    They migrate to known payloads via interval ticks.
-    Populated from blocks or gossip aggregated attestations.
-    """
-
-    latest_known_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
-    """
-    Aggregated signature proofs that have been processed.
-
-    These payloads are "known" and contribute to fork choice weights.
-    Used for recursive signature aggregation when building blocks.
+    See AttestationPool for the per-stage lifecycle and the order in which
+    gossip arrivals, aggregation, block inclusion, and migration touch each
+    stage during a slot's interval cycle.
     """
 
     @classmethod
@@ -247,28 +219,11 @@ class Store(StrictBaseModel):
         Returns:
             New Store with stale attestation data removed.
         """
-        # Filter out stale entries from all attestation-related mappings.
-        #
-        # Each mapping is keyed by attestation data, so we check membership by slot
-        # against the finalized slot.
-
         return self.model_copy(
             update={
-                "attestation_signatures": {
-                    attestation_data: sigs
-                    for attestation_data, sigs in self.attestation_signatures.items()
-                    if attestation_data.target.slot > self.latest_finalized.slot
-                },
-                "latest_new_aggregated_payloads": {
-                    attestation_data: proofs
-                    for attestation_data, proofs in self.latest_new_aggregated_payloads.items()
-                    if attestation_data.target.slot > self.latest_finalized.slot
-                },
-                "latest_known_aggregated_payloads": {
-                    attestation_data: proofs
-                    for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
-                    if attestation_data.target.slot > self.latest_finalized.slot
-                },
+                "attestation_pool": self.attestation_pool.prune_finalized(
+                    self.latest_finalized.slot
+                ),
             }
         )
 
@@ -375,23 +330,19 @@ class Store(StrictBaseModel):
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
             ), "Signature verification failed"
 
-            # Store signature and attestation data for later aggregation.
-            # Copy the inner sets so we can add to them without mutating the previous store.
-            new_committee_sigs = {k: set(v) for k, v in self.attestation_signatures.items()}
-
             # Aggregators store all received gossip signatures.
             # The p2p layer only delivers attestations from subscribed subnets,
             # so subnet filtering happens at subscription time, not here.
             # Non-aggregator nodes validate and drop — they never store gossip signatures.
-            if is_aggregator:
-                new_committee_sigs.setdefault(attestation_data, set()).add(
-                    AttestationSignatureEntry(validator_id, signature)
-                )
+            if not is_aggregator:
+                return self
 
-            # Return store with updated signature map and attestation data
             return self.model_copy(
                 update={
-                    "attestation_signatures": new_committee_sigs,
+                    "attestation_pool": self.attestation_pool.add_signature(
+                        attestation_data,
+                        AttestationSignatureEntry(validator_id, signature),
+                    ),
                 }
             )
 
@@ -452,16 +403,9 @@ class Store(StrictBaseModel):
                 f"Committee aggregation signature verification failed: {exc}"
             ) from exc
 
-        # Shallow-copy the dict and its inner sets to preserve immutability.
-        new_aggregated_payloads = {
-            k: set(v) for k, v in self.latest_new_aggregated_payloads.items()
-        }
-        new_aggregated_payloads.setdefault(data, set()).add(proof)
-
-        # Return store with updated aggregated payloads and attestation data
         return self.model_copy(
             update={
-                "latest_new_aggregated_payloads": new_aggregated_payloads,
+                "attestation_pool": self.attestation_pool.add_new_proof(data, proof),
             }
         )
 
@@ -553,19 +497,19 @@ class Store(StrictBaseModel):
                 f"maximum is {MAX_ATTESTATIONS_DATA}"
             )
 
-            # Copy the aggregated proof map for updates
-            # Shallow-copy the dict and its inner sets to preserve immutability
-            # Block attestations go directly to "known" payloads
-            # (like is_from_block=True in the spec)
-            block_proofs: dict[AttestationData, set[AggregatedSignatureProof]] = {
-                k: set(v) for k, v in store.latest_known_aggregated_payloads.items()
-            }
-
+            # Block attestations go straight to "known" (is_from_block=True in the spec).
+            # Group them by data so the pool merges per-key in one pass.
+            block_proofs_by_data: dict[AttestationData, set[AggregatedSignatureProof]] = {}
             for att, proof in zip(aggregated_attestations, attestation_signatures, strict=True):
-                block_proofs.setdefault(att.data, set()).add(proof)
+                block_proofs_by_data.setdefault(att.data, set()).add(proof)
 
-            # Update store with new aggregated proofs and attestation data
-            store = store.model_copy(update={"latest_known_aggregated_payloads": block_proofs})
+            store = store.model_copy(
+                update={
+                    "attestation_pool": store.attestation_pool.add_block_proofs(
+                        block_proofs_by_data
+                    ),
+                }
+            )
 
             # Update forkchoice head based on new block and attestations
             store = store.update_head()
@@ -612,7 +556,7 @@ class Store(StrictBaseModel):
             Mapping from block root to accumulated attestation weight.
         """
         attestations = self.extract_attestations_from_aggregated_payloads(
-            self.latest_known_aggregated_payloads
+            self.attestation_pool.known_proofs
         )
 
         start_slot = self.latest_finalized.slot
@@ -734,7 +678,7 @@ class Store(StrictBaseModel):
         """
         # Extract attestations from known aggregated payloads
         attestations = self.extract_attestations_from_aggregated_payloads(
-            self.latest_known_aggregated_payloads
+            self.attestation_pool.known_proofs
         )
 
         # Run LMD-GHOST fork choice algorithm.
@@ -757,9 +701,9 @@ class Store(StrictBaseModel):
         """
         Process pending aggregated payloads and update forkchoice head.
 
-        Moves aggregated payloads from latest_new_aggregated_payloads to
-        latest_known_aggregated_payloads, making them eligible to contribute to
-        fork choice weights. This migration happens at specific interval ticks.
+        Moves aggregated payloads from the new pool to the known pool,
+        making them eligible to contribute to fork choice weights.
+        This migration happens at specific interval ticks.
 
         The Interval Tick System
         -------------------------
@@ -776,20 +720,9 @@ class Store(StrictBaseModel):
         Returns:
             New Store with migrated aggregated payloads and updated head.
         """
-        # Merge new aggregated payloads into known aggregated payloads
-        merged_aggregated_payloads = {
-            attestation_data: set(proofs)
-            for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
-        }
-        for attestation_data, proofs in self.latest_new_aggregated_payloads.items():
-            merged_aggregated_payloads.setdefault(attestation_data, set()).update(proofs)
-
-        # Create store with migrated aggregated payloads
+        # Migrate new -> known and clear the new pool in one shot.
         store = self.model_copy(
-            update={
-                "latest_known_aggregated_payloads": merged_aggregated_payloads,
-                "latest_new_aggregated_payloads": {},
-            }
+            update={"attestation_pool": self.attestation_pool.migrate_new_to_known()}
         )
 
         # Update head with newly accepted aggregated payloads
@@ -854,7 +787,7 @@ class Store(StrictBaseModel):
         # the availability rationale tied to the interval-3/interval-4
         # ordering.
         attestations = self.extract_attestations_from_aggregated_payloads(
-            self.latest_new_aggregated_payloads,
+            self.attestation_pool.new_proofs,
         )
 
         # Run LMD GHOST with the supermajority threshold.
@@ -911,9 +844,9 @@ class Store(StrictBaseModel):
             Updated store and the list of freshly produced signed attestations.
         """
         validators = self.states[self.head].validators
-        gossip_sigs = self.attestation_signatures
-        new = self.latest_new_aggregated_payloads
-        known = self.latest_known_aggregated_payloads
+        gossip_sigs = self.attestation_pool.signatures
+        new = self.attestation_pool.new_proofs
+        known = self.attestation_pool.known_proofs
 
         new_aggregates: list[SignedAggregatedAttestation] = []
 
@@ -995,7 +928,7 @@ class Store(StrictBaseModel):
             )
             new_aggregates.append(SignedAggregatedAttestation(data=data, proof=proof))
 
-        # ── Store bookkeeping ────────────────────────────────────────
+        # Store bookkeeping.
         #
         # Record freshly produced proofs so future rounds can reuse them.
         # Remove gossip signatures that were consumed by this aggregation.
@@ -1003,16 +936,11 @@ class Store(StrictBaseModel):
         for signed_att in new_aggregates:
             new_aggregated_payloads.setdefault(signed_att.data, set()).add(signed_att.proof)
 
-        remaining_attestation_signatures = {
-            data: sigs
-            for data, sigs in self.attestation_signatures.items()
-            if data not in new_aggregated_payloads
-        }
-
         return self.model_copy(
             update={
-                "latest_new_aggregated_payloads": new_aggregated_payloads,
-                "attestation_signatures": remaining_attestation_signatures,
+                "attestation_pool": self.attestation_pool.replace_after_aggregation(
+                    new_aggregated_payloads
+                ),
             }
         ), new_aggregates
 
@@ -1301,7 +1229,7 @@ class Store(StrictBaseModel):
             proposer_index=validator_index,
             parent_root=head_root,
             known_block_roots=set(store.blocks.keys()),
-            aggregated_payloads=store.latest_known_aggregated_payloads,
+            aggregated_payloads=store.attestation_pool.known_proofs,
         )
 
         # Invariant: the produced block must close any justified divergence.

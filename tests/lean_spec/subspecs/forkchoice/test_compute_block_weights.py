@@ -6,7 +6,7 @@ from lean_spec.subspecs.containers.attestation import AttestationData
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice import Store
+from lean_spec.subspecs.forkchoice import AttestationPool, Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types.byte_arrays import ByteListMiB
@@ -71,7 +71,7 @@ def test_linear_chain_weight_accumulates_upward(base_store: Store) -> None:
             "blocks": new_blocks,
             "states": new_states,
             "head": block2_root,
-            "latest_known_aggregated_payloads": aggregated_payloads,
+            "attestation_pool": AttestationPool(known_proofs=aggregated_payloads),
         }
     )
 
@@ -118,7 +118,7 @@ def test_multiple_attestations_accumulate(base_store: Store) -> None:
             "blocks": new_blocks,
             "states": new_states,
             "head": block1_root,
-            "latest_known_aggregated_payloads": aggregated_payloads,
+            "attestation_pool": AttestationPool(known_proofs=aggregated_payloads),
         }
     )
 

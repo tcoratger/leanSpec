@@ -449,7 +449,7 @@ class BlockSpec(CamelModel):
             proposer_index=proposer_index,
             parent_root=parent_root,
             known_block_roots=set(store.blocks.keys()),
-            aggregated_payloads=merged_store.latest_known_aggregated_payloads,
+            aggregated_payloads=merged_store.attestation_pool.known_proofs,
         )
 
         # Append forced attestations that bypass the builder's MAX cap.

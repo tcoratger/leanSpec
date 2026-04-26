@@ -153,14 +153,14 @@ class TestAttestationProcessingTiming:
         """Test basic new attestation processing moves aggregated payloads."""
         # The method now processes aggregated payloads, not attestations directly
         # Just verify the method runs without error
-        initial_known_payloads = len(sample_store.latest_known_aggregated_payloads)
+        initial_known_payloads = len(sample_store.attestation_pool.known_proofs)
 
         # Accept new attestations (which processes aggregated payloads)
         sample_store = sample_store.accept_new_attestations()
 
         # New payloads should move to known payloads
-        assert len(sample_store.latest_new_aggregated_payloads) == 0
-        assert len(sample_store.latest_known_aggregated_payloads) >= initial_known_payloads
+        assert len(sample_store.attestation_pool.new_proofs) == 0
+        assert len(sample_store.attestation_pool.known_proofs) >= initial_known_payloads
 
     def test_accept_new_attestations_multiple(self, sample_store: Store) -> None:
         """Test accepting multiple new aggregated payloads."""
@@ -169,18 +169,18 @@ class TestAttestationProcessingTiming:
         sample_store = sample_store.accept_new_attestations()
 
         # All new payloads should move to known payloads
-        assert len(sample_store.latest_new_aggregated_payloads) == 0
+        assert len(sample_store.attestation_pool.new_proofs) == 0
 
     def test_accept_new_attestations_empty(self, sample_store: Store) -> None:
         """Test accepting new attestations when there are none."""
-        initial_known_payloads = len(sample_store.latest_known_aggregated_payloads)
+        initial_known_payloads = len(sample_store.attestation_pool.known_proofs)
 
         # Accept attestations when there are no new payloads
         sample_store = sample_store.accept_new_attestations()
 
         # Should be no-op
-        assert len(sample_store.latest_new_aggregated_payloads) == 0
-        assert len(sample_store.latest_known_aggregated_payloads) == initial_known_payloads
+        assert len(sample_store.attestation_pool.new_proofs) == 0
+        assert len(sample_store.attestation_pool.known_proofs) == initial_known_payloads
 
 
 class TestProposalHeadTiming:
@@ -229,7 +229,7 @@ class TestProposalHeadTiming:
 
         # get_proposal_head should have called accept_new_attestations
         # which migrates new payloads to known payloads
-        assert len(store.latest_new_aggregated_payloads) == 0
+        assert len(store.attestation_pool.new_proofs) == 0
 
 
 class TestTimeConstants:

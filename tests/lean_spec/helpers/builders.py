@@ -31,7 +31,7 @@ from lean_spec.subspecs.containers.block.types import AggregatedAttestations, At
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice import AttestationSignatureEntry, Store
+from lean_spec.subspecs.forkchoice import AttestationPool, AttestationSignatureEntry, Store
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
@@ -377,17 +377,13 @@ def make_store_with_attestation_signatures(
         validator_id,
         attestation_slot,
     )
-    attestation_signatures = {
+    signatures = {
         attestation_data: {
             AttestationSignatureEntry(vid, key_manager.sign_attestation_data(vid, attestation_data))
             for vid in attesting_validators
         },
     }
-    store = store.model_copy(
-        update={
-            "attestation_signatures": attestation_signatures,
-        }
-    )
+    store = store.model_copy(update={"attestation_pool": AttestationPool(signatures=signatures)})
     return store, attestation_data
 
 

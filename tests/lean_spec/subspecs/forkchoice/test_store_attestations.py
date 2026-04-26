@@ -14,7 +14,7 @@ from lean_spec.subspecs.containers.attestation import (
 from lean_spec.subspecs.containers.checkpoint import Checkpoint
 from lean_spec.subspecs.containers.slot import Slot
 from lean_spec.subspecs.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.subspecs.forkchoice import AttestationSignatureEntry
+from lean_spec.subspecs.forkchoice import AttestationPool, AttestationSignatureEntry
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import ByteListMiB, Bytes32, Uint64
@@ -43,9 +43,7 @@ def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyMan
     aggregated_payloads = {attestation_data: {proof}}
 
     producer_store = base_store.model_copy(
-        update={
-            "latest_known_aggregated_payloads": aggregated_payloads,
-        }
+        update={"attestation_pool": AttestationPool(known_proofs=aggregated_payloads)}
     )
 
     proposer_index = ValidatorIndex(1)
@@ -57,7 +55,7 @@ def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyMan
 
     # Verify attestations can be extracted from aggregated payloads
     extracted_attestations = updated_store.extract_attestations_from_aggregated_payloads(
-        updated_store.latest_known_aggregated_payloads
+        updated_store.attestation_pool.known_proofs
     )
     assert ValidatorIndex(1) in extracted_attestations
     assert ValidatorIndex(2) in extracted_attestations
@@ -87,9 +85,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     }
 
     producer_store_1 = base_store.model_copy(
-        update={
-            "attestation_signatures": gossip_sigs_1,
-        }
+        update={"attestation_pool": AttestationPool(signatures=gossip_sigs_1)}
     )
 
     consumer_store_1, signed_block_1 = make_signed_block_from_store(
@@ -111,9 +107,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     }
 
     producer_store_2 = store_after_block_1.model_copy(
-        update={
-            "attestation_signatures": gossip_sigs_2,
-        }
+        update={"attestation_pool": AttestationPool(signatures=gossip_sigs_2)}
     )
 
     store_before_block_2, signed_block_2 = make_signed_block_from_store(
@@ -122,7 +116,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
 
     # Capture the original list lengths for keys that already exist
     original_sig_lengths = {
-        k: len(v) for k, v in store_before_block_2.latest_new_aggregated_payloads.items()
+        k: len(v) for k, v in store_before_block_2.attestation_pool.new_proofs.items()
     }
 
     # Process the second block
@@ -130,7 +124,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
 
     # Verify immutability: the list lengths in store_before_block_2 should not have changed
     for key, original_length in original_sig_lengths.items():
-        current_length = len(store_before_block_2.latest_new_aggregated_payloads[key])
+        current_length = len(store_before_block_2.attestation_pool.new_proofs[key])
         assert current_length == original_length, (
             f"Immutability violated: list for key {key} grew from {original_length} to "
             f"{current_length}"
@@ -138,8 +132,8 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
 
     # Verify that the updated store has new keys (different attestation data in block 2)
     # The key point is that store_before_block_2 wasn't mutated
-    assert len(store_after_block_2.latest_new_aggregated_payloads) >= len(
-        store_before_block_2.latest_new_aggregated_payloads
+    assert len(store_after_block_2.attestation_pool.new_proofs) >= len(
+        store_before_block_2.attestation_pool.new_proofs
     )
 
 
@@ -168,13 +162,13 @@ class TestOnGossipAttestationImportGating:
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
-        assert attestation_data not in store.attestation_signatures, (
+        assert attestation_data not in store.attestation_pool.signatures, (
             "Precondition: no signatures before processing"
         )
 
         updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
 
-        sigs = updated_store.attestation_signatures.get(attestation_data, set())
+        sigs = updated_store.attestation_pool.signatures.get(attestation_data, set())
         assert attester_validator in {entry.validator_id for entry in sigs}, (
             "Aggregator should store any attestation it receives"
         )
@@ -201,7 +195,7 @@ class TestOnGossipAttestationImportGating:
 
         stored_ids = {
             entry.validator_id
-            for entry in updated.attestation_signatures.get(attestation_data, set())
+            for entry in updated.attestation_pool.signatures.get(attestation_data, set())
         }
         assert stored_ids == set(attesters), (
             "Aggregator should store attestations from all received validators"
@@ -224,7 +218,7 @@ class TestOnGossipAttestationImportGating:
 
         updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=False)
 
-        sigs = updated_store.attestation_signatures.get(attestation_data, set())
+        sigs = updated_store.attestation_pool.signatures.get(attestation_data, set())
         assert attester_validator not in {entry.validator_id for entry in sigs}, (
             "Non-aggregator should never store gossip signatures"
         )
@@ -248,7 +242,7 @@ class TestOnGossipAttestationImportGating:
 
         updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=False)
 
-        assert attestation_data not in updated_store.attestation_signatures, (
+        assert attestation_data not in updated_store.attestation_pool.signatures, (
             "Non-aggregator should not create any attestation_signatures entry"
         )
 
@@ -300,10 +294,10 @@ class TestOnGossipAggregatedAttestation:
         updated_store = store.on_gossip_aggregated_attestation(signed_aggregated)
 
         # Verify proof is stored keyed by attestation data
-        assert attestation_data in updated_store.latest_new_aggregated_payloads, (
+        assert attestation_data in updated_store.attestation_pool.new_proofs, (
             "Proof should be stored for this attestation data"
         )
-        proofs = updated_store.latest_new_aggregated_payloads[attestation_data]
+        proofs = updated_store.attestation_pool.new_proofs[attestation_data]
         assert len(proofs) == 1
         assert proof in proofs
 
@@ -344,8 +338,8 @@ class TestOnGossipAggregatedAttestation:
 
         updated_store = store.on_gossip_aggregated_attestation(signed_aggregated)
 
-        assert attestation_data in updated_store.latest_new_aggregated_payloads
-        assert proof in updated_store.latest_new_aggregated_payloads[attestation_data]
+        assert attestation_data in updated_store.attestation_pool.new_proofs
+        assert proof in updated_store.attestation_pool.new_proofs[attestation_data]
 
     def test_invalid_proof_rejected(self, key_manager: XmssKeyManager) -> None:
         """
@@ -457,7 +451,7 @@ class TestOnGossipAggregatedAttestation:
         )
 
         # Both proofs should be stored under the same attestation data
-        stored_proofs = store.latest_new_aggregated_payloads[attestation_data]
+        stored_proofs = store.attestation_pool.new_proofs[attestation_data]
         assert len(stored_proofs) == 2
         assert proof_1 in stored_proofs, "First proof should be stored"
         assert proof_2 in stored_proofs, "Second proof should be stored"
@@ -495,10 +489,10 @@ class TestAggregateCommitteeSignatures:
         updated_store, _ = store.aggregate()
 
         # Verify proofs were created and stored keyed by attestation data
-        assert attestation_data in updated_store.latest_new_aggregated_payloads, (
+        assert attestation_data in updated_store.attestation_pool.new_proofs, (
             "Aggregated proof should be stored for this attestation data"
         )
-        proofs = updated_store.latest_new_aggregated_payloads[attestation_data]
+        proofs = updated_store.attestation_pool.new_proofs[attestation_data]
         assert len(proofs) >= 1, "At least one proof should exist"
 
     def test_aggregated_proof_is_valid(self, key_manager: XmssKeyManager) -> None:
@@ -519,7 +513,7 @@ class TestAggregateCommitteeSignatures:
 
         updated_store, _ = store.aggregate()
 
-        proofs = updated_store.latest_new_aggregated_payloads[attestation_data]
+        proofs = updated_store.attestation_pool.new_proofs[attestation_data]
         proof = next(iter(proofs))
 
         # Extract participants from the proof
@@ -551,7 +545,7 @@ class TestAggregateCommitteeSignatures:
         updated_store, _ = store.aggregate()
 
         # Verify no proofs were created
-        assert len(updated_store.latest_new_aggregated_payloads) == 0
+        assert len(updated_store.attestation_pool.new_proofs) == 0
 
     def test_multiple_attestation_data_grouped_separately(
         self, key_manager: XmssKeyManager
@@ -584,16 +578,14 @@ class TestAggregateCommitteeSignatures:
         }
 
         store = base_store.model_copy(
-            update={
-                "attestation_signatures": attestation_signatures,
-            }
+            update={"attestation_pool": AttestationPool(signatures=attestation_signatures)}
         )
 
         updated_store, _ = store.aggregate()
 
         # Verify both attestation data have separate proofs
-        assert att_data_1 in updated_store.latest_new_aggregated_payloads
-        assert att_data_2 in updated_store.latest_new_aggregated_payloads
+        assert att_data_1 in updated_store.attestation_pool.new_proofs
+        assert att_data_2 in updated_store.attestation_pool.new_proofs
 
 
 class TestTickIntervalAggregation:
@@ -631,7 +623,7 @@ class TestTickIntervalAggregation:
         updated_store, _ = store.tick_interval(has_proposal=False, is_aggregator=True)
 
         # Verify aggregation was performed
-        assert attestation_data in updated_store.latest_new_aggregated_payloads, (
+        assert attestation_data in updated_store.attestation_pool.new_proofs, (
             "Aggregation should occur at interval 2 for aggregators"
         )
 
@@ -659,7 +651,7 @@ class TestTickIntervalAggregation:
         updated_store, _ = store.tick_interval(has_proposal=False, is_aggregator=False)
 
         # Verify aggregation was NOT performed
-        assert attestation_data not in updated_store.latest_new_aggregated_payloads, (
+        assert attestation_data not in updated_store.attestation_pool.new_proofs, (
             "Aggregation should NOT occur for non-aggregators"
         )
 
@@ -691,7 +683,7 @@ class TestTickIntervalAggregation:
 
             updated_store, _ = test_store.tick_interval(has_proposal=False, is_aggregator=True)
 
-            assert attestation_data not in updated_store.latest_new_aggregated_payloads, (
+            assert attestation_data not in updated_store.attestation_pool.new_proofs, (
                 f"Aggregation should NOT occur at interval {target_interval}"
             )
 
@@ -764,7 +756,7 @@ class TestEndToEndAggregationFlow:
             )
 
         # Verify signatures were stored
-        sigs = store.attestation_signatures.get(attestation_data, set())
+        sigs = store.attestation_pool.signatures.get(attestation_data, set())
         stored_validators = {entry.validator_id for entry in sigs}
         for vid in attesting_validators:
             assert vid in stored_validators, f"Signature for {vid} should be stored"
@@ -774,12 +766,12 @@ class TestEndToEndAggregationFlow:
         store, _ = store.tick_interval(has_proposal=False, is_aggregator=True)
 
         # Step 3: Verify aggregated proofs were created
-        assert attestation_data in store.latest_new_aggregated_payloads, (
+        assert attestation_data in store.attestation_pool.new_proofs, (
             "Aggregated proofs should exist after interval 2"
         )
 
         # Step 4: Verify the proof is valid
-        proof = next(iter(store.latest_new_aggregated_payloads[attestation_data]))
+        proof = next(iter(store.attestation_pool.new_proofs[attestation_data]))
         participants = proof.participants.to_validator_indices()
         public_keys = [key_manager[vid].attestation_public for vid in participants]
 

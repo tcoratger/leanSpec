@@ -15,7 +15,7 @@ from lean_spec.subspecs.containers import (
     ValidatorIndex,
 )
 from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.forkchoice import AttestationSignatureEntry, Store
+from lean_spec.subspecs.forkchoice import AttestationPool, AttestationSignatureEntry, Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, Uint64
@@ -101,8 +101,10 @@ class TestBlockProduction:
 
         sample_store = sample_store.model_copy(
             update={
-                "latest_known_aggregated_payloads": known_payloads,
-                "attestation_signatures": gossip_sigs,
+                "attestation_pool": AttestationPool(
+                    signatures=gossip_sigs,
+                    known_proofs=known_payloads,
+                ),
             }
         )
 
@@ -178,11 +180,7 @@ class TestBlockProduction:
         validator_idx = ValidatorIndex(3)
 
         # Ensure no attestations in store (clear aggregated payloads)
-        sample_store = sample_store.model_copy(
-            update={
-                "latest_known_aggregated_payloads": {},
-            }
-        )
+        sample_store = sample_store.model_copy(update={"attestation_pool": AttestationPool()})
 
         store, block, _signatures = sample_store.produce_block_with_signatures(
             slot,
@@ -221,12 +219,14 @@ class TestBlockProduction:
 
         sample_store = sample_store.model_copy(
             update={
-                "latest_known_aggregated_payloads": {signed_7.data: {proof_7}},
-                "attestation_signatures": {
-                    signed_7.data: {
-                        AttestationSignatureEntry(ValidatorIndex(7), signed_7.signature)
+                "attestation_pool": AttestationPool(
+                    signatures={
+                        signed_7.data: {
+                            AttestationSignatureEntry(ValidatorIndex(7), signed_7.signature)
+                        },
                     },
-                },
+                    known_proofs={signed_7.data: {proof_7}},
+                ),
             }
         )
 

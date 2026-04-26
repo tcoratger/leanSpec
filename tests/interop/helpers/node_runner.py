@@ -109,9 +109,9 @@ class TestNode:
             safe_target_slot=int(safe_block.slot) if safe_block else 0,
             finalized_slot=self.finalized_slot,
             justified_slot=self.justified_slot,
-            attestation_signatures_count=len(store.attestation_signatures),
-            new_aggregated_count=len(store.latest_new_aggregated_payloads),
-            known_aggregated_count=len(store.latest_known_aggregated_payloads),
+            attestation_signatures_count=len(store.attestation_pool.signatures),
+            new_aggregated_count=len(store.attestation_pool.new_proofs),
+            known_aggregated_count=len(store.attestation_pool.known_proofs),
             block_count=len(store.blocks),
         )
 
