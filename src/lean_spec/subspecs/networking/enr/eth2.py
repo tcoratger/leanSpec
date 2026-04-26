@@ -44,15 +44,6 @@ class Eth2Data(StrictBaseModel):
     next_fork_epoch: Uint64
     """Epoch when next fork activates. FAR_FUTURE_EPOCH if none scheduled."""
 
-    @classmethod
-    def no_scheduled_fork(cls, current_digest: ForkDigest, current_version: Version) -> "Eth2Data":
-        """Create Eth2Data indicating no scheduled fork."""
-        return cls(
-            fork_digest=current_digest,
-            next_fork_version=current_version,
-            next_fork_epoch=FAR_FUTURE_EPOCH,
-        )
-
 
 class AttestationSubnets(BaseBitvector):
     """

@@ -316,29 +316,3 @@ class ValidatorRegistry:
             )
 
         return registry
-
-    @classmethod
-    def from_secret_keys(
-        cls, keys: dict[ValidatorIndex, tuple[SecretKey, SecretKey]]
-    ) -> ValidatorRegistry:
-        """
-        Create registry from a dictionary of secret key pairs.
-
-        Convenience method for testing or programmatic key loading.
-
-        Args:
-            keys: Mapping from validator index to (attestation_secret_key, proposal_secret_key).
-
-        Returns:
-            Registry populated with provided keys.
-        """
-        registry = cls()
-        for index, (att_sk, prop_sk) in keys.items():
-            registry.add(
-                ValidatorEntry(
-                    index=index,
-                    attestation_secret_key=att_sk,
-                    proposal_secret_key=prop_sk,
-                )
-            )
-        return registry

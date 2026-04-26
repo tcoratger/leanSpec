@@ -16,7 +16,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from lean_spec.types import Bytes32, Bytes33
+from lean_spec.types import Bytes33
 
 from ..peer_id import KeyType, PeerId, PublicKeyProto
 
@@ -32,20 +32,6 @@ class Secp256k1PublicKey:
 
     _key: ec.EllipticCurvePublicKey
     """The cryptography library's public key object"""
-
-    @classmethod
-    def from_bytes(cls, data: Bytes33) -> Secp256k1PublicKey:
-        """
-        Load from 33-byte compressed SEC1 format.
-
-        Args:
-            data: 33-byte compressed secp256k1 public key.
-
-        Returns:
-            Parsed public key.
-        """
-        key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), data)
-        return cls(_key=key)
 
     def to_bytes(self) -> Bytes33:
         """
@@ -106,34 +92,6 @@ class IdentityKeypair:
         private_key = ec.generate_private_key(ec.SECP256K1())
         public_key = Secp256k1PublicKey(_key=private_key.public_key())
         return cls(private_key=private_key, public_key=public_key)
-
-    @classmethod
-    def from_bytes(cls, data: Bytes32) -> IdentityKeypair:
-        """
-        Load keypair from raw private key bytes.
-
-        Args:
-            data: 32-byte secp256k1 private key.
-
-        Returns:
-            Identity keypair.
-        """
-        private_key = ec.derive_private_key(
-            int.from_bytes(data, "big"),
-            ec.SECP256K1(),
-        )
-        public_key = Secp256k1PublicKey(_key=private_key.public_key())
-        return cls(private_key=private_key, public_key=public_key)
-
-    def private_key_bytes(self) -> Bytes32:
-        """
-        Return the raw 32-byte private key.
-
-        Returns:
-            32-byte private key scalar.
-        """
-        private_numbers = self.private_key.private_numbers()
-        return Bytes32(private_numbers.private_value.to_bytes(32, "big"))
 
     def sign(self, message: bytes) -> bytes:
         """

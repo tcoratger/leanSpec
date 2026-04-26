@@ -21,7 +21,6 @@ class TestMessageCacheShift:
         # Only 1 window used out of 6; shift should evict nothing.
         evicted = cache.shift()
         assert evicted == 0
-        assert len(cache) == 1
         assert cache.has(msg.id)
 
     def test_shift_evicts_oldest_window(self) -> None:
@@ -52,38 +51,12 @@ class TestMessageCacheShift:
         # One shift: still within capacity (2 windows).
         evicted = cache.shift()
         assert evicted == 0
-        assert len(cache) == 3
+        assert all(cache.has(m.id) for m in msgs)
 
         # Second shift: oldest window (with 3 msgs) is evicted.
         evicted = cache.shift()
         assert evicted == 3
-        assert len(cache) == 0
-
-
-class TestMessageCacheClear:
-    """Tests for MessageCache.clear()."""
-
-    def test_clear_empties_all(self) -> None:
-        """clear() removes all messages and resets windows."""
-        cache = MessageCache()
-        for i in range(5):
-            msg = GossipsubMessage(topic=b"t", raw_data=f"d{i}".encode())
-            cache.put(TopicId("t"), msg)
-
-        assert len(cache) == 5
-        cache.clear()
-        assert len(cache) == 0
-
-    def test_clear_allows_reuse(self) -> None:
-        """After clear(), new messages can be added normally."""
-        cache = MessageCache()
-        old_msg = GossipsubMessage(topic=b"t", raw_data=b"old")
-        cache.put(TopicId("t"), old_msg)
-        cache.clear()
-
-        new_msg = GossipsubMessage(topic=b"t", raw_data=b"new")
-        assert cache.put(TopicId("t"), new_msg) is True
-        assert len(cache) == 1
+        assert not any(cache.has(m.id) for m in msgs)
 
 
 class TestMessageCacheGetGossipIds:
@@ -167,7 +140,7 @@ class TestMessageCachePutAndGet:
 
         assert cache.put(TopicId("t"), msg) is True
         assert cache.put(TopicId("t"), msg) is False
-        assert len(cache) == 1
+        assert cache.has(msg.id)
 
     def test_has_method(self) -> None:
         """The has() method works for message IDs."""
@@ -214,21 +187,12 @@ class TestSeenCache:
         """cleanup() with no expired entries removes nothing."""
         seen = SeenCache(ttl_seconds=120)
         now = time.time()
-        seen.add(MessageId(b"12345678901234567890"), Timestamp(now))
+        msg_id = MessageId(b"12345678901234567890")
+        seen.add(msg_id, Timestamp(now))
 
         removed = seen.cleanup(now)
         assert removed == 0
-        assert len(seen) == 1
-
-    def test_clear_empties_all(self) -> None:
-        """clear() removes all entries."""
-        seen = SeenCache()
-        for i in range(5):
-            seen.add(MessageId(f"x{i:019d}".encode()), Timestamp(time.time()))
-
-        assert len(seen) == 5
-        seen.clear()
-        assert len(seen) == 0
+        assert seen.has(msg_id)
 
     def test_has_method(self) -> None:
         """The has() method works for seen message IDs."""

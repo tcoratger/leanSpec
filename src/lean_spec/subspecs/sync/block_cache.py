@@ -295,27 +295,6 @@ class BlockCache:
         """
         self._orphans.discard(root)
 
-    def get_orphan_parents(self) -> list[Bytes32]:
-        """
-        Get roots of missing parent blocks for all orphans.
-
-        This is the entry point for backfill. It returns a deduplicated list
-        of parent roots that need to be fetched to resolve current orphans.
-
-        Deduplication matters because multiple orphan blocks might share the
-        same missing parent (e.g., two competing blocks at the same slot).
-
-        Returns:
-            List of parent block roots to fetch via BlocksByRoot requests.
-        """
-        return list(
-            {
-                pending.parent_root
-                for root in self._orphans
-                if (pending := self._blocks.get(root)) and pending.parent_root not in self._blocks
-            }
-        )
-
     def get_children(self, parent_root: Bytes32) -> list[PendingBlock]:
         """
         Get all cached children of a given parent root.

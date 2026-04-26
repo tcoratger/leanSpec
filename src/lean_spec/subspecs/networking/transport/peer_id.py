@@ -38,7 +38,6 @@ from enum import IntEnum
 from typing import Final
 
 from lean_spec.subspecs.networking import varint
-from lean_spec.types import Bytes33
 
 __all__ = [
     # Main types
@@ -239,37 +238,6 @@ class Multihash:
         return bytes([self.code, len(self.digest)]) + self.digest
 
     @classmethod
-    def identity(cls, data: bytes) -> Multihash:
-        """
-        Create an identity multihash (no hashing).
-
-        Args:
-            data: Data to wrap (must be <= 127 bytes).
-
-        Returns:
-            Identity multihash.
-
-        Raises:
-            ValueError: If data exceeds 127 bytes.
-        """
-        if len(data) > 127:
-            raise ValueError("Identity multihash limited to 127 bytes")
-        return cls(code=MultihashCode.IDENTITY, digest=data)
-
-    @classmethod
-    def sha256(cls, data: bytes) -> Multihash:
-        """
-        Create a SHA256 multihash.
-
-        Args:
-            data: Data to hash.
-
-        Returns:
-            SHA256 multihash.
-        """
-        return cls(code=MultihashCode.SHA256, digest=hashlib.sha256(data).digest())
-
-    @classmethod
     def from_data(cls, data: bytes) -> Multihash:
         """
         Create a multihash using libp2p's size-based selection.
@@ -286,9 +254,8 @@ class Multihash:
             Multihash with appropriate hash function.
         """
         if len(data) <= _IDENTITY_THRESHOLD:
-            return cls.identity(data)
-        else:
-            return cls.sha256(data)
+            return cls(code=MultihashCode.IDENTITY, digest=data)
+        return cls(code=MultihashCode.SHA256, digest=hashlib.sha256(data).digest())
 
 
 @dataclass(frozen=True, slots=True)
@@ -407,21 +374,3 @@ class PeerId:
         encoded = public_key.encode()
         mh = Multihash.from_data(encoded)
         return cls(multihash=mh.encode())
-
-    @classmethod
-    def from_secp256k1(cls, public_key_bytes: Bytes33) -> PeerId:
-        """
-        Derive PeerId from a secp256k1 compressed public key.
-
-        This is the standard method used by ream, zeam, and the Ethereum
-        libp2p network for peer identification.
-
-        Args:
-            public_key_bytes: 33-byte compressed secp256k1 public key
-                (starts with 0x02 or 0x03).
-
-        Returns:
-            Derived PeerId (starts with "16Uiu2..." for secp256k1).
-        """
-        proto = PublicKeyProto(key_type=KeyType.SECP256K1, key_data=public_key_bytes)
-        return cls.from_public_key(proto)

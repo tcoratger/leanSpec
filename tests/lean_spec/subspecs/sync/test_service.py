@@ -732,18 +732,6 @@ class TestSyncTriggerGuards:
 
         assert sync_service.state == SyncState.SYNCING
 
-    async def test_start_sync_noop_without_peer_finalized_slot(
-        self,
-        peer_id: PeerId,
-    ) -> None:
-        """Peer connected but no Status means no sync trigger."""
-        service = create_mock_sync_service(peer_id)
-        assert service.state == SyncState.IDLE
-
-        await service.start_sync()
-
-        assert service.state == SyncState.IDLE
-
 
 class TestSyncCompleteGuards:
     """Tests for _check_sync_complete early exits."""

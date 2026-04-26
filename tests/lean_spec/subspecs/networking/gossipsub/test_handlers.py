@@ -403,27 +403,6 @@ class TestHandleMessage:
         )
 
     @pytest.mark.asyncio
-    async def test_message_callback_invoked(self) -> None:
-        """Message handler callback is invoked."""
-        behavior, _ = make_behavior()
-        peer_id = add_peer(behavior, "peer1")
-
-        received: list[GossipsubMessageEvent] = []
-        behavior.set_message_handler(received.append)
-
-        msg = Message(topic=TopicId("topic"), data=b"data")
-        await behavior._handle_message(peer_id, msg)
-
-        assert received == [
-            GossipsubMessageEvent(
-                peer_id=peer_id,
-                topic=TopicId("topic"),
-                data=b"data",
-                message_id=GossipsubMessage.compute_id(b"topic", b"data"),
-            )
-        ]
-
-    @pytest.mark.asyncio
     async def test_empty_topic_ignored(self) -> None:
         """Message with empty topic is silently dropped."""
         behavior, capture = make_behavior()

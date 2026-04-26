@@ -59,7 +59,7 @@ import asyncio
 import logging
 import random
 import time
-from collections.abc import Callable, Coroutine
+from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from itertools import count
 from typing import ClassVar, Final, cast
@@ -228,9 +228,6 @@ class GossipsubBehavior:
 
     _heartbeat_task: asyncio.Task[None] | None = None
     """Background heartbeat task."""
-
-    _message_handler: Callable[[GossipsubMessageEvent], None] | None = None
-    """Optional callback for received messages."""
 
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event)
     """Event to signal stop to the events generator."""
@@ -555,10 +552,6 @@ class GossipsubBehavior:
                 pass
             return None
 
-    def set_message_handler(self, handler: Callable[[GossipsubMessageEvent], None]) -> None:
-        """Set a callback for received messages."""
-        self._message_handler = handler
-
     async def _handle_rpc(self, peer_id: PeerId, rpc: RPC) -> None:
         """Dispatch an incoming RPC to the appropriate handlers."""
         state = self._peers.get(peer_id)
@@ -650,9 +643,6 @@ class GossipsubBehavior:
             peer_id=peer_id, topic=msg.topic, data=decompressed, message_id=msg_id
         )
         await self._event_queue.put(event)
-
-        if self._message_handler:
-            self._message_handler(event)
 
         logger.debug(
             "Received message %s from %s on topic %s", msg_id.hex()[:8], peer_id, msg.topic
