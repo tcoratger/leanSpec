@@ -521,12 +521,8 @@ class Store(StrictBaseModel):
             # The store's checkpoint is pinned to the anchor at init and only
             # moves forward via real justification/finalization events.
             # On ties the store's view is authoritative.
-            latest_justified = max(
-                self.latest_justified, post_state.latest_justified, key=lambda c: c.slot
-            )
-            latest_finalized = max(
-                self.latest_finalized, post_state.latest_finalized, key=lambda c: c.slot
-            )
+            latest_justified = max(self.latest_justified, post_state.latest_justified)
+            latest_finalized = max(self.latest_finalized, post_state.latest_finalized)
 
             store = self.model_copy(
                 update={
@@ -1333,12 +1329,8 @@ class Store(StrictBaseModel):
         # Locally produced blocks bypass normal block processing.
         # We must manually propagate any checkpoint advances.
         # Higher slots indicate more recent justified/finalized states.
-        latest_justified = max(
-            final_post_state.latest_justified, store.latest_justified, key=lambda c: c.slot
-        )
-        latest_finalized = max(
-            final_post_state.latest_finalized, store.latest_finalized, key=lambda c: c.slot
-        )
+        latest_justified = max(final_post_state.latest_justified, store.latest_justified)
+        latest_finalized = max(final_post_state.latest_finalized, store.latest_finalized)
 
         # Persist block and state immutably.
         new_store = store.model_copy(
