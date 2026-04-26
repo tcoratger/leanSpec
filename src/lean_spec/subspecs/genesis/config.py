@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 from pydantic import Field, field_validator, model_validator
 
-from lean_spec.subspecs.containers import State, Validator
+from lean_spec.subspecs.containers import Validator
 from lean_spec.subspecs.containers.state import Validators
 from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Bytes52, StrictBaseModel, Uint64
@@ -130,15 +130,6 @@ class GenesisConfig(StrictBaseModel):
                 for i, entry in enumerate(self.genesis_validators)
             ]
         )
-
-    def create_state(self) -> State:
-        """
-        Generate the complete genesis state from this configuration.
-
-        Combines genesis time and validator set to create the initial
-        consensus state. This state becomes slot 0 for the chain.
-        """
-        return State.generate_genesis(self.genesis_time, self.to_validators())
 
     @classmethod
     def from_yaml_file(cls, path: Path | str) -> GenesisConfig:

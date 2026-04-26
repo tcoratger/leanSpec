@@ -158,13 +158,6 @@ class TestPeerManagerBasicOperations:
         manager = PeerManager()
         assert manager.get_peer(peer("16Uiu2HAmNonexistent")) is None
 
-    def test_clear(self, connected_peer_info: PeerInfo) -> None:
-        """Clear removes all peers."""
-        manager = PeerManager()
-        manager.add_peer(connected_peer_info)
-        manager.clear()
-        assert len(manager) == 0
-
 
 class TestPeerManagerStatusTracking:
     """Tests for PeerManager status tracking."""

@@ -614,14 +614,6 @@ class RPC:
 
         return rpc
 
-    def is_empty(self) -> bool:
-        """Check if this RPC contains no data."""
-        return (
-            not self.subscriptions
-            and not self.publish
-            and (self.control is None or self.control.is_empty())
-        )
-
     @classmethod
     def subscription(cls, topics: list[TopicId], subscribe: bool = True) -> RPC:
         """

@@ -109,10 +109,6 @@ class ENR(StrictBaseModel):
         """Get value by key, or None if absent."""
         return self.pairs.get(key)
 
-    def has(self, key: EnrKey) -> bool:
-        """Check if key is present."""
-        return key in self.pairs
-
     @property
     def identity_scheme(self) -> str | None:
         """Get identity scheme (should be "v4")."""
@@ -219,13 +215,6 @@ class ENR(StrictBaseModel):
         - 64-byte signature (Bytes64, enforced by type)
         """
         return self.identity_scheme == self.SCHEME and self.public_key is not None
-
-    def is_compatible_with(self, other: ENR) -> bool:
-        """Check fork compatibility via eth2 fork digest."""
-        self_eth2, other_eth2 = self.eth2_data, other.eth2_data
-        if self_eth2 is None or other_eth2 is None:
-            return False
-        return self_eth2.fork_digest == other_eth2.fork_digest
 
     def _build_content_items(self) -> list[RLPItem]:
         """
