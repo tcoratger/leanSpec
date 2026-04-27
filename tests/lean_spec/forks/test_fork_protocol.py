@@ -46,6 +46,14 @@ class TestDevnet4Spec:
         assert Devnet4Spec.NAME == "devnet4"
         assert Devnet4Spec.VERSION == 4
 
+    def test_gossip_digest(self) -> None:
+        """Devnet4Spec carries the gossipsub fork digest as fork metadata."""
+        assert Devnet4Spec.GOSSIP_DIGEST == "devnet0"
+
+    def test_previous_is_none(self) -> None:
+        """Devnet4Spec is the root of the upgrade chain."""
+        assert Devnet4Spec.previous is None
+
     def test_is_fork_protocol(self) -> None:
         """Devnet4Spec is a ForkProtocol instance."""
         assert isinstance(Devnet4Spec(), ForkProtocol)
@@ -83,6 +91,14 @@ class TestDevnet5Spec:
     def test_inherits_devnet4_behavior(self) -> None:
         """Devnet5Spec reuses devnet4 method logic until divergence lands."""
         assert issubclass(Devnet5Spec, Devnet4Spec)
+
+    def test_previous_links_to_devnet4(self) -> None:
+        """Devnet5Spec.previous points back to its predecessor."""
+        assert Devnet5Spec.previous is Devnet4Spec
+
+    def test_gossip_digest_inherited(self) -> None:
+        """Devnet5Spec inherits the network's gossipsub digest until it diverges."""
+        assert Devnet5Spec.GOSSIP_DIGEST == "devnet0"
 
     def test_binds_its_own_container_classes(self) -> None:
         """Devnet5Spec routes state/store construction through its own bindings."""

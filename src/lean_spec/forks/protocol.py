@@ -35,6 +35,22 @@ class ForkProtocol(ABC):
     VERSION: ClassVar[int]
     """Strictly monotonic version. Used to order forks in the registry."""
 
+    GOSSIP_DIGEST: ClassVar[str]
+    """
+    Fork identifier embedded in gossipsub topic names.
+
+    Must match the digest used by other clients on the same network so that
+    block, attestation, and aggregation topics route compatibly.
+    """
+
+    previous: ClassVar["type[ForkProtocol] | None"]
+    """
+    Predecessor fork in the upgrade chain, or None for the root fork.
+
+    Forms a linked chain that the registry can walk to derive ordering
+    and that upgrade_state can traverse for cross-fork state migrations.
+    """
+
     state_class: ClassVar[type[SpecStateType]]
     """Concrete State container class owned by this fork."""
 
