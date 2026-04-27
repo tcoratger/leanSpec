@@ -1,10 +1,10 @@
-"""Dispatcher routing spec calls to the correct fork."""
+"""Registry of registered forks, ordered oldest to newest."""
 
 from .protocol import ForkProtocol
 
 
-class SpecRunner:
-    """Routes specification calls to the correct fork."""
+class ForkRegistry:
+    """Registry of registered forks, ordered by version."""
 
     def __init__(self, forks: list[ForkProtocol]) -> None:
         """
@@ -23,7 +23,7 @@ class SpecRunner:
                 monotonic, or names collide.
         """
         if not forks:
-            raise ValueError("SpecRunner requires at least one fork")
+            raise ValueError("ForkRegistry requires at least one fork")
 
         versions = [f.VERSION for f in forks]
         if any(versions[i] >= versions[i + 1] for i in range(len(versions) - 1)):

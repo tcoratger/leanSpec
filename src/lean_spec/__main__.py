@@ -32,9 +32,8 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Final
 
-from lean_spec.forks import FORK_SEQUENCE, ForkProtocol, SpecRunner, State
+from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol, State
 from lean_spec.forks.devnet4.containers import Block, BlockBody, Checkpoint
 from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
 from lean_spec.forks.devnet4.containers.slot import Slot
@@ -58,12 +57,6 @@ from lean_spec.subspecs.sync.checkpoint_sync import (
 )
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.types import Bytes32, Uint64
-
-# Fork identifier for gossip topics.
-#
-# Must match the fork string used by ream and other clients.
-# For devnet, this is "devnet0".
-GOSSIP_FORK_DIGEST: Final = "devnet0"
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +197,7 @@ def _init_from_genesis(
         network=event_source.reqresp_client,
         fork=fork,
         validator_registry=validator_registry,
-        fork_digest=GOSSIP_FORK_DIGEST,
+        fork_digest=fork.GOSSIP_DIGEST,
         is_aggregator=is_aggregator,
         aggregate_subnet_ids=aggregate_subnet_ids,
         api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
@@ -320,7 +313,7 @@ async def _init_from_checkpoint(
             network=event_source.reqresp_client,
             fork=fork,
             validator_registry=validator_registry,
-            fork_digest=GOSSIP_FORK_DIGEST,
+            fork_digest=fork.GOSSIP_DIGEST,
             is_aggregator=is_aggregator,
             aggregate_subnet_ids=aggregate_subnet_ids,
             api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
@@ -435,8 +428,7 @@ async def run_node(
             Only effective when is_aggregator is also True.
         api_port: Port for API server (health, fork_choice, /metrics). None or 0 disables.
     """
-    spec_runner = SpecRunner(FORK_SEQUENCE)
-    fork = spec_runner.current
+    fork = DEFAULT_REGISTRY.current
 
     metrics.init(name="leanspec-node", version="0.0.1")
     set_observer(PrometheusObserver())
@@ -511,14 +503,14 @@ async def run_node(
     #
     # Without this, the event source defaults to "0x00000000" and rejects
     # all messages from other clients that use "devnet0".
-    event_source.set_fork_digest(GOSSIP_FORK_DIGEST)
+    event_source.set_fork_digest(fork.GOSSIP_DIGEST)
 
     # Subscribe to gossip topics.
     #
     # We subscribe before connecting to bootnodes so that when
     # we establish connections, we can immediately announce our
     # subscriptions to peers.
-    block_topic = GossipTopic.block(GOSSIP_FORK_DIGEST).to_topic_id()
+    block_topic = GossipTopic.block(fork.GOSSIP_DIGEST).to_topic_id()
     event_source.subscribe_gossip_topic(block_topic)
 
     # Determine attestation subnets to subscribe to.
@@ -549,7 +541,7 @@ async def run_node(
 
     for subnet_id in subscription_subnets:
         attestation_subnet_topic = GossipTopic.attestation_subnet(
-            GOSSIP_FORK_DIGEST, subnet_id
+            fork.GOSSIP_DIGEST, subnet_id
         ).to_topic_id()
         event_source.subscribe_gossip_topic(attestation_subnet_topic)
         logger.info("Subscribed to attestation subnet %d", subnet_id)
