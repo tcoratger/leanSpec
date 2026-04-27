@@ -61,12 +61,12 @@ class QuicStreamAdapter:
 
     Provides:
 
-    - Buffered reads: ``read(n)`` returns exactly up to *n* bytes,
+    - Buffered reads: `read(n)` returns exactly up to *n* bytes,
       keeping leftovers for the next call.
-    - Exact reads: ``readexactly(n)`` blocks until *n* bytes arrive.
-    - Buffered writes: ``write()`` accumulates data, ``drain()`` flushes.
-    - Half-close: ``finish_write()`` flushes then sends FIN.
-    - Multistream-select negotiation via ``negotiate_*`` methods.
+    - Exact reads: `readexactly(n)` blocks until *n* bytes arrive.
+    - Buffered writes: `write()` accumulates data, `drain()` flushes.
+    - Half-close: `finish_write()` flushes then sends FIN.
+    - Multistream-select negotiation via `negotiate_*` methods.
     """
 
     __slots__ = ("_stream", "_buffer", "_write_buffer")

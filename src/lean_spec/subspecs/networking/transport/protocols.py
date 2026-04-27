@@ -15,8 +15,8 @@ class InboundStreamProtocol(Protocol):
 
     Matches QuicStreamAdapter and test mocks.
 
-    - ``read()`` takes no arguments (returns next available chunk).
-    - ``close()`` is async (QUIC streams need async FIN).
+    - `read()` takes no arguments (returns next available chunk).
+    - `close()` is async (QUIC streams need async FIN).
     """
 
     async def read(self) -> bytes:

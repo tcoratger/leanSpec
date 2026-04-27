@@ -485,7 +485,7 @@ class TestValidatorPublishWrappers:
         """Attestation wrapper publishes to network with computed subnet_id.
 
         The subnet_id is derived from the attestation's validator index via
-        ``compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)``. This test
+        `compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)`. This test
         verifies the computed value is forwarded correctly to the network.
         """
         assert node_with_validator.validator_service is not None
@@ -562,12 +562,12 @@ class TestSignalHandlers:
 class TestPeriodicLogging:
     """Tests for the periodic logging task.
 
-    These tests call ``_log_justified_finalized_periodically`` directly
-    rather than through ``run()``, isolating the logging loop from the
+    These tests call `_log_justified_finalized_periodically` directly
+    rather than through `run()`, isolating the logging loop from the
     full TaskGroup lifecycle.
 
-    Instead of patching ``asyncio.sleep`` (which would mutate the global
-    asyncio module), we set the log interval to 0 so ``sleep(0)`` just
+    Instead of patching `asyncio.sleep` (which would mutate the global
+    asyncio module), we set the log interval to 0 so `sleep(0)` just
     yields control. A background task sets the shutdown event after
     one iteration completes.
     """
@@ -628,8 +628,8 @@ class TestPeriodicLogging:
     ) -> None:
         """Validator count gauge is set to 0 when no validator service exists.
 
-        This verifies the ``len(self.validator_service.registry)`` fallback
-        path that returns 0 when ``validator_service is None``.
+        This verifies the `len(self.validator_service.registry)` fallback
+        path that returns 0 when `validator_service is None`.
         """
         from prometheus_client import CollectorRegistry
 

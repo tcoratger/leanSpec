@@ -437,7 +437,7 @@ class TestLiveNetworkEventSourceAsyncIteration:
     """
     Async iterator protocol conformance.
 
-    The sync service consumes network events via ``async for event in source``.
+    The sync service consumes network events via `async for event in source`.
     The event source must implement the async iterator protocol correctly,
     including signaling exhaustion when stopped.
     """

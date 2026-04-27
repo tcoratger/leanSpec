@@ -211,18 +211,21 @@ class Store(StrictBaseModel):
         # Read the slot at which the anchor block was proposed.
         anchor_slot = anchor_block.slot
 
-        # Initialize checkpoints from this state.
+        # Seed both checkpoints from the anchor block itself.
         #
-        # We explicitly set the root to the anchor block root.
-        # The state internally might have zero-hash checkpoints (if genesis),
-        # but the Store must treat the anchor block as the justified/finalized point.
+        # The store treats the anchor as the new genesis for fork choice:
+        # all history below it is pruned. The justified and finalized checkpoints
+        # therefore point at the anchor block with the anchor's own slot,
+        # regardless of what the anchor state's embedded checkpoints say.
+        anchor_checkpoint = Checkpoint(root=anchor_root, slot=anchor_slot)
+
         return cls(
             time=Interval.from_slot(anchor_slot),
             config=state.config,
             head=anchor_root,
             safe_target=anchor_root,
-            latest_justified=state.latest_justified.model_copy(update={"root": anchor_root}),
-            latest_finalized=state.latest_finalized.model_copy(update={"root": anchor_root}),
+            latest_justified=anchor_checkpoint,
+            latest_finalized=anchor_checkpoint,
             blocks={anchor_root: anchor_block},
             states={anchor_root: state},
             validator_id=validator_id,
@@ -516,15 +519,11 @@ class Store(StrictBaseModel):
             # Keep the checkpoint with the higher slot.
             # On slot ties, prefer the store's own checkpoint.
             #
-            # The store's checkpoint is pinned to the anchor block root at init.
-            # The anchor state may hold a pre-anchor root.
+            # The store's checkpoint is pinned to the anchor at init and only
+            # moves forward via real justification/finalization events.
             # On ties the store's view is authoritative.
-            latest_justified = max(
-                self.latest_justified, post_state.latest_justified, key=lambda c: c.slot
-            )
-            latest_finalized = max(
-                self.latest_finalized, post_state.latest_finalized, key=lambda c: c.slot
-            )
+            latest_justified = max(self.latest_justified, post_state.latest_justified)
+            latest_finalized = max(self.latest_finalized, post_state.latest_finalized)
 
             store = self.model_copy(
                 update={
@@ -813,18 +812,15 @@ class Store(StrictBaseModel):
         - Interval 3: Safe target update (HERE)
         - Interval 4: New attestations migrate to "known" pool
 
-        Because interval 4 has not yet run, attestations live in two pools:
+        Only the "new" pool counts. Migration into "known" runs at interval 4,
+        after this step, so safe target sees only votes received this slot.
 
-        - "new": freshly received from gossipsub aggregation this slot
-        - "known": from block attestations and previously accepted gossip
+        Safe target is an *availability* signal, not durable knowledge:
 
-        Both pools must be merged to get the full attestation picture.
-        Using only one pool undercounts support. See inline comments for
-        concrete scenarios where this matters.
-
-        Note: the Ream reference implementation uses only the "new" pool.
-        Our merge approach is more conservative. It ensures the safe target
-        reflects every attestation the node knows about.
+        - A block is safe when 2/3 of currently online validators vote for a descendant.
+        - "Known" carries block-included, previously migrated, and self-attestations.
+        - Those reflect historical knowledge, not current liveness.
+        - Counting them would advance safe target on stale evidence after a participation collapse.
 
         Returns:
             New Store with updated safe_target.
@@ -843,44 +839,11 @@ class Store(StrictBaseModel):
         # For example, 100 validators => threshold is 67, not 66.
         min_target_score = -(-num_validators * 2 // 3)
 
-        # Merge both attestation pools into a single unified view.
-        #
-        # Why merge? At interval 3, the migration step (interval 4) has not
-        # run yet. Attestations can enter the "known" pool through paths that
-        # bypass gossipsub entirely:
-        #
-        # 1. Proposer's own attestation: the block proposer bundles their
-        #    attestation directly in the block body. When the block is
-        #    processed, this attestation lands in "known" immediately.
-        #    It never appears in "new" because it was never gossipped.
-        #
-        # 2. Self-attestation: a node's own gossip attestation does not
-        #    loop back through gossipsub to itself. The node records it
-        #    locally in "known" without going through the "new" pipeline.
-        #
-        # Without this merge, those attestations would be invisible to the
-        # safe target calculation, causing it to undercount support.
-        #
-        # The technique: start with a shallow copy of "known", then overlay
-        # every entry from "new" on top. When both pools contain proofs for
-        # the same attestation data, merge the proof sets.
-        all_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {
-            attestation_data: set(proofs)
-            for attestation_data, proofs in self.latest_known_aggregated_payloads.items()
-        }
-        for attestation_data, proofs in self.latest_new_aggregated_payloads.items():
-            if attestation_data in all_payloads:
-                # Both pools have proofs for this attestation. Combine them.
-                all_payloads[attestation_data].update(proofs)
-            else:
-                # Only "new" has proofs for this attestation. Add them directly.
-                all_payloads[attestation_data] = set(proofs)
-
-        # Convert the merged aggregated payloads into per-validator votes.
-        #
-        # Each proof encodes which validators participated.
-        # This step unpacks those bitfields into a flat mapping of validator -> vote.
-        attestations = self.extract_attestations_from_aggregated_payloads(all_payloads)
+        # Unpack "new" payloads into a flat validator -> vote mapping.
+        # "Known" is excluded by design.
+        attestations = self.extract_attestations_from_aggregated_payloads(
+            self.latest_new_aggregated_payloads,
+        )
 
         # Run LMD GHOST with the supermajority threshold.
         #
@@ -1354,12 +1317,8 @@ class Store(StrictBaseModel):
         # Locally produced blocks bypass normal block processing.
         # We must manually propagate any checkpoint advances.
         # Higher slots indicate more recent justified/finalized states.
-        latest_justified = max(
-            final_post_state.latest_justified, store.latest_justified, key=lambda c: c.slot
-        )
-        latest_finalized = max(
-            final_post_state.latest_finalized, store.latest_finalized, key=lambda c: c.slot
-        )
+        latest_justified = max(final_post_state.latest_justified, store.latest_justified)
+        latest_finalized = max(final_post_state.latest_finalized, store.latest_finalized)
 
         # Persist block and state immutably.
         new_store = store.model_copy(

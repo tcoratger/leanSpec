@@ -19,7 +19,7 @@ class DomainType(Bytes4):
 
 
 class NodeId(Bytes32):
-    """32-byte node identifier for Discovery v5, derived from ``keccak256(pubkey)``."""
+    """32-byte node identifier for Discovery v5, derived from `keccak256(pubkey)`."""
 
 
 class ForkDigest(Bytes4):
@@ -35,13 +35,13 @@ class SeqNumber(Uint64):
 
 
 class ProtocolId(str):
-    """Libp2p protocol identifier, e.g. ``/eth2/beacon_chain/req/status/1/ssz_snappy``."""
+    """Libp2p protocol identifier, e.g. `/eth2/beacon_chain/req/status/1/ssz_snappy`."""
 
     __slots__ = ()
 
 
 class Multiaddr(str):
-    """Multiaddress string, e.g. ``/ip4/192.168.1.1/udp/9000/quic-v1``."""
+    """Multiaddress string, e.g. `/ip4/192.168.1.1/udp/9000/quic-v1`."""
 
     __slots__ = ()
 

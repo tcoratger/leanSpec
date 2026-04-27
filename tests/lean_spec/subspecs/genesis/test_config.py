@@ -8,8 +8,6 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.spec import Devnet4Spec
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.types import Bytes52, SSZValueError, Uint64
 
@@ -119,20 +117,6 @@ class TestGenesisConfigValidators:
         validators = config.to_validators()
 
         assert len(validators.data) == 0
-
-
-class TestGenesisConfigState:
-    """Tests for state creation."""
-
-    def test_create_state_returns_valid_genesis(self) -> None:
-        """State has correct genesis time and validators."""
-        config = GenesisConfig.from_yaml(SAMPLE_YAML)
-        state = config.create_state(Devnet4Spec())
-
-        # Genesis time is stored in the state's config.
-        assert state.config.genesis_time == config.genesis_time
-        assert state.slot == Slot(0)
-        assert len(state.validators.data) == 3
 
 
 class TestGenesisConfigValidation:

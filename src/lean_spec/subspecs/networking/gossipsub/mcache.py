@@ -226,16 +226,6 @@ class MessageCache:
 
         return evicted
 
-    def clear(self) -> None:
-        """Clear all cached messages."""
-        self._windows.clear()
-        self._windows.append(set())
-        self._by_id.clear()
-
-    def __len__(self) -> int:
-        """Return the total number of cached messages."""
-        return len(self._by_id)
-
 
 @dataclass(slots=True)
 class SeenCache:
@@ -316,11 +306,3 @@ class SeenCache:
             del self._timestamps[msg_id]
 
         return len(expired)
-
-    def clear(self) -> None:
-        """Clear all seen entries."""
-        self._timestamps.clear()
-
-    def __len__(self) -> int:
-        """Return the number of seen message IDs."""
-        return len(self._timestamps)

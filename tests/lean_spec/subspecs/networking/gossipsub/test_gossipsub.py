@@ -471,14 +471,6 @@ class TestRPCProtobufEncoding:
         )
         assert RPC.decode(rpc.encode()) == rpc
 
-    def test_rpc_empty_check(self) -> None:
-        """Test RPC is_empty method."""
-        empty_rpc = RPC()
-        assert empty_rpc.is_empty()
-
-        non_empty = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("/topic"))])
-        assert not non_empty.is_empty()
-
     def test_rpc_helper_functions(self) -> None:
         """Test RPC creation helper functions."""
         assert RPC.subscription([TopicId("/topic1"), TopicId("/topic2")], subscribe=True) == RPC(

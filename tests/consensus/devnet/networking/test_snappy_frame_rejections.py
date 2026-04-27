@@ -30,7 +30,7 @@ def test_snappy_frame_decode_rejects_wrong_stream_identifier(
     """A stream whose opening bytes do not spell the snappy magic is rejected.
 
     A valid framed snappy stream starts with the ten-byte sequence
-    ``ff 06 00 00 73 4e 61 50 70 59`` ("sNaPpY"). Ten zero bytes satisfy
+    `ff 06 00 00 73 4e 61 50 70 59` ("sNaPpY"). Ten zero bytes satisfy
     the length check but carry the wrong magic, so the decoder rejects
     the stream at the identifier check.
     """
@@ -47,8 +47,8 @@ def test_snappy_frame_decode_rejects_unknown_unskippable_chunk(
     """A chunk of an unassigned unskippable type is rejected.
 
     The byte sequence begins with a valid stream identifier followed by a
-    chunk whose type byte is ``0x03`` with a zero-length payload. Type
-    ``0x03`` sits in the reserved-unskippable range, so any unrecognised
+    chunk whose type byte is `0x03` with a zero-length payload. Type
+    `0x03` sits in the reserved-unskippable range, so any unrecognised
     occurrence must force the decoder to abort.
     """
     stream_identifier = "ff060000734e61507059"

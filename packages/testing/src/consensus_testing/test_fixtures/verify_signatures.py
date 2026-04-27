@@ -31,7 +31,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
     Generates a complete signed block from the block specification,
     then verifies that signatures pass or fail as expected.
 
-    An optional ``tamper`` hook mutates the built signed block before
+    An optional `tamper` hook mutates the built signed block before
     verification runs. This is the only supported way to exercise
     signature-verification rejection paths that lie behind structural
     invariants the block builder normally upholds.
@@ -61,15 +61,15 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
     Supported operations:
 
-    - ``{"operation": "drop_last_signature"}``: Remove the last entry
+    - `{"operation": "drop_last_signature"}`: Remove the last entry
       from the block's attestation_signatures list. Produces a signed
       block whose signature-group count is one less than its
       attestation count.
-    - ``{"operation": "set_proposer_index", "value": int}``: Rewrite
+    - `{"operation": "set_proposer_index", "value": int}`: Rewrite
       the block's proposer_index field. Use this to exercise the
       validator-bounds check that the builder skips because its round-
       robin selection stays within range by construction.
-    - ``{"operation": "clear_first_attestation_bits"}``: Replace the
+    - `{"operation": "clear_first_attestation_bits"}`: Replace the
       first body attestation with one whose aggregation_bits carry no
       set bit. Exercises the empty-participants check inside
       signature verification.

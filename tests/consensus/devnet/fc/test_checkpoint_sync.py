@@ -15,7 +15,7 @@ from lean_spec.forks.devnet4.containers.slot import Slot
 from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT, SECONDS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Uint64
+from lean_spec.types import Bytes32, Uint64
 
 pytestmark = pytest.mark.valid_until("Devnet")
 
@@ -47,7 +47,8 @@ def test_store_init_from_non_genesis_anchor(
     -----------------------------
 
     - Head points to the anchor block.
-    - Latest justified and latest finalized both reference the anchor root.
+    - Latest justified and latest finalized both reference the anchor root
+      at the anchor's own slot (beacon-chain seeding convention).
     - Store clock is at the anchor slot (no pre-anchor intervals tracked).
     - The anchor block is the only entry in the store's block map.
 
@@ -78,9 +79,12 @@ def test_store_init_from_non_genesis_anchor(
                     time=anchor_time_intervals,
                     head_slot=ANCHOR_SLOT,
                     head_root_label="genesis",
-                    latest_justified_slot=anchor_state.latest_justified.slot,
+                    # Both checkpoints are seeded from the anchor itself:
+                    # slot = anchor.slot, root = anchor_root. The anchor
+                    # state's embedded checkpoint slots are intentionally ignored.
+                    latest_justified_slot=ANCHOR_SLOT,
                     latest_justified_root_label="genesis",
-                    latest_finalized_slot=anchor_state.latest_finalized.slot,
+                    latest_finalized_slot=ANCHOR_SLOT,
                     latest_finalized_root_label="genesis",
                     safe_target_root_label="genesis",
                     labels_in_store=["genesis"],
@@ -135,9 +139,11 @@ def test_extend_chain_from_non_genesis_anchor(
                 checks=StoreChecks(
                     head_slot=Slot(11),
                     head_root_label="block_11",
-                    latest_justified_slot=anchor_state.latest_justified.slot,
+                    # Empty blocks carry no attestations, so neither checkpoint
+                    # advances past the anchor seeding.
+                    latest_justified_slot=ANCHOR_SLOT,
                     latest_justified_root_label="genesis",
-                    latest_finalized_slot=anchor_state.latest_finalized.slot,
+                    latest_finalized_slot=ANCHOR_SLOT,
                     latest_finalized_root_label="genesis",
                     labels_in_store=["genesis", "block_11"],
                 ),
@@ -151,7 +157,9 @@ def test_extend_chain_from_non_genesis_anchor(
                 checks=StoreChecks(
                     head_slot=Slot(12),
                     head_root_label="block_12",
+                    latest_justified_slot=ANCHOR_SLOT,
                     latest_justified_root_label="genesis",
+                    latest_finalized_slot=ANCHOR_SLOT,
                     latest_finalized_root_label="genesis",
                     labels_in_store=["genesis", "block_11", "block_12"],
                 ),
@@ -165,7 +173,9 @@ def test_extend_chain_from_non_genesis_anchor(
                 checks=StoreChecks(
                     head_slot=Slot(13),
                     head_root_label="block_13",
+                    latest_justified_slot=ANCHOR_SLOT,
                     latest_justified_root_label="genesis",
+                    latest_finalized_slot=ANCHOR_SLOT,
                     latest_finalized_root_label="genesis",
                     labels_in_store=["genesis", "block_11", "block_12", "block_13"],
                 ),
@@ -238,9 +248,9 @@ def test_fork_off_non_genesis_anchor(
             # unambiguously heavier.
             #
             # Source is pinned to the anchor block because the store
-            # only knows about blocks at or after the anchor. The
-            # anchor state's internal justified root still points to
-            # pre-anchor history that was discarded on checkpoint sync.
+            # only knows about blocks at or after the anchor, and the
+            # store's latest_justified checkpoint is seeded at
+            # (anchor.slot, anchor_root).
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(12),
@@ -312,4 +322,52 @@ def test_non_genesis_anchor_is_internally_consistent(
                 checks=StoreChecks(head_root_label="genesis"),
             ),
         ],
+    )
+
+
+def test_store_from_anchor_rejects_mismatched_state_root(
+    fork_choice_test: ForkChoiceTestFiller,
+) -> None:
+    """Store.from_anchor aborts when the anchor block's state_root disagrees
+    with the hash of the anchor state.
+
+    Scenario
+    --------
+    Build a valid mid-chain anchor, then replace the anchor block's state_root
+    with an unrelated value. The block and state no longer agree on the post
+    state, so the store must refuse the pair.
+
+    Key Assertions
+    --------------
+
+    - The fixture is marked anchor_valid=False and carries no steps: init
+      aborts before any step could run.
+    - Store.from_anchor raises an AssertionError whose message contains the
+      exact precondition text from the spec, pinning the failure to the
+      state-root check rather than any later crash.
+    - No Store is returned to the caller; initialization fails cleanly.
+
+    Why This Matters
+    ----------------
+    A block and state that disagree on the state root are structurally
+    inconsistent. Seeding a store from that pair would corrupt every future
+    lookup that resolves a block root to its post state. Clients must refuse
+    the anchor at init time, not silently repair or ignore it.
+    """
+    anchor_state, anchor_block = build_anchor(
+        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+    )
+
+    # Sanity: the helper-built pair is consistent to begin with. Makes the
+    # mismatch below the only difference between this test and the happy path.
+    assert anchor_block.state_root == hash_tree_root(anchor_state)
+
+    bad_anchor_block = anchor_block.model_copy(update={"state_root": Bytes32(b"\xff" * 32)})
+
+    fork_choice_test(
+        anchor_state=anchor_state,
+        anchor_block=bad_anchor_block,
+        anchor_valid=False,
+        expected_anchor_error="Anchor block state root must match anchor state hash",
+        steps=[],
     )

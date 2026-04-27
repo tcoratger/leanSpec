@@ -27,7 +27,7 @@ from .config import (
 
 
 class Interval(Uint64):
-    """Interval count since genesis (matches ``Store.time``)."""
+    """Interval count since genesis (matches `Store.time`)."""
 
     @classmethod
     def from_unix_time(cls, unix_seconds: Uint64, genesis_time: Uint64) -> Interval:

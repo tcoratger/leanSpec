@@ -52,7 +52,7 @@ def _make_network_service(
     peer_id: PeerId | None = None,
     fork_digest: str = FORK_DIGEST,
 ) -> tuple[NetworkService, MockEventSource]:
-    """Build a ``NetworkService`` wired to a ``MockEventSource``."""
+    """Build a `NetworkService` wired to a `MockEventSource`."""
     source = MockEventSource(events=events)
     if sync_service is None:
         _pid = peer_id or PeerId.from_base58("16Uiu2HAmTestPeer123")
@@ -85,7 +85,7 @@ class _StopAfterFirstEvent(MockEventSource):
 
 
 class TestRunLifecycle:
-    """Tests for ``run()`` loop control flow."""
+    """Tests for `run()` loop control flow."""
 
     async def test_source_exhaustion_exits_gracefully(self, peer_id: PeerId) -> None:
         """run() completes without error when the event source is empty."""
@@ -166,7 +166,7 @@ class TestRunLifecycle:
 
 
 class TestAggregatedAttestationDispatch:
-    """Tests for ``GossipAggregatedAttestationEvent`` routing."""
+    """Tests for `GossipAggregatedAttestationEvent` routing."""
 
     async def test_gossip_aggregated_attestation_routed(self, peer_id: PeerId) -> None:
         """GossipAggregatedAttestationEvent calls sync_service.on_gossip_aggregated_attestation."""
@@ -267,7 +267,7 @@ class TestSecondaryEventDispatch:
 
 
 class TestPeerConnectionEvents:
-    """Tests for ``PeerConnectedEvent`` and ``PeerDisconnectedEvent``."""
+    """Tests for `PeerConnectedEvent` and `PeerDisconnectedEvent`."""
 
     async def test_peer_connected_adds_to_manager(
         self,
@@ -315,7 +315,7 @@ class TestPeerConnectionEvents:
 
 
 class TestPublishBlock:
-    """Tests for ``publish_block()``."""
+    """Tests for `publish_block()`."""
 
     async def test_publish_block_encodes_and_publishes(self, peer_id: PeerId) -> None:
         """Block is SSZ-encoded, snappy-compressed, and published to correct topic."""
@@ -349,7 +349,7 @@ class TestPublishBlock:
 
 
 class TestPublishAttestation:
-    """Tests for ``publish_attestation()``."""
+    """Tests for `publish_attestation()`."""
 
     async def test_publish_attestation_happy_path(self, peer_id: PeerId) -> None:
         """Attestation is SSZ-encoded, compressed, and published to subnet topic."""
@@ -399,7 +399,7 @@ class TestPublishAttestation:
 
 
 class TestPublishAggregatedAttestation:
-    """Tests for ``publish_aggregated_attestation()``."""
+    """Tests for `publish_aggregated_attestation()`."""
 
     async def test_publish_aggregated_attestation_happy_path(self, peer_id: PeerId) -> None:
         """Aggregated attestation is encoded, compressed, and published."""
@@ -464,7 +464,7 @@ class TestNetworkServiceInit:
     """Tests for constructor fields and defaults."""
 
     def test_default_fork_digest(self, peer_id: PeerId) -> None:
-        """fork_digest defaults to ``0x00000000`` when not specified."""
+        """fork_digest defaults to `0x00000000` when not specified."""
         source = MockEventSource(events=[])
         sync_service = create_mock_sync_service(peer_id)
         svc = NetworkService(

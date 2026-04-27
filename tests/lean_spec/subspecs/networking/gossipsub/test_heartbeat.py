@@ -239,15 +239,14 @@ class TestHeartbeatIntegration:
         msg = GossipsubMessage(topic=b"topic", raw_data=b"data")
         behavior.message_cache.put(TopicId("topic"), msg)
 
-        initial_len = len(behavior.message_cache)
-        assert initial_len == 1
+        assert behavior.message_cache.has(msg.id)
 
         # Run heartbeat several times to shift through all windows
         for _ in range(7):
             await behavior._heartbeat()
 
         # After enough shifts, old messages should be evicted
-        assert len(behavior.message_cache) == 0
+        assert not behavior.message_cache.has(msg.id)
 
     @pytest.mark.asyncio
     async def test_cleans_seen_cache(self) -> None:

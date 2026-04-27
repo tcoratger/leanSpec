@@ -36,7 +36,6 @@ State Machine
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
@@ -224,9 +223,6 @@ class SyncService:
 
     _blocks_processed: int = field(default=0)
     """Counter for processed blocks."""
-
-    _sync_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    """Lock to prevent concurrent sync operations."""
 
     _pending_attestations: list[SignedAttestation] = field(default_factory=list)
     """Attestations awaiting block processing.
@@ -672,43 +668,6 @@ class SyncService:
             signed_attestation: The aggregate to publish.
         """
         await self._publish_agg_fn(signed_attestation)
-
-    async def start_sync(self) -> None:
-        """
-        Start or resume synchronization.
-
-        This is the main entry point for initiating sync. It assesses the
-        current state and begins appropriate sync activities.
-        """
-        # Serialize sync operations to prevent race conditions.
-        #
-        # Without this lock, concurrent calls to start_sync could cause
-        # duplicate state transitions or conflicting sync operations.
-        async with self._sync_lock:
-            await self._check_sync_trigger()
-
-    async def process_pending_blocks(self) -> int:
-        """
-        Process all blocks in cache that now have parents.
-
-        Called after backfill completes or when blocks may have become
-        processable.
-
-        Returns:
-            Number of blocks processed.
-        """
-        if self._head_sync is None:
-            raise RuntimeError("HeadSync not initialized")
-
-        # Process blocks in topological order (parents before children).
-        #
-        # When backfill fetches missing parents, it may unlock a chain of
-        # waiting blocks. HeadSync handles the ordering to ensure each block
-        # is processed only after its parent is in the store.
-        count, new_store = await self._head_sync.process_all_processable(self.store)
-        self.store = new_store
-
-        return count
 
     async def _check_sync_trigger(self) -> None:
         """

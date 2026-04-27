@@ -20,7 +20,6 @@ from typing import Any
 import yaml
 from pydantic import Field, field_validator, model_validator
 
-from lean_spec.forks import ForkProtocol, State
 from lean_spec.forks.devnet4.containers import Validator
 from lean_spec.forks.devnet4.containers.state import Validators
 from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
@@ -131,18 +130,6 @@ class GenesisConfig(StrictBaseModel):
                 for i, entry in enumerate(self.genesis_validators)
             ]
         )
-
-    def create_state(self, fork: ForkProtocol) -> State:
-        """
-        Generate the complete genesis state from this configuration.
-
-        Combines genesis time and validator set to create the initial
-        consensus state. This state becomes slot 0 for the chain.
-
-        Args:
-            fork: Fork specification that determines how genesis state is constructed.
-        """
-        return fork.generate_genesis(self.genesis_time, self.to_validators())
 
     @classmethod
     def from_yaml_file(cls, path: Path | str) -> GenesisConfig:

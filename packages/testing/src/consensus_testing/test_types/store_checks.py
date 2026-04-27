@@ -279,7 +279,7 @@ class StoreChecks(CamelModel):
     Block labels that must be present in the store's block tree.
 
     Each label is resolved to a block root via the block registry,
-    then checked for presence in ``store.blocks``. This verifies
+    then checked for presence in `store.blocks`. This verifies
     that blocks from abandoned forks are retained (not pruned).
     """
 

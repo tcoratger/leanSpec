@@ -184,7 +184,3 @@ class PeerManager:
     def get_all_peers(self) -> list[SyncPeer]:
         """Get all tracked peers."""
         return list(self._peers.values())
-
-    def clear(self) -> None:
-        """Remove all peers."""
-        self._peers.clear()

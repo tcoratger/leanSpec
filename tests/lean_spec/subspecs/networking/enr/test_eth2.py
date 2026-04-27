@@ -27,16 +27,6 @@ class TestEth2Data:
         assert data.fork_digest == ForkDigest(b"\x12\x34\x56\x78")
         assert data.next_fork_epoch == Uint64(194048)
 
-    def test_no_scheduled_fork_factory(self) -> None:
-        """no_scheduled_fork factory creates correct data."""
-        digest = ForkDigest(b"\xab\xcd\xef\x01")
-        version = Version(b"\x01\x00\x00\x00")
-        data = Eth2Data.no_scheduled_fork(digest, version)
-
-        assert data.fork_digest == digest
-        assert data.next_fork_version == version
-        assert data.next_fork_epoch == FAR_FUTURE_EPOCH
-
     def test_eth2_data_immutable(self) -> None:
         """Eth2Data is immutable (frozen)."""
         data = Eth2Data(

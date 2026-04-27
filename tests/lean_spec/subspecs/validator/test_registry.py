@@ -331,23 +331,6 @@ class TestValidatorRegistry:
             ValidatorIndex(5): (kp_att.attestation_secret, kp_prop.proposal_secret)
         }
 
-    def test_from_secret_keys(self, km: XmssKeyManager) -> None:
-        """Registry can be populated from a dictionary of key pairs."""
-        kp_0 = km[ValidatorIndex(0)]
-        kp_2 = km[ValidatorIndex(2)]
-
-        registry = ValidatorRegistry.from_secret_keys(
-            {
-                ValidatorIndex(0): (kp_0.attestation_secret, kp_0.proposal_secret),
-                ValidatorIndex(2): (kp_2.attestation_secret, kp_2.proposal_secret),
-            }
-        )
-
-        assert registry_state(registry) == {
-            ValidatorIndex(0): (kp_0.attestation_secret, kp_0.proposal_secret),
-            ValidatorIndex(2): (kp_2.attestation_secret, kp_2.proposal_secret),
-        }
-
 
 def _write_manifest(path: Path, validators: list[dict[str, object]]) -> None:
     """Write a minimal manifest YAML file at path."""

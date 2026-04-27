@@ -385,52 +385,6 @@ class HeadSync:
             descendants_processed=0,
         ), store
 
-    async def process_all_processable(self, store: Store) -> tuple[int, Store]:
-        """
-        Process all blocks in the cache that now have parents in the store.
-
-        Called after backfill completes or store updates to process any
-        blocks that have become processable.
-
-        Args:
-            store: Current store.
-
-        Returns:
-            Tuple of (count of blocks processed, updated store).
-        """
-        processed_count = 0
-
-        while True:
-            # Get processable blocks (parents in store).
-            processable = self.block_cache.get_processable(store)
-            if not processable:
-                break
-
-            for pending in processable:
-                if pending.root in self._processing:
-                    continue
-                if pending.root in store.blocks:
-                    self.block_cache.remove(pending.root)
-                    continue
-
-                self._processing.add(pending.root)
-
-                try:
-                    try:
-                        store = self.process_block(store, pending.block)
-                        processed_count += 1
-                        self.block_cache.remove(pending.root)
-
-                    except Exception as exc:
-                        # Processing failed. Remove from cache to avoid infinite loop.
-                        logger.debug("Failed to process cached block: %s", exc)
-                        self.block_cache.remove(pending.root)
-
-                finally:
-                    self._processing.discard(pending.root)
-
-        return processed_count, store
-
     def reset(self) -> None:
         """Clear processing state."""
         self._processing.clear()

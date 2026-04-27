@@ -45,15 +45,13 @@ def generate_pre_state(
 ) -> State:
     """Generate a default pre-state for consensus tests.
 
-    When a fork is provided, genesis is generated through the fork's
-    protocol implementation. This ensures each fork produces its own
-    correct genesis state when a later fork introduces new State fields.
+    A fork argument routes through that fork's own genesis builder.
+    Later forks adding extra state fields stay correct this way.
 
     Args:
         genesis_time: The genesis timestamp.
         num_validators: Number of validators to include.
-        fork: ForkProtocol instance to use for genesis generation.
-            Defaults to State.generate_genesis for backward compatibility.
+        fork: Optional fork dispatching genesis. Defaults to the base builder.
 
     Returns:
         A properly initialized consensus state.

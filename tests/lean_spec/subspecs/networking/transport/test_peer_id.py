@@ -23,7 +23,6 @@ from lean_spec.subspecs.networking.transport.peer_id import (
     PeerId,
     PublicKeyProto,
 )
-from lean_spec.types import Bytes33
 
 # Protobuf tag constants for test assertions
 _PROTOBUF_TAG_TYPE = 0x08  # (1 << 3) | 0 = field 1, varint
@@ -98,31 +97,20 @@ class TestMultihash:
     """Tests for multihash functions."""
 
     def test_identity_multihash_format(self) -> None:
-        """Identity multihash: [0x00][length][data]."""
+        """Small data uses identity multihash: [0x00][length][data]."""
         data = b"test"
-        mh = Multihash.identity(data)
+        mh = Multihash.from_data(data)
         result = mh.encode()
 
         assert result[0] == MultihashCode.IDENTITY  # 0x00
         assert result[1] == len(data)  # 4
         assert result[2:] == data
 
-    def test_identity_multihash_max_length(self) -> None:
-        """Identity multihash limited to 127 bytes."""
-        # 127 bytes should work
-        data = bytes(127)
-        mh = Multihash.identity(data)
-        result = mh.encode()
-        assert len(result) == 2 + 127
-
-        # 128 bytes should fail
-        with pytest.raises(ValueError, match="127 bytes"):
-            Multihash.identity(bytes(128))
-
     def test_sha256_multihash_format(self) -> None:
-        """SHA256 multihash: [0x12][0x20][32-byte hash]."""
-        data = b"test data"
-        mh = Multihash.sha256(data)
+        """Large data uses SHA256 multihash: [0x12][0x20][32-byte hash]."""
+        # 50 bytes > 42-byte identity threshold → SHA256 path
+        data = bytes(50)
+        mh = Multihash.from_data(data)
         result = mh.encode()
 
         assert result[0] == MultihashCode.SHA256  # 0x12
@@ -130,10 +118,10 @@ class TestMultihash:
         assert len(result) == 2 + 32
 
     def test_sha256_multihash_deterministic(self) -> None:
-        """Same input produces same multihash."""
-        data = b"deterministic test"
-        result1 = Multihash.sha256(data).encode()
-        result2 = Multihash.sha256(data).encode()
+        """Same large input produces same multihash."""
+        data = bytes(50)
+        result1 = Multihash.from_data(data).encode()
+        result2 = Multihash.from_data(data).encode()
         assert result1 == result2
 
 
@@ -245,7 +233,7 @@ class TestDerivePeerId:
     def test_derive_from_secp256k1(self) -> None:
         """Derive PeerId from secp256k1 public key."""
         keypair = IdentityKeypair.generate()
-        peer_id = PeerId.from_secp256k1(keypair.public_key.to_bytes())
+        peer_id = keypair.to_peer_id()
 
         # Result should be a valid Base58 string
         peer_id_str = str(peer_id)
@@ -257,10 +245,9 @@ class TestDerivePeerId:
     def test_derive_deterministic(self) -> None:
         """Same key always produces same PeerId."""
         keypair = IdentityKeypair.generate()
-        public_key_bytes = keypair.public_key.to_bytes()
 
-        peer_id1 = PeerId.from_secp256k1(public_key_bytes)
-        peer_id2 = PeerId.from_secp256k1(public_key_bytes)
+        peer_id1 = keypair.to_peer_id()
+        peer_id2 = keypair.to_peer_id()
 
         assert str(peer_id1) == str(peer_id2)
 
@@ -269,8 +256,8 @@ class TestDerivePeerId:
         keypair1 = IdentityKeypair.generate()
         keypair2 = IdentityKeypair.generate()
 
-        peer_id1 = PeerId.from_secp256k1(keypair1.public_key.to_bytes())
-        peer_id2 = PeerId.from_secp256k1(keypair2.public_key.to_bytes())
+        peer_id1 = keypair1.to_peer_id()
+        peer_id2 = keypair2.to_peer_id()
 
         assert str(peer_id1) != str(peer_id2)
 
@@ -282,7 +269,7 @@ class TestPeerIdFormat:
         """Small encoded keys use identity multihash."""
         # secp256k1 key: 33 bytes, encoded is 37 bytes (< 42)
         keypair = IdentityKeypair.generate()
-        peer_id = PeerId.from_secp256k1(keypair.public_key.to_bytes())
+        peer_id = keypair.to_peer_id()
 
         # Decode to verify structure
         decoded = Base58.decode(str(peer_id))
@@ -350,7 +337,7 @@ class TestKnownVectors:
         assert our_encoded == spec_encoded, "Our encoding must match spec"
 
         # Compute PeerId (36 bytes <= 42, uses identity multihash)
-        multihash = Multihash.identity(spec_encoded).encode()
+        multihash = Multihash.from_data(spec_encoded).encode()
         peer_id = Base58.encode(multihash)
 
         # Expected PeerId computed from spec test vector
@@ -388,7 +375,7 @@ class TestKnownVectors:
         assert our_encoded == spec_encoded, "Our encoding must match spec"
 
         # Compute PeerId (37 bytes <= 42, uses identity multihash)
-        multihash = Multihash.identity(spec_encoded).encode()
+        multihash = Multihash.from_data(spec_encoded).encode()
         peer_id = Base58.encode(multihash)
 
         # Expected PeerId computed from spec test vector
@@ -432,7 +419,7 @@ class TestKnownVectors:
         assert our_encoded == spec_encoded, "Our encoding must match spec"
 
         # Compute PeerId (95 bytes > 42, uses SHA256 multihash)
-        multihash = Multihash.sha256(spec_encoded).encode()
+        multihash = Multihash.from_data(spec_encoded).encode()
         peer_id = Base58.encode(multihash)
 
         # Expected PeerId computed from spec test vector
@@ -450,7 +437,7 @@ class TestKnownVectors:
         key_data = bytes(32)  # All zeros
         proto = PublicKeyProto(key_type=KeyType.ED25519, key_data=key_data)
         encoded = proto.encode()
-        multihash = Multihash.identity(encoded).encode()
+        multihash = Multihash.from_data(encoded).encode()
         peer_id = Base58.encode(multihash)
 
         assert peer_id.startswith("12D3KooW")
@@ -463,7 +450,7 @@ class TestKnownVectors:
         key_data = bytes([0x02] + [0] * 32)  # Compressed format
         proto = PublicKeyProto(key_type=KeyType.SECP256K1, key_data=key_data)
         encoded = proto.encode()
-        multihash = Multihash.identity(encoded).encode()
+        multihash = Multihash.from_data(encoded).encode()
         peer_id = Base58.encode(multihash)
 
         # All secp256k1 PeerIds start with "16Uiu2" (from 00 25 08 02)
@@ -475,10 +462,11 @@ class TestKnownVectors:
         This matches the libp2p spec test vector.
         """
         # From spec: 08021221037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99
-        key_data = Bytes33(
-            bytes.fromhex("037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99")
+        key_data = bytes.fromhex(
+            "037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99"
         )
-        peer_id = PeerId.from_secp256k1(key_data)
+        proto = PublicKeyProto(key_type=KeyType.SECP256K1, key_data=key_data)
+        peer_id = PeerId.from_public_key(proto)
 
         # Expected PeerId from spec test vector
         expected = "16Uiu2HAmLhLvBoYaoZfaMUKuibM6ac163GwKY74c5kiSLg5KvLpY"
@@ -491,7 +479,7 @@ class TestKnownVectors:
     def test_peer_id_length_reasonable(self) -> None:
         """PeerId length is reasonable (not too long)."""
         keypair = IdentityKeypair.generate()
-        peer_id = PeerId.from_secp256k1(keypair.public_key.to_bytes())
+        peer_id = keypair.to_peer_id()
 
         # Identity-hash PeerId should be around 52-60 characters
         # (Base58 encoding of ~39 bytes: 2 multihash header + 37 encoded key)
@@ -504,28 +492,19 @@ class TestIntegration:
     def test_derive_from_generated_keypair(self) -> None:
         """Derive PeerId from freshly generated keypair."""
         keypair = IdentityKeypair.generate()
-        peer_id = PeerId.from_secp256k1(keypair.public_key.to_bytes())
+        peer_id = keypair.to_peer_id()
 
         assert len(str(peer_id)) > 0
         # Verify structure
         decoded = Base58.decode(str(peer_id))
         assert decoded[0] == MultihashCode.IDENTITY
 
-    def test_keypair_to_peer_id_matches(self) -> None:
-        """IdentityKeypair.to_peer_id() matches from_secp256k1()."""
-        keypair = IdentityKeypair.generate()
-
-        peer_id1 = keypair.to_peer_id()
-        peer_id2 = PeerId.from_secp256k1(keypair.public_key.to_bytes())
-
-        assert str(peer_id1) == str(peer_id2)
-
     def test_multiple_keypairs_unique_peerids(self) -> None:
         """Each keypair produces unique PeerId."""
         peer_ids = set()
         for _ in range(10):
             keypair = IdentityKeypair.generate()
-            peer_id = PeerId.from_secp256k1(keypair.public_key.to_bytes())
+            peer_id = keypair.to_peer_id()
             peer_ids.add(str(peer_id))
 
         # All 10 should be unique
