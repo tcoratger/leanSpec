@@ -74,8 +74,8 @@ class NetworkService:
     event_source: EventSource
     """Source of network events from the transport layer."""
 
-    fork_digest: str = field(default="0x00000000")
-    """Fork digest for gossip topics (4-byte hex string)."""
+    network_name: str = field(default="0x00000000")
+    """Network name for gossip topics (4-byte hex string)."""
 
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
@@ -210,7 +210,7 @@ class NetworkService:
         Args:
             block: Signed block to publish.
         """
-        topic = GossipTopic.block(self.fork_digest)
+        topic = GossipTopic.block(self.network_name)
         ssz_bytes = block.encode_bytes()
         compressed = compress(ssz_bytes)
 
@@ -230,7 +230,7 @@ class NetworkService:
             attestation: Signed attestation to publish.
             subnet_id: Subnet ID to publish to.
         """
-        topic = GossipTopic.attestation_subnet(self.fork_digest, subnet_id)
+        topic = GossipTopic.attestation_subnet(self.network_name, subnet_id)
         ssz_bytes = attestation.encode_bytes()
         compressed = compress(ssz_bytes)
 
@@ -246,7 +246,7 @@ class NetworkService:
         Args:
             signed_attestation: Aggregated attestation to publish.
         """
-        topic = GossipTopic.committee_aggregation(self.fork_digest)
+        topic = GossipTopic.committee_aggregation(self.network_name)
         ssz_bytes = signed_attestation.encode_bytes()
         compressed = compress(ssz_bytes)
 

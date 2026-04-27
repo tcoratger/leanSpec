@@ -99,9 +99,9 @@ class NodeConfig:
     If None, the node runs in passive mode (sync only).
     """
 
-    fork_digest: str = field(default="0x00000000")
+    network_name: str = field(default="0x00000000")
     """
-    Fork digest for gossip topics.
+    Network name for gossip topics.
 
     For devnet testing with ream, use "devnet0".
     """
@@ -272,7 +272,7 @@ class Node:
         network_service = NetworkService(
             sync_service=sync_service,
             event_source=config.event_source,
-            fork_digest=config.fork_digest,
+            network_name=config.network_name,
             is_aggregator=config.is_aggregator,
             aggregate_subnet_ids=config.aggregate_subnet_ids,
         )

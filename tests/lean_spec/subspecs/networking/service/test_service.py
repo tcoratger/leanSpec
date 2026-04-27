@@ -50,7 +50,7 @@ def _make_network_service(
     *,
     sync_service: object | None = None,
     peer_id: PeerId | None = None,
-    fork_digest: str = FORK_DIGEST,
+    network_name: str = FORK_DIGEST,
 ) -> tuple[NetworkService, MockEventSource]:
     """Build a `NetworkService` wired to a `MockEventSource`."""
     source = MockEventSource(events=events)
@@ -60,7 +60,7 @@ def _make_network_service(
     svc = NetworkService(
         sync_service=sync_service,  # type: ignore[arg-type]
         event_source=source,
-        fork_digest=fork_digest,
+        network_name=network_name,
     )
     return svc, source
 
@@ -122,7 +122,7 @@ class TestRunLifecycle:
         svc = NetworkService(
             sync_service=sync_service,
             event_source=MockEventSource(events=[]),  # placeholder
-            fork_digest=FORK_DIGEST,
+            network_name=FORK_DIGEST,
         )
         # Replace with the stop-after-first source
         stop_source = _StopAfterFirstEvent(events, svc)
@@ -154,7 +154,7 @@ class TestRunLifecycle:
         svc = NetworkService(
             sync_service=sync_service,
             event_source=source,  # type: ignore[arg-type]
-            fork_digest=FORK_DIGEST,
+            network_name=FORK_DIGEST,
         )
         await svc.run()
         assert not svc.is_running
@@ -342,7 +342,7 @@ class TestPublishBlock:
         """Block topic string matches the expected format."""
         topic = GossipTopic.block(FORK_DIGEST)
         topic_id = topic.to_topic_id()
-        # Topic format: /leanconsensus/{fork_digest}/block/ssz_snappy
+        # Topic format: /leanconsensus/{network_name}/block/ssz_snappy
         assert FORK_DIGEST in topic_id
         assert "block" in topic_id
         assert "ssz_snappy" in topic_id
@@ -464,14 +464,14 @@ class TestNetworkServiceInit:
     """Tests for constructor fields and defaults."""
 
     def test_default_fork_digest(self, peer_id: PeerId) -> None:
-        """fork_digest defaults to `0x00000000` when not specified."""
+        """network_name defaults to `0x00000000` when not specified."""
         source = MockEventSource(events=[])
         sync_service = create_mock_sync_service(peer_id)
         svc = NetworkService(
             sync_service=sync_service,
             event_source=source,
         )
-        assert svc.fork_digest == "0x00000000"
+        assert svc.network_name == "0x00000000"
 
     def test_default_is_aggregator(self, peer_id: PeerId) -> None:
         """is_aggregator defaults to False."""

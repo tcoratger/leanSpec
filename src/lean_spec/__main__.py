@@ -197,7 +197,7 @@ def _init_from_genesis(
         network=event_source.reqresp_client,
         fork=fork,
         validator_registry=validator_registry,
-        fork_digest=fork.GOSSIP_DIGEST,
+        network_name=fork.NETWORK_NAME,
         is_aggregator=is_aggregator,
         aggregate_subnet_ids=aggregate_subnet_ids,
         api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
@@ -313,7 +313,7 @@ async def _init_from_checkpoint(
             network=event_source.reqresp_client,
             fork=fork,
             validator_registry=validator_registry,
-            fork_digest=fork.GOSSIP_DIGEST,
+            network_name=fork.NETWORK_NAME,
             is_aggregator=is_aggregator,
             aggregate_subnet_ids=aggregate_subnet_ids,
             api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
@@ -499,18 +499,18 @@ async def run_node(
 
     event_source = await LiveNetworkEventSource.create()
 
-    # Set the fork digest for incoming message validation.
+    # Set the network name for incoming message validation.
     #
     # Without this, the event source defaults to "0x00000000" and rejects
     # all messages from other clients that use "devnet0".
-    event_source.set_fork_digest(fork.GOSSIP_DIGEST)
+    event_source.set_network_name(fork.NETWORK_NAME)
 
     # Subscribe to gossip topics.
     #
     # We subscribe before connecting to bootnodes so that when
     # we establish connections, we can immediately announce our
     # subscriptions to peers.
-    block_topic = GossipTopic.block(fork.GOSSIP_DIGEST).to_topic_id()
+    block_topic = GossipTopic.block(fork.NETWORK_NAME).to_topic_id()
     event_source.subscribe_gossip_topic(block_topic)
 
     # Determine attestation subnets to subscribe to.
@@ -541,7 +541,7 @@ async def run_node(
 
     for subnet_id in subscription_subnets:
         attestation_subnet_topic = GossipTopic.attestation_subnet(
-            fork.GOSSIP_DIGEST, subnet_id
+            fork.NETWORK_NAME, subnet_id
         ).to_topic_id()
         event_source.subscribe_gossip_topic(attestation_subnet_topic)
         logger.info("Subscribed to attestation subnet %d", subnet_id)

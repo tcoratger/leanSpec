@@ -35,7 +35,7 @@ class ForkProtocol(ABC):
     VERSION: ClassVar[int]
     """Strictly monotonic version. Used to order forks in the registry."""
 
-    GOSSIP_DIGEST: ClassVar[str]
+    NETWORK_NAME: ClassVar[str]
     """
     Fork identifier embedded in gossipsub topic names.
 

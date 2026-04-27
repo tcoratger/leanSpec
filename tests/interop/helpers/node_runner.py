@@ -201,8 +201,8 @@ class NodeCluster:
     _genesis_time: int = field(default=0, repr=False)
     """Genesis time for all nodes."""
 
-    fork_digest: str = field(default="devnet0")
-    """Fork digest for gossip topics."""
+    network_name: str = field(default="devnet0")
+    """Network name for gossip topics."""
 
     def __post_init__(self) -> None:
         """Initialize validators and keys."""
@@ -272,7 +272,7 @@ class NodeCluster:
         listen_addr = f"/ip4/127.0.0.1/udp/{p2p_port}/quic-v1"
 
         event_source = await LiveNetworkEventSource.create()
-        event_source.set_fork_digest(self.fork_digest)
+        event_source.set_network_name(self.network_name)
 
         validator_registry: ValidatorRegistry | None = None
         if validator_indices:
@@ -299,7 +299,7 @@ class NodeCluster:
             fork=LstarSpec(),
             api_config=None,  # Disable API server for interop tests (not needed for P2P testing)
             validator_registry=validator_registry,
-            fork_digest=self.fork_digest,
+            network_name=self.network_name,
             is_aggregator=is_aggregator,
         )
 
@@ -367,8 +367,8 @@ class NodeCluster:
 
         await event_source.start_gossipsub()
 
-        block_topic = TopicId(f"/leanconsensus/{self.fork_digest}/block/ssz_snappy")
-        aggregation_topic = TopicId(f"/leanconsensus/{self.fork_digest}/aggregation/ssz_snappy")
+        block_topic = TopicId(f"/leanconsensus/{self.network_name}/block/ssz_snappy")
+        aggregation_topic = TopicId(f"/leanconsensus/{self.network_name}/aggregation/ssz_snappy")
         event_source.subscribe_gossip_topic(block_topic)
         event_source.subscribe_gossip_topic(aggregation_topic)
 
@@ -380,7 +380,7 @@ class NodeCluster:
             for idx in validator_indices:
                 subnet_id = int(idx) % int(ATTESTATION_COMMITTEE_COUNT)
                 topic = TopicId(
-                    f"/leanconsensus/{self.fork_digest}/attestation_{subnet_id}/ssz_snappy"
+                    f"/leanconsensus/{self.network_name}/attestation_{subnet_id}/ssz_snappy"
                 )
                 event_source.subscribe_gossip_topic(topic)
 

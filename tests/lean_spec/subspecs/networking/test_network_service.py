@@ -38,13 +38,13 @@ from tests.lean_spec.helpers import (
 @pytest.fixture
 def block_topic() -> GossipTopic:
     """Provide a block gossip topic for tests."""
-    return GossipTopic(kind=TopicKind.BLOCK, fork_digest="0x12345678")
+    return GossipTopic(kind=TopicKind.BLOCK, network_name="0x12345678")
 
 
 @pytest.fixture
 def attestation_topic() -> GossipTopic:
     """Provide an attestation subnet gossip topic for tests."""
-    return GossipTopic(kind=TopicKind.ATTESTATION_SUBNET, fork_digest="0x12345678")
+    return GossipTopic(kind=TopicKind.ATTESTATION_SUBNET, network_name="0x12345678")
 
 
 class TestBlockRoutingToForkchoice:
