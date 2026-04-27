@@ -4,7 +4,7 @@ Fork protocol interface for leanSpec consensus.
 This module is deliberately agnostic of any individual devnet.
 """
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Protocol, Self
 
 
@@ -68,6 +68,16 @@ class ForkProtocol(ABC):
         """Construct a forkchoice store anchored at the given state and block."""
         return self.store_class.from_anchor(state, anchor_block, validator_id)
 
+    @abstractmethod
     def upgrade_state(self, state: Any) -> Any:
-        """Migrate state from the previous fork. Default: identity."""
-        return state
+        """
+        Migrate state from the previous fork's shape into this fork's shape.
+
+        Every concrete fork must declare this explicitly. The root fork
+        (previous is None) returns the input unchanged. Later forks return a
+        state of their own shape derived from the predecessor's state.
+
+        Making this abstract is intentional: a silent no-op default would
+        hide missed migrations whenever a fork adds a field but forgets to
+        override.
+        """

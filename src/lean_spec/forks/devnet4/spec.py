@@ -21,3 +21,11 @@ class Devnet4Spec(ForkProtocol):
     state_class: ClassVar[type[State]] = State
     block_class: ClassVar[type[Block]] = Block
     store_class: ClassVar[type[Store]] = Store
+
+    def upgrade_state(self, state: State) -> State:
+        """
+        Devnet4 is the root fork: there is no predecessor, so no migration.
+
+        Returns the input state unchanged.
+        """
+        return state

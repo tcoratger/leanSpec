@@ -28,3 +28,13 @@ class Devnet5Spec(Devnet4Spec):
     state_class: ClassVar[type[State]] = State
     block_class: ClassVar[type[Block]] = Block
     store_class: ClassVar[type[Store]] = Store
+
+    def upgrade_state(self, state: State) -> State:
+        """
+        Devnet5 currently mirrors devnet4 exactly, so the migration is identity.
+
+        When devnet5 introduces its own State shape under
+        forks/devnet5/containers/, replace this body with the real migration
+        from devnet4's State to devnet5's State.
+        """
+        return state

@@ -23,6 +23,11 @@ from tests.lean_spec.helpers.builders import make_validators
 class TestForkProtocolGeneric:
     """ForkProtocol must not hard-reference any devnet."""
 
+    def test_cannot_instantiate_directly(self) -> None:
+        """ForkProtocol is abstract; concrete forks must implement upgrade_state."""
+        with pytest.raises(TypeError, match="abstract"):
+            ForkProtocol()  # type: ignore[abstract]
+
     def test_protocol_module_imports_no_devnet_package(self) -> None:
         """The protocol module must not import any devnet package."""
         source = protocol.__file__
@@ -72,7 +77,7 @@ class TestDevnet4Spec:
         assert len(state.validators) == 4
 
     def test_upgrade_state_is_identity(self) -> None:
-        """Default upgrade_state returns the same state."""
+        """Devnet4 is the root fork: upgrade_state returns the input unchanged."""
         fork = Devnet4Spec()
         validators = make_validators(4)
         state = fork.generate_genesis(Uint64(0), validators)
