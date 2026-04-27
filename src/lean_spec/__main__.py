@@ -33,7 +33,7 @@ import sys
 import time
 from pathlib import Path
 
-from lean_spec.forks import DEFAULT_RUNNER, ForkProtocol, State
+from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol, State
 from lean_spec.forks.devnet4.containers import Block, BlockBody, Checkpoint
 from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
 from lean_spec.forks.devnet4.containers.slot import Slot
@@ -428,7 +428,7 @@ async def run_node(
             Only effective when is_aggregator is also True.
         api_port: Port for API server (health, fork_choice, /metrics). None or 0 disables.
     """
-    fork = DEFAULT_RUNNER.current
+    fork = DEFAULT_REGISTRY.current
 
     metrics.init(name="leanspec-node", version="0.0.1")
     set_observer(PrometheusObserver())
