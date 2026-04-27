@@ -1,15 +1,15 @@
-from lean_spec.forks.devnet4.containers.block import (
+from lean_spec.forks.lstar.containers.block import (
     Block,
     BlockBody,
     BlockSignatures,
     SignedBlock,
 )
-from lean_spec.forks.devnet4.containers.block.types import (
+from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
 )
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.types import Bytes32
 from tests.lean_spec.helpers.builders import make_mock_signature
 

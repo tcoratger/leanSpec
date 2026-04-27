@@ -13,9 +13,9 @@ from consensus_testing import (
     StoreChecks,
 )
 
-from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.lstar.containers.slot import Slot
 
-pytestmark = pytest.mark.valid_until("Devnet4")
+pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_equal_weight_forks_use_lexicographic_tiebreaker(

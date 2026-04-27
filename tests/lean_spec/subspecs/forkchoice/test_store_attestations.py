@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.devnet4 import AttestationSignatureEntry
-from lean_spec.forks.devnet4.containers.attestation import (
+from lean_spec.forks.lstar import AttestationSignatureEntry
+from lean_spec.forks.lstar.containers.attestation import (
     AttestationData,
     SignedAggregatedAttestation,
     SignedAttestation,
 )
-from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof

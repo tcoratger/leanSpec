@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.types.bitfields import BaseBitlist
 

@@ -1,4 +1,4 @@
-"""Devnet4 fork"""
+"""Lstar fork"""
 
 from .containers.state import State
 from .store import AttestationSignatureEntry, Store

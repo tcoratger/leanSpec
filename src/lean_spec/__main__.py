@@ -34,10 +34,10 @@ import time
 from pathlib import Path
 
 from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol, State
-from lean_spec.forks.devnet4.containers import Block, BlockBody, Checkpoint
-from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import SubnetId
+from lean_spec.forks.lstar.containers import Block, BlockBody, Checkpoint
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.genesis import GenesisConfig

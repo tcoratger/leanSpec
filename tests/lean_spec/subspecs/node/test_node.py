@@ -10,25 +10,25 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.devnet4 import State
-from lean_spec.forks.devnet4.containers import (
+from lean_spec.forks.lstar import State
+from lean_spec.forks.lstar.containers import (
     Block,
     BlockBody,
 )
-from lean_spec.forks.devnet4.containers.block import BlockHeader
-from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
-from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
-from lean_spec.forks.devnet4.containers.config import Config
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state import Validators
-from lean_spec.forks.devnet4.containers.state.types import (
+from lean_spec.forks.lstar.containers.block import BlockHeader
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
+from lean_spec.forks.lstar.containers.config import Config
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
-from lean_spec.forks.devnet4.spec import Devnet4Spec
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import (
     ATTESTATION_COMMITTEE_COUNT,
@@ -116,7 +116,7 @@ def node_config() -> NodeConfig:
         validators=make_validators(3),
         event_source=MockEventSource(),
         network=MockNetworkRequester(),
-        fork=Devnet4Spec(),
+        fork=LstarSpec(),
         time_fn=lambda: 1704067200.0,
     )
 

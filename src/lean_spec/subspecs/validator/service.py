@@ -37,18 +37,18 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lean_spec.forks.devnet4.containers import (
+from lean_spec.forks.lstar.containers import (
     AttestationData,
     Block,
     SignedAttestation,
     SignedBlock,
     ValidatorIndex,
 )
-from lean_spec.forks.devnet4.containers.block import (
+from lean_spec.forks.lstar.containers.block import (
     AttestationSignatures,
     BlockSignatures,
 )
-from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import SyncService

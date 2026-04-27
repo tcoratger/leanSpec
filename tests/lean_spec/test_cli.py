@@ -20,10 +20,10 @@ from lean_spec.__main__ import (
     create_anchor_block,
     resolve_bootnode,
 )
-from lean_spec.forks.devnet4.containers import Block, BlockBody
-from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.spec import Devnet4Spec
+from lean_spec.forks.lstar.containers import Block, BlockBody
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.node import Node
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -341,7 +341,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
-                fork=Devnet4Spec(),
+                fork=LstarSpec(),
             )
 
         # Returns None due to genesis time mismatch
@@ -376,7 +376,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
-                fork=Devnet4Spec(),
+                fork=LstarSpec(),
             )
 
         # Assert
@@ -404,7 +404,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
-                fork=Devnet4Spec(),
+                fork=LstarSpec(),
             )
 
         # Assert
@@ -436,7 +436,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
-                fork=Devnet4Spec(),
+                fork=LstarSpec(),
             )
 
         assert result is not None
@@ -467,7 +467,7 @@ class TestInitFromCheckpoint:
                 checkpoint_sync_url="http://localhost:5052",
                 genesis=local_genesis,
                 event_source=mock_event_source,
-                fork=Devnet4Spec(),
+                fork=LstarSpec(),
             )
 
         # Assert

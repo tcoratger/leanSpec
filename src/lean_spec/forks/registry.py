@@ -46,7 +46,7 @@ class ForkRegistry:
         Look up a fork by name.
 
         Args:
-            name: Fork name (e.g. 'devnet4').
+            name: Fork name (e.g. 'lstar').
 
         Returns:
             The matching ForkProtocol instance.

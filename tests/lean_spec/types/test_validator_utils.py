@@ -2,8 +2,8 @@
 
 import pytest
 
-from lean_spec.forks.devnet4.containers import ValidatorIndex
-from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.lstar.containers import ValidatorIndex
+from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.types import Uint64
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.forks.devnet4.containers import Slot
+from lean_spec.forks.lstar.containers import Slot
 from lean_spec.subspecs.chain import Interval, SlotClock
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,

@@ -13,9 +13,9 @@ from lean_multisig_py import (
 )
 
 from lean_spec.config import LEAN_ENV, LeanEnvMode
-from lean_spec.forks.devnet4.containers.attestation import AggregationBits
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.attestation import AggregationBits
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.types import ByteListMiB, Bytes32, Container
 
 from .containers import PublicKey, Signature

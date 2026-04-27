@@ -16,8 +16,8 @@ from consensus_testing import (
     TickStep,
 )
 
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
     MAX_ATTESTATIONS_DATA,
@@ -25,7 +25,7 @@ from lean_spec.subspecs.chain.config import (
     SECONDS_PER_SLOT,
 )
 
-pytestmark = pytest.mark.valid_until("Devnet4")
+pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_block_builder_fixed_point_advances_justification(

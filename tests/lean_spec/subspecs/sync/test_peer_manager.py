@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
-from lean_spec.forks.devnet4.containers.slot import Slot
+from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
+from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status

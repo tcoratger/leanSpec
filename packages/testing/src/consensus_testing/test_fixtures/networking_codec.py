@@ -2,7 +2,7 @@
 
 from typing import Any, ClassVar
 
-from lean_spec.forks.devnet4.containers.validator import SubnetId
+from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.snappy import compress, decompress, frame_compress, frame_decompress
 from lean_spec.subspecs.networking.discovery.codec import decode_message, encode_message
 from lean_spec.subspecs.networking.discovery.messages import (

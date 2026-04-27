@@ -41,15 +41,15 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 
 from lean_spec.forks import Store
-from lean_spec.forks.devnet4.containers import (
+from lean_spec.forks.lstar.containers import (
     Block,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
 )
-from lean_spec.forks.devnet4.containers.block import BlockLookup
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import SubnetId
+from lean_spec.forks.lstar.containers.block import BlockLookup
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.reqresp.message import Status

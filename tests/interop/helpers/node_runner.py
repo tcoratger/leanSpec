@@ -12,12 +12,12 @@ import time
 from dataclasses import dataclass, field
 from typing import cast
 
-from lean_spec.forks.devnet4 import Store
-from lean_spec.forks.devnet4.containers import Checkpoint, Validator
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state import Validators
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
-from lean_spec.forks.devnet4.spec import Devnet4Spec
+from lean_spec.forks.lstar import Store
+from lean_spec.forks.lstar.containers import Checkpoint, Validator
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
@@ -296,7 +296,7 @@ class NodeCluster:
             validators=self._validators,
             event_source=event_source,
             network=event_source.reqresp_client,
-            fork=Devnet4Spec(),
+            fork=LstarSpec(),
             api_config=None,  # Disable API server for interop tests (not needed for P2P testing)
             validator_registry=validator_registry,
             fork_digest=self.fork_digest,

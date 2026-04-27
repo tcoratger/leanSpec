@@ -2,7 +2,7 @@
 
 import pytest
 
-from lean_spec.forks.devnet4.containers.validator import SubnetId
+from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client.event_source import GossipHandler
 from lean_spec.subspecs.networking.gossipsub import (

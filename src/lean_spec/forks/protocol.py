@@ -30,7 +30,7 @@ class ForkProtocol(ABC):
     """Identity and construction facade for a devnet fork."""
 
     NAME: ClassVar[str]
-    """Fork name, e.g. 'devnet4'. Must be unique across the registry."""
+    """Fork name, e.g. 'lstar'. Must be unique across the registry."""
 
     VERSION: ClassVar[int]
     """Strictly monotonic version. Used to order forks in the registry."""

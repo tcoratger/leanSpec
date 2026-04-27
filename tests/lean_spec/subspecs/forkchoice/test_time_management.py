@@ -3,11 +3,11 @@
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from lean_spec.forks.devnet4 import State, Store
-from lean_spec.forks.devnet4.containers import Block
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state import Validators
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar import State, Store
+from lean_spec.forks.lstar.containers import Block
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,

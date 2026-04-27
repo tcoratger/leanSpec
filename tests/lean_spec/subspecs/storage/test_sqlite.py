@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from lean_spec.forks.devnet4 import State
-from lean_spec.forks.devnet4.containers import Block, BlockBody, Checkpoint
-from lean_spec.forks.devnet4.containers.attestation import AttestationData
-from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar import State
+from lean_spec.forks.lstar.containers import Block, BlockBody, Checkpoint
+from lean_spec.forks.lstar.containers.attestation import AttestationData
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import (
     SQLiteDatabase,

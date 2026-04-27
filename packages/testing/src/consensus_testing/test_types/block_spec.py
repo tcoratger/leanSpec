@@ -4,26 +4,26 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from lean_spec.forks.devnet4.containers.attestation import (
+from lean_spec.forks.lstar.containers.attestation import (
     AggregatedAttestation,
     Attestation,
     AttestationData,
     SignedAttestation,
 )
-from lean_spec.forks.devnet4.containers.block import (
+from lean_spec.forks.lstar.containers.block import (
     Block,
     BlockBody,
     BlockSignatures,
     SignedBlock,
 )
-from lean_spec.forks.devnet4.containers.block.types import (
+from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
 )
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state import State
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.forks.devnet4.store import Store
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature

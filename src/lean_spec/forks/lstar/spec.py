@@ -1,18 +1,18 @@
-"""Devnet4 fork — identity and construction facade."""
+"""Lstar fork — identity and construction facade."""
 
 from typing import ClassVar
 
-from lean_spec.forks.devnet4.containers.block import Block
+from lean_spec.forks.lstar.containers.block import Block
 
 from ..protocol import ForkProtocol
 from .containers.state import State
 from .store import Store
 
 
-class Devnet4Spec(ForkProtocol):
-    """Devnet4 fork."""
+class LstarSpec(ForkProtocol):
+    """Lstar fork."""
 
-    NAME: ClassVar[str] = "devnet4"
+    NAME: ClassVar[str] = "lstar"
     VERSION: ClassVar[int] = 4
     GOSSIP_DIGEST: ClassVar[str] = "devnet0"
 
@@ -24,7 +24,7 @@ class Devnet4Spec(ForkProtocol):
 
     def upgrade_state(self, state: State) -> State:
         """
-        Devnet4 is the root fork: there is no predecessor, so no migration.
+        Lstar is the root fork: there is no predecessor, so no migration.
 
         Returns the input state unchanged.
         """

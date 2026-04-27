@@ -59,8 +59,8 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.forks.devnet4.containers import SignedBlock
-from lean_spec.forks.devnet4.containers.attestation import (
+from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.forks.lstar.containers.attestation import (
     SignedAggregatedAttestation,
     SignedAttestation,
 )

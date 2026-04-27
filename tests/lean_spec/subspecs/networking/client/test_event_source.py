@@ -7,11 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lean_spec.forks.devnet4.containers import SignedBlock
-from lean_spec.forks.devnet4.containers.attestation import SignedAttestation
-from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.forks.lstar.containers.attestation import SignedAttestation
+from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.snappy import compress
 from lean_spec.subspecs.networking.client.event_source import (
     SUPPORTED_PROTOCOLS,

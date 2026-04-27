@@ -9,7 +9,7 @@ __all__ = ["AttestationSignatureEntry", "Store"]
 from collections import defaultdict
 from typing import NamedTuple
 
-from lean_spec.forks.devnet4.containers import (
+from lean_spec.forks.lstar.containers import (
     AttestationData,
     Block,
     Checkpoint,
@@ -18,10 +18,10 @@ from lean_spec.forks.devnet4.containers import (
     SignedBlock,
     ValidatorIndex,
 )
-from lean_spec.forks.devnet4.containers.attestation.attestation import SignedAggregatedAttestation
-from lean_spec.forks.devnet4.containers.block import BlockLookup
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndices
+from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
+from lean_spec.forks.lstar.containers.block import BlockLookup
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,

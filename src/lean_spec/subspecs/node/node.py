@@ -20,12 +20,12 @@ from pathlib import Path
 from typing import Final
 
 from lean_spec.forks import ForkProtocol, Store
-from lean_spec.forks.devnet4.containers import Block, BlockBody, SignedBlock
-from lean_spec.forks.devnet4.containers.attestation import SignedAttestation
-from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state import Validators
-from lean_spec.forks.devnet4.containers.validator import SubnetId, ValidatorIndex
+from lean_spec.forks.lstar.containers import Block, BlockBody, SignedBlock
+from lean_spec.forks.lstar.containers.attestation import SignedAttestation
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.api import AggregatorController, ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.clock import Interval
@@ -417,7 +417,7 @@ class Node:
         if fork is not None:
             store_cls = fork.store_class
         else:
-            from lean_spec.forks.devnet4.store import Store
+            from lean_spec.forks.lstar.store import Store
 
             store_cls = Store
         return store_cls(

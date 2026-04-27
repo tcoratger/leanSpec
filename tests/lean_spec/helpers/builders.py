@@ -11,8 +11,8 @@ from typing import Callable, NamedTuple, cast
 
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.devnet4 import AttestationSignatureEntry, State, Store
-from lean_spec.forks.devnet4.containers import (
+from lean_spec.forks.lstar import AttestationSignatureEntry, State, Store
+from lean_spec.forks.lstar.containers import (
     AttestationData,
     Block,
     BlockBody,
@@ -21,18 +21,18 @@ from lean_spec.forks.devnet4.containers import (
     SignedBlock,
     Validator,
 )
-from lean_spec.forks.devnet4.containers.attestation import (
+from lean_spec.forks.lstar.containers.attestation import (
     AggregatedAttestation,
     SignedAggregatedAttestation,
 )
-from lean_spec.forks.devnet4.containers.block import BlockSignatures
-from lean_spec.forks.devnet4.containers.block.types import (
+from lean_spec.forks.lstar.containers.block import BlockSignatures
+from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
 )
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state import Validators
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId

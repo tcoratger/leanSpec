@@ -5,19 +5,19 @@ from __future__ import annotations
 from collections.abc import Iterable
 from collections.abc import Set as AbstractSet
 
-from lean_spec.forks.devnet4.containers.attestation import AggregatedAttestation, AttestationData
-from lean_spec.forks.devnet4.containers.block import Block, BlockBody, BlockHeader
-from lean_spec.forks.devnet4.containers.block.types import AggregatedAttestations
-from lean_spec.forks.devnet4.containers.checkpoint import Checkpoint
-from lean_spec.forks.devnet4.containers.config import Config
-from lean_spec.forks.devnet4.containers.slot import Slot
-from lean_spec.forks.devnet4.containers.state.types import (
+from lean_spec.forks.lstar.containers.attestation import AggregatedAttestation, AttestationData
+from lean_spec.forks.lstar.containers.block import Block, BlockBody, BlockHeader
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
+from lean_spec.forks.lstar.containers.config import Config
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.forks.devnet4.containers.validator import ValidatorIndex, Validators
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex, Validators
 from lean_spec.subspecs.chain.config import MAX_ATTESTATIONS_DATA
 from lean_spec.subspecs.observability import observe_state_transition
 from lean_spec.subspecs.ssz.hash import hash_tree_root

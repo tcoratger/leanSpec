@@ -1,13 +1,12 @@
 """Multi-fork dispatch layer for leanSpec consensus specification."""
 
-from .devnet4.containers.state import State
-from .devnet4.spec import Devnet4Spec
-from .devnet4.store import AttestationSignatureEntry, Store
-from .devnet5.spec import Devnet5Spec
+from .lstar.containers.state import State
+from .lstar.spec import LstarSpec
+from .lstar.store import AttestationSignatureEntry, Store
 from .protocol import ForkProtocol, SpecStateType, SpecStoreType
 from .registry import ForkRegistry
 
-FORK_SEQUENCE: list[ForkProtocol] = [Devnet4Spec(), Devnet5Spec()]
+FORK_SEQUENCE: list[ForkProtocol] = [LstarSpec()]
 """Ordered oldest to newest. ForkRegistry enforces strictly increasing VERSION."""
 
 DEFAULT_REGISTRY: ForkRegistry = ForkRegistry(FORK_SEQUENCE)
@@ -16,11 +15,10 @@ DEFAULT_REGISTRY: ForkRegistry = ForkRegistry(FORK_SEQUENCE)
 __all__ = [
     "AttestationSignatureEntry",
     "DEFAULT_REGISTRY",
-    "Devnet4Spec",
-    "Devnet5Spec",
     "FORK_SEQUENCE",
     "ForkProtocol",
     "ForkRegistry",
+    "LstarSpec",
     "SpecStateType",
     "SpecStoreType",
     "State",
