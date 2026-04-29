@@ -3,6 +3,7 @@
 import pytest
 from consensus_testing import (
     AggregatedAttestationSpec,
+    AttestationCheck,
     AttestationStep,
     BlockSpec,
     BlockStep,
@@ -264,17 +265,17 @@ def test_same_slot_equivocating_attesters_count_once(
     --------
     Eight validators. Two forks diverge from a common ancestor:
 
-    - fork_a receives slot-3 votes from validators 0, 1, and 2
-    - fork_b receives slot-3 votes from validators 0, 1, 3, and 4
+    - fork_a (slot 2) receives slot-3 votes from V0, V1, V2
+    - fork_b (slot 3) receives slot-3 votes from V0, V1, V3, V4
 
-    Validators 0 and 1 equivocate by signing both fork votes at the same
-    attestation slot. Their later conflicting vote must not add weight to
-    fork_b while still counting for fork_a.
+    Both gossip aggregates carry attestation slot 3.
+    V0 and V1 equivocate by voting on both forks.
+    The later conflicting vote must not shift weight to fork_b.
 
     Expected Behavior
     -----------------
-    1. fork_a has effective weight 3
-    2. fork_b has effective weight 2
+    1. fork_a has effective weight 3 (V0, V1, V2)
+    2. fork_b has effective weight 2 (V3, V4)
     3. Head stays on fork_a
     4. No checkpoint is justified by the below-threshold votes
     """
@@ -293,7 +294,12 @@ def test_same_slot_equivocating_attesters_count_once(
                 block=BlockSpec(slot=Slot(3), parent_label="common", label="fork_b"),
                 checks=StoreChecks(lexicographic_head_among=["fork_a", "fork_b"]),
             ),
+            # Slot 3, interval 3 (aggregate phase).
+            # Pool is empty, so the trigger is a no-op.
             TickStep(interval=18),
+            # fork_a is gossiped first.
+            # Insertion-ordered dicts make this deterministic.
+            # V0 and V1's first votes stick on fork_a.
             GossipAggregatedAttestationStep(
                 attestation=GossipAggregatedAttestationSpec(
                     validator_ids=[
@@ -319,6 +325,8 @@ def test_same_slot_equivocating_attesters_count_once(
                     target_root_label="fork_b",
                 ),
             ),
+            # 16s = interval 20. Crosses interval 19 (slot 3, interval 4),
+            # which migrates aggregates from "new" to "known".
             TickStep(
                 time=16,
                 checks=StoreChecks(
@@ -327,6 +335,42 @@ def test_same_slot_equivocating_attesters_count_once(
                     latest_justified_slot=Slot(0),
                     latest_finalized_slot=Slot(0),
                     latest_known_aggregated_target_slots=[Slot(2), Slot(3)],
+                    # Per-validator votes pin down the first-vote-wins rule.
+                    # - V0, V1 equivocated;
+                    # - V2 only fork_a;
+                    # - V3, V4 only fork_b.
+                    attestation_checks=[
+                        AttestationCheck(
+                            validator=ValidatorIndex(0),
+                            location="known",
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(2),
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(1),
+                            location="known",
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(2),
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(2),
+                            location="known",
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(2),
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(3),
+                            location="known",
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(3),
+                        ),
+                        AttestationCheck(
+                            validator=ValidatorIndex(4),
+                            location="known",
+                            attestation_slot=Slot(3),
+                            target_slot=Slot(3),
+                        ),
+                    ],
                 ),
             ),
         ],

@@ -444,8 +444,12 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
     6. latest_finalized_slot is 10
     7. The block body contains exactly both aggregated attestations
     """
+    # Slot 11, interval 2 (aggregate phase).
+    # Pool is empty here, so the trigger is a no-op.
     aggregate_interval = 11 * int(INTERVALS_PER_SLOT) + 2
     aggregate_time = math.ceil(aggregate_interval * int(MILLISECONDS_PER_INTERVAL) / 1000)
+    # Slot 12 boundary. Crosses slot 11, interval 4,
+    # which migrates aggregates from "new" to "known".
     block_time = 12 * int(SECONDS_PER_SLOT)
 
     fork_choice_test(
@@ -541,7 +545,7 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
                         parent_label=f"block_{n - 1}",
                         label=f"block_{n}",
                     ),
-                    checks=(StoreChecks(head_slot=Slot(n)) if n == 9 or n == 11 else None),
+                    checks=StoreChecks(head_slot=Slot(n)),
                 )
                 for n in range(9, 12)
             ],
