@@ -631,6 +631,9 @@ def test_attestation_target_selection_after_finality_has_moved(
                     latest_finalized_slot=Slot(1),
                 ),
             ),
+            # First block after finality moves.
+            # Full check that the walkback respects the new finalized boundary
+            # instead of falling back to genesis.
             BlockStep(
                 block=BlockSpec(slot=Slot(9), parent_label="block_8", label="block_9"),
                 checks=StoreChecks(
@@ -642,14 +645,11 @@ def test_attestation_target_selection_after_finality_has_moved(
                     attestation_target_slot=Slot(7),
                 ),
             ),
+            # Target must stay pinned on block_7 as the head extends.
             BlockStep(
                 block=BlockSpec(slot=Slot(10), parent_label="block_9", label="block_10"),
                 checks=StoreChecks(
                     head_slot=Slot(10),
-                    latest_justified_slot=Slot(7),
-                    latest_finalized_slot=Slot(1),
-                    safe_target_slot=Slot(7),
-                    safe_target_root_label="block_7",
                     attestation_target_slot=Slot(7),
                 ),
             ),
@@ -657,10 +657,6 @@ def test_attestation_target_selection_after_finality_has_moved(
                 block=BlockSpec(slot=Slot(11), parent_label="block_10", label="block_11"),
                 checks=StoreChecks(
                     head_slot=Slot(11),
-                    latest_justified_slot=Slot(7),
-                    latest_finalized_slot=Slot(1),
-                    safe_target_slot=Slot(7),
-                    safe_target_root_label="block_7",
                     attestation_target_slot=Slot(7),
                 ),
             ),
