@@ -4,6 +4,7 @@ from lean_spec.forks.lstar.containers.block import AggregatedAttestations, Block
 from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import State, Validators
 from lean_spec.forks.lstar.containers.validator import Validator, ValidatorIndex
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.protocol import ForkProtocol
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes52, Uint64
@@ -11,6 +12,9 @@ from lean_spec.types import Bytes52, Uint64
 from .keys import XmssKeyManager
 
 _DEFAULT_GENESIS_TIME = Uint64(0)
+_DEFAULT_FORK: ForkProtocol = LstarSpec()
+"""Stateless fork instance used when callers do not pass one explicitly.
+Replaces the legacy None-fork fallback that bypassed fork dispatch."""
 
 
 def _build_validators(num_validators: int) -> Validators:
@@ -39,34 +43,30 @@ def _build_validators(num_validators: int) -> Validators:
 
 
 def generate_pre_state(
+    fork: ForkProtocol = _DEFAULT_FORK,
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
     num_validators: int = 4,
-    fork: ForkProtocol | None = None,
 ) -> State:
     """Generate a default pre-state for consensus tests.
 
-    A fork argument routes through that fork's own genesis builder.
-    Later forks adding extra state fields stay correct this way.
-
     Args:
+        fork: Fork dispatching genesis construction.
         genesis_time: The genesis timestamp.
         num_validators: Number of validators to include.
-        fork: Optional fork dispatching genesis. Defaults to the base builder.
 
     Returns:
         A properly initialized consensus state.
     """
     validators = _build_validators(num_validators)
-
-    if fork is not None:
-        return fork.generate_genesis(genesis_time=genesis_time, validators=validators)
-
-    return State.generate_genesis(genesis_time=genesis_time, validators=validators)
+    state = fork.generate_genesis(genesis_time=genesis_time, validators=validators)
+    assert isinstance(state, State)
+    return state
 
 
 def build_anchor(
     num_validators: int,
     anchor_slot: Slot,
+    fork: ForkProtocol = _DEFAULT_FORK,
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
 ) -> tuple[State, Block]:
     """Build a consistent non-genesis anchor by advancing the genesis state.
@@ -82,6 +82,7 @@ def build_anchor(
     - State latest_block_header matches the anchor block header (without state_root).
 
     Args:
+        fork: Fork dispatching genesis construction.
         num_validators: Size of the validator set in the anchor state.
         anchor_slot: Slot at which the anchor block lives. Must be > 0.
         genesis_time: Genesis timestamp for the underlying pre-state.
@@ -99,7 +100,7 @@ def build_anchor(
             "For a genesis anchor use generate_pre_state instead."
         )
 
-    state = generate_pre_state(genesis_time=genesis_time, num_validators=num_validators)
+    state = generate_pre_state(fork=fork, genesis_time=genesis_time, num_validators=num_validators)
 
     # Reconstruct the genesis block from the state's latest header.
     # The genesis block is fully determined by the genesis state.

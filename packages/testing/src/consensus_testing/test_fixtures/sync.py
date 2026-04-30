@@ -8,6 +8,7 @@ sync-layer decisions bit-for-bit.
 from typing import Any, ClassVar
 
 from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.sync.checkpoint_sync import verify_checkpoint_state
 from lean_spec.types import Uint64
 
@@ -74,10 +75,14 @@ class SyncTest(BaseConsensusFixture):
         """
         num_validators = int(self.input["numValidators"])
         anchor_slot = int(self.input.get("anchorSlot", 0))
+        fork = LstarSpec()
         if anchor_slot == 0:
-            state = generate_pre_state(genesis_time=Uint64(0), num_validators=num_validators)
+            state = generate_pre_state(
+                fork=fork, genesis_time=Uint64(0), num_validators=num_validators
+            )
         else:
             state, _ = build_anchor(
+                fork=fork,
                 num_validators=num_validators,
                 anchor_slot=Slot(anchor_slot),
                 genesis_time=Uint64(0),

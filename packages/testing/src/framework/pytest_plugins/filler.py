@@ -422,7 +422,7 @@ def test_case_description(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture(scope="function")
-def pre(request: pytest.FixtureRequest) -> Any:
+def pre(request: pytest.FixtureRequest, fork: Any) -> Any:
     """
     Default pre-state (layer-specific).
 
@@ -438,11 +438,12 @@ def pre(request: pytest.FixtureRequest) -> Any:
         )
 
     layer_module = request.config.layer_module  # type: ignore[attr-defined]
+    spec = fork.spec_class()()
 
     if hasattr(request, "param"):
-        return layer_module.generate_pre_state(**request.param)
+        return layer_module.generate_pre_state(fork=spec, **request.param)
 
-    return layer_module.generate_pre_state()
+    return layer_module.generate_pre_state(fork=spec)
 
 
 def base_spec_filler_parametrizer(fixture_class: Any) -> Any:

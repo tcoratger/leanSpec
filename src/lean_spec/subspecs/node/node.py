@@ -17,9 +17,9 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
-from lean_spec.forks import ForkProtocol, Store
+from lean_spec.forks import ForkProtocol, State, Store
 from lean_spec.forks.lstar.containers import Block, BlockBody, SignedBlock
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
@@ -212,7 +212,7 @@ class Node:
             # Generate genesis state from validators.
             #
             # Includes initial checkpoints, validator registry, and config.
-            state = fork.generate_genesis(config.genesis_time, config.validators)
+            state = cast(State, fork.generate_genesis(config.genesis_time, config.validators))
 
             # Create genesis block.
             #
@@ -229,7 +229,7 @@ class Node:
             # Initialize forkchoice store.
             #
             # Genesis block is both justified and finalized.
-            store = fork.create_store(state, block, validator_id)
+            store = cast(Store, fork.create_store(state, block, validator_id))
 
             # Persist genesis to database if available.
             #
