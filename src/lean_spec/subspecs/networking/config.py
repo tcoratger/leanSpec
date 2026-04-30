@@ -72,3 +72,14 @@ Per the libp2p TLS spec (https://github.com/libp2p/specs/blob/master/tls/tls.md)
 "libp2p" is the Application-Layer Protocol Negotiation (ALPN) value used
 during the TLS 1.3 handshake to identify libp2p connections.
 """
+
+MIN_SLOTS_FOR_BLOCK_REQUESTS: Final[int] = 3600
+"""History window for BlocksByRange responders, in slots.
+
+Responders MUST keep this many recent slots available.
+
+The window slides with the node's current slot. It is never an absolute slot number.
+
+A request whose start slot falls below the window receives RESOURCE_UNAVAILABLE.
+This lets nodes prune state below the window.
+"""

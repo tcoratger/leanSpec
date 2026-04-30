@@ -18,16 +18,18 @@ from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.service.events import NetworkEvent
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Uint64
 
 
 class MockNetworkRequester:
     """Mock network that returns pre-configured blocks and tracks requests."""
 
     def __init__(self) -> None:
-        """Initialize with empty block store and request log."""
+        """Initialize with empty block store and request logs."""
         self.blocks_by_root: dict[Bytes32, SignedBlock] = {}
-        self.request_log: list[tuple[PeerId, list[Bytes32]]] = []
+        self.blocks_by_slot: dict[Slot, SignedBlock] = {}
+        self.root_request_log: list[tuple[PeerId, list[Bytes32]]] = []
+        self.range_request_log: list[tuple[PeerId, Slot, Uint64]] = []
         self.should_fail: bool = False
 
     async def request_blocks_by_root(
@@ -36,7 +38,7 @@ class MockNetworkRequester:
         roots: list[Bytes32],
     ) -> list[SignedBlock]:
         """Return blocks for requested roots."""
-        self.request_log.append((peer_id, roots))
+        self.root_request_log.append((peer_id, roots))
         if self.should_fail:
             raise ConnectionError("Network failed")
         return [self.blocks_by_root[r] for r in roots if r in self.blocks_by_root]
@@ -49,10 +51,29 @@ class MockNetworkRequester:
         """Return a single block by root."""
         return self.blocks_by_root.get(root)
 
+    async def request_blocks_by_range(
+        self,
+        peer_id: PeerId,
+        start_slot: Slot,
+        count: Uint64,
+    ) -> list[SignedBlock]:
+        """Return blocks for requested slot range."""
+        self.range_request_log.append((peer_id, start_slot, count))
+        if self.should_fail:
+            raise ConnectionError("Network failed")
+
+        blocks: list[SignedBlock] = []
+        for i in range(int(count)):
+            slot = start_slot + Slot(i)
+            if slot in self.blocks_by_slot:
+                blocks.append(self.blocks_by_slot[slot])
+        return blocks
+
     def add_block(self, block: SignedBlock) -> Bytes32:
         """Add a block to the mock network. Returns its root."""
         root = hash_tree_root(block.block)
         self.blocks_by_root[root] = block
+        self.blocks_by_slot[block.block.slot] = block
         return root
 
 

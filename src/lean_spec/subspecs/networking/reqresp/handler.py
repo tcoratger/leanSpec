@@ -64,18 +64,24 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Final
 
-from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.forks.lstar.containers import SignedBlock, Slot
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
-from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE
+from lean_spec.subspecs.networking.config import (
+    MAX_ERROR_MESSAGE_SIZE,
+    MAX_REQUEST_BLOCKS,
+    MIN_SLOTS_FOR_BLOCK_REQUESTS,
+)
 from lean_spec.subspecs.networking.transport.protocols import InboundStreamProtocol
 from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import VarintError, decode_varint
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Uint64
 
 from .codec import ResponseCode
 from .message import (
+    BLOCKS_BY_RANGE_PROTOCOL_V1,
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
+    BlocksByRangeRequest,
     BlocksByRootRequest,
     Status,
 )
@@ -124,6 +130,21 @@ type AsyncBlockLookup = Callable[[Bytes32], Awaitable[SignedBlock | None]]
 Takes a block root and returns the block if available, None otherwise.
 """
 
+type AsyncBlockBySlotLookup = Callable[[Slot], Awaitable[SignedBlock | None]]
+"""Type alias for block lookup by slot function.
+
+Takes a slot and returns the canonical block if available, None otherwise.
+"""
+
+type CurrentSlotLookup = Callable[[], Slot]
+"""Type alias for current-slot lookup function.
+
+Returns the node's current wall-clock slot.
+
+Used to compute the sliding history window for range requests.
+The window covers recent slots; older state may be pruned.
+"""
+
 
 @dataclass(slots=True)
 class RequestHandler:
@@ -151,6 +172,18 @@ class RequestHandler:
 
     block_lookup: AsyncBlockLookup | None = None
     """Callback to look up blocks by root."""
+
+    block_by_slot_lookup: AsyncBlockBySlotLookup | None = None
+    """Callback to look up canonical blocks by slot."""
+
+    current_slot_lookup: CurrentSlotLookup | None = None
+    """Callback returning the node's current slot.
+
+    Required to bound the BlocksByRange sliding history window.
+
+    When unset, the handler cannot place the window and conservatively rejects
+    every range request with SERVER_ERROR.
+    """
 
     async def handle_status(self, response: StreamResponseAdapter) -> None:
         """
@@ -221,11 +254,76 @@ class RequestHandler:
                 # The peer can retry or ask another peer for this specific block.
                 logger.warning("Error looking up block %s: %s", root.hex()[:8], e)
 
+    async def handle_blocks_by_range(
+        self,
+        request: BlocksByRangeRequest,
+        response: StreamResponseAdapter,
+    ) -> None:
+        """
+        Handle incoming BlocksByRange request.
+
+        Looks up and sends each requested block in the range.
+
+        Checks proceed in order:
+
+        1. Reject when no block lookup is configured (server misconfiguration).
+        2. Reject malformed requests: count of zero, or count above the limit.
+        3. Reject when the start slot falls below the sliding history window.
+        4. Stream canonical blocks; empty slots are silently skipped per spec.
+
+        Args:
+            request: Block range to look up.
+            response: Stream for sending blocks.
+        """
+        if self.block_by_slot_lookup is None:
+            logger.warning("BlocksByRange request received but no block_by_slot_lookup configured")
+            await response.send_error(ResponseCode.SERVER_ERROR, "Block lookup not available")
+            return
+
+        # A count of zero is INVALID_REQUEST in modern forks.
+        # Phase 0 accepted it as an empty response; we follow the stricter rule.
+        if request.count == Uint64(0) or request.count > Uint64(MAX_REQUEST_BLOCKS):
+            await response.send_error(ResponseCode.INVALID_REQUEST, "Invalid count")
+            return
+
+        # Without a current-slot source the window cannot be placed.
+        # Refuse the request rather than silently misreport available history.
+        if self.current_slot_lookup is None:
+            logger.warning("BlocksByRange request received but no current_slot_lookup configured")
+            await response.send_error(ResponseCode.SERVER_ERROR, "Current slot not available")
+            return
+
+        # Sliding window: max(0, current_slot - MIN_SLOTS_FOR_BLOCK_REQUESTS) to current_slot.
+        current_slot = self.current_slot_lookup()
+        window_floor = (
+            current_slot - Slot(MIN_SLOTS_FOR_BLOCK_REQUESTS)
+            if current_slot >= Slot(MIN_SLOTS_FOR_BLOCK_REQUESTS)
+            else Slot(0)
+        )
+        if request.start_slot < window_floor:
+            await response.send_error(
+                ResponseCode.RESOURCE_UNAVAILABLE, "Requested slot predates history window"
+            )
+            return
+
+        # Stream blocks in slot order.
+        # The callback returns canonical-only blocks and None for empty slots.
+        # Empty slots are skipped silently per spec.
+        for i in range(int(request.count)):
+            slot = request.start_slot + Slot(i)
+            try:
+                block = await self.block_by_slot_lookup(slot)
+                if block is not None:
+                    await response.send_success(block.encode_bytes())
+            except Exception as e:
+                logger.warning("Error looking up block at slot %s: %s", slot, e)
+
 
 REQRESP_PROTOCOL_IDS: Final[frozenset[ProtocolId]] = frozenset(
     {
         STATUS_PROTOCOL_V1,
         BLOCKS_BY_ROOT_PROTOCOL_V1,
+        BLOCKS_BY_RANGE_PROTOCOL_V1,
     }
 )
 """Protocol IDs handled by ReqRespServer."""
@@ -449,6 +547,21 @@ class ReqRespServer:
                 )
                 return
             await self.handler.handle_blocks_by_root(request, response)
+
+        elif protocol_id == BLOCKS_BY_RANGE_PROTOCOL_V1:
+            # BlocksByRange request: Peer wants blocks by range.
+            #
+            # The request is an SSZ object with start_slot and count.
+            try:
+                request = BlocksByRangeRequest.decode_bytes(ssz_bytes)
+            except Exception as e:
+                # SSZ decode failure: wrong size, malformed offsets, etc.
+                logger.debug("BlocksByRangeRequest decode error: %s", e)
+                await response.send_error(
+                    ResponseCode.INVALID_REQUEST, "Invalid BlocksByRangeRequest message"
+                )
+                return
+            await self.handler.handle_blocks_by_range(request, response)
 
         else:
             # Unknown protocol ID.

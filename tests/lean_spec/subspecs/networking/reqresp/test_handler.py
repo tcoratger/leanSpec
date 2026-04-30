@@ -4,30 +4,38 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from typing import Final
+
+import pytest
 
 from lean_spec.forks.lstar.containers import Checkpoint, SignedBlock
 from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE
+from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
 )
 from lean_spec.subspecs.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
+    AsyncBlockBySlotLookup,
     ReqRespServer,
     RequestHandler,
     StreamResponseAdapter,
 )
 from lean_spec.subspecs.networking.reqresp.message import (
+    BLOCKS_BY_RANGE_PROTOCOL_V1,
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
+    BlocksByRangeRequest,
     BlocksByRootRequest,
     RequestedBlockRoots,
     Status,
 )
 from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import encode_varint
-from lean_spec.types import Bytes32
+from lean_spec.subspecs.ssz import hash_tree_root
+from lean_spec.types import Bytes32, Uint64
+from lean_spec.types.exceptions import SSZSerializationError
 from tests.lean_spec.helpers import make_test_block, make_test_status
 
 
@@ -1193,3 +1201,430 @@ class TestReadRequestBufferLimit:
 
         code, _ = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
+
+
+class TestBlocksByRangeRequestRoundTrip:
+    """SSZ encode/decode round-trip tests."""
+
+    def test_basic_roundtrip(self) -> None:
+        """Encode then decode yields identical container."""
+        req = BlocksByRangeRequest(start_slot=Slot(100), count=Uint64(10))
+        encoded = req.encode_bytes()
+        assert len(encoded) == 16  # 8 (Slot) + 8 (Uint64)
+
+        decoded = BlocksByRangeRequest.decode_bytes(encoded)
+        assert decoded.start_slot == Slot(100)
+        assert decoded.count == Uint64(10)
+
+    def test_roundtrip_preserves_equality(self) -> None:
+        """Decoded request equals original."""
+        original = BlocksByRangeRequest(start_slot=Slot(42), count=Uint64(1024))
+        decoded = BlocksByRangeRequest.decode_bytes(original.encode_bytes())
+        assert original == decoded
+
+    def test_roundtrip_various_values(self) -> None:
+        """Round-trip works for diverse value combinations."""
+        cases = [
+            (Slot(0), Uint64(1)),
+            (Slot(1), Uint64(1)),
+            (Slot(0), Uint64(MAX_REQUEST_BLOCKS)),
+            (Slot(999_999), Uint64(512)),
+        ]
+        for start_slot, count in cases:
+            req = BlocksByRangeRequest(start_slot=start_slot, count=count)
+            decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+            assert decoded.start_slot == start_slot
+            assert decoded.count == count
+
+
+class TestBlocksByRangeRequestHashTreeRoot:
+    """hash_tree_root stability tests."""
+
+    def test_hash_tree_root_stable_across_reencodings(self) -> None:
+        """hash_tree_root is identical for equal requests re-encoded."""
+        req1 = BlocksByRangeRequest(start_slot=Slot(100), count=Uint64(10))
+        req2 = BlocksByRangeRequest(start_slot=Slot(100), count=Uint64(10))
+
+        root1 = hash_tree_root(req1)
+        root2 = hash_tree_root(req2)
+        assert root1 == root2
+
+    def test_hash_tree_root_after_decode(self) -> None:
+        """hash_tree_root matches between original and decoded copy."""
+        original = BlocksByRangeRequest(start_slot=Slot(500), count=Uint64(64))
+        decoded = BlocksByRangeRequest.decode_bytes(original.encode_bytes())
+
+        assert hash_tree_root(original) == hash_tree_root(decoded)
+
+    def test_hash_tree_root_differs_for_different_values(self) -> None:
+        """Different requests produce different roots."""
+        req_a = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(10))
+        req_b = BlocksByRangeRequest(start_slot=Slot(1), count=Uint64(10))
+        req_c = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(11))
+
+        assert hash_tree_root(req_a) != hash_tree_root(req_b)
+        assert hash_tree_root(req_a) != hash_tree_root(req_c)
+
+
+class TestBlocksByRangeRequestBoundaryValues:
+    """Boundary and edge-case value tests."""
+
+    def test_start_slot_zero_decodes_cleanly(self) -> None:
+        """start_slot at Slot(0) encodes and decodes correctly."""
+        req = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(1))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.start_slot == Slot(0)
+
+    def test_large_start_slot_decodes_cleanly(self) -> None:
+        """Large start_slot values encode and decode correctly."""
+        large_slot = Slot(2**63 - 1)  # Very large but valid
+        req = BlocksByRangeRequest(start_slot=large_slot, count=Uint64(1))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.start_slot == large_slot
+
+    def test_max_uint64_start_slot_decodes_cleanly(self) -> None:
+        """start_slot at Uint64 max boundary decodes cleanly."""
+        max_slot = Slot(2**64 - 1)
+        req = BlocksByRangeRequest(start_slot=max_slot, count=Uint64(1))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.start_slot == max_slot
+
+    def test_count_one(self) -> None:
+        """Minimum meaningful count (1) round-trips correctly."""
+        req = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(1))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.count == Uint64(1)
+
+    def test_count_max_request_blocks(self) -> None:
+        """count == MAX_REQUEST_BLOCKS round-trips correctly."""
+        req = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(MAX_REQUEST_BLOCKS))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.count == Uint64(MAX_REQUEST_BLOCKS)
+
+    def test_count_zero_encodes_and_decodes(self) -> None:
+        """count == 0 encodes/decodes at SSZ layer (validation is handler-level)."""
+        req = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(0))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.count == Uint64(0)
+
+    def test_count_above_max_encodes_and_decodes(self) -> None:
+        """count > MAX_REQUEST_BLOCKS encodes/decodes at SSZ layer.
+
+        Enforcement of MAX_REQUEST_BLOCKS is the handler's job, not SSZ's.
+        """
+        req = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(MAX_REQUEST_BLOCKS + 1))
+        decoded = BlocksByRangeRequest.decode_bytes(req.encode_bytes())
+        assert decoded.count == Uint64(MAX_REQUEST_BLOCKS + 1)
+
+
+class TestBlocksByRangeRequestMalformedPayloads:
+    """Truncated and oversized payload rejection tests."""
+
+    def test_truncated_payload_rejected(self) -> None:
+        """Payload shorter than 16 bytes is rejected."""
+        truncated = b"\x01" * 15  # 15 bytes, need 16
+        with pytest.raises(SSZSerializationError):
+            BlocksByRangeRequest.decode_bytes(truncated)
+
+    def test_empty_payload_rejected(self) -> None:
+        """Zero-length payload is rejected."""
+        with pytest.raises(SSZSerializationError):
+            BlocksByRangeRequest.decode_bytes(b"")
+
+    def test_single_byte_rejected(self) -> None:
+        """Single byte payload is rejected."""
+        with pytest.raises(SSZSerializationError):
+            BlocksByRangeRequest.decode_bytes(b"\x00")
+
+    def test_eight_byte_payload_rejected(self) -> None:
+        """8 bytes (half-payload, single field) is rejected."""
+        partial = (100).to_bytes(8, "little")
+        with pytest.raises(SSZSerializationError):
+            BlocksByRangeRequest.decode_bytes(partial)
+
+
+class TestBlocksByRangeProtocolId:
+    """Protocol ID format tests."""
+
+    def test_protocol_id_format(self) -> None:
+        """Protocol ID follows lean namespace convention."""
+        assert BLOCKS_BY_RANGE_PROTOCOL_V1.startswith("/leanconsensus/req/")
+        assert BLOCKS_BY_RANGE_PROTOCOL_V1.endswith("/ssz_snappy")
+        assert "blocks_by_range" in BLOCKS_BY_RANGE_PROTOCOL_V1
+
+    def test_protocol_id_version_is_v1(self) -> None:
+        """Protocol ID is version 1."""
+        assert "/1/" in BLOCKS_BY_RANGE_PROTOCOL_V1
+
+    def test_protocol_id_distinct_from_blocks_by_root(self) -> None:
+        """BlocksByRange and BlocksByRoot have distinct protocol IDs."""
+        assert BLOCKS_BY_RANGE_PROTOCOL_V1 != BLOCKS_BY_ROOT_PROTOCOL_V1
+
+
+def _slot_lookup_from(blocks: dict[int, SignedBlock]) -> AsyncBlockBySlotLookup:
+    """Build an AsyncBlockBySlotLookup that returns blocks from the given dict."""
+
+    async def _lookup(slot: Slot) -> SignedBlock | None:
+        return blocks.get(int(slot))
+
+    return _lookup
+
+
+_DEFAULT_CURRENT_SLOT: Final[Slot] = Slot(5000)
+"""Default current slot used by `_make_range_handler`.
+
+With MIN_SLOTS_FOR_BLOCK_REQUESTS=3600 the window floor is 1400.
+Tests with start_slot below 1400 must override the current slot explicitly.
+"""
+
+
+def _make_range_handler(
+    blocks: dict[int, SignedBlock] | None = None,
+    current_slot: Slot = _DEFAULT_CURRENT_SLOT,
+    block_by_slot_lookup: AsyncBlockBySlotLookup | None = None,
+) -> RequestHandler:
+    """Build a RequestHandler wired for BlocksByRange tests."""
+    lookup = block_by_slot_lookup or _slot_lookup_from(blocks or {})
+    return RequestHandler(
+        block_by_slot_lookup=lookup,
+        current_slot_lookup=lambda: current_slot,
+    )
+
+
+class TestRequestHandlerBlocksByRange:
+    """Tests for RequestHandler.handle_blocks_by_range."""
+
+    async def test_returns_exactly_count_consecutive_blocks(self) -> None:
+        """Returns exactly `count` consecutive blocks from start_slot when all retained."""
+        blocks_db = {4000 + i: make_test_block(slot=4000 + i, seed=40 + i) for i in range(5)}
+        handler = _make_range_handler(blocks=blocks_db)
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        assert response.errors == []
+        assert decoded_slots == [Slot(4000 + i) for i in range(5)]
+
+    async def test_returns_fewer_when_range_overruns_head(self) -> None:
+        """Returns fewer than count when range overruns head, no error."""
+        blocks_db = {4000 + i: make_test_block(slot=4000 + i, seed=40 + i) for i in range(3)}
+        handler = _make_range_handler(blocks=blocks_db)
+        response = MockResponseStream()
+
+        # Request 10 blocks but only 3 exist
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(10))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        assert response.errors == []
+        assert decoded_slots == [Slot(4000), Slot(4001), Slot(4002)]
+
+    async def test_skips_empty_slots_preserves_monotonicity(self) -> None:
+        """Skips empty slots, preserves slot monotonicity."""
+        # Blocks at slots 4000, 4002, 4004 (4001 and 4003 are empty)
+        blocks_db = {
+            4000: make_test_block(slot=4000, seed=40),
+            4002: make_test_block(slot=4002, seed=42),
+            4004: make_test_block(slot=4004, seed=44),
+        }
+        handler = _make_range_handler(blocks=blocks_db)
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        assert response.errors == []
+        assert decoded_slots == [Slot(4000), Slot(4002), Slot(4004)]
+
+    async def test_resource_unavailable_when_start_slot_predates_window(self) -> None:
+        """RESOURCE_UNAVAILABLE when start_slot is older than the sliding window.
+
+        With current_slot=5000 and MIN_SLOTS_FOR_BLOCK_REQUESTS=3600 the floor is
+        slot 1400; start_slot=0 falls outside it.
+        """
+        handler = _make_range_handler(current_slot=Slot(5000))
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(10))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.successes == []
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.RESOURCE_UNAVAILABLE
+
+    async def test_genesis_request_allowed_before_window_extends_below_zero(self) -> None:
+        """At genesis (current_slot < MIN_SLOTS_FOR_BLOCK_REQUESTS) start_slot=0 is in window."""
+        block_zero = make_test_block(slot=0, seed=0)
+        handler = _make_range_handler(blocks={0: block_zero}, current_slot=Slot(100))
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(1))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        assert response.errors == []
+        assert decoded_slots == [Slot(0)]
+
+    async def test_invalid_request_on_count_zero(self) -> None:
+        """INVALID_REQUEST when count == 0."""
+        handler = _make_range_handler()
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(0))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.successes == []
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.INVALID_REQUEST
+
+    async def test_invalid_request_on_count_exceeds_max(self) -> None:
+        """INVALID_REQUEST when count > MAX_REQUEST_BLOCKS."""
+        handler = _make_range_handler()
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(
+            start_slot=Slot(4000),
+            count=Uint64(MAX_REQUEST_BLOCKS + 1),
+        )
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.successes == []
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.INVALID_REQUEST
+
+    async def test_count_at_max_boundary_succeeds(self) -> None:
+        """count == MAX_REQUEST_BLOCKS is valid (boundary case)."""
+        handler = _make_range_handler()
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(
+            start_slot=Slot(4000),
+            count=Uint64(MAX_REQUEST_BLOCKS),
+        )
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.errors == []
+        assert response.successes == []
+
+    async def test_no_block_by_slot_lookup_returns_error(self) -> None:
+        """SERVER_ERROR when no block_by_slot_lookup callback is configured."""
+        handler = RequestHandler()  # no lookups
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.successes == []
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.SERVER_ERROR
+        assert "Block lookup not available" in response.errors[0][1]
+
+    async def test_no_current_slot_lookup_returns_error(self) -> None:
+        """SERVER_ERROR when current_slot_lookup is missing — window cannot be bounded."""
+        handler = RequestHandler(block_by_slot_lookup=_slot_lookup_from({}))
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.successes == []
+        assert len(response.errors) == 1
+        assert response.errors[0][0] == ResponseCode.SERVER_ERROR
+        assert "Current slot not available" in response.errors[0][1]
+
+    async def test_lookup_error_continues(self) -> None:
+        """Lookup exceptions are caught and processing continues."""
+        block_at_4001 = make_test_block(slot=4001, seed=41)
+
+        async def slot_lookup(slot: Slot) -> SignedBlock | None:
+            if int(slot) == 4000:
+                raise RuntimeError("Database error")
+            if int(slot) == 4001:
+                return block_at_4001
+            return None
+
+        handler = _make_range_handler(block_by_slot_lookup=slot_lookup)
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(3))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        assert response.errors == []
+        assert decoded_slots == [Slot(4001)]
+
+    async def test_empty_range_returns_no_blocks(self) -> None:
+        """Range with no blocks at all returns empty (no error)."""
+        handler = _make_range_handler()
+        response = MockResponseStream()
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
+        await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
+
+        assert response.errors == []
+        assert response.successes == []
+
+
+class TestReqRespServerBlocksByRange:
+    """Full ReqRespServer integration tests for BlocksByRange."""
+
+    async def test_handle_blocks_by_range_request(self) -> None:
+        """Full BlocksByRange request/response flow through ReqRespServer."""
+        block = make_test_block(slot=4000, seed=40)
+        handler = _make_range_handler(blocks={4000: block})
+        server = ReqRespServer(handler=handler)
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(1))
+        request_bytes = encode_request(request.encode_bytes())
+
+        stream = MockStream(request_data=request_bytes)
+        await server.handle_stream(stream, BLOCKS_BY_RANGE_PROTOCOL_V1)
+
+        assert stream.closed is True
+        success_blocks = []
+        for chunk in stream.written:
+            code, ssz_bytes = ResponseCode.decode(chunk)
+            if code == ResponseCode.SUCCESS:
+                success_blocks.append(SignedBlock.decode_bytes(ssz_bytes))
+        assert [b.block.slot for b in success_blocks] == [Slot(4000)]
+
+    async def test_invalid_ssz_returns_invalid_request(self) -> None:
+        """Invalid SSZ for BlocksByRange returns INVALID_REQUEST."""
+        handler = _make_range_handler()
+        server = ReqRespServer(handler=handler)
+
+        invalid_ssz = b"\xff" * 10
+        request_bytes = encode_request(invalid_ssz)
+        stream = MockStream(request_data=request_bytes)
+
+        await server.handle_stream(stream, BLOCKS_BY_RANGE_PROTOCOL_V1)
+
+        assert stream.closed is True
+        codes = [ResponseCode.decode(chunk)[0] for chunk in stream.written]
+        assert codes == [ResponseCode.INVALID_REQUEST]
+
+    async def test_protocol_id_in_reqresp_set(self) -> None:
+        """BlocksByRange protocol ID is in REQRESP_PROTOCOL_IDS."""
+        assert BLOCKS_BY_RANGE_PROTOCOL_V1 in REQRESP_PROTOCOL_IDS
+
+    async def test_roundtrip_blocks_by_range_multiple(self) -> None:
+        """Full encode -> server -> decode roundtrip for multiple blocks."""
+        blocks_db = {4000 + i: make_test_block(slot=4000 + i, seed=40 + i) for i in range(3)}
+        handler = _make_range_handler(blocks=blocks_db)
+        server = ReqRespServer(handler=handler)
+
+        request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(3))
+        request_wire = encode_request(request.encode_bytes())
+        stream = MockStream(request_data=request_wire)
+
+        await server.handle_stream(stream, BLOCKS_BY_RANGE_PROTOCOL_V1)
+
+        success_blocks = []
+        for response_wire in stream.written:
+            code, ssz_bytes = ResponseCode.decode(response_wire)
+            if code == ResponseCode.SUCCESS:
+                success_blocks.append(SignedBlock.decode_bytes(ssz_bytes))
+        assert [b.block.slot for b in success_blocks] == [Slot(4000 + i) for i in range(3)]

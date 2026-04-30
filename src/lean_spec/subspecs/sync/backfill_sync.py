@@ -38,16 +38,44 @@ Backfill depth is limited to prevent attacks and resource exhaustion:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.forks.lstar.containers import SignedBlock, Slot
+from lean_spec.subspecs.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Uint64
 
 from .block_cache import BlockCache
 from .config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
 from .peer_manager import PeerManager
+
+logger = logging.getLogger(__name__)
+
+
+class StoreView(Protocol):
+    """
+    Read-only view of forkchoice state used by backfill.
+
+    Used to skip blocks already in the Store and to find the highest known
+    canonical slot for gap detection.
+
+    Decouples backfill from the concrete Store class.
+    Lets tests supply a tiny in-memory implementation.
+    """
+
+    def has_root(self, root: Bytes32) -> bool:
+        """Return True if the block root is present in the Store."""
+        ...
+
+    def finalized_slot(self) -> Slot:
+        """Return the slot of the latest finalized checkpoint."""
+        ...
+
+    def head_slot(self) -> Slot:
+        """Return the slot of the current canonical head."""
+        ...
 
 
 class NetworkRequester(Protocol):
@@ -79,6 +107,27 @@ class NetworkRequester(Protocol):
         Returns:
             List of blocks the peer returned. May be fewer than requested
             if the peer does not have all blocks. Empty on error.
+        """
+        ...
+
+    async def request_blocks_by_range(
+        self,
+        peer_id: PeerId,
+        start_slot: Slot,
+        count: Uint64,
+    ) -> list[SignedBlock]:
+        """
+        Request blocks by slot range from a specific peer.
+
+        Args:
+            peer_id: Peer to request from.
+            start_slot: Start slot of the range (inclusive).
+            count: Number of blocks to request (up to MAX_REQUEST_BLOCKS).
+
+        Returns:
+            List of blocks the peer returned. May be fewer than requested
+            if the peer does not have all blocks (empty slots are skipped).
+            Empty on error.
         """
         ...
 
@@ -122,8 +171,28 @@ class BackfillSync:
     network: NetworkRequester
     """Network interface for block requests."""
 
+    store_view: StoreView | None = field(default=None)
+    """Read-only window into the Store.
+
+    Used for known-root and gap checks.
+
+    When None, backfill recurses by root only.
+    No short-circuiting for blocks already in the Store.
+    No range fills on detected gaps.
+    Production callers must supply a view.
+    """
+
     _pending: set[Bytes32] = field(default_factory=set)
     """Roots currently being fetched (to avoid duplicate requests)."""
+
+    _max_range_slot: Slot = field(default_factory=lambda: Slot(0))
+    """Highest slot covered by a successfully completed range request.
+
+    Advanced only when the peer answers without raising — success or empty result.
+
+    On exception, the watermark is left untouched.
+    A subsequent call can then retry the same range, possibly via a different peer.
+    """
 
     async def fill_missing(
         self,
@@ -171,6 +240,99 @@ class BackfillSync:
         finally:
             # Always clear pending status, even on error.
             self._pending.difference_update(roots_to_fetch)
+
+    async def fill_range(
+        self,
+        start_slot: Slot,
+        count: Uint64,
+        depth: int = 0,
+    ) -> None:
+        """
+        Fetch missing blocks by slot range.
+
+        This is a more efficient alternative to fill_missing when a large
+        contiguous gap is detected.
+
+        Args:
+            start_slot: Start slot of the range.
+            count: Number of blocks to request.
+            depth: Current backfill depth.
+        """
+        if depth >= MAX_BACKFILL_DEPTH:
+            return
+
+        if count == Uint64(0):
+            return
+
+        # Skip slots already covered by a previous successful range fetch.
+        # The watermark tracks the highest answered slot; earlier slots need not
+        # be re-requested. Failed fetches do not advance the watermark, so a
+        # retry can still re-cover the range.
+        watermark = self._max_range_slot
+        actual_start = start_slot if start_slot > watermark else watermark + Slot(1)
+        end_slot = start_slot + Slot(int(count) - 1)
+
+        if end_slot < actual_start:
+            logger.debug(
+                "Skipping range fetch [%s, %s]: already covered (watermark=%s)",
+                start_slot,
+                end_slot,
+                watermark,
+            )
+            return
+
+        # Split into per-message batches.
+        #
+        # Each network request is bounded by MAX_REQUEST_BLOCKS, so a wider
+        # range becomes several round-trips here.
+        current_slot = actual_start
+        remaining = int(end_slot) - int(current_slot) + 1
+
+        while remaining > 0:
+            batch_count = min(remaining, MAX_REQUEST_BLOCKS)
+            await self._fetch_range(current_slot, Uint64(batch_count), depth)
+            current_slot = current_slot + Slot(batch_count)
+            remaining -= batch_count
+
+    async def _fetch_range(
+        self,
+        start_slot: Slot,
+        count: Uint64,
+        depth: int,
+    ) -> None:
+        """Fetch a range of blocks from a peer."""
+        last_slot = start_slot + Slot(int(count) - 1)
+        peer = self.peer_manager.select_peer_for_request(min_slot=last_slot)
+        if peer is None:
+            # Fallback to any peer if no one reports having the whole range.
+            peer = self.peer_manager.select_peer_for_request()
+
+        if peer is None:
+            return
+
+        peer.on_request_start()
+        try:
+            blocks = await self.network.request_blocks_by_range(
+                peer_id=peer.peer_id,
+                start_slot=start_slot,
+                count=count,
+            )
+        except Exception as e:
+            # Peer-side failure.
+            #
+            # Do not advance the watermark.
+            # A retry against another peer can still re-cover the range.
+            logger.warning("Range fetch failed from %s: %s", peer.peer_id, e)
+            self.peer_manager.on_request_failure(peer.peer_id)
+            return
+
+        # The peer answered: success or empty.
+        # Mark the range as covered so future range fills can skip it.
+        self._max_range_slot = max(self._max_range_slot, last_slot)
+        self.peer_manager.on_request_success(peer.peer_id)
+
+        if blocks:
+            await self._process_received_blocks(blocks, peer.peer_id, depth)
 
     async def _fetch_batch(
         self,
@@ -249,21 +411,50 @@ class BackfillSync:
                 backfill_depth=depth + 1,
             )
 
-            # Check if this block's parent is known.
-            #
-            # A block is orphan if its parent is not in the cache.
-            # (We cannot check the Store here; that is the SyncService's job.)
+            # A block is an orphan if its parent is not in the cache or in the Store.
             parent_root = pending.parent_root
-            if parent_root not in self.block_cache:
+            parent_known = parent_root in self.block_cache or (
+                self.store_view.has_root(parent_root) if self.store_view is not None else False
+            )
+
+            if not parent_known:
                 # Parent unknown. Mark as orphan and queue for fetch.
                 self.block_cache.mark_orphan(pending.root)
                 if parent_root not in self._pending:
                     new_orphan_parents.append(parent_root)
 
-        # Recursively fetch orphan parents.
-        if new_orphan_parents:
-            await self.fill_missing(new_orphan_parents, depth=depth + 1)
+        if not new_orphan_parents:
+            return
+
+        # When the earliest received block still has a missing parent far above
+        # the highest slot we already know, fetching the gap as a contiguous
+        # range is cheaper than recursing parent-by-parent.
+        #
+        # Floor the range at the head slot (highest known canonical slot), not
+        # at the finalized slot. Slots above finalized but at or below head are
+        # already in the Store and should not be re-downloaded.
+        if self.store_view is not None and blocks:
+            earliest_block = min(blocks, key=lambda b: b.block.slot)
+            head_slot = self.store_view.head_slot()
+            if earliest_block.block.slot > head_slot:
+                gap_floor = head_slot + Slot(1)
+                gap_size = int(earliest_block.block.slot - gap_floor)
+                if gap_size > 0:
+                    logger.debug(
+                        "Backfill gap (%d slots) at slot %s; range-fetching from %s.",
+                        gap_size,
+                        earliest_block.block.slot,
+                        gap_floor,
+                    )
+                    await self.fill_range(
+                        start_slot=gap_floor,
+                        count=Uint64(gap_size),
+                        depth=depth + 1,
+                    )
+
+        await self.fill_missing(new_orphan_parents, depth=depth + 1)
 
     def reset(self) -> None:
         """Clear all pending state."""
         self._pending.clear()
+        self._max_range_slot = Slot(0)
