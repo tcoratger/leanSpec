@@ -5,16 +5,16 @@ This module is deliberately agnostic of any individual devnet.
 """
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Protocol, Self
+from typing import Any, ClassVar, Protocol, Self
 
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, SSZList, Uint64
 
 
 class SpecStateType(Protocol):
     """Structural contract: any fork's State container class exposes genesis."""
 
     @classmethod
-    def generate_genesis(cls, genesis_time: Uint64, validators: object) -> Self:
+    def generate_genesis(cls, genesis_time: Uint64, validators: SSZList[Any]) -> Self:
         """Construct the fork's genesis state."""
         ...
 
@@ -73,7 +73,7 @@ class ForkProtocol(ABC):
     store_class: type[SpecStoreType]
     """Concrete forkchoice Store class owned by this fork."""
 
-    def generate_genesis(self, genesis_time: Uint64, validators: object) -> SpecStateType:
+    def generate_genesis(self, genesis_time: Uint64, validators: SSZList[Any]) -> SpecStateType:
         """Construct a genesis state using this fork's State class."""
         return self.state_class.generate_genesis(genesis_time, validators)
 
