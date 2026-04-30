@@ -13,8 +13,7 @@ from .keys import XmssKeyManager
 
 _DEFAULT_GENESIS_TIME = Uint64(0)
 _DEFAULT_FORK: ForkProtocol = LstarSpec()
-"""Stateless fork instance used when callers do not pass one explicitly.
-Replaces the legacy None-fork fallback that bypassed fork dispatch."""
+"""Stateless fork instance used when callers do not pass one explicitly."""
 
 
 def _build_validators(num_validators: int) -> Validators:
