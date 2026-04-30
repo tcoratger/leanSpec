@@ -32,8 +32,9 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import cast
 
-from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol, State
+from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol, State, Store
 from lean_spec.forks.lstar.containers import Block, BlockBody, Checkpoint
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.forks.lstar.containers.slot import Slot
@@ -197,7 +198,7 @@ def _init_from_genesis(
         network=event_source.reqresp_client,
         fork=fork,
         validator_registry=validator_registry,
-        network_name=fork.NETWORK_NAME,
+        network_name=fork.GOSSIP_DIGEST,
         is_aggregator=is_aggregator,
         aggregate_subnet_ids=aggregate_subnet_ids,
         api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
@@ -288,7 +289,7 @@ async def _init_from_checkpoint(
         # The store treats this as the new "genesis" for fork choice purposes.
         # All blocks before the checkpoint are effectively pruned.
         validator_id = validator_registry.primary_index() if validator_registry else None
-        store = fork.create_store(state, anchor_block, validator_id)
+        store = cast(Store, fork.create_store(state, anchor_block, validator_id))
         logger.info(
             "Initialized from checkpoint at slot %d (finalized=%s)",
             state.slot,
@@ -313,7 +314,7 @@ async def _init_from_checkpoint(
             network=event_source.reqresp_client,
             fork=fork,
             validator_registry=validator_registry,
-            network_name=fork.NETWORK_NAME,
+            network_name=fork.GOSSIP_DIGEST,
             is_aggregator=is_aggregator,
             aggregate_subnet_ids=aggregate_subnet_ids,
             api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
@@ -503,14 +504,14 @@ async def run_node(
     #
     # Without this, the event source defaults to "0x00000000" and rejects
     # all messages from other clients that use "devnet0".
-    event_source.set_network_name(fork.NETWORK_NAME)
+    event_source.set_network_name(fork.GOSSIP_DIGEST)
 
     # Subscribe to gossip topics.
     #
     # We subscribe before connecting to bootnodes so that when
     # we establish connections, we can immediately announce our
     # subscriptions to peers.
-    block_topic = GossipTopic.block(fork.NETWORK_NAME).to_topic_id()
+    block_topic = GossipTopic.block(fork.GOSSIP_DIGEST).to_topic_id()
     event_source.subscribe_gossip_topic(block_topic)
 
     # Determine attestation subnets to subscribe to.
@@ -541,7 +542,7 @@ async def run_node(
 
     for subnet_id in subscription_subnets:
         attestation_subnet_topic = GossipTopic.attestation_subnet(
-            fork.NETWORK_NAME, subnet_id
+            fork.GOSSIP_DIGEST, subnet_id
         ).to_topic_id()
         event_source.subscribe_gossip_topic(attestation_subnet_topic)
         logger.info("Subscribed to attestation subnet %d", subnet_id)

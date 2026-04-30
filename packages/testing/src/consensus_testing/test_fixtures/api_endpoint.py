@@ -8,6 +8,7 @@ from lean_spec.forks.lstar.containers import BlockBody, Slot, ValidatorIndex
 from lean_spec.forks.lstar.containers.block import Block
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Uint64
 
@@ -45,8 +46,11 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
     endpoint responses whose shape depends on post-genesis slot numbers,
     historical roots, and multi-node fork-choice trees.
     """
+    fork = LstarSpec()
     if anchor_slot == 0:
-        state = generate_pre_state(genesis_time=Uint64(genesis_time), num_validators=num_validators)
+        state = generate_pre_state(
+            fork=fork, genesis_time=Uint64(genesis_time), num_validators=num_validators
+        )
         block = _make_genesis_block(state)
         # No validator identity — fixture only reads store data, never signs.
         return Store.from_anchor(state, block, validator_id=None)
@@ -55,6 +59,7 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
     # The returned pair (state, block) is internally consistent with the
     # historical chain the fixture wants to present to the endpoint.
     state, block = build_anchor(
+        fork=fork,
         num_validators=num_validators,
         anchor_slot=Slot(anchor_slot),
         genesis_time=Uint64(genesis_time),
