@@ -11,13 +11,13 @@ from consensus_testing import (
     TickStep,
 )
 
+from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import GOSSIP_DISPARITY_INTERVALS
-from lean_spec.subspecs.containers.slot import Slot
-from lean_spec.subspecs.containers.validator import ValidatorIndex
 from lean_spec.types import Bytes32
 
-pytestmark = pytest.mark.valid_until("Devnet")
+pytestmark = pytest.mark.valid_until("Lstar")
 
 
 SLOT_3_BOUNDARY_INTERVAL = int(Interval.from_slot(Slot(3)) - GOSSIP_DISPARITY_INTERVALS)
