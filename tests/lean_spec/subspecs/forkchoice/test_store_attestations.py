@@ -14,6 +14,7 @@ from lean_spec.forks.lstar.containers.attestation import (
 from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
 from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
@@ -744,6 +745,8 @@ class TestEndToEndAggregationFlow:
         store = make_store(
             num_validators=num_validators, key_manager=key_manager, validator_id=aggregator_id
         )
+        # Advance the clock to slot 1 so the attestation's slot has begun.
+        store = store.model_copy(update={"time": Interval.from_slot(Slot(1))})
 
         attestation_data = store.produce_attestation_data(Slot(1))
         data_root = hash_tree_root(attestation_data)
