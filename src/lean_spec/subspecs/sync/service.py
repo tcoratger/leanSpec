@@ -48,15 +48,13 @@ from lean_spec.forks.lstar.containers import (
     SignedBlock,
 )
 from lean_spec.forks.lstar.containers.block import BlockLookup
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database
-from lean_spec.types import ZERO_HASH, Bytes32
+from lean_spec.types import ZERO_HASH, Bytes32, Slot, SubnetId
 
 from .backfill_sync import BackfillSync, NetworkRequester
 from .block_cache import BlockCache

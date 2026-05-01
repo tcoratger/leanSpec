@@ -17,9 +17,7 @@ from lean_spec.forks.lstar.containers import (
 )
 from lean_spec.forks.lstar.containers.block import BlockHeader
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
 from lean_spec.forks.lstar.containers.config import Config
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import Validators
 from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
@@ -27,7 +25,6 @@ from lean_spec.forks.lstar.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import (
@@ -40,7 +37,7 @@ from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import MockEventSource, MockNetworkRequester, make_validators
 
 GENESIS_TIME = Uint64(1704067200)

@@ -4,12 +4,11 @@ End-to-end tests for the Generalized XMSS signature scheme.
 
 import pytest
 
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
 )
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 
 
 def _test_correctness_roundtrip(

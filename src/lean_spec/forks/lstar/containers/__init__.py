@@ -22,10 +22,8 @@ from .block import (
     BlockHeader,
     SignedBlock,
 )
-from .checkpoint import Checkpoint
 from .config import Config
-from .slot import Slot
-from .validator import Validator, ValidatorIndex, ValidatorIndices
+from .validator import Validator, ValidatorIndices
 
 __all__ = [
     "AggregatedAttestation",
@@ -35,13 +33,10 @@ __all__ = [
     "Block",
     "BlockBody",
     "BlockHeader",
-    "Checkpoint",
     "Config",
     "SignedAggregatedAttestation",
     "SignedAttestation",
     "SignedBlock",
-    "Slot",
     "Validator",
-    "ValidatorIndex",
     "ValidatorIndices",
 ]

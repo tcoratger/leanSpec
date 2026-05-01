@@ -12,14 +12,11 @@ from lean_spec.forks.lstar.containers import (
     Block,
     BlockBody,
     BlockHeader,
-    Checkpoint,
     Config,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
-    Slot,
     Validator,
-    ValidatorIndex,
 )
 from lean_spec.forks.lstar.containers.attestation import AggregationBits
 from lean_spec.forks.lstar.containers.block import BlockSignatures
@@ -35,7 +32,16 @@ from lean_spec.forks.lstar.containers.state.types import (
 )
 from lean_spec.forks.lstar.containers.validator import Validators
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Boolean, ByteListMiB, Bytes32, Bytes52, Uint64
+from lean_spec.types import (
+    Boolean,
+    ByteListMiB,
+    Bytes32,
+    Bytes52,
+    Checkpoint,
+    Slot,
+    Uint64,
+    ValidatorIndex,
+)
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

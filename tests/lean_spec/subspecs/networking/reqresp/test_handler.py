@@ -8,8 +8,7 @@ from typing import Final
 
 import pytest
 
-from lean_spec.forks.lstar.containers import Checkpoint, SignedBlock
-from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.reqresp.codec import (
     ResponseCode,
@@ -34,7 +33,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
 from lean_spec.subspecs.networking.types import ProtocolId
 from lean_spec.subspecs.networking.varint import encode_varint
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64
 from lean_spec.types.exceptions import SSZSerializationError
 from tests.lean_spec.helpers import make_test_block, make_test_status
 

@@ -32,7 +32,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.forks.lstar.containers import SignedBlock, Slot
+from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.subspecs.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.reqresp.codec import (
     CodecError,
@@ -54,7 +54,7 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnectionManager,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 
 logger = logging.getLogger(__name__)
 

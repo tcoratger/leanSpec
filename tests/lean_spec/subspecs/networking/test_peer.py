@@ -2,8 +2,6 @@
 
 import time
 
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.enr import ENR
 from lean_spec.subspecs.networking.enr.eth2 import FAR_FUTURE_EPOCH
@@ -11,7 +9,7 @@ from lean_spec.subspecs.networking.enr.keys import EnrKey
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp import Status
 from lean_spec.subspecs.networking.types import ConnectionState, Direction, Multiaddr, SeqNumber
-from lean_spec.types import Bytes32, Bytes64
+from lean_spec.types import Bytes32, Bytes64, Checkpoint, Slot
 
 
 def peer(name: str) -> PeerId:

@@ -5,12 +5,14 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.forks.lstar import Store
-from lean_spec.forks.lstar.containers import Attestation, AttestationData, Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
+from lean_spec.forks.lstar.containers import (
+    Attestation,
+    AttestationData,
+)
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import GOSSIP_DISPARITY_INTERVALS, INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 # Slot used by every time-check case below.
 ATTESTATION_SLOT = Slot(2)

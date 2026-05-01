@@ -1,13 +1,12 @@
 """Consensus layer pre-state generation."""
 
 from lean_spec.forks.lstar.containers.block import AggregatedAttestations, Block, BlockBody
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import State, Validators
-from lean_spec.forks.lstar.containers.validator import Validator, ValidatorIndex
+from lean_spec.forks.lstar.containers.validator import Validator
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.protocol import ForkProtocol
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes52, Uint64
+from lean_spec.types import Bytes52, Slot, Uint64, ValidatorIndex
 
 from .keys import XmssKeyManager
 

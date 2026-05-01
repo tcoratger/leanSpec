@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
@@ -21,7 +19,7 @@ from lean_spec.subspecs.sync.peer_manager import (
     PeerManager,
     SyncPeer,
 )
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import MockNetworkRequester, make_signed_block
 
 

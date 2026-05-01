@@ -42,10 +42,10 @@ import logging
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from lean_spec.forks.lstar.containers import SignedBlock, Slot
+from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.subspecs.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 
 from .block_cache import BlockCache
 from .config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST

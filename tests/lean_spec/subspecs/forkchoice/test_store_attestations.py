@@ -11,14 +11,12 @@ from lean_spec.forks.lstar.containers.attestation import (
     SignedAggregatedAttestation,
     SignedAttestation,
 )
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import ByteListMiB, Bytes32, Uint64
+from lean_spec.types import ByteListMiB, Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     make_aggregated_proof,

@@ -62,8 +62,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Final
 
-from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.types import SubnetId
 
 
 class ForkMismatchError(ValueError):

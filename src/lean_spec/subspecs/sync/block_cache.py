@@ -45,10 +45,9 @@ from time import time
 
 from lean_spec.forks import Store
 from lean_spec.forks.lstar.containers import SignedBlock
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Slot
 
 from .config import MAX_CACHED_BLOCKS
 

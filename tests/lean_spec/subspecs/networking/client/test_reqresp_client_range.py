@@ -7,14 +7,16 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lean_spec.forks.lstar.containers import Block, BlockBody, SignedBlock
+from lean_spec.forks.lstar.containers import (
+    Block,
+    BlockBody,
+    SignedBlock,
+)
 from lean_spec.forks.lstar.containers.block import BlockSignatures
 from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
 )
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking.client.reqresp_client import ReqRespClient
 from lean_spec.subspecs.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.reqresp.codec import (
@@ -26,7 +28,7 @@ from lean_spec.subspecs.networking.reqresp.message import (
 )
 from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import make_mock_signature
 
 

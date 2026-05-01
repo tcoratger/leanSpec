@@ -43,14 +43,12 @@ from lean_spec.forks.lstar.containers.attestation import (
     AggregatedAttestation,
     AttestationData,
 )
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustifiedSlots,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
-from lean_spec.types import Boolean
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
+from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
 

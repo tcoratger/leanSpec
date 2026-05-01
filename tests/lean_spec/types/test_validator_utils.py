@@ -2,9 +2,7 @@
 
 import pytest
 
-from lean_spec.forks.lstar.containers import ValidatorIndex
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.types import Uint64
+from lean_spec.types import Slot, Uint64, ValidatorIndex
 
 
 class TestValidatorIndexIsProposerFor:

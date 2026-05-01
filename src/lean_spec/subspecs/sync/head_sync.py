@@ -49,10 +49,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from lean_spec.forks import Store
-from lean_spec.forks.lstar.containers import SignedBlock, Slot
+from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 
 from .backfill_sync import BackfillSync
 from .block_cache import BlockCache

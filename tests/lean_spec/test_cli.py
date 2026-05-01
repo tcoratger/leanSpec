@@ -20,15 +20,17 @@ from lean_spec.__main__ import (
     create_anchor_block,
     resolve_bootnode,
 )
-from lean_spec.forks.lstar.containers import Block, BlockBody
+from lean_spec.forks.lstar.containers import (
+    Block,
+    BlockBody,
+)
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.node import Node
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 from lean_spec.types.rlp import RLPItem, encode_rlp
 from tests.lean_spec.helpers import make_genesis_state
 

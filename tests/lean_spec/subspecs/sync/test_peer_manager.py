@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
@@ -17,7 +15,7 @@ from lean_spec.subspecs.sync.peer_manager import (
     PeerManager,
     SyncPeer,
 )
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot
 
 
 def peer(name: str) -> PeerId:

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from lean_spec.subspecs.chain.config import HISTORICAL_ROOTS_LIMIT, VALIDATOR_REGISTRY_LIMIT
-from lean_spec.types import Boolean, Bytes32, SSZList
+from lean_spec.types import Boolean, Bytes32, Slot, SSZList
 from lean_spec.types.bitfields import BaseBitlist
-
-from ..slot import Slot
 
 
 class HistoricalBlockHashes(SSZList[Bytes32]):

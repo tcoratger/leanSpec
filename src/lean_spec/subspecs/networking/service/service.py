@@ -30,13 +30,13 @@ from lean_spec.forks.lstar.containers.attestation import (
     SignedAggregatedAttestation,
     SignedAttestation,
 )
-from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.snappy import compress
 from lean_spec.subspecs.networking.client.event_source import EventSource
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.types import ConnectionState
 from lean_spec.subspecs.sync import SyncService
+from lean_spec.types import SubnetId
 
 from .events import (
     GossipAggregatedAttestationEvent,

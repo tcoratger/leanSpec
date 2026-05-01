@@ -5,40 +5,7 @@ from __future__ import annotations
 import lean_spec.forks.lstar.containers.attestation.aggregation_bits as _aggregation_bits
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.subspecs.xmss.containers import PublicKey
-from lean_spec.types import Boolean, Bytes52, Container, SSZList, Uint64
-
-from .slot import Slot
-
-
-class SubnetId(Uint64):
-    """Subnet identifier (0-63) for attestation subnet partitioning."""
-
-
-class ValidatorIndex(Uint64):
-    """Represents a validator's unique index as a 64-bit unsigned integer."""
-
-    def is_proposer_for(self, slot: Slot, num_validators: Uint64) -> bool:
-        """
-        Check if this validator is the proposer for the given slot.
-
-        Uses round-robin proposer selection per the lean protocol spec.
-        """
-        return int(slot) % int(num_validators) == int(self)
-
-    def is_valid(self, num_validators: Uint64) -> bool:
-        """Check if this index is within valid bounds for a registry of given size."""
-        return int(self) < int(num_validators)
-
-    def compute_subnet_id(self, num_committees: Uint64) -> SubnetId:
-        """Compute the attestation subnet id for this validator.
-
-        Args:
-            num_committees: Positive number of committees.
-
-        Returns:
-            A SubnetId in 0..(num_committees-1).
-        """
-        return SubnetId(int(self) % int(num_committees))
+from lean_spec.types import Boolean, Bytes52, Container, SSZList, ValidatorIndex
 
 
 class ValidatorIndices(SSZList[ValidatorIndex]):

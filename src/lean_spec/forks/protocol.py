@@ -7,7 +7,7 @@ This module is deliberately agnostic of any individual devnet.
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Protocol, Self
 
-from lean_spec.types import Bytes32, SSZList, Uint64
+from lean_spec.types import Bytes32, SSZList, Uint64, ValidatorIndex
 
 
 class SpecStateType(Protocol):
@@ -33,7 +33,7 @@ class SpecStoreType(Protocol):
         cls,
         state: SpecStateType,
         anchor_block: SpecBlockType,
-        validator_id: Uint64 | None,
+        validator_id: ValidatorIndex | None,
     ) -> Self:
         """Construct a forkchoice store anchored at the given state/block."""
         ...
@@ -81,7 +81,7 @@ class ForkProtocol(ABC):
         self,
         state: SpecStateType,
         anchor_block: SpecBlockType,
-        validator_id: Uint64 | None,
+        validator_id: ValidatorIndex | None,
     ) -> SpecStoreType:
         """Construct a forkchoice store anchored at the given state and block."""
         return self.store_class.from_anchor(state, anchor_block, validator_id)

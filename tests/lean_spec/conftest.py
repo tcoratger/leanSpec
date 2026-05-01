@@ -14,8 +14,7 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import State, Store
 from lean_spec.forks.lstar.containers import Block
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
+from lean_spec.types import Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     GenesisData,
     make_genesis_block,

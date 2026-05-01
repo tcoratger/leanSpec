@@ -2,7 +2,6 @@
 
 from typing import Any, ClassVar
 
-from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.snappy import compress, decompress, frame_compress, frame_decompress
 from lean_spec.subspecs.networking.discovery.codec import decode_message, encode_message
 from lean_spec.subspecs.networking.discovery.messages import (
@@ -56,7 +55,7 @@ from lean_spec.subspecs.networking.reqresp.codec import (
 from lean_spec.subspecs.networking.transport.peer_id import KeyType, PeerId, PublicKeyProto
 from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
-from lean_spec.types import Bytes16, Bytes33, Bytes64
+from lean_spec.types import Bytes16, Bytes33, Bytes64, SubnetId
 
 from .base import BaseConsensusFixture
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
+from lean_spec.types import ValidatorIndex
 from lean_spec.types.bitfields import BaseBitlist
 
 

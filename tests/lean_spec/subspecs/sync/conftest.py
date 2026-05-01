@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.forks.lstar.containers import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot
 
 
 @pytest.fixture
