@@ -30,7 +30,6 @@ from lean_spec.forks.lstar.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.forks.lstar.containers.state import Validators
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
@@ -51,7 +50,15 @@ from lean_spec.subspecs.xmss.types import (
     HashTreeOpening,
     Randomness,
 )
-from lean_spec.types import Bytes32, Bytes52, Checkpoint, Slot, Uint64, ValidatorIndex
+from lean_spec.types import (
+    Bytes32,
+    Bytes52,
+    Checkpoint,
+    Slot,
+    Uint64,
+    ValidatorIndex,
+    ValidatorIndices,
+)
 
 from .mocks import MockForkchoiceStore, MockNetworkRequester
 

@@ -19,15 +19,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, cast
 
-from lean_spec.forks import ForkProtocol, State, Store
-from lean_spec.forks.lstar.containers import (
+from lean_spec.forks import (
+    AggregatedAttestations,
     Block,
     BlockBody,
+    ForkProtocol,
+    SignedAttestation,
     SignedBlock,
+    State,
+    Store,
+    Validators,
 )
-from lean_spec.forks.lstar.containers.attestation import SignedAttestation
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import Validators
 from lean_spec.subspecs.api import AggregatorController, ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.clock import Interval
@@ -197,7 +199,12 @@ class Node:
         # The database is optional - nodes can run without persistence.
         database: Database | None = None
         if config.database_path is not None:
-            database = SQLiteDatabase(config.database_path, config.fork.state_class)
+            database = SQLiteDatabase(
+                config.database_path,
+                state_class=config.fork.state_class,
+                block_class=config.fork.block_class,
+                attestation_data_class=config.fork.attestation_data_class,
+            )
 
         #
         # If database contains valid state, resume from there.
@@ -416,12 +423,7 @@ class Node:
         #
         # The store starts with just the head block and state.
         # Additional blocks can be loaded on demand or via sync.
-        if fork is not None:
-            store_cls = fork.store_class
-        else:
-            from lean_spec.forks.lstar.store import Store
-
-            store_cls = Store
+        store_cls = fork.store_class if fork is not None else Store
         return store_cls(
             time=Interval(store_time),
             config=head_state.config,

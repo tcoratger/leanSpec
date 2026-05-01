@@ -18,7 +18,6 @@ from lean_spec.forks.lstar.containers import (
     SignedBlock,
     Validator,
 )
-from lean_spec.forks.lstar.containers.attestation import AggregationBits
 from lean_spec.forks.lstar.containers.block import BlockSignatures
 from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
@@ -33,6 +32,7 @@ from lean_spec.forks.lstar.containers.state.types import (
 from lean_spec.forks.lstar.containers.validator import Validators
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import (
+    AggregationBits,
     Boolean,
     ByteListMiB,
     Bytes32,

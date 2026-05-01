@@ -38,11 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lean_spec.forks.lstar.containers import SignedBlock
-from lean_spec.forks.lstar.containers.attestation import (
-    SignedAggregatedAttestation,
-    SignedAttestation,
-)
+from lean_spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
 from lean_spec.snappy import SnappyDecompressionError, decompress
 from lean_spec.subspecs.networking.gossipsub.topic import (
     ForkMismatchError,

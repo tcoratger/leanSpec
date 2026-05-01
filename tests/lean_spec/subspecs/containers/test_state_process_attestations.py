@@ -47,8 +47,7 @@ from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustifiedSlots,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
-from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex
+from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
 

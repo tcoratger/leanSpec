@@ -8,10 +8,9 @@ from lean_spec.forks.lstar.containers.attestation import AggregatedAttestation, 
 from lean_spec.forks.lstar.containers.block.block import Block, BlockBody
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.forks.lstar.containers.state import State
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, ValidatorIndices
 
 from ..keys import XmssKeyManager
 from ..test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation

@@ -13,7 +13,6 @@ from lean_spec.forks.lstar.containers import (
     Block,
     SignedAttestation,
     SignedBlock,
-    ValidatorIndices,
 )
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
@@ -25,7 +24,7 @@ from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     MockNetworkRequester,

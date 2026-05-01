@@ -15,9 +15,7 @@ from __future__ import annotations
 
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.types import Checkpoint, Container, Slot, ValidatorIndex
-
-from .aggregation_bits import AggregationBits
+from lean_spec.types import AggregationBits, Checkpoint, Container, Slot, ValidatorIndex
 
 
 class AttestationData(Container):

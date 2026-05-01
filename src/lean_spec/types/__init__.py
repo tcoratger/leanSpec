@@ -1,5 +1,6 @@
 """Reusable type definitions for the Lean Ethereum specification."""
 
+from .aggregation import VALIDATOR_REGISTRY_LIMIT, AggregationBits, ValidatorIndices
 from .base import CamelModel, StrictBaseModel
 from .bitfields import BaseBitlist, BaseBitvector
 from .boolean import Boolean
@@ -66,11 +67,14 @@ __all__ = [
     "Boolean",
     "Container",
     # Domain types — fork-stable
+    "AggregationBits",
     "Checkpoint",
     "IMMEDIATE_JUSTIFICATION_WINDOW",
     "Slot",
     "SubnetId",
+    "VALIDATOR_REGISTRY_LIMIT",
     "ValidatorIndex",
+    "ValidatorIndices",
     # RLP encoding/decoding
     "encode_rlp",
     "decode_rlp",

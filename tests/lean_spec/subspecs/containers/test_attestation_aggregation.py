@@ -4,11 +4,17 @@ import pytest
 
 from lean_spec.forks.lstar.containers.attestation import (
     AggregatedAttestation,
-    AggregationBits,
     AttestationData,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
-from lean_spec.types import Boolean, Bytes32, Checkpoint, Slot, ValidatorIndex
+from lean_spec.types import (
+    AggregationBits,
+    Boolean,
+    Bytes32,
+    Checkpoint,
+    Slot,
+    ValidatorIndex,
+    ValidatorIndices,
+)
 
 
 class TestAggregationBits:

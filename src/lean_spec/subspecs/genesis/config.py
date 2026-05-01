@@ -20,8 +20,7 @@ from typing import Any
 import yaml
 from pydantic import Field, field_validator, model_validator
 
-from lean_spec.forks.lstar.containers import Validator
-from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks import Validator, Validators
 from lean_spec.types import Bytes52, StrictBaseModel, Uint64, ValidatorIndex
 
 

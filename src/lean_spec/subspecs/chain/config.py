@@ -2,7 +2,20 @@
 
 from typing import Final
 
-from lean_spec.types import Uint8, Uint64
+from lean_spec.types import VALIDATOR_REGISTRY_LIMIT, Uint8, Uint64
+
+__all__ = [
+    "ATTESTATION_COMMITTEE_COUNT",
+    "GOSSIP_DISPARITY_INTERVALS",
+    "HISTORICAL_ROOTS_LIMIT",
+    "INTERVALS_PER_SLOT",
+    "JUSTIFICATION_LOOKBACK_SLOTS",
+    "MAX_ATTESTATIONS_DATA",
+    "MILLISECONDS_PER_INTERVAL",
+    "MILLISECONDS_PER_SLOT",
+    "SECONDS_PER_SLOT",
+    "VALIDATOR_REGISTRY_LIMIT",
+]
 
 INTERVALS_PER_SLOT: Final = Uint64(5)
 """Number of intervals per slot for forkchoice processing."""
@@ -36,9 +49,6 @@ The maximum number of historical block roots to store in the state.
 With a 4-second slot, this corresponds to a history
 of approximately 12.1 days.
 """
-
-VALIDATOR_REGISTRY_LIMIT: Final = Uint64(2**12)
-"""The maximum number of validators that can be in the registry."""
 
 ATTESTATION_COMMITTEE_COUNT: Final = Uint64(1)
 """The number of attestation committees per slot."""

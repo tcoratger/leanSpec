@@ -40,10 +40,7 @@ from pathlib import Path
 from typing import ClassVar, Literal
 
 from lean_spec.config import LEAN_ENV
-from lean_spec.forks.lstar.containers import (
-    AttestationData,
-    ValidatorIndices,
-)
+from lean_spec.forks.lstar.containers import AttestationData
 from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
@@ -64,7 +61,7 @@ from lean_spec.subspecs.xmss.types import (
     HashTreeOpening,
     Randomness,
 )
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
 
 SecretField = Literal["attestation_secret", "proposal_secret"]
 """Discriminator for which secret key to load from a validator key pair."""

@@ -23,9 +23,11 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from lean_spec.forks import State
-from lean_spec.forks.lstar.containers import Block
-from lean_spec.forks.lstar.containers.attestation import AttestationData
+from lean_spec.forks.protocol import (
+    SpecAttestationDataType,
+    SpecBlockType,
+    SpecStateType,
+)
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 
 from .exceptions import StorageCorruptionError, StorageReadError, StorageWriteError
@@ -52,7 +54,13 @@ class SQLiteDatabase:
     Writes are buffered until explicitly committed via commit() or batch_write().
     """
 
-    def __init__(self, path: Path | str, state_class: type[State] = State) -> None:
+    def __init__(
+        self,
+        path: Path | str,
+        state_class: type[SpecStateType],
+        block_class: type[SpecBlockType],
+        attestation_data_class: type[SpecAttestationDataType],
+    ) -> None:
         """
         Initialize SQLite database.
 
@@ -62,9 +70,13 @@ class SQLiteDatabase:
             path: Path to SQLite database file.
                   Use ":memory:" for in-memory database.
             state_class: State class used to decode SSZ bytes.
+            block_class: Block class used to decode SSZ bytes.
+            attestation_data_class: AttestationData class used to decode SSZ bytes.
         """
         self._path = Path(path) if isinstance(path, str) else path
         self._state_class = state_class
+        self._block_class = block_class
+        self._attestation_data_class = attestation_data_class
 
         # SQLite handles concurrent access through file-level locking.
         #
@@ -120,7 +132,7 @@ class SQLiteDatabase:
 
     # Block Operations
 
-    def get_block(self, root: Bytes32) -> Block | None:
+    def get_block(self, root: Bytes32) -> SpecBlockType | None:
         """Retrieve a block by its root hash."""
         try:
             cursor = self._conn.cursor()
@@ -141,11 +153,11 @@ class SQLiteDatabase:
             return None
 
         try:
-            return Block.decode_bytes(row["data"])
+            return self._block_class.decode_bytes(row["data"])
         except Exception as e:
             raise StorageCorruptionError(f"Corrupt block data for root {root.hex()}: {e}") from e
 
-    def put_block(self, block: Block, root: Bytes32) -> None:
+    def put_block(self, block: SpecBlockType, root: Bytes32) -> None:
         """Store a block with its root hash."""
         try:
             cursor = self._conn.cursor()
@@ -189,7 +201,7 @@ class SQLiteDatabase:
     # They are large (~2MB+) and expensive to compute from scratch.
     # Storing states enables fast re-initialization and historical queries.
 
-    def get_state(self, root: Bytes32) -> State | None:
+    def get_state(self, root: Bytes32) -> SpecStateType | None:
         """Retrieve a state by its associated block root."""
         try:
             cursor = self._conn.cursor()
@@ -211,7 +223,7 @@ class SQLiteDatabase:
                 f"Corrupt state data for block root {root.hex()}: {e}"
             ) from e
 
-    def put_state(self, state: State, root: Bytes32) -> None:
+    def put_state(self, state: SpecStateType, root: Bytes32) -> None:
         """Store a state indexed by its associated block root."""
         try:
             cursor = self._conn.cursor()
@@ -336,7 +348,9 @@ class SQLiteDatabase:
     # Fork choice uses the latest attestation from each validator
     # to determine which branch has the most support.
 
-    def get_latest_attestation(self, validator_index: ValidatorIndex) -> AttestationData | None:
+    def get_latest_attestation(
+        self, validator_index: ValidatorIndex
+    ) -> SpecAttestationDataType | None:
         """Retrieve the latest attestation for a validator."""
         try:
             cursor = self._conn.cursor()
@@ -359,7 +373,7 @@ class SQLiteDatabase:
             return None
 
         try:
-            return AttestationData.decode_bytes(row["data"])
+            return self._attestation_data_class.decode_bytes(row["data"])
         except Exception as e:
             raise StorageCorruptionError(
                 f"Corrupt attestation data for validator {validator_index}: {e}"
@@ -368,7 +382,7 @@ class SQLiteDatabase:
     def put_latest_attestation(
         self,
         validator_index: ValidatorIndex,
-        attestation: AttestationData,
+        attestation: SpecAttestationDataType,
     ) -> None:
         """Store the latest attestation for a validator."""
         try:
@@ -390,7 +404,7 @@ class SQLiteDatabase:
                 f"Failed to write attestation for validator {validator_index}: {e}"
             ) from e
 
-    def get_all_latest_attestations(self) -> dict[ValidatorIndex, AttestationData]:
+    def get_all_latest_attestations(self) -> dict[ValidatorIndex, SpecAttestationDataType]:
         """Retrieve all latest attestations."""
         try:
             cursor = self._conn.cursor()
@@ -406,7 +420,9 @@ class SQLiteDatabase:
 
         try:
             return {
-                ValidatorIndex(row["validator_index"]): AttestationData.decode_bytes(row["data"])
+                ValidatorIndex(row["validator_index"]): self._attestation_data_class.decode_bytes(
+                    row["data"]
+                )
                 for row in rows
             }
         except Exception as e:

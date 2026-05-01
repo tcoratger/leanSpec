@@ -43,8 +43,7 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from time import time
 
-from lean_spec.forks import Store
-from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.forks import SignedBlock, Store
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Slot

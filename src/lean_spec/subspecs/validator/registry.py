@@ -32,9 +32,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, field_validator
 
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.xmss import SecretKey
-from lean_spec.types import Bytes52, ValidatorIndex
+from lean_spec.types import Bytes52, ValidatorIndex, ValidatorIndices
 
 logger = logging.getLogger(__name__)
 

@@ -18,7 +18,6 @@ from lean_spec.forks.lstar.containers import (
 )
 from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.forks.lstar.containers.block import BlockLookup
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     GOSSIP_DISPARITY_INTERVALS,
@@ -42,6 +41,7 @@ from lean_spec.types import (
     Uint8,
     Uint64,
     ValidatorIndex,
+    ValidatorIndices,
 )
 from lean_spec.types.base import StrictBaseModel
 

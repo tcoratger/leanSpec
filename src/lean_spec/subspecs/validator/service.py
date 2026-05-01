@@ -37,15 +37,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.forks import (
     AttestationData,
+    AttestationSignatures,
     Block,
+    BlockSignatures,
     SignedAttestation,
     SignedBlock,
-)
-from lean_spec.forks.lstar.containers.block import (
-    AttestationSignatures,
-    BlockSignatures,
 )
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.ssz.hash import hash_tree_root

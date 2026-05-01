@@ -5,10 +5,9 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, AggregationError
-from lean_spec.types import ByteListMiB, Checkpoint, Slot, ValidatorIndex
+from lean_spec.types import ByteListMiB, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import make_attestation_data_simple, make_bytes32
 
 

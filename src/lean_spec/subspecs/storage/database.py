@@ -11,9 +11,11 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Protocol
 
-from lean_spec.forks import State
-from lean_spec.forks.lstar.containers import Block
-from lean_spec.forks.lstar.containers.attestation import AttestationData
+from lean_spec.forks.protocol import (
+    SpecAttestationDataType,
+    SpecBlockType,
+    SpecStateType,
+)
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 
 
@@ -35,7 +37,7 @@ class Database(Protocol):
 
     # Block Operations
 
-    def get_block(self, root: Bytes32) -> Block | None:
+    def get_block(self, root: Bytes32) -> SpecBlockType | None:
         """
         Retrieve a block by its root hash.
 
@@ -47,7 +49,7 @@ class Database(Protocol):
         """
         ...
 
-    def put_block(self, block: Block, root: Bytes32) -> None:
+    def put_block(self, block: SpecBlockType, root: Bytes32) -> None:
         """
         Store a block with its root hash.
 
@@ -71,7 +73,7 @@ class Database(Protocol):
 
     # State Operations
 
-    def get_state(self, root: Bytes32) -> State | None:
+    def get_state(self, root: Bytes32) -> SpecStateType | None:
         """
         Retrieve a state by its associated block root.
 
@@ -83,7 +85,7 @@ class Database(Protocol):
         """
         ...
 
-    def put_state(self, state: State, root: Bytes32) -> None:
+    def put_state(self, state: SpecStateType, root: Bytes32) -> None:
         """
         Store a state indexed by its associated block root.
 
@@ -145,7 +147,9 @@ class Database(Protocol):
 
     # Attestation Operations
 
-    def get_latest_attestation(self, validator_index: ValidatorIndex) -> AttestationData | None:
+    def get_latest_attestation(
+        self, validator_index: ValidatorIndex
+    ) -> SpecAttestationDataType | None:
         """
         Retrieve the latest attestation for a validator.
 
@@ -160,7 +164,7 @@ class Database(Protocol):
     def put_latest_attestation(
         self,
         validator_index: ValidatorIndex,
-        attestation: AttestationData,
+        attestation: SpecAttestationDataType,
     ) -> None:
         """
         Store the latest attestation for a validator.
@@ -171,7 +175,7 @@ class Database(Protocol):
         """
         ...
 
-    def get_all_latest_attestations(self) -> dict[ValidatorIndex, AttestationData]:
+    def get_all_latest_attestations(self) -> dict[ValidatorIndex, SpecAttestationDataType]:
         """
         Retrieve all latest attestations.
 
