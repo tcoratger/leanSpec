@@ -13,9 +13,6 @@ from lean_spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedBlock,
 )
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.reqresp.message import Status
@@ -24,7 +21,7 @@ from lean_spec.subspecs.storage.database import Database
 from lean_spec.subspecs.sync.config import MAX_PENDING_ATTESTATIONS
 from lean_spec.subspecs.sync.service import SyncProgress, SyncService
 from lean_spec.subspecs.sync.states import SyncState
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockForkchoiceStore,
     RecordedCall,

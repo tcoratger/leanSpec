@@ -1,7 +1,8 @@
-from lean_spec.forks.lstar.containers import AttestationData, Checkpoint, SignedAttestation
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
-from lean_spec.types import Bytes32
+from lean_spec.forks.lstar.containers import (
+    AttestationData,
+    SignedAttestation,
+)
+from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers.builders import make_mock_signature
 
 

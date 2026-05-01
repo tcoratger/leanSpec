@@ -6,13 +6,8 @@ from typing import cast
 
 import pytest
 
-from lean_spec.forks.lstar.containers import (
-    AttestationData,
-    Checkpoint,
-)
+from lean_spec.forks.lstar.containers import AttestationData
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.reqresp.message import Status
@@ -25,7 +20,7 @@ from lean_spec.subspecs.networking.service import (
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.states import SyncState
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
     MockForkchoiceStore,

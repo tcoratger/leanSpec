@@ -19,12 +19,10 @@ from lean_spec.forks.lstar.containers.block import (
 from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
 )
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import State, Validators
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import Uint64
+from lean_spec.types import Slot, Uint64, ValidatorIndex
 
 from ..keys import (
     LEAN_ENV_TO_SCHEMES,

@@ -13,10 +13,8 @@ from dataclasses import dataclass, field
 from typing import cast
 
 from lean_spec.forks.lstar import Store
-from lean_spec.forks.lstar.containers import Checkpoint, Validator
-from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.forks.lstar.containers import Validator
 from lean_spec.forks.lstar.containers.state import Validators
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.networking import PeerId
@@ -29,7 +27,7 @@ from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME, SecretKey
-from lean_spec.types import Bytes52, Uint64
+from lean_spec.types import Bytes52, Checkpoint, Slot, Uint64, ValidatorIndex
 
 from .diagnostics import PipelineDiagnostics
 from .port_allocator import PortAllocator

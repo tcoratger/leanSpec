@@ -35,10 +35,11 @@ from pathlib import Path
 from typing import cast
 
 from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol, State, Store
-from lean_spec.forks.lstar.containers import Block, BlockBody, Checkpoint
+from lean_spec.forks.lstar.containers import (
+    Block,
+    BlockBody,
+)
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import SubnetId
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.genesis import GenesisConfig
@@ -57,7 +58,7 @@ from lean_spec.subspecs.sync.checkpoint_sync import (
     verify_checkpoint_state,
 )
 from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Checkpoint, Slot, SubnetId, Uint64
 
 logger = logging.getLogger(__name__)
 

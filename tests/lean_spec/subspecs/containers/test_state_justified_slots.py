@@ -9,14 +9,11 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state.types import (
     JustificationRoots,
     JustificationValidators,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
-from lean_spec.types import Boolean
+from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import make_aggregated_attestation, make_block, make_genesis_state
 
 

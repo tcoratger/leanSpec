@@ -6,13 +6,12 @@ Each references its parent, forming a chain.
 The proposer is determined by slot assignment.
 """
 
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, Validators
+from lean_spec.forks.lstar.containers.validator import Validators
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregationError
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 from lean_spec.types.container import Container
 
 from .types import (

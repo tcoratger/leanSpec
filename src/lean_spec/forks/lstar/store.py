@@ -12,15 +12,12 @@ from typing import NamedTuple
 from lean_spec.forks.lstar.containers import (
     AttestationData,
     Block,
-    Checkpoint,
     Config,
     SignedAttestation,
     SignedBlock,
-    ValidatorIndex,
 )
 from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.forks.lstar.containers.block import BlockLookup
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
@@ -40,8 +37,11 @@ from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, Generaliz
 from lean_spec.types import (
     ZERO_HASH,
     Bytes32,
+    Checkpoint,
+    Slot,
     Uint8,
     Uint64,
+    ValidatorIndex,
 )
 from lean_spec.types.base import StrictBaseModel
 

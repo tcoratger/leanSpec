@@ -4,11 +4,9 @@ from typing import Literal
 
 from lean_spec.forks.lstar.containers import AttestationData
 from lean_spec.forks.lstar.containers.block.block import Block, BlockLookup
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.ssz import hash_tree_root
-from lean_spec.types import ZERO_HASH, Bytes32, CamelModel, Uint64
+from lean_spec.types import ZERO_HASH, Bytes32, CamelModel, Slot, Uint64, ValidatorIndex
 
 from .utils import resolve_block_root
 

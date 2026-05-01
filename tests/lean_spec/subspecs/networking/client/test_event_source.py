@@ -9,9 +9,6 @@ import pytest
 
 from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.snappy import compress
 from lean_spec.subspecs.networking.client.event_source import (
     SUPPORTED_PROTOCOLS,
@@ -41,7 +38,7 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     QuicConnectionManager,
 )
 from lean_spec.subspecs.networking.varint import encode_varint
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 
 FORK_DIGEST = "0xaabbccdd"

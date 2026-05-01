@@ -4,7 +4,6 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from lean_spec.forks.lstar.containers.block.block import Block
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import State
 from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
@@ -12,7 +11,7 @@ from lean_spec.forks.lstar.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.types import Bytes32, CamelModel
+from lean_spec.types import Bytes32, CamelModel, Slot
 
 from .utils import resolve_block_root
 

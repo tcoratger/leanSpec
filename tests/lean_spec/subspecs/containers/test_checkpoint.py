@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot
 
 # Two distinct roots to verify ordering ignores root content.
 ROOT_A = Bytes32(b"\xa0" * 32)

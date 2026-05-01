@@ -1,11 +1,15 @@
-"""Slot container."""
+"""Slot type — fork-stable consensus-time index.
 
-from __future__ import annotations
+A slot is the smallest unit of consensus time. The numeric type and the
+justifiability rule are stable across the leanSpec fork chain; later forks
+that change the rule should override the relevant fork-class methods rather
+than fork the type itself.
+"""
 
 import math
 from typing import Final
 
-from lean_spec.types import Uint64
+from lean_spec.types.uint import Uint64
 
 IMMEDIATE_JUSTIFICATION_WINDOW: Final = 5
 """First N slots after finalization are always justifiable."""
@@ -14,7 +18,7 @@ IMMEDIATE_JUSTIFICATION_WINDOW: Final = 5
 class Slot(Uint64):
     """Represents a slot number as a 64-bit unsigned integer."""
 
-    def justified_index_after(self, finalized_slot: Slot) -> int | None:
+    def justified_index_after(self, finalized_slot: "Slot") -> int | None:
         """
         Return the relative bitfield index for justification tracking.
 
@@ -27,7 +31,7 @@ class Slot(Uint64):
         # Slot (finalized_slot + 1) maps to index 0.
         return int(self - finalized_slot) - 1
 
-    def is_justifiable_after(self, finalized_slot: Slot) -> bool:
+    def is_justifiable_after(self, finalized_slot: "Slot") -> bool:
         """
         Checks if this slot is a valid candidate for justification after a given finalized slot.
 

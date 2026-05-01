@@ -14,11 +14,10 @@ from types import MappingProxyType
 from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
 from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.service.events import NetworkEvent
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 
 
 class MockNetworkRequester:

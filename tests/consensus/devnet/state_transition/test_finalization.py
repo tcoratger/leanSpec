@@ -9,15 +9,13 @@ from consensus_testing import (
     generate_pre_state,
 )
 
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state.types import (
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Boolean
+from lean_spec.types import Boolean, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

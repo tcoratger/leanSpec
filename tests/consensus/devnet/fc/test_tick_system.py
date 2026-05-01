@@ -12,9 +12,7 @@ from consensus_testing import (
     TickStep,
 )
 
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
-from lean_spec.types import Uint64
+from lean_spec.types import Slot, Uint64, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

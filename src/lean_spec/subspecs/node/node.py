@@ -20,12 +20,14 @@ from pathlib import Path
 from typing import Final, cast
 
 from lean_spec.forks import ForkProtocol, State, Store
-from lean_spec.forks.lstar.containers import Block, BlockBody, SignedBlock
+from lean_spec.forks.lstar.containers import (
+    Block,
+    BlockBody,
+    SignedBlock,
+)
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import Validators
-from lean_spec.forks.lstar.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.subspecs.api import AggregatorController, ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.clock import Interval
@@ -38,7 +40,7 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database, SQLiteDatabase
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, SubnetId, Uint64, ValidatorIndex
 
 logger = logging.getLogger(__name__)
 

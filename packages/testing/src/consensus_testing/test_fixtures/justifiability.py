@@ -13,7 +13,7 @@ Every client must implement this identically for consensus.
 
 from typing import Any, ClassVar
 
-from lean_spec.forks.lstar.containers.slot import Slot
+from lean_spec.types import Slot
 
 from .base import BaseConsensusFixture
 

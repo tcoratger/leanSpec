@@ -1,10 +1,9 @@
 """Tests for Store attestation data pruning."""
 
 from lean_spec.forks.lstar import AttestationSignatureEntry, Store
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import ByteListMiB, Bytes32
+from lean_spec.types import ByteListMiB, Bytes32, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     make_attestation_data,
     make_bytes32,

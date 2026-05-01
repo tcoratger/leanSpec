@@ -11,13 +11,12 @@ from __future__ import annotations
 from pydantic import model_validator
 
 from lean_spec.config import LEAN_ENV
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.xmss.target_sum import (
     PROD_TARGET_SUM_ENCODER,
     TEST_TARGET_SUM_ENCODER,
     TargetSumEncoder,
 )
-from lean_spec.types import Bytes32, StrictBaseModel, Uint64
+from lean_spec.types import Bytes32, Slot, StrictBaseModel, Uint64
 
 from ._validation import enforce_strict_types
 from .constants import (

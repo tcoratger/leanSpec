@@ -12,9 +12,8 @@ from consensus_testing import (
 )
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
 from lean_spec.subspecs.chain.config import MAX_ATTESTATIONS_DATA
+from lean_spec.types import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

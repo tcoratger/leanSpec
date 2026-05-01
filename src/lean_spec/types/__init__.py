@@ -19,6 +19,7 @@ from .byte_arrays import (
     Bytes64,
     Bytes65,
 )
+from .checkpoint import Checkpoint
 from .collections import SSZList, SSZVector
 from .container import Container
 from .exceptions import (
@@ -28,9 +29,11 @@ from .exceptions import (
     SSZValueError,
 )
 from .rlp import RLPDecodingError, RLPItem, decode_rlp, decode_rlp_list, encode_rlp
+from .slot import IMMEDIATE_JUSTIFICATION_WINDOW, Slot
 from .ssz_base import SSZType
 from .uint import Uint8, Uint16, Uint32, Uint64
 from .union import SSZUnion
+from .validator import SubnetId, ValidatorIndex
 
 __all__ = [
     # Core types
@@ -62,6 +65,12 @@ __all__ = [
     "SSZUnion",
     "Boolean",
     "Container",
+    # Domain types — fork-stable
+    "Checkpoint",
+    "IMMEDIATE_JUSTIFICATION_WINDOW",
+    "Slot",
+    "SubnetId",
+    "ValidatorIndex",
     # RLP encoding/decoding
     "encode_rlp",
     "decode_rlp",

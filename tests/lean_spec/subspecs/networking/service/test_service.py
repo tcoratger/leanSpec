@@ -6,13 +6,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from lean_spec.forks.lstar.containers import (
-    AttestationData,
-    Checkpoint,
-)
+from lean_spec.forks.lstar.containers import AttestationData
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import SubnetId, ValidatorIndex
 from lean_spec.snappy import compress
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
@@ -29,7 +24,7 @@ from lean_spec.subspecs.networking.service.events import (
     PeerStatusEvent,
 )
 from lean_spec.subspecs.networking.types import ConnectionState
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot, SubnetId, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
     create_mock_sync_service,

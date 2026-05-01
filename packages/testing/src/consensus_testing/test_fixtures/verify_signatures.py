@@ -16,8 +16,7 @@ from lean_spec.forks.lstar.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.forks.lstar.containers.state import State
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex
-from lean_spec.types import Boolean
+from lean_spec.types import Boolean, ValidatorIndex
 
 from ..keys import XmssKeyManager
 from ..test_types import BlockSpec

@@ -1,10 +1,9 @@
 """Tests for SSZ serialization of XMSS types."""
 
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
 from lean_spec.subspecs.xmss.containers import PublicKey, SecretKey, Signature
 from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64
 
 
 def test_public_key_ssz_roundtrip() -> None:

@@ -20,15 +20,14 @@ from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
     AttestationSignatures,
 )
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state import State
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.types import Bytes32, CamelModel
+from lean_spec.types import Bytes32, CamelModel, Slot, ValidatorIndex
 
 from ..keys import LEAN_ENV_TO_SCHEMES, XmssKeyManager, create_dummy_signature
 from .aggregated_attestation_spec import AggregatedAttestationSpec

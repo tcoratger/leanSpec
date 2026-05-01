@@ -42,20 +42,18 @@ from lean_spec.forks.lstar.containers import (
     Block,
     SignedAttestation,
     SignedBlock,
-    ValidatorIndex,
 )
 from lean_spec.forks.lstar.containers.block import (
     AttestationSignatures,
     BlockSignatures,
 )
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import SyncService
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 
 from .registry import ValidatorEntry, ValidatorRegistry
 

@@ -8,11 +8,9 @@ from lean_spec.forks.lstar import AttestationSignatureEntry
 from lean_spec.forks.lstar.containers.attestation import AttestationData
 from lean_spec.forks.lstar.containers.block import Block, BlockBody
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.forks.lstar.containers.slot import Slot
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, ValidatorIndices
+from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32
+from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     make_aggregated_proof,
     make_attestation_data_simple,

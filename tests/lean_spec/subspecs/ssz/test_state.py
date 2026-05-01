@@ -2,17 +2,15 @@ from lean_spec.forks.lstar import State
 from lean_spec.forks.lstar.containers.block.block import (
     BlockHeader,
 )
-from lean_spec.forks.lstar.containers.checkpoint import Checkpoint
 from lean_spec.forks.lstar.containers.config import Config
-from lean_spec.forks.lstar.containers.slot import Slot
 from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.forks.lstar.containers.validator import ValidatorIndex, Validators
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.forks.lstar.containers.validator import Validators
+from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 
 
 def test_encode_decode_state_roundtrip() -> None:
