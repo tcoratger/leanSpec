@@ -64,7 +64,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Final
 
-from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.forks import SignedBlock
 from lean_spec.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.subspecs.networking.config import (
     MAX_ERROR_MESSAGE_SIZE,

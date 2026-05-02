@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from lean_spec.forks.lstar import Store
 from lean_spec.forks.lstar.containers.attestation import AttestationData
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.types.byte_arrays import ByteListMiB
 from tests.lean_spec.helpers import make_bytes32, make_signed_block
 

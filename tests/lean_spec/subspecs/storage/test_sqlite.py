@@ -28,7 +28,7 @@ from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 @pytest.fixture
 def db() -> Generator[SQLiteDatabase, None, None]:
     """Create an in-memory SQLite database for testing."""
-    database = SQLiteDatabase(":memory:", State)
+    database = SQLiteDatabase(":memory:", State, Block, AttestationData)
     yield database
     database.close()
 
@@ -354,7 +354,7 @@ class TestRestartRecovery:
             genesis_time = Uint64(1000)
 
             # Write genesis data and close.
-            with SQLiteDatabase(db_path, State) as db:
+            with SQLiteDatabase(db_path, State, Block, AttestationData) as db:
                 with db.batch_write():
                     db.put_block(genesis_block, block_root)
                     db.put_state(genesis_state, block_root)
@@ -365,7 +365,7 @@ class TestRestartRecovery:
                     db.put_genesis_time(genesis_time)
 
             # Reopen and verify all data survived.
-            with SQLiteDatabase(db_path, State) as db:
+            with SQLiteDatabase(db_path, State, Block, AttestationData) as db:
                 assert db.get_head_root() == block_root
                 assert db.get_block(block_root) == genesis_block
                 assert db.get_state(block_root) == genesis_state
@@ -586,7 +586,7 @@ class TestLifecycle:
 
     def test_context_manager(self) -> None:
         """Database works as context manager."""
-        with SQLiteDatabase(":memory:", State) as db:
+        with SQLiteDatabase(":memory:", State, Block, AttestationData) as db:
             root = Bytes32(b"\x0c" * 32)
             db.put_head_root(root)
             db.commit()

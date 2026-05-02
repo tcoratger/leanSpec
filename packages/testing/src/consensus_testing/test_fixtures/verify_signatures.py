@@ -7,7 +7,6 @@ from typing import Any, ClassVar
 from pydantic import Field
 
 from lean_spec.forks.lstar.containers.attestation import AggregatedAttestation
-from lean_spec.forks.lstar.containers.attestation.aggregation_bits import AggregationBits
 from lean_spec.forks.lstar.containers.block import (
     SignedBlock,
 )
@@ -16,7 +15,7 @@ from lean_spec.forks.lstar.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.forks.lstar.containers.state import State
-from lean_spec.types import Boolean, ValidatorIndex
+from lean_spec.types import AggregationBits, Boolean, ValidatorIndex
 
 from ..keys import XmssKeyManager
 from ..test_types import BlockSpec

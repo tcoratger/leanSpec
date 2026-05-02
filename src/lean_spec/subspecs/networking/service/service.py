@@ -25,11 +25,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.forks.lstar.containers import SignedBlock
-from lean_spec.forks.lstar.containers.attestation import (
-    SignedAggregatedAttestation,
-    SignedAttestation,
-)
+from lean_spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
 from lean_spec.snappy import compress
 from lean_spec.subspecs.networking.client.event_source import EventSource
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic

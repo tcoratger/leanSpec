@@ -6,9 +6,16 @@ from lean_spec.forks.lstar.containers.attestation import AttestationData
 from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.forks.lstar.containers.block.block import Block
 from lean_spec.forks.lstar.containers.state import State
-from lean_spec.forks.lstar.containers.validator import ValidatorIndices
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import ByteListMiB, Bytes32, CamelModel, Checkpoint, Slot, ValidatorIndex
+from lean_spec.types import (
+    ByteListMiB,
+    Bytes32,
+    CamelModel,
+    Checkpoint,
+    Slot,
+    ValidatorIndex,
+    ValidatorIndices,
+)
 
 from ..keys import XmssKeyManager
 from .utils import resolve_checkpoint

@@ -1,10 +1,12 @@
 """Tests for the multi-fork architecture."""
 
 import ast
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
 
+import lean_spec
 from lean_spec.forks import (
     DEFAULT_REGISTRY,
     FORK_SEQUENCE,
@@ -17,6 +19,18 @@ from lean_spec.forks.lstar.containers.block import Block
 from lean_spec.forks.lstar.containers.state import State
 from lean_spec.types import Slot, Uint64
 from tests.lean_spec.helpers.builders import make_validators
+
+_LEAN_SPEC_FILE = lean_spec.__file__
+assert _LEAN_SPEC_FILE is not None  # noqa: S101
+_SUBSPECS_ROOT: Path = Path(_LEAN_SPEC_FILE).parent / "subspecs"
+"""Filesystem root for subspec source files. Used by import-guard tests."""
+
+_FORBIDDEN_FORK_PREFIXES: tuple[str, ...] = ("lean_spec.forks.lstar",)
+"""
+Module prefixes that subspec code must never import directly.
+
+Subspecs are meant to be fork-agnostic shared libraries.
+"""
 
 
 class _NextSpec(LstarSpec):
@@ -39,7 +53,7 @@ class TestForkProtocolGeneric:
         """The protocol module must not import any devnet package."""
         source = protocol.__file__
         assert source is not None
-        tree = ast.parse(open(source).read())
+        tree = ast.parse(Path(source).read_text())
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
@@ -48,6 +62,26 @@ class TestForkProtocolGeneric:
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     assert "devnet" not in alias.name, f"Forbidden import of {alias.name}"
+
+    def test_subspecs_do_not_import_concrete_fork(self) -> None:
+        """Subspecs must remain fork-agnostic."""
+        offenders: list[str] = []
+        for source_file in _SUBSPECS_ROOT.rglob("*.py"):
+            tree = ast.parse(source_file.read_text(), filename=str(source_file))
+            location = source_file.relative_to(_SUBSPECS_ROOT.parent)
+            for node in ast.walk(tree):
+                # `from X import Y` — `X` is the module being imported from.
+                if isinstance(node, ast.ImportFrom):
+                    mod = node.module or ""
+                    if any(mod.startswith(p) for p in _FORBIDDEN_FORK_PREFIXES):
+                        offenders.append(f"{location}:{node.lineno}: from {mod} import ...")
+                # `import X` — each `alias.name` is a fully-qualified module path.
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if any(alias.name.startswith(p) for p in _FORBIDDEN_FORK_PREFIXES):
+                            offenders.append(f"{location}:{node.lineno}: import {alias.name}")
+
+        assert not offenders, "Subspecs must not import concrete forks:\n" + "\n".join(offenders)
 
 
 class TestLstarSpec:
