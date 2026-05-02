@@ -9,6 +9,8 @@ from lean_spec.forks.lstar.containers import (
     Attestation,
     AttestationData,
     Block,
+    BlockBody,
+    BlockHeader,
     Config,
     SignedAggregatedAttestation,
     SignedAttestation,
@@ -16,6 +18,10 @@ from lean_spec.forks.lstar.containers import (
     Validator,
 )
 from lean_spec.forks.lstar.containers.block.block import BlockSignatures
+from lean_spec.forks.lstar.containers.block.types import (
+    AggregatedAttestations,
+    AttestationSignatures,
+)
 from lean_spec.forks.lstar.containers.state import State
 from lean_spec.forks.lstar.containers.validator import Validators
 from lean_spec.subspecs.chain.clock import Interval
@@ -38,8 +44,12 @@ class LstarSpec(ForkProtocol):
 
     state_class: type[State] = State
     block_class: type[Block] = Block
+    block_body_class: type[BlockBody] = BlockBody
+    block_header_class: type[BlockHeader] = BlockHeader
     signed_block_class: type[SignedBlock] = SignedBlock
     block_signatures_class: type[BlockSignatures] = BlockSignatures
+    aggregated_attestations_class: type[AggregatedAttestations] = AggregatedAttestations
+    attestation_signatures_class: type[AttestationSignatures] = AttestationSignatures
     store_class: type[Store] = Store
 
     attestation_data_class: type[AttestationData] = AttestationData
