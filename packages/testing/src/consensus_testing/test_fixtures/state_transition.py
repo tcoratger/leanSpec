@@ -8,6 +8,7 @@ from lean_spec.forks.lstar.containers.attestation import AggregatedAttestation, 
 from lean_spec.forks.lstar.containers.block.block import Block, BlockBody
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Bytes32, ValidatorIndices
@@ -15,6 +16,9 @@ from lean_spec.types import Bytes32, ValidatorIndices
 from ..keys import XmssKeyManager
 from ..test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
 from .base import BaseConsensusFixture
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all fixture invocations."""
 
 
 class StateTransitionTest(BaseConsensusFixture):
@@ -136,9 +140,10 @@ class StateTransitionTest(BaseConsensusFixture):
                 if cached_state is not None:
                     state = cached_state
                 elif getattr(block_spec, "skip_slot_processing", False):
-                    state = state.process_block(block)
+                    state = _SPEC.process_block(state, block)
                 else:
-                    state = state.state_transition(
+                    state = _SPEC.state_transition(
+                        state,
                         block=block,
                         valid_signatures=True,
                     )
@@ -212,7 +217,7 @@ class StateTransitionTest(BaseConsensusFixture):
         # Advance slots unless the spec intentionally skips slot processing.
         slot_advanced_state: State | None = None
         if not spec.skip_slot_processing:
-            slot_advanced_state = state.process_slots(spec.slot)
+            slot_advanced_state = _SPEC.process_slots(state, spec.slot)
 
         # Resolve the parent root.
         # Default: latest block header from the slot-advanced state.
@@ -255,7 +260,8 @@ class StateTransitionTest(BaseConsensusFixture):
 
             known_block_roots = frozenset(hash_tree_root(b) for b in block_registry.values())
 
-            block, post_state, _, _ = state.build_block(
+            block, post_state, _, _ = _SPEC.build_block(
+                state,
                 slot=spec.slot,
                 proposer_index=proposer_index,
                 parent_root=parent_root,
@@ -289,7 +295,8 @@ class StateTransitionTest(BaseConsensusFixture):
             # The body changed, so re-run the transition to get the correct
             # post-state and state root.
             if post_state is not None:
-                post_state = state.process_slots(spec.slot).process_block(block)
+                post_state = _SPEC.process_slots(state, spec.slot)
+                post_state = _SPEC.process_block(post_state, block)
                 block = block.model_copy(update={"state_root": hash_tree_root(post_state)})
 
         return block, post_state

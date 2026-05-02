@@ -47,6 +47,7 @@ from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustifiedSlots,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
@@ -54,7 +55,9 @@ from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 class TestProcessAttestationsBoundsCheck:
     """Verify attestations with out-of-bounds slot references are rejected safely."""
 
-    def test_attestation_with_target_beyond_history_is_silently_rejected(self) -> None:
+    def test_attestation_with_target_beyond_history_is_silently_rejected(
+        self, spec: LstarSpec
+    ) -> None:
         """
         Reject attestations whose target slot exceeds history bounds.
 
@@ -131,7 +134,7 @@ class TestProcessAttestationsBoundsCheck:
         # Process the attestation.
         #
         # This is the critical line: it must NOT raise IndexError.
-        result_state = state.process_attestations([attestation])
+        result_state = spec.process_attestations(state, [attestation])
 
         # Verify the attestation was silently rejected.
         #
@@ -146,7 +149,9 @@ class TestProcessAttestationsBoundsCheck:
         assert result_state.latest_justified == state.latest_justified
         assert result_state.latest_finalized == state.latest_finalized
 
-    def test_attestation_with_source_beyond_history_is_silently_rejected(self) -> None:
+    def test_attestation_with_source_beyond_history_is_silently_rejected(
+        self, spec: LstarSpec
+    ) -> None:
         """
         Reject attestations where history lookup would fail for any referenced slot.
 
@@ -213,7 +218,7 @@ class TestProcessAttestationsBoundsCheck:
         # Process the attestation.
         #
         # Must NOT raise IndexError.
-        result_state = state.process_attestations([attestation])
+        result_state = spec.process_attestations(state, [attestation])
 
         # Verify the attestation was silently rejected.
         #

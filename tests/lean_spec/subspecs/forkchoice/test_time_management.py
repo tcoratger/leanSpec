@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 from lean_spec.forks.lstar import State, Store
 from lean_spec.forks.lstar.containers import Block
 from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     INTERVALS_PER_SLOT,
@@ -53,43 +54,43 @@ class TestGetForkchoiceStore:
 class TestOnTick:
     """Test Store on_tick functionality."""
 
-    def test_on_tick_basic(self, sample_store: Store) -> None:
+    def test_on_tick_basic(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test basic on_tick."""
         initial_time = sample_store.time
         # 200 seconds = 200*1000/800 = 250 intervals
         target_interval = Interval(200 * 1000 // int(MILLISECONDS_PER_INTERVAL))
 
-        sample_store, _ = sample_store.on_tick(target_interval, has_proposal=True)
+        sample_store, _ = spec.on_tick(sample_store, target_interval, has_proposal=True)
 
         # Time should advance
         assert sample_store.time > initial_time
 
-    def test_on_tick_no_proposal(self, sample_store: Store) -> None:
+    def test_on_tick_no_proposal(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test on_tick without proposal."""
         initial_time = sample_store.time
         # 100 seconds = 125 intervals
         target_interval = Interval(100 * 1000 // int(MILLISECONDS_PER_INTERVAL))
 
-        sample_store, _ = sample_store.on_tick(target_interval, has_proposal=False)
+        sample_store, _ = spec.on_tick(sample_store, target_interval, has_proposal=False)
 
         # Time should still advance
         assert sample_store.time >= initial_time
 
-    def test_on_tick_already_current(self, sample_store: Store) -> None:
+    def test_on_tick_already_current(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test on_tick when already at target time (should be no-op)."""
         initial_time = sample_store.time
 
-        sample_store, _ = sample_store.on_tick(Interval(initial_time), has_proposal=True)
+        sample_store, _ = spec.on_tick(sample_store, Interval(initial_time), has_proposal=True)
 
         # No-op: target equals current time
         assert sample_store.time == initial_time
 
-    def test_on_tick_small_increment(self, sample_store: Store) -> None:
+    def test_on_tick_small_increment(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test on_tick with small interval increment."""
         initial_time = sample_store.time
         target_interval = Interval(int(initial_time) + 1)
 
-        sample_store, _ = sample_store.on_tick(target_interval, has_proposal=False)
+        sample_store, _ = spec.on_tick(sample_store, target_interval, has_proposal=False)
 
         # Should advance by exactly one interval
         assert sample_store.time == target_interval
@@ -184,7 +185,7 @@ class TestAttestationProcessingTiming:
 class TestProposalHeadTiming:
     """Test proposal head timing logic."""
 
-    def test_get_proposal_head_basic(self, sample_store: Store) -> None:
+    def test_get_proposal_head_basic(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test getting proposal head for a slot."""
         # Add a block to make the test more realistic
         genesis_block = Block(
@@ -202,28 +203,30 @@ class TestProposalHeadTiming:
         sample_store = sample_store.model_copy(update={"blocks": new_blocks, "head": genesis_hash})
 
         # Get proposal head for slot 0
-        store, head = sample_store.get_proposal_head(Slot(0))
+        store, head = spec.get_proposal_head(sample_store, Slot(0))
 
         # Should return the store's head
         assert head == store.head
 
-    def test_get_proposal_head_advances_time(self, sample_store: Store) -> None:
+    def test_get_proposal_head_advances_time(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test that get_proposal_head advances store time appropriately."""
         initial_time = sample_store.time
 
         # Get proposal head for a future slot
         future_slot = Slot(5)
-        store, _ = sample_store.get_proposal_head(future_slot)
+        store, _ = spec.get_proposal_head(sample_store, future_slot)
 
         # Time may have advanced (depending on slot timing)
         # This is mainly testing that the call doesn't fail
         assert store.time >= initial_time
 
-    def test_get_proposal_head_processes_attestations(self, sample_store: Store) -> None:
+    def test_get_proposal_head_processes_attestations(
+        self, sample_store: Store, spec: LstarSpec
+    ) -> None:
         """Test that get_proposal_head processes pending aggregated payloads."""
         # Attestations are now tracked via aggregated payloads
         # Test simplified to verify the method runs correctly
-        store, head = sample_store.get_proposal_head(Slot(1))
+        store, head = spec.get_proposal_head(sample_store, Slot(1))
 
         # get_proposal_head should have called accept_new_attestations
         # which migrates new payloads to known payloads

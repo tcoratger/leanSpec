@@ -14,6 +14,7 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import State, Store
 from lean_spec.forks.lstar.containers import Block
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     GenesisData,
@@ -22,6 +23,12 @@ from tests.lean_spec.helpers import (
     make_genesis_state,
     make_store,
 )
+
+
+@pytest.fixture(scope="session")
+def spec() -> LstarSpec:
+    """Active fork spec used to drive state transition and forkchoice operations."""
+    return LstarSpec()
 
 
 @pytest.fixture

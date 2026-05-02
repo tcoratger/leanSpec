@@ -15,11 +15,15 @@ from lean_spec.forks.lstar.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import AggregationBits, Boolean, ValidatorIndex
 
 from ..keys import XmssKeyManager
 from ..test_types import BlockSpec
 from .base import BaseConsensusFixture
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all fixture invocations."""
 
 
 class VerifySignaturesTest(BaseConsensusFixture):
@@ -111,7 +115,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
         # Verify signatures
         try:
-            signed_block.verify_signatures(self.anchor_state.validators)
+            _SPEC.verify_signatures(signed_block, self.anchor_state.validators)
         except AssertionError as e:
             exception_raised = e
             # If we expect an exception, this is fine

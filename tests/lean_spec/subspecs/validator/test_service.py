@@ -14,6 +14,7 @@ from lean_spec.forks.lstar.containers import (
     SignedAttestation,
     SignedBlock,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -160,11 +161,11 @@ class TestSignBlock:
         )
 
     def test_attestation_signatures_included(
-        self, sync_service: SyncService, key_manager: XmssKeyManager
+        self, sync_service: SyncService, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """Aggregated attestation proofs passed in are present in the returned signature."""
         service, block = self._setup(sync_service, key_manager)
-        attestation_data = sync_service.store.produce_attestation_data(Slot(1))
+        attestation_data = spec.produce_attestation_data(sync_service.store, Slot(1))
         agg_proof = make_aggregated_proof(key_manager, [ValidatorIndex(0)], attestation_data)
 
         result = service._sign_block(block, ValidatorIndex(0), [agg_proof])
@@ -199,6 +200,7 @@ class TestSignAttestation:
         self,
         sync_service: SyncService,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
         index: int = 0,
     ) -> tuple[ValidatorService, AttestationData]:
         registry = _make_registry(key_manager, index)
@@ -207,14 +209,14 @@ class TestSignAttestation:
             clock=SlotClock(genesis_time=Uint64(0)),
             registry=registry,
         )
-        att_data = sync_service.store.produce_attestation_data(Slot(1))
+        att_data = spec.produce_attestation_data(sync_service.store, Slot(1))
         return service, att_data
 
     def test_fields_populated_correctly(
-        self, sync_service: SyncService, key_manager: XmssKeyManager
+        self, sync_service: SyncService, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """The signed attestation contains the correct validator ID, data, and a valid signature."""
-        service, att_data = self._setup(sync_service, key_manager, index=3)
+        service, att_data = self._setup(sync_service, key_manager, spec, index=3)
 
         result = service._sign_attestation(att_data, ValidatorIndex(3))
 
@@ -230,10 +232,10 @@ class TestSignAttestation:
         )
 
     def test_uses_attestation_key_not_proposal_key(
-        self, sync_service: SyncService, key_manager: XmssKeyManager
+        self, sync_service: SyncService, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """Attestation signature verifies with the attestation public key, not the proposal key."""
-        service, att_data = self._setup(sync_service, key_manager)
+        service, att_data = self._setup(sync_service, key_manager, spec)
 
         result = service._sign_attestation(att_data, ValidatorIndex(0))
 
@@ -246,7 +248,7 @@ class TestSignAttestation:
         )
 
     def test_missing_validator_raises_value_error(
-        self, sync_service: SyncService, key_manager: XmssKeyManager
+        self, sync_service: SyncService, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """Signing an attestation with an unregistered validator index raises ValueError."""
         service = ValidatorService(
@@ -254,7 +256,7 @@ class TestSignAttestation:
             clock=SlotClock(genesis_time=Uint64(0)),
             registry=ValidatorRegistry(),
         )
-        att_data = sync_service.store.produce_attestation_data(Slot(1))
+        att_data = spec.produce_attestation_data(sync_service.store, Slot(1))
 
         with pytest.raises(ValueError, match="No secret key for validator 99"):
             service._sign_attestation(att_data, ValidatorIndex(99))
@@ -1097,6 +1099,7 @@ class TestValidatorServiceIntegration:
         key_manager: XmssKeyManager,
         real_sync_service: SyncService,
         real_registry: ValidatorRegistry,
+        spec: LstarSpec,
     ) -> None:
         """
         Verify attestations from the pool are included in produced blocks.
@@ -1105,7 +1108,7 @@ class TestValidatorServiceIntegration:
         and include them in the block body.
         """
         store = real_sync_service.store
-        attestation_data = store.produce_attestation_data(Slot(0))
+        attestation_data = spec.produce_attestation_data(store, Slot(0))
         data_root = hash_tree_root(attestation_data)
 
         participants = [ValidatorIndex(3), ValidatorIndex(4)]

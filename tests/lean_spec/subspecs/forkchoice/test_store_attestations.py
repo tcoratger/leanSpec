@@ -11,6 +11,7 @@ from lean_spec.forks.lstar.containers.attestation import (
     SignedAggregatedAttestation,
     SignedAttestation,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -34,13 +35,15 @@ from tests.lean_spec.helpers import (
 )
 
 
-def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyManager) -> None:
+def test_on_block_processes_multi_validator_aggregations(
+    key_manager: XmssKeyManager, spec: LstarSpec
+) -> None:
     """Ensure Store.on_block handles aggregated attestations with many validators."""
     base_store = make_store(num_validators=3, key_manager=key_manager)
 
     # Producer view knows about attestations from validators 1 and 2
     attestation_slot = Slot(1)
-    attestation_data = base_store.produce_attestation_data(attestation_slot)
+    attestation_data = spec.produce_attestation_data(base_store, attestation_slot)
 
     participants = [ValidatorIndex(1), ValidatorIndex(2)]
 
@@ -59,7 +62,7 @@ def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyMan
         producer_store, key_manager, attestation_slot, proposer_index
     )
 
-    updated_store = consumer_store.on_block(signed_block)
+    updated_store = spec.on_block(consumer_store, signed_block)
 
     # Verify attestations can be extracted from aggregated payloads
     extracted_attestations = updated_store.extract_attestations_from_aggregated_payloads(
@@ -73,6 +76,7 @@ def test_on_block_processes_multi_validator_aggregations(key_manager: XmssKeyMan
 
 def test_on_block_preserves_immutability_of_aggregated_payloads(
     key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """Verify that Store.on_block doesn't mutate previous store's latest_new_aggregated_payloads."""
     base_store = make_store(
@@ -81,7 +85,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
 
     # First block with attestations from validators 1 and 2
     attestation_slot_1 = Slot(1)
-    attestation_data_1 = base_store.produce_attestation_data(attestation_slot_1)
+    attestation_data_1 = spec.produce_attestation_data(base_store, attestation_slot_1)
 
     gossip_sigs_1 = {
         attestation_data_1: {
@@ -101,11 +105,11 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     consumer_store_1, signed_block_1 = make_signed_block_from_store(
         producer_store_1, key_manager, attestation_slot_1, ValidatorIndex(1)
     )
-    store_after_block_1 = consumer_store_1.on_block(signed_block_1)
+    store_after_block_1 = spec.on_block(consumer_store_1, signed_block_1)
 
     # Second block with attestations for the SAME validators
     attestation_slot_2 = Slot(2)
-    attestation_data_2 = store_after_block_1.produce_attestation_data(attestation_slot_2)
+    attestation_data_2 = spec.produce_attestation_data(store_after_block_1, attestation_slot_2)
 
     gossip_sigs_2 = {
         attestation_data_2: {
@@ -132,7 +136,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     }
 
     # Process the second block
-    store_after_block_2 = store_before_block_2.on_block(signed_block_2)
+    store_after_block_2 = spec.on_block(store_before_block_2, signed_block_2)
 
     # Verify immutability: the list lengths in store_before_block_2 should not have changed
     for key, original_length in original_sig_lengths.items():
@@ -159,7 +163,9 @@ class TestOnGossipAttestationImportGating:
     drop everything.
     """
 
-    def test_aggregator_stores_received_attestation(self, key_manager: XmssKeyManager) -> None:
+    def test_aggregator_stores_received_attestation(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """Aggregator stores any attestation that reaches the store."""
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)
@@ -178,14 +184,16 @@ class TestOnGossipAttestationImportGating:
             "Precondition: no signatures before processing"
         )
 
-        updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+        updated_store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         sigs = updated_store.attestation_signatures.get(attestation_data, set())
         assert attester_validator in {entry.validator_id for entry in sigs}, (
             "Aggregator should store any attestation it receives"
         )
 
-    def test_aggregator_stores_multiple_attestations(self, key_manager: XmssKeyManager) -> None:
+    def test_aggregator_stores_multiple_attestations(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """Aggregator stores all attestations regardless of which validator sent them."""
         current_validator = ValidatorIndex(0)
         attesters = [ValidatorIndex(1), ValidatorIndex(2), ValidatorIndex(3)]
@@ -203,7 +211,7 @@ class TestOnGossipAttestationImportGating:
 
         updated = store
         for v in attesters:
-            updated = updated.on_gossip_attestation(make_signed(v), is_aggregator=True)
+            updated = spec.on_gossip_attestation(updated, make_signed(v), is_aggregator=True)
 
         stored_ids = {
             entry.validator_id
@@ -213,7 +221,9 @@ class TestOnGossipAttestationImportGating:
             "Aggregator should store attestations from all received validators"
         )
 
-    def test_non_aggregator_never_stores_signature(self, key_manager: XmssKeyManager) -> None:
+    def test_non_aggregator_never_stores_signature(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """Non-aggregator nodes drop all gossip attestations regardless of sender."""
         current_validator = ValidatorIndex(0)
         attester_validator = ValidatorIndex(1)
@@ -228,7 +238,7 @@ class TestOnGossipAttestationImportGating:
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
-        updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=False)
+        updated_store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=False)
 
         sigs = updated_store.attestation_signatures.get(attestation_data, set())
         assert attester_validator not in {entry.validator_id for entry in sigs}, (
@@ -236,7 +246,7 @@ class TestOnGossipAttestationImportGating:
         )
 
     def test_non_aggregator_does_not_create_signatures_entry(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """Non-aggregator leaves attestation_signatures unchanged."""
         current_validator = ValidatorIndex(0)
@@ -252,7 +262,7 @@ class TestOnGossipAttestationImportGating:
             signature=key_manager.sign_attestation_data(attester_validator, attestation_data),
         )
 
-        updated_store = store.on_gossip_attestation(signed_attestation, is_aggregator=False)
+        updated_store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=False)
 
         assert attestation_data not in updated_store.attestation_signatures, (
             "Non-aggregator should not create any attestation_signatures entry"
@@ -266,7 +276,9 @@ class TestOnGossipAggregatedAttestation:
     Tests aggregated proof verification and storage in latest_new_aggregated_payloads.
     """
 
-    def test_valid_proof_stored_correctly(self, key_manager: XmssKeyManager) -> None:
+    def test_valid_proof_stored_correctly(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """
         Valid aggregated attestation is verified and stored.
 
@@ -303,7 +315,7 @@ class TestOnGossipAggregatedAttestation:
             proof=proof,
         )
 
-        updated_store = store.on_gossip_aggregated_attestation(signed_aggregated)
+        updated_store = spec.on_gossip_aggregated_attestation(store, signed_aggregated)
 
         # Verify proof is stored keyed by attestation data
         assert attestation_data in updated_store.latest_new_aggregated_payloads, (
@@ -313,7 +325,9 @@ class TestOnGossipAggregatedAttestation:
         assert len(proofs) == 1
         assert proof in proofs
 
-    def test_attestation_data_used_as_key(self, key_manager: XmssKeyManager) -> None:
+    def test_attestation_data_used_as_key(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """
         Attestation data is used directly as the key in aggregated payloads.
 
@@ -348,12 +362,12 @@ class TestOnGossipAggregatedAttestation:
             proof=proof,
         )
 
-        updated_store = store.on_gossip_aggregated_attestation(signed_aggregated)
+        updated_store = spec.on_gossip_aggregated_attestation(store, signed_aggregated)
 
         assert attestation_data in updated_store.latest_new_aggregated_payloads
         assert proof in updated_store.latest_new_aggregated_payloads[attestation_data]
 
-    def test_invalid_proof_rejected(self, key_manager: XmssKeyManager) -> None:
+    def test_invalid_proof_rejected(self, key_manager: XmssKeyManager, spec: LstarSpec) -> None:
         """
         Corrupted aggregated proof is rejected with AssertionError.
 
@@ -398,9 +412,9 @@ class TestOnGossipAggregatedAttestation:
         )
 
         with pytest.raises(AssertionError, match="signature verification failed"):
-            store.on_gossip_aggregated_attestation(signed_aggregated)
+            spec.on_gossip_aggregated_attestation(store, signed_aggregated)
 
-    def test_multiple_proofs_accumulate(self, key_manager: XmssKeyManager) -> None:
+    def test_multiple_proofs_accumulate(self, key_manager: XmssKeyManager, spec: LstarSpec) -> None:
         """
         Multiple aggregated proofs for same validator accumulate.
 
@@ -455,11 +469,11 @@ class TestOnGossipAggregatedAttestation:
             slot=attestation_data.slot,
         )
 
-        store = store.on_gossip_aggregated_attestation(
-            SignedAggregatedAttestation(data=attestation_data, proof=proof_1)
+        store = spec.on_gossip_aggregated_attestation(
+            store, SignedAggregatedAttestation(data=attestation_data, proof=proof_1)
         )
-        store = store.on_gossip_aggregated_attestation(
-            SignedAggregatedAttestation(data=attestation_data, proof=proof_2)
+        store = spec.on_gossip_aggregated_attestation(
+            store, SignedAggregatedAttestation(data=attestation_data, proof=proof_2)
         )
 
         # Both proofs should be stored under the same attestation data
@@ -560,7 +574,7 @@ class TestAggregateCommitteeSignatures:
         assert len(updated_store.latest_new_aggregated_payloads) == 0
 
     def test_multiple_attestation_data_grouped_separately(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """
         Signatures for different attestation data are aggregated separately.
@@ -572,7 +586,7 @@ class TestAggregateCommitteeSignatures:
         )
 
         # Create two different attestation data (different slots)
-        att_data_1 = base_store.produce_attestation_data(Slot(1))
+        att_data_1 = spec.produce_attestation_data(base_store, Slot(1))
         # Create a second attestation data with different head
         att_data_2 = AttestationData(
             slot=Slot(1),
@@ -734,7 +748,9 @@ class TestEndToEndAggregationFlow:
     interval-triggered aggregation to proof storage.
     """
 
-    def test_gossip_to_aggregation_to_storage(self, key_manager: XmssKeyManager) -> None:
+    def test_gossip_to_aggregation_to_storage(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """
         Complete flow: gossip attestation -> aggregation -> proof storage.
 
@@ -753,7 +769,7 @@ class TestEndToEndAggregationFlow:
         # Advance the clock to slot 1 so the attestation's slot has begun.
         store = store.model_copy(update={"time": Interval.from_slot(Slot(1))})
 
-        attestation_data = store.produce_attestation_data(Slot(1))
+        attestation_data = spec.produce_attestation_data(store, Slot(1))
         data_root = hash_tree_root(attestation_data)
 
         # Step 1: Receive gossip attestations from validators 1 and 2
@@ -766,7 +782,8 @@ class TestEndToEndAggregationFlow:
                 data=attestation_data,
                 signature=key_manager.sign_attestation_data(vid, attestation_data),
             )
-            store = store.on_gossip_attestation(
+            store = spec.on_gossip_attestation(
+                store,
                 signed_attestation,
                 is_aggregator=True,
             )

@@ -14,6 +14,7 @@ from lean_spec.forks.lstar.containers import (
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
 from lean_spec.forks.lstar.containers.block import BlockSignatures
 from lean_spec.forks.lstar.containers.block.types import AttestationSignatures
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import JUSTIFICATION_LOOKBACK_SLOTS
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -46,6 +47,7 @@ class TestGetAttestationTarget:
         self,
         observer_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Target should walk back toward safe_target when head is ahead."""
         store = observer_store
@@ -55,7 +57,7 @@ class TestGetAttestationTarget:
             slot = Slot(slot_num)
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
 
-            store, block, _ = store.produce_block_with_signatures(slot, proposer)
+            store, block, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         # Head has advanced (the exact slot depends on forkchoice without attestations)
         head_slot = store.blocks[store.head].slot
@@ -77,6 +79,7 @@ class TestGetAttestationTarget:
     def test_attestation_target_respects_justifiable_slots(
         self,
         observer_store: Store,
+        spec: LstarSpec,
     ) -> None:
         """Target should land on a slot that is_justifiable_after the finalized slot."""
         store = observer_store
@@ -85,7 +88,7 @@ class TestGetAttestationTarget:
         for slot_num in range(1, 10):
             slot = Slot(slot_num)
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
-            store, _, _ = store.produce_block_with_signatures(slot, proposer)
+            store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         target = store.get_attestation_target()
         finalized_slot = store.latest_finalized.slot
@@ -93,7 +96,9 @@ class TestGetAttestationTarget:
         # The target slot must be justifiable after the finalized slot
         assert target.slot.is_justifiable_after(finalized_slot)
 
-    def test_attestation_target_consistency_with_head(self, observer_store: Store) -> None:
+    def test_attestation_target_consistency_with_head(
+        self, observer_store: Store, spec: LstarSpec
+    ) -> None:
         """Target should be on the path from head to finalized checkpoint."""
         store = observer_store
 
@@ -101,7 +106,7 @@ class TestGetAttestationTarget:
         for slot_num in range(1, 4):
             slot = Slot(slot_num)
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
-            store, _, _ = store.produce_block_with_signatures(slot, proposer)
+            store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         target = store.get_attestation_target()
 
@@ -128,6 +133,7 @@ class TestSafeTargetAdvancement:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Safe target should only advance with 2/3+ attestation support."""
         store = keyed_store
@@ -135,14 +141,14 @@ class TestSafeTargetAdvancement:
         # Produce a block at slot 1
         slot = Slot(1)
         proposer = ValidatorIndex(1)
-        store, block, _ = store.produce_block_with_signatures(slot, proposer)
+        store, block, _ = spec.produce_block_with_signatures(store, slot, proposer)
         block_root = hash_tree_root(block)
 
         # Add attestations from fewer than 2/3 of validators
         num_validators = len(store.states[block_root].validators)
         threshold = (num_validators * 2 + 2) // 3  # Ceiling of 2/3
 
-        attestation_data = store.produce_attestation_data(slot)
+        attestation_data = spec.produce_attestation_data(store, slot)
 
         # Create signed attestations and process them
         for i in range(threshold - 1):
@@ -154,7 +160,7 @@ class TestSafeTargetAdvancement:
                 signature=sig,
             )
             # Process as gossip (requires aggregator flag)
-            store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+            store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
         store, _ = store.aggregate()
@@ -173,6 +179,7 @@ class TestSafeTargetAdvancement:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Safe target should advance when 2/3+ validators attest to same target."""
         store = keyed_store
@@ -180,10 +187,10 @@ class TestSafeTargetAdvancement:
         # Produce a block at slot 1
         slot = Slot(1)
         proposer = ValidatorIndex(1)
-        store, _, _ = store.produce_block_with_signatures(slot, proposer)
+        store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         # Get attestation data for slot 1
-        attestation_data = store.produce_attestation_data(slot)
+        attestation_data = spec.produce_attestation_data(store, slot)
 
         # Add attestations from at least 2/3 of validators
         num_validators = len(store.states[store.head].validators)
@@ -198,7 +205,7 @@ class TestSafeTargetAdvancement:
                 data=attestation_data,
                 signature=sig,
             )
-            store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+            store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
         store, _ = store.aggregate()
@@ -215,6 +222,7 @@ class TestSafeTargetAdvancement:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """update_safe_target should use new aggregated payloads."""
         store = keyed_store
@@ -222,9 +230,9 @@ class TestSafeTargetAdvancement:
         # Produce block at slot 1
         slot = Slot(1)
         proposer = ValidatorIndex(1)
-        store, block, _ = store.produce_block_with_signatures(slot, proposer)
+        store, block, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
-        attestation_data = store.produce_attestation_data(slot)
+        attestation_data = spec.produce_attestation_data(store, slot)
         num_validators = len(store.states[store.head].validators)
 
         # Create signed attestations and process them
@@ -236,7 +244,7 @@ class TestSafeTargetAdvancement:
                 data=attestation_data,
                 signature=sig,
             )
-            store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+            store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate into new payloads
         store, _ = store.aggregate()
@@ -255,6 +263,7 @@ class TestJustificationLogic:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Justification should occur when 2/3 validators attest to the same target."""
         store = keyed_store
@@ -262,7 +271,7 @@ class TestJustificationLogic:
         # Produce block at slot 1
         slot_1 = Slot(1)
         proposer_1 = ValidatorIndex(1)
-        store, block_1, _ = store.produce_block_with_signatures(slot_1, proposer_1)
+        store, block_1, _ = spec.produce_block_with_signatures(store, slot_1, proposer_1)
         block_1_root = hash_tree_root(block_1)
 
         # Produce block at slot 2 with attestations to slot 1
@@ -289,13 +298,13 @@ class TestJustificationLogic:
                 data=attestation_data,
                 signature=sig,
             )
-            store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+            store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate signatures before producing the next block
         store, _ = store.aggregate()
 
         # Produce block 2 which includes these attestations
-        store, block_2, signatures = store.produce_block_with_signatures(slot_2, proposer_2)
+        store, block_2, signatures = spec.produce_block_with_signatures(store, slot_2, proposer_2)
 
         # Check that attestations were included
         assert len(block_2.body.attestations) > 0
@@ -311,6 +320,7 @@ class TestJustificationLogic:
         self,
         observer_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Attestations must have a valid (already justified) source."""
         store = observer_store
@@ -318,7 +328,7 @@ class TestJustificationLogic:
         # Produce block at slot 1
         slot = Slot(1)
         proposer = ValidatorIndex(1)
-        store, block, _ = store.produce_block_with_signatures(slot, proposer)
+        store, block, _ = spec.produce_block_with_signatures(store, slot, proposer)
         block_root = hash_tree_root(block)
 
         # Create attestation with invalid source (not justified)
@@ -345,6 +355,7 @@ class TestJustificationLogic:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Justification should track votes for multiple potential targets."""
         store = keyed_store
@@ -353,14 +364,14 @@ class TestJustificationLogic:
         for slot_num in range(1, 4):
             slot = Slot(slot_num)
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
-            store, _, _ = store.produce_block_with_signatures(slot, proposer)
+            store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         # Create attestations to different targets from different validators
         head_block = store.blocks[store.head]
         num_validators = len(store.states[store.head].validators)
 
         # Half validators attest to head
-        attestation_data_head = store.produce_attestation_data(head_block.slot)
+        attestation_data_head = spec.produce_attestation_data(store, head_block.slot)
 
         for i in range(num_validators // 2):
             vid = ValidatorIndex(i)
@@ -370,7 +381,7 @@ class TestJustificationLogic:
                 data=attestation_data_head,
                 signature=sig,
             )
-            store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+            store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         store, _ = store.aggregate()
         store = store.update_safe_target()
@@ -386,6 +397,7 @@ class TestFinalizationFollowsJustification:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Finalization should follow when justification advances without gaps."""
         store = keyed_store
@@ -418,9 +430,11 @@ class TestFinalizationFollowsJustification:
                         data=attestation_data,
                         signature=sig,
                     )
-                    store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+                    store = spec.on_gossip_attestation(
+                        store, signed_attestation, is_aggregator=True
+                    )
 
-            store, block, _ = store.produce_block_with_signatures(slot, proposer)
+            store, block, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         # After processing blocks with attestations, check finalization
         # The exact finalization behavior depends on 3SF-mini rules
@@ -436,14 +450,15 @@ class TestAttestationTargetEdgeCases:
     def test_attestation_target_with_skipped_slots(
         self,
         observer_store: Store,
+        spec: LstarSpec,
     ) -> None:
         """Attestation target should handle chains with skipped slots."""
         store = observer_store
 
         # Produce blocks with gaps (skipped slots)
-        store, _, _ = store.produce_block_with_signatures(Slot(1), ValidatorIndex(1))
+        store, _, _ = spec.produce_block_with_signatures(store, Slot(1), ValidatorIndex(1))
         # Skip slot 2, 3
-        store, _, _ = store.produce_block_with_signatures(Slot(4), ValidatorIndex(4))
+        store, _, _ = spec.produce_block_with_signatures(store, Slot(4), ValidatorIndex(4))
 
         target = store.get_attestation_target()
 
@@ -465,6 +480,7 @@ class TestAttestationTargetEdgeCases:
     def test_attestation_target_at_justification_lookback_boundary(
         self,
         observer_store: Store,
+        spec: LstarSpec,
     ) -> None:
         """Test target when head is exactly JUSTIFICATION_LOOKBACK_SLOTS ahead."""
         store = observer_store
@@ -474,7 +490,7 @@ class TestAttestationTargetEdgeCases:
         for slot_num in range(1, lookback + 2):
             slot = Slot(slot_num)
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
-            store, _, _ = store.produce_block_with_signatures(slot, proposer)
+            store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
         target = store.get_attestation_target()
         head_slot = store.blocks[store.head].slot
@@ -490,6 +506,7 @@ class TestIntegrationScenarios:
         self,
         keyed_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Test complete cycle: produce block, attest, justify."""
         store = keyed_store
@@ -497,11 +514,11 @@ class TestIntegrationScenarios:
         # Phase 1: Produce initial block
         slot_1 = Slot(1)
         proposer_1 = ValidatorIndex(1)
-        store, block_1, _ = store.produce_block_with_signatures(slot_1, proposer_1)
+        store, block_1, _ = spec.produce_block_with_signatures(store, slot_1, proposer_1)
         block_1_root = hash_tree_root(block_1)
 
         # Phase 2: Create attestations from multiple validators
-        attestation_data = store.produce_attestation_data(slot_1)
+        attestation_data = spec.produce_attestation_data(store, slot_1)
 
         num_validators = len(store.states[block_1_root].validators)
         for i in range(num_validators):
@@ -513,7 +530,7 @@ class TestIntegrationScenarios:
                 signature=sig,
             )
             # Process as gossip
-            store = store.on_gossip_attestation(signed_attestation, is_aggregator=True)
+            store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Phase 3: Aggregate signatures into payloads
         store, _ = store.aggregate()
@@ -527,7 +544,7 @@ class TestIntegrationScenarios:
         # Phase 5: Produce another block including attestations
         slot_2 = Slot(2)
         proposer_2 = ValidatorIndex(2)
-        store, block_2, _ = store.produce_block_with_signatures(slot_2, proposer_2)
+        store, block_2, _ = spec.produce_block_with_signatures(store, slot_2, proposer_2)
 
         # Verify final state
         assert len(store.blocks) >= 3  # Genesis + 2 blocks
@@ -538,6 +555,7 @@ class TestIntegrationScenarios:
         self,
         observer_store: Store,
         key_manager: XmssKeyManager,
+        spec: LstarSpec,
     ) -> None:
         """Test attestation target is correct after processing a block via on_block."""
         store = observer_store
@@ -545,7 +563,7 @@ class TestIntegrationScenarios:
         # Produce a block
         slot_1 = Slot(1)
         proposer_1 = ValidatorIndex(1)
-        store, block, signatures = store.produce_block_with_signatures(slot_1, proposer_1)
+        store, block, signatures = spec.produce_block_with_signatures(store, slot_1, proposer_1)
         block_root = hash_tree_root(block)
 
         # Sign the block root with the proposal key
@@ -562,8 +580,8 @@ class TestIntegrationScenarios:
         # Process block via on_block on a fresh consumer store
         consumer_store = observer_store
         target_interval = Interval.from_slot(block.slot)
-        consumer_store, _ = consumer_store.on_tick(target_interval, has_proposal=True)
-        consumer_store = consumer_store.on_block(signed_block)
+        consumer_store, _ = spec.on_tick(consumer_store, target_interval, has_proposal=True)
+        consumer_store = spec.on_block(consumer_store, signed_block)
 
         # Get attestation target after on_block
         target = consumer_store.get_attestation_target()
