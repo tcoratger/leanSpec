@@ -1,13 +1,10 @@
-"""Tests for the LstarSpec delegator surface (Stage 4A of #686).
+"""Verify that every fork-class method forwards faithfully to the underlying container.
 
-LstarSpec exposes container methods (state transition, fork choice, block
-production, signature verification) as fork-class methods that delegate to
-the underlying State / Store / SignedBlock methods. Stage 4A only adds the
-surface; the bodies stay on the containers and call sites are unchanged.
+Each test patches the container method, calls the matching fork-class method,
+and asserts:
 
-Each test verifies that the delegator forwards its arguments to the
-corresponding container method and returns the container method's result
-unchanged. This locks the surface in place before Stage 4C moves the bodies.
+- The container method receives the same arguments.
+- The fork-class method returns the container's result unchanged.
 """
 
 from unittest.mock import patch
@@ -32,19 +29,19 @@ from tests.lean_spec.helpers.builders import (
 _NUM_VALIDATORS = 3
 _VALIDATOR_ID = ValidatorIndex(0)
 _SENTINEL = object()
-"""Unique object returned by patched container methods to confirm delegators forward unchanged."""
+"""Unique object returned by patched containers to confirm the result is forwarded unchanged."""
 
 
 def _spec() -> LstarSpec:
-    """Construct a fresh LstarSpec for each delegator test."""
+    """Build a fresh fork-class instance for one test."""
     return LstarSpec()
 
 
 class TestStateDelegators:
-    """LstarSpec methods that delegate to State."""
+    """Fork-class methods that route through the state container."""
 
     def test_state_transition_forwards(self) -> None:
-        """state_transition delegator forwards to State.state_transition."""
+        """The post-state computation forwards to the state container."""
         state = make_keyed_genesis_state(_NUM_VALIDATORS)
         block = Block.model_construct(slot=Slot(1))
 
@@ -55,7 +52,7 @@ class TestStateDelegators:
         assert result is _SENTINEL
 
     def test_process_slots_forwards(self) -> None:
-        """process_slots delegator forwards to State.process_slots."""
+        """Advancing through empty slots forwards to the state container."""
         state = make_keyed_genesis_state(_NUM_VALIDATORS)
         target = Slot(7)
 
@@ -66,7 +63,7 @@ class TestStateDelegators:
         assert result is _SENTINEL
 
     def test_process_block_forwards(self) -> None:
-        """process_block delegator forwards to State.process_block."""
+        """Full block processing forwards to the state container."""
         state = make_keyed_genesis_state(_NUM_VALIDATORS)
         block = Block.model_construct(slot=Slot(1))
 
@@ -77,7 +74,7 @@ class TestStateDelegators:
         assert result is _SENTINEL
 
     def test_process_block_header_forwards(self) -> None:
-        """process_block_header delegator forwards to State.process_block_header."""
+        """Header-only processing forwards to the state container."""
         state = make_keyed_genesis_state(_NUM_VALIDATORS)
         block = Block.model_construct(slot=Slot(1))
 
@@ -88,7 +85,7 @@ class TestStateDelegators:
         assert result is _SENTINEL
 
     def test_process_attestations_forwards(self) -> None:
-        """process_attestations delegator forwards to State.process_attestations."""
+        """Folding attestations into the state forwards to the state container."""
         state = make_keyed_genesis_state(_NUM_VALIDATORS)
         attestations: list[AggregatedAttestation] = []
 
@@ -99,7 +96,7 @@ class TestStateDelegators:
         assert result is _SENTINEL
 
     def test_build_block_forwards(self) -> None:
-        """build_block delegator forwards to State.build_block."""
+        """Block construction forwards to the state container."""
         state = make_keyed_genesis_state(_NUM_VALIDATORS)
         slot = Slot(1)
         proposer_index = ValidatorIndex(1)
@@ -126,10 +123,10 @@ class TestStateDelegators:
 
 
 class TestSignedBlockDelegator:
-    """LstarSpec method that delegates to SignedBlock."""
+    """Fork-class method that routes through the signed-block container."""
 
     def test_verify_signatures_forwards(self) -> None:
-        """verify_signatures delegator forwards to SignedBlock.verify_signatures."""
+        """Signature verification forwards to the signed-block container."""
         validators = make_validators(_NUM_VALIDATORS)
         signed_block = make_signed_block(
             slot=Slot(0),
@@ -146,14 +143,14 @@ class TestSignedBlockDelegator:
 
 
 class TestStoreDelegators:
-    """LstarSpec methods that delegate to Store."""
+    """Fork-class methods that route through the forkchoice store."""
 
     def _store(self) -> Store:
-        """Build a genesis store for delegator tests."""
+        """Build a genesis forkchoice store for one test."""
         return make_genesis_data(num_validators=_NUM_VALIDATORS, validator_id=_VALIDATOR_ID).store
 
     def test_on_block_forwards(self) -> None:
-        """on_block delegator forwards to Store.on_block."""
+        """Incorporating a new block forwards to the forkchoice store."""
         store = self._store()
         signed_block = make_signed_block(
             slot=Slot(1),
@@ -169,7 +166,7 @@ class TestStoreDelegators:
         assert result is _SENTINEL
 
     def test_on_tick_forwards(self) -> None:
-        """on_tick delegator forwards to Store.on_tick."""
+        """Advancing forkchoice time forwards to the forkchoice store."""
         store = self._store()
         target = Interval.from_slot(Slot(1))
 
@@ -180,7 +177,7 @@ class TestStoreDelegators:
         assert result is _SENTINEL
 
     def test_on_gossip_attestation_forwards(self) -> None:
-        """on_gossip_attestation delegator forwards to Store.on_gossip_attestation."""
+        """A single-validator attestation from gossip forwards to the forkchoice store."""
         store = self._store()
         attestation = SignedAttestation.model_construct()
 
@@ -191,7 +188,7 @@ class TestStoreDelegators:
         assert result is _SENTINEL
 
     def test_on_gossip_aggregated_attestation_forwards(self) -> None:
-        """Aggregated-attestation delegator forwards to the Store method."""
+        """An aggregated attestation from gossip forwards to the forkchoice store."""
         store = self._store()
         attestation = SignedAggregatedAttestation.model_construct()
 
@@ -204,7 +201,7 @@ class TestStoreDelegators:
         assert result is _SENTINEL
 
     def test_produce_attestation_data_forwards(self) -> None:
-        """produce_attestation_data delegator forwards to Store.produce_attestation_data."""
+        """Building attestation payload forwards to the forkchoice store."""
         store = self._store()
         slot = Slot(2)
 
@@ -215,7 +212,7 @@ class TestStoreDelegators:
         assert result is _SENTINEL
 
     def test_produce_block_with_signatures_forwards(self) -> None:
-        """Block-production delegator forwards to Store.produce_block_with_signatures."""
+        """Producing a proposal block with proofs forwards to the forkchoice store."""
         store = self._store()
         slot = Slot(2)
         validator_index = ValidatorIndex(1)
@@ -227,7 +224,7 @@ class TestStoreDelegators:
         assert result is _SENTINEL
 
     def test_get_proposal_head_forwards(self) -> None:
-        """get_proposal_head delegator forwards to Store.get_proposal_head."""
+        """Resolving the proposal head forwards to the forkchoice store."""
         store = self._store()
         slot = Slot(2)
 

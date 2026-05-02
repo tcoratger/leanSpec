@@ -64,31 +64,25 @@ class LstarSpec(ForkProtocol):
         assert isinstance(state, State)
         return state
 
-    # State transition surface
-    #
-    # The methods below mirror the existing State / Store / SignedBlock methods
-    # one-for-one. Stage 4A only adds the spec-class API surface; the bodies are
-    # pure delegators to the container methods. Stage 4C will move the bodies in.
-
     def state_transition(
         self,
         state: State,
         block: Block,
         valid_signatures: bool = True,
     ) -> State:
-        """Apply the full state transition function and return the post-state."""
+        """Compute the post-state obtained by applying a block to a pre-state."""
         return state.state_transition(block, valid_signatures)
 
     def process_slots(self, state: State, target_slot: Slot) -> State:
-        """Advance the state through empty slots up to ``target_slot``."""
+        """Advance the state through empty slots up to a target slot."""
         return state.process_slots(target_slot)
 
     def process_block(self, state: State, block: Block) -> State:
-        """Apply full block processing (header + body) to the state."""
+        """Apply a full block (header and body) to the state."""
         return state.process_block(block)
 
     def process_block_header(self, state: State, block: Block) -> State:
-        """Apply block-header processing only."""
+        """Apply only the header portion of a block to the state."""
         return state.process_block_header(block)
 
     def process_attestations(
@@ -96,7 +90,7 @@ class LstarSpec(ForkProtocol):
         state: State,
         attestations: Iterable[AggregatedAttestation],
     ) -> State:
-        """Apply aggregated attestations and update justification/finalization."""
+        """Fold attestations into the state and update justification and finalization."""
         return state.process_attestations(attestations)
 
     def build_block(
@@ -108,7 +102,7 @@ class LstarSpec(ForkProtocol):
         known_block_roots: AbstractSet[Bytes32],
         aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] | None = None,
     ) -> tuple[Block, State, list[AggregatedAttestation], list[AggregatedSignatureProof]]:
-        """Build a valid block on top of ``state``."""
+        """Assemble a valid block on top of the given pre-state."""
         return state.build_block(
             slot=slot,
             proposer_index=proposer_index,
@@ -117,18 +111,14 @@ class LstarSpec(ForkProtocol):
             aggregated_payloads=aggregated_payloads,
         )
 
-    # Block signature verification
-
     def verify_signatures(
         self,
         signed_block: SignedBlock,
         validators: Validators,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
     ) -> bool:
-        """Verify all XMSS signatures in ``signed_block`` against ``validators``."""
+        """Check that every signature carried by a signed block is valid."""
         return signed_block.verify_signatures(validators, scheme)
-
-    # Forkchoice surface
 
     def on_block(
         self,
@@ -136,7 +126,7 @@ class LstarSpec(ForkProtocol):
         signed_block: SignedBlock,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
     ) -> Store:
-        """Process a new block and update the forkchoice store."""
+        """Incorporate a newly received block into the forkchoice view."""
         return store.on_block(signed_block, scheme)
 
     def on_tick(
@@ -146,7 +136,7 @@ class LstarSpec(ForkProtocol):
         has_proposal: bool,
         is_aggregator: bool = False,
     ) -> tuple[Store, list[SignedAggregatedAttestation]]:
-        """Advance the forkchoice store time to ``target_interval``."""
+        """Advance forkchoice time to a target interval and emit any due aggregates."""
         return store.on_tick(target_interval, has_proposal, is_aggregator)
 
     def on_gossip_attestation(
@@ -156,7 +146,7 @@ class LstarSpec(ForkProtocol):
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
         is_aggregator: bool = False,
     ) -> Store:
-        """Process a single-validator attestation received via gossip."""
+        """Incorporate a single-validator attestation received from the network."""
         return store.on_gossip_attestation(signed_attestation, scheme, is_aggregator)
 
     def on_gossip_aggregated_attestation(
@@ -164,11 +154,11 @@ class LstarSpec(ForkProtocol):
         store: Store,
         signed_attestation: SignedAggregatedAttestation,
     ) -> Store:
-        """Process an aggregated attestation received via gossip."""
+        """Incorporate an aggregated attestation received from the network."""
         return store.on_gossip_aggregated_attestation(signed_attestation)
 
     def produce_attestation_data(self, store: Store, slot: Slot) -> AttestationData:
-        """Produce attestation data for the given slot."""
+        """Build the attestation payload that a validator should sign at this slot."""
         return store.produce_attestation_data(slot)
 
     def produce_block_with_signatures(
@@ -177,9 +167,9 @@ class LstarSpec(ForkProtocol):
         slot: Slot,
         validator_index: ValidatorIndex,
     ) -> tuple[Store, Block, list[AggregatedSignatureProof]]:
-        """Produce a block plus its aggregated signature proofs for ``slot``."""
+        """Produce a proposal block together with the aggregated signature proofs it needs."""
         return store.produce_block_with_signatures(slot, validator_index)
 
     def get_proposal_head(self, store: Store, slot: Slot) -> tuple[Store, Bytes32]:
-        """Return the head root that a block proposal at ``slot`` should build on."""
+        """Resolve the head root that a proposal at this slot should extend."""
         return store.get_proposal_head(slot)
