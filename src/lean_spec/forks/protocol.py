@@ -71,6 +71,38 @@ class SpecBlockType(SpecSSZType, Protocol):
         ...
 
 
+class SpecBlockBodyType(SpecSSZType, Protocol):
+    """Structural contract: any fork's BlockBody container class.
+
+    Carries the variable-size payload attached to a block — typically
+    aggregated attestations and any future operation lists.
+    """
+
+
+class SpecBlockHeaderType(SpecSSZType, Protocol):
+    """Structural contract: any fork's BlockHeader container class.
+
+    The fixed-shape summary of a block used in state-transition tracking
+    and state-root caching. Carries slot, proposer, parent root, state
+    root, and body root.
+    """
+
+
+class SpecAggregatedAttestationsType(SpecSSZType, Protocol):
+    """Structural contract: any fork's AggregatedAttestations list class.
+
+    Bounded SSZ list of aggregated attestations included in a block body.
+    """
+
+
+class SpecAttestationSignaturesType(SpecSSZType, Protocol):
+    """Structural contract: any fork's AttestationSignatures list class.
+
+    Bounded SSZ list of aggregated signature proofs aligned one-for-one
+    with a block body's aggregated attestations.
+    """
+
+
 class SpecSignedBlockType(SpecSSZType, Protocol):
     """Structural contract: any fork's SignedBlock container class.
 
@@ -282,11 +314,23 @@ class ForkProtocol(ABC):
     block_class: type[SpecBlockType]
     """Concrete Block container class owned by this fork."""
 
+    block_body_class: type[SpecBlockBodyType]
+    """Concrete BlockBody container class owned by this fork."""
+
+    block_header_class: type[SpecBlockHeaderType]
+    """Concrete BlockHeader container class owned by this fork."""
+
     signed_block_class: type[SpecSignedBlockType]
     """Concrete SignedBlock container class — block + signatures envelope."""
 
     block_signatures_class: type[SpecBlockSignaturesType]
     """Concrete BlockSignatures container class — proposer + attestation signatures."""
+
+    aggregated_attestations_class: type[SpecAggregatedAttestationsType]
+    """Concrete AggregatedAttestations list class — block-body aggregated votes."""
+
+    attestation_signatures_class: type[SpecAttestationSignaturesType]
+    """Concrete AttestationSignatures list class — signature group bundle."""
 
     store_class: type[SpecStoreType]
     """Concrete forkchoice Store class owned by this fork."""
