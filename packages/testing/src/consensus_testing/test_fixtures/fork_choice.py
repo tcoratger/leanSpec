@@ -7,11 +7,10 @@ Validates Store responses to blocks, attestations, and time progression.
 
 from __future__ import annotations
 
-from typing import ClassVar, Self, cast
+from typing import ClassVar, Self
 
 from pydantic import Field, model_validator
 
-from lean_spec.forks.lstar import Store
 from lean_spec.forks.lstar.containers.block import (
     Block,
     BlockBody,
@@ -257,13 +256,10 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # The Store is the node's local view of the chain.
         # It starts from a trusted anchor (usually genesis).
-        store = cast(
-            Store,
-            _SPEC.create_store(
-                self.anchor_state,
-                self.anchor_block,
-                validator_id=ValidatorIndex(0),
-            ),
+        store = _SPEC.create_store(
+            self.anchor_state,
+            self.anchor_block,
+            validator_id=ValidatorIndex(0),
         )
 
         # Block registry for fork creation

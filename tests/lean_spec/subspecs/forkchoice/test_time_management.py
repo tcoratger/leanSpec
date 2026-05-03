@@ -1,7 +1,5 @@
 """Tests for time advancement, intervals, and slot management."""
 
-from typing import cast
-
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -45,13 +43,10 @@ class TestGetForkchoiceStore:
             body=make_empty_block_body(),
         )
 
-        store = cast(
-            Store,
-            spec.create_store(
-                state,
-                anchor_block,
-                validator_id=TEST_VALIDATOR_ID,
-            ),
+        store = spec.create_store(
+            state,
+            anchor_block,
+            validator_id=TEST_VALIDATOR_ID,
         )
 
         assert store.time == Interval(int(INTERVALS_PER_SLOT) * anchor_slot)

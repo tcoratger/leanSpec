@@ -339,7 +339,7 @@ def make_genesis_data(
         validators = make_validators(num_validators)
     genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
     genesis_block = make_genesis_block(genesis_state)
-    store = cast(Store, _SPEC.create_store(genesis_state, genesis_block, validator_id=validator_id))
+    store = _SPEC.create_store(genesis_state, genesis_block, validator_id=validator_id)
     return GenesisData(store, genesis_state, genesis_block)
 
 

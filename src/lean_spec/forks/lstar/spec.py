@@ -3,7 +3,7 @@
 from collections import defaultdict
 from collections.abc import Iterable
 from collections.abc import Set as AbstractSet
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -59,7 +59,7 @@ from lean_spec.types import (
     ValidatorIndices,
 )
 
-from ..protocol import ForkProtocol, SpecBlockType, SpecStateType, SpecStoreType
+from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
 from .store import AttestationSignatureEntry, Store
 
 
@@ -871,12 +871,14 @@ class LstarSpec(ForkProtocol):
 
         return True
 
-    def create_store(
+    # Pydantic fields don't structurally match Protocol @property in ty;
+    # the concrete return is Liskov-safe (Store satisfies SpecStoreType structurally).
+    def create_store(  # type: ignore[override]  # ty: ignore[invalid-method-override]
         self,
         state: SpecStateType,
         anchor_block: SpecBlockType,
         validator_id: ValidatorIndex | None,
-    ) -> SpecStoreType:
+    ) -> Store:
         """Initialize a forkchoice store from an anchor state and block.
 
         The anchor block and state form the starting point for fork choice.
@@ -921,19 +923,16 @@ class LstarSpec(ForkProtocol):
         # regardless of what the anchor state's embedded checkpoints say.
         anchor_checkpoint = Checkpoint(root=anchor_root, slot=anchor_slot)
 
-        return cast(
-            SpecStoreType,
-            self.store_class(
-                time=Interval.from_slot(anchor_slot),
-                config=state.config,
-                head=anchor_root,
-                safe_target=anchor_root,
-                latest_justified=anchor_checkpoint,
-                latest_finalized=anchor_checkpoint,
-                blocks={anchor_root: anchor_block},
-                states={anchor_root: state},
-                validator_id=validator_id,
-            ),
+        return self.store_class(
+            time=Interval.from_slot(anchor_slot),
+            config=state.config,
+            head=anchor_root,
+            safe_target=anchor_root,
+            latest_justified=anchor_checkpoint,
+            latest_finalized=anchor_checkpoint,
+            blocks={anchor_root: anchor_block},
+            states={anchor_root: state},
+            validator_id=validator_id,
         )
 
     def prune_stale_attestation_data(self, store: Store) -> Store:
