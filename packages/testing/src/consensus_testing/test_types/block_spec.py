@@ -21,6 +21,7 @@ from lean_spec.forks.lstar.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -30,6 +31,9 @@ from lean_spec.types import Bytes32, CamelModel, Slot, ValidatorIndex, Validator
 
 from ..keys import LEAN_ENV_TO_SCHEMES, XmssKeyManager, create_dummy_signature
 from .aggregated_attestation_spec import AggregatedAttestationSpec
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all spec invocations."""
 
 
 class BlockSpec(CamelModel):
@@ -304,7 +308,7 @@ class BlockSpec(CamelModel):
 
         # Resolve the parent root.
         # The default is the latest block header from the slot-advanced state.
-        parent_state = state.process_slots(self.slot)
+        parent_state = _SPEC.process_slots(state, self.slot)
         parent_root = self.resolve_parent_root(
             block_registry,
             default_root=hash_tree_root(parent_state.latest_block_header),
@@ -360,7 +364,8 @@ class BlockSpec(CamelModel):
             for agg_att, proof in zip(aggregated_attestations, attestation_sigs.data, strict=True)
         }
 
-        final_block, _, _, aggregated_signatures = state.build_block(
+        final_block, _, _, aggregated_signatures = _SPEC.build_block(
+            state,
             slot=self.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
@@ -424,7 +429,9 @@ class BlockSpec(CamelModel):
         # check rejects votes whose slot has not yet started locally.
         block_slot_interval = Interval.from_slot(self.slot)
         if store.time < block_slot_interval:
-            store, _ = store.on_tick(block_slot_interval, has_proposal=True, is_aggregator=True)
+            store, _ = _SPEC.on_tick(
+                store, block_slot_interval, has_proposal=True, is_aggregator=True
+            )
 
         # Gossip valid attestation signatures into the Store.
         # This runs signature verification through the spec's validation path.
@@ -435,7 +442,8 @@ class BlockSpec(CamelModel):
                 or (signature := sigs_for_data.get(attestation.validator_id)) is None
             ):
                 continue
-            store = store.on_gossip_attestation(
+            store = _SPEC.on_gossip_attestation(
+                store,
                 SignedAttestation(
                     validator_id=attestation.validator_id,
                     data=attestation.data,
@@ -450,7 +458,8 @@ class BlockSpec(CamelModel):
         merged_store = aggregation_store.accept_new_attestations()
 
         # Build the block through the spec's State.build_block().
-        final_block, _, _, block_proofs = parent_state.build_block(
+        final_block, _, _, block_proofs = _SPEC.build_block(
+            parent_state,
             slot=self.slot,
             proposer_index=proposer_index,
             parent_root=parent_root,
@@ -486,7 +495,8 @@ class BlockSpec(CamelModel):
                 )
 
             # Recompute state root with the modified body.
-            post_state = parent_state.process_slots(self.slot).process_block(final_block)
+            post_state = _SPEC.process_slots(parent_state, self.slot)
+            post_state = _SPEC.process_block(post_state, final_block)
             final_block = final_block.model_copy(update={"state_root": hash_tree_root(post_state)})
 
         return self._sign_block(final_block, block_proofs, proposer_index, key_manager)

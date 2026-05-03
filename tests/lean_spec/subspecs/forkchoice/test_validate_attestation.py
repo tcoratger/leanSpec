@@ -9,6 +9,7 @@ from lean_spec.forks.lstar.containers import (
     Attestation,
     AttestationData,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import GOSSIP_DISPARITY_INTERVALS, INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -36,6 +37,7 @@ class TestValidateAttestationHeadChecks:
 
     def test_head_checkpoint_slot_mismatch_rejected(
         self,
+        spec: LstarSpec,
         observer_store: Store,
     ) -> None:
         """Head checkpoint slot must match the actual block slot."""
@@ -45,7 +47,7 @@ class TestValidateAttestationHeadChecks:
         # This gives us a real block whose actual slot is 1.
         slot_1 = Slot(1)
         proposer = ValidatorIndex(1)
-        store, block, _ = store.produce_block_with_signatures(slot_1, proposer)
+        store, block, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
         block_root = hash_tree_root(block)
 
         genesis_root = store.latest_justified.root
@@ -68,6 +70,7 @@ class TestValidateAttestationHeadChecks:
 
     def test_head_slot_less_than_source_rejected(
         self,
+        spec: LstarSpec,
         observer_store: Store,
     ) -> None:
         """Head cannot be older than the justified source."""
@@ -77,10 +80,10 @@ class TestValidateAttestationHeadChecks:
         slot_1 = Slot(1)
         slot_2 = Slot(2)
         proposer = ValidatorIndex(1)
-        store, block_1, _ = store.produce_block_with_signatures(slot_1, proposer)
+        store, block_1, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
         block_1_root = hash_tree_root(block_1)
 
-        store, block_2, _ = store.produce_block_with_signatures(slot_2, ValidatorIndex(2))
+        store, block_2, _ = spec.produce_block_with_signatures(store, slot_2, ValidatorIndex(2))
         block_2_root = hash_tree_root(block_2)
 
         genesis_root = store.latest_justified.root
@@ -104,6 +107,7 @@ class TestValidateAttestationHeadChecks:
 
     def test_head_slot_less_than_target_rejected(
         self,
+        spec: LstarSpec,
         observer_store: Store,
     ) -> None:
         """Head cannot be older than the target."""
@@ -113,10 +117,10 @@ class TestValidateAttestationHeadChecks:
         slot_1 = Slot(1)
         slot_2 = Slot(2)
         proposer = ValidatorIndex(1)
-        store, block_1, _ = store.produce_block_with_signatures(slot_1, proposer)
+        store, block_1, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
         block_1_root = hash_tree_root(block_1)
 
-        store, block_2, _ = store.produce_block_with_signatures(slot_2, ValidatorIndex(2))
+        store, block_2, _ = spec.produce_block_with_signatures(store, slot_2, ValidatorIndex(2))
         block_2_root = hash_tree_root(block_2)
 
         genesis_root = store.latest_justified.root
@@ -140,6 +144,7 @@ class TestValidateAttestationHeadChecks:
 
     def test_valid_attestation_with_correct_head_passes(
         self,
+        spec: LstarSpec,
         observer_store: Store,
     ) -> None:
         """An attestation with all checkpoints consistent should pass."""
@@ -148,7 +153,7 @@ class TestValidateAttestationHeadChecks:
         # Produce a single block at slot 1.
         slot_1 = Slot(1)
         proposer = ValidatorIndex(1)
-        store, block, _ = store.produce_block_with_signatures(slot_1, proposer)
+        store, block, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
         block_root = hash_tree_root(block)
 
         genesis_root = store.latest_justified.root
@@ -209,11 +214,11 @@ class TestValidateAttestationTimeCheck:
     """
 
     @staticmethod
-    def _build_two_block_chain(store: Store) -> tuple[Store, AttestationData]:
+    def _build_two_block_chain(spec: LstarSpec, store: Store) -> tuple[Store, AttestationData]:
         """Produce blocks at slots 1 and ATTESTATION_SLOT; return ATTESTATION_SLOT data."""
-        store, _, _ = store.produce_block_with_signatures(Slot(1), ValidatorIndex(1))
-        store, block_2, _ = store.produce_block_with_signatures(
-            ATTESTATION_SLOT, ValidatorIndex(int(ATTESTATION_SLOT))
+        store, _, _ = spec.produce_block_with_signatures(store, Slot(1), ValidatorIndex(1))
+        store, block_2, _ = spec.produce_block_with_signatures(
+            store, ATTESTATION_SLOT, ValidatorIndex(int(ATTESTATION_SLOT))
         )
         block_2_root = hash_tree_root(block_2)
         genesis_root = store.latest_justified.root
@@ -226,43 +231,49 @@ class TestValidateAttestationTimeCheck:
         )
         return store, data
 
-    def test_attestation_at_current_slot_passes(self, observer_store: Store) -> None:
+    def test_attestation_at_current_slot_passes(
+        self, spec: LstarSpec, observer_store: Store
+    ) -> None:
         """A vote at the current slot is always accepted, every interval."""
-        store, data = self._build_two_block_chain(observer_store)
+        store, data = self._build_two_block_chain(spec, observer_store)
 
         # Sweep every interval in the attestation's slot.
         for offset in range(int(INTERVALS_PER_SLOT)):
             local = store.model_copy(update={"time": ATTESTATION_START_INTERVAL + Interval(offset)})
             local.validate_attestation(data)
 
-    def test_attestation_in_past_passes(self, observer_store: Store) -> None:
+    def test_attestation_in_past_passes(self, spec: LstarSpec, observer_store: Store) -> None:
         """A vote from a past slot is always accepted."""
-        store, data = self._build_two_block_chain(observer_store)
+        store, data = self._build_two_block_chain(spec, observer_store)
 
         # Place the local clock several slots ahead.
         far_future = ATTESTATION_START_INTERVAL + INTERVALS_PER_SLOT * Interval(10)
         store = store.model_copy(update={"time": far_future})
         store.validate_attestation(data)
 
-    def test_attestation_at_disparity_boundary_passes(self, observer_store: Store) -> None:
+    def test_attestation_at_disparity_boundary_passes(
+        self, spec: LstarSpec, observer_store: Store
+    ) -> None:
         """At the disparity boundary the attestation is still accepted."""
-        store, data = self._build_two_block_chain(observer_store)
+        store, data = self._build_two_block_chain(spec, observer_store)
 
         store = store.model_copy(update={"time": DISPARITY_BOUNDARY_INTERVAL})
         store.validate_attestation(data)
 
     def test_attestation_just_beyond_disparity_boundary_rejected(
-        self, observer_store: Store
+        self, spec: LstarSpec, observer_store: Store
     ) -> None:
         """One interval past the disparity boundary the attestation is rejected."""
-        store, data = self._build_two_block_chain(observer_store)
+        store, data = self._build_two_block_chain(spec, observer_store)
 
         store = store.model_copy(update={"time": JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL})
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
             store.validate_attestation(data)
 
-    def test_attestation_one_full_slot_in_future_rejected(self, observer_store: Store) -> None:
+    def test_attestation_one_full_slot_in_future_rejected(
+        self, spec: LstarSpec, observer_store: Store
+    ) -> None:
         """
         Regression: a full-slot future window must be rejected.
 
@@ -270,7 +281,7 @@ class TestValidateAttestationTimeCheck:
         That window let an adversary pre-publish next-slot aggregates
         before any honest validator could produce them.
         """
-        store, data = self._build_two_block_chain(observer_store)
+        store, data = self._build_two_block_chain(spec, observer_store)
 
         store = store.model_copy(update={"time": ONE_FULL_SLOT_BEHIND_INTERVAL})
 

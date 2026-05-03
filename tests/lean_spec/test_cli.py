@@ -257,12 +257,12 @@ class TestCreateAnchorBlock:
         assert anchor_block.state_root == expected_state_root
         assert anchor_block.state_root != Bytes32.zero()
 
-    def test_preserves_non_zero_state_root(self) -> None:
+    def test_preserves_non_zero_state_root(self, spec: LstarSpec) -> None:
         """Non-zero state root in header is preserved."""
         # Arrange: Create a state and process a slot to fill in state root
         state = make_genesis_state(num_validators=3, genesis_time=1000)
         # Process slot advances and fills in the state root
-        state_with_root = state.process_slots(Slot(1))
+        state_with_root = spec.process_slots(state, Slot(1))
 
         # The state root should now be non-zero in the header
         assert state_with_root.latest_block_header.state_root != Bytes32.zero()

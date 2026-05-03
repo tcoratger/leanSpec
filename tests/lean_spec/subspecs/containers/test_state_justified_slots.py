@@ -13,42 +13,43 @@ from lean_spec.forks.lstar.containers.state.types import (
     JustificationRoots,
     JustificationValidators,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import make_aggregated_attestation, make_block, make_genesis_state
 
 
-def test_justified_slots_do_not_include_finalized_boundary() -> None:
+def test_justified_slots_do_not_include_finalized_boundary(spec: LstarSpec) -> None:
     state = make_genesis_state(num_validators=4)
 
     # First post-genesis block at slot 1.
-    state_slot_1 = state.process_slots(Slot(1))
+    state_slot_1 = spec.process_slots(state, Slot(1))
     block_1 = make_block(state_slot_1, Slot(1), attestations=[])
-    post_1 = state_slot_1.process_block_header(block_1)
+    post_1 = spec.process_block_header(state_slot_1, block_1)
 
     # latest_finalized.slot is 0, so justified_slots starts at slot 1.
     # Processing block_1 only materializes the parent slot 0, which must not be stored.
     assert len(post_1.justified_slots) == 0
 
     # Second block at slot 2 materializes parent slot 1, which is the first bit.
-    post_1_slot_2 = post_1.process_slots(Slot(2))
+    post_1_slot_2 = spec.process_slots(post_1, Slot(2))
     block_2 = make_block(post_1_slot_2, Slot(2), attestations=[])
-    post_2 = post_1_slot_2.process_block_header(block_2)
+    post_2 = spec.process_block_header(post_1_slot_2, block_2)
 
     assert len(post_2.justified_slots) == 1
     assert bool(post_2.justified_slots[0]) is False
 
 
-def test_justified_slots_rebases_when_finalization_advances() -> None:
+def test_justified_slots_rebases_when_finalization_advances(spec: LstarSpec) -> None:
     # Use 3 validators so a 2-of-3 aggregation is a supermajority.
     state = make_genesis_state(num_validators=3)
 
     # Block 1 (slot 1): initializes history (stores slot 0 root), but no justified_slots bits yet.
-    state = state.process_slots(Slot(1))
+    state = spec.process_slots(state, Slot(1))
     block_1 = make_block(state, Slot(1), attestations=[])
-    state = state.process_block(block_1)
+    state = spec.process_block(state, block_1)
 
     # Block 2 (slot 2): justify slot 1 with source=0 -> target=1.
-    state = state.process_slots(Slot(2))
+    state = spec.process_slots(state, Slot(2))
     block_2 = make_block(state, Slot(2), attestations=[])
 
     source_0 = Checkpoint(root=block_1.parent_root, slot=Slot(0))
@@ -61,10 +62,10 @@ def test_justified_slots_rebases_when_finalization_advances() -> None:
     )
 
     block_2 = make_block(state, Slot(2), attestations=[att_0_to_1])
-    state = state.process_block(block_2)
+    state = spec.process_block(state, block_2)
 
     # Block 3 (slot 3): justify slot 2 with source=1 -> target=2, which finalizes slot 1.
-    state = state.process_slots(Slot(3))
+    state = spec.process_slots(state, Slot(3))
     block_3 = make_block(state, Slot(3), attestations=[])
 
     source_1 = Checkpoint(root=block_2.parent_root, slot=Slot(1))
@@ -77,7 +78,7 @@ def test_justified_slots_rebases_when_finalization_advances() -> None:
     )
 
     block_3 = make_block(state, Slot(3), attestations=[att_1_to_2])
-    state = state.process_block(block_3)
+    state = spec.process_block(state, block_3)
 
     assert state.latest_finalized.slot == Slot(1)
 
@@ -98,7 +99,7 @@ def test_is_slot_justified_raises_on_out_of_bounds() -> None:
         make_genesis_state(num_validators=1).justified_slots.is_slot_justified(Slot(0), Slot(1))
 
 
-def test_pruning_keeps_pending_justifications() -> None:
+def test_pruning_keeps_pending_justifications(spec: LstarSpec) -> None:
     """
     Verify pruning keeps pending justifications after finalization advances.
 
@@ -116,11 +117,11 @@ def test_pruning_keeps_pending_justifications() -> None:
     #
     # We need an existing justified checkpoint before we can test pruning.
 
-    state = state.process_slots(Slot(1))
+    state = spec.process_slots(state, Slot(1))
     block_1 = make_block(state, Slot(1), attestations=[])
-    state = state.process_block(block_1)
+    state = spec.process_block(state, block_1)
 
-    state = state.process_slots(Slot(2))
+    state = spec.process_slots(state, Slot(2))
     block_2 = make_block(state, Slot(2), attestations=[])
     source_0 = Checkpoint(root=block_1.parent_root, slot=Slot(0))
     target_1 = Checkpoint(root=block_2.parent_root, slot=Slot(1))
@@ -131,24 +132,24 @@ def test_pruning_keeps_pending_justifications() -> None:
         target=target_1,
     )
     block_2 = make_block(state, Slot(2), attestations=[att_0_to_1])
-    state = state.process_block(block_2)
+    state = spec.process_block(state, block_2)
 
     assert state.latest_finalized.slot == Slot(0)
     assert state.latest_justified.slot == Slot(1)
 
     # Phase 2: Extend chain to populate more history entries.
 
-    state = state.process_slots(Slot(3))
+    state = spec.process_slots(state, Slot(3))
     block_3 = make_block(state, Slot(3), attestations=[])
-    state = state.process_block(block_3)
+    state = spec.process_block(state, block_3)
 
-    state = state.process_slots(Slot(4))
+    state = spec.process_slots(state, Slot(4))
     block_4 = make_block(state, Slot(4), attestations=[])
-    state = state.process_block(block_4)
+    state = spec.process_block(state, block_4)
 
-    state = state.process_slots(Slot(5))
+    state = spec.process_slots(state, Slot(5))
     block_5 = make_block(state, Slot(5), attestations=[])
-    state = state.process_block_header(block_5)
+    state = spec.process_block_header(state, block_5)
 
     slot_3_root = state.historical_block_hashes[3]
 
@@ -186,7 +187,7 @@ def test_pruning_keeps_pending_justifications() -> None:
     #
     # Pruning iterates over all slots for each root in history.
     # Duplicate roots must map to multiple slots, not just one.
-    state = state.process_attestations([att_1_to_2])
+    state = spec.process_attestations(state, [att_1_to_2])
 
     # Verify finalization succeeded.
     assert state.latest_finalized.slot == Slot(1)

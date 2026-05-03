@@ -30,6 +30,7 @@ from lean_spec.forks.lstar.containers.block.types import (
     AttestationSignatures,
 )
 from lean_spec.forks.lstar.containers.state import Validators
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
@@ -61,6 +62,9 @@ from lean_spec.types import (
 )
 
 from .mocks import MockForkchoiceStore, MockNetworkRequester
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all helper invocations."""
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -367,7 +371,7 @@ def make_store_with_attestation_data(
         key_manager=key_manager,
     )
     store = store.model_copy(update={"time": Interval.from_slot(attestation_slot)})
-    attestation_data = store.produce_attestation_data(attestation_slot)
+    attestation_data = _SPEC.produce_attestation_data(store, attestation_slot)
     return store, attestation_data
 
 
@@ -480,7 +484,7 @@ def make_signed_block_from_store(
 
     Returns the updated store (with time advanced) and the signed block.
     """
-    _, block, _ = store.produce_block_with_signatures(slot, proposer_index)
+    _, block, _ = _SPEC.produce_block_with_signatures(store, slot, proposer_index)
     block_root = hash_tree_root(block)
     proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
     attestation_signatures = key_manager.build_attestation_signatures(block.body.attestations)
@@ -494,7 +498,7 @@ def make_signed_block_from_store(
     )
 
     target_interval = Interval.from_slot(block.slot)
-    advanced_store, _ = store.on_tick(target_interval, has_proposal=True)
+    advanced_store, _ = _SPEC.on_tick(store, target_interval, has_proposal=True)
 
     return advanced_store, signed_block
 

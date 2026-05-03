@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from lean_spec.forks.lstar.containers.attestation import AttestationData, SignedAttestation
 from lean_spec.forks.lstar.containers.block.block import Block
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel, Checkpoint, Slot, ValidatorIndex
 
 from ..keys import XmssKeyManager, create_dummy_signature
 from .utils import resolve_checkpoint
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all spec invocations."""
 
 
 class GossipAttestationSpec(CamelModel):
@@ -200,7 +204,7 @@ class GossipAttestationSpec(CamelModel):
             attestation_data = self.build_attestation_data(block_registry, anchor_block)
         else:
             # Honest path: use the Store's own attestation data production.
-            attestation_data = store.produce_attestation_data(self.slot)
+            attestation_data = _SPEC.produce_attestation_data(store, self.slot)
 
         signature = (
             key_manager.sign_attestation_data(self.validator_id, attestation_data)

@@ -8,6 +8,7 @@ from lean_spec.forks.lstar import AttestationSignatureEntry
 from lean_spec.forks.lstar.containers.attestation import AttestationData
 from lean_spec.forks.lstar.containers.block import Block, BlockBody
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import (
@@ -59,6 +60,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
 
 def test_build_block_collects_valid_available_attestations(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     state = make_keyed_genesis_state(2, container_key_manager)
     parent_header_with_state_root = state.latest_block_header.model_copy(
@@ -78,7 +80,8 @@ def test_build_block_collects_valid_available_attestations(
     proof = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], att_data)
     aggregated_payloads = {att_data: {proof}}
 
-    block, post_state, aggregated_atts, aggregated_proofs = state.build_block(
+    block, post_state, aggregated_atts, aggregated_proofs = spec.build_block(
+        state,
         slot=Slot(1),
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
@@ -105,6 +108,7 @@ def test_build_block_collects_valid_available_attestations(
 
 def test_build_block_skips_attestations_without_signatures(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     state = make_keyed_genesis_state(1, container_key_manager)
     parent_header_with_state_root = state.latest_block_header.model_copy(
@@ -112,7 +116,8 @@ def test_build_block_skips_attestations_without_signatures(
     )
     parent_root = hash_tree_root(parent_header_with_state_root)
 
-    block, post_state, aggregated_atts, aggregated_proofs = state.build_block(
+    block, post_state, aggregated_atts, aggregated_proofs = spec.build_block(
+        state,
         slot=Slot(1),
         proposer_index=ValidatorIndex(0),
         parent_root=parent_root,
@@ -190,6 +195,7 @@ def test_aggregated_signatures_with_multiple_data_groups(
 
 def test_build_block_state_root_valid_when_signatures_split(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """
     Verify state root validity when attestations split across signature sources.
@@ -239,7 +245,8 @@ def test_build_block_state_root_valid_when_signatures_split(
     )
     aggregated_payloads = {att_data: {proof_0, fallback_proof}}
 
-    block, _, aggregated_atts, _ = pre_state.build_block(
+    block, _, aggregated_atts, _ = spec.build_block(
+        pre_state,
         slot=Slot(1),
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
@@ -254,7 +261,7 @@ def test_build_block_state_root_valid_when_signatures_split(
         "Compacted attestation should cover all three validators"
     )
 
-    result_state = pre_state.state_transition(block, valid_signatures=True)
+    result_state = spec.state_transition(pre_state, block, valid_signatures=True)
 
     assert result_state.slot == Slot(1)
     assert result_state.latest_block_header.slot == Slot(1)
@@ -267,6 +274,7 @@ def test_build_block_state_root_valid_when_signatures_split(
 
 def test_build_block_skips_non_matching_source(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """Only attestation data whose source matches current_justified is included."""
     state = make_keyed_genesis_state(2, container_key_manager)
@@ -293,7 +301,8 @@ def test_build_block_skips_non_matching_source(
     proof_good = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], att_data_good)
     proof_bad = make_aggregated_proof(container_key_manager, [ValidatorIndex(1)], att_data_bad)
 
-    _, _, aggregated_atts, _ = state.build_block(
+    _, _, aggregated_atts, _ = spec.build_block(
+        state,
         slot=Slot(1),
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
@@ -307,6 +316,7 @@ def test_build_block_skips_non_matching_source(
 
 def test_build_block_skips_unknown_head_root(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """Attestation data with head root not in known_block_roots is excluded."""
     state = make_keyed_genesis_state(2, container_key_manager)
@@ -335,7 +345,8 @@ def test_build_block_skips_unknown_head_root(
         container_key_manager, [ValidatorIndex(1)], att_data_unknown
     )
 
-    _, _, aggregated_atts, _ = state.build_block(
+    _, _, aggregated_atts, _ = spec.build_block(
+        state,
         slot=Slot(1),
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
@@ -363,6 +374,7 @@ def test_aggregate_with_no_signatures(
 
 def test_build_block_fixed_point_closes_justified_divergence(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """
     Fixed-point loop advances justification when pool attestations are available.
@@ -398,7 +410,8 @@ def test_build_block_fixed_point_closes_justified_divergence(
         state_root=Bytes32.zero(),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
-    state_1 = state_0.process_slots(Slot(1)).process_block(block_1)
+    state_1 = spec.process_slots(state_0, Slot(1))
+    state_1 = spec.process_block(state_1, block_1)
 
     # After block_1: justified = (genesis_root, slot=0).
     assert state_1.latest_justified == Checkpoint(root=genesis_root, slot=Slot(0))
@@ -414,7 +427,8 @@ def test_build_block_fixed_point_closes_justified_divergence(
         state_root=Bytes32.zero(),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
-    state_2 = state_1.process_slots(Slot(2)).process_block(block_2)
+    state_2 = spec.process_slots(state_1, Slot(2))
+    state_2 = spec.process_block(state_2, block_2)
 
     # Still at genesis justified — no attestations processed.
     assert state_2.latest_justified == Checkpoint(root=genesis_root, slot=Slot(0))
@@ -452,7 +466,8 @@ def test_build_block_fixed_point_closes_justified_divergence(
     #   Pass 1: current_justified = genesis -> attestations match (source=genesis)
     #           3/4 supermajority -> justifies slot 1
     #   Pass 2: no new entries -> done
-    _, post_state, aggregated_atts, _ = state_2.build_block(
+    _, post_state, aggregated_atts, _ = spec.build_block(
+        state_2,
         slot=Slot(3),
         proposer_index=ValidatorIndex(3),
         parent_root=block_2_root,

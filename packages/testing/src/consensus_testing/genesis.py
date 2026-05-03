@@ -11,7 +11,10 @@ from lean_spec.types import Bytes52, Slot, Uint64, ValidatorIndex
 from .keys import XmssKeyManager
 
 _DEFAULT_GENESIS_TIME = Uint64(0)
-_DEFAULT_FORK: ForkProtocol = LstarSpec()
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all helper invocations."""
+
+_DEFAULT_FORK: ForkProtocol = _SPEC
 """Stateless fork instance used when callers do not pass one explicitly."""
 
 
@@ -121,7 +124,8 @@ def build_anchor(
     for next_slot in range(1, int(anchor_slot) + 1):
         slot = Slot(next_slot)
         proposer_index = ValidatorIndex(int(slot) % int(num_validators_u64))
-        current_block, state, _, _ = state.build_block(
+        current_block, state, _, _ = _SPEC.build_block(
+            state,
             slot=slot,
             proposer_index=proposer_index,
             parent_root=parent_root,

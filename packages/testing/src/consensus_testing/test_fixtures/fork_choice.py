@@ -20,6 +20,7 @@ from lean_spec.forks.lstar.containers.block.types import (
     AggregatedAttestations,
 )
 from lean_spec.forks.lstar.containers.state import State, Validators
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Slot, Uint64, ValidatorIndex
@@ -36,6 +37,9 @@ from ..test_types import (
     TickStep,
 )
 from .base import BaseConsensusFixture
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all fixture invocations."""
 
 
 class ForkChoiceTest(BaseConsensusFixture):
@@ -289,7 +293,8 @@ class ForkChoiceTest(BaseConsensusFixture):
                             target_interval = Interval.from_unix_time(
                                 Uint64(step.time), store.config.genesis_time
                             )
-                        store, _ = store.on_tick(
+                        store, _ = _SPEC.on_tick(
+                            store,
                             target_interval,
                             has_proposal=step.has_proposal,
                             is_aggregator=True,
@@ -321,13 +326,14 @@ class ForkChoiceTest(BaseConsensusFixture):
                         # This tick includes a block (has proposal).
                         # Always act as aggregator to ensure gossip signatures are aggregated
                         target_interval = Interval.from_slot(block.slot)
-                        store, _ = store.on_tick(
-                            target_interval, has_proposal=True, is_aggregator=True
+                        store, _ = _SPEC.on_tick(
+                            store, target_interval, has_proposal=True, is_aggregator=True
                         )
 
                         # Process the block through Store.
                         # This validates, applies state transition, and updates the store's head.
-                        store = store.on_block(
+                        store = _SPEC.on_block(
+                            store,
                             signed_block,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                         )
@@ -344,7 +350,8 @@ class ForkChoiceTest(BaseConsensusFixture):
                             step.valid,
                         )
                         step._filled_attestation = signed_attestation
-                        store = store.on_gossip_attestation(
+                        store = _SPEC.on_gossip_attestation(
+                            store,
                             signed_attestation,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
                             is_aggregator=step.is_aggregator,
@@ -357,7 +364,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                             key_manager,
                         )
                         step._filled_attestation = signed_aggregated
-                        store = store.on_gossip_aggregated_attestation(signed_aggregated)
+                        store = _SPEC.on_gossip_aggregated_attestation(store, signed_aggregated)
 
                     case _:
                         raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
