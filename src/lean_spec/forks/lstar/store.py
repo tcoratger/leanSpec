@@ -516,7 +516,12 @@ class Store(StrictBaseModel):
             )
 
             # Validate cryptographic signatures
-            valid_signatures = signed_block.verify_signatures(parent_state.validators, scheme)
+            # Deferred import breaks the spec ↔ store cycle.
+            from lean_spec.forks.lstar.spec import LstarSpec
+
+            valid_signatures = LstarSpec().verify_signatures(
+                signed_block, parent_state.validators, scheme
+            )
 
             # Execute state transition function to compute post-block state
             post_state = parent_state.state_transition(block, valid_signatures)
