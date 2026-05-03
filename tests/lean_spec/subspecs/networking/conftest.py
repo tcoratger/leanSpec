@@ -1,8 +1,4 @@
-"""
-Shared pytest fixtures for sync service tests.
-
-Peer ID and connection state fixtures are inherited from the parent conftest.
-"""
+"""Shared fixtures for networking subspec tests."""
 
 from __future__ import annotations
 
@@ -10,19 +6,17 @@ from typing import Any
 
 import pytest
 
-from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.sync import service as sync_service_module
-from lean_spec.types import Bytes32, Checkpoint, Slot
 
 
 @pytest.fixture(autouse=True)
 def _delegate_spec_to_store(monkeypatch: pytest.MonkeyPatch) -> None:
     """Route sync-service spec calls back to the mock store's matching method.
 
-    Sync tests run against `MockForkchoiceStore`, which records calls on its own
-    methods. The real spec implementation expects a fully-formed Pydantic Store.
-    Routing each spec call back to `store.method(...)` lets the mock intercept
-    in-place without a sync-service code change.
+    Networking tests drive `SyncService` against `MockForkchoiceStore` for
+    isolation. The real spec implementation expects a fully-formed Pydantic
+    Store; routing each spec call back to `store.method(...)` lets the mock
+    intercept in-place without changing service code.
     """
     spec = sync_service_module._SPEC
 
@@ -46,18 +40,3 @@ def _delegate_spec_to_store(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(spec, "on_block", on_block)
     monkeypatch.setattr(spec, "on_gossip_attestation", on_gossip_attestation)
     monkeypatch.setattr(spec, "on_gossip_aggregated_attestation", on_gossip_aggregated_attestation)
-
-
-@pytest.fixture
-def sample_checkpoint() -> Checkpoint:
-    """Sample checkpoint for sync tests."""
-    return Checkpoint(root=Bytes32.zero(), slot=Slot(100))
-
-
-@pytest.fixture
-def sample_status(sample_checkpoint: Checkpoint) -> Status:
-    """Sample Status message for sync tests."""
-    return Status(
-        finalized=sample_checkpoint,
-        head=Checkpoint(root=Bytes32.zero(), slot=Slot(150)),
-    )
