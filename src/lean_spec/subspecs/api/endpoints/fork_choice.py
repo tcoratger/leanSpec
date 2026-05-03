@@ -34,7 +34,7 @@ async def handle(request: web.Request) -> web.Response:
         raise web.HTTPServiceUnavailable(reason="Store not initialized")
 
     finalized_slot = store.latest_finalized.slot
-    weights = store.compute_block_weights()
+    weights = request.app["spec"].compute_block_weights(store)
 
     nodes = []
     for root, block in store.blocks.items():

@@ -3,7 +3,7 @@
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from lean_spec.forks.lstar import State, Store
+from lean_spec.forks.lstar import Store
 from lean_spec.forks.lstar.containers import Block
 from lean_spec.forks.lstar.containers.state import Validators
 from lean_spec.forks.lstar.spec import LstarSpec
@@ -25,10 +25,11 @@ class TestGetForkchoiceStore:
     @settings(max_examples=100)
     @given(anchor_slot=st.integers(min_value=0, max_value=10000))
     def test_store_time_from_anchor_slot(self, anchor_slot: int) -> None:
-        """Store.from_anchor sets time = anchor_slot * INTERVALS_PER_SLOT."""
+        """spec.create_store sets time = anchor_slot * INTERVALS_PER_SLOT."""
         # Must create its own state and block instead of using sample_store()
-        # because sample_store() bypasses from_anchor() with hardcoded time.
-        state = State.generate_genesis(
+        # because sample_store() bypasses create_store() with hardcoded time.
+        spec = LstarSpec()
+        state = spec.generate_genesis(
             genesis_time=Uint64(1000),
             validators=Validators(data=[]),
         )
@@ -42,7 +43,7 @@ class TestGetForkchoiceStore:
             body=make_empty_block_body(),
         )
 
-        store = Store.from_anchor(
+        store = spec.create_store(
             state,
             anchor_block,
             validator_id=TEST_VALIDATOR_ID,
@@ -99,37 +100,37 @@ class TestOnTick:
 class TestIntervalTicking:
     """Test interval-based time ticking."""
 
-    def test_tick_interval_basic(self, sample_store: Store) -> None:
+    def test_tick_interval_basic(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test basic interval ticking."""
         initial_time = sample_store.time
 
         # Tick one interval forward
-        sample_store, _ = sample_store.tick_interval(has_proposal=False)
+        sample_store, _ = spec.tick_interval(sample_store, has_proposal=False)
 
         # Time should advance by one interval
         assert sample_store.time == initial_time + Uint64(1)
 
-    def test_tick_interval_with_proposal(self, sample_store: Store) -> None:
+    def test_tick_interval_with_proposal(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test interval ticking with proposal."""
         initial_time = sample_store.time
 
-        sample_store, _ = sample_store.tick_interval(has_proposal=True)
+        sample_store, _ = spec.tick_interval(sample_store, has_proposal=True)
 
         # Time should advance
         assert sample_store.time == initial_time + Uint64(1)
 
-    def test_tick_interval_sequence(self, sample_store: Store) -> None:
+    def test_tick_interval_sequence(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test sequence of interval ticks."""
         initial_time = sample_store.time
 
         # Tick multiple intervals
         for i in range(5):
-            sample_store, _ = sample_store.tick_interval(has_proposal=(i % 2 == 0))
+            sample_store, _ = spec.tick_interval(sample_store, has_proposal=(i % 2 == 0))
 
         # Should have advanced by 5 intervals
         assert sample_store.time == initial_time + Uint64(5)
 
-    def test_tick_interval_actions_by_phase(self, sample_store: Store) -> None:
+    def test_tick_interval_actions_by_phase(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test different actions performed based on interval phase."""
         # Reset store to known state
         initial_time = Uint64(0)
@@ -138,7 +139,7 @@ class TestIntervalTicking:
         # Tick through a complete slot cycle
         for interval in range(INTERVALS_PER_SLOT):
             has_proposal = interval == 0  # Proposal only in first interval
-            sample_store, _ = sample_store.tick_interval(has_proposal=has_proposal)
+            sample_store, _ = spec.tick_interval(sample_store, has_proposal=has_proposal)
 
             current_interval = sample_store.time % INTERVALS_PER_SLOT
             expected_interval = Uint64((interval + 1)) % INTERVALS_PER_SLOT
@@ -148,34 +149,34 @@ class TestIntervalTicking:
 class TestAttestationProcessingTiming:
     """Test timing of attestation processing."""
 
-    def test_accept_new_attestations_basic(self, sample_store: Store) -> None:
+    def test_accept_new_attestations_basic(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test basic new attestation processing moves aggregated payloads."""
         # The method now processes aggregated payloads, not attestations directly
         # Just verify the method runs without error
         initial_known_payloads = len(sample_store.latest_known_aggregated_payloads)
 
         # Accept new attestations (which processes aggregated payloads)
-        sample_store = sample_store.accept_new_attestations()
+        sample_store = spec.accept_new_attestations(sample_store)
 
         # New payloads should move to known payloads
         assert len(sample_store.latest_new_aggregated_payloads) == 0
         assert len(sample_store.latest_known_aggregated_payloads) >= initial_known_payloads
 
-    def test_accept_new_attestations_multiple(self, sample_store: Store) -> None:
+    def test_accept_new_attestations_multiple(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test accepting multiple new aggregated payloads."""
         # Aggregated payloads are now the source of attestations
         # The test is simplified to just test the migration logic
-        sample_store = sample_store.accept_new_attestations()
+        sample_store = spec.accept_new_attestations(sample_store)
 
         # All new payloads should move to known payloads
         assert len(sample_store.latest_new_aggregated_payloads) == 0
 
-    def test_accept_new_attestations_empty(self, sample_store: Store) -> None:
+    def test_accept_new_attestations_empty(self, sample_store: Store, spec: LstarSpec) -> None:
         """Test accepting new attestations when there are none."""
         initial_known_payloads = len(sample_store.latest_known_aggregated_payloads)
 
         # Accept attestations when there are no new payloads
-        sample_store = sample_store.accept_new_attestations()
+        sample_store = spec.accept_new_attestations(sample_store)
 
         # Should be no-op
         assert len(sample_store.latest_new_aggregated_payloads) == 0

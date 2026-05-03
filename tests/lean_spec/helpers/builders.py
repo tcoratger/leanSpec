@@ -61,10 +61,7 @@ from lean_spec.types import (
     ValidatorIndices,
 )
 
-from .mocks import MockForkchoiceStore, MockNetworkRequester
-
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all helper invocations."""
+from .mocks import MockForkchoiceStore, MockNetworkRequester, StoreInterceptingSpec
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -142,7 +139,7 @@ def make_genesis_state(
     """
     if validators is None:
         validators = make_validators(num_validators)
-    return State.generate_genesis(genesis_time=Uint64(genesis_time), validators=validators)
+    return LstarSpec().generate_genesis(genesis_time=Uint64(genesis_time), validators=validators)
 
 
 def make_empty_block_body() -> BlockBody:
@@ -339,7 +336,7 @@ def make_genesis_data(
         validators = make_validators(num_validators)
     genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
     genesis_block = make_genesis_block(genesis_state)
-    store = Store.from_anchor(genesis_state, genesis_block, validator_id=validator_id)
+    store = LstarSpec().create_store(genesis_state, genesis_block, validator_id=validator_id)
     return GenesisData(store, genesis_state, genesis_block)
 
 
@@ -371,7 +368,7 @@ def make_store_with_attestation_data(
         key_manager=key_manager,
     )
     store = store.model_copy(update={"time": Interval.from_slot(attestation_slot)})
-    attestation_data = _SPEC.produce_attestation_data(store, attestation_slot)
+    attestation_data = LstarSpec().produce_attestation_data(store, attestation_slot)
     return store, attestation_data
 
 
@@ -484,7 +481,7 @@ def make_signed_block_from_store(
 
     Returns the updated store (with time advanced) and the signed block.
     """
-    _, block, _ = _SPEC.produce_block_with_signatures(store, slot, proposer_index)
+    _, block, _ = LstarSpec().produce_block_with_signatures(store, slot, proposer_index)
     block_root = hash_tree_root(block)
     proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
     attestation_signatures = key_manager.build_attestation_signatures(block.body.attestations)
@@ -498,7 +495,7 @@ def make_signed_block_from_store(
     )
 
     target_interval = Interval.from_slot(block.slot)
-    advanced_store, _ = _SPEC.on_tick(store, target_interval, has_proposal=True)
+    advanced_store, _ = LstarSpec().on_tick(store, target_interval, has_proposal=True)
 
     return advanced_store, signed_block
 
@@ -523,6 +520,7 @@ def create_mock_sync_service(
         block_cache=BlockCache(),
         clock=SlotClock(genesis_time=Uint64(0), time_fn=lambda: 1000.0),
         network=MockNetworkRequester(),
+        spec=StoreInterceptingSpec(),
         database=database,
         genesis_start=genesis_start,
         process_block=processor,

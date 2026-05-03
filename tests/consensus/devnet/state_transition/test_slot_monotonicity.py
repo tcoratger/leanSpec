@@ -7,6 +7,7 @@ from consensus_testing import (
     generate_pre_state,
 )
 
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Slot
 
 pytestmark = pytest.mark.valid_until("Devnet")
@@ -37,7 +38,7 @@ def test_process_slots_target_equal_to_state_slot_rejected(
     - Protects against replay of already-processed slots.
     """
     pre_state = generate_pre_state()
-    pre_state = pre_state.process_slots(Slot(1))
+    pre_state = LstarSpec().process_slots(pre_state, Slot(1))
 
     state_transition_test(
         pre=pre_state,
@@ -78,7 +79,7 @@ def test_block_at_parent_slot_rejected_when_slot_processing_skipped(
       when the chain tip is at or above the claimed slot.
     """
     pre_state = generate_pre_state()
-    pre_state = pre_state.process_slots(Slot(1))
+    pre_state = LstarSpec().process_slots(pre_state, Slot(1))
 
     state_transition_test(
         pre=pre_state,

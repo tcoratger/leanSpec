@@ -66,7 +66,7 @@ class TestValidateAttestationHeadChecks:
         )
 
         with pytest.raises(AssertionError, match="Head checkpoint slot mismatch"):
-            store.validate_attestation(attestation.data)
+            spec.validate_attestation(store, attestation.data)
 
     def test_head_slot_less_than_source_rejected(
         self,
@@ -103,7 +103,7 @@ class TestValidateAttestationHeadChecks:
         )
 
         with pytest.raises(AssertionError, match="Head checkpoint must not be older than target"):
-            store.validate_attestation(attestation.data)
+            spec.validate_attestation(store, attestation.data)
 
     def test_head_slot_less_than_target_rejected(
         self,
@@ -140,7 +140,7 @@ class TestValidateAttestationHeadChecks:
         )
 
         with pytest.raises(AssertionError, match="Head checkpoint must not be older than target"):
-            store.validate_attestation(attestation.data)
+            spec.validate_attestation(store, attestation.data)
 
     def test_valid_attestation_with_correct_head_passes(
         self,
@@ -176,10 +176,11 @@ class TestValidateAttestationHeadChecks:
             ),
         )
 
-        store.validate_attestation(attestation.data)
+        spec.validate_attestation(store, attestation.data)
 
     def test_head_equal_to_source_and_target_passes(
         self,
+        spec: LstarSpec,
         observer_store: Store,
     ) -> None:
         """All three checkpoints pointing to genesis (slot 0) is valid."""
@@ -202,7 +203,7 @@ class TestValidateAttestationHeadChecks:
             ),
         )
 
-        store.validate_attestation(attestation.data)
+        spec.validate_attestation(store, attestation.data)
 
 
 class TestValidateAttestationTimeCheck:
@@ -240,7 +241,7 @@ class TestValidateAttestationTimeCheck:
         # Sweep every interval in the attestation's slot.
         for offset in range(int(INTERVALS_PER_SLOT)):
             local = store.model_copy(update={"time": ATTESTATION_START_INTERVAL + Interval(offset)})
-            local.validate_attestation(data)
+            spec.validate_attestation(local, data)
 
     def test_attestation_in_past_passes(self, spec: LstarSpec, observer_store: Store) -> None:
         """A vote from a past slot is always accepted."""
@@ -249,7 +250,7 @@ class TestValidateAttestationTimeCheck:
         # Place the local clock several slots ahead.
         far_future = ATTESTATION_START_INTERVAL + INTERVALS_PER_SLOT * Interval(10)
         store = store.model_copy(update={"time": far_future})
-        store.validate_attestation(data)
+        spec.validate_attestation(store, data)
 
     def test_attestation_at_disparity_boundary_passes(
         self, spec: LstarSpec, observer_store: Store
@@ -258,7 +259,7 @@ class TestValidateAttestationTimeCheck:
         store, data = self._build_two_block_chain(spec, observer_store)
 
         store = store.model_copy(update={"time": DISPARITY_BOUNDARY_INTERVAL})
-        store.validate_attestation(data)
+        spec.validate_attestation(store, data)
 
     def test_attestation_just_beyond_disparity_boundary_rejected(
         self, spec: LstarSpec, observer_store: Store
@@ -269,7 +270,7 @@ class TestValidateAttestationTimeCheck:
         store = store.model_copy(update={"time": JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL})
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
-            store.validate_attestation(data)
+            spec.validate_attestation(store, data)
 
     def test_attestation_one_full_slot_in_future_rejected(
         self, spec: LstarSpec, observer_store: Store
@@ -286,4 +287,4 @@ class TestValidateAttestationTimeCheck:
         store = store.model_copy(update={"time": ONE_FULL_SLOT_BEHIND_INTERVAL})
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
-            store.validate_attestation(data)
+            spec.validate_attestation(store, data)

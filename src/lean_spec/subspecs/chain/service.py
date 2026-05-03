@@ -26,7 +26,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.forks import SignedAggregatedAttestation
+from lean_spec.forks import LstarSpec, SignedAggregatedAttestation
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.sync import SyncService
 from lean_spec.types import Uint64
@@ -56,6 +56,9 @@ class ChainService:
 
     clock: SlotClock
     """Clock for time calculation."""
+
+    spec: LstarSpec = field(default_factory=LstarSpec)
+    """Fork spec driving consensus methods. Default lets tests skip wiring."""
 
     _running: bool = field(default=False, repr=False)
     """Whether the service is running."""
@@ -172,7 +175,8 @@ class ChainService:
 
         # Tick remaining intervals one at a time.
         while store.time < target_interval:
-            store, new_aggregates = store.tick_interval(
+            store, new_aggregates = self.spec.tick_interval(
+                store,
                 has_proposal=False,
                 is_aggregator=self.sync_service.is_aggregator,
             )

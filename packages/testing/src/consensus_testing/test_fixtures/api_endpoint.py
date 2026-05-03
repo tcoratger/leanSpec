@@ -53,7 +53,7 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
         )
         block = _make_genesis_block(state)
         # No validator identity — fixture only reads store data, never signs.
-        return Store.from_anchor(state, block, validator_id=None)
+        return fork.create_store(state, block, validator_id=None)
 
     # Walk the chain from genesis through anchor_slot using empty blocks.
     # The returned pair (state, block) is internally consistent with the
@@ -64,7 +64,7 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
         anchor_slot=Slot(anchor_slot),
         genesis_time=Uint64(genesis_time),
     )
-    return Store.from_anchor(state, block, validator_id=None)
+    return fork.create_store(state, block, validator_id=None)
 
 
 def _health_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
@@ -100,7 +100,7 @@ def _finalized_state_response(store: Store, _fixture: "ApiEndpointTest") -> dict
 
 def _fork_choice_response(store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
     """Fork choice tree: blocks with weights, head, checkpoints, validator count."""
-    weights = store.compute_block_weights()
+    weights = LstarSpec().compute_block_weights(store)
 
     # Only post-finalization blocks are relevant to head selection.
     nodes = [

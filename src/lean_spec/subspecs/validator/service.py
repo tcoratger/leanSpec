@@ -42,6 +42,7 @@ from lean_spec.forks import (
     AttestationSignatures,
     Block,
     BlockSignatures,
+    LstarSpec,
     SignedAttestation,
     SignedBlock,
 )
@@ -88,6 +89,9 @@ class ValidatorService:
 
     registry: ValidatorRegistry
     """Registry of validators we control."""
+
+    spec: LstarSpec = field(default_factory=LstarSpec)
+    """Fork spec driving consensus methods. Default lets tests skip wiring."""
 
     on_block: BlockPublisher = field(default=_noop_block_publisher)
     """Callback invoked when a block is produced."""
@@ -259,7 +263,8 @@ class ValidatorService:
 
             # We are the proposer for this slot.
             try:
-                new_store, block, signatures = store.produce_block_with_signatures(
+                new_store, block, signatures = self.spec.produce_block_with_signatures(
+                    store,
                     slot=slot,
                     validator_index=validator_index,
                 )
@@ -330,7 +335,7 @@ class ValidatorService:
                     break
 
         # Ensure we are attesting to the latest known head
-        self.sync_service.store = self.sync_service.store.update_head()
+        self.sync_service.store = self.spec.update_head(self.sync_service.store)
         store = self.sync_service.store
 
         head_state = store.states.get(store.head)
@@ -338,7 +343,7 @@ class ValidatorService:
             return
 
         for validator_index in self.registry.indices():
-            attestation_data = store.produce_attestation_data(slot)
+            attestation_data = self.spec.produce_attestation_data(store, slot)
             signed_attestation = self._sign_attestation(attestation_data, validator_index)
 
             self._attestations_produced += 1
@@ -353,7 +358,8 @@ class ValidatorService:
                 self.sync_service.store.validator_id is not None and self.sync_service.is_aggregator
             )
             try:
-                self.sync_service.store = self.sync_service.store.on_gossip_attestation(
+                self.sync_service.store = self.spec.on_gossip_attestation(
+                    self.sync_service.store,
                     signed_attestation=signed_attestation,
                     is_aggregator=is_aggregator_role,
                 )

@@ -14,6 +14,7 @@ from lean_spec.forks.lstar.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Boolean, Slot, ValidatorIndex
 
@@ -218,7 +219,8 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
     7. There are no pending justifications
     """
     pre = generate_pre_state()
-    anchor_root = hash_tree_root(pre.process_slots(Slot(1)).latest_block_header)
+    anchor_state = LstarSpec().process_slots(pre, Slot(1))
+    anchor_root = hash_tree_root(anchor_state.latest_block_header)
 
     state_transition_test(
         pre=pre,

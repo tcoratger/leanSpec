@@ -24,6 +24,7 @@ from lean_spec.forks.lstar.containers.state.types import (
     JustificationValidators,
     JustifiedSlots,
 )
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 
@@ -245,7 +246,8 @@ def test_first_post_genesis_block_sets_checkpoint_anchor_roots(
     5. justified_slots is empty
     """
     pre = generate_pre_state()
-    anchor_root = hash_tree_root(pre.process_slots(Slot(1)).latest_block_header)
+    anchor_state = LstarSpec().process_slots(pre, Slot(1))
+    anchor_root = hash_tree_root(anchor_state.latest_block_header)
 
     state_transition_test(
         pre=pre,

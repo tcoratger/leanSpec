@@ -10,14 +10,46 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import MappingProxyType
+from typing import Any
 
 from lean_spec.forks.lstar.containers import SignedBlock
 from lean_spec.forks.lstar.containers.attestation import SignedAttestation
 from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.service.events import NetworkEvent
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Slot, Uint64
+
+
+class StoreInterceptingSpec(LstarSpec):
+    """Spec stub that forwards consensus calls to the store argument."""
+
+    def on_block(  # type: ignore[override]
+        self, store: Any, signed_block: Any, *args: Any, **kwargs: Any
+    ) -> Any:
+        """Forward to store.on_block."""
+        kwargs.pop("scheme", None)
+        return store.on_block(signed_block, *args, **kwargs)
+
+    def on_gossip_attestation(  # type: ignore[override]
+        self, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
+    ) -> Any:
+        """Forward to store.on_gossip_attestation."""
+        kwargs.pop("scheme", None)
+        return store.on_gossip_attestation(signed_attestation, *args, **kwargs)
+
+    def on_gossip_aggregated_attestation(  # type: ignore[override]
+        self, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
+    ) -> Any:
+        """Forward to store.on_gossip_aggregated_attestation."""
+        return store.on_gossip_aggregated_attestation(signed_attestation, *args, **kwargs)
+
+    def tick_interval(  # type: ignore[override]
+        self, store: Any, has_proposal: bool, is_aggregator: bool = False
+    ) -> Any:
+        """Forward to store.tick_interval."""
+        return store.tick_interval(has_proposal, is_aggregator)
 
 
 class MockNetworkRequester:

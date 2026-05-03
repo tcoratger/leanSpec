@@ -22,6 +22,7 @@ from tests.lean_spec.helpers import (
 
 def test_aggregated_signatures_prefers_full_gossip_payload(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     store = make_store(num_validators=2, key_manager=container_key_manager)
     head_state = store.states[store.head]
@@ -40,7 +41,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     }
 
     store = store.model_copy(update={"attestation_signatures": attestation_signatures})
-    _, results = store.aggregate()
+    _, results = spec.aggregate(store)
 
     assert len(results) == 1
     assert set(results[0].proof.participants.to_validator_indices()) == {
@@ -133,16 +134,18 @@ def test_build_block_skips_attestations_without_signatures(
 
 def test_aggregate_with_empty_attestation_signatures(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """Empty attestations list should return empty results."""
     store = make_store(num_validators=2, key_manager=container_key_manager)
-    _, results = store.aggregate()
+    _, results = spec.aggregate(store)
 
     assert results == []
 
 
 def test_aggregated_signatures_with_multiple_data_groups(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """Multiple attestation data groups should be processed independently."""
     store = make_store(num_validators=4, key_manager=container_key_manager)
@@ -179,7 +182,7 @@ def test_aggregated_signatures_with_multiple_data_groups(
     }
 
     store = store.model_copy(update={"attestation_signatures": attestation_signatures})
-    _, results = store.aggregate()
+    _, results = spec.aggregate(store)
 
     assert len(results) == 2
 
@@ -360,6 +363,7 @@ def test_build_block_skips_unknown_head_root(
 
 def test_aggregate_with_no_signatures(
     container_key_manager: XmssKeyManager,
+    spec: LstarSpec,
 ) -> None:
     """
     Test edge case where the store has no attestation signatures or payloads.
@@ -367,7 +371,7 @@ def test_aggregate_with_no_signatures(
     Returns empty results (no attestations can be aggregated without signatures).
     """
     store = make_store(num_validators=2, key_manager=container_key_manager)
-    _, results = store.aggregate()
+    _, results = spec.aggregate(store)
 
     assert results == []
 

@@ -41,11 +41,6 @@ class SpecStateType(SpecSSZType, Protocol):
         """Genesis configuration carried by the state."""
         ...
 
-    @classmethod
-    def generate_genesis(cls, genesis_time: Uint64, validators: SSZList[Any]) -> Self:
-        """Construct the fork's genesis state."""
-        ...
-
 
 class SpecBlockType(SpecSSZType, Protocol):
     """Structural contract: any fork's Block container class."""
@@ -359,10 +354,11 @@ class ForkProtocol(ABC):
     config_class: type[SpecConfigType]
     """Concrete genesis Config container class."""
 
+    @abstractmethod
     def generate_genesis(self, genesis_time: Uint64, validators: SSZList[Any]) -> SpecStateType:
-        """Construct a genesis state using this fork's State class."""
-        return self.state_class.generate_genesis(genesis_time, validators)
+        """Construct a genesis state for this fork."""
 
+    @abstractmethod
     def create_store(
         self,
         state: SpecStateType,
@@ -370,7 +366,6 @@ class ForkProtocol(ABC):
         validator_id: ValidatorIndex | None,
     ) -> SpecStoreType:
         """Construct a forkchoice store anchored at the given state and block."""
-        return self.store_class.from_anchor(state, anchor_block, validator_id)
 
     @abstractmethod
     def upgrade_state(self, state: SpecStateType) -> SpecStateType:

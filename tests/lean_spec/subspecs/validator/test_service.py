@@ -497,7 +497,9 @@ class TestMaybeProduceBlock:
         )
 
         with patch.object(
-            Store, "produce_block_with_signatures", side_effect=AssertionError("mismatch")
+            service.spec,
+            "produce_block_with_signatures",
+            side_effect=AssertionError("mismatch"),
         ):
             # Slot 0: proposer is validator 0 (0 % 8 = 0), which is in the registry.
             await service._maybe_produce_block(Slot(0))
@@ -677,7 +679,11 @@ class TestProduceAttestationsAdvanced:
 
         with (
             caplog.at_level("DEBUG"),
-            patch.object(Store, "on_gossip_attestation", side_effect=RuntimeError("store error")),
+            patch.object(
+                service.spec,
+                "on_gossip_attestation",
+                side_effect=RuntimeError("store error"),
+            ),
         ):
             await service._produce_attestations(target_slot)
 
