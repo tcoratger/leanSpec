@@ -142,7 +142,7 @@ def make_genesis_state(
     """
     if validators is None:
         validators = make_validators(num_validators)
-    return State.generate_genesis(genesis_time=Uint64(genesis_time), validators=validators)
+    return _SPEC.generate_genesis(genesis_time=Uint64(genesis_time), validators=validators)
 
 
 def make_empty_block_body() -> BlockBody:
@@ -339,7 +339,7 @@ def make_genesis_data(
         validators = make_validators(num_validators)
     genesis_state = make_genesis_state(validators=validators, genesis_time=genesis_time)
     genesis_block = make_genesis_block(genesis_state)
-    store = Store.from_anchor(genesis_state, genesis_block, validator_id=validator_id)
+    store = cast(Store, _SPEC.create_store(genesis_state, genesis_block, validator_id=validator_id))
     return GenesisData(store, genesis_state, genesis_block)
 
 

@@ -2,10 +2,13 @@
 
 from lean_spec.forks.lstar.containers.block import Block, BlockBody
 from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import State, Validators
+from lean_spec.forks.lstar.containers.state import Validators
 from lean_spec.forks.lstar.containers.validator import Validator
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Slot, Uint64, ValidatorIndex
+
+_SPEC = LstarSpec()
 
 
 def test_genesis_block_hash_comparison() -> None:
@@ -20,7 +23,7 @@ def test_genesis_block_hash_comparison() -> None:
         ]
     )
 
-    genesis_state1 = State.generate_genesis(
+    genesis_state1 = _SPEC.generate_genesis(
         genesis_time=Uint64(1000),
         validators=validators1,
     )
@@ -38,7 +41,7 @@ def test_genesis_block_hash_comparison() -> None:
     genesis_block_hash1 = hash_tree_root(genesis_block1)
 
     # Create a second genesis state with same config but regenerated (should produce same hash)
-    genesis_state1_copy = State.generate_genesis(
+    genesis_state1_copy = _SPEC.generate_genesis(
         genesis_time=Uint64(1000),
         validators=validators1,
     )
@@ -66,7 +69,7 @@ def test_genesis_block_hash_comparison() -> None:
         ]
     )
 
-    genesis_state2 = State.generate_genesis(
+    genesis_state2 = _SPEC.generate_genesis(
         genesis_time=Uint64(1000),  # Same genesis_time but different validators
         validators=validators2,
     )
@@ -94,7 +97,7 @@ def test_genesis_block_hash_comparison() -> None:
         ]
     )
 
-    genesis_state3 = State.generate_genesis(
+    genesis_state3 = _SPEC.generate_genesis(
         genesis_time=Uint64(2000),  # Different genesis_time but same validators
         validators=validators3,
     )

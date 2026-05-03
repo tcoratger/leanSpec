@@ -64,7 +64,7 @@ class TestBlockProduction:
         data_5 = AttestationData(
             slot=head_block.slot,
             head=head_checkpoint,
-            target=sample_store.get_attestation_target(),
+            target=spec.get_attestation_target(sample_store),
             source=sample_store.latest_justified,
         )
         signed_5 = SignedAttestation(
@@ -75,7 +75,7 @@ class TestBlockProduction:
         data_6 = AttestationData(
             slot=head_block.slot,
             head=head_checkpoint,
-            target=sample_store.get_attestation_target(),
+            target=spec.get_attestation_target(sample_store),
             source=sample_store.latest_justified,
         )
         signed_6 = SignedAttestation(
@@ -214,7 +214,7 @@ class TestBlockProduction:
         data_7 = AttestationData(
             slot=head_block.slot,
             head=head_checkpoint,
-            target=sample_store.get_attestation_target(),
+            target=spec.get_attestation_target(sample_store),
             source=sample_store.latest_justified,
         )
         signed_7 = SignedAttestation(
@@ -269,7 +269,7 @@ class TestValidatorIntegration:
         spec.produce_block_with_signatures(sample_store, proposer_slot, proposer_idx)
 
         # Update store state after block production
-        sample_store = sample_store.update_head()
+        sample_store = spec.update_head(sample_store)
 
         # Other validator creates attestation for slot 2
         attestor_slot = Slot(2)

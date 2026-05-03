@@ -1,6 +1,7 @@
 """Tests for Store attestation data pruning."""
 
 from lean_spec.forks.lstar import AttestationSignatureEntry, Store
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import ByteListMiB, Bytes32, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import (
@@ -11,7 +12,7 @@ from tests.lean_spec.helpers import (
 )
 
 
-def test_prunes_entries_with_target_at_finalized(pruning_store: Store) -> None:
+def test_prunes_entries_with_target_at_finalized(spec: LstarSpec, pruning_store: Store) -> None:
     """Verify entries with target.slot == finalized slot are pruned."""
     store = pruning_store
 
@@ -40,12 +41,12 @@ def test_prunes_entries_with_target_at_finalized(pruning_store: Store) -> None:
     assert attestation_data in store.attestation_signatures
 
     # Prune should remove entries where target.slot <= finalized.slot
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     assert attestation_data not in pruned_store.attestation_signatures
 
 
-def test_prunes_entries_with_target_before_finalized(pruning_store: Store) -> None:
+def test_prunes_entries_with_target_before_finalized(spec: LstarSpec, pruning_store: Store) -> None:
     """Verify entries with target.slot < finalized slot are pruned."""
     store = pruning_store
 
@@ -74,12 +75,12 @@ def test_prunes_entries_with_target_before_finalized(pruning_store: Store) -> No
     assert attestation_data in store.attestation_signatures
 
     # Prune should remove entries where target.slot <= finalized.slot
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     assert attestation_data not in pruned_store.attestation_signatures
 
 
-def test_keeps_entries_with_target_after_finalized(pruning_store: Store) -> None:
+def test_keeps_entries_with_target_after_finalized(spec: LstarSpec, pruning_store: Store) -> None:
     """Verify entries with target.slot > finalized slot are kept."""
     store = pruning_store
 
@@ -108,12 +109,12 @@ def test_keeps_entries_with_target_after_finalized(pruning_store: Store) -> None
     assert attestation_data in store.attestation_signatures
 
     # Prune should keep entries where target.slot > finalized.slot
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     assert attestation_data in pruned_store.attestation_signatures
 
 
-def test_prunes_related_structures_together(pruning_store: Store) -> None:
+def test_prunes_related_structures_together(spec: LstarSpec, pruning_store: Store) -> None:
     """Verify all three data structures are pruned atomically."""
     store = pruning_store
 
@@ -172,7 +173,7 @@ def test_prunes_related_structures_together(pruning_store: Store) -> None:
     assert fresh_attestation in store.latest_new_aggregated_payloads
     assert fresh_attestation in store.latest_known_aggregated_payloads
 
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     # Stale entries should be removed from all structures
     assert stale_attestation not in pruned_store.attestation_signatures
@@ -185,7 +186,7 @@ def test_prunes_related_structures_together(pruning_store: Store) -> None:
     assert fresh_attestation in pruned_store.latest_known_aggregated_payloads
 
 
-def test_handles_empty_attestation_signatures(pruning_store: Store) -> None:
+def test_handles_empty_attestation_signatures(spec: LstarSpec, pruning_store: Store) -> None:
     """Verify pruning works correctly when attestation_signatures is empty."""
     store = pruning_store
 
@@ -193,12 +194,14 @@ def test_handles_empty_attestation_signatures(pruning_store: Store) -> None:
     assert len(store.attestation_signatures) == 0
 
     # Pruning should not fail
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     assert len(pruned_store.attestation_signatures) == 0
 
 
-def test_prunes_multiple_validators_same_attestation_data(pruning_store: Store) -> None:
+def test_prunes_multiple_validators_same_attestation_data(
+    spec: LstarSpec, pruning_store: Store
+) -> None:
     """Verify pruning removes entries for multiple validators with same attestation data."""
     store = pruning_store
 
@@ -228,13 +231,13 @@ def test_prunes_multiple_validators_same_attestation_data(pruning_store: Store) 
     assert stale_attestation in store.attestation_signatures
     assert len(store.attestation_signatures[stale_attestation]) == 2
 
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     # All validators' signatures should be removed (whole entry pruned)
     assert stale_attestation not in pruned_store.attestation_signatures
 
 
-def test_mixed_stale_and_fresh_entries(pruning_store: Store) -> None:
+def test_mixed_stale_and_fresh_entries(spec: LstarSpec, pruning_store: Store) -> None:
     """Verify correct pruning behavior with a mix of stale and fresh entries."""
     store = pruning_store
 
@@ -267,7 +270,7 @@ def test_mixed_stale_and_fresh_entries(pruning_store: Store) -> None:
     for att in attestations:
         assert att in store.attestation_signatures
 
-    pruned_store = store.prune_stale_attestation_data()
+    pruned_store = spec.prune_stale_attestation_data(store)
 
     # Entries with target.slot <= 5 should be pruned (slots 1-5)
     for att in attestations[:5]:

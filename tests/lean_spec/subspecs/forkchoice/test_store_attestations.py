@@ -65,8 +65,8 @@ def test_on_block_processes_multi_validator_aggregations(
     updated_store = spec.on_block(consumer_store, signed_block)
 
     # Verify attestations can be extracted from aggregated payloads
-    extracted_attestations = updated_store.extract_attestations_from_aggregated_payloads(
-        updated_store.latest_known_aggregated_payloads
+    extracted_attestations = spec.extract_attestations_from_aggregated_payloads(
+        updated_store, updated_store.latest_known_aggregated_payloads
     )
     assert ValidatorIndex(1) in extracted_attestations
     assert ValidatorIndex(2) in extracted_attestations
@@ -492,7 +492,7 @@ class TestAggregateCommitteeSignatures:
     """
 
     def test_aggregates_attestation_signatures_into_proof(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """
         Aggregation creates proofs from collected gossip signatures.
@@ -512,7 +512,7 @@ class TestAggregateCommitteeSignatures:
         )
 
         # Perform aggregation
-        updated_store, _ = store.aggregate()
+        updated_store, _ = spec.aggregate(store)
 
         # Verify proofs were created and stored keyed by attestation data
         assert attestation_data in updated_store.latest_new_aggregated_payloads, (
@@ -521,7 +521,7 @@ class TestAggregateCommitteeSignatures:
         proofs = updated_store.latest_new_aggregated_payloads[attestation_data]
         assert len(proofs) >= 1, "At least one proof should exist"
 
-    def test_aggregated_proof_is_valid(self, key_manager: XmssKeyManager) -> None:
+    def test_aggregated_proof_is_valid(self, key_manager: XmssKeyManager, spec: LstarSpec) -> None:
         """
         Created aggregated proof passes verification.
 
@@ -537,7 +537,7 @@ class TestAggregateCommitteeSignatures:
             attesting_validators=attesting_validators,
         )
 
-        updated_store, _ = store.aggregate()
+        updated_store, _ = spec.aggregate(store)
 
         proofs = updated_store.latest_new_aggregated_payloads[attestation_data]
         proof = next(iter(proofs))
@@ -554,7 +554,7 @@ class TestAggregateCommitteeSignatures:
         )
 
     def test_empty_attestation_signatures_produces_no_proofs(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """
         No proofs created when attestation_signatures is empty.
@@ -568,7 +568,7 @@ class TestAggregateCommitteeSignatures:
             attesting_validators=[],  # No attesters
         )
 
-        updated_store, _ = store.aggregate()
+        updated_store, _ = spec.aggregate(store)
 
         # Verify no proofs were created
         assert len(updated_store.latest_new_aggregated_payloads) == 0
@@ -609,7 +609,7 @@ class TestAggregateCommitteeSignatures:
             }
         )
 
-        updated_store, _ = store.aggregate()
+        updated_store, _ = spec.aggregate(store)
 
         # Verify both attestation data have separate proofs
         assert att_data_1 in updated_store.latest_new_aggregated_payloads
@@ -625,7 +625,7 @@ class TestTickIntervalAggregation:
     """
 
     def test_interval_2_triggers_aggregation_for_aggregator(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """
         Aggregation is triggered at interval 2 when is_aggregator=True.
@@ -648,7 +648,7 @@ class TestTickIntervalAggregation:
         store = store.model_copy(update={"time": Uint64(1)})
 
         # Tick to interval 2 as aggregator
-        updated_store, _ = store.tick_interval(has_proposal=False, is_aggregator=True)
+        updated_store, _ = spec.tick_interval(store, has_proposal=False, is_aggregator=True)
 
         # Verify aggregation was performed
         assert attestation_data in updated_store.latest_new_aggregated_payloads, (
@@ -656,7 +656,7 @@ class TestTickIntervalAggregation:
         )
 
     def test_interval_2_skips_aggregation_for_non_aggregator(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """
         Aggregation is NOT triggered at interval 2 when is_aggregator=False.
@@ -676,14 +676,16 @@ class TestTickIntervalAggregation:
         store = store.model_copy(update={"time": Uint64(1)})
 
         # Tick to interval 2 as NON-aggregator
-        updated_store, _ = store.tick_interval(has_proposal=False, is_aggregator=False)
+        updated_store, _ = spec.tick_interval(store, has_proposal=False, is_aggregator=False)
 
         # Verify aggregation was NOT performed
         assert attestation_data not in updated_store.latest_new_aggregated_payloads, (
             "Aggregation should NOT occur for non-aggregators"
         )
 
-    def test_other_intervals_do_not_trigger_aggregation(self, key_manager: XmssKeyManager) -> None:
+    def test_other_intervals_do_not_trigger_aggregation(
+        self, key_manager: XmssKeyManager, spec: LstarSpec
+    ) -> None:
         """
         Aggregation is NOT triggered at intervals other than 2.
 
@@ -709,14 +711,16 @@ class TestTickIntervalAggregation:
             pre_tick_time = (target_interval - 1) % int(INTERVALS_PER_SLOT)
             test_store = store.model_copy(update={"time": Uint64(pre_tick_time)})
 
-            updated_store, _ = test_store.tick_interval(has_proposal=False, is_aggregator=True)
+            updated_store, _ = spec.tick_interval(
+                test_store, has_proposal=False, is_aggregator=True
+            )
 
             assert attestation_data not in updated_store.latest_new_aggregated_payloads, (
                 f"Aggregation should NOT occur at interval {target_interval}"
             )
 
     def test_interval_0_accepts_attestations_with_proposal(
-        self, key_manager: XmssKeyManager
+        self, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
         """
         Interval 0 accepts new attestations when has_proposal=True.
@@ -732,7 +736,7 @@ class TestTickIntervalAggregation:
         store = store.model_copy(update={"time": Uint64(4)})
 
         # Tick to interval 0 with proposal
-        updated_store, _ = store.tick_interval(has_proposal=True, is_aggregator=True)
+        updated_store, _ = spec.tick_interval(store, has_proposal=True, is_aggregator=True)
 
         # Verify time advanced
         assert updated_store.time == Uint64(5)
@@ -796,7 +800,7 @@ class TestEndToEndAggregationFlow:
 
         # Step 2: Advance to interval 2 (aggregation interval)
         store = store.model_copy(update={"time": Uint64(1)})
-        store, _ = store.tick_interval(has_proposal=False, is_aggregator=True)
+        store, _ = spec.tick_interval(store, has_proposal=False, is_aggregator=True)
 
         # Step 3: Verify aggregated proofs were created
         assert attestation_data in store.latest_new_aggregated_payloads, (

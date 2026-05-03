@@ -4,11 +4,14 @@ from typing import Literal
 
 from lean_spec.forks.lstar.containers import AttestationData
 from lean_spec.forks.lstar.containers.block.block import Block, BlockLookup
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import ZERO_HASH, Bytes32, CamelModel, Slot, Uint64, ValidatorIndex
 
 from .utils import resolve_block_root
+
+_SPEC = LstarSpec()
 
 
 def _ancestor_set(blocks: BlockLookup, head: Bytes32) -> set[Bytes32]:
@@ -364,7 +367,7 @@ class StoreChecks(CamelModel):
 
         # Attestation target checkpoint (slot + root consistency)
         if "attestation_target_slot" in fields:
-            target = store.get_attestation_target()
+            target = _SPEC.get_attestation_target(store)
             _check("attestation_target.slot", target.slot, self.attestation_target_slot)
 
             block_found = any(
@@ -395,7 +398,7 @@ class StoreChecks(CamelModel):
                     payloads = store.latest_known_aggregated_payloads
                     label = "in latest_known"
 
-                extracted = store.extract_attestations_from_aggregated_payloads(payloads)
+                extracted = _SPEC.extract_attestations_from_aggregated_payloads(store, payloads)
                 if check.validator not in extracted:
                     raise AssertionError(
                         f"Step {step_index}: validator {check.validator} not found "
@@ -559,8 +562,8 @@ class StoreChecks(CamelModel):
             root = hash_tree_root(block)
             slot = block.slot
 
-            known_attestations = store.extract_attestations_from_aggregated_payloads(
-                store.latest_known_aggregated_payloads
+            known_attestations = _SPEC.extract_attestations_from_aggregated_payloads(
+                store, store.latest_known_aggregated_payloads
             )
             weight = 0
             for attestation in known_attestations.values():

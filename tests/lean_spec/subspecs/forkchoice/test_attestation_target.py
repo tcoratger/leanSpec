@@ -25,9 +25,9 @@ from tests.lean_spec.helpers import make_store
 class TestGetAttestationTarget:
     """Tests for Store.get_attestation_target() method."""
 
-    def test_attestation_target_at_genesis(self, observer_store: Store) -> None:
+    def test_attestation_target_at_genesis(self, spec: LstarSpec, observer_store: Store) -> None:
         """Target at genesis should be the genesis block."""
-        target = observer_store.get_attestation_target()
+        target = spec.get_attestation_target(observer_store)
 
         genesis_hash = observer_store.head
         genesis_block = observer_store.blocks[genesis_hash]
@@ -35,9 +35,11 @@ class TestGetAttestationTarget:
         assert target.root == genesis_hash
         assert target.slot == genesis_block.slot
 
-    def test_attestation_target_returns_checkpoint(self, observer_store: Store) -> None:
+    def test_attestation_target_returns_checkpoint(
+        self, spec: LstarSpec, observer_store: Store
+    ) -> None:
         """get_attestation_target should return a Checkpoint."""
-        target = observer_store.get_attestation_target()
+        target = spec.get_attestation_target(observer_store)
 
         assert isinstance(target, Checkpoint)
         assert target.root in observer_store.blocks
@@ -67,7 +69,7 @@ class TestGetAttestationTarget:
         assert store.blocks[store.safe_target].slot == Slot(0)
 
         # Get attestation target
-        target = store.get_attestation_target()
+        target = spec.get_attestation_target(store)
 
         # Target should be walked back from head toward safe_target
         # It cannot exceed JUSTIFICATION_LOOKBACK_SLOTS steps back from head
@@ -90,7 +92,7 @@ class TestGetAttestationTarget:
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
             store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
-        target = store.get_attestation_target()
+        target = spec.get_attestation_target(store)
         finalized_slot = store.latest_finalized.slot
 
         # The target slot must be justifiable after the finalized slot
@@ -108,7 +110,7 @@ class TestGetAttestationTarget:
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
             store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
-        target = store.get_attestation_target()
+        target = spec.get_attestation_target(store)
 
         # Walk from head back to target and verify the path exists
         current_root = store.head
@@ -163,10 +165,10 @@ class TestSafeTargetAdvancement:
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
-        store, _ = store.aggregate()
+        store, _ = spec.aggregate(store)
 
         # Update safe target (uses latest_new_aggregated_payloads)
-        store = store.update_safe_target()
+        store = spec.update_safe_target(store)
 
         # Safe target should still be at genesis (insufficient votes)
         current_safe_slot = store.blocks[store.safe_target].slot
@@ -208,10 +210,10 @@ class TestSafeTargetAdvancement:
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate the signatures
-        store, _ = store.aggregate()
+        store, _ = spec.aggregate(store)
 
         # Update safe target
-        store = store.update_safe_target()
+        store = spec.update_safe_target(store)
 
         # Verify the aggregation produced payloads and safe target was updated.
         # Safe target advancement depends on the full 3SF-mini justification rules,
@@ -247,10 +249,10 @@ class TestSafeTargetAdvancement:
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate into new payloads
-        store, _ = store.aggregate()
+        store, _ = spec.aggregate(store)
 
         # Update safe target should use new aggregated payloads
-        store = store.update_safe_target()
+        store = spec.update_safe_target(store)
 
         # Verify update_safe_target processes new aggregated payloads without error
         assert store.safe_target in store.blocks
@@ -301,7 +303,7 @@ class TestJustificationLogic:
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Aggregate signatures before producing the next block
-        store, _ = store.aggregate()
+        store, _ = spec.aggregate(store)
 
         # Produce block 2 which includes these attestations
         store, block_2, signatures = spec.produce_block_with_signatures(store, slot_2, proposer_2)
@@ -349,7 +351,7 @@ class TestJustificationLogic:
 
         # This attestation should fail validation because source is unknown
         with pytest.raises(AssertionError, match="Unknown source block"):
-            store.validate_attestation(attestation.data)
+            spec.validate_attestation(store, attestation.data)
 
     def test_justification_tracking_with_multiple_targets(
         self,
@@ -383,8 +385,8 @@ class TestJustificationLogic:
             )
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
-        store, _ = store.aggregate()
-        store = store.update_safe_target()
+        store, _ = spec.aggregate(store)
+        store = spec.update_safe_target(store)
 
         # With only half the validators, safe target should not advance past genesis
         assert store.blocks[store.safe_target].slot == Slot(0)
@@ -460,7 +462,7 @@ class TestAttestationTargetEdgeCases:
         # Skip slot 2, 3
         store, _, _ = spec.produce_block_with_signatures(store, Slot(4), ValidatorIndex(4))
 
-        target = store.get_attestation_target()
+        target = spec.get_attestation_target(store)
 
         # Target should still be valid despite skipped slots
         assert target.root in store.blocks
@@ -468,13 +470,14 @@ class TestAttestationTargetEdgeCases:
 
     def test_attestation_target_single_validator(
         self,
+        spec: LstarSpec,
         key_manager: XmssKeyManager,
     ) -> None:
         """Attestation target computation should work with single validator."""
         store = make_store(num_validators=1, key_manager=key_manager, validator_id=None)
 
         # Should be able to get attestation target
-        target = store.get_attestation_target()
+        target = spec.get_attestation_target(store)
         assert target.root == store.head
 
     def test_attestation_target_at_justification_lookback_boundary(
@@ -492,7 +495,7 @@ class TestAttestationTargetEdgeCases:
             proposer = ValidatorIndex(slot_num % len(store.states[store.head].validators))
             store, _, _ = spec.produce_block_with_signatures(store, slot, proposer)
 
-        target = store.get_attestation_target()
+        target = spec.get_attestation_target(store)
         head_slot = store.blocks[store.head].slot
 
         # Target should not be more than JUSTIFICATION_LOOKBACK_SLOTS behind head
@@ -533,10 +536,10 @@ class TestIntegrationScenarios:
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         # Phase 3: Aggregate signatures into payloads
-        store, _ = store.aggregate()
+        store, _ = spec.aggregate(store)
 
         # Phase 4: Update safe target
-        store = store.update_safe_target()
+        store = spec.update_safe_target(store)
 
         # Verify the full cycle completed: safe target is a valid block in the store
         assert store.safe_target in store.blocks
@@ -584,7 +587,7 @@ class TestIntegrationScenarios:
         consumer_store = spec.on_block(consumer_store, signed_block)
 
         # Get attestation target after on_block
-        target = consumer_store.get_attestation_target()
+        target = spec.get_attestation_target(consumer_store)
 
         # Target should be valid
         assert target.root in consumer_store.blocks

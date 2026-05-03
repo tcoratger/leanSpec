@@ -7,7 +7,7 @@ Validates Store responses to blocks, attestations, and time progression.
 
 from __future__ import annotations
 
-from typing import ClassVar, Self
+from typing import ClassVar, Self, cast
 
 from pydantic import Field, model_validator
 
@@ -202,7 +202,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 "Store.from_anchor is expected to fail before any step can run"
             )
             try:
-                Store.from_anchor(
+                _SPEC.create_store(
                     self.anchor_state,
                     self.anchor_block,
                     validator_id=ValidatorIndex(0),
@@ -257,10 +257,13 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # The Store is the node's local view of the chain.
         # It starts from a trusted anchor (usually genesis).
-        store = Store.from_anchor(
-            self.anchor_state,
-            self.anchor_block,
-            validator_id=ValidatorIndex(0),
+        store = cast(
+            Store,
+            _SPEC.create_store(
+                self.anchor_state,
+                self.anchor_block,
+                validator_id=ValidatorIndex(0),
+            ),
         )
 
         # Block registry for fork creation

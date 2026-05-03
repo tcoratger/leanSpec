@@ -26,7 +26,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.forks import SignedAggregatedAttestation
+from lean_spec.forks import LstarSpec, SignedAggregatedAttestation
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.sync import SyncService
 from lean_spec.types import Uint64
@@ -34,6 +34,9 @@ from lean_spec.types import Uint64
 from .clock import Interval, SlotClock
 
 logger = logging.getLogger(__name__)
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all chain invocations."""
 
 
 @dataclass(slots=True)
@@ -172,7 +175,8 @@ class ChainService:
 
         # Tick remaining intervals one at a time.
         while store.time < target_interval:
-            store, new_aggregates = store.tick_interval(
+            store, new_aggregates = _SPEC.tick_interval(
+                store,
                 has_proposal=False,
                 is_aggregator=self.sync_service.is_aggregator,
             )

@@ -454,8 +454,8 @@ class BlockSpec(CamelModel):
             )
 
         # Trigger Store aggregation to merge gossip signatures into known payloads.
-        aggregation_store, _ = store.aggregate()
-        merged_store = aggregation_store.accept_new_attestations()
+        aggregation_store, _ = _SPEC.aggregate(store)
+        merged_store = _SPEC.accept_new_attestations(aggregation_store)
 
         # Build the block through the spec's State.build_block().
         final_block, _, _, block_proofs = _SPEC.build_block(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from lean_spec.forks.lstar import Store
 from lean_spec.forks.lstar.containers.attestation import AttestationData
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
@@ -19,12 +20,12 @@ def _make_empty_proof(participants: list[ValidatorIndex]) -> AggregatedSignature
     )
 
 
-def test_genesis_only_store_returns_empty_weights(base_store: Store) -> None:
+def test_genesis_only_store_returns_empty_weights(spec: LstarSpec, base_store: Store) -> None:
     """A genesis-only store with no attestations has no block weights."""
-    assert base_store.compute_block_weights() == {}
+    assert spec.compute_block_weights(base_store) == {}
 
 
-def test_linear_chain_weight_accumulates_upward(base_store: Store) -> None:
+def test_linear_chain_weight_accumulates_upward(spec: LstarSpec, base_store: Store) -> None:
     """Weights walk up from the attested head through all ancestors above finalized slot."""
     genesis_root = base_store.head
 
@@ -73,7 +74,7 @@ def test_linear_chain_weight_accumulates_upward(base_store: Store) -> None:
         }
     )
 
-    weights = store.compute_block_weights()
+    weights = spec.compute_block_weights(store)
 
     # Validator 0 attests to block2 as head.
     # Walking up: block2 (slot 2 > 0) gets +1, block1 (slot 1 > 0) gets +1.
@@ -81,7 +82,7 @@ def test_linear_chain_weight_accumulates_upward(base_store: Store) -> None:
     assert weights == {block2_root: 1, block1_root: 1}
 
 
-def test_multiple_attestations_accumulate(base_store: Store) -> None:
+def test_multiple_attestations_accumulate(spec: LstarSpec, base_store: Store) -> None:
     """Multiple validators attesting to the same head accumulate weight."""
     genesis_root = base_store.head
 
@@ -120,7 +121,7 @@ def test_multiple_attestations_accumulate(base_store: Store) -> None:
         }
     )
 
-    weights = store.compute_block_weights()
+    weights = spec.compute_block_weights(store)
 
     # Both validators contribute weight to block1
     assert weights == {block1_root: 2}

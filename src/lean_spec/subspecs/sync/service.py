@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from lean_spec.forks import (
     Block,
     BlockLookup,
+    LstarSpec,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
@@ -64,6 +65,9 @@ from .peer_manager import PeerManager
 from .states import SyncState
 
 logger = logging.getLogger(__name__)
+
+_SPEC = LstarSpec()
+"""Active fork spec — stateless, safe to share across all sync invocations."""
 
 
 @dataclass(slots=True)
@@ -115,7 +119,7 @@ def default_block_processor(
     itself through the observer, wired at node startup. Everything else
     here is derived by diffing pre- and post-stores.
     """
-    new_store = store.on_block(block)
+    new_store = _SPEC.on_block(store, block)
 
     metrics.lean_head_slot.set(new_store.blocks[new_store.head].slot)
     metrics.lean_safe_target_slot.set(new_store.blocks[new_store.safe_target].slot)
@@ -574,7 +578,8 @@ class SyncService:
         # Invalid attestations (bad signature, unknown target) are rejected.
         # Validation failures are logged but don't crash the event loop.
         try:
-            self.store = self.store.on_gossip_attestation(
+            self.store = _SPEC.on_gossip_attestation(
+                self.store,
                 signed_attestation=attestation,
                 is_aggregator=is_aggregator_role,
             )
@@ -631,7 +636,7 @@ class SyncService:
         )
 
         try:
-            self.store = self.store.on_gossip_aggregated_attestation(signed_attestation)
+            self.store = _SPEC.on_gossip_aggregated_attestation(self.store, signed_attestation)
             logger.info(
                 "Aggregated attestation from peer %s slot=%s: validation and signature ok",
                 peer_str,
@@ -665,7 +670,8 @@ class SyncService:
         self._pending_attestations = []
         for attestation in pending:
             try:
-                self.store = self.store.on_gossip_attestation(
+                self.store = _SPEC.on_gossip_attestation(
+                    self.store,
                     signed_attestation=attestation,
                     is_aggregator=is_aggregator_role,
                 )
@@ -676,7 +682,7 @@ class SyncService:
         self._pending_aggregated_attestations = []
         for signed_attestation in pending_agg:
             try:
-                self.store = self.store.on_gossip_aggregated_attestation(signed_attestation)
+                self.store = _SPEC.on_gossip_aggregated_attestation(self.store, signed_attestation)
             except (AssertionError, KeyError):
                 self._pending_aggregated_attestations.append(signed_attestation)
 
