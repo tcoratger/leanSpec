@@ -4,22 +4,28 @@ Forkchoice store for tracking chain state and attestations.
 The Store tracks all information required for the LMD GHOST forkchoice algorithm.
 """
 
-__all__ = ["AttestationSignatureEntry", "Store"]
+__all__ = ["AttestationSignatureEntry", "BlockT", "StateT", "Store"]
 
-from typing import NamedTuple
+from typing import Generic, NamedTuple, TypeVar
+
+from pydantic import Field
 
 from lean_spec.forks.lstar.containers import (
     AttestationData,
     Config,
 )
-from lean_spec.forks.lstar.containers.block import BlockLookup
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
 from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.types import Bytes32, Checkpoint, ValidatorIndex
 from lean_spec.types.base import StrictBaseModel
+from lean_spec.types.container import Container
 
-from .containers.state import State
+StateT = TypeVar("StateT", bound=Container)
+"""Per-fork post-state type tracked alongside each known block."""
+
+BlockT = TypeVar("BlockT", bound=Container)
+"""Per-fork block type stored in the forkchoice view."""
 
 
 class AttestationSignatureEntry(NamedTuple):
@@ -34,7 +40,7 @@ class AttestationSignatureEntry(NamedTuple):
     signature: Signature
 
 
-class Store(StrictBaseModel):
+class Store(StrictBaseModel, Generic[StateT, BlockT]):
     """
     Forkchoice store tracking chain state and validator attestations.
 
@@ -91,7 +97,7 @@ class Store(StrictBaseModel):
     Fork choice will never revert finalized history.
     """
 
-    blocks: BlockLookup = {}
+    blocks: dict[Bytes32, BlockT] = Field(default_factory=dict)
     """
     Mapping from block root to Block objects.
 
@@ -100,7 +106,7 @@ class Store(StrictBaseModel):
     Every block that might participate in fork choice must appear here.
     """
 
-    states: dict[Bytes32, State] = {}
+    states: dict[Bytes32, StateT] = Field(default_factory=dict)
     """
     Mapping from block root to State objects.
 
@@ -113,14 +119,18 @@ class Store(StrictBaseModel):
     validator_id: ValidatorIndex | None
     """Index of the validator running this store instance."""
 
-    attestation_signatures: dict[AttestationData, set[AttestationSignatureEntry]] = {}
+    attestation_signatures: dict[AttestationData, set[AttestationSignatureEntry]] = Field(
+        default_factory=dict
+    )
     """
     Per-validator XMSS signatures learned from committee attesters.
 
     Keyed by AttestationData.
     """
 
-    latest_new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
+    latest_new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = Field(
+        default_factory=dict
+    )
     """
     Aggregated signature proofs pending processing.
 
@@ -129,7 +139,9 @@ class Store(StrictBaseModel):
     Populated from blocks or gossip aggregated attestations.
     """
 
-    latest_known_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
+    latest_known_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = Field(
+        default_factory=dict
+    )
     """
     Aggregated signature proofs that have been processed.
 

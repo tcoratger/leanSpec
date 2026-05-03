@@ -3,7 +3,7 @@
 from typing import Literal
 
 from lean_spec.forks.lstar.containers import AttestationData
-from lean_spec.forks.lstar.containers.block.block import Block, BlockLookup
+from lean_spec.forks.lstar.containers.block.block import Block
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.ssz import hash_tree_root
@@ -12,7 +12,7 @@ from lean_spec.types import ZERO_HASH, Bytes32, CamelModel, Slot, Uint64, Valida
 from .utils import resolve_block_root
 
 
-def _ancestor_set(blocks: BlockLookup, head: Bytes32) -> set[Bytes32]:
+def _ancestor_set(blocks: dict[Bytes32, Block], head: Bytes32) -> set[Bytes32]:
     """Walk parent links from head and collect every reachable block root."""
     seen: set[Bytes32] = set()
     root = head

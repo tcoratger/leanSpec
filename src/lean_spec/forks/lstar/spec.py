@@ -62,6 +62,9 @@ from lean_spec.types import (
 from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
 from .store import AttestationSignatureEntry, Store
 
+LstarStore = Store[State, Block]
+"""Concrete Store specialization owned by the lstar fork."""
+
 
 class LstarSpec(ForkProtocol):
     """Lstar fork."""
@@ -80,7 +83,7 @@ class LstarSpec(ForkProtocol):
     block_signatures_class: type[BlockSignatures] = BlockSignatures
     aggregated_attestations_class: type[AggregatedAttestations] = AggregatedAttestations
     attestation_signatures_class: type[AttestationSignatures] = AttestationSignatures
-    store_class: type[Store] = Store
+    store_class: type[Store[State, Block]] = LstarStore
 
     attestation_data_class: type[AttestationData] = AttestationData
     attestation_class: type[Attestation] = Attestation
@@ -878,7 +881,7 @@ class LstarSpec(ForkProtocol):
         state: SpecStateType,
         anchor_block: SpecBlockType,
         validator_id: ValidatorIndex | None,
-    ) -> Store:
+    ) -> LstarStore:
         """Initialize a forkchoice store from an anchor state and block.
 
         The anchor block and state form the starting point for fork choice.
@@ -935,7 +938,7 @@ class LstarSpec(ForkProtocol):
             validator_id=validator_id,
         )
 
-    def prune_stale_attestation_data(self, store: Store) -> Store:
+    def prune_stale_attestation_data(self, store: LstarStore) -> LstarStore:
         """Remove attestation data that can no longer influence fork choice.
 
         An attestation becomes stale when its target checkpoint falls at or before
@@ -972,7 +975,7 @@ class LstarSpec(ForkProtocol):
             }
         )
 
-    def validate_attestation(self, store: Store, attestation_data: AttestationData) -> None:
+    def validate_attestation(self, store: LstarStore, attestation_data: AttestationData) -> None:
         """Validate incoming attestation before processing.
 
         Ensures the vote respects the basic laws of time and topology:
@@ -1026,11 +1029,11 @@ class LstarSpec(ForkProtocol):
 
     def on_gossip_attestation(
         self,
-        store: Store,
+        store: LstarStore,
         signed_attestation: SignedAttestation,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
         is_aggregator: bool = False,
-    ) -> Store:
+    ) -> LstarStore:
         """Process a signed attestation received via gossip network.
 
         This method:
@@ -1090,9 +1093,9 @@ class LstarSpec(ForkProtocol):
 
     def on_gossip_aggregated_attestation(
         self,
-        store: Store,
+        store: LstarStore,
         signed_attestation: SignedAggregatedAttestation,
-    ) -> Store:
+    ) -> LstarStore:
         """Process a signed aggregated attestation received via aggregation topic.
 
         This method:
@@ -1155,10 +1158,10 @@ class LstarSpec(ForkProtocol):
 
     def on_block(
         self,
-        store: Store,
+        store: LstarStore,
         signed_block: SignedBlock,
         scheme: GeneralizedXmssScheme = TARGET_SIGNATURE_SCHEME,
-    ) -> Store:
+    ) -> LstarStore:
         """Process a new block and update the forkchoice state.
 
         This method integrates a block into the forkchoice store by:
@@ -1263,7 +1266,7 @@ class LstarSpec(ForkProtocol):
 
     def extract_attestations_from_aggregated_payloads(
         self,
-        store: Store,
+        store: LstarStore,
         aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]],
     ) -> dict[ValidatorIndex, AttestationData]:
         """Extract attestations from aggregated payloads.
@@ -1281,7 +1284,7 @@ class LstarSpec(ForkProtocol):
                         attestations[validator_id] = attestation_data
         return attestations
 
-    def compute_block_weights(self, store: Store) -> dict[Bytes32, int]:
+    def compute_block_weights(self, store: LstarStore) -> dict[Bytes32, int]:
         """Compute attestation-based weight for each block above the finalized slot.
 
         Walks backward from each validator's latest head vote, incrementing weight
@@ -1306,7 +1309,7 @@ class LstarSpec(ForkProtocol):
 
     def _compute_lmd_ghost_head(
         self,
-        store: Store,
+        store: LstarStore,
         start_root: Bytes32,
         attestations: dict[ValidatorIndex, AttestationData],
         min_score: int = 0,
@@ -1388,7 +1391,7 @@ class LstarSpec(ForkProtocol):
 
         return head
 
-    def update_head(self, store: Store) -> Store:
+    def update_head(self, store: LstarStore) -> LstarStore:
         """Compute updated store with new canonical head.
 
         Selects the canonical chain head using:
@@ -1418,7 +1421,7 @@ class LstarSpec(ForkProtocol):
             }
         )
 
-    def accept_new_attestations(self, store: Store) -> Store:
+    def accept_new_attestations(self, store: LstarStore) -> LstarStore:
         """Process pending aggregated payloads and update forkchoice head.
 
         Moves aggregated payloads from latest_new_aggregated_payloads to
@@ -1456,7 +1459,7 @@ class LstarSpec(ForkProtocol):
         # Update head with newly accepted aggregated payloads
         return self.update_head(store)
 
-    def update_safe_target(self, store: Store) -> Store:
+    def update_safe_target(self, store: LstarStore) -> LstarStore:
         """Compute the deepest block that has 2/3+ supermajority attestation weight.
 
         The safe target is the furthest-from-genesis block where enough validators
@@ -1523,7 +1526,7 @@ class LstarSpec(ForkProtocol):
         # The head and attestation pools remain unchanged.
         return store.model_copy(update={"safe_target": safe_target})
 
-    def aggregate(self, store: Store) -> tuple[Store, list[SignedAggregatedAttestation]]:
+    def aggregate(self, store: LstarStore) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
         """Turn raw validator votes into compact aggregated attestations.
 
         Validators cast individual signatures over gossip. Before those
@@ -1660,10 +1663,10 @@ class LstarSpec(ForkProtocol):
 
     def tick_interval(
         self,
-        store: Store,
+        store: LstarStore,
         has_proposal: bool,
         is_aggregator: bool = False,
-    ) -> tuple[Store, list[SignedAggregatedAttestation]]:
+    ) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
         """Advance store time by one interval and perform interval-specific actions.
 
         Different actions are performed based on interval within slot:
@@ -1691,11 +1694,11 @@ class LstarSpec(ForkProtocol):
 
     def on_tick(
         self,
-        store: Store,
+        store: LstarStore,
         target_interval: Interval,
         has_proposal: bool,
         is_aggregator: bool = False,
-    ) -> tuple[Store, list[SignedAggregatedAttestation]]:
+    ) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
         """Advance forkchoice store time to given interval count.
 
         Ticks store forward interval by interval, performing appropriate
@@ -1716,7 +1719,7 @@ class LstarSpec(ForkProtocol):
 
         return store, all_new_aggregates
 
-    def get_proposal_head(self, store: Store, slot: Slot) -> tuple[Store, Bytes32]:
+    def get_proposal_head(self, store: LstarStore, slot: Slot) -> tuple[LstarStore, Bytes32]:
         """Get the head for block proposal at given slot.
 
         Ensures store is up-to-date and processes any pending attestations
@@ -1732,7 +1735,7 @@ class LstarSpec(ForkProtocol):
 
         return store, store.head
 
-    def get_attestation_target(self, store: Store) -> Checkpoint:
+    def get_attestation_target(self, store: LstarStore) -> Checkpoint:
         """Calculate target checkpoint for validator attestations.
 
         Determines appropriate attestation target based on head, safe target,
@@ -1770,7 +1773,7 @@ class LstarSpec(ForkProtocol):
 
         return Checkpoint(root=target_block_root, slot=target_block.slot)
 
-    def produce_attestation_data(self, store: Store, slot: Slot) -> AttestationData:
+    def produce_attestation_data(self, store: LstarStore, slot: Slot) -> AttestationData:
         """Produce attestation data for the given slot.
 
         This method constructs an AttestationData object according to the lean protocol
@@ -1796,10 +1799,10 @@ class LstarSpec(ForkProtocol):
 
     def produce_block_with_signatures(
         self,
-        store: Store,
+        store: LstarStore,
         slot: Slot,
         validator_index: ValidatorIndex,
-    ) -> tuple[Store, Block, list[AggregatedSignatureProof]]:
+    ) -> tuple[LstarStore, Block, list[AggregatedSignatureProof]]:
         """Produce a block and its aggregated signature proofs for the target slot.
 
         Block production proceeds in four stages:
