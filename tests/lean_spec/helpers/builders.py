@@ -61,7 +61,7 @@ from lean_spec.types import (
     ValidatorIndices,
 )
 
-from .mocks import MockForkchoiceStore, MockNetworkRequester
+from .mocks import MockForkchoiceStore, MockNetworkRequester, StoreInterceptingSpec
 
 
 def make_bytes32(seed: int) -> Bytes32:
@@ -520,7 +520,7 @@ def create_mock_sync_service(
         block_cache=BlockCache(),
         clock=SlotClock(genesis_time=Uint64(0), time_fn=lambda: 1000.0),
         network=MockNetworkRequester(),
-        spec=LstarSpec(),
+        spec=StoreInterceptingSpec(),
         database=database,
         genesis_start=genesis_start,
         process_block=processor,

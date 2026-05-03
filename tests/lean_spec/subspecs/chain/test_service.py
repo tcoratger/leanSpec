@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import patch
 
+from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.subspecs.chain.service import ChainService
 from lean_spec.types import ZERO_HASH, Bytes32, Slot, Uint64
+from tests.lean_spec.helpers.mocks import StoreInterceptingSpec
 
 
 @dataclass
@@ -58,7 +60,7 @@ class MockSyncService:
     is_aggregator: bool = False
     published_aggregations: list = field(default_factory=list)
 
-    async def publish_aggregated_attestation(self, agg: object) -> None:
+    async def publish_aggregated_attestation(self, agg: SignedAggregatedAttestation) -> None:
         """Record published aggregations."""
         self.published_aggregations.append(agg)
 
@@ -74,8 +76,11 @@ class TestChainServiceLifecycle:
         """
         sync_service = MockSyncService()
         clock = SlotClock(genesis_time=Uint64(0), time_fn=lambda: 0.0)
-        # MockSyncService satisfies SyncService interface for testing.
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         assert chain_service.is_running is False
 
@@ -87,7 +92,11 @@ class TestChainServiceLifecycle:
         """
         sync_service = MockSyncService()
         clock = SlotClock(genesis_time=Uint64(0), time_fn=lambda: 0.0)
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         chain_service._running = True
         assert chain_service.is_running is True
@@ -103,7 +112,11 @@ class TestChainServiceLifecycle:
         """
         sync_service = MockSyncService()
         clock = SlotClock(genesis_time=Uint64(0), time_fn=lambda: 0.0)
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         call_count = 0
 
@@ -135,7 +148,11 @@ class TestIntervalTiming:
         current_time = float(genesis) + interval_secs / 2
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         captured_duration: float | None = None
 
@@ -162,7 +179,11 @@ class TestIntervalTiming:
         current_time = float(genesis + (MILLISECONDS_PER_INTERVAL // Uint64(1000)))
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         captured_duration: float | None = None
 
@@ -188,7 +209,11 @@ class TestIntervalTiming:
         current_time = 900.0  # 100 seconds before genesis
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         captured_duration: float | None = None
 
@@ -222,7 +247,11 @@ class TestStoreTicking:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         call_count = 0
 
@@ -252,7 +281,11 @@ class TestStoreTicking:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         tick_count = 0
 
@@ -281,7 +314,11 @@ class TestStoreTicking:
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         initial_store = MockStore()
         sync_service = MockSyncService(store=initial_store)
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         # No ticks before our first run.
         assert sync_service.store.tick_calls == []
@@ -327,7 +364,11 @@ class TestMultipleIntervals:
 
         clock = SlotClock(genesis_time=genesis, time_fn=advancing_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         async def advance_and_stop(_duration: float) -> None:
             nonlocal time_index
@@ -364,7 +405,11 @@ class TestInitialTick:
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         initial_store = MockStore()
         sync_service = MockSyncService(store=initial_store)
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         # Run just the initial tick without the full run loop.
         await chain_service._initial_tick()
@@ -387,7 +432,11 @@ class TestInitialTick:
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         initial_store = MockStore()
         sync_service = MockSyncService(store=initial_store)
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         await chain_service._initial_tick()
 
@@ -408,7 +457,11 @@ class TestInitialTick:
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         initial_store = MockStore()
         sync_service = MockSyncService(store=initial_store)
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         await chain_service._initial_tick()
 
@@ -430,7 +483,11 @@ class TestInitialTick:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         await chain_service._initial_tick()
 
@@ -460,7 +517,11 @@ class TestIntervalTracking:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         sleep_call_count = 0
 
@@ -494,7 +555,11 @@ class TestEdgeCases:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         async def stop_immediately(_duration: float) -> None:
             chain_service.stop()
@@ -519,7 +584,11 @@ class TestEdgeCases:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         async def stop_immediately(_duration: float) -> None:
             chain_service.stop()
@@ -544,7 +613,11 @@ class TestEdgeCases:
 
         clock = SlotClock(genesis_time=genesis, time_fn=lambda: current_time)
         sync_service = MockSyncService()
-        chain_service = ChainService(sync_service=sync_service, clock=clock)  # type: ignore[arg-type]
+        chain_service = ChainService(
+            sync_service=sync_service,  # type: ignore[arg-type]
+            clock=clock,
+            spec=StoreInterceptingSpec(),
+        )
 
         async def stop_during_sleep(_duration: float) -> None:
             # Simulate stop being called while sleeping.
