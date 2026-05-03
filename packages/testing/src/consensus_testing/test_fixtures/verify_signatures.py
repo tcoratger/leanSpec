@@ -22,9 +22,6 @@ from ..keys import XmssKeyManager
 from ..test_types import BlockSpec
 from .base import BaseConsensusFixture
 
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all fixture invocations."""
-
 
 class VerifySignaturesTest(BaseConsensusFixture):
     """
@@ -115,7 +112,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
         # Verify signatures
         try:
-            _SPEC.verify_signatures(signed_block, self.anchor_state.validators)
+            LstarSpec().verify_signatures(signed_block, self.anchor_state.validators)
         except AssertionError as e:
             exception_raised = e
             # If we expect an exception, this is fine

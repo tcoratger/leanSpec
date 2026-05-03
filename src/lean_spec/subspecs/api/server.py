@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 from aiohttp import web
 
-from lean_spec.forks import Store
+from lean_spec.forks import LstarSpec, Store
 
 from .aggregator_controller import AggregatorController
 from .routes import ADMIN_ROUTES, ROUTES
@@ -65,6 +65,9 @@ class ApiServer:
     config: ApiServerConfig
     """Server configuration."""
 
+    spec: LstarSpec = field(default_factory=LstarSpec)
+    """Fork spec used by handlers needing consensus computations (e.g. fork-choice weights)."""
+
     store_getter: Callable[[], Store | None] | None = None
     """Callable that returns the current Store instance."""
 
@@ -97,6 +100,9 @@ class ApiServer:
 
         # Store the store_getter in app for handlers that need store access
         app["store_getter"] = self.store_getter
+
+        # Expose the fork spec for handlers that drive consensus computations.
+        app["spec"] = self.spec
 
         # Expose the aggregator controller to admin endpoints.
         # Absence is fine; endpoints return 503 when unset.

@@ -11,8 +11,6 @@ from lean_spec.types import ZERO_HASH, Bytes32, CamelModel, Slot, Uint64, Valida
 
 from .utils import resolve_block_root
 
-_SPEC = LstarSpec()
-
 
 def _ancestor_set(blocks: BlockLookup, head: Bytes32) -> set[Bytes32]:
     """Walk parent links from head and collect every reachable block root."""
@@ -367,7 +365,7 @@ class StoreChecks(CamelModel):
 
         # Attestation target checkpoint (slot + root consistency)
         if "attestation_target_slot" in fields:
-            target = _SPEC.get_attestation_target(store)
+            target = LstarSpec().get_attestation_target(store)
             _check("attestation_target.slot", target.slot, self.attestation_target_slot)
 
             block_found = any(
@@ -398,7 +396,9 @@ class StoreChecks(CamelModel):
                     payloads = store.latest_known_aggregated_payloads
                     label = "in latest_known"
 
-                extracted = _SPEC.extract_attestations_from_aggregated_payloads(store, payloads)
+                extracted = LstarSpec().extract_attestations_from_aggregated_payloads(
+                    store, payloads
+                )
                 if check.validator not in extracted:
                     raise AssertionError(
                         f"Step {step_index}: validator {check.validator} not found "
@@ -562,7 +562,8 @@ class StoreChecks(CamelModel):
             root = hash_tree_root(block)
             slot = block.slot
 
-            known_attestations = _SPEC.extract_attestations_from_aggregated_payloads(
+            spec = LstarSpec()
+            known_attestations = spec.extract_attestations_from_aggregated_payloads(
                 store, store.latest_known_aggregated_payloads
             )
             weight = 0

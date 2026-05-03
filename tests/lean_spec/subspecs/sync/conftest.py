@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
+from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.sync import service as sync_service_module
 from lean_spec.types import Bytes32, Checkpoint, Slot
 
 
@@ -24,12 +24,12 @@ def _delegate_spec_to_store(monkeypatch: pytest.MonkeyPatch) -> None:
     Routing each spec call back to `store.method(...)` lets the mock intercept
     in-place without a sync-service code change.
     """
-    spec = sync_service_module._SPEC
 
-    def on_block(store: Any, signed_block: Any, *args: Any, **kwargs: Any) -> Any:
+    def on_block(self: LstarSpec, store: Any, signed_block: Any, *args: Any, **kwargs: Any) -> Any:
         return store.on_block(signed_block, *args, **kwargs)
 
     def on_gossip_attestation(
+        self: LstarSpec,
         store: Any,
         signed_attestation: Any,
         *args: Any,
@@ -39,13 +39,15 @@ def _delegate_spec_to_store(monkeypatch: pytest.MonkeyPatch) -> None:
         return store.on_gossip_attestation(signed_attestation, *args, **kwargs)
 
     def on_gossip_aggregated_attestation(
-        store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
+        self: LstarSpec, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
     ) -> Any:
         return store.on_gossip_aggregated_attestation(signed_attestation, *args, **kwargs)
 
-    monkeypatch.setattr(spec, "on_block", on_block)
-    monkeypatch.setattr(spec, "on_gossip_attestation", on_gossip_attestation)
-    monkeypatch.setattr(spec, "on_gossip_aggregated_attestation", on_gossip_aggregated_attestation)
+    monkeypatch.setattr(LstarSpec, "on_block", on_block)
+    monkeypatch.setattr(LstarSpec, "on_gossip_attestation", on_gossip_attestation)
+    monkeypatch.setattr(
+        LstarSpec, "on_gossip_aggregated_attestation", on_gossip_aggregated_attestation
+    )
 
 
 @pytest.fixture

@@ -12,8 +12,6 @@ from lean_spec.forks.lstar.containers.state.types import JustifiedSlots
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Boolean, Bytes32, Slot, ValidatorIndex
 
-_SPEC = LstarSpec()
-
 pytestmark = pytest.mark.valid_until("Lstar")
 
 
@@ -336,7 +334,7 @@ def test_block_with_wrong_slot(state_transition_test: StateTransitionTestFiller)
     - Essential for slot-based consensus
     """
     pre_state = generate_pre_state()
-    pre_state = _SPEC.process_slots(pre_state, Slot(1))
+    pre_state = LstarSpec().process_slots(pre_state, Slot(1))
 
     state_transition_test(
         pre=pre_state,

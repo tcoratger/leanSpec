@@ -6,11 +6,6 @@ import json
 
 from aiohttp import web
 
-from lean_spec.forks import LstarSpec
-
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all endpoint invocations."""
-
 
 async def handle(request: web.Request) -> web.Response:
     """
@@ -39,7 +34,7 @@ async def handle(request: web.Request) -> web.Response:
         raise web.HTTPServiceUnavailable(reason="Store not initialized")
 
     finalized_slot = store.latest_finalized.slot
-    weights = _SPEC.compute_block_weights(store)
+    weights = request.app["spec"].compute_block_weights(store)
 
     nodes = []
     for root, block in store.blocks.items():

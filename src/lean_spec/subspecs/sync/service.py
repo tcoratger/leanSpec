@@ -66,9 +66,6 @@ from .states import SyncState
 
 logger = logging.getLogger(__name__)
 
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all sync invocations."""
-
 
 @dataclass(slots=True)
 class _SyncStoreView:
@@ -107,34 +104,37 @@ def _ancestor_set(blocks: BlockLookup, head: Bytes32) -> set[Bytes32]:
     return seen
 
 
-def default_block_processor(
-    store: Store,
-    block: SignedBlock,
-) -> Store:
+def make_default_block_processor(
+    spec: LstarSpec,
+) -> Callable[[Store, SignedBlock], Store]:
     """
-    Default block processor.
+    Build a default block processor bound to the given spec.
 
     Wraps the pure spec entry point with caller-side fork-choice telemetry.
     State transition and block processing timings are emitted by the spec
     itself through the observer, wired at node startup. Everything else
     here is derived by diffing pre- and post-stores.
     """
-    new_store = _SPEC.on_block(store, block)
 
-    metrics.lean_head_slot.set(new_store.blocks[new_store.head].slot)
-    metrics.lean_safe_target_slot.set(new_store.blocks[new_store.safe_target].slot)
-    metrics.lean_latest_justified_slot.set(new_store.latest_justified.slot)
-    metrics.lean_latest_finalized_slot.set(new_store.latest_finalized.slot)
+    def default_block_processor(store: Store, block: SignedBlock) -> Store:
+        new_store = spec.on_block(store, block)
 
-    if new_store.head != store.head:
-        depth = len(
-            _ancestor_set(new_store.blocks, store.head)
-            - _ancestor_set(new_store.blocks, new_store.head)
-        )
-        metrics.lean_fork_choice_reorgs_total.inc()
-        metrics.lean_fork_choice_reorg_depth.observe(depth)
+        metrics.lean_head_slot.set(new_store.blocks[new_store.head].slot)
+        metrics.lean_safe_target_slot.set(new_store.blocks[new_store.safe_target].slot)
+        metrics.lean_latest_justified_slot.set(new_store.latest_justified.slot)
+        metrics.lean_latest_finalized_slot.set(new_store.latest_finalized.slot)
 
-    return new_store
+        if new_store.head != store.head:
+            depth = len(
+                _ancestor_set(new_store.blocks, store.head)
+                - _ancestor_set(new_store.blocks, new_store.head)
+            )
+            metrics.lean_fork_choice_reorgs_total.inc()
+            metrics.lean_fork_choice_reorg_depth.observe(depth)
+
+        return new_store
+
+    return default_block_processor
 
 
 async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> None:
@@ -212,6 +212,9 @@ class SyncService:
     network: NetworkRequester
     """Network interface for block requests."""
 
+    spec: LstarSpec = field(default_factory=LstarSpec)
+    """Fork spec driving consensus methods. Default lets tests skip wiring."""
+
     database: Database | None = field(default=None)
     """Optional database for persisting blocks and states."""
 
@@ -227,8 +230,8 @@ class SyncService:
     is also True — non-aggregator nodes never import gossip attestations.
     """
 
-    process_block: Callable[[Store, SignedBlock], Store] = field(default=default_block_processor)
-    """Block processor function. Defaults to the store's block processing."""
+    process_block: Callable[[Store, SignedBlock], Store] | None = field(default=None)
+    """Block processor function. Defaults to the spec's block processing."""
 
     _publish_agg_fn: Callable[[SignedAggregatedAttestation], Coroutine[None, None, None]] = field(
         default=_noop_publish_agg
@@ -279,6 +282,12 @@ class SyncService:
 
     def __post_init__(self) -> None:
         """Initialize sync components."""
+        # Bind the default processor to the injected spec when no override is provided.
+        #
+        # Tests pass an explicit processor and skip this path.
+        if self.process_block is None:
+            self.process_block = make_default_block_processor(self.spec)
+
         self._init_components()
 
         # Genesis validators already hold the full genesis state so they
@@ -328,7 +337,9 @@ class SyncService:
         # Delegate to the actual block processor.
         #
         # The processor validates the block and updates forkchoice state.
-        new_store = self.process_block(store, block)
+        processor = self.process_block
+        assert processor is not None
+        new_store = processor(store, block)
 
         # Track processed blocks.
         #
@@ -578,7 +589,7 @@ class SyncService:
         # Invalid attestations (bad signature, unknown target) are rejected.
         # Validation failures are logged but don't crash the event loop.
         try:
-            self.store = _SPEC.on_gossip_attestation(
+            self.store = self.spec.on_gossip_attestation(
                 self.store,
                 signed_attestation=attestation,
                 is_aggregator=is_aggregator_role,
@@ -636,7 +647,7 @@ class SyncService:
         )
 
         try:
-            self.store = _SPEC.on_gossip_aggregated_attestation(self.store, signed_attestation)
+            self.store = self.spec.on_gossip_aggregated_attestation(self.store, signed_attestation)
             logger.info(
                 "Aggregated attestation from peer %s slot=%s: validation and signature ok",
                 peer_str,
@@ -670,7 +681,7 @@ class SyncService:
         self._pending_attestations = []
         for attestation in pending:
             try:
-                self.store = _SPEC.on_gossip_attestation(
+                self.store = self.spec.on_gossip_attestation(
                     self.store,
                     signed_attestation=attestation,
                     is_aggregator=is_aggregator_role,
@@ -682,7 +693,9 @@ class SyncService:
         self._pending_aggregated_attestations = []
         for signed_attestation in pending_agg:
             try:
-                self.store = _SPEC.on_gossip_aggregated_attestation(self.store, signed_attestation)
+                self.store = self.spec.on_gossip_aggregated_attestation(
+                    self.store, signed_attestation
+                )
             except (AssertionError, KeyError):
                 self._pending_aggregated_attestations.append(signed_attestation)
 

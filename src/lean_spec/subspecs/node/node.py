@@ -17,16 +17,16 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final, cast
+from typing import Final
 
 from lean_spec.forks import (
     AggregatedAttestations,
     Block,
     BlockBody,
     ForkProtocol,
+    LstarSpec,
     SignedAttestation,
     SignedBlock,
-    State,
     Store,
     Validators,
 )
@@ -212,6 +212,13 @@ class Node:
         validator_id = (
             config.validator_registry.primary_index() if config.validator_registry else None
         )
+        # The composition root narrows the protocol to its concrete fork.
+        # Services need the concrete consensus surface (process_slots, build_block,
+        # tick_interval, ...) which the abstract protocol does not declare.
+        # When fork #2 lands, replace this with a per-slot dispatcher.
+        assert isinstance(config.fork, LstarSpec), (
+            f"Only LstarSpec is supported at the composition root, got {type(config.fork).__name__}"
+        )
         fork = config.fork
         store = cls._try_load_store_from_database(
             database, validator_id, config.genesis_time, config.time_fn, fork
@@ -221,7 +228,7 @@ class Node:
             # Generate genesis state from validators.
             #
             # Includes initial checkpoints, validator registry, and config.
-            state = cast(State, fork.generate_genesis(config.genesis_time, config.validators))
+            state = fork.generate_genesis(config.genesis_time, config.validators)
 
             # Create genesis block.
             #
@@ -238,7 +245,7 @@ class Node:
             # Initialize forkchoice store.
             #
             # Genesis block is both justified and finalized.
-            store = cast(Store, fork.create_store(state, block, validator_id))
+            store = fork.create_store(state, block, validator_id)
 
             # Persist genesis to database if available.
             #
@@ -271,13 +278,14 @@ class Node:
             block_cache=block_cache,
             clock=clock,
             network=config.network,
+            spec=fork,
             database=database,
             is_aggregator=config.is_aggregator,
             aggregate_subnet_ids=config.aggregate_subnet_ids,
             genesis_start=True,
         )
 
-        chain_service = ChainService(sync_service=sync_service, clock=clock)
+        chain_service = ChainService(sync_service=sync_service, clock=clock, spec=fork)
         network_service = NetworkService(
             sync_service=sync_service,
             event_source=config.event_source,
@@ -304,6 +312,7 @@ class Node:
             # Store getter captures sync_service to get the live store
             api_server = ApiServer(
                 config=config.api_config,
+                spec=fork,
                 store_getter=lambda: sync_service.store,
                 aggregator_controller=aggregator_controller,
             )
@@ -336,6 +345,7 @@ class Node:
                 sync_service=sync_service,
                 clock=clock,
                 registry=config.validator_registry,
+                spec=fork,
                 on_block=publish_block_wrapper,
                 on_attestation=publish_attestation_wrapper,
             )

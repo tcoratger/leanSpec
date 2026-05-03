@@ -37,9 +37,6 @@ from ..test_types import (
 )
 from .base import BaseConsensusFixture
 
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all fixture invocations."""
-
 
 class ForkChoiceTest(BaseConsensusFixture):
     """
@@ -189,6 +186,8 @@ class ForkChoiceTest(BaseConsensusFixture):
         assert self.anchor_block is not None, "anchor block must be set before making fixture"
         assert self.max_slot is not None, "max slot must be set before making fixture"
 
+        spec = LstarSpec()
+
         # Expected anchor-init failure path.
         #
         # When anchor_valid is False, the test asserts that Store.from_anchor
@@ -201,7 +200,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                 "Store.from_anchor is expected to fail before any step can run"
             )
             try:
-                _SPEC.create_store(
+                spec.create_store(
                     self.anchor_state,
                     self.anchor_block,
                     validator_id=ValidatorIndex(0),
@@ -256,7 +255,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # The Store is the node's local view of the chain.
         # It starts from a trusted anchor (usually genesis).
-        store = _SPEC.create_store(
+        store = spec.create_store(
             self.anchor_state,
             self.anchor_block,
             validator_id=ValidatorIndex(0),
@@ -292,7 +291,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                             target_interval = Interval.from_unix_time(
                                 Uint64(step.time), store.config.genesis_time
                             )
-                        store, _ = _SPEC.on_tick(
+                        store, _ = spec.on_tick(
                             store,
                             target_interval,
                             has_proposal=step.has_proposal,
@@ -325,13 +324,13 @@ class ForkChoiceTest(BaseConsensusFixture):
                         # This tick includes a block (has proposal).
                         # Always act as aggregator to ensure gossip signatures are aggregated
                         target_interval = Interval.from_slot(block.slot)
-                        store, _ = _SPEC.on_tick(
+                        store, _ = spec.on_tick(
                             store, target_interval, has_proposal=True, is_aggregator=True
                         )
 
                         # Process the block through Store.
                         # This validates, applies state transition, and updates the store's head.
-                        store = _SPEC.on_block(
+                        store = spec.on_block(
                             store,
                             signed_block,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
@@ -349,7 +348,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                             step.valid,
                         )
                         step._filled_attestation = signed_attestation
-                        store = _SPEC.on_gossip_attestation(
+                        store = spec.on_gossip_attestation(
                             store,
                             signed_attestation,
                             scheme=LEAN_ENV_TO_SCHEMES[self.lean_env],
@@ -363,7 +362,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                             key_manager,
                         )
                         step._filled_attestation = signed_aggregated
-                        store = _SPEC.on_gossip_aggregated_attestation(store, signed_aggregated)
+                        store = spec.on_gossip_aggregated_attestation(store, signed_aggregated)
 
                     case _:
                         raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")

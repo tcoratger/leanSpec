@@ -35,9 +35,6 @@ from .clock import Interval, SlotClock
 
 logger = logging.getLogger(__name__)
 
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all chain invocations."""
-
 
 @dataclass(slots=True)
 class ChainService:
@@ -59,6 +56,9 @@ class ChainService:
 
     clock: SlotClock
     """Clock for time calculation."""
+
+    spec: LstarSpec = field(default_factory=LstarSpec)
+    """Fork spec driving consensus methods. Default lets tests skip wiring."""
 
     _running: bool = field(default=False, repr=False)
     """Whether the service is running."""
@@ -175,7 +175,7 @@ class ChainService:
 
         # Tick remaining intervals one at a time.
         while store.time < target_interval:
-            store, new_aggregates = _SPEC.tick_interval(
+            store, new_aggregates = self.spec.tick_interval(
                 store,
                 has_proposal=False,
                 is_aggregator=self.sync_service.is_aggregator,

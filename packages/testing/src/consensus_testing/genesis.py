@@ -4,18 +4,12 @@ from lean_spec.forks.lstar.containers.block import AggregatedAttestations, Block
 from lean_spec.forks.lstar.containers.state import State, Validators
 from lean_spec.forks.lstar.containers.validator import Validator
 from lean_spec.forks.lstar.spec import LstarSpec
-from lean_spec.forks.protocol import ForkProtocol
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes52, Slot, Uint64, ValidatorIndex
 
 from .keys import XmssKeyManager
 
 _DEFAULT_GENESIS_TIME = Uint64(0)
-_SPEC = LstarSpec()
-"""Active fork spec — stateless, safe to share across all helper invocations."""
-
-_DEFAULT_FORK: ForkProtocol = _SPEC
-"""Stateless fork instance used when callers do not pass one explicitly."""
 
 
 def _build_validators(num_validators: int) -> Validators:
@@ -44,30 +38,30 @@ def _build_validators(num_validators: int) -> Validators:
 
 
 def generate_pre_state(
-    fork: ForkProtocol = _DEFAULT_FORK,
+    fork: LstarSpec | None = None,
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
     num_validators: int = 4,
 ) -> State:
     """Generate a default pre-state for consensus tests.
 
     Args:
-        fork: Fork dispatching genesis construction.
+        fork: Fork dispatching genesis construction. Defaults to a fresh
+            LstarSpec instance.
         genesis_time: The genesis timestamp.
         num_validators: Number of validators to include.
 
     Returns:
         A properly initialized consensus state.
     """
+    fork = fork or LstarSpec()
     validators = _build_validators(num_validators)
-    state = fork.generate_genesis(genesis_time=genesis_time, validators=validators)
-    assert isinstance(state, State)
-    return state
+    return fork.generate_genesis(genesis_time=genesis_time, validators=validators)
 
 
 def build_anchor(
     num_validators: int,
     anchor_slot: Slot,
-    fork: ForkProtocol = _DEFAULT_FORK,
+    fork: LstarSpec | None = None,
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
 ) -> tuple[State, Block]:
     """Build a consistent non-genesis anchor by advancing the genesis state.
@@ -101,6 +95,7 @@ def build_anchor(
             "For a genesis anchor use generate_pre_state instead."
         )
 
+    fork = fork or LstarSpec()
     state = generate_pre_state(fork=fork, genesis_time=genesis_time, num_validators=num_validators)
 
     # Reconstruct the genesis block from the state's latest header.
@@ -124,7 +119,7 @@ def build_anchor(
     for next_slot in range(1, int(anchor_slot) + 1):
         slot = Slot(next_slot)
         proposer_index = ValidatorIndex(int(slot) % int(num_validators_u64))
-        current_block, state, _, _ = _SPEC.build_block(
+        current_block, state, _, _ = fork.build_block(
             state,
             slot=slot,
             proposer_index=proposer_index,
