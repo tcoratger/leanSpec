@@ -66,7 +66,7 @@ class Block(Container):
     """The block's payload."""
 
 
-BlockLookup = dict[Bytes32, "Block"]
+BlockLookup = dict[Bytes32, Block]
 """Mapping from block root to Block objects."""
 
 
