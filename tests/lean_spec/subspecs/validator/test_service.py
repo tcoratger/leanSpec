@@ -496,8 +496,9 @@ class TestMaybeProduceBlock:
             on_block=lambda b: blocks.append(b),  # type: ignore[arg-type, return-value]
         )
 
-        with patch(
-            "lean_spec.subspecs.validator.service._SPEC.produce_block_with_signatures",
+        with patch.object(
+            service.spec,
+            "produce_block_with_signatures",
             side_effect=AssertionError("mismatch"),
         ):
             # Slot 0: proposer is validator 0 (0 % 8 = 0), which is in the registry.
@@ -678,8 +679,9 @@ class TestProduceAttestationsAdvanced:
 
         with (
             caplog.at_level("DEBUG"),
-            patch(
-                "lean_spec.subspecs.validator.service._SPEC.on_gossip_attestation",
+            patch.object(
+                service.spec,
+                "on_gossip_attestation",
                 side_effect=RuntimeError("store error"),
             ),
         ):
