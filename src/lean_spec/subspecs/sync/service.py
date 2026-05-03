@@ -42,7 +42,6 @@ from dataclasses import dataclass, field
 
 from lean_spec.forks import (
     Block,
-    BlockLookup,
     LstarSpec,
     SignedAggregatedAttestation,
     SignedAttestation,
@@ -91,7 +90,7 @@ class _SyncStoreView:
         return store.blocks[store.head].slot
 
 
-def _ancestor_set(blocks: BlockLookup, head: Bytes32) -> set[Bytes32]:
+def _ancestor_set(blocks: dict[Bytes32, Block], head: Bytes32) -> set[Bytes32]:
     """Walk parent links from head and collect every reachable block root."""
     seen: set[Bytes32] = set()
     root = head

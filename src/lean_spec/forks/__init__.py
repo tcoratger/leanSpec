@@ -13,13 +13,16 @@ from .lstar.containers import (
     SignedBlock,
     Validator,
 )
-from .lstar.containers.block import BlockLookup, BlockSignatures
+from .lstar.containers.block import BlockSignatures
 from .lstar.containers.block.types import AggregatedAttestations, AttestationSignatures
 from .lstar.containers.state import State, Validators
-from .lstar.spec import LstarSpec
-from .lstar.store import AttestationSignatureEntry, Store
+from .lstar.spec import LstarSpec, LstarStore
+from .lstar.store import AttestationSignatureEntry
 from .protocol import ForkProtocol, SpecStateType, SpecStoreType
 from .registry import ForkRegistry
+
+Store = LstarStore
+"""Public alias resolving to the concrete LstarStore until other forks land."""
 
 FORK_SEQUENCE: list[ForkProtocol] = [LstarSpec()]
 """Ordered oldest to newest. ForkRegistry enforces strictly increasing VERSION."""
@@ -37,7 +40,6 @@ __all__ = [
     "Block",
     "BlockBody",
     "BlockHeader",
-    "BlockLookup",
     "BlockSignatures",
     "Config",
     "DEFAULT_REGISTRY",
@@ -45,6 +47,7 @@ __all__ = [
     "ForkProtocol",
     "ForkRegistry",
     "LstarSpec",
+    "LstarStore",
     "SignedAggregatedAttestation",
     "SignedAttestation",
     "SignedBlock",
