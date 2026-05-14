@@ -745,38 +745,24 @@ class LstarSpec(ForkProtocol):
                     ):
                         continue
 
-                    # Mirror the state-transition filters from here on.
+                    # Genesis-anchored votes have source.slot = target.slot = 0.
                     #
-                    # Without these, the producer wastes body capacity on
-                    # attestations the state transition will drop.
-                    #
-                    # Genesis-anchored votes are the one exception.
-                    # Both source and target sit at slot 0 in this case.
-                    # They cannot advance justification.
-                    # They carry head-vote weight for fork choice instead.
-                    # The state transition drops them at the time-flow check.
-                    # Before that, they propagate into peers' aggregated payload pool.
-                    targets_genesis_anchor = att_data.source.slot == Slot(0) and (
+                    # They cannot advance justification: the state transition drops them.
+                    # They still carry head-vote weight for fork choice.
+                    # Including them in the body propagates them into peers' payload pool.
+                    # The bypass below keeps them past the target-already-justified check,
+                    # since slot 0 is implicitly justified and would otherwise filter them.
+                    is_genesis_self_vote = att_data.source.slot == Slot(0) and (
                         att_data.target.slot == Slot(0)
                     )
 
                     # Skip attestations whose target slot is already justified.
                     #
                     # Justification adds nothing for them.
-                    if not targets_genesis_anchor and current_justified_slots.is_slot_justified(
+                    # Entries the state transition will later drop are still kept here.
+                    # They carry head-vote weight for fork choice.
+                    if not is_genesis_self_vote and current_justified_slots.is_slot_justified(
                         current_finalized_slot, att_data.target.slot
-                    ):
-                        continue
-
-                    # Time must flow forward: target strictly after source.
-                    if not targets_genesis_anchor and att_data.target.slot <= att_data.source.slot:
-                        continue
-
-                    # The target must fall on a slot the state transition accepts.
-                    #
-                    # Only certain offsets past the finalized boundary qualify.
-                    if not targets_genesis_anchor and not att_data.target.slot.is_justifiable_after(
-                        current_finalized_slot
                     ):
                         continue
 
