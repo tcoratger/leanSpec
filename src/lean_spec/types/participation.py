@@ -28,7 +28,7 @@ class AggregationBits(BaseBitlist):
             `AssertionError`: If no bits are set.
         """
         # Extract indices where bit is set; fail if none found.
-        indices = [ValidatorIndex(i) for i, bit in enumerate(self.data) if bool(bit)]
+        indices = [ValidatorIndex(i) for i, bit in enumerate(self.data) if bit]
         if not indices:
             raise AssertionError("Aggregated attestation must reference at least one validator")
 
