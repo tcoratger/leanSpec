@@ -125,8 +125,9 @@ class Boolean(int, SSZType):
             A boolean wrapping the decoded value.
 
         Raises:
-            SSZSerializationError: If the input length is not 1, or the byte
-                is outside the 0x00 / 0x01 set.
+            SSZSerializationError:
+                - When the input length is not 1.
+                - When the byte value is outside the 0x00 / 0x01 set.
         """
         if len(data) != 1:
             raise SSZSerializationError(f"Boolean: expected 1 byte, got {len(data)}")
@@ -155,7 +156,9 @@ class Boolean(int, SSZType):
             A boolean wrapping the decoded value.
 
         Raises:
-            SSZSerializationError: If scope is not 1, or decoding fails.
+            SSZSerializationError:
+                - When scope is not 1.
+                - When the underlying byte decode fails.
         """
         if scope != 1:
             raise SSZSerializationError(f"Boolean: expected scope of 1, got {scope}")
