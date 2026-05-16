@@ -41,7 +41,7 @@ def test_pydantic_accepts_existing_boolean_instance() -> None:
 
 def test_pydantic_serializes_boolean_to_plain_bool() -> None:
     """Pydantic serializes Boolean back to a plain bool for JSON output."""
-    serialized = BooleanModel(value=True).model_dump()
+    serialized = BooleanModel(value=True).model_dump()  # type: ignore[arg-type]
     assert serialized == {"value": True}
     assert type(serialized["value"]) is bool
 
