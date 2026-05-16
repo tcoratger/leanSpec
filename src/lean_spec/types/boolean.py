@@ -37,7 +37,12 @@ class Boolean(int, SSZType):
         if not isinstance(value, int):
             raise SSZTypeError(f"Expected bool or int, got {type(value).__name__}")
 
-        if value not in (0, 1):
+        # Coerce to a plain int before the membership test:
+        #
+        #   - value in (0, 1) does value == 0 or value == 1.
+        #   - For a Boolean operand, those comparisons hit strict equality and raise.
+        #   - int(value) returns a plain int, so == falls back to int equality.
+        if int(value) not in (0, 1):
             raise SSZValueError(f"Boolean value must be 0 or 1, not {value}")
 
         return super().__new__(cls, value)
@@ -115,26 +120,13 @@ class Boolean(int, SSZType):
         """Deserialize a boolean from a binary stream."""
         if scope != 1:
             raise SSZSerializationError(f"Boolean: expected scope of 1, got {scope}")
-        data = stream.read(1)
-        if len(data) != 1:
-            raise SSZSerializationError(f"Boolean: expected 1 byte, got {len(data)}")
-        return cls.decode_bytes(data)
+        return cls.decode_bytes(stream.read(1))
 
-    def __add__(self, other: Any) -> Self:
-        """Disable the addition operator (`+`)."""
+    def _no_arithmetic(self, other: Any) -> Self:
+        """Reject arithmetic on Boolean — use bitwise & | ^ instead."""
         raise TypeError("Arithmetic operations are not supported for Boolean.")
 
-    def __radd__(self, other: Any) -> Self:
-        """Disable the reverse addition operator (`+`)."""
-        raise TypeError("Arithmetic operations are not supported for Boolean.")
-
-    def __sub__(self, other: Any) -> Self:
-        """Disable the subtraction operator (`-`)."""
-        raise TypeError("Arithmetic operations are not supported for Boolean.")
-
-    def __rsub__(self, other: Any) -> Self:
-        """Disable the reverse subtraction operator (`-`)."""
-        raise TypeError("Arithmetic operations are not supported for Boolean.")
+    __add__ = __radd__ = __sub__ = __rsub__ = _no_arithmetic
 
     def __and__(self, other: Any) -> Self:
         """Handle the bitwise AND operator (`&`) strictly."""
@@ -176,23 +168,25 @@ class Boolean(int, SSZType):
         return self.__xor__(other)
 
     def __eq__(self, other: object) -> bool:
-        """
-        Handle the equality operator (`==`).
-
-        Allows comparison with native `bool` and `int` types (0 or 1).
-
-        It returns `False` for all other types.
-        """
-        return isinstance(other, int) and int(self) == int(other)
+        """Handle the equality operator strictly — only Boolean equals Boolean."""
+        if not isinstance(other, Boolean):
+            raise TypeError(
+                f"Unsupported operand type(s) for ==: "
+                f"'{type(self).__name__}' and '{type(other).__name__}'"
+            )
+        return int(self) == int(other)
 
     def __ne__(self, other: object) -> bool:
-        """
-        Handle the inequality operator (`!=`).
+        """Handle the inequality operator strictly — only Boolean compares to Boolean.
 
-        Must be defined explicitly because `int.__ne__` would bypass
-        our custom `__eq__` type-checking logic.
+        Defined explicitly because int.__ne__ would bypass the strict __eq__ above.
         """
-        return not self.__eq__(other)
+        if not isinstance(other, Boolean):
+            raise TypeError(
+                f"Unsupported operand type(s) for !=: "
+                f"'{type(self).__name__}' and '{type(other).__name__}'"
+            )
+        return int(self) != int(other)
 
     def __repr__(self) -> str:
         """Return the official string representation of the object."""
