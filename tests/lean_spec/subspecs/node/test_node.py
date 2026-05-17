@@ -12,7 +12,6 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import State
 from lean_spec.forks.lstar.containers import (
-    AttestationData,
     Block,
     BlockBody,
 )
@@ -81,7 +80,7 @@ def _make_populated_db(
         justifications_validators=JustificationValidators(data=[]),
     )
 
-    db = SQLiteDatabase(":memory:", State, Block, AttestationData)
+    db = SQLiteDatabase(":memory:", State, Block)
     db.put_block(block, head_root)
     db.put_state(state, head_root)
     db.put_head_root(head_root)
