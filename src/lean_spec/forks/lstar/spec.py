@@ -7,7 +7,6 @@ from typing import Any, ClassVar
 
 from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
-    Attestation,
     AttestationData,
     Block,
     BlockBody,
@@ -16,13 +15,8 @@ from lean_spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
-    Validator,
 )
-from lean_spec.forks.lstar.containers.block.block import BlockSignatures
-from lean_spec.forks.lstar.containers.block.types import (
-    AggregatedAttestations,
-    AttestationSignatures,
-)
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.forks.lstar.containers.state import State
 from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
@@ -82,22 +76,11 @@ class LstarSpec(ForkProtocol):
     block_class: type[Block] = Block
     block_body_class: type[BlockBody] = BlockBody
     block_header_class: type[BlockHeader] = BlockHeader
-    signed_block_class: type[SignedBlock] = SignedBlock
-    block_signatures_class: type[BlockSignatures] = BlockSignatures
     aggregated_attestations_class: type[AggregatedAttestations] = AggregatedAttestations
-    attestation_signatures_class: type[AttestationSignatures] = AttestationSignatures
     store_class: type[Store[State, Block]] = LstarStore
 
     attestation_data_class: type[AttestationData] = AttestationData
-    attestation_class: type[Attestation] = Attestation
-    signed_attestation_class: type[SignedAttestation] = SignedAttestation
     aggregated_attestation_class: type[AggregatedAttestation] = AggregatedAttestation
-    signed_aggregated_attestation_class: type[SignedAggregatedAttestation] = (
-        SignedAggregatedAttestation
-    )
-
-    validator_class: type[Validator] = Validator
-    validators_class: type[Validators] = Validators
 
     config_class: type[Config] = Config
 
@@ -1433,14 +1416,6 @@ class LstarSpec(ForkProtocol):
         When two branches have equal weight, the one with the lexicographically
         larger hash is chosen to break ties.
         """
-        # If the starting point is not defined, choose the earliest known block.
-        #
-        # This ensures that the walk always has an anchor.
-        if start_root == ZERO_HASH:
-            start_root = min(
-                store.blocks.keys(), key=lambda block_hash: store.blocks[block_hash].slot
-            )
-
         # Remember the slot of the anchor once and reuse it during the walk.
         #
         # This avoids repeated lookups inside the inner loop.
