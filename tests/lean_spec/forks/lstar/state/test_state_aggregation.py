@@ -101,7 +101,7 @@ def test_build_block_collects_valid_available_attestations(
     )
 
     aggregated_proofs[0].verify(
-        public_keys=[container_key_manager[ValidatorIndex(0)].attestation_public],
+        public_keys=[container_key_manager[ValidatorIndex(0)].attestation_keypair.public_key],
         message=data_root,
         slot=att_data.slot,
     )

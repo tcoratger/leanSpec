@@ -218,7 +218,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             left_bottom_tree=left_bottom_tree,
             right_bottom_tree=right_bottom_tree,
         )
-        return KeyPair(public=pk, secret=sk)
+        return KeyPair(public_key=pk, secret_key=sk)
 
     def sign(self, sk: SecretKey, slot: Slot, message: Bytes32) -> Signature:
         """

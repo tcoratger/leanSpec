@@ -127,8 +127,8 @@ def _make_validator_registry() -> ValidatorRegistry:
     registry.add(
         ValidatorEntry(
             index=ValidatorIndex(0),
-            attestation_secret_key=kp.attestation_secret,
-            proposal_secret_key=kp.proposal_secret,
+            attestation_secret_key=kp.attestation_keypair.secret_key,
+            proposal_secret_key=kp.proposal_keypair.secret_key,
         )
     )
     return registry

@@ -297,7 +297,7 @@ class TestOnGossipAggregatedAttestation:
         xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
         raw_xmss = list(
             zip(
-                [key_manager[vid].attestation_public for vid in participants],
+                [key_manager[vid].attestation_keypair.public_key for vid in participants],
                 [key_manager.sign_attestation_data(vid, attestation_data) for vid in participants],
                 strict=True,
             )
@@ -344,7 +344,7 @@ class TestOnGossipAggregatedAttestation:
         xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
         raw_xmss = list(
             zip(
-                [key_manager[vid].attestation_public for vid in participants],
+                [key_manager[vid].attestation_keypair.public_key for vid in participants],
                 [key_manager.sign_attestation_data(vid, attestation_data) for vid in participants],
                 strict=True,
             )
@@ -384,7 +384,7 @@ class TestOnGossipAggregatedAttestation:
         xmss_participants = ValidatorIndices(data=signers).to_aggregation_bits()
         raw_xmss = list(
             zip(
-                [key_manager[vid].attestation_public for vid in signers],
+                [key_manager[vid].attestation_keypair.public_key for vid in signers],
                 [key_manager.sign_attestation_data(vid, attestation_data) for vid in signers],
                 strict=True,
             )
@@ -432,7 +432,7 @@ class TestOnGossipAggregatedAttestation:
         xmss_1 = ValidatorIndices(data=participants_1).to_aggregation_bits()
         raw_xmss_1 = list(
             zip(
-                [key_manager[vid].attestation_public for vid in participants_1],
+                [key_manager[vid].attestation_keypair.public_key for vid in participants_1],
                 [
                     key_manager.sign_attestation_data(vid, attestation_data)
                     for vid in participants_1
@@ -453,7 +453,7 @@ class TestOnGossipAggregatedAttestation:
         xmss_2 = ValidatorIndices(data=participants_2).to_aggregation_bits()
         raw_xmss_2 = list(
             zip(
-                [key_manager[vid].attestation_public for vid in participants_2],
+                [key_manager[vid].attestation_keypair.public_key for vid in participants_2],
                 [
                     key_manager.sign_attestation_data(vid, attestation_data)
                     for vid in participants_2
@@ -544,7 +544,7 @@ class TestAggregateCommitteeSignatures:
 
         # Extract participants from the proof
         participants = proof.participants.to_validator_indices()
-        public_keys = [key_manager[vid].attestation_public for vid in participants]
+        public_keys = [key_manager[vid].attestation_keypair.public_key for vid in participants]
 
         # Verify the proof is valid
         proof.verify(
@@ -810,7 +810,7 @@ class TestEndToEndAggregationFlow:
         # Step 4: Verify the proof is valid
         proof = next(iter(store.latest_new_aggregated_payloads[attestation_data]))
         participants = proof.participants.to_validator_indices()
-        public_keys = [key_manager[vid].attestation_public for vid in participants]
+        public_keys = [key_manager[vid].attestation_keypair.public_key for vid in participants]
 
         proof.verify(
             public_keys=public_keys,
