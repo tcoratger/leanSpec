@@ -24,7 +24,7 @@ def _sign_and_aggregate(
     xmss_participants = ValidatorIndices(data=validator_ids).to_aggregation_bits()
     raw_xmss = list(
         zip(
-            [key_manager[vid].attestation_public for vid in validator_ids],
+            [key_manager[vid].attestation_keypair.public_key for vid in validator_ids],
             [key_manager.sign_attestation_data(vid, att_data) for vid in validator_ids],
             strict=True,
         )
@@ -60,7 +60,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
     xmss_participants = ValidatorIndices(data=vids).to_aggregation_bits()
     raw_xmss = list(
         zip(
-            [key_manager[vid].attestation_public for vid in vids],
+            [key_manager[vid].attestation_keypair.public_key for vid in vids],
             [key_manager.sign_attestation_data(vid, att_data) for vid in vids],
             strict=True,
         )
@@ -76,7 +76,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
 
     assert set(proof.participants.to_validator_indices()) == set(vids)
 
-    public_keys = [key_manager[vid].attestation_public for vid in vids]
+    public_keys = [key_manager[vid].attestation_keypair.public_key for vid in vids]
     proof.verify(
         public_keys=public_keys,
         message=hash_tree_root(att_data),
@@ -100,7 +100,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
     xmss_participants = ValidatorIndices(data=extra_vids).to_aggregation_bits()
     raw_xmss = list(
         zip(
-            [key_manager[vid].attestation_public for vid in extra_vids],
+            [key_manager[vid].attestation_keypair.public_key for vid in extra_vids],
             [key_manager.sign_attestation_data(vid, att_data) for vid in extra_vids],
             strict=True,
         )
@@ -108,7 +108,12 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
 
     parent = AggregatedSignatureProof.aggregate(
         xmss_participants=xmss_participants,
-        children=[(child, [key_manager[ValidatorIndex(i)].attestation_public for i in range(2)])],
+        children=[
+            (
+                child,
+                [key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(2)],
+            )
+        ],
         raw_xmss=raw_xmss,
         message=hash_tree_root(att_data),
         slot=att_data.slot,
@@ -117,7 +122,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
     expected_vids = {ValidatorIndex(i) for i in range(4)}
     assert set(parent.participants.to_validator_indices()) == expected_vids
 
-    public_keys = [key_manager[ValidatorIndex(i)].attestation_public for i in range(4)]
+    public_keys = [key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(4)]
     parent.verify(
         public_keys=public_keys,
         message=hash_tree_root(att_data),
@@ -137,9 +142,9 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
     child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
     child_c = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
 
-    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
-    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
-    child_c_pks = [key_manager[ValidatorIndex(2)].attestation_public]
+    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
+    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
+    child_c_pks = [key_manager[ValidatorIndex(2)].attestation_keypair.public_key]
 
     parent = AggregatedSignatureProof.aggregate(
         xmss_participants=None,
@@ -152,7 +157,7 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
     expected_vids = {ValidatorIndex(i) for i in range(3)}
     assert set(parent.participants.to_validator_indices()) == expected_vids
 
-    public_keys = [key_manager[ValidatorIndex(i)].attestation_public for i in range(3)]
+    public_keys = [key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(3)]
     parent.verify(
         public_keys=public_keys,
         message=hash_tree_root(att_data),
@@ -175,10 +180,10 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
     leaf_c = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
     leaf_d = _sign_and_aggregate(key_manager, [ValidatorIndex(3)], att_args)
 
-    leaf_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
-    leaf_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
-    leaf_c_pks = [key_manager[ValidatorIndex(2)].attestation_public]
-    leaf_d_pks = [key_manager[ValidatorIndex(3)].attestation_public]
+    leaf_a_pks = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
+    leaf_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
+    leaf_c_pks = [key_manager[ValidatorIndex(2)].attestation_keypair.public_key]
+    leaf_d_pks = [key_manager[ValidatorIndex(3)].attestation_keypair.public_key]
 
     # Level 1: two intermediate proofs
     mid_ab = AggregatedSignatureProof.aggregate(
@@ -207,7 +212,9 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
 
     assert set(root.participants.to_validator_indices()) == {ValidatorIndex(i) for i in range(4)}
     root.verify(
-        public_keys=[key_manager[ValidatorIndex(i)].attestation_public for i in range(4)],
+        public_keys=[
+            key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(4)
+        ],
         message=msg,
         slot=att_data.slot,
     )
@@ -226,15 +233,15 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
     child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
     child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
 
-    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
-    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
+    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
+    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
 
     # Additional raw signatures from validators 2 and 3
     extra_vids = [ValidatorIndex(2), ValidatorIndex(3)]
     xmss_participants = ValidatorIndices(data=extra_vids).to_aggregation_bits()
     raw_xmss = list(
         zip(
-            [key_manager[vid].attestation_public for vid in extra_vids],
+            [key_manager[vid].attestation_keypair.public_key for vid in extra_vids],
             [key_manager.sign_attestation_data(vid, att_data) for vid in extra_vids],
             strict=True,
         )
@@ -250,7 +257,9 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
 
     assert set(proof.participants.to_validator_indices()) == {ValidatorIndex(i) for i in range(4)}
     proof.verify(
-        public_keys=[key_manager[ValidatorIndex(i)].attestation_public for i in range(4)],
+        public_keys=[
+            key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(4)
+        ],
         message=msg,
         slot=att_data.slot,
     )
@@ -265,7 +274,7 @@ def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager)
     xmss_participants = ValidatorIndices(data=[vid]).to_aggregation_bits()
     raw_xmss = [
         (
-            key_manager[vid].attestation_public,
+            key_manager[vid].attestation_keypair.public_key,
             key_manager.sign_attestation_data(vid, att_data),
         )
     ]
@@ -281,7 +290,7 @@ def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager)
     wrong_message = make_bytes32(999)
     with pytest.raises(AggregationError, match="verification failed"):
         proof.verify(
-            public_keys=[key_manager[vid].attestation_public],
+            public_keys=[key_manager[vid].attestation_keypair.public_key],
             message=wrong_message,
             slot=att_data.slot,
         )
@@ -296,7 +305,7 @@ def test_aggregate_wrong_slot_fails_verification(key_manager: XmssKeyManager) ->
     xmss_participants = ValidatorIndices(data=[vid]).to_aggregation_bits()
     raw_xmss = [
         (
-            key_manager[vid].attestation_public,
+            key_manager[vid].attestation_keypair.public_key,
             key_manager.sign_attestation_data(vid, att_data),
         )
     ]
@@ -311,7 +320,7 @@ def test_aggregate_wrong_slot_fails_verification(key_manager: XmssKeyManager) ->
 
     with pytest.raises(AggregationError, match="verification failed"):
         proof.verify(
-            public_keys=[key_manager[vid].attestation_public],
+            public_keys=[key_manager[vid].attestation_keypair.public_key],
             message=hash_tree_root(att_data),
             slot=Slot(99),
         )
@@ -340,7 +349,7 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
 
     with pytest.raises(AggregationError, match="verification failed"):
         corrupted_proof.verify(
-            public_keys=[key_manager[vid].attestation_public],
+            public_keys=[key_manager[vid].attestation_keypair.public_key],
             message=hash_tree_root(att_data),
             slot=att_data.slot,
         )
@@ -360,8 +369,8 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
     # Child B signs message B (different)
     child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args_b)
 
-    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_public]
-    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_public]
+    child_a_pks = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
+    child_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
 
     # Aggregation rejects children that signed different messages
     with pytest.raises(AggregationError):
@@ -386,7 +395,13 @@ def test_aggregate_rejects_single_child_without_raw(key_manager: XmssKeyManager)
         AggregatedSignatureProof.aggregate(
             xmss_participants=None,
             children=[
-                (stub_child, [key_manager[ValidatorIndex(i)].attestation_public for i in range(1)])
+                (
+                    stub_child,
+                    [
+                        key_manager[ValidatorIndex(i)].attestation_keypair.public_key
+                        for i in range(1)
+                    ],
+                )
             ],
             raw_xmss=[],
             message=make_bytes32(0),
@@ -407,7 +422,7 @@ def test_aggregate_rejects_mismatched_participant_count(
     ).to_aggregation_bits()
     raw_xmss = [
         (
-            key_manager[ValidatorIndex(0)].attestation_public,
+            key_manager[ValidatorIndex(0)].attestation_keypair.public_key,
             key_manager.sign_attestation_data(ValidatorIndex(0), att_data),
         )
     ]
