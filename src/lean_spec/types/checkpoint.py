@@ -1,9 +1,11 @@
 """
-Checkpoint Container.
+Checkpoint container.
 
-A checkpoint marks a specific moment in the chain. It combines a block
-identifier with a slot number. Checkpoints are used for justification and
-finalization.
+A checkpoint marks a specific moment in the chain.
+
+It combines a block identifier with a slot number.
+
+Checkpoints are used for justification and finalization.
 """
 
 from lean_spec.types.byte_arrays import Bytes32
