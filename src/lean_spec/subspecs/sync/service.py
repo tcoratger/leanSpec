@@ -406,16 +406,6 @@ class SyncService:
         """Current sync state."""
         return self._state
 
-    @property
-    def is_syncing(self) -> bool:
-        """Check if actively syncing."""
-        return self._state.is_syncing
-
-    @property
-    def is_synced(self) -> bool:
-        """Check if synced with network."""
-        return self._state.is_synced
-
     def get_progress(self) -> SyncProgress:
         """
         Get current sync progress.
@@ -722,7 +712,7 @@ class SyncService:
         #
         # If already SYNCING, we should not re-trigger.
         # This prevents redundant state transitions.
-        if self._state.is_syncing:
+        if self._state == SyncState.SYNCING:
             return
 
         # Guard: Require peer information before syncing.
@@ -741,7 +731,7 @@ class SyncService:
         # network has finalized past our head, we are definitely behind.
         if network_finalized > head_slot:
             await self._transition_to(SyncState.SYNCING)
-        elif self._state.is_idle:
+        elif self._state == SyncState.IDLE:
             # Transition from IDLE even if caught up.
             #
             # IDLE -> SYNCING enables gossip processing. Even if our head matches
@@ -756,7 +746,7 @@ class SyncService:
         finalized slot and there are no orphan blocks.
         """
         # Guard: Only check completion while actively syncing.
-        if not self._state.is_syncing:
+        if self._state != SyncState.SYNCING:
             return
 
         # Invariant: All orphan blocks must be resolved before declaring synced.
@@ -781,23 +771,19 @@ class SyncService:
             await self._transition_to(SyncState.SYNCED)
 
     async def _transition_to(self, new_state: SyncState) -> None:
-        """
-        Transition to a new sync state.
+        """Transition to a new sync state, rejecting invalid moves.
 
-        Args:
-            new_state: Target state.
+        Two invariants are enforced:
 
-        Raises:
-            ValueError: If transition is not allowed.
+        - No self-transitions: a transition must change the current state.
+        - No IDLE -> SYNCED shortcut: SYNCING must run before SYNCED is reached.
+
+        Every other (from, to) pair is allowed, including any state -> IDLE.
         """
-        # Validate the transition against the state machine rules.
-        #
-        # The state machine enforces valid transitions:
-        # - IDLE -> SYNCING (start sync)
-        # - SYNCING -> SYNCED (caught up)
-        # - SYNCED -> SYNCING (fell behind)
-        # - Any -> IDLE (reset)
-        if not self._state.can_transition_to(new_state):
+        forbidden = new_state == self._state or (
+            self._state == SyncState.IDLE and new_state == SyncState.SYNCED
+        )
+        if forbidden:
             raise ValueError(f"Invalid state transition: {self._state.name} -> {new_state.name}")
 
         self._state = new_state
