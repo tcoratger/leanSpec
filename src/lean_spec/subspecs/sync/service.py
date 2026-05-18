@@ -66,30 +66,6 @@ from .states import SyncState
 logger = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
-class _SyncStoreView:
-    """StoreView adapter delegating to the live SyncService.store reference.
-
-    Wraps a getter so updates to ``SyncService.store`` (assigned after each
-    block is processed) are observed by backfill without re-wiring.
-    """
-
-    _get_store: Callable[[], Store]
-
-    def has_root(self, root: Bytes32) -> bool:
-        """Return True if the block root is present in the Store."""
-        return root in self._get_store().blocks
-
-    def finalized_slot(self) -> Slot:
-        """Return the slot of the latest finalized checkpoint."""
-        return self._get_store().latest_finalized.slot
-
-    def head_slot(self) -> Slot:
-        """Return the slot of the current canonical head."""
-        store = self._get_store()
-        return store.blocks[store.head].slot
-
-
 def _ancestor_set(blocks: dict[Bytes32, Block], head: Bytes32) -> set[Bytes32]:
     """Walk parent links from head and collect every reachable block root."""
     seen: set[Bytes32] = set()
@@ -303,14 +279,14 @@ class SyncService:
         """
         # BackfillSync handles fetching missing parent blocks from peers.
         #
-        # It needs network access to request blocks and the cache to store them.
-        # The store view is a thin adapter that always reads the current
-        # store reference, since we replace `self.store` after each block.
+        # SyncService implements the StoreView protocol directly.
+        # Backfill reads `self.store` through us, so the live reference is
+        # always observed even as we reassign it after each block.
         self._backfill = BackfillSync(
             peer_manager=self.peer_manager,
             block_cache=self.block_cache,
             network=self.network,
-            store_view=_SyncStoreView(_get_store=lambda: self.store),
+            store_view=self,
         )
 
         # HeadSync processes incoming gossip blocks and coordinates backfill.
@@ -405,6 +381,14 @@ class SyncService:
     def state(self) -> SyncState:
         """Current sync state."""
         return self._state
+
+    def has_root(self, root: Bytes32) -> bool:
+        """Return True if the block root is present in the current store."""
+        return root in self.store.blocks
+
+    def head_slot(self) -> Slot:
+        """Return the slot of the current canonical head."""
+        return self.store.blocks[self.store.head].slot
 
     def get_progress(self) -> SyncProgress:
         """
