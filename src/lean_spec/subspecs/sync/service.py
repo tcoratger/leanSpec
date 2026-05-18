@@ -79,39 +79,6 @@ def _ancestor_set(blocks: dict[Bytes32, Block], head: Bytes32) -> set[Bytes32]:
     return seen
 
 
-def make_default_block_processor(
-    spec: LstarSpec,
-) -> Callable[[Store, SignedBlock], Store]:
-    """
-    Build a default block processor bound to the given spec.
-
-    Wraps the pure spec entry point with caller-side fork-choice telemetry.
-    State transition and block processing timings are emitted by the spec
-    itself through the observer, wired at node startup. Everything else
-    here is derived by diffing pre- and post-stores.
-    """
-
-    def default_block_processor(store: Store, block: SignedBlock) -> Store:
-        new_store = spec.on_block(store, block)
-
-        metrics.lean_head_slot.set(new_store.blocks[new_store.head].slot)
-        metrics.lean_safe_target_slot.set(new_store.blocks[new_store.safe_target].slot)
-        metrics.lean_latest_justified_slot.set(new_store.latest_justified.slot)
-        metrics.lean_latest_finalized_slot.set(new_store.latest_finalized.slot)
-
-        if new_store.head != store.head:
-            depth = len(
-                _ancestor_set(new_store.blocks, store.head)
-                - _ancestor_set(new_store.blocks, new_store.head)
-            )
-            metrics.lean_fork_choice_reorgs_total.inc()
-            metrics.lean_fork_choice_reorg_depth.observe(depth)
-
-        return new_store
-
-    return default_block_processor
-
-
 async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> None:
     """No-op default for aggregated attestation publishing."""
 
@@ -257,11 +224,11 @@ class SyncService:
 
     def __post_init__(self) -> None:
         """Initialize sync components."""
-        # Bind the default processor to the injected spec when no override is provided.
+        # Bind the default processor when no override is provided.
         #
         # Tests pass an explicit processor and skip this path.
         if self.process_block is None:
-            self.process_block = make_default_block_processor(self.spec)
+            self.process_block = self._default_process_block
 
         self._init_components()
 
@@ -297,6 +264,31 @@ class SyncService:
             backfill=self._backfill,
             process_block=self._process_block_wrapper,
         )
+
+    def _default_process_block(self, store: Store, block: SignedBlock) -> Store:
+        """Run the spec's block processor and emit forkchoice telemetry.
+
+        Wraps the pure spec entry point with caller-side metrics.
+        State transition and block processing timings are emitted by the spec
+        itself through the observer, wired at node startup.
+        Everything below is derived by diffing pre- and post-stores.
+        """
+        new_store = self.spec.on_block(store, block)
+
+        metrics.lean_head_slot.set(new_store.blocks[new_store.head].slot)
+        metrics.lean_safe_target_slot.set(new_store.blocks[new_store.safe_target].slot)
+        metrics.lean_latest_justified_slot.set(new_store.latest_justified.slot)
+        metrics.lean_latest_finalized_slot.set(new_store.latest_finalized.slot)
+
+        if new_store.head != store.head:
+            depth = len(
+                _ancestor_set(new_store.blocks, store.head)
+                - _ancestor_set(new_store.blocks, new_store.head)
+            )
+            metrics.lean_fork_choice_reorgs_total.inc()
+            metrics.lean_fork_choice_reorg_depth.observe(depth)
+
+        return new_store
 
     def _process_block_wrapper(
         self,
