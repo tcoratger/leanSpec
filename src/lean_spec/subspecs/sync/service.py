@@ -193,11 +193,7 @@ class SyncService:
         )
 
     def process_block(self, store: Store, block: SignedBlock) -> Store:
-        """Apply a block to the store, emit telemetry, and persist when wired up.
-
-        All block processing flows through this method regardless of how the
-        block arrived (gossip, head-sync, or backfilled descendant).
-        """
+        """Apply a block to the store, emit telemetry, and persist when wired up."""
         new_store = self.spec.on_block(store, block)
 
         # Live chain pointers, exposed as gauges so dashboards reflect the current view.
