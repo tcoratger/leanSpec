@@ -3,34 +3,6 @@
 from typing import Any, ClassVar
 
 from lean_spec.snappy import compress, decompress, frame_compress, frame_decompress
-from lean_spec.subspecs.networking.discovery.codec import decode_message, encode_message
-from lean_spec.subspecs.networking.discovery.messages import (
-    Distance,
-    FindNode,
-    IdNonce,
-    IPv4,
-    IPv6,
-    Nodes,
-    Nonce,
-    PacketFlag,
-    Ping,
-    Pong,
-    Port,
-    RequestId,
-    TalkReq,
-    TalkResp,
-)
-from lean_spec.subspecs.networking.discovery.packet import (
-    decode_handshake_authdata,
-    decode_message_authdata,
-    decode_packet_header,
-    decode_whoareyou_authdata,
-    encode_handshake_authdata,
-    encode_message_authdata,
-    encode_packet,
-    encode_whoareyou_authdata,
-)
-from lean_spec.subspecs.networking.discovery.routing import log2_distance, xor_distance
 from lean_spec.subspecs.networking.enr.enr import ENR
 from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
 from lean_spec.subspecs.networking.gossipsub.rpc import (
@@ -53,9 +25,8 @@ from lean_spec.subspecs.networking.reqresp.codec import (
     encode_request,
 )
 from lean_spec.subspecs.networking.transport.peer_id import KeyType, PeerId, PublicKeyProto
-from lean_spec.subspecs.networking.types import NodeId, SeqNumber
 from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
-from lean_spec.types import Bytes16, Bytes33, Bytes64, SubnetId
+from lean_spec.types import SubnetId
 
 from .base import BaseConsensusFixture
 
@@ -118,18 +89,10 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 output = self._make_enr()
             case "peer_id":
                 output = self._make_peer_id()
-            case "discv5_message":
-                output = self._make_discv5_message()
-            case "discv5_packet":
-                output = self._make_discv5_packet()
             case "snappy_block":
                 output = self._make_snappy_block()
             case "snappy_frame":
                 output = self._make_snappy_frame()
-            case "xor_distance":
-                output = self._make_xor_distance()
-            case "log2_distance":
-                output = self._make_log2_distance()
             case "decode_failure":
                 output = self._make_decode_failure()
             case _:
@@ -146,8 +109,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
         The input record carries two fields:
 
         - `decoder`: name of the target decoder (`varint`, `snappy_frame`,
-          `gossipsub_rpc`, `reqresp_request`, `reqresp_response`,
-          `discv5_message`, `enr`).
+          `gossipsub_rpc`, `reqresp_request`, `reqresp_response`, `enr`).
         - `bytes`: hex-encoded malformed input.
 
         Returns:
@@ -173,11 +135,6 @@ class NetworkingCodecTest(BaseConsensusFixture):
             "gossipsub_rpc": RPC.decode,
             "reqresp_request": decode_request,
             "reqresp_response": ResponseCode.decode,
-            "discv5_message": decode_message,
-            "discv5_packet": lambda raw: decode_packet_header(
-                NodeId(_from_hex(self.input.get("localNodeId", "0x" + "00" * 32))),
-                raw,
-            ),
             "enr": ENR.from_rlp,
         }
         if decoder_name not in decoders:
@@ -357,20 +314,6 @@ class NetworkingCodecTest(BaseConsensusFixture):
             "uncompressedLength": len(data),
         }
 
-    def _make_xor_distance(self) -> dict[str, Any]:
-        """Compute XOR distance between two node IDs."""
-        node_a = NodeId(_from_hex(self.input["nodeA"]))
-        node_b = NodeId(_from_hex(self.input["nodeB"]))
-        distance = xor_distance(node_a, node_b)
-        return {"distance": hex(distance)}
-
-    def _make_log2_distance(self) -> dict[str, Any]:
-        """Compute log2 of XOR distance for k-bucket assignment."""
-        node_a = NodeId(_from_hex(self.input["nodeA"]))
-        node_b = NodeId(_from_hex(self.input["nodeB"]))
-        distance = int(log2_distance(node_a, node_b))
-        return {"distance": distance}
-
     def _make_enr(self) -> dict[str, Any]:
         """Parse an ENR string, re-serialize, assert roundtrip, extract properties."""
         enr_string = self.input["enrString"]
@@ -448,149 +391,6 @@ class NetworkingCodecTest(BaseConsensusFixture):
             "protobufEncoded": _to_hex(encoded_proto),
             "peerId": peer_id_str,
         }
-
-    def _make_discv5_message(self) -> dict[str, Any]:
-        """Encode a discv5 message as type byte + RLP, decode it back, assert roundtrip."""
-        msg = _build_discv5_message(self.input)
-        encoded = encode_message(msg)
-
-        # Decode and re-encode must produce identical bytes.
-        re_encoded = encode_message(decode_message(encoded))
-        assert encoded == re_encoded, "Discv5 message roundtrip produced different bytes"
-
-        return {"encoded": _to_hex(encoded)}
-
-    def _make_discv5_packet(self) -> dict[str, Any]:
-        """Encode a Discovery v5 packet and roundtrip-decode the header.
-
-        Input keys (all hex unless noted):
-
-        - `packetType`: "message", "whoareyou", or "handshake".
-        - `destNodeId`: 32-byte destination node ID. Masking key
-          derives from its first 16 bytes; clients also use this as the
-          local node id when decoding.
-        - `nonce`: 12-byte message nonce.
-        - `maskingIv`: 16-byte header-masking IV, supplied explicitly
-          so the produced bytes are deterministic.
-        - `message`: message payload (empty for WHOAREYOU, otherwise
-          the already-encrypted ciphertext bytes).
-        - `encryptionKey`: 16-byte AES-GCM key for non-WHOAREYOU.
-
-        Packet-type-specific input keys:
-
-        - message: `srcId`.
-        - whoareyou: `idNonce`, `enrSeq` (uint64 integer).
-        - handshake: `srcId`, `idSignature`, `ephPubkey`, optional
-          `record` (RLP-encoded ENR).
-
-        Output:
-
-        - `encoded`: full packet hex.
-        - `flag`: numeric flag (0/1/2) recovered via decode.
-        - `authdataSize`: size of authdata in bytes.
-        """
-        packet_type = self.input["packetType"]
-        dest_node_id = NodeId(_from_hex(self.input["destNodeId"]))
-        nonce = Nonce(_from_hex(self.input["nonce"]))
-        masking_iv = Bytes16(_from_hex(self.input["maskingIv"]))
-        message_bytes = _from_hex(self.input.get("message", "0x"))
-
-        if packet_type == "message":
-            flag = PacketFlag.MESSAGE
-            authdata = encode_message_authdata(NodeId(_from_hex(self.input["srcId"])))
-            encryption_key: Bytes16 | None = Bytes16(_from_hex(self.input["encryptionKey"]))
-        elif packet_type == "whoareyou":
-            flag = PacketFlag.WHOAREYOU
-            authdata = encode_whoareyou_authdata(
-                IdNonce(_from_hex(self.input["idNonce"])),
-                SeqNumber(int(self.input["enrSeq"])),
-            )
-            encryption_key = None
-        elif packet_type == "handshake":
-            flag = PacketFlag.HANDSHAKE
-            record = _from_hex(self.input["record"]) if self.input.get("record") else None
-            authdata = encode_handshake_authdata(
-                NodeId(_from_hex(self.input["srcId"])),
-                Bytes64(_from_hex(self.input["idSignature"])),
-                Bytes33(_from_hex(self.input["ephPubkey"])),
-                record=record,
-            )
-            encryption_key = Bytes16(_from_hex(self.input["encryptionKey"]))
-        else:
-            raise ValueError(f"Unknown discv5 packet type: {packet_type!r}")
-
-        encoded = encode_packet(
-            dest_node_id=dest_node_id,
-            flag=flag,
-            nonce=nonce,
-            authdata=authdata,
-            message=message_bytes,
-            encryption_key=encryption_key,
-            masking_iv=masking_iv,
-        )
-
-        # Roundtrip: decode header and assert shape matches.
-        header, _msg, _ad = decode_packet_header(dest_node_id, encoded)
-        assert header.flag == flag, "Packet flag roundtrip mismatch"
-        assert header.nonce == nonce, "Packet nonce roundtrip mismatch"
-        assert header.authdata == authdata, "Packet authdata roundtrip mismatch"
-
-        # Exercise per-type authdata decode for extra shape coverage.
-        if flag == PacketFlag.MESSAGE:
-            decode_message_authdata(header.authdata)
-        elif flag == PacketFlag.WHOAREYOU:
-            decode_whoareyou_authdata(header.authdata)
-        elif flag == PacketFlag.HANDSHAKE:
-            decode_handshake_authdata(header.authdata)
-
-        return {
-            "encoded": _to_hex(encoded),
-            "flag": int(flag),
-            "authdataSize": len(authdata),
-        }
-
-
-def _build_discv5_message(
-    d: dict[str, Any],
-) -> Ping | Pong | FindNode | Nodes | TalkReq | TalkResp:
-    """Build a discv5 message dataclass from a JSON-friendly dict."""
-    request_id = RequestId(data=_from_hex(d["requestId"]))
-    match d["type"]:
-        case "ping":
-            return Ping(request_id=request_id, enr_seq=SeqNumber(d["enrSeq"]))
-        case "pong":
-            ip_bytes = _from_hex(d["recipientIp"])
-            ip = IPv4(ip_bytes) if len(ip_bytes) == 4 else IPv6(ip_bytes)
-            return Pong(
-                request_id=request_id,
-                enr_seq=SeqNumber(d["enrSeq"]),
-                recipient_ip=ip,
-                recipient_port=Port(d["recipientPort"]),
-            )
-        case "findnode":
-            return FindNode(
-                request_id=request_id,
-                distances=[Distance(x) for x in d["distances"]],
-            )
-        case "nodes":
-            return Nodes(
-                request_id=request_id,
-                total=d["total"],
-                enrs=[_from_hex(e) for e in d.get("enrs", [])],
-            )
-        case "talkreq":
-            return TalkReq(
-                request_id=request_id,
-                protocol=_from_hex(d["protocol"]),
-                request=_from_hex(d["request"]),
-            )
-        case "talkresp":
-            return TalkResp(
-                request_id=request_id,
-                response=_from_hex(d["response"]),
-            )
-        case _:
-            raise ValueError(f"Unknown discv5 message type: {d['type']}")
 
 
 def _build_rpc(d: dict[str, Any]) -> RPC:
