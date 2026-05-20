@@ -42,13 +42,10 @@ from typing import ClassVar, Literal
 
 from lean_spec.config import LEAN_ENV
 from lean_spec.forks.lstar.containers import AttestationData
-from lean_spec.forks.lstar.containers.block.types import (
-    AggregatedAttestations,
-    AttestationSignatures,
-)
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
 from lean_spec.subspecs.xmss.containers import (
     PublicKey,
@@ -67,7 +64,13 @@ from lean_spec.subspecs.xmss.types import (
     HashTreeOpening,
     Randomness,
 )
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
+from lean_spec.types import (
+    Bytes32,
+    Slot,
+    Uint64,
+    ValidatorIndex,
+    ValidatorIndices,
+)
 
 KeyRole = Literal["attestation", "proposal"]
 """Discriminator for which signing role's key to load from a validator key pair."""
@@ -514,18 +517,21 @@ class XmssKeyManager:
         self,
         validator_ids: list[ValidatorIndex],
         attestation_data: AttestationData,
-    ) -> AggregatedSignatureProof:
+    ) -> TypeOneMultiSignature:
         """
-        Sign attestation data with each validator and aggregate into a single proof.
+        Sign attestation data with each validator and aggregate into a Type-1 proof.
 
-        Convenience method for the common sign-each-validator-then-aggregate pattern.
+        Each validator's XMSS attestation key signs the attestation data
+        root. The signatures are then handed to the multi-signature
+        binding to produce a single cryptographically valid Type-1 proof
+        binding all participants to (data, slot).
 
         Args:
             validator_ids: Validators to sign with.
             attestation_data: The attestation data to sign.
 
         Returns:
-            Aggregated signature proof combining all validators' signatures.
+            Cryptographically valid Type-1 proof covering validator_ids.
         """
         raw_xmss = [
             (
@@ -534,34 +540,32 @@ class XmssKeyManager:
             )
             for vid in validator_ids
         ]
-
-        xmss_participants = ValidatorIndices(data=validator_ids).to_aggregation_bits()
-
-        return AggregatedSignatureProof.aggregate(
-            xmss_participants=xmss_participants,
+        return TypeOneMultiSignature.aggregate(
+            xmss_participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
             children=[],
             raw_xmss=raw_xmss,
             message=hash_tree_root(attestation_data),
             slot=attestation_data.slot,
         )
 
-    def build_attestation_signatures(
+    def build_attestation_proofs(
         self,
         aggregated_attestations: AggregatedAttestations,
         signature_lookup: Mapping[AttestationData, Mapping[ValidatorIndex, Signature]]
         | None = None,
-    ) -> AttestationSignatures:
+    ) -> list[TypeOneMultiSignature]:
         """
-        Produce aggregated signature proofs for a list of attestations.
+        Produce Type-1 proofs aligned with the given attestations.
 
         For each aggregated attestation:
 
-        1. Identify participating validators from the aggregation bitfield
-        2. Collect each participant's public key and individual signature
-        3. Combine them into a single aggregated proof for the leanVM verifier
+        1. Identify participating validators from the aggregation bitfield.
+        2. Collect each participant's attestation public key and signature.
+        3. Combine them into a single Type-1 single-message proof via the
+           multi-signature binding.
 
         Pre-computed signatures can be supplied via the lookup to avoid
-        redundant signing. Missing signatures are computed on the fly.
+        redundant signing. Missing entries are signed on the fly.
 
         Args:
             aggregated_attestations: Attestations with aggregation bitfields set.
@@ -569,11 +573,11 @@ class XmssKeyManager:
                 attestation data then validator index.
 
         Returns:
-            One aggregated signature proof per attestation.
+            One Type-1 single-message proof per attestation, parallel to the input.
         """
         lookup = signature_lookup or {}
 
-        proofs: list[AggregatedSignatureProof] = []
+        proofs: list[TypeOneMultiSignature] = []
         for agg in aggregated_attestations:
             # Decode which validators participated from the bitfield.
             validator_ids = agg.aggregation_bits.to_validator_indices()
@@ -582,7 +586,7 @@ class XmssKeyManager:
             # Fall back to signing on the fly for any missing entries.
             sigs_for_data = lookup.get(agg.data, {})
 
-            # Collect the attestation public key for each participant.
+            # Collect the attestation public keys for each participant.
             public_keys = [self.get_public_keys(vid)[0] for vid in validator_ids]
 
             # Gather individual signatures, computing any that are missing.
@@ -593,16 +597,17 @@ class XmssKeyManager:
 
             # Produce a single aggregated proof that the leanVM can verify
             # in one pass over all participants.
-            proof = AggregatedSignatureProof.aggregate(
-                xmss_participants=agg.aggregation_bits,
-                children=[],
-                raw_xmss=list(zip(public_keys, signatures, strict=True)),
-                message=hash_tree_root(agg.data),
-                slot=agg.data.slot,
+            proofs.append(
+                TypeOneMultiSignature.aggregate(
+                    children=[],
+                    raw_xmss=list(zip(public_keys, signatures, strict=True)),
+                    xmss_participants=agg.aggregation_bits,
+                    message=hash_tree_root(agg.data),
+                    slot=agg.data.slot,
+                )
             )
-            proofs.append(proof)
 
-        return AttestationSignatures(data=proofs)
+        return proofs
 
 
 def _generate_single_keypair(

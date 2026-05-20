@@ -93,9 +93,10 @@ class SpecAggregatedAttestationsType(SpecSSZType, Protocol):
 class SpecSignedBlockType(SpecSSZType, Protocol):
     """Structural contract: any fork's SignedBlock container class.
 
-    A SignedBlock wraps a Block with its proposer + attestation signatures.
-    Subspecs treat instances as opaque SSZ-encodable payloads passed
-    between sync, gossip, and storage.
+    A SignedBlock wraps a Block with a single aggregated proof covering
+    every attestation in the body plus the proposer's signature over
+    the block root. Subspecs treat instances as opaque SSZ-encodable
+    payloads passed between sync, gossip, and storage.
     """
 
     @property

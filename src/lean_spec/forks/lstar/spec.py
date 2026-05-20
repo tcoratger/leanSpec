@@ -1,8 +1,7 @@
 """Lstar fork — identity and construction facade."""
 
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
-from collections.abc import Set as AbstractSet
+from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
 from lean_spec.forks.lstar.containers import (
@@ -38,7 +37,12 @@ from lean_spec.subspecs.observability import (
     observe_state_transition,
 )
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, AggregationError
+from lean_spec.subspecs.xmss.aggregation import (
+    AggregationError,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
+)
+from lean_spec.subspecs.xmss.containers import PublicKey
 from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
 from lean_spec.types import (
     ZERO_HASH,
@@ -649,8 +653,8 @@ class LstarSpec(ForkProtocol):
         proposer_index: ValidatorIndex,
         parent_root: Bytes32,
         known_block_roots: AbstractSet[Bytes32],
-        aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] | None = None,
-    ) -> tuple[Block, State, list[AggregatedAttestation], list[AggregatedSignatureProof]]:
+        aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]] | None = None,
+    ) -> tuple[Block, State, list[AggregatedAttestation], list[TypeOneMultiSignature]]:
         """
         Build a valid block on top of the given pre-state.
 
@@ -662,7 +666,7 @@ class LstarSpec(ForkProtocol):
         repeats with the new checkpoint.
         """
         aggregated_attestations: list[AggregatedAttestation] = []
-        aggregated_signatures: list[AggregatedSignatureProof] = []
+        aggregated_signatures: list[TypeOneMultiSignature] = []
 
         if aggregated_payloads:
             # Fixed-point loop: find attestation_data entries matching the current
@@ -753,7 +757,7 @@ class LstarSpec(ForkProtocol):
 
                     found_entries = True
 
-                    selected, _ = AggregatedSignatureProof.select_greedily(proofs)
+                    selected, _ = TypeOneMultiSignature.select_greedily(proofs)
                     aggregated_signatures.extend(selected)
                     for proof in selected:
                         aggregated_attestations.append(
@@ -802,7 +806,7 @@ class LstarSpec(ForkProtocol):
             # During the fixed-point loop above, multiple proofs may have been
             # selected for the same AttestationData across iterations. Group them
             # and merge each group into a single recursive proof.
-            proof_groups: dict[AttestationData, list[AggregatedSignatureProof]] = {}
+            proof_groups: dict[AttestationData, list[TypeOneMultiSignature]] = {}
             for att, sig in zip(aggregated_attestations, aggregated_signatures, strict=True):
                 proof_groups.setdefault(att.data, []).append(sig)
 
@@ -825,7 +829,7 @@ class LstarSpec(ForkProtocol):
                         )
                         for proof in proofs
                     ]
-                    sig = AggregatedSignatureProof.aggregate(
+                    sig = TypeOneMultiSignature.aggregate(
                         xmss_participants=None,
                         children=children,
                         raw_xmss=[],
@@ -862,88 +866,79 @@ class LstarSpec(ForkProtocol):
         validators: Validators,
     ) -> bool:
         """
-        Verify all XMSS signatures in this signed block.
+        Verify the merged Type-2 proof carried by a signed block.
 
-        Checks that:
-
-        - Each body attestation is signed by participating validators
-        - The proposer signed the block root with the proposal key
-
+        The block envelope holds one SSZ-encoded Type-2 proof binding
+        every body attestation plus the proposer's signature over the
+        block root.
         The signing scheme is read from this fork's capability.
 
         Args:
-            signed_block: The signed block whose signatures are checked.
+            signed_block: The signed block whose merged proof is checked.
             validators: Validator registry providing public keys for verification.
 
         Returns:
-            True if all signatures are valid.
+            True if the merged proof is valid.
 
         Raises:
-            AssertionError: On verification failure.
+            AssertionError: On any structural or cryptographic mismatch.
         """
         block = signed_block.block
-        signatures = signed_block.signature
         aggregated_attestations = block.body.attestations
-        attestation_signatures = signatures.attestation_signatures
-
-        # Each attestation in the body must have a corresponding signature entry.
-        assert len(aggregated_attestations) == len(attestation_signatures), (
-            "Attestation signature groups must align with block body attestations"
-        )
-
-        # Attestations and signatures are parallel arrays.
-        # - Each attestation says "validators X, Y, Z voted for this data".
-        # - Each signature proves those validators actually signed.
-        for aggregated_attestation, aggregated_signature in zip(
-            aggregated_attestations, attestation_signatures, strict=True
-        ):
-            # Extract which validators participated in this attestation.
-            # The aggregation bits encode validator indices as a bitfield.
-            validator_ids = aggregated_attestation.aggregation_bits.to_validator_indices()
-
-            # The signed message is the attestation data root.
-            # All validators in this group signed this exact data.
-            attestation_data_root = hash_tree_root(aggregated_attestation.data)
-
-            for validator_id in validator_ids:
-                num_validators = Uint64(len(validators))
-                assert validator_id.is_valid(num_validators), "Validator index out of range"
-
-            # Collect attestation public keys for all participating validators.
-            # Order matters: must match the order in the aggregated signature.
-            public_keys = [validators[vid].get_attestation_pubkey() for vid in validator_ids]
-
-            try:
-                aggregated_signature.verify(
-                    public_keys=public_keys,
-                    message=attestation_data_root,
-                    slot=aggregated_attestation.data.slot,
-                )
-            except AggregationError as exc:
-                raise AssertionError(
-                    f"Attestation aggregated signature verification failed: {exc}"
-                ) from exc
-
-        # Verify the proposer's signature over the block root.
-        #
-        # The proposer signs hash_tree_root(block) with their proposal key.
-        # This proves the proposer endorsed this specific block.
-        proposer_index = block.proposer_index
-        assert proposer_index.is_valid(Uint64(len(validators))), "Proposer index out of range"
-
-        proposer = validators[proposer_index]
-        block_root = hash_tree_root(block)
 
         try:
-            valid = self.sig_scheme.verify(
-                proposer.get_proposal_pubkey(),
-                block.slot,
-                block_root,
-                signatures.proposer_signature,
+            type_two = TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
+        except Exception as exc:
+            raise AssertionError(f"Block proof decoding failed: {exc}") from exc
+
+        num_validators = Uint64(len(validators))
+        public_keys_per_message: list[list[PublicKey]] = []
+
+        # Each component is bound to the message and slot it signed.
+        #
+        # Without this binding a proposer could pair honest signatures
+        # with attacker-chosen attestation data that resolves to the same
+        # pubkeys, crediting validators for votes they never cast.
+        message_bindings: list[tuple[Bytes32, Slot]] = []
+
+        # One pubkey set per attestation, in body order.
+        #
+        # The attestation list and the proof component list are parallel.
+        # Each attestation names the validators that voted for its data.
+        # Its matching proof component proves those validators signed.
+        for aggregated_attestation in aggregated_attestations:
+            validator_ids = aggregated_attestation.aggregation_bits.to_validator_indices()
+            for validator_id in validator_ids:
+                assert validator_id.is_valid(num_validators), "Validator index out of range"
+
+            public_keys_per_message.append(
+                [validators[vid].get_attestation_pubkey() for vid in validator_ids]
             )
-        except (ValueError, IndexError):
-            valid = False
-        assert valid, "Proposer block signature verification failed"
+            message_bindings.append(
+                (
+                    hash_tree_root(aggregated_attestation.data),
+                    aggregated_attestation.data.slot,
+                )
+            )
+
+        # Final component: the proposer's signature over the block root.
+        #
+        # The proposer signs the block root with their proposal key.
+        # This proves the proposer endorsed this specific block.
+        # It is a single-participant entry, distinct from the vote entries.
+        proposer_index = block.proposer_index
+        assert proposer_index.is_valid(num_validators), "Proposer index out of range"
+
+        public_keys_per_message.append([validators[proposer_index].get_proposal_pubkey()])
+        message_bindings.append((hash_tree_root(block), block.slot))
+
+        try:
+            type_two.verify(
+                public_keys_per_message=public_keys_per_message,
+                messages=message_bindings,
+            )
+        except AggregationError as exc:
+            raise AssertionError(f"Block proof verification failed: {exc}") from exc
 
         return True
 
@@ -1213,7 +1208,7 @@ class LstarSpec(ForkProtocol):
         # Prepare public keys for verification
         public_keys = [validators[vid].get_attestation_pubkey() for vid in validator_ids]
 
-        # Verify the leanVM aggregated proof
+        # Verify the Type-1 single-message aggregated proof.
         try:
             proof.verify(
                 public_keys=public_keys,
@@ -1279,6 +1274,19 @@ class LstarSpec(ForkProtocol):
                 f"Sync parent chain before processing block at slot {block.slot}."
             )
 
+            # The block body constrains how many distinct AttestationData
+            # entries it may carry.
+            aggregated_attestations = block.body.attestations
+            att_data_set = {att.data for att in aggregated_attestations}
+            assert len(att_data_set) == len(aggregated_attestations), (
+                "Block contains duplicate AttestationData entries; "
+                "each AttestationData must appear at most once"
+            )
+            assert len(att_data_set) <= int(MAX_ATTESTATIONS_DATA), (
+                f"Block contains {len(att_data_set)} distinct AttestationData entries; "
+                f"maximum is {MAX_ATTESTATIONS_DATA}"
+            )
+
             # Validate cryptographic signatures
             valid_signatures = self.verify_signatures(signed_block, parent_state.validators)
 
@@ -1305,41 +1313,31 @@ class LstarSpec(ForkProtocol):
                 }
             )
 
-            # Process block body attestations and their signatures
-            # Block attestations go directly to "known" payloads
-            aggregated_attestations = block.body.attestations
-            attestation_signatures = signed_block.signature.attestation_signatures
-
-            assert len(aggregated_attestations) == len(attestation_signatures), (
-                "Attestation signature groups must match aggregated attestations"
-            )
-
-            # Each unique AttestationData must appear at most once per block.
-            att_data_set = {att.data for att in aggregated_attestations}
-            assert len(att_data_set) == len(aggregated_attestations), (
-                "Block contains duplicate AttestationData entries; "
-                "each AttestationData must appear at most once"
-            )
-            assert Uint8(len(att_data_set)) <= MAX_ATTESTATIONS_DATA, (
-                f"Block contains {len(att_data_set)} distinct AttestationData entries; "
-                f"maximum is {MAX_ATTESTATIONS_DATA}"
-            )
-
-            # Copy the aggregated proof map for updates
-            # Shallow-copy the dict and its inner sets to preserve immutability
-            # Block attestations go directly to "known" payloads
-            # (like is_from_block=True in the spec)
-            block_proofs: dict[AttestationData, set[AggregatedSignatureProof]] = {
+            # Register each block attestation's data in the known pool.
+            #
+            # Only the data key is recorded here, with an empty proof set.
+            # The block carries one merged proof for all attestations.
+            # That proof is verified as a whole and not decomposed at import.
+            # Per-attestation proofs reach the pools through the
+            # deconstruction and gossip path instead.
+            #
+            # Consequence: a block's own attestations contribute zero weight
+            # to the head computation triggered by this import.
+            # Recovered Type-1 proofs land in the new pool and migrate to
+            # the known pool at the next acceptance tick.
+            # Head weight from block-imported votes is therefore deferred
+            # by up to one slot.
+            # Shallow-copy the dict and its inner sets to preserve immutability.
+            block_proofs: dict[AttestationData, set[TypeOneMultiSignature]] = {
                 k: set(v) for k, v in store.latest_known_aggregated_payloads.items()
             }
 
-            for att, proof in zip(aggregated_attestations, attestation_signatures, strict=True):
-                block_proofs.setdefault(att.data, set()).add(proof)
+            for aggregated_attestation in aggregated_attestations:
+                block_proofs.setdefault(aggregated_attestation.data, set())
 
-            # Update store with new aggregated proofs and attestation data
             store = store.model_copy(update={"latest_known_aggregated_payloads": block_proofs})
 
-            # Update forkchoice head based on new block and attestations
+            # Update forkchoice head based on new block and attestations.
             store = self.update_head(store)
 
             # Prune stale attestation data when finalization advances
@@ -1351,7 +1349,7 @@ class LstarSpec(ForkProtocol):
     def extract_attestations_from_aggregated_payloads(
         self,
         store: LstarStore,
-        aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]],
+        aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]],
     ) -> dict[ValidatorIndex, AttestationData]:
         """Extract attestations from aggregated payloads.
 
@@ -1655,7 +1653,8 @@ class LstarSpec(ForkProtocol):
             #
             # New payloads go first because they represent uncommitted
             # work — known payloads fill remaining gaps.
-            child_proofs, covered = AggregatedSignatureProof.select_greedily(
+
+            child_proofs, covered = TypeOneMultiSignature.select_greedily(
                 new.get(data), known.get(data)
             )
 
@@ -1676,18 +1675,23 @@ class LstarSpec(ForkProtocol):
                 if e.validator_id not in covered
             ]
 
-            # The XMSS layer enforces a minimum: either at least one raw
-            # signature, or at least two child proofs to merge.
+            # The aggregation layer enforces a minimum: either at least one
+            # raw signature, or at least two child proofs to merge.
             #
             # A lone child proof is already a valid proof — nothing to do.
             if not raw_entries and len(child_proofs) < 2:
                 continue
 
-            # Encode the set of raw signers as a compact bitfield.
-            xmss_participants = ValidatorIndices(
-                data=[vid for vid, _, _ in raw_entries]
-            ).to_aggregation_bits()
-            raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
+            # Encode raw signers as a compact bitfield when present.
+            # Child-only aggregation (no raw signatures) must pass None.
+            if raw_entries:
+                xmss_participants = ValidatorIndices(
+                    data=[vid for vid, _, _ in raw_entries]
+                ).to_aggregation_bits()
+                raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
+            else:
+                xmss_participants = None
+                raw_xmss = []
 
             # Phase 3: Aggregate
             #
@@ -1709,7 +1713,7 @@ class LstarSpec(ForkProtocol):
 
             # Hand everything to the XMSS subspec.
             # Out comes a single proof covering all selected validators.
-            proof = AggregatedSignatureProof.aggregate(
+            proof = TypeOneMultiSignature.aggregate(
                 xmss_participants=xmss_participants,
                 children=children,
                 raw_xmss=raw_xmss,
@@ -1722,7 +1726,7 @@ class LstarSpec(ForkProtocol):
         #
         # Record freshly produced proofs so future rounds can reuse them.
         # Remove gossip signatures that were consumed by this aggregation.
-        new_aggregated_payloads: dict[AttestationData, set[AggregatedSignatureProof]] = {}
+        new_aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]] = {}
         for signed_att in new_aggregates:
             new_aggregated_payloads.setdefault(signed_att.data, set()).add(signed_att.proof)
 
@@ -1880,8 +1884,8 @@ class LstarSpec(ForkProtocol):
         store: LstarStore,
         slot: Slot,
         validator_index: ValidatorIndex,
-    ) -> tuple[LstarStore, Block, list[AggregatedSignatureProof]]:
-        """Produce a block and its aggregated signature proofs for the target slot.
+    ) -> tuple[LstarStore, Block, list[TypeOneMultiSignature]]:
+        """Produce a block and its per-attestation Type-1 proofs for the target slot.
 
         Block production proceeds in four stages:
         1. Retrieve the current chain head as the parent block
@@ -1891,6 +1895,11 @@ class LstarSpec(ForkProtocol):
 
         The block builder uses a fixed-point algorithm to collect attestations.
         Each iteration may update the justified checkpoint.
+
+        Returns the per-attestation Type-1 proofs unmerged. The validator
+        service signs the block root with the proposal key, wraps that into
+        a singleton Type-1, and merges all of them into the block-level
+        Type-2 proof carried by SignedBlock.proof.
 
         Raises:
             AssertionError: If validator is not the proposer for this slot,

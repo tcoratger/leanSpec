@@ -9,15 +9,10 @@ from typing import Generator
 import httpx
 import pytest
 
-from lean_spec.forks import (
-    AttestationSignatures,
-    BlockSignatures,
-    SignedBlock,
-)
+from lean_spec.forks import SignedBlock
 from lean_spec.subspecs.api import AggregatorController, ApiServer, ApiServerConfig
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32
-from tests.lean_spec.helpers import make_mock_signature
+from lean_spec.types import ByteList512KiB, Bytes32
 from tests.lean_spec.helpers.builders import make_genesis_data
 
 # Default port for auto-started local server
@@ -84,10 +79,7 @@ class _ServerThread(threading.Thread):
         # at least the finalized root; see ApiServer.signed_block_getter.
         anchor_signed_block = SignedBlock(
             block=genesis.block,
-            signature=BlockSignatures(
-                attestation_signatures=AttestationSignatures(data=[]),
-                proposer_signature=make_mock_signature(),
-            ),
+            proof=ByteList512KiB(data=b""),
         )
         anchor_root = hash_tree_root(genesis.block)
 

@@ -8,9 +8,7 @@ import httpx
 import pytest
 
 from lean_spec.forks import (
-    AttestationSignatures,
     Block,
-    BlockSignatures,
     SignedBlock,
 )
 from lean_spec.forks.lstar import State, Store
@@ -27,8 +25,7 @@ from lean_spec.subspecs.sync.checkpoint_sync import (
     fetch_finalized_state,
     verify_checkpoint_state,
 )
-from lean_spec.types import Bytes32, Slot
-from tests.lean_spec.helpers import make_mock_signature
+from lean_spec.types import ByteList512KiB, Bytes32, Slot
 
 
 class _MockTransport(httpx.AsyncBaseTransport):
@@ -234,19 +231,13 @@ class TestCheckpointSyncClientServerIntegration:
 
 
 def _wrap_as_signed_block(block: Block) -> SignedBlock:
-    """Build a SignedBlock around a Block using a mock signature.
+    """Build a SignedBlock around a Block using an empty proof envelope.
 
     The spec retains only Block in Store; tests need a SignedBlock for the
-    ``signed_block_getter`` callable, so we construct one with empty
-    attestation signatures and a mock proposer signature.
+    signed-block getter callable. An empty proof is sufficient for these
+    structural checks, which do not exercise cryptographic verification.
     """
-    return SignedBlock(
-        block=block,
-        signature=BlockSignatures(
-            attestation_signatures=AttestationSignatures(data=[]),
-            proposer_signature=make_mock_signature(),
-        ),
-    )
+    return SignedBlock(block=block, proof=ByteList512KiB(data=b""))
 
 
 class TestFetchFinalizedBlock:

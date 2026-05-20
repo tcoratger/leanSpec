@@ -272,7 +272,8 @@ def test_produce_block_enforces_max_attestations_data_limit(
     ----------------------
     The builder sorts entries by target.slot and processes them in order.
     After selecting MAX_ATTESTATIONS_DATA entries it breaks, excluding the
-    entry with the highest target slot.
+    entries with the highest target slots. The proposer signature occupies
+    the remaining slot in the Type-2 proof envelope.
 
     Expected post-state
     -------------------

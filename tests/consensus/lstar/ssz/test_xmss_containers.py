@@ -6,7 +6,10 @@ from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 
 from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.xmss import PublicKey
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss.aggregation import (
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
+)
 from lean_spec.subspecs.xmss.types import (
     HASH_DIGEST_LENGTH,
     HashDigestList,
@@ -18,7 +21,7 @@ from lean_spec.subspecs.xmss.types import (
 from lean_spec.types import (
     AggregationBits,
     Boolean,
-    ByteListMiB,
+    ByteList512KiB,
     Bytes32,
     Slot,
     Uint64,
@@ -69,48 +72,43 @@ def test_signature_actual(ssz: SSZTestFiller) -> None:
     ssz(type_name="Signature", value=signature)
 
 
-# --- AggregatedSignatureProof ---
+# --- TypeOneMultiSignature / TypeTwoMultiSignature ---
 
 
-def test_aggregated_signature_proof_empty(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for AggregatedSignatureProof with empty proof data."""
+def _bits(participants: list[bool]) -> AggregationBits:
+    """Build a participant bitfield from a list of booleans."""
+    return AggregationBits(data=[Boolean(b) for b in participants])
+
+
+def test_type_one_multi_signature_empty(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for a Type-1 proof with empty proof bytes."""
     ssz(
-        type_name="AggregatedSignatureProof",
-        value=AggregatedSignatureProof(
-            participants=AggregationBits(data=[Boolean(True)]),
-            proof_data=ByteListMiB(data=b""),
+        type_name="TypeOneMultiSignature",
+        value=TypeOneMultiSignature(
+            participants=_bits([True]),
+            proof=ByteList512KiB(data=b""),
         ),
     )
 
 
-def test_aggregated_signature_proof_with_data(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for AggregatedSignatureProof with proof data."""
+def test_type_one_multi_signature_with_proof(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for a Type-1 proof with non-empty proof bytes."""
+    wire = b"\xde\xad\xbe\xef"
     ssz(
-        type_name="AggregatedSignatureProof",
-        value=AggregatedSignatureProof(
-            participants=AggregationBits(data=[Boolean(True), Boolean(False), Boolean(True)]),
-            proof_data=ByteListMiB(data=b"\xde\xad\xbe\xef"),
+        type_name="TypeOneMultiSignature",
+        value=TypeOneMultiSignature(
+            participants=_bits([True, False, True]),
+            proof=ByteList512KiB(data=wire),
         ),
     )
 
 
-def test_aggregated_signature_proof_multiple_participants(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for AggregatedSignatureProof with five of six participants active."""
+def test_type_two_multi_signature_roundtrip(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for a Type-2 proof envelope."""
+    wire = b"\x01\x02\x03"
     ssz(
-        type_name="AggregatedSignatureProof",
-        value=AggregatedSignatureProof(
-            participants=AggregationBits(
-                data=[
-                    Boolean(True),
-                    Boolean(True),
-                    Boolean(True),
-                    Boolean(False),
-                    Boolean(True),
-                    Boolean(True),
-                ]
-            ),
-            proof_data=ByteListMiB(data=b"\x01\x02\x03\x04\x05\x06\x07\x08"),
-        ),
+        type_name="TypeTwoMultiSignature",
+        value=TypeTwoMultiSignature(proof=ByteList512KiB(data=wire)),
     )
 
 

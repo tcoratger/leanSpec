@@ -438,7 +438,7 @@ class BaseByteList(SSZModel):
         return self.data.hex()
 
 
-class ByteListMiB(BaseByteList):
-    """Variable-length byte list with a limit of 1 MiB (1024 * 1024 bytes)."""
+class ByteList512KiB(BaseByteList):
+    """Variable-length byte list with a 512 KiB limit."""
 
-    LIMIT = 1024 * 1024
+    LIMIT = 512 * 1024

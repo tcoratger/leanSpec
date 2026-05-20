@@ -23,7 +23,7 @@ def _reset_xmss_signing_state():
     """Reset XMSS signing state around each test in this module.
 
     Tests here sign at high slots (50+). Without resetting, the advanced
-    key state poisons the shared manager for later tests on the same
+    key state poisons the cache for any later test on the same
     worker that need low-slot signatures.
     """
     XmssKeyManager.reset_signing_state()
@@ -46,7 +46,7 @@ def test_block_with_maximum_attestations(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Block with MAX_ATTESTATIONS_DATA distinct entries is accepted by the store.
+    Block with MAX_ATTESTATIONS_DATA distinct entriesis accepted by the store.
 
     Scenario
     --------
@@ -107,7 +107,7 @@ def test_block_exceeding_maximum_attestations_is_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Block with MAX_ATTESTATIONS_DATA + 1 distinct entries is rejected by the store.
+    Block with MAX_ATTESTATIONS_DATA + 1 distinct entries is rejected.
 
     Scenario
     --------

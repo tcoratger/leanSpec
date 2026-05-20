@@ -53,9 +53,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
         head_state.validators[ValidatorIndex(i)].get_attestation_pubkey() for i in range(2)
     ]
     results[0].proof.verify(
-        public_keys=public_keys,
-        message=hash_tree_root(att_data),
-        slot=att_data.slot,
+        public_keys=public_keys, message=hash_tree_root(att_data), slot=att_data.slot
     )
 
 
@@ -149,7 +147,6 @@ def test_aggregated_signatures_with_multiple_data_groups(
 ) -> None:
     """Multiple attestation data groups should be processed independently."""
     store = make_store(num_validators=4, key_manager=container_key_manager)
-    head_state = store.states[store.head]
     source = Checkpoint(root=make_bytes32(22), slot=Slot(0))
     att_data1 = make_attestation_data_simple(
         Slot(9), make_bytes32(23), make_bytes32(24), source=source
@@ -188,7 +185,9 @@ def test_aggregated_signatures_with_multiple_data_groups(
 
     for signed_att in results:
         participants = signed_att.proof.participants.to_validator_indices()
-        public_keys = [head_state.validators[vid].get_attestation_pubkey() for vid in participants]
+        public_keys = [
+            container_key_manager[vid].attestation_keypair.public_key for vid in participants
+        ]
         signed_att.proof.verify(
             public_keys=public_keys,
             message=hash_tree_root(signed_att.data),

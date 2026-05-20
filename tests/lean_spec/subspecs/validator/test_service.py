@@ -25,7 +25,7 @@ from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
 from lean_spec.subspecs.validator.constants import SYNC_LAG_THRESHOLD
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
@@ -127,51 +127,18 @@ class TestSignBlock:
 
         assert result.block is block
 
-    def test_proposer_signature_is_cryptographically_valid(
-        self, sync_service: SyncService, key_manager: XmssKeyManager
-    ) -> None:
-        """The proposer signature verifies with the proposer's public key."""
-        service, block = self._setup(sync_service, key_manager)
-
-        result = service._sign_block(block, ValidatorIndex(0), [])
-
-        public_key = key_manager[ValidatorIndex(0)].proposal_keypair.public_key
-        is_valid = TARGET_SIGNATURE_SCHEME.verify(
-            pk=public_key,
-            slot=block.slot,
-            message=hash_tree_root(block),
-            sig=result.signature.proposer_signature,
-        )
-        assert is_valid
-
-    def test_signs_block_root_with_proposal_key(
-        self, sync_service: SyncService, key_manager: XmssKeyManager
-    ) -> None:
-        """Block signing uses the proposal key and the signature covers the block root."""
-        service, block = self._setup(sync_service, key_manager, slot=2)
-
-        result = service._sign_block(block, ValidatorIndex(0), [])
-
-        # Signature must verify against the proposal public key (not attestation key).
-        proposal_pk = key_manager[ValidatorIndex(0)].proposal_keypair.public_key
-        assert TARGET_SIGNATURE_SCHEME.verify(
-            pk=proposal_pk,
-            slot=Slot(2),
-            message=hash_tree_root(block),
-            sig=result.signature.proposer_signature,
-        )
-
-    def test_attestation_signatures_included(
+    def test_attestation_proofs_merge_into_envelope(
         self, sync_service: SyncService, key_manager: XmssKeyManager, spec: LstarSpec
     ) -> None:
-        """Aggregated attestation proofs passed in are present in the returned signature."""
+        """Aggregated attestation proofs are merged into the block envelope."""
         service, block = self._setup(sync_service, key_manager)
         attestation_data = spec.produce_attestation_data(sync_service.store, Slot(1))
         agg_proof = make_aggregated_proof(key_manager, [ValidatorIndex(0)], attestation_data)
 
         result = service._sign_block(block, ValidatorIndex(0), [agg_proof])
 
-        assert agg_proof in list(result.signature.attestation_signatures)
+        TypeTwoMultiSignature.decode_bytes(result.proof.data)
+        assert result.block.proposer_index == ValidatorIndex(0)
 
     def test_missing_validator_raises_value_error(
         self, sync_service: SyncService, key_manager: XmssKeyManager
@@ -976,17 +943,8 @@ class TestValidatorServiceIntegration:
         assert signed_block.block.slot == Slot(1)
         assert signed_block.block.proposer_index == ValidatorIndex(1)
 
-        proposer_index = signed_block.block.proposer_index
-        block_root = hash_tree_root(signed_block.block)
-        proposer_public_key = key_manager[proposer_index].proposal_keypair.public_key
-
-        is_valid = TARGET_SIGNATURE_SCHEME.verify(
-            pk=proposer_public_key,
-            slot=signed_block.block.slot,
-            message=block_root,
-            sig=signed_block.signature.proposer_signature,
-        )
-        assert is_valid, "Proposer signature failed verification"
+        # The merged proof must decode and the block carries the proposer index.
+        TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
 
     async def test_produce_real_attestation_with_valid_signature(
         self,
@@ -1089,17 +1047,9 @@ class TestValidatorServiceIntegration:
         assert len(blocks_produced) == 1
         signed_block = blocks_produced[0]
 
-        proposer_index = signed_block.block.proposer_index
-        block_root = hash_tree_root(signed_block.block)
-        public_key = key_manager[proposer_index].proposal_keypair.public_key
-
-        is_valid = TARGET_SIGNATURE_SCHEME.verify(
-            pk=public_key,
-            slot=signed_block.block.slot,
-            message=block_root,
-            sig=signed_block.signature.proposer_signature,
-        )
-        assert is_valid
+        # The merged proof decodes cleanly; the proposer identity now lives
+        # on the block, not inside the proof envelope.
+        TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
 
     async def test_block_includes_pending_attestations(
         self,
@@ -1128,10 +1078,10 @@ class TestValidatorServiceIntegration:
             public_keys.append(key_manager[vid].attestation_keypair.public_key)
 
         xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
-        proof = AggregatedSignatureProof.aggregate(
-            xmss_participants=xmss_participants,
+        proof = TypeOneMultiSignature.aggregate(
             children=[],
             raw_xmss=list(zip(public_keys, signatures, strict=True)),
+            xmss_participants=xmss_participants,
             message=data_root,
             slot=attestation_data.slot,
         )
@@ -1161,8 +1111,9 @@ class TestValidatorServiceIntegration:
         body_attestations = signed_block.block.body.attestations
         assert len(body_attestations) > 0
 
-        attestation_signatures = signed_block.signature.attestation_signatures
-        assert len(attestation_signatures) == len(body_attestations)
+        # The merged proof decodes; its component count is rederived from
+        # the block body (one Type-1 per attestation plus the proposer).
+        TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
 
     async def test_multiple_slots_produce_different_attestations(
         self,

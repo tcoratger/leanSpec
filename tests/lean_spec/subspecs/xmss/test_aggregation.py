@@ -6,8 +6,18 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof, AggregationError
-from lean_spec.types import ByteListMiB, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.subspecs.xmss.aggregation import (
+    AggregationError,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
+)
+from lean_spec.types import (
+    ByteList512KiB,
+    Checkpoint,
+    Slot,
+    ValidatorIndex,
+    ValidatorIndices,
+)
 from tests.lean_spec.helpers import make_attestation_data_simple, make_bytes32
 
 
@@ -15,7 +25,7 @@ def _sign_and_aggregate(
     key_manager: XmssKeyManager,
     validator_ids: list[ValidatorIndex],
     att_data_args: tuple[Slot, int, int, Checkpoint],
-) -> AggregatedSignatureProof:
+) -> TypeOneMultiSignature:
     """Sign attestation data with the given validators and aggregate."""
     slot, head, target, source = att_data_args
     att_data = make_attestation_data_simple(slot, make_bytes32(head), make_bytes32(target), source)
@@ -29,20 +39,19 @@ def _sign_and_aggregate(
             strict=True,
         )
     )
-    proof = AggregatedSignatureProof.aggregate(
+    return TypeOneMultiSignature.aggregate(
         xmss_participants=xmss_participants,
         children=[],
         raw_xmss=raw_xmss,
         message=data_root,
         slot=att_data.slot,
     )
-    return proof
 
 
 def test_aggregate_rejects_empty_inputs() -> None:
     """Aggregation with no signatures and no children raises an error."""
     with pytest.raises(AggregationError, match="At least one raw signature or child proof"):
-        AggregatedSignatureProof.aggregate(
+        TypeOneMultiSignature.aggregate(
             xmss_participants=None,
             children=[],
             raw_xmss=[],
@@ -52,7 +61,7 @@ def test_aggregate_rejects_empty_inputs() -> None:
 
 
 def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
-    """Multiple validators' signatures can be aggregated into a single proof."""
+    """Multiple validators' signatures can be aggregated into a single Type-1 proof."""
     source = Checkpoint(root=make_bytes32(10), slot=Slot(0))
     att_data = make_attestation_data_simple(Slot(2), make_bytes32(11), make_bytes32(12), source)
     vids = [ValidatorIndex(i) for i in range(4)]
@@ -66,7 +75,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
         )
     )
 
-    proof = AggregatedSignatureProof.aggregate(
+    proof = TypeOneMultiSignature.aggregate(
         xmss_participants=xmss_participants,
         children=[],
         raw_xmss=raw_xmss,
@@ -77,11 +86,7 @@ def test_aggregate_multiple_signatures(key_manager: XmssKeyManager) -> None:
     assert set(proof.participants.to_validator_indices()) == set(vids)
 
     public_keys = [key_manager[vid].attestation_keypair.public_key for vid in vids]
-    proof.verify(
-        public_keys=public_keys,
-        message=hash_tree_root(att_data),
-        slot=att_data.slot,
-    )
+    proof.verify(public_keys=public_keys, message=hash_tree_root(att_data), slot=att_data.slot)
 
 
 def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> None:
@@ -106,13 +111,14 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
         )
     )
 
-    parent = AggregatedSignatureProof.aggregate(
+    parent = TypeOneMultiSignature.aggregate(
         xmss_participants=xmss_participants,
         children=[
             (
                 child,
                 [key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(2)],
             )
+            for child in [child, child]
         ],
         raw_xmss=raw_xmss,
         message=hash_tree_root(att_data),
@@ -123,11 +129,7 @@ def test_aggregate_children_with_raw_signatures(key_manager: XmssKeyManager) -> 
     assert set(parent.participants.to_validator_indices()) == expected_vids
 
     public_keys = [key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(4)]
-    parent.verify(
-        public_keys=public_keys,
-        message=hash_tree_root(att_data),
-        slot=att_data.slot,
-    )
+    parent.verify(public_keys=public_keys, message=hash_tree_root(att_data), slot=att_data.slot)
 
 
 def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
@@ -146,7 +148,7 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
     child_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
     child_c_pks = [key_manager[ValidatorIndex(2)].attestation_keypair.public_key]
 
-    parent = AggregatedSignatureProof.aggregate(
+    parent = TypeOneMultiSignature.aggregate(
         xmss_participants=None,
         children=[(child_a, child_a_pks), (child_b, child_b_pks), (child_c, child_c_pks)],
         raw_xmss=[],
@@ -158,11 +160,7 @@ def test_aggregate_three_children(key_manager: XmssKeyManager) -> None:
     assert set(parent.participants.to_validator_indices()) == expected_vids
 
     public_keys = [key_manager[ValidatorIndex(i)].attestation_keypair.public_key for i in range(3)]
-    parent.verify(
-        public_keys=public_keys,
-        message=hash_tree_root(att_data),
-        slot=att_data.slot,
-    )
+    parent.verify(public_keys=public_keys, message=hash_tree_root(att_data), slot=att_data.slot)
 
 
 def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
@@ -174,7 +172,7 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
     )
     msg = hash_tree_root(att_data)
 
-    # Level 0: four individual leaf proofs
+    # Level 0: four individual leaf proofs.
     leaf_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
     leaf_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
     leaf_c = _sign_and_aggregate(key_manager, [ValidatorIndex(2)], att_args)
@@ -185,15 +183,15 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
     leaf_c_pks = [key_manager[ValidatorIndex(2)].attestation_keypair.public_key]
     leaf_d_pks = [key_manager[ValidatorIndex(3)].attestation_keypair.public_key]
 
-    # Level 1: two intermediate proofs
-    mid_ab = AggregatedSignatureProof.aggregate(
+    # Level 1: two intermediate proofs.
+    mid_ab = TypeOneMultiSignature.aggregate(
         xmss_participants=None,
         children=[(leaf_a, leaf_a_pks), (leaf_b, leaf_b_pks)],
         raw_xmss=[],
         message=msg,
         slot=att_data.slot,
     )
-    mid_cd = AggregatedSignatureProof.aggregate(
+    mid_cd = TypeOneMultiSignature.aggregate(
         xmss_participants=None,
         children=[(leaf_c, leaf_c_pks), (leaf_d, leaf_d_pks)],
         raw_xmss=[],
@@ -201,8 +199,8 @@ def test_aggregate_children_of_children(key_manager: XmssKeyManager) -> None:
         slot=att_data.slot,
     )
 
-    # Level 2: final root proof
-    root = AggregatedSignatureProof.aggregate(
+    # Level 2: final root proof.
+    root = TypeOneMultiSignature.aggregate(
         xmss_participants=None,
         children=[(mid_ab, leaf_a_pks + leaf_b_pks), (mid_cd, leaf_c_pks + leaf_d_pks)],
         raw_xmss=[],
@@ -229,14 +227,14 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
     )
     msg = hash_tree_root(att_data)
 
-    # Two child proofs
+    # Two child proofs.
     child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args)
     child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args)
 
     child_a_pks = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
     child_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
 
-    # Additional raw signatures from validators 2 and 3
+    # Additional raw signatures from validators 2 and 3.
     extra_vids = [ValidatorIndex(2), ValidatorIndex(3)]
     xmss_participants = ValidatorIndices(data=extra_vids).to_aggregation_bits()
     raw_xmss = list(
@@ -247,7 +245,7 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
         )
     )
 
-    proof = AggregatedSignatureProof.aggregate(
+    proof = TypeOneMultiSignature.aggregate(
         xmss_participants=xmss_participants,
         children=[(child_a, child_a_pks), (child_b, child_b_pks)],
         raw_xmss=raw_xmss,
@@ -266,57 +264,28 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
 
 
 def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager) -> None:
-    """Verification fails when the message doesn't match what was signed."""
+    """Verification fails when the caller passes a message that does not match the proof."""
     source = Checkpoint(root=make_bytes32(120), slot=Slot(0))
     att_data = make_attestation_data_simple(Slot(1), make_bytes32(121), make_bytes32(122), source)
     vid = ValidatorIndex(0)
 
-    xmss_participants = ValidatorIndices(data=[vid]).to_aggregation_bits()
-    raw_xmss = [
-        (
-            key_manager[vid].attestation_keypair.public_key,
-            key_manager.sign_attestation_data(vid, att_data),
-        )
-    ]
+    proof = _sign_and_aggregate(key_manager, [vid], (att_data.slot, 121, 122, source))
 
-    proof = AggregatedSignatureProof.aggregate(
-        xmss_participants=xmss_participants,
-        children=[],
-        raw_xmss=raw_xmss,
-        message=hash_tree_root(att_data),
-        slot=att_data.slot,
-    )
-
-    wrong_message = make_bytes32(999)
     with pytest.raises(AggregationError, match="verification failed"):
         proof.verify(
             public_keys=[key_manager[vid].attestation_keypair.public_key],
-            message=wrong_message,
+            message=make_bytes32(123),
             slot=att_data.slot,
         )
 
 
 def test_aggregate_wrong_slot_fails_verification(key_manager: XmssKeyManager) -> None:
-    """Verification fails when the slot doesn't match what was signed."""
+    """Verification fails when the caller passes a slot that does not match the proof."""
     source = Checkpoint(root=make_bytes32(130), slot=Slot(0))
     att_data = make_attestation_data_simple(Slot(2), make_bytes32(131), make_bytes32(132), source)
     vid = ValidatorIndex(1)
 
-    xmss_participants = ValidatorIndices(data=[vid]).to_aggregation_bits()
-    raw_xmss = [
-        (
-            key_manager[vid].attestation_keypair.public_key,
-            key_manager.sign_attestation_data(vid, att_data),
-        )
-    ]
-
-    proof = AggregatedSignatureProof.aggregate(
-        xmss_participants=xmss_participants,
-        children=[],
-        raw_xmss=raw_xmss,
-        message=hash_tree_root(att_data),
-        slot=att_data.slot,
-    )
+    proof = _sign_and_aggregate(key_manager, [vid], (att_data.slot, 131, 132, source))
 
     with pytest.raises(AggregationError, match="verification failed"):
         proof.verify(
@@ -332,23 +301,16 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
     att_data = make_attestation_data_simple(Slot(3), make_bytes32(141), make_bytes32(142), source)
     vid = ValidatorIndex(2)
 
-    proof = _sign_and_aggregate(
-        key_manager,
-        [vid],
-        (att_data.slot, 141, 142, source),
-    )
+    proof = _sign_and_aggregate(key_manager, [vid], (att_data.slot, 141, 142, source))
 
-    # Corrupt the proof data by flipping bytes
-    corrupted_data = bytearray(proof.proof_data.encode_bytes())
-    corrupted_data[10] ^= 0xFF
-    corrupted_data[20] ^= 0xFF
-    corrupted_proof = AggregatedSignatureProof(
-        participants=proof.participants,
-        proof_data=ByteListMiB(data=bytes(corrupted_data)),
-    )
+    corrupted_bytes = bytearray(proof.proof.data)
+    corrupted_bytes[10] ^= 0xFF
+    corrupted_bytes[20] ^= 0xFF
+    corrupted_blob = ByteList512KiB(data=bytes(corrupted_bytes))
+    corrupted = proof.model_copy(update={"proof": corrupted_blob})
 
     with pytest.raises(AggregationError, match="verification failed"):
-        corrupted_proof.verify(
+        corrupted.verify(
             public_keys=[key_manager[vid].attestation_keypair.public_key],
             message=hash_tree_root(att_data),
             slot=att_data.slot,
@@ -356,7 +318,7 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
 
 
 def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyManager) -> None:
-    """Aggregating children that signed different messages fails."""
+    """Aggregating children that signed different messages fails inside the binding."""
     source = Checkpoint(root=make_bytes32(150), slot=Slot(0))
     att_args_a = (Slot(4), 151, 152, source)
     att_args_b = (Slot(4), 161, 162, source)
@@ -364,17 +326,15 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
         att_args_b[0], make_bytes32(att_args_b[1]), make_bytes32(att_args_b[2]), att_args_b[3]
     )
 
-    # Child A signs message A
     child_a = _sign_and_aggregate(key_manager, [ValidatorIndex(0)], att_args_a)
-    # Child B signs message B (different)
     child_b = _sign_and_aggregate(key_manager, [ValidatorIndex(1)], att_args_b)
 
     child_a_pks = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
     child_b_pks = [key_manager[ValidatorIndex(1)].attestation_keypair.public_key]
 
-    # Aggregation rejects children that signed different messages
+    # The binding rejects mismatching messages during recursive aggregation.
     with pytest.raises(AggregationError):
-        AggregatedSignatureProof.aggregate(
+        TypeOneMultiSignature.aggregate(
             xmss_participants=None,
             children=[(child_a, child_a_pks), (child_b, child_b_pks)],
             raw_xmss=[],
@@ -385,14 +345,14 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
 
 def test_aggregate_rejects_single_child_without_raw(key_manager: XmssKeyManager) -> None:
     """A single child without raw signatures is rejected (need at least two children)."""
-    # Create a stub child proof without calling the Rust bindings
-    stub_child = AggregatedSignatureProof(
+    placeholder = ByteList512KiB(data=b"\x00")
+    stub_child = TypeOneMultiSignature(
         participants=ValidatorIndices(data=[ValidatorIndex(0)]).to_aggregation_bits(),
-        proof_data=ByteListMiB(data=b"\x00"),
+        proof=placeholder,
     )
 
     with pytest.raises(AggregationError, match="At least two child proofs"):
-        AggregatedSignatureProof.aggregate(
+        TypeOneMultiSignature.aggregate(
             xmss_participants=None,
             children=[
                 (
@@ -416,7 +376,7 @@ def test_aggregate_rejects_mismatched_participant_count(
     source = Checkpoint(root=make_bytes32(60), slot=Slot(0))
     att_data = make_attestation_data_simple(Slot(7), make_bytes32(61), make_bytes32(62), source)
 
-    # Claim 2 participants but only provide 1 signature
+    # Claim 2 participants but only provide 1 signature.
     xmss_participants = ValidatorIndices(
         data=[ValidatorIndex(0), ValidatorIndex(1)]
     ).to_aggregation_bits()
@@ -428,10 +388,151 @@ def test_aggregate_rejects_mismatched_participant_count(
     ]
 
     with pytest.raises(AggregationError, match="does not match"):
-        AggregatedSignatureProof.aggregate(
+        TypeOneMultiSignature.aggregate(
             xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
             message=hash_tree_root(att_data),
             slot=att_data.slot,
+        )
+
+
+def test_type_two_aggregate_rejects_empty_parts() -> None:
+    """Type-2 aggregation requires at least one Type-1 input."""
+    with pytest.raises(AggregationError, match="at least one Type-1 input"):
+        TypeTwoMultiSignature.aggregate(parts=[], public_keys_per_part=[])
+
+
+def test_type_two_aggregate_rejects_mismatched_pubkey_layout(
+    key_manager: XmssKeyManager,
+) -> None:
+    """The per-part pubkey layout must match the participant count of each part."""
+    source = Checkpoint(root=make_bytes32(200), slot=Slot(0))
+    att_args = (Slot(7), 201, 202, source)
+
+    part = _sign_and_aggregate(
+        key_manager,
+        [ValidatorIndex(0), ValidatorIndex(1)],
+        att_args,
+    )
+    # Layout claims one pubkey for a part that binds two participants.
+    wrong_layout = [[key_manager[ValidatorIndex(0)].attestation_keypair.public_key]]
+
+    with pytest.raises(AggregationError, match="expected 2 pubkeys, got 1"):
+        TypeTwoMultiSignature.aggregate(
+            parts=[part],
+            public_keys_per_part=wrong_layout,
+        )
+
+
+def test_type_two_verify_round_trip(key_manager: XmssKeyManager) -> None:
+    """A Type-2 merge of two distinct-message Type-1 proofs round-trips through verify."""
+    source = Checkpoint(root=make_bytes32(300), slot=Slot(0))
+
+    # Two distinct messages signed by disjoint validator sets.
+    att_args_a = (Slot(8), 301, 302, source)
+    att_args_b = (Slot(8), 303, 304, source)
+    att_data_a = make_attestation_data_simple(
+        att_args_a[0],
+        make_bytes32(att_args_a[1]),
+        make_bytes32(att_args_a[2]),
+        att_args_a[3],
+    )
+    att_data_b = make_attestation_data_simple(
+        att_args_b[0],
+        make_bytes32(att_args_b[1]),
+        make_bytes32(att_args_b[2]),
+        att_args_b[3],
+    )
+
+    vids_a = [ValidatorIndex(0), ValidatorIndex(1)]
+    vids_b = [ValidatorIndex(2), ValidatorIndex(3)]
+    part_a = _sign_and_aggregate(key_manager, vids_a, att_args_a)
+    part_b = _sign_and_aggregate(key_manager, vids_b, att_args_b)
+
+    pubkeys_a = [key_manager[vid].attestation_keypair.public_key for vid in vids_a]
+    pubkeys_b = [key_manager[vid].attestation_keypair.public_key for vid in vids_b]
+
+    merged = TypeTwoMultiSignature.aggregate(
+        parts=[part_a, part_b],
+        public_keys_per_part=[pubkeys_a, pubkeys_b],
+    )
+
+    merged.verify(
+        public_keys_per_message=[pubkeys_a, pubkeys_b],
+        messages=[
+            (hash_tree_root(att_data_a), att_data_a.slot),
+            (hash_tree_root(att_data_b), att_data_b.slot),
+        ],
+    )
+
+
+def test_type_two_verify_rejects_message_swap(key_manager: XmssKeyManager) -> None:
+    """Swapping the parallel message bindings causes verification to fail.
+
+    Without per-component message binding a proposer could pair honest
+    signatures with attacker-chosen attestation data.
+    """
+    source = Checkpoint(root=make_bytes32(400), slot=Slot(0))
+
+    att_args_a = (Slot(9), 401, 402, source)
+    att_args_b = (Slot(9), 403, 404, source)
+    att_data_a = make_attestation_data_simple(
+        att_args_a[0],
+        make_bytes32(att_args_a[1]),
+        make_bytes32(att_args_a[2]),
+        att_args_a[3],
+    )
+    att_data_b = make_attestation_data_simple(
+        att_args_b[0],
+        make_bytes32(att_args_b[1]),
+        make_bytes32(att_args_b[2]),
+        att_args_b[3],
+    )
+
+    vids_a = [ValidatorIndex(0), ValidatorIndex(1)]
+    vids_b = [ValidatorIndex(2), ValidatorIndex(3)]
+    part_a = _sign_and_aggregate(key_manager, vids_a, att_args_a)
+    part_b = _sign_and_aggregate(key_manager, vids_b, att_args_b)
+
+    pubkeys_a = [key_manager[vid].attestation_keypair.public_key for vid in vids_a]
+    pubkeys_b = [key_manager[vid].attestation_keypair.public_key for vid in vids_b]
+
+    merged = TypeTwoMultiSignature.aggregate(
+        parts=[part_a, part_b],
+        public_keys_per_part=[pubkeys_a, pubkeys_b],
+    )
+
+    # Swap the parallel messages: part_a's pubkeys are now paired with part_b's
+    # message and vice versa.
+    with pytest.raises(AggregationError, match="verification failed"):
+        merged.verify(
+            public_keys_per_message=[pubkeys_a, pubkeys_b],
+            messages=[
+                (hash_tree_root(att_data_b), att_data_b.slot),
+                (hash_tree_root(att_data_a), att_data_a.slot),
+            ],
+        )
+
+
+def test_type_two_verify_rejects_mismatched_messages_length(
+    key_manager: XmssKeyManager,
+) -> None:
+    """messages must have the same length as public_keys_per_message."""
+    source = Checkpoint(root=make_bytes32(500), slot=Slot(0))
+    att_args = (Slot(10), 501, 502, source)
+
+    vids = [ValidatorIndex(0), ValidatorIndex(1)]
+    part = _sign_and_aggregate(key_manager, vids, att_args)
+    pubkeys = [key_manager[vid].attestation_keypair.public_key for vid in vids]
+
+    merged = TypeTwoMultiSignature.aggregate(
+        parts=[part],
+        public_keys_per_part=[pubkeys],
+    )
+
+    with pytest.raises(AggregationError, match="expected 1 message bindings, got 0"):
+        merged.verify(
+            public_keys_per_message=[pubkeys],
+            messages=[],
         )

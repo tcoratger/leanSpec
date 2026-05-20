@@ -8,17 +8,18 @@ from lean_spec.forks.lstar import Store
 from lean_spec.forks.lstar.containers.attestation import AttestationData
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
-from lean_spec.types.byte_arrays import ByteListMiB
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.types.byte_arrays import ByteList512KiB, Bytes32
 from tests.lean_spec.helpers import make_bytes32, make_signed_block
 
 
-def _make_empty_proof(participants: list[ValidatorIndex]) -> AggregatedSignatureProof:
-    """Create an aggregated proof with empty proof data for testing."""
-    return AggregatedSignatureProof(
+def _make_empty_proof(participants: list[ValidatorIndex]) -> TypeOneMultiSignature:
+    """Create a placeholder Type-1 proof carrying a participant bitfield."""
+    placeholder = ByteList512KiB(data=b"")
+    return TypeOneMultiSignature(
         participants=ValidatorIndices(data=participants).to_aggregation_bits(),
-        proof_data=ByteListMiB(data=b""),
+        proof=placeholder,
     )
 
 

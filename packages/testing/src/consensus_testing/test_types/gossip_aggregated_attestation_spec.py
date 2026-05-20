@@ -6,9 +6,9 @@ from lean_spec.forks.lstar.containers.attestation import AttestationData
 from lean_spec.forks.lstar.containers.attestation.attestation import SignedAggregatedAttestation
 from lean_spec.forks.lstar.containers.block.block import Block
 from lean_spec.forks.lstar.containers.state import State
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import (
-    ByteListMiB,
+    ByteList512KiB,
     Bytes32,
     CamelModel,
     Checkpoint,
@@ -188,9 +188,10 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # Correct participant bitfield but zeroed-out proof bytes.
         # Exercises signature verification rejection.
         if not self.valid_signature:
-            proof = AggregatedSignatureProof(
+            placeholder = ByteList512KiB(data=b"\x00" * 32)
+            proof = TypeOneMultiSignature(
                 participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
-                proof_data=ByteListMiB(data=b"\x00" * 32),
+                proof=placeholder,
             )
             return SignedAggregatedAttestation(data=attestation_data, proof=proof)
 
@@ -205,9 +206,9 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # but the claimed participants no longer match.
         # The store must detect and reject this inconsistency.
         if self.signer_ids and self.signer_ids != self.validator_ids:
-            proof = AggregatedSignatureProof(
+            proof = TypeOneMultiSignature(
                 participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
-                proof_data=proof.proof_data,
+                proof=proof.proof,
             )
 
         return SignedAggregatedAttestation(data=attestation_data, proof=proof)

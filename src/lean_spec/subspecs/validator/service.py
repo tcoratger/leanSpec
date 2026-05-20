@@ -39,9 +39,7 @@ from typing import Literal
 
 from lean_spec.forks import (
     AttestationData,
-    AttestationSignatures,
     Block,
-    BlockSignatures,
     LstarSpec,
     SignedAttestation,
     SignedBlock,
@@ -50,9 +48,9 @@ from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import SyncService
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
+from lean_spec.subspecs.xmss.containers import PublicKey, Signature
+from lean_spec.types import ByteList512KiB, Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
 
 from .constants import HYSTERESIS_BAND, NETWORK_STALL_THRESHOLD, SYNC_LAG_THRESHOLD
 from .registry import ValidatorEntry, ValidatorRegistry
@@ -317,7 +315,8 @@ class ValidatorService:
 
                 self.sync_service.store = new_store
 
-                # Sign the block: proposer_signature covers the block root.
+                # Sign the block: proposer_signature covers the block root,
+                # and is merged with attestation proofs into one block proof.
                 signed_block = self._sign_block(block, validator_index, signatures)
 
                 self._blocks_produced += 1
@@ -411,17 +410,21 @@ class ValidatorService:
         self,
         block: Block,
         validator_index: ValidatorIndex,
-        attestation_signatures: list[AggregatedSignatureProof],
+        attestation_proofs: list[TypeOneMultiSignature],
     ) -> SignedBlock:
         """
         Sign a block and wrap it for publishing.
 
-        Signs hash_tree_root(block) with the proposer's proposal key.
+        Signs the block root with the proposer's proposal key, wraps the
+        signature into a singleton Type-1 proof, and merges that with the
+        per-attestation Type-1 proofs into a single Type-2 proof. The
+        merged proof is SSZ-encoded and stored on SignedBlock.proof.
 
         Args:
             block: The block to sign.
             validator_index: Index of the proposing validator.
-            attestation_signatures: Aggregated signatures for included attestations.
+            attestation_proofs: Per-AttestationData Type-1 proofs included in
+                the block body, parallel to block.body.attestations.
 
         Returns:
             Signed block ready for publishing.
@@ -439,14 +442,60 @@ class ValidatorService:
             "proposal_secret_key",
         )
 
-        signature = BlockSignatures(
-            attestation_signatures=AttestationSignatures(data=attestation_signatures),
-            proposer_signature=proposer_signature,
+        # Resolve validator pubkeys from state using validator indices.
+        key_state = self.sync_service.store.states.get(block_root)
+        if key_state is None:
+            key_state = self.sync_service.store.states.get(self.sync_service.store.head)
+        if key_state is None:
+            raise ValueError(
+                "No state available to resolve validator public keys for block signing"
+            )
+
+        validators = key_state.validators
+        if not validator_index.is_valid(Uint64(len(validators))):
+            raise ValueError(f"Validator {validator_index} not found in state validators")
+        proposer_pubkey = validators[validator_index].get_proposal_pubkey()
+
+        # Wrap the proposer's raw XMSS signature into a singleton Type-1.
+        # The participant set is just the proposer index.
+        proposer_participants = ValidatorIndices(data=[validator_index]).to_aggregation_bits()
+        proposer_type_1 = TypeOneMultiSignature.aggregate(
+            children=[],
+            raw_xmss=[(proposer_pubkey, proposer_signature)],
+            xmss_participants=proposer_participants,
+            message=block_root,
+            slot=block.slot,
+        )
+
+        # Merge the per-attestation proofs and the proposer Type-1 into one
+        # Type-2 proof. Order matters: verify_signatures expects the proposer
+        # entry to be last, parallel to block.body.attestations + 1.
+        # The pubkey lookup below indexes the active validator set, so each
+        # participant must fall within it.
+        # A stale partial aggregate would otherwise blow up deep inside
+        # the aggregator with an opaque KeyError.
+        num_validators = Uint64(len(validators))
+        public_keys_per_part: list[list[PublicKey]] = []
+        for proof in attestation_proofs:
+            part_pubkeys: list[PublicKey] = []
+            for vid in proof.participants.to_validator_indices():
+                if not vid.is_valid(num_validators):
+                    raise ValueError(
+                        f"Attestation proof references validator {vid}; "
+                        f"active set has {num_validators} validators"
+                    )
+                part_pubkeys.append(validators[vid].get_attestation_pubkey())
+            public_keys_per_part.append(part_pubkeys)
+        public_keys_per_part.append([proposer_pubkey])
+
+        merged = TypeTwoMultiSignature.aggregate(
+            [*attestation_proofs, proposer_type_1],
+            public_keys_per_part=public_keys_per_part,
         )
 
         return SignedBlock(
             block=block,
-            signature=signature,
+            proof=ByteList512KiB(data=merged.encode_bytes()),
         )
 
     def _sign_attestation(

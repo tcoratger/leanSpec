@@ -15,9 +15,9 @@ from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import AggregatedSignatureProof
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import (
-    ByteListMiB,
+    ByteList512KiB,
     Bytes32,
     Checkpoint,
     Slot,
@@ -302,7 +302,7 @@ class TestOnGossipAggregatedAttestation:
                 strict=True,
             )
         )
-        proof = AggregatedSignatureProof.aggregate(
+        proof = TypeOneMultiSignature.aggregate(
             xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
@@ -349,7 +349,7 @@ class TestOnGossipAggregatedAttestation:
                 strict=True,
             )
         )
-        proof = AggregatedSignatureProof.aggregate(
+        proof = TypeOneMultiSignature.aggregate(
             xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
@@ -389,7 +389,7 @@ class TestOnGossipAggregatedAttestation:
                 strict=True,
             )
         )
-        proof = AggregatedSignatureProof.aggregate(
+        proof = TypeOneMultiSignature.aggregate(
             xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
@@ -398,13 +398,11 @@ class TestOnGossipAggregatedAttestation:
         )
 
         # Corrupt the proof data
-        corrupted_data = bytearray(proof.proof_data.encode_bytes())
+        corrupted_data = bytearray(proof.proof.data)
         corrupted_data[10] ^= 0xFF
         corrupted_data[20] ^= 0xFF
-        corrupted_proof = AggregatedSignatureProof(
-            participants=proof.participants,
-            proof_data=ByteListMiB(data=bytes(corrupted_data)),
-        )
+        corrupted_blob = ByteList512KiB(data=bytes(corrupted_data))
+        corrupted_proof = proof.model_copy(update={"proof": corrupted_blob})
 
         signed_aggregated = SignedAggregatedAttestation(
             data=attestation_data,
@@ -440,7 +438,7 @@ class TestOnGossipAggregatedAttestation:
                 strict=True,
             )
         )
-        proof_1 = AggregatedSignatureProof.aggregate(
+        proof_1 = TypeOneMultiSignature.aggregate(
             xmss_participants=xmss_1,
             children=[],
             raw_xmss=raw_xmss_1,
@@ -461,7 +459,7 @@ class TestOnGossipAggregatedAttestation:
                 strict=True,
             )
         )
-        proof_2 = AggregatedSignatureProof.aggregate(
+        proof_2 = TypeOneMultiSignature.aggregate(
             xmss_participants=xmss_2,
             children=[],
             raw_xmss=raw_xmss_2,
@@ -546,7 +544,7 @@ class TestAggregateCommitteeSignatures:
         participants = proof.participants.to_validator_indices()
         public_keys = [key_manager[vid].attestation_keypair.public_key for vid in participants]
 
-        # Verify the proof is valid
+        # Verify proof is valid
         proof.verify(
             public_keys=public_keys,
             message=hash_tree_root(attestation_data),
@@ -774,7 +772,6 @@ class TestEndToEndAggregationFlow:
         store = store.model_copy(update={"time": Interval.from_slot(Slot(1))})
 
         attestation_data = spec.produce_attestation_data(store, Slot(1))
-        data_root = hash_tree_root(attestation_data)
 
         # Step 1: Receive gossip attestations from validators 1 and 2
         # (all in same subnet since ATTESTATION_COMMITTEE_COUNT=1 by default)
@@ -814,6 +811,6 @@ class TestEndToEndAggregationFlow:
 
         proof.verify(
             public_keys=public_keys,
-            message=data_root,
+            message=hash_tree_root(attestation_data),
             slot=attestation_data.slot,
         )
