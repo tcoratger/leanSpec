@@ -18,9 +18,9 @@ class PeerInfo:
 
     Tracks identity, connection state, and cached protocol data.
 
-    The enr and status fields cache fork data from discovery and handshake:
+    The enr and status fields cache fork data from peer configuration and handshake:
 
-    - enr: Populated from discovery, contains eth2 fork_digest
+    - enr: Populated from bootnode/peer configuration, contains eth2 fork_digest
     - status: Populated after Status handshake, contains finalized/head checkpoints
 
     These cached values enable fork compatibility checks at multiple layers.
@@ -42,7 +42,7 @@ class PeerInfo:
     """Unix timestamp of last successful interaction."""
 
     enr: ENR | None = None
-    """Cached ENR from discovery. Contains eth2 fork_digest for compatibility checks."""
+    """Cached ENR from peer configuration. Contains eth2 fork_digest for compatibility checks."""
 
     status: Status | None = None
     """Cached Status from handshake. Contains finalized/head checkpoints."""

@@ -2,7 +2,6 @@
 
 from .api_endpoint import ApiEndpointTest
 from .base import BaseConsensusFixture
-from .discovery_crypto import DiscoveryCryptoTest
 from .fork_choice import ForkChoiceTest
 from .gossipsub_handler import GossipsubHandlerTest
 from .justifiability import JustifiabilityTest
@@ -24,7 +23,6 @@ __all__ = [
     "GossipsubHandlerTest",
     "ApiEndpointTest",
     "SlotClockTest",
-    "DiscoveryCryptoTest",
     "JustifiabilityTest",
     "PoseidonPermutationTest",
     "SyncTest",

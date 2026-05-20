@@ -7,7 +7,6 @@ from .genesis import build_anchor, generate_pre_state
 from .test_fixtures import (
     ApiEndpointTest,
     BaseConsensusFixture,
-    DiscoveryCryptoTest,
     ForkChoiceTest,
     GossipsubHandlerTest,
     JustifiabilityTest,
@@ -44,7 +43,6 @@ NetworkingCodecTestFiller = Type[NetworkingCodecTest]
 GossipsubHandlerTestFiller = Type[GossipsubHandlerTest]
 ApiEndpointTestFiller = Type[ApiEndpointTest]
 SlotClockTestFiller = Type[SlotClockTest]
-DiscoveryCryptoTestFiller = Type[DiscoveryCryptoTest]
 JustifiabilityTestFiller = Type[JustifiabilityTest]
 PoseidonPermutationTestFiller = Type[PoseidonPermutationTest]
 SyncTestFiller = Type[SyncTest]
@@ -69,7 +67,6 @@ __all__ = [
     "GossipsubHandlerTest",
     "ApiEndpointTest",
     "SlotClockTest",
-    "DiscoveryCryptoTest",
     "JustifiabilityTest",
     "PoseidonPermutationTest",
     "SyncTest",
@@ -93,7 +90,6 @@ __all__ = [
     "GossipsubHandlerTestFiller",
     "ApiEndpointTestFiller",
     "SlotClockTestFiller",
-    "DiscoveryCryptoTestFiller",
     "JustifiabilityTestFiller",
     "PoseidonPermutationTestFiller",
     "SyncTestFiller",
