@@ -53,7 +53,6 @@ class TestConstants:
         assert NA == "na"
 
 
-
 class TestNegotiateServer:
     """Tests for server-side negotiation."""
 

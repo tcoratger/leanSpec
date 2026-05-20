@@ -503,5 +503,3 @@ def test_attestation_subnets_partial(ssz: SSZTestFiller) -> None:
         type_name="AttestationSubnets",
         value=AttestationSubnets.from_subnet_ids([0, 7, 15, 31, 63]),
     )
-
-

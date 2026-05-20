@@ -479,6 +479,7 @@ class TestMultiaddrGeneration:
         )
         assert enr.multiaddr() is None
 
+
 class TestStringRepresentation:
     """Tests for ENR string representation."""
 

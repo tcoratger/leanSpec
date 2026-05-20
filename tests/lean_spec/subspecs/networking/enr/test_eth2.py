@@ -123,4 +123,3 @@ class TestAttestationSubnets:
     def test_length_constant(self) -> None:
         """LENGTH constant is 64."""
         assert AttestationSubnets.LENGTH == 64
-
