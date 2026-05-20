@@ -211,6 +211,12 @@ class LiveNetworkEventSource:
     Controls the main loop and background tasks.
     """
 
+    _stop_event: asyncio.Event = field(default_factory=asyncio.Event)
+    """Set when the event source stops.
+
+    Lets awaiters wake immediately rather than poll the running flag.
+    """
+
     _gossip_handler: GossipHandler = field(init=False)
     """Handler for decoding incoming gossip messages.
 
@@ -440,14 +446,24 @@ class LiveNetworkEventSource:
         Raises:
             StopAsyncIteration: When no more events will arrive.
         """
-        while self._running:
-            try:
-                return await asyncio.wait_for(self._events.get(), timeout=0.5)
-            except asyncio.TimeoutError:
-                # Check running flag and loop.
-                continue
+        if not self._running:
+            raise StopAsyncIteration
 
-        raise StopAsyncIteration
+        # Race the queue against the stop signal.
+        # Whichever wins decides whether to return an event or end iteration.
+        get_task = asyncio.create_task(self._events.get())
+        stop_task = asyncio.create_task(self._stop_event.wait())
+        try:
+            done, _ = await asyncio.wait(
+                {get_task, stop_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if get_task in done:
+                return get_task.result()
+            raise StopAsyncIteration
+        finally:
+            get_task.cancel()
+            stop_task.cancel()
 
     async def dial(self, multiaddr: str) -> PeerId | None:
         """
@@ -466,6 +482,7 @@ class LiveNetworkEventSource:
         # can operate. Without this, _accept_streams exits immediately if
         # dial() is called before listen().
         self._running = True
+        self._stop_event.clear()
 
         try:
             # Detect transport type and connect accordingly.
@@ -548,6 +565,7 @@ class LiveNetworkEventSource:
             multiaddr: Address to listen on (e.g., "/ip4/0.0.0.0/udp/9000/quic-v1").
         """
         self._running = True
+        self._stop_event.clear()
 
         if is_quic_multiaddr(multiaddr):
             await self._listen_quic(multiaddr)
@@ -695,6 +713,7 @@ class LiveNetworkEventSource:
     async def stop(self) -> None:
         """Stop the event source and cancel background tasks."""
         self._running = False
+        self._stop_event.set()
 
         # Cancel gossip tasks first (including event forwarding task).
         # This must happen BEFORE stopping gossipsub behavior to avoid
