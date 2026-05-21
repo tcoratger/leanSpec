@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from types import MappingProxyType
 from typing import cast
 
@@ -11,9 +10,7 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
-    SignedBlock,
 )
-from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.ssz.hash import hash_tree_root
@@ -43,30 +40,6 @@ def _signed_aggregated_attestation(key_manager: XmssKeyManager) -> SignedAggrega
     )
     proof = make_aggregated_proof(key_manager, [ValidatorIndex(1)], attestation_data)
     return SignedAggregatedAttestation(data=attestation_data, proof=proof)
-
-
-def _persist_process_block(
-    *,
-    include_post_state: bool,
-    prune: bool,
-) -> Callable[[Store, SignedBlock], Store]:
-    post_state = make_genesis_state(num_validators=1)
-
-    def process_block(store: Store, block: SignedBlock) -> Store:
-        ms = cast(MockForkchoiceStore, store)
-        ms.on_block(block)
-        block_root = hash_tree_root(block.block)
-        if include_post_state:
-            ms.states[block_root] = post_state
-        slot = block.block.slot
-        ms.latest_justified = Checkpoint(root=block_root, slot=slot)
-        if prune:
-            ms.latest_finalized = Checkpoint(root=block_root, slot=slot)
-        else:
-            ms.latest_finalized = Checkpoint(root=Bytes32.zero(), slot=Slot(0))
-        return cast(Store, ms)
-
-    return process_block
 
 
 @pytest.fixture
@@ -579,7 +552,7 @@ class TestGenesisStart:
 
 
 class TestBlockPersistence:
-    """Tests for _process_block_wrapper and database persistence."""
+    """Tests for process_block and database persistence."""
 
     def test_process_block_increments_counter_without_database(
         self,
@@ -595,7 +568,7 @@ class TestBlockPersistence:
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
-        service.store = service._process_block_wrapper(service.store, block)
+        service.store = service.process_block(service.store, block)
         assert service._blocks_processed == 1
 
     def test_persist_skips_state_when_post_state_missing(
@@ -607,8 +580,10 @@ class TestBlockPersistence:
         service = create_mock_sync_service(
             peer_id,
             database=cast(Database, db),
-            process_block=_persist_process_block(include_post_state=False, prune=False),
         )
+        mock_store = cast(MockForkchoiceStore, service.store)
+        # Justified advances each block; finalized stays at genesis (no prune).
+        mock_store.advance_justified_on_block = True
         service.state = SyncState.SYNCING
         genesis_root = service.store.head
         block = make_signed_block(
@@ -617,7 +592,7 @@ class TestBlockPersistence:
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
-        service.store = service._process_block_wrapper(service.store, block)
+        service.store = service.process_block(service.store, block)
 
         block_root = hash_tree_root(block.block)
         assert db.calls[0].name == "batch_write_enter"
@@ -649,8 +624,12 @@ class TestBlockPersistence:
         service = create_mock_sync_service(
             peer_id,
             database=cast(Database, db),
-            process_block=_persist_process_block(include_post_state=True, prune=True),
         )
+        mock_store = cast(MockForkchoiceStore, service.store)
+        # Post-state indexing requires both a state to index and an advanced finalized.
+        mock_store.on_block_post_state = make_genesis_state(num_validators=1)
+        mock_store.advance_justified_on_block = True
+        mock_store.advance_finalized_on_block = True
         service.state = SyncState.SYNCING
         genesis_root = service.store.head
         block = make_signed_block(
@@ -659,7 +638,7 @@ class TestBlockPersistence:
             parent_root=genesis_root,
             state_root=Bytes32.zero(),
         )
-        service.store = service._process_block_wrapper(service.store, block)
+        service.store = service.process_block(service.store, block)
 
         block_root = hash_tree_root(block.block)
         assert db.calls[0].name == "batch_write_enter"
