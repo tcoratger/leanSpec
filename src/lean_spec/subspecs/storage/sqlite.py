@@ -166,23 +166,6 @@ class SQLiteDatabase:
         except sqlite3.Error as e:
             raise StorageWriteError(f"Failed to write block {root.hex()}: {e}") from e
 
-    def has_block(self, root: Bytes32) -> bool:
-        """Check if a block exists in storage."""
-        try:
-            cursor = self._conn.cursor()
-
-            # SELECT 1 is an existence check optimization.
-            #
-            # We only care whether a row exists, not its contents.
-            # This avoids deserializing potentially large SSZ data.
-            cursor.execute(
-                f"SELECT 1 FROM {BLOCKS.TABLE_NAME} WHERE root = ?",
-                (bytes(root),),
-            )
-            return cursor.fetchone() is not None
-        except sqlite3.Error as e:
-            raise StorageReadError(f"Failed to check block existence {root.hex()}: {e}") from e
-
     # State Operations
 
     #
@@ -230,20 +213,6 @@ class SQLiteDatabase:
             )
         except sqlite3.Error as e:
             raise StorageWriteError(f"Failed to write state for block {root.hex()}: {e}") from e
-
-    def has_state(self, root: Bytes32) -> bool:
-        """Check if a state exists in storage."""
-        try:
-            cursor = self._conn.cursor()
-            cursor.execute(
-                f"SELECT 1 FROM {STATES.TABLE_NAME} WHERE root = ?",
-                (bytes(root),),
-            )
-            return cursor.fetchone() is not None
-        except sqlite3.Error as e:
-            raise StorageReadError(
-                f"Failed to check state existence for block {root.hex()}: {e}"
-            ) from e
 
     # Checkpoint Operations
 
@@ -500,13 +469,6 @@ class SQLiteDatabase:
             raise StorageWriteError(f"Failed to write genesis time: {e}") from e
 
     # Transaction Control
-
-    def commit(self) -> None:
-        """Commit pending writes to durable storage."""
-        try:
-            self._conn.commit()
-        except sqlite3.Error as e:
-            raise StorageWriteError(f"Failed to commit: {e}") from e
 
     @contextmanager
     def batch_write(self) -> Generator[None]:

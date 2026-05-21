@@ -514,7 +514,7 @@ class Node:
                 break
             store = self.sync_service.store
             peers_connected = sum(
-                1 for p in self.sync_service.peer_manager.get_all_peers() if p.is_connected()
+                1 for p in self.sync_service.peer_manager.peers.values() if p.is_connected()
             )
             metrics.lean_current_slot.set(self.clock.current_slot())
             metrics.lean_connected_peers.set(peers_connected)
