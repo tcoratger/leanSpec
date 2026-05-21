@@ -5,7 +5,7 @@ This module contains the `HashSubTree` type and its associated construction meth
 implementing the memory-efficient top-bottom tree traversal approach.
 """
 
-from __future__ import annotations
+from typing import Self
 
 from lean_spec.types import Uint64
 from lean_spec.types.container import Container
@@ -103,7 +103,7 @@ class HashSubTree(Container):
         start_index: Uint64,
         parameter: Parameter,
         lowest_layer_nodes: list[HashDigestVector],
-    ) -> HashSubTree:
+    ) -> Self:
         """
         Builds a new sparse Merkle subtree starting from a specified layer.
 
@@ -187,7 +187,7 @@ class HashSubTree(Container):
         start_bottom_tree_index: Uint64,
         parameter: Parameter,
         bottom_tree_roots: list[HashDigestVector],
-    ) -> HashSubTree:
+    ) -> Self:
         """
         Constructs a top tree from the roots of bottom trees.
 
@@ -243,7 +243,7 @@ class HashSubTree(Container):
         bottom_tree_index: Uint64,
         parameter: Parameter,
         leaves: list[HashDigestVector],
-    ) -> HashSubTree:
+    ) -> Self:
         """
         Constructs a single bottom tree from leaf hashes.
 
@@ -327,7 +327,7 @@ class HashSubTree(Container):
         prf_key: PRFKey,
         bottom_tree_index: Uint64,
         parameter: Parameter,
-    ) -> HashSubTree:
+    ) -> Self:
         """
         Generates a single bottom tree on-demand from the PRF key.
 

@@ -7,8 +7,6 @@ Containers are the primary way to define structured data in
 Ethereum's serialization format.
 """
 
-from __future__ import annotations
-
 from typing import IO, Any, Self, override
 
 from .constants import OFFSET_BYTE_LENGTH

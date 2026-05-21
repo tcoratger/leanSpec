@@ -1,7 +1,5 @@
 """Generalized XMSS containers."""
 
-from __future__ import annotations
-
 from typing import override
 
 from pydantic import field_serializer, field_validator, model_serializer
