@@ -1,5 +1,6 @@
 """Lstar fork — identity and construction facade."""
 
+import math
 from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
@@ -1570,9 +1571,9 @@ class LstarSpec(ForkProtocol):
         # Compute the 2/3 supermajority threshold.
         #
         # A block needs at least this many attestation votes to be "safe".
-        # The ceiling division (negation trick) ensures we round UP.
+        # The threshold is rounded UP so a strict majority is required.
         # For example, 100 validators => threshold is 67, not 66.
-        min_target_score = -(-num_validators * 2 // 3)
+        min_target_score = math.ceil(int(num_validators) * 2 / 3)
 
         # Unpack "new" payloads into a flat validator -> vote mapping.
         # "Known" is excluded by design.
