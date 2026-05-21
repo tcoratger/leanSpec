@@ -49,36 +49,6 @@ async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> 
 
 
 @dataclass(slots=True)
-class SyncProgress:
-    """
-    Current synchronization progress.
-
-    Provides a snapshot of sync state for monitoring and logging.
-    """
-
-    state: SyncState
-    """Current sync state machine state."""
-
-    local_head_slot: Slot | None = None
-    """Slot of our current chain head."""
-
-    network_finalized_slot: Slot | None = None
-    """Network consensus on finalized slot (mode of peer reports)."""
-
-    blocks_processed: int = 0
-    """Total blocks integrated into Store this session."""
-
-    peers_connected: int = 0
-    """Number of connected peers with status."""
-
-    cache_size: int = 0
-    """Number of blocks in pending cache."""
-
-    orphan_count: int = 0
-    """Number of orphan blocks awaiting parents."""
-
-
-@dataclass(slots=True)
 class SyncService:
     """Central coordinator for the sync state machine."""
 
@@ -340,21 +310,6 @@ class SyncService:
     def head_slot(self) -> Slot:
         """Return the slot of the current canonical head."""
         return self.store.blocks[self.store.head].slot
-
-    def get_progress(self) -> SyncProgress:
-        """Snapshot the current sync state for monitoring and logging."""
-        # Mode of peer-reported finalized slots, or None if too few peers reported.
-        network_slot = self.peer_manager.get_network_finalized_slot()
-
-        return SyncProgress(
-            state=self.state,
-            local_head_slot=self.head_slot(),
-            network_finalized_slot=network_slot,
-            blocks_processed=self._blocks_processed,
-            peers_connected=sum(1 for p in self.peer_manager.get_all_peers() if p.is_connected()),
-            cache_size=len(self.block_cache),
-            orphan_count=self.block_cache.orphan_count,
-        )
 
     async def on_peer_status(self, peer_id: PeerId, status: Status) -> None:
         """Record a peer's chain status and move to SYNCING if needed."""
@@ -778,17 +733,3 @@ class SyncService:
             raise ValueError(f"Invalid state transition: {self.state.name} -> {new_state.name}")
 
         self.state = new_state
-
-    def reset(self) -> None:
-        """Return to IDLE and clear caches, counters, and sub-component state."""
-        self.state = SyncState.IDLE
-        self._blocks_processed = 0
-
-        # Cached blocks may be stale or invalid after a reset.
-        self.block_cache.clear()
-
-        # Sub-components hold pending requests and orphan trackers that must clear too.
-        if self._backfill is not None:
-            self._backfill.reset()
-        if self._head_sync is not None:
-            self._head_sync.reset()

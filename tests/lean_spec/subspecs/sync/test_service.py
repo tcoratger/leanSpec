@@ -16,7 +16,7 @@ from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage.database import Database
 from lean_spec.subspecs.sync.config import MAX_PENDING_ATTESTATIONS
-from lean_spec.subspecs.sync.service import SyncProgress, SyncService
+from lean_spec.subspecs.sync.service import SyncService
 from lean_spec.subspecs.sync.states import SyncState
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
@@ -244,137 +244,6 @@ class TestGossipBlockHandling:
         assert sync_service._blocks_processed == 0
         assert block_root in sync_service.block_cache
         assert sync_service.block_cache.orphan_count == 1
-
-
-class TestProgressReporting:
-    """Tests for sync progress reporting."""
-
-    def test_progress_reflects_current_state(
-        self,
-        sync_service: SyncService,
-        peer_id: PeerId,
-    ) -> None:
-        """get_progress accurately reflects service state."""
-        # Initial progress
-        progress = sync_service.get_progress()
-        assert progress == SyncProgress(
-            state=SyncState.IDLE,
-            local_head_slot=Slot(0),
-            network_finalized_slot=None,
-            blocks_processed=0,
-            peers_connected=1,
-            cache_size=0,
-            orphan_count=0,
-        )
-
-        # After processing some blocks
-        sync_service.state = SyncState.SYNCING
-        sync_service._blocks_processed = 42
-
-        progress = sync_service.get_progress()
-        assert progress == SyncProgress(
-            state=SyncState.SYNCING,
-            local_head_slot=Slot(0),
-            network_finalized_slot=None,
-            blocks_processed=42,
-            peers_connected=1,
-            cache_size=0,
-            orphan_count=0,
-        )
-
-    def test_progress_includes_network_consensus(
-        self,
-        sync_service: SyncService,
-        peer_id: PeerId,
-    ) -> None:
-        """Progress includes network finalized slot from peers."""
-        status = Status(
-            finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(100)),
-            head=Checkpoint(root=Bytes32.zero(), slot=Slot(150)),
-        )
-        sync_service.peer_manager.update_status(peer_id, status)
-
-        progress = sync_service.get_progress()
-        assert progress == SyncProgress(
-            state=SyncState.IDLE,
-            local_head_slot=Slot(0),
-            network_finalized_slot=Slot(100),
-            blocks_processed=0,
-            peers_connected=1,
-            cache_size=0,
-            orphan_count=0,
-        )
-
-    def test_progress_tracks_cache_state(
-        self,
-        sync_service: SyncService,
-        peer_id: PeerId,
-    ) -> None:
-        """Progress includes cache size and orphan count."""
-        # Add blocks to cache
-        block1 = make_signed_block(
-            slot=Slot(1),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32(b"\x01" * 32),
-            state_root=Bytes32(b"\x01" * 32),
-        )
-        block2 = make_signed_block(
-            slot=Slot(2),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32(b"\x02" * 32),
-            state_root=Bytes32(b"\x02" * 32),
-        )
-
-        pending1 = sync_service.block_cache.add(block1, peer_id)
-        sync_service.block_cache.add(block2, peer_id)
-        sync_service.block_cache.mark_orphan(pending1.root)
-
-        progress = sync_service.get_progress()
-        assert progress == SyncProgress(
-            state=SyncState.IDLE,
-            local_head_slot=Slot(0),
-            network_finalized_slot=None,
-            blocks_processed=0,
-            peers_connected=1,
-            cache_size=2,
-            orphan_count=1,
-        )
-
-
-class TestReset:
-    """Tests for service reset functionality."""
-
-    def test_reset_clears_all_state(
-        self,
-        sync_service: SyncService,
-        peer_id: PeerId,
-    ) -> None:
-        """reset() returns service to initial state."""
-        # Put service in a dirty state
-        sync_service.state = SyncState.SYNCED
-        sync_service._blocks_processed = 100
-
-        block = make_signed_block(
-            slot=Slot(1),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32(b"\x01" * 32),
-            state_root=Bytes32.zero(),
-        )
-        sync_service.block_cache.add(block, peer_id)
-
-        # Verify backfill component exists before adding pending
-        assert sync_service._backfill is not None
-        sync_service._backfill._pending.add(Bytes32(b"\x02" * 32))
-
-        # Reset
-        sync_service.reset()
-
-        # Verify clean state
-        assert sync_service.state == SyncState.IDLE
-        assert sync_service._blocks_processed == 0
-        assert len(sync_service.block_cache) == 0
-        assert sync_service._backfill is not None
-        assert sync_service._backfill._pending == set()
 
 
 class TestAttestationGossipHandling:
