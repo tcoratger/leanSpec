@@ -224,12 +224,6 @@ class BaseBytes(bytes, SSZType):
         return hash((type(self), bytes(self)))
 
 
-class Bytes1(BaseBytes):
-    """Fixed-size byte array of exactly 1 byte."""
-
-    LENGTH = 1
-
-
 class Bytes4(BaseBytes):
     """Fixed-size byte array of exactly 4 bytes."""
 

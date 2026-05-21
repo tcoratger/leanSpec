@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import IO, Any, ClassVar, Literal, NoReturn, Self, SupportsIndex, SupportsInt, override
+from typing import IO, Any, ClassVar, NoReturn, Self, SupportsInt, override
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -180,22 +180,6 @@ class BaseUint(int, SSZType):
     def max_value(cls) -> Self:
         """The maximum value for this unsigned integer."""
         return cls(2**cls.BITS - 1)
-
-    def to_bytes(
-        self,
-        length: SupportsIndex | None = None,
-        byteorder: Literal["little", "big"] = "little",
-        *,
-        signed: bool = False,
-    ) -> bytes:
-        """
-        Return an array of bytes representing the integer.
-
-        Defaults to little-endian and a fixed length based on `BITS`.
-        """
-        # If no length is specified, use the type's natural byte length.
-        actual_length = self.BITS // 8 if length is None else int(length)
-        return super().to_bytes(length=actual_length, byteorder=byteorder, signed=signed)
 
     def _raise_type_error(self, other: Any, op_symbol: str) -> NoReturn:
         """Helper to raise a consistent TypeError."""
