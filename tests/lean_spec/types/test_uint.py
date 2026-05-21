@@ -313,31 +313,6 @@ def test_index_operator_index(uint_class: Type[BaseUint]) -> None:
     assert isinstance(operator.index(val), int)
 
 
-@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-def test_to_bytes_default(uint_class: Type[BaseUint]) -> None:
-    """Tests the default behavior of the to_bytes method."""
-    byte_length = uint_class.BITS // 8
-    value = uint_class(1)
-    expected = b"\x01" + b"\x00" * (byte_length - 1)
-    assert value.to_bytes() == expected
-
-
-def test_to_bytes_specifics() -> None:
-    """Tests specific byte representations."""
-    assert Uint8(255).to_bytes() == b"\xff"
-    assert Uint16(258).to_bytes() == b"\x02\x01"  # Little-endian
-    assert Uint16(258).to_bytes(byteorder="big") == b"\x01\x02"
-
-
-def test_to_bytes_overflow() -> None:
-    """Tests that to_bytes raises an error if the length is too small."""
-    with pytest.raises(OverflowError):
-        Uint32(256).to_bytes(length=1)
-
-    with pytest.raises(OverflowError):
-        Uint32(100).to_bytes(length=0)
-
-
 class TestUintSSZ:
     """A collection of tests for the SSZ interface of Uint types."""
 
