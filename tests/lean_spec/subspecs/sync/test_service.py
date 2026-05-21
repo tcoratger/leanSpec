@@ -437,7 +437,7 @@ class TestAttestationGossipHandling:
 
         await sync_service.on_gossip_attestation(attestation)
 
-        assert sync_service._pending_attestations == [attestation]
+        assert list(sync_service._pending_attestations) == [attestation]
 
     async def test_buffered_attestation_replayed_after_block(
         self,
@@ -468,7 +468,7 @@ class TestAttestationGossipHandling:
         await sync_service.on_gossip_block(block, peer_id)
 
         # Attestation was replayed (accepted by mock store).
-        assert sync_service._pending_attestations == []
+        assert list(sync_service._pending_attestations) == []
         mock_store = cast(MockForkchoiceStore, sync_service.store)
         assert attestation in mock_store._attestations_received
 
@@ -806,7 +806,7 @@ class TestAggregatedAttestationGossip:
         mock_store.reject_aggregated_attestation = lambda _att: True
 
         await sync_service.on_gossip_aggregated_attestation(signed)
-        assert sync_service._pending_aggregated_attestations == [signed]
+        assert list(sync_service._pending_aggregated_attestations) == [signed]
 
     async def test_replay_pending_mixed_success_and_failure(
         self,
@@ -827,7 +827,7 @@ class TestAggregatedAttestationGossip:
         sync_service._replay_pending_attestations()
 
         assert ok_att in mock_store._attestations_received
-        assert sync_service._pending_aggregated_attestations == [bad_signed]
+        assert list(sync_service._pending_aggregated_attestations) == [bad_signed]
 
 
 class TestReplayPendingAttestationsPlain:
@@ -856,4 +856,4 @@ class TestReplayPendingAttestationsPlain:
         sync_service._replay_pending_attestations()
 
         assert ok_att in mock_store._attestations_received
-        assert sync_service._pending_attestations == [bad_att]
+        assert list(sync_service._pending_attestations) == [bad_att]
