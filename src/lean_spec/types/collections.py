@@ -1,7 +1,5 @@
 """Vector and List Type Specifications."""
 
-from __future__ import annotations
-
 import io
 from collections.abc import Iterator, Sequence
 from typing import (

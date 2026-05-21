@@ -1,7 +1,5 @@
 """Base classes and interfaces for all SSZ types."""
 
-from __future__ import annotations
-
 import io
 from abc import ABC, abstractmethod
 from collections.abc import Sequence

@@ -11,8 +11,6 @@ Two flavors are defined by the SSZ spec:
 Both flavors serialize as the raw bytes themselves — no length prefix, no delimiter.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from typing import IO, Any, ClassVar, Self, override
 
