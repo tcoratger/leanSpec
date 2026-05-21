@@ -7,6 +7,7 @@ Drives a node from cold start to active participation in the network.
 from __future__ import annotations
 
 import logging
+from collections import deque
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 
@@ -137,17 +138,21 @@ class SyncService:
     _blocks_processed: int = field(default=0)
     """Counter for processed blocks."""
 
-    _pending_attestations: list[SignedAttestation] = field(default_factory=list)
+    _pending_attestations: deque[SignedAttestation] = field(
+        default_factory=lambda: deque(maxlen=MAX_PENDING_ATTESTATIONS)
+    )
     """
     Attestations queued for replay after the next block lands.
 
     An attestation referencing a not-yet-received block fails validation.
 
     Buffering avoids dropping votes that arrived slightly out of order.
+
+    Bounded so overflow drops the oldest entry first.
     """
 
-    _pending_aggregated_attestations: list[SignedAggregatedAttestation] = field(
-        default_factory=list
+    _pending_aggregated_attestations: deque[SignedAggregatedAttestation] = field(
+        default_factory=lambda: deque(maxlen=MAX_PENDING_ATTESTATIONS)
     )
     """
     Aggregated attestations awaiting block processing.
@@ -478,8 +483,6 @@ class SyncService:
             #
             # Cap drops oldest on overflow: newer attestations are likelier to land soon.
             self._pending_attestations.append(attestation)
-            if len(self._pending_attestations) > MAX_PENDING_ATTESTATIONS:
-                self._pending_attestations = self._pending_attestations[-MAX_PENDING_ATTESTATIONS:]
 
     async def on_gossip_aggregated_attestation(
         self,
@@ -522,10 +525,6 @@ class SyncService:
             #
             # Cap drops oldest on overflow: newer aggregates are likelier to land soon.
             self._pending_aggregated_attestations.append(signed_attestation)
-            if len(self._pending_aggregated_attestations) > MAX_PENDING_ATTESTATIONS:
-                self._pending_aggregated_attestations = self._pending_aggregated_attestations[
-                    -MAX_PENDING_ATTESTATIONS:
-                ]
 
     def _replay_pending_attestations(self) -> None:
         """Retry buffered attestations after a block is processed."""
@@ -541,7 +540,7 @@ class SyncService:
         #   - B fails:    T2 still missing, B is re-appended.
         # Post-loop queue: [B].
         pending = self._pending_attestations
-        self._pending_attestations = []
+        self._pending_attestations = deque(maxlen=MAX_PENDING_ATTESTATIONS)
         for attestation in pending:
             try:
                 self.store = self.spec.on_gossip_attestation(
@@ -555,7 +554,7 @@ class SyncService:
 
         # Same mechanism for aggregated attestations.
         pending_agg = self._pending_aggregated_attestations
-        self._pending_aggregated_attestations = []
+        self._pending_aggregated_attestations = deque(maxlen=MAX_PENDING_ATTESTATIONS)
         for signed_attestation in pending_agg:
             try:
                 self.store = self.spec.on_gossip_aggregated_attestation(
