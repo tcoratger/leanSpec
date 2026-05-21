@@ -539,8 +539,8 @@ class SyncService:
         #   - A succeeds: T1 is in the store, A is consumed.
         #   - B fails:    T2 still missing, B is re-appended.
         # Post-loop queue: [B].
-        pending = list(self._pending_attestations)
-        self._pending_attestations.clear()
+        pending = self._pending_attestations
+        self._pending_attestations = deque(maxlen=MAX_PENDING_ATTESTATIONS)
         for attestation in pending:
             try:
                 self.store = self.spec.on_gossip_attestation(
@@ -553,8 +553,8 @@ class SyncService:
                 self._pending_attestations.append(attestation)
 
         # Same mechanism for aggregated attestations.
-        pending_agg = list(self._pending_aggregated_attestations)
-        self._pending_aggregated_attestations.clear()
+        pending_agg = self._pending_aggregated_attestations
+        self._pending_aggregated_attestations = deque(maxlen=MAX_PENDING_ATTESTATIONS)
         for signed_attestation in pending_agg:
             try:
                 self.store = self.spec.on_gossip_aggregated_attestation(
