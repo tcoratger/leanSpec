@@ -98,7 +98,6 @@ class TestBackfillChainResolution:
             parent_root=Bytes32.zero(),
             slot=Slot(10),
             received_from=peer_id,
-            received_at=cached.received_at,
             backfill_depth=1,
         )
 
@@ -157,7 +156,6 @@ class TestBackfillChainResolution:
             parent_root=parent_root,
             slot=Slot(3),
             received_from=peer_id,
-            received_at=child_cached.received_at,
             backfill_depth=1,
         )
 
@@ -168,7 +166,6 @@ class TestBackfillChainResolution:
             parent_root=grandparent_root,
             slot=Slot(2),
             received_from=peer_id,
-            received_at=parent_cached.received_at,
             backfill_depth=2,
         )
 
@@ -179,7 +176,6 @@ class TestBackfillChainResolution:
             parent_root=Bytes32.zero(),
             slot=Slot(1),
             received_from=peer_id,
-            received_at=grandparent_cached.received_at,
             backfill_depth=3,
         )
 

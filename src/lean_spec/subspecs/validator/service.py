@@ -701,17 +701,3 @@ class ValidatorService:
         """Total attestations produced since creation."""
         return self._attestations_produced
 
-    @property
-    def blocks_skipped_lag(self) -> int:
-        """Block proposals skipped because the local view was too stale."""
-        return self._blocks_skipped_lag
-
-    @property
-    def attestations_skipped_lag(self) -> int:
-        """Attestations skipped because the local view was too stale."""
-        return self._attestations_skipped_lag
-
-    @property
-    def duty_gate_closed(self) -> bool:
-        """True while the sync-lag gate is silencing duties."""
-        return self._duty_gate_closed

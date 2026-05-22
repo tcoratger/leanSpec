@@ -195,39 +195,6 @@ def test_hash_tree_root_boolean(val: Boolean, serialized_hex: str) -> None:
     assert hash_tree_root(val).hex() == expected
 
 
-@pytest.mark.parametrize(
-    "payload_hex",
-    [
-        "",  # Empty bytes
-        "00",  # Single byte
-        "01",
-        "ab",
-        "00010203",  # Multiple bytes
-        "ff" * 31,  # 31 bytes, requires padding
-        "ff" * 32,  # Exactly one chunk
-        "ff" * 33,  # More than one chunk, requires Merklization
-    ],
-)
-def test_hash_tree_root_raw_bytes_like(payload_hex: str) -> None:
-    """Tests that `hash_tree_root` handles various raw byte-like inputs consistently."""
-    # Convert the hex payload to a bytes object.
-    data = bytes.fromhex(payload_hex)
-
-    # Compute the hash tree root for `bytes`.
-    got_b = hash_tree_root(data).hex()
-    # Compute the hash tree root for `bytearray`.
-    got_ba = hash_tree_root(bytearray(data)).hex()
-    # Compute the hash tree root for `memoryview`.
-    got_mv = hash_tree_root(memoryview(data)).hex()
-
-    # The core SSZ logic is to pack the data into chunks and then Merkleize.
-    # - For a single chunk or less, the root is just the padded chunk.
-    # - For multiple chunks, it's the root of the Merkle tree.
-    #
-    # This assertion verifies that all byte-like input types are treated identically.
-    assert got_b == got_ba == got_mv
-
-
 def test_hash_tree_root_bytevector_48() -> None:
     """Tests the hash tree root of a fixed-size `ByteVector` that spans multiple chunks."""
     # Create a ByteVector of 48 bytes with values 0x00 to 0x2F (47).

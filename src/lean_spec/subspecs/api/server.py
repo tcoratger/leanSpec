@@ -45,9 +45,6 @@ class ApiServerConfig:
     port: int = 5052
     """Port to listen on."""
 
-    enabled: bool = True
-    """Whether the API server is enabled."""
-
 
 @dataclass(slots=True)
 class ApiServer:
@@ -85,6 +82,9 @@ class ApiServer:
     _site: web.TCPSite | None = field(default=None, init=False)
     """TCP site for the server."""
 
+    _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
+    """Set when the server stops, so run() can return without polling."""
+
     @property
     def store(self) -> Store | None:
         """Get the current Store instance."""
@@ -92,10 +92,6 @@ class ApiServer:
 
     async def start(self) -> None:
         """Start the API server in the background."""
-        if not self.config.enabled:
-            logger.info("API server is disabled")
-            return
-
         app = web.Application()
 
         # Store the store_getter in app for handlers that need store access
@@ -126,9 +122,7 @@ class ApiServer:
         Blocks until stop() is called.
         """
         await self.start()
-
-        while self._runner is not None:
-            await asyncio.sleep(1)
+        await self._stop_event.wait()
 
     def stop(self) -> None:
         """Request graceful shutdown (fire-and-forget). Prefer aclose() in async code."""
@@ -146,3 +140,4 @@ class ApiServer:
             self._runner = None
             self._site = None
             logger.info("API server stopped")
+        self._stop_event.set()
