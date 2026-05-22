@@ -1457,9 +1457,9 @@ class TestSyncLagGate:
         # Invariant: the gate never moves counters. Attribution belongs
         # to the run loop. Querying the gate must leave them at zero.
         assert not service._is_synced_for_duties(Slot(20), "block")
-        assert service.blocks_skipped_lag == 0
-        assert service.attestations_skipped_lag == 0
-        assert service.duty_gate_closed is True
+        assert service._blocks_skipped_lag == 0
+        assert service._attestations_skipped_lag == 0
+        assert service._duty_gate_closed is True
 
     async def test_run_loop_skips_block_production_when_gated(
         self, sync_service: SyncService, key_manager: XmssKeyManager
@@ -1493,8 +1493,8 @@ class TestSyncLagGate:
 
         # Block path bypassed, attestation counter untouched.
         assert block_calls == []
-        assert service.blocks_skipped_lag >= 1
-        assert service.attestations_skipped_lag == 0
+        assert service._blocks_skipped_lag >= 1
+        assert service._attestations_skipped_lag == 0
 
     async def test_run_loop_skips_attestation_when_gated(
         self, sync_service: SyncService, key_manager: XmssKeyManager
@@ -1535,8 +1535,8 @@ class TestSyncLagGate:
         # Attestation skipped, slot retryable, block counter untouched.
         assert attest_calls == []
         assert Slot(10) not in service._attested_slots
-        assert service.attestations_skipped_lag >= 1
-        assert service.blocks_skipped_lag == 0
+        assert service._attestations_skipped_lag >= 1
+        assert service._blocks_skipped_lag == 0
 
     def test_gate_logs_only_on_transition(
         self, sync_service: SyncService, caplog: pytest.LogCaptureFixture

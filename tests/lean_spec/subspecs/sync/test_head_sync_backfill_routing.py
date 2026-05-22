@@ -120,9 +120,6 @@ class TestRejectionBelowFinalized:
 
         assert result == HeadSyncResult(
             processed=False,
-            cached=False,
-            backfill_triggered=False,
-            descendants_processed=0,
         )
         assert returned_store is store
         assert recorder.range_calls == []
@@ -143,9 +140,6 @@ class TestRejectionBelowFinalized:
 
         assert result == HeadSyncResult(
             processed=False,
-            cached=False,
-            backfill_triggered=False,
-            descendants_processed=0,
         )
         assert returned_store is store
         assert recorder.range_calls == []
@@ -170,9 +164,6 @@ class TestBackfillRoutingAboveHead:
 
         assert result == HeadSyncResult(
             processed=False,
-            cached=True,
-            backfill_triggered=True,
-            descendants_processed=0,
         )
         assert recorder.range_calls == []
         assert recorder.missing_calls == [[unknown_parent]]
@@ -192,9 +183,6 @@ class TestBackfillRoutingAboveHead:
 
         assert result == HeadSyncResult(
             processed=False,
-            cached=True,
-            backfill_triggered=True,
-            descendants_processed=0,
         )
         # gap_floor = head+1 = 21, gap_size = 100 - 21 = 79.
         assert recorder.range_calls == [(Slot(21), Uint64(79))]
@@ -221,9 +209,6 @@ class TestAltForkRoutingAtOrBelowHead:
 
         assert result == HeadSyncResult(
             processed=False,
-            cached=True,
-            backfill_triggered=True,
-            descendants_processed=0,
         )
         assert recorder.range_calls == []
         assert recorder.missing_calls == [[unknown_parent]]

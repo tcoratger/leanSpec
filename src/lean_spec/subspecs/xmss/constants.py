@@ -100,11 +100,6 @@ class XmssConfig(StrictBaseModel):
         return math.ceil(self.DIMENSION / self.Z)
 
     @property
-    def PUBLIC_KEY_LEN_BYTES(self) -> int:  # noqa: N802
-        """The size of the public key in bytes."""
-        return self.HASH_LEN_FE * P_BYTES + self.PARAMETER_LEN * P_BYTES
-
-    @property
     def SIGNATURE_LEN_BYTES(self) -> int:  # noqa: N802
         """
         The SSZ-encoded size of a signature in bytes.

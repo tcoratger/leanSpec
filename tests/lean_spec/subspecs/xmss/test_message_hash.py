@@ -11,6 +11,7 @@ from lean_spec.subspecs.xmss.message_hash import (
     TEST_MESSAGE_HASHER,
 )
 from lean_spec.subspecs.xmss.rand import TEST_RAND
+from lean_spec.subspecs.xmss.types import Randomness
 from lean_spec.subspecs.xmss.utils import int_to_base_p
 from lean_spec.types import Bytes32, Uint64
 
@@ -110,7 +111,7 @@ def test_apply_output_is_valid_codeword() -> None:
     # Setup with random inputs.
     parameter = rand.parameter()
     epoch = Uint64(313)
-    randomness = rand.rho()
+    randomness = Randomness(data=rand.field_elements(config.RAND_LEN_FE))
     message = Bytes32(b"\xaa" * 32)
 
     # Call the message hash function.
