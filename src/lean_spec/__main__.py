@@ -162,7 +162,6 @@ def _init_from_genesis(
     fork: ForkProtocol,
     validator_registry: ValidatorRegistry | None = None,
     is_aggregator: bool = False,
-    aggregate_subnet_ids: tuple[SubnetId, ...] = (),
     api_port: int | None = None,
 ) -> Node:
     """
@@ -174,8 +173,6 @@ def _init_from_genesis(
         fork: Fork specification for state/store construction.
         validator_registry: Optional registry with validator secret keys.
         is_aggregator: Enable aggregator mode for attestation aggregation.
-        aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
-            Only effective when is_aggregator is also True.
         api_port: Port for API server and /metrics. None disables the API.
 
     Returns:
@@ -200,7 +197,6 @@ def _init_from_genesis(
         validator_registry=validator_registry,
         network_name=fork.GOSSIP_DIGEST,
         is_aggregator=is_aggregator,
-        aggregate_subnet_ids=aggregate_subnet_ids,
         api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
     )
 
@@ -215,7 +211,6 @@ async def _init_from_checkpoint(
     fork: ForkProtocol,
     validator_registry: ValidatorRegistry | None = None,
     is_aggregator: bool = False,
-    aggregate_subnet_ids: tuple[SubnetId, ...] = (),
     api_port: int | None = None,
 ) -> Node | None:
     """
@@ -245,8 +240,6 @@ async def _init_from_checkpoint(
         fork: Fork specification for state/store construction.
         validator_registry: Optional registry with validator secret keys.
         is_aggregator: Enable aggregator mode for attestation aggregation.
-        aggregate_subnet_ids: Additional subnets to subscribe and aggregate from.
-            Only effective when is_aggregator is also True.
         api_port: Port for API server and /metrics. None disables the API.
 
     Returns:
@@ -316,7 +309,6 @@ async def _init_from_checkpoint(
             validator_registry=validator_registry,
             network_name=fork.GOSSIP_DIGEST,
             is_aggregator=is_aggregator,
-            aggregate_subnet_ids=aggregate_subnet_ids,
             api_config=ApiServerConfig(port=api_port) if api_port is not None else None,
         )
 
@@ -574,7 +566,6 @@ async def run_node(
             fork=fork,
             validator_registry=validator_registry,
             is_aggregator=is_aggregator,
-            aggregate_subnet_ids=aggregate_subnet_ids,
             api_port=api_port_int,
         )
         if node is None:
@@ -590,7 +581,6 @@ async def run_node(
             fork=fork,
             validator_registry=validator_registry,
             is_aggregator=is_aggregator,
-            aggregate_subnet_ids=aggregate_subnet_ids,
             api_port=api_port_int,
         )
 
