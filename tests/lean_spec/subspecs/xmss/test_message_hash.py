@@ -44,7 +44,7 @@ def test_encode_epoch() -> None:
     # Test specific values from the Rust reference tests.
     test_epochs = [0, 42, 2**32 - 1]
     for epoch in test_epochs:
-        acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE.value
+        acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE
         expected = int_to_base_p(acc, config.TWEAK_LEN_FE)
         assert hasher.encode_epoch(Uint64(epoch)) == expected
 

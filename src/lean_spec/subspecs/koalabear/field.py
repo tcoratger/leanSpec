@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import IO, Final, Self
+from typing import IO, Final, Self, override
 
 from lean_spec.types import SSZType
 
@@ -48,21 +48,25 @@ class Fp(SSZType):
         self.value: int = value % P
 
     @classmethod
+    @override
     def is_fixed_size(cls) -> bool:
         """Fp elements are fixed-size (4 bytes)."""
         return True
 
     @classmethod
+    @override
     def get_byte_length(cls) -> int:
         """Get the byte length of an Fp element."""
         return P_BYTES
 
+    @override
     def serialize(self, stream: IO[bytes]) -> int:
         """Serialize the field element to a binary stream."""
         stream.write(self.value.to_bytes(P_BYTES, byteorder="little"))
         return P_BYTES
 
     @classmethod
+    @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Deserialize a field element from a binary stream."""
         if scope != P_BYTES:

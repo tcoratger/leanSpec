@@ -80,7 +80,7 @@ class MessageHasher(StrictBaseModel):
         hash input in a structured, domain-separated way.
         """
         # Combine the epoch and the message hash prefix into a single integer.
-        acc = (int(epoch) << 8) | TWEAK_PREFIX_MESSAGE.value
+        acc = (int(epoch) << 8) | TWEAK_PREFIX_MESSAGE
 
         # Decompose the integer into its base-P representation.
         return int_to_base_p(acc, self.config.TWEAK_LEN_FE)

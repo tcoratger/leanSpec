@@ -206,16 +206,13 @@ class LiveNetworkEventSource:
     Used to validate incoming messages belong to the same fork.
     """
 
-    _running: bool = False
-    """Whether the event source is running.
-
-    Controls the main loop and background tasks.
-    """
-
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event)
-    """Set when the event source stops.
+    """Lifecycle signal.
 
-    Lets awaiters wake immediately rather than poll the running flag.
+    Set means "stopped": fresh instances start stopped (the event is
+    forced to the set state in __post_init__) and stay stopped until
+    dial or listen clears it. Awaiters of wait() wake the moment
+    stop() sets it again.
     """
 
     _gossip_handler: GossipHandler = field(init=False)
@@ -258,6 +255,8 @@ class LiveNetworkEventSource:
         self._reqresp_handler = RequestHandler()
         self._reqresp_server = ReqRespServer(handler=self._reqresp_handler)
         self._gossipsub_behavior = GossipsubBehavior(params=GossipsubParameters())
+        # Initial lifecycle: stopped. dial() or listen() clears the event to start.
+        self._stop_event.set()
 
     @classmethod
     async def create(
@@ -377,7 +376,7 @@ class LiveNetworkEventSource:
     async def _forward_gossipsub_events(self) -> None:
         """Forward events from GossipsubBehavior to our event queue."""
         try:
-            while self._running:
+            while not self._stop_event.is_set():
                 event = await self._gossipsub_behavior.get_next_event()
                 if event is None:
                     # Stopped or no event.
@@ -447,7 +446,7 @@ class LiveNetworkEventSource:
         Raises:
             StopAsyncIteration: When no more events will arrive.
         """
-        if not self._running:
+        if self._stop_event.is_set():
             raise StopAsyncIteration
 
         # Race the queue against the stop signal.
@@ -479,10 +478,9 @@ class LiveNetworkEventSource:
         Returns:
             Peer ID on success, None on failure.
         """
-        # Ensure _running is set so background tasks (like _accept_streams)
+        # Clear the stop signal so background tasks (like _accept_streams)
         # can operate. Without this, _accept_streams exits immediately if
         # dial() is called before listen().
-        self._running = True
         self._stop_event.clear()
 
         try:
@@ -565,7 +563,6 @@ class LiveNetworkEventSource:
         Args:
             multiaddr: Address to listen on (e.g., "/ip4/0.0.0.0/udp/9000/quic-v1").
         """
-        self._running = True
         self._stop_event.clear()
 
         if is_quic_multiaddr(multiaddr):
@@ -713,7 +710,6 @@ class LiveNetworkEventSource:
 
     async def stop(self) -> None:
         """Stop the event source and cancel background tasks."""
-        self._running = False
         self._stop_event.set()
 
         # Cancel gossip tasks first (including event forwarding task).
@@ -830,9 +826,9 @@ class LiveNetworkEventSource:
             # Main loop: accept streams until shutdown or disconnection.
             #
             # The loop continues as long as:
-            #   - We haven't been told to stop (_running is True).
+            #   - We haven't been told to stop (stop event is clear).
             #   - The peer is still connected (peer_id in _connections).
-            while self._running and peer_id in self._connections:
+            while not self._stop_event.is_set() and peer_id in self._connections:
                 try:
                     # Accept the next incoming stream.
                     #
