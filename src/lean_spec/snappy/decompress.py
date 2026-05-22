@@ -263,5 +263,3 @@ def _execute_copy(output: bytearray, offset: int, length: int, max_length: int) 
     for _ in range(length):
         output.append(output[src_pos])
         src_pos += 1
-
-

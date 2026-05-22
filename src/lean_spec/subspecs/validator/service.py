@@ -700,4 +700,3 @@ class ValidatorService:
     def attestations_produced(self) -> int:
         """Total attestations produced since creation."""
         return self._attestations_produced
-
