@@ -20,7 +20,7 @@ from lean_spec.config import LEAN_ENV
 from lean_spec.types import StrictBaseModel, Uint64
 from lean_spec.types.constants import OFFSET_BYTE_LENGTH
 
-from ..koalabear import P_BYTES, Fp, P
+from ..koalabear import P_BYTES, P
 
 
 class XmssConfig(StrictBaseModel):
@@ -158,13 +158,13 @@ TEST_CONFIG: Final = XmssConfig(
 """Lightweight XMSS configuration for fast test execution."""
 
 
-TWEAK_PREFIX_CHAIN: Final = Fp(value=0x00)
+TWEAK_PREFIX_CHAIN: Final[int] = 0x00
 """The unique prefix for tweaks used in Winternitz-style hash chains."""
 
-TWEAK_PREFIX_TREE: Final = Fp(value=0x01)
+TWEAK_PREFIX_TREE: Final[int] = 0x01
 """The unique prefix for tweaks used when hashing Merkle tree nodes."""
 
-TWEAK_PREFIX_MESSAGE: Final = Fp(value=0x02)
+TWEAK_PREFIX_MESSAGE: Final[int] = 0x02
 """The unique prefix for tweaks used in the initial message hashing step."""
 
 PRF_KEY_LENGTH: Final = 32

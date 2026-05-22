@@ -657,7 +657,7 @@ async def run_node(
 
     # Run the node.
     logger.info("Starting consensus node...")
-    event_source._running = True
+    event_source._stop_event.clear()
     await node.run()
 
 
