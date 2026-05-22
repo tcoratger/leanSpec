@@ -60,6 +60,22 @@ def _htr_fp(value: Fp) -> Bytes32:
 
 
 @hash_tree_root.register
+def _htr_bytes(value: bytes) -> Bytes32:
+    """Treat raw bytes like ByteVector[N]."""
+    return merkleize(pack_bytes(value))
+
+
+@hash_tree_root.register
+def _htr_bytearray(value: bytearray) -> Bytes32:
+    return merkleize(pack_bytes(bytes(value)))
+
+
+@hash_tree_root.register
+def _htr_memoryview(value: memoryview) -> Bytes32:
+    return merkleize(pack_bytes(value.tobytes()))
+
+
+@hash_tree_root.register
 def _htr_bytevector(value: BaseBytes) -> Bytes32:
     return merkleize(pack_bytes(value.encode_bytes()))
 
