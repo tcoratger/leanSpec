@@ -32,7 +32,7 @@ from lean_spec.subspecs.xmss.aggregation import (
     TypeTwoMultiSignature,
 )
 from lean_spec.subspecs.xmss.containers import PublicKey
-from lean_spec.types import Bytes32, Slot, SubnetId
+from lean_spec.types import Bytes32, Slot
 from lean_spec.types.exceptions import SSZError
 
 from .backfill_sync import BackfillSync, NetworkRequester
@@ -76,13 +76,6 @@ class SyncService:
 
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
-
-    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
-    """
-    Extra subnets the aggregator subscribes to on top of its validator-derived one.
-
-    Ignored on non-aggregator nodes, which never import gossip attestations.
-    """
 
     publish_aggregated_attestation: Callable[
         [SignedAggregatedAttestation], Coroutine[None, None, None]

@@ -42,7 +42,7 @@ from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database, SQLiteDatabase
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
-from lean_spec.types import Bytes32, Slot, SubnetId, Uint64, ValidatorIndex
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +130,6 @@ class NodeConfig:
     NetworkService. The flag can be toggled at runtime via the admin API
     (see AggregatorController). Runtime toggles do not persist across
     restarts and do not update the local ENR or subnet subscriptions.
-    """
-
-    aggregate_subnet_ids: tuple[SubnetId, ...] = field(default_factory=tuple)
-    """
-    Additional attestation subnets to subscribe to and aggregate from.
-
-    When set, the node subscribes to these subnets at the p2p layer in
-    addition to validator-derived subnets. Effective only when is_aggregator
-    is True — only aggregators import gossip attestations into forkchoice.
-
-    Additive to the validator-derived subnet.
     """
 
 
@@ -280,7 +269,6 @@ class Node:
             spec=fork,
             database=database,
             is_aggregator=config.is_aggregator,
-            aggregate_subnet_ids=config.aggregate_subnet_ids,
             genesis_start=True,
         )
 
@@ -290,7 +278,6 @@ class Node:
             event_source=config.event_source,
             network_name=config.network_name,
             is_aggregator=config.is_aggregator,
-            aggregate_subnet_ids=config.aggregate_subnet_ids,
         )
 
         # Wire up aggregated attestation publishing.
