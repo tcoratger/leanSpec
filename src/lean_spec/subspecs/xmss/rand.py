@@ -1,7 +1,5 @@
 """Random data generator for the XMSS signature scheme."""
 
-from __future__ import annotations
-
 import secrets
 
 from lean_spec.types import StrictBaseModel
