@@ -21,11 +21,9 @@ from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.metrics import PrometheusObserver, registry as metrics
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource
 from lean_spec.subspecs.networking.gossipsub import GossipTopic
-from lean_spec.subspecs.networking.gossipsub.subscription import (
-    compute_subscription_subnets,
-)
 from lean_spec.subspecs.node import Node, NodeConfig
 from lean_spec.subspecs.observability import set_observer
+from lean_spec.types import SubnetId
 
 from .bootstrap import NodeBootstrap
 
@@ -45,13 +43,16 @@ async def _build_event_source(boot: NodeBootstrap) -> LiveNetworkEventSource:
     event_source.subscribe_gossip_topic(block_topic)
     logger.info("Subscribed to block gossip topic: %s", block_topic)
 
-    # Derive the attestation subnets from owned validators and aggregator extras.
-    subnets = compute_subscription_subnets(
-        boot.registry.indices(),
-        committee_count=ATTESTATION_COMMITTEE_COUNT,
-        is_aggregator=boot.is_aggregator,
-        extra_subnets=boot.aggregate_subnet_ids,
-    )
+    # Validator-owned subnets carry the attestations the mesh must propagate.
+    # Missing one of them breaks the attestation flow for that validator.
+    subnets: set[SubnetId] = {
+        idx.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT) for idx in boot.registry.indices()
+    }
+
+    # Aggregator extras are advisory subnets the operator wants this node to see.
+    # They are ignored on non-aggregator nodes, which the bootstrap layer enforces.
+    if boot.is_aggregator:
+        subnets.update(boot.aggregate_subnet_ids)
 
     # Subscribe to every owned subnet under its fork-scoped topic id.
     for subnet_id in subnets:
