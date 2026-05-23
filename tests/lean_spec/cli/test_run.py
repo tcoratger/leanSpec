@@ -1,9 +1,4 @@
-"""Tests for the consensus node run sequence.
-
-Only the event-source builder is exercised here.
-The full run sequence composes too many side-effecting collaborators to
-mock cleanly; that surface is integration-test territory.
-"""
+"""Tests for the consensus node run sequence."""
 
 from __future__ import annotations
 
@@ -26,11 +21,7 @@ from lean_spec.types import Slot, ValidatorIndex
 
 
 class _RecordingEventSource:
-    """In-test fake that records what the builder configures on it.
-
-    The builder only calls two methods on the event source during pre-serving
-    wiring, so a tiny fake is more readable than a mock with attribute setup.
-    """
+    """In-test fake that records what the builder configures on it."""
 
     def __init__(self) -> None:
         self.network_name: str | None = None
