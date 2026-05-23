@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from lean_spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
@@ -372,6 +373,67 @@ class LiveNetworkEventSource:
         self._gossipsub_event_task.add_done_callback(self._gossip_tasks.discard)
 
         logger.info("GossipSub behavior started")
+
+    async def start_serving(
+        self,
+        *,
+        status: Status,
+        current_slot_lookup: CurrentSlotLookup,
+        listen_addr: str | None,
+        bootnode_multiaddrs: Sequence[str],
+    ) -> None:
+        """
+        Bring the event source online in the spec-required order.
+
+        Five steps, each a precondition for the next:
+
+        1. Set the Status the responder serves.
+        2. Wire the current-slot lookup the range queries depend on.
+        3. Dial bootnodes best-effort, since a peerless honest node remains valid.
+        4. Bind the listener with a short bind-error probe window.
+        5. Start gossipsub last so the heartbeat reaches reachable peers only.
+
+        Args:
+            status: Initial finalized and head checkpoints the responder serves.
+            current_slot_lookup: Wall-clock-to-slot callback for range bounds.
+            listen_addr: Multiaddr to bind for inbound connections, or None for dial-only.
+            bootnode_multiaddrs: Pre-resolved outbound peers.
+
+        Raises:
+            OSError: If the listener fails to bind within the probe window.
+        """
+        # Status and current-slot lookup must be set before the responder serves.
+        # Without them, range queries return SERVER_ERROR.
+        self.set_status(status)
+        self.set_current_slot_lookup(current_slot_lookup)
+
+        # Dial and listen each clear the stop event internally.
+        # Clearing it here covers the no-bootnodes, no-listen case.
+        self._stop_event.clear()
+
+        for multiaddr in bootnode_multiaddrs:
+            logger.info("Connecting to bootnode %s", multiaddr)
+            try:
+                peer_id = await self.dial(multiaddr)
+            except Exception as exc:
+                logger.warning("Failed to connect to bootnode %s: %s", multiaddr, exc)
+                continue
+            if peer_id is not None:
+                logger.info("Connected to bootnode, peer_id=%s", peer_id)
+            else:
+                logger.warning("Failed to connect to bootnode %s", multiaddr)
+
+        if listen_addr:
+            logger.info("Starting listener on %s", listen_addr)
+            listener_task = asyncio.create_task(self.listen(listen_addr))
+
+            # Surface bind failures synchronously instead of as silent crashes.
+            await asyncio.sleep(0.1)
+            if listener_task.done():
+                listener_task.result()
+
+        logger.info("Starting gossipsub behavior...")
+        await self.start_gossipsub()
 
     async def _forward_gossipsub_events(self) -> None:
         """Forward events from GossipsubBehavior to our event queue."""

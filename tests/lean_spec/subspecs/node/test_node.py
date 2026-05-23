@@ -34,11 +34,17 @@ from lean_spec.subspecs.chain.config import (
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
-from tests.lean_spec.helpers import MockEventSource, MockNetworkRequester, make_validators
+from tests.lean_spec.helpers import (
+    MockEventSource,
+    MockNetworkRequester,
+    make_genesis_state,
+    make_validators,
+)
 
 GENESIS_TIME = Uint64(1704067200)
 
@@ -730,3 +736,32 @@ class TestNodeIntegration:
 
         head_block = node.sync_service.store.blocks[node.sync_service.store.head]
         assert head_block.slot == Slot(0)
+
+
+class TestNodeFromGenesisAnchorStore:
+    """Regression guard for the anchor_store wiring on NodeConfig."""
+
+    def test_anchor_store_is_used_when_provided(self, spec: LstarSpec) -> None:
+        """The node adopts the provided anchor store rather than synthesising one."""
+        state = make_genesis_state(num_validators=3, genesis_time=1000)
+        anchor_block = Block(
+            slot=state.latest_block_header.slot,
+            proposer_index=state.latest_block_header.proposer_index,
+            parent_root=state.latest_block_header.parent_root,
+            state_root=hash_tree_root(state),
+            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+        )
+        anchor_store = spec.create_store(state, anchor_block, None)
+
+        config = NodeConfig(
+            genesis_time=Uint64(1000),
+            validators=state.validators,
+            event_source=MockEventSource(),
+            network=MockNetworkRequester(),
+            fork=spec,
+            anchor_store=anchor_store,
+        )
+
+        node = Node.from_genesis(config)
+
+        assert node.store is anchor_store
