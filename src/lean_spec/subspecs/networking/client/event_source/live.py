@@ -385,39 +385,30 @@ class LiveNetworkEventSource:
         """
         Bring the event source online in the spec-required order.
 
-        The order matters for ReqResp correctness:
+        Five steps, each a precondition for the next:
 
-        1. Status must be set before any peer can hit the responder, or
-           BlocksByRoot / BlocksByRange queries return SERVER_ERROR.
-        2. The current-slot lookup must be wired before BlocksByRange
-           serves, for the same reason.
-        3. Bootnodes are dialed best-effort; failures log but do not abort.
-           A peerless node is still a valid honest participant.
-        4. The listener binds the local port. We give it a 100 ms head start
-           so a bind error (port in use) surfaces here rather than silently
-           in the background.
-        5. Gossipsub starts last so the heartbeat does not run before peers
-           are reachable.
+        1. Set the Status the responder serves.
+        2. Wire the current-slot lookup the range queries depend on.
+        3. Dial bootnodes best-effort, since a peerless honest node remains valid.
+        4. Bind the listener with a short bind-error probe window.
+        5. Start gossipsub last so the heartbeat reaches reachable peers only.
 
         Args:
-            status: Initial Status (finalized, head) the responder serves.
-            current_slot_lookup: Wall-clock-to-slot callback for ReqResp range bounds.
-            listen_addr: Multiaddr to bind for inbound connections, or None to
-                run dial-only.
-            bootnode_multiaddrs: Pre-resolved outbound peers. Caller is
-                expected to have parsed ENR strings into multiaddrs already.
+            status: Initial finalized and head checkpoints the responder serves.
+            current_slot_lookup: Wall-clock-to-slot callback for range bounds.
+            listen_addr: Multiaddr to bind for inbound connections, or None for dial-only.
+            bootnode_multiaddrs: Pre-resolved outbound peers.
 
         Raises:
             OSError: If the listener fails to bind within the probe window.
         """
-        # The set-state-before-serving invariant: every other setter is
-        # idempotent, these two are load-bearing for correctness.
+        # Status and current-slot lookup must be set before the responder serves.
+        # Without them, range queries return SERVER_ERROR.
         self.set_status(status)
         self.set_current_slot_lookup(current_slot_lookup)
 
-        # Best-effort outbound connections. Both dial() and listen() clear
-        # the stop event internally; we also clear it here so a no-bootnodes,
-        # no-listen configuration still yields events.
+        # Dial and listen each clear the stop event internally.
+        # Clearing it here covers the no-bootnodes, no-listen case.
         self._stop_event.clear()
 
         for multiaddr in bootnode_multiaddrs:
@@ -436,9 +427,7 @@ class LiveNetworkEventSource:
             logger.info("Starting listener on %s", listen_addr)
             listener_task = asyncio.create_task(self.listen(listen_addr))
 
-            # Surface immediate bind failures (port already in use, etc.)
-            # synchronously instead of leaving them as a silent background
-            # task crash.
+            # Surface bind failures synchronously instead of as silent crashes.
             await asyncio.sleep(0.1)
             if listener_task.done():
                 listener_task.result()
