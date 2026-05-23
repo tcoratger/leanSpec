@@ -46,7 +46,7 @@ from ..identity import IdentityKeypair
 from ..peer_id import PeerId
 from .stream import QuicStream, QuicTransportError
 from .stream_adapter import QuicStreamAdapter
-from .tls import generate_libp2p_certificate
+from .tls import PeerVerificationError, generate_libp2p_certificate, verify_libp2p_certificate
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +211,15 @@ class LibP2PQuicProtocol(QuicConnectionProtocol):
         self.peer_identity: PeerId | None = None
         self.handshake_complete = asyncio.Event()
         self._buffered_events: list[QuicEvent] = []
+
+        # Why: libp2p QUIC mandates mutual authentication.
+        # The server must request the client certificate so the libp2p
+        # extension is available on both sides of the handshake.
+        # aioquic does not expose mTLS as a public option; this private
+        # flag is the established libp2p-on-aioquic mechanism.
+        quic = getattr(self, "_quic", None)
+        if quic is not None and not quic.configuration.is_client:
+            quic.tls._request_client_certificate = True
 
     def quic_event_received(self, event: QuicEvent) -> None:
         """Handle QUIC events."""
@@ -424,22 +433,23 @@ class QuicConnectionManager:
             # Wait for handshake to complete.
             await protocol.handshake_complete.wait()
 
-            # For now, we don't verify peer certificate (requires deeper aioquic integration).
-            # In production, we would extract and verify the libp2p certificate extension.
+            # Derive and verify the peer identity from the server's certificate.
             #
-            # Without peer ID verification, we trust the connection based on:
-            # - QUIC encryption (TLS 1.3)
-            # - The peer being at the expected address
+            # Why: TLS 1.3 always delivers the server's certificate to the
+            # client. The libp2p extension binds the identity key to the TLS
+            # key; verifying the signature proves the server controls both.
+            peer_cert = protocol._quic.tls._peer_certificate
+            if peer_cert is None:
+                raise QuicTransportError("Peer did not present a TLS certificate")
+            peer_id = verify_libp2p_certificate(peer_cert)
 
-            # Create a placeholder peer_id if we couldn't verify.
-            # In a real implementation, we'd extract this from the certificate.
-            if expected_peer_id:
-                peer_id = expected_peer_id
-            else:
-                # Generate a random peer ID for now.
-                # This is NOT correct for production but allows testing.
-                temp_key = IdentityKeypair.generate()
-                peer_id = temp_key.to_peer_id()
+            # Invariant: the dialed multiaddr must name the same peer we ended
+            # up authenticated with.
+            # Mismatch indicates a man-in-the-middle or a stale ENR; reject it.
+            if expected_peer_id is not None and peer_id != expected_peer_id:
+                raise QuicTransportError(
+                    f"Peer identity mismatch: expected {expected_peer_id}, got {peer_id}"
+                )
 
             conn = QuicConnection(
                 _protocol=protocol,
@@ -499,8 +509,23 @@ class QuicConnectionManager:
         # Callback to set up connection when handshake completes.
         # Captures this manager's state (self, on_connection, host, port).
         def handle_handshake(protocol_instance: LibP2PQuicProtocol) -> None:
-            temp_key = IdentityKeypair.generate()
-            remote_peer_id = temp_key.to_peer_id()
+            # Derive and verify the client's peer identity from the cert it
+            # sent during the mutual-TLS handshake.
+            # Drop the connection if the cert is missing or the libp2p
+            # extension fails to verify.
+            peer_cert = protocol_instance._quic.tls._peer_certificate
+            if peer_cert is None:
+                logger.warning("Inbound connection without client certificate, closing")
+                protocol_instance._quic.close()
+                protocol_instance.transmit()
+                return
+            try:
+                remote_peer_id = verify_libp2p_certificate(peer_cert)
+            except PeerVerificationError as exc:
+                logger.warning("Rejecting inbound connection: %s", exc)
+                protocol_instance._quic.close()
+                protocol_instance.transmit()
+                return
 
             remote_addr = f"/ip4/{host}/udp/{port}/quic-v1/p2p/{remote_peer_id}"
             conn = QuicConnection(

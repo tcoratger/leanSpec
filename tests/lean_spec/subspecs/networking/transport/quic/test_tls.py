@@ -11,10 +11,11 @@ generation pipeline, including signature verification of the identity proof.
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from lean_spec.subspecs.networking.transport.identity.keypair import IdentityKeypair
@@ -22,12 +23,14 @@ from lean_spec.subspecs.networking.transport.quic.tls import (
     KEY_TYPE_SECP256K1,
     LIBP2P_EXTENSION_OID,
     SIGNATURE_PREFIX,
+    PeerVerificationError,
     _create_extension_payload,
     _encode_asn1_length,
     _encode_asn1_octet_string,
     _encode_asn1_sequence,
     _encode_asn1_signed_key,
     generate_libp2p_certificate,
+    verify_libp2p_certificate,
 )
 
 # ---------------------------------------------------------------------------
@@ -399,3 +402,128 @@ def _parse_der_tlv_with_rest(data: bytes) -> tuple[int, bytes, bytes]:
     value_start = 1 + length_size
     value_end = value_start + length
     return tag, data[value_start:value_end], data[value_end:]
+
+
+# ---------------------------------------------------------------------------
+# verify_libp2p_certificate — happy path + rejection cases
+# ---------------------------------------------------------------------------
+
+
+def _cert_without_libp2p_extension() -> x509.Certificate:
+    """Build a self-signed cert that has no libp2p extension."""
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.now(timezone.utc)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([]))
+        .issuer_name(x509.Name([]))
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+
+
+def _replace_libp2p_extension(cert: x509.Certificate, payload: bytes) -> x509.Certificate:
+    """Re-sign the cert with the libp2p extension replaced by the given bytes."""
+    # Use the same TLS public key but a fresh private key (test-only).
+    # We can't re-sign with the original key (not exposed), so generate
+    # a new TLS keypair and rebuild the cert around the new payload.
+    # The verifier only inspects the libp2p extension and the cert's
+    # SubjectPublicKeyInfo; it does not check the cert's outer signature.
+    tls_key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.now(timezone.utc)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([]))
+        .issuer_name(x509.Name([]))
+        .public_key(cert.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(
+            x509.UnrecognizedExtension(LIBP2P_EXTENSION_OID, payload),
+            critical=False,
+        )
+        .sign(tls_key, hashes.SHA256())
+    )
+
+
+class TestVerifyLibp2pCertificate:
+    """Validate end-to-end extraction of peer identity from a libp2p TLS cert."""
+
+    def test_roundtrip_recovers_peer_id(self, identity_key: IdentityKeypair) -> None:
+        """A freshly generated cert verifies and yields the original PeerId."""
+        _, _, cert = generate_libp2p_certificate(identity_key)
+        assert verify_libp2p_certificate(cert) == identity_key.to_peer_id()
+
+    def test_distinct_keys_yield_distinct_peer_ids(self) -> None:
+        """Two independent identity keys produce different verified PeerIds."""
+        key_a = IdentityKeypair.generate()
+        key_b = IdentityKeypair.generate()
+        _, _, cert_a = generate_libp2p_certificate(key_a)
+        _, _, cert_b = generate_libp2p_certificate(key_b)
+
+        peer_a = verify_libp2p_certificate(cert_a)
+        peer_b = verify_libp2p_certificate(cert_b)
+
+        assert peer_a == key_a.to_peer_id()
+        assert peer_b == key_b.to_peer_id()
+        assert peer_a != peer_b
+
+    def test_missing_extension_is_rejected(self) -> None:
+        """A cert without the libp2p extension fails verification."""
+        cert = _cert_without_libp2p_extension()
+        with pytest.raises(PeerVerificationError, match="missing"):
+            verify_libp2p_certificate(cert)
+
+    def test_tampered_signature_is_rejected(self, identity_key: IdentityKeypair) -> None:
+        """Flipping a byte inside the SignedKey signature breaks verification."""
+        _, _, cert = generate_libp2p_certificate(identity_key)
+        ext = cert.extensions.get_extension_for_oid(LIBP2P_EXTENSION_OID)
+        assert isinstance(ext.value, x509.UnrecognizedExtension)
+        payload = bytearray(ext.value.value)
+
+        # The signature is the second OCTET STRING; flip its last byte.
+        payload[-1] ^= 0x01
+        tampered = _replace_libp2p_extension(cert, bytes(payload))
+
+        with pytest.raises(PeerVerificationError, match="signature"):
+            verify_libp2p_certificate(tampered)
+
+    def test_malformed_outer_sequence_is_rejected(self, identity_key: IdentityKeypair) -> None:
+        """Replacing the SEQUENCE tag with garbage fails ASN.1 parsing."""
+        _, _, cert = generate_libp2p_certificate(identity_key)
+        ext = cert.extensions.get_extension_for_oid(LIBP2P_EXTENSION_OID)
+        assert isinstance(ext.value, x509.UnrecognizedExtension)
+        payload = bytearray(ext.value.value)
+        payload[0] = 0x31  # SET tag instead of SEQUENCE (0x30)
+        broken = _replace_libp2p_extension(cert, bytes(payload))
+
+        with pytest.raises(PeerVerificationError, match="tag mismatch"):
+            verify_libp2p_certificate(broken)
+
+    def test_unknown_key_type_is_rejected(self, identity_key: IdentityKeypair) -> None:
+        """A SignedKey carrying an unknown KeyType is rejected up front."""
+        # Build a SignedKey by hand whose protobuf Type field is 99 (no such key type).
+        public_key_compressed = identity_key.public_key.to_bytes()
+        bogus_proto = bytes([0x08, 99, 0x12, len(public_key_compressed)]) + public_key_compressed
+        signature = identity_key.sign(b"")  # signature value is irrelevant here
+        payload = _encode_asn1_signed_key(bogus_proto, signature)
+
+        _, _, cert = generate_libp2p_certificate(identity_key)
+        broken = _replace_libp2p_extension(cert, payload)
+
+        with pytest.raises(PeerVerificationError, match="KeyType"):
+            verify_libp2p_certificate(broken)
+
+    def test_truncated_signed_key_is_rejected(self, identity_key: IdentityKeypair) -> None:
+        """A SignedKey body shorter than its declared length is rejected."""
+        _, _, cert = generate_libp2p_certificate(identity_key)
+        ext = cert.extensions.get_extension_for_oid(LIBP2P_EXTENSION_OID)
+        assert isinstance(ext.value, x509.UnrecognizedExtension)
+        truncated = _replace_libp2p_extension(cert, ext.value.value[:-5])
+
+        with pytest.raises(PeerVerificationError):
+            verify_libp2p_certificate(truncated)
