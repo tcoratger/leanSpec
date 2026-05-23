@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from lean_spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
@@ -372,6 +373,78 @@ class LiveNetworkEventSource:
         self._gossipsub_event_task.add_done_callback(self._gossip_tasks.discard)
 
         logger.info("GossipSub behavior started")
+
+    async def start_serving(
+        self,
+        *,
+        status: Status,
+        current_slot_lookup: CurrentSlotLookup,
+        listen_addr: str | None,
+        bootnode_multiaddrs: Sequence[str],
+    ) -> None:
+        """
+        Bring the event source online in the spec-required order.
+
+        The order matters for ReqResp correctness:
+
+        1. Status must be set before any peer can hit the responder, or
+           BlocksByRoot / BlocksByRange queries return SERVER_ERROR.
+        2. The current-slot lookup must be wired before BlocksByRange
+           serves, for the same reason.
+        3. Bootnodes are dialed best-effort; failures log but do not abort.
+           A peerless node is still a valid honest participant.
+        4. The listener binds the local port. We give it a 100 ms head start
+           so a bind error (port in use) surfaces here rather than silently
+           in the background.
+        5. Gossipsub starts last so the heartbeat does not run before peers
+           are reachable.
+
+        Args:
+            status: Initial Status (finalized, head) the responder serves.
+            current_slot_lookup: Wall-clock-to-slot callback for ReqResp range bounds.
+            listen_addr: Multiaddr to bind for inbound connections, or None to
+                run dial-only.
+            bootnode_multiaddrs: Pre-resolved outbound peers. Caller is
+                expected to have parsed ENR strings into multiaddrs already.
+
+        Raises:
+            OSError: If the listener fails to bind within the probe window.
+        """
+        # The set-state-before-serving invariant: every other setter is
+        # idempotent, these two are load-bearing for correctness.
+        self.set_status(status)
+        self.set_current_slot_lookup(current_slot_lookup)
+
+        # Best-effort outbound connections. Both dial() and listen() clear
+        # the stop event internally; we also clear it here so a no-bootnodes,
+        # no-listen configuration still yields events.
+        self._stop_event.clear()
+
+        for multiaddr in bootnode_multiaddrs:
+            logger.info("Connecting to bootnode %s", multiaddr)
+            try:
+                peer_id = await self.dial(multiaddr)
+            except Exception as exc:
+                logger.warning("Failed to connect to bootnode %s: %s", multiaddr, exc)
+                continue
+            if peer_id is not None:
+                logger.info("Connected to bootnode, peer_id=%s", peer_id)
+            else:
+                logger.warning("Failed to connect to bootnode %s", multiaddr)
+
+        if listen_addr:
+            logger.info("Starting listener on %s", listen_addr)
+            listener_task = asyncio.create_task(self.listen(listen_addr))
+
+            # Surface immediate bind failures (port already in use, etc.)
+            # synchronously instead of leaving them as a silent background
+            # task crash.
+            await asyncio.sleep(0.1)
+            if listener_task.done():
+                listener_task.result()
+
+        logger.info("Starting gossipsub behavior...")
+        await self.start_gossipsub()
 
     async def _forward_gossipsub_events(self) -> None:
         """Forward events from GossipsubBehavior to our event queue."""

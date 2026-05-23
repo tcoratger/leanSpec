@@ -24,8 +24,11 @@ from typing import Final
 import httpx
 
 from lean_spec.forks import State
+from lean_spec.forks.lstar.containers import Block, BlockBody
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.types import Bytes32
 
 logger = logging.getLogger(__name__)
 
@@ -153,3 +156,50 @@ def verify_checkpoint_state(state: State) -> bool:
     except Exception as e:
         logger.error("State verification failed: %s", e)
         return False
+
+
+def create_anchor_block(state: State) -> Block:
+    """
+    Create an anchor block from a checkpoint state.
+
+    The forkchoice store requires a block to establish the starting point.
+    We reconstruct this "anchor block" from the header embedded in the state.
+
+    The body content does not matter for fork choice initialization.
+    Only header fields (slot, parent, state root) establish the anchor.
+
+    Args:
+        state: The checkpoint state containing the latest block header.
+
+    Returns:
+        A Block suitable for initializing the forkchoice store.
+    """
+    header = state.latest_block_header
+
+    # The state root in the header may be zero.
+    #
+    # Why? Block processing stores the header BEFORE computing post-state root.
+    # This prevents circular dependency: state root depends on header, header
+    # would depend on state root. The spec breaks this cycle by storing zero
+    # initially, then filling it in when the next slot processes.
+    #
+    # For checkpoint sync, we may receive state at exactly the block's slot.
+    # In this case, the state root was never filled in. We compute it now.
+    state_root = header.state_root
+    if state_root == Bytes32.zero():
+        state_root = hash_tree_root(state)
+
+    # Build a minimal body.
+    #
+    # Fork choice only cares about the block's identity (its hash) and
+    # lineage (parent_root). The body content is irrelevant for anchoring.
+    # We use an empty body because we lack the original block data.
+    body = BlockBody(attestations=AggregatedAttestations(data=[]))
+
+    return Block(
+        slot=header.slot,
+        proposer_index=header.proposer_index,
+        parent_root=header.parent_root,
+        state_root=state_root,
+        body=body,
+    )

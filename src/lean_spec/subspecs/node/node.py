@@ -132,6 +132,24 @@ class NodeConfig:
     restarts and do not update the local ENR or subnet subscriptions.
     """
 
+    anchor_store: Store | None = field(default=None)
+    """
+    Pre-built forkchoice store to anchor the node on.
+
+    When set, the node skips genesis-store synthesis and uses this store
+    directly. Used for checkpoint sync, where the store is built from a
+    fetched finalized state rather than from the genesis validator set.
+
+    The store-load order in from_genesis is:
+
+    1. Database (if database_path is set and contains valid state).
+    2. anchor_store (this field), if provided.
+    3. Fresh synthesis from the genesis validator set.
+
+    The validators field MUST match the validator set inside this store
+    (state.validators for checkpoint, genesis.to_validators() for genesis).
+    """
+
 
 @dataclass(slots=True)
 class Node:
@@ -211,6 +229,12 @@ class Node:
         store = cls._try_load_store_from_database(
             database, validator_id, config.genesis_time, config.time_fn, fork
         )
+
+        # An explicit anchor store wins over genesis synthesis but loses to a
+        # populated database, so a restart with persisted state still recovers
+        # from disk even when the caller passes a checkpoint anchor.
+        if store is None and config.anchor_store is not None:
+            store = config.anchor_store
 
         if store is None:
             # Generate genesis state from validators.
