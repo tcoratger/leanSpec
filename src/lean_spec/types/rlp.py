@@ -24,9 +24,37 @@ References:
 """
 
 import math
+from typing import Final
 
 type RLPItem = bytes | list[RLPItem]
 """A byte string or a list of items recursively."""
+
+
+STRING_BASE: Final = 0x80
+"""The byte at which byte-string prefixes begin.
+
+Anything below (0x00 through 0x7F) is its own encoding, with no prefix needed.
+From this byte upward, a prefix carries either the string's length or a length-of-length.
+The boundary keeps small single bytes free of encoding overhead.
+"""
+
+LIST_BASE: Final = 0xC0
+"""The byte at which list prefixes begin.
+
+Lists and byte strings share the same length-prefix structure, just shifted by 0x40.
+That offset is what tells the decoder to open a list instead of a string.
+0xC0 sits above all 64 string prefixes (0x80 to 0xBF), leaving them undisturbed.
+"""
+
+SHORT_FORM_MAX: Final = 55
+"""The largest payload length that fits the compact one-byte prefix.
+
+- Smaller payloads encode with just base + length as the prefix, no extra bytes.
+- Larger payloads switch to the long form, where the prefix carries a length-of-length.
+
+Why 55: each base owns 64 prefix values.
+Lengths 0 through 55 take 56 of them, leaving 8 for long-form variants.
+"""
 
 
 class RLPDecodingError(Exception):
@@ -58,9 +86,9 @@ def encode_rlp(item: RLPItem) -> bytes:
     #   b""       ->  80               (empty string is the length-zero short form)
     #   b"dog"    ->  83 64 6f 67      (short string of length 3)
     if isinstance(item, bytes):
-        if len(item) == 1 and item[0] < 0x80:
+        if len(item) == 1 and item[0] < STRING_BASE:
             return item
-        return _with_length_prefix(item, base=0x80)
+        return _with_length_prefix(item, base=STRING_BASE)
 
     # List branch: encode each element, concatenate, then wrap with a list prefix.
     #
@@ -74,7 +102,7 @@ def encode_rlp(item: RLPItem) -> bytes:
     #   [b"dog", b"god"]  ->  c8 83 64 6f 67 83 67 6f 64            (two short strings inside)
     if isinstance(item, list):
         payload = b"".join(encode_rlp(element) for element in item)
-        return _with_length_prefix(payload, base=0xC0)
+        return _with_length_prefix(payload, base=LIST_BASE)
 
     raise TypeError(f"Cannot RLP encode type: {type(item).__name__}")
 
@@ -101,7 +129,7 @@ def _with_length_prefix(payload: bytes, base: int) -> bytes:
     #
     #   prefix  =  0x80 + 3  =  0x83
     #   output  =  83 64 6f 67     (prefix, then "dog")
-    if length <= 55:
+    if length <= SHORT_FORM_MAX:
         return bytes([base + length]) + payload
 
     # Long form (payload of 56 bytes or more).
@@ -126,7 +154,7 @@ def _with_length_prefix(payload: bytes, base: int) -> bytes:
     #   prefix                        =  0x80 + 55 + 2  =  0xB9
     #   output                        =  B9 04 00 [1024 bytes of payload]
     length_bytes = length.to_bytes(math.ceil(length.bit_length() / 8), "big")
-    return bytes([base + 55 + len(length_bytes)]) + length_bytes + payload
+    return bytes([base + SHORT_FORM_MAX + len(length_bytes)]) + length_bytes + payload
 
 
 def decode_rlp(data: bytes) -> RLPItem:
@@ -218,14 +246,14 @@ def _decode_item(data: bytes, offset: int) -> tuple[RLPItem, int]:
     #   prefix          =  0x7f         (below 0x80, no length field)
     #   item            =  b"\x7f"
     #   next offset     =  1
-    if prefix < 0x80:
+    if prefix < STRING_BASE:
         return data[offset : offset + 1], offset + 1
 
     # String or list dispatch by prefix family.
     #
     # The string range ends at 0xC0 (exclusive) and the list range starts there.
     # The shared length helper resolves payload bounds for either family.
-    base = 0x80 if prefix < 0xC0 else 0xC0
+    base = STRING_BASE if prefix < LIST_BASE else LIST_BASE
     payload_start, payload_end = _decode_length(data, offset, base)
 
     # String branch: payload bytes are the decoded value.
@@ -236,7 +264,7 @@ def _decode_item(data: bytes, offset: int) -> tuple[RLPItem, int]:
     #   payload range   =  [1, 4)
     #   item            =  b"dog"
     #   next offset     =  4
-    if base == 0x80:
+    if base == STRING_BASE:
         return data[payload_start:payload_end], payload_end
 
     # List branch: drain items from the bounded payload range.
@@ -299,7 +327,7 @@ def _decode_length(data: bytes, offset: int, base: int) -> tuple[int, int]:
     #   prefix          =  0x83
     #   short_length    =  0x83 - 0x80  =  3
     #   payload range   =  [1, 4)       (bytes 64 6f 67 = "dog")
-    if short_length <= 55:
+    if short_length <= SHORT_FORM_MAX:
         start = offset + 1
         end = start + short_length
         if end > len(data):
@@ -319,7 +347,7 @@ def _decode_length(data: bytes, offset: int, base: int) -> tuple[int, int]:
     #   len_of_len      =  57 - 55      =  2
     #   length          =  int(04 00, big)  =  1024
     #   payload range   =  [3, 1027)
-    len_of_len = short_length - 55
+    len_of_len = short_length - SHORT_FORM_MAX
     length_start = offset + 1
     length_end = length_start + len_of_len
     if length_end > len(data):
@@ -344,8 +372,8 @@ def _decode_length(data: bytes, offset: int, base: int) -> tuple[int, int]:
     #
     # Example: input b8 37 [55 "a" bytes] is rejected.
     # The shorter equivalent b7 [55 "a" bytes] is the canonical form.
-    if length <= 55:
-        kind = "string" if base == 0x80 else "list"
+    if length <= SHORT_FORM_MAX:
+        kind = "string" if base == STRING_BASE else "list"
         raise RLPDecodingError(f"Non-canonical: long {kind} encoding for short {kind}")
 
     start = length_end
