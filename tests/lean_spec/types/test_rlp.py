@@ -5,13 +5,6 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.types.rlp import (
-    LONG_LIST_BASE,
-    LONG_STRING_BASE,
-    SHORT_LIST_MAX_LEN,
-    SHORT_LIST_PREFIX,
-    SHORT_STRING_MAX_LEN,
-    SHORT_STRING_PREFIX,
-    SINGLE_BYTE_MAX,
     RLPDecodingError,
     RLPItem,
     decode_rlp,
@@ -19,10 +12,14 @@ from lean_spec.types.rlp import (
     encode_rlp,
 )
 
-# Derived constants for test assertions.
-# Long encoding prefixes are BASE + 1 (for 1-byte length).
-LONG_STRING_PREFIX = LONG_STRING_BASE + 1  # 0xB8
-LONG_LIST_PREFIX = LONG_LIST_BASE + 1  # 0xF8
+# RLP spec boundaries (Yellow Paper Appendix B). Inlined to match the wire-format literals.
+SINGLE_BYTE_MAX = 0x7F  # Largest value encoded as itself with no prefix.
+SHORT_STRING_PREFIX = 0x80  # Base byte for short strings: prefix = 0x80 + length.
+SHORT_STRING_MAX_LEN = 55  # Largest payload length that fits the short string range.
+LONG_STRING_PREFIX = 0xB8  # First byte of the long string range (= 0xB7 + 1).
+SHORT_LIST_PREFIX = 0xC0  # Base byte for short lists: prefix = 0xC0 + payload length.
+SHORT_LIST_MAX_LEN = 55  # Largest payload length that fits the short list range.
+LONG_LIST_PREFIX = 0xF8  # First byte of the long list range (= 0xF7 + 1).
 
 
 class TestEncodeEmptyString:
@@ -465,6 +462,30 @@ class TestDecodeErrors:
         with pytest.raises(RLPDecodingError, match=r"Non-canonical.*long list"):
             decode_rlp(bytes.fromhex("f837") + bytes.fromhex("80") * 55)
 
+    def test_decode_non_canonical_leading_zeros_long_string(self) -> None:
+        """Long string whose multi-byte length carries a leading zero is non-canonical."""
+        # 0xb9 marks a long string with two length bytes.
+        # The length bytes 00 38 decode to 56.
+        # The leading zero is redundant since the canonical form is 0xb8 38 with one length byte.
+        with pytest.raises(RLPDecodingError, match=r"Non-canonical.*leading zeros"):
+            decode_rlp(bytes.fromhex("b90038") + b"a" * 56)
+
+    def test_decode_non_canonical_leading_zeros_long_list(self) -> None:
+        """Long list whose multi-byte length carries a leading zero is non-canonical."""
+        # 0xf9 marks a long list with two length bytes.
+        # The length bytes 00 38 decode to 56.
+        # The leading zero is redundant since the canonical form is 0xf8 38 with one length byte.
+        with pytest.raises(RLPDecodingError, match=r"Non-canonical.*leading zeros"):
+            decode_rlp(bytes.fromhex("f90038") + bytes.fromhex("80") * 56)
+
+    def test_decode_list_payload_length_mismatch(self) -> None:
+        """Inner item that overshoots the parent list boundary is rejected."""
+        # Outer list 0xc3 declares three payload bytes.
+        # Inner short string 0x85 declares five data bytes.
+        # Those five bytes fit in the buffer but extend past the outer list's payload end.
+        with pytest.raises(RLPDecodingError, match=r"List payload length mismatch"):
+            decode_rlp(bytes.fromhex("c3856161616161"))
+
 
 class TestDecodeListFunction:
     """Tests for the decode_list convenience function."""
@@ -639,14 +660,14 @@ class TestBoundaryConditions:
     """Tests for boundary conditions based on module constants."""
 
     def test_single_byte_max_boundary(self) -> None:
-        """Verify SINGLE_BYTE_MAX boundary (0x7f vs 0x80)."""
+        """Verify single-byte boundary (0x7f vs 0x80)."""
         # 0x7f = single byte encoding
         assert encode_rlp(bytes([SINGLE_BYTE_MAX])) == bytes([SINGLE_BYTE_MAX])
         # 0x80 = short string encoding
         assert encode_rlp(bytes([SINGLE_BYTE_MAX + 1])) == bytes([0x81, 0x80])
 
     def test_short_string_max_boundary(self) -> None:
-        """Verify SHORT_STRING_MAX_LEN boundary (55 vs 56 bytes)."""
+        """Verify short-string boundary (55 vs 56 bytes)."""
         # 55 bytes = short string encoding (prefix 0xb7)
         data_55 = b"a" * SHORT_STRING_MAX_LEN
         encoded_55 = encode_rlp(data_55)
@@ -658,7 +679,7 @@ class TestBoundaryConditions:
         assert encoded_56[0] == LONG_STRING_PREFIX  # 0xb8
 
     def test_short_list_max_boundary(self) -> None:
-        """Verify SHORT_LIST_MAX_LEN boundary (55 vs 56 bytes payload)."""
+        """Verify short-list boundary (55 vs 56 bytes payload)."""
         # 55 bytes payload = short list encoding (prefix 0xf7)
         items_55: list[RLPItem] = [b"a" for _ in range(SHORT_LIST_MAX_LEN)]
         encoded_55 = encode_rlp(items_55)
@@ -671,7 +692,7 @@ class TestBoundaryConditions:
 
     def test_prefix_boundaries(self) -> None:
         """Verify prefix range boundaries from RLP spec."""
-        # Verify constants match RLP specification
+        # Verify literals match RLP specification
         assert SHORT_STRING_PREFIX == 0x80
         assert LONG_STRING_PREFIX == 0xB8
         assert SHORT_LIST_PREFIX == 0xC0
