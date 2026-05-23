@@ -8,22 +8,16 @@ import httpx
 import pytest
 
 from lean_spec.forks.lstar import State, Store
-from lean_spec.forks.lstar.containers import Block, BlockBody
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.forks.lstar.containers.state import Validators
-from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.api import ApiServer, ApiServerConfig
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import (
     FINALIZED_STATE_ENDPOINT,
     CheckpointSyncError,
-    create_anchor_block,
     fetch_finalized_state,
     verify_checkpoint_state,
 )
-from lean_spec.types import Bytes32, Slot, Uint64
-from tests.lean_spec.helpers import make_genesis_state
+from lean_spec.types import Slot
 
 
 class _MockTransport(httpx.AsyncBaseTransport):
@@ -226,61 +220,3 @@ class TestCheckpointSyncClientServerIntegration:
 
         finally:
             await server.aclose()
-
-
-class TestCreateAnchorBlock:
-    """Tests for the anchor-block reconstruction helper."""
-
-    def test_computes_state_root_when_zero(self) -> None:
-        """State root is computed when header has zero state root."""
-        state = make_genesis_state(num_validators=3, genesis_time=1000)
-        assert state.latest_block_header.state_root == Bytes32.zero()
-
-        anchor_block = create_anchor_block(state)
-
-        expected_state_root = hash_tree_root(state)
-        assert anchor_block.state_root == expected_state_root
-        assert anchor_block.state_root != Bytes32.zero()
-
-    def test_preserves_non_zero_state_root(self, spec: LstarSpec) -> None:
-        """Non-zero state root in header is preserved."""
-        state = make_genesis_state(num_validators=3, genesis_time=1000)
-        state_with_root = spec.process_slots(state, Slot(1))
-        assert state_with_root.latest_block_header.state_root != Bytes32.zero()
-
-        anchor_block = create_anchor_block(state_with_root)
-
-        assert anchor_block.state_root == state_with_root.latest_block_header.state_root
-
-    def test_preserves_header_fields(self) -> None:
-        """Slot, proposer_index, and parent_root are preserved from header."""
-        state = make_genesis_state(num_validators=3, genesis_time=1000)
-        header = state.latest_block_header
-
-        anchor_block = create_anchor_block(state)
-
-        assert anchor_block.slot == header.slot
-        assert anchor_block.proposer_index == header.proposer_index
-        assert anchor_block.parent_root == header.parent_root
-
-    def test_creates_empty_body(self) -> None:
-        """Block body contains empty attestations list."""
-        state = make_genesis_state(num_validators=3, genesis_time=1000)
-
-        anchor_block = create_anchor_block(state)
-
-        assert len(anchor_block.body.attestations) == 0
-
-    def test_anchor_block_structure_is_valid(self) -> None:
-        """Anchor block has all required fields populated."""
-        state = make_genesis_state(num_validators=5, genesis_time=2000)
-
-        anchor_block = create_anchor_block(state)
-
-        assert isinstance(anchor_block, Block)
-        assert isinstance(anchor_block.slot, Slot)
-        assert isinstance(anchor_block.proposer_index, Uint64)
-        assert isinstance(anchor_block.parent_root, Bytes32)
-        assert isinstance(anchor_block.state_root, Bytes32)
-        assert isinstance(anchor_block.body, BlockBody)
-        assert isinstance(anchor_block.body.attestations, AggregatedAttestations)

@@ -15,11 +15,13 @@ from __future__ import annotations
 from typing import cast
 
 from lean_spec.forks import ForkProtocol, Store, Validators
+from lean_spec.forks.lstar.containers import Block, BlockBody
+from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.networking.reqresp.message import Status
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import (
     CheckpointSyncError,
-    create_anchor_block,
     fetch_finalized_state,
     verify_checkpoint_state,
 )
@@ -99,7 +101,21 @@ class Anchor(StrictBaseModel):
                 f"local={genesis.genesis_time}"
             )
 
-        anchor_block = create_anchor_block(state)
+        # Reconstruct the anchor block from the header embedded in the state.
+        # A header stored before its post-state root carries a zero placeholder;
+        # in that case we recompute the root from the state itself.
+        # Fork choice only needs identity and lineage, so the body is left empty.
+        header = state.latest_block_header
+        state_root = (
+            header.state_root if header.state_root != Bytes32.zero() else hash_tree_root(state)
+        )
+        anchor_block = Block(
+            slot=header.slot,
+            proposer_index=header.proposer_index,
+            parent_root=header.parent_root,
+            state_root=state_root,
+            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+        )
 
         # The protocol return type is structural, but only one concrete store ships.
         store = cast(Store, fork.create_store(state, anchor_block, validator_id))

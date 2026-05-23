@@ -34,8 +34,8 @@ from lean_spec.subspecs.chain.config import (
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.node import Node, NodeConfig
+from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
-from lean_spec.subspecs.sync.checkpoint_sync import create_anchor_block
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
@@ -744,7 +744,13 @@ class TestNodeFromGenesisAnchorStore:
     def test_anchor_store_is_used_when_provided(self, spec: LstarSpec) -> None:
         """The node adopts the provided anchor store rather than synthesising one."""
         state = make_genesis_state(num_validators=3, genesis_time=1000)
-        anchor_block = create_anchor_block(state)
+        anchor_block = Block(
+            slot=state.latest_block_header.slot,
+            proposer_index=state.latest_block_header.proposer_index,
+            parent_root=state.latest_block_header.parent_root,
+            state_root=hash_tree_root(state),
+            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+        )
         anchor_store = spec.create_store(state, anchor_block, None)
 
         config = NodeConfig(
