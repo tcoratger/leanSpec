@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import IO, Any, ClassVar, NoReturn, Self, SupportsInt, override
+from typing import IO, Any, ClassVar, NoReturn, Self, SupportsInt, overload, override
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -12,7 +12,7 @@ from .ssz_base import SSZType
 
 
 class BaseUint(int, SSZType):
-    """A base class for custom unsigned integer types that inherits from `int`."""
+    """Base class for fixed-width unsigned integer types."""
 
     __slots__ = ()
 
@@ -188,106 +188,109 @@ class BaseUint(int, SSZType):
             f"'{type(self).__name__}' and '{type(other).__name__}'"
         )
 
-    def _validate_int_operand(self, other: Any, op_symbol: str) -> None:
-        """Helper to ensure an operand is a true integer, not a bool."""
-        if not isinstance(other, int) or isinstance(other, bool):
-            raise TypeError(
-                f"Unsupported operand type for {op_symbol}: "
-                f"expected 'int' but got '{type(other).__name__}'"
-            )
-
     def __add__(self, other: Any) -> Self:
         """Handle the addition operator (`+`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "+")
         return type(self)(super().__add__(other))
 
     def __radd__(self, other: Any) -> Self:
         """Handle the reverse addition operator (`+`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "+")
         return type(self)(int(other) + int(self))
 
     def __sub__(self, other: Any) -> Self:
         """Handle the subtraction operator (`-`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "-")
         return type(self)(super().__sub__(other))
 
     def __rsub__(self, other: Any) -> Self:
         """Handle the reverse subtraction operator (`-`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "-")
         return type(self)(int(other) - int(self))
 
     def __mul__(self, other: Any) -> Self:
         """Handle the multiplication operator (`*`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "*")
         return type(self)(super().__mul__(other))
 
     def __rmul__(self, other: Any) -> Self:
         """Handle the reverse multiplication operator (`*`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "*")
         return type(self)(int(other) * int(self))
 
     def __floordiv__(self, other: Any) -> Self:
         """Handle the floor division operator (`//`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "//")
         return type(self)(super().__floordiv__(other))
 
     def __rfloordiv__(self, other: Any) -> Self:
         """Handle the reverse floor division operator (`//`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "//")
         return type(self)(int(other) // int(self))
 
     def __mod__(self, other: Any) -> Self:
         """Handle the modulo operator (`%`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "%")
         return type(self)(super().__mod__(other))
 
     def __rmod__(self, other: Any) -> Self:
         """Handle the reverse modulo operator (`%`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "%")
         return type(self)(int(other) % int(self))
 
-    def __pow__(self, exponent: Any, modulo: Any | None = None) -> Any:  # type: ignore[override]
+    @overload
+    def __pow__(self, value: int, mod: None = None, /) -> Self: ...
+    @overload
+    def __pow__(self, value: int, mod: int, /) -> Self: ...
+    # The parent declaration uses two stub overloads with different return types.
+    #
+    # Narrowing both to a single subtype is safe by Liskov substitution.
+    # The strict overload-match check rejects it regardless.
+    def __pow__(self, value: int, mod: int | None = None, /) -> Self:  # ty: ignore[invalid-method-override]
         """Handle the exponentiation operator (`**`) and `pow(self, exp, mod)`."""
-        self._validate_int_operand(exponent, "** or pow()")
-        if modulo is not None:
-            self._validate_int_operand(modulo, "** or pow()")
-
-        result = pow(int(self), int(exponent), int(modulo) if modulo is not None else None)
+        if type(value) is not type(self):
+            self._raise_type_error(value, "**")
+        if mod is not None and type(mod) is not type(self):
+            self._raise_type_error(mod, "**")
+        result = pow(int(self), int(value), int(mod) if mod is not None else None)
         return type(self)(result)
 
-    def __rpow__(self, base: Any) -> Any:  # type: ignore[override]
-        """Handle the reverse exponentiation operator (`**`)."""
-        self._validate_int_operand(base, "**")
-        result = pow(int(base), int(self))
+    def __rpow__(self, base: int, modulo: int | None = None, /) -> Self:
+        """Handle the reverse exponentiation operator and three-argument pow."""
+        if type(base) is not type(self):
+            self._raise_type_error(base, "**")
+        if modulo is not None and type(modulo) is not type(self):
+            self._raise_type_error(modulo, "**")
+        result = pow(int(base), int(self), int(modulo) if modulo is not None else None)
         return type(self)(result)
 
     def __divmod__(self, other: Any) -> tuple[Self, Self]:
         """Handle `divmod(self, other)`."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "divmod")
         q, r = super().__divmod__(other)
         return type(self)(q), type(self)(r)
 
     def __rdivmod__(self, other: Any) -> tuple[Self, Self]:
         """Handle `divmod(other, self)`."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "divmod")
         q, r = super().__rdivmod__(other)
         return type(self)(q), type(self)(r)
 
     def __and__(self, other: Any) -> Self:
         """Handle the bitwise AND operator (`&`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "&")
         return type(self)(super().__and__(other))
 
@@ -297,7 +300,7 @@ class BaseUint(int, SSZType):
 
     def __or__(self, other: Any) -> Self:
         """Handle the bitwise OR operator (`|`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "|")
         return type(self)(super().__or__(other))
 
@@ -307,7 +310,7 @@ class BaseUint(int, SSZType):
 
     def __xor__(self, other: Any) -> Self:
         """Handle the bitwise XOR operator (`^`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "^")
         return type(self)(super().__xor__(other))
 
@@ -317,59 +320,61 @@ class BaseUint(int, SSZType):
 
     def __lshift__(self, other: Any) -> Self:
         """Handle the left bit-shift operator (`<<`)."""
-        self._validate_int_operand(other, "<<")
+        if type(other) is not type(self):
+            self._raise_type_error(other, "<<")
         return type(self)(super().__lshift__(other))
 
     def __rlshift__(self, other: Any) -> Self:
         """Handle the reverse left bit-shift operator (`<<`)."""
-        self._validate_int_operand(other, "<<")
+        if type(other) is not type(self):
+            self._raise_type_error(other, "<<")
         return type(self)(int(other) << int(self))
 
     def __rshift__(self, other: Any) -> Self:
         """Handle the right bit-shift operator (`>>`)."""
-        self._validate_int_operand(other, ">>")
+        if type(other) is not type(self):
+            self._raise_type_error(other, ">>")
         return type(self)(super().__rshift__(other))
 
     def __rrshift__(self, other: Any) -> Self:
         """Handle the reverse right bit-shift operator (`>>`)."""
-        self._validate_int_operand(other, ">>")
+        if type(other) is not type(self):
+            self._raise_type_error(other, ">>")
         return type(self)(int(other) >> int(self))
 
     def __eq__(self, other: object) -> bool:
         """Handle the equality operator (`==`)."""
-        # Two values of different widths must not compare equal.
         if type(other) is not type(self):
             self._raise_type_error(other, "==")
         return super().__eq__(other)
 
     def __ne__(self, other: object) -> bool:
         """Handle the inequality operator (`!=`)."""
-        # Two values of different widths must not compare equal.
         if type(other) is not type(self):
             self._raise_type_error(other, "!=")
         return super().__ne__(other)
 
     def __lt__(self, other: Any) -> bool:
         """Handle the less-than operator (`<`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "<")
         return super().__lt__(other)
 
     def __le__(self, other: Any) -> bool:
         """Handle the less-than-or-equal-to operator (`<=`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, "<=")
         return super().__le__(other)
 
     def __gt__(self, other: Any) -> bool:
         """Handle the greater-than operator (`>`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, ">")
         return super().__gt__(other)
 
     def __ge__(self, other: Any) -> bool:
         """Handle the greater-than-or-equal-to operator (`>=`)."""
-        if not isinstance(other, BaseUint):
+        if type(other) is not type(self):
             self._raise_type_error(other, ">=")
         return super().__ge__(other)
 

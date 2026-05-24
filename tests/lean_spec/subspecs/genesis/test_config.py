@@ -9,7 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from lean_spec.subspecs.genesis import GenesisConfig
-from lean_spec.types import Bytes52, SSZValueError, Uint64
+from lean_spec.types import Bytes52, SSZValueError, Uint64, ValidatorIndex
 
 
 def _load(content: str) -> GenesisConfig:
@@ -107,7 +107,7 @@ class TestGenesisConfigValidators:
         assert len(validators.data) == 3
 
         for i, validator in enumerate(validators.data):
-            assert validator.index == Uint64(i)
+            assert validator.index == ValidatorIndex(i)
             assert validator.attestation_pubkey == config.genesis_validators[i].attestation_pubkey
             assert validator.proposal_pubkey == config.genesis_validators[i].proposal_pubkey
 

@@ -149,10 +149,10 @@ def test_arithmetic_operators(uint_class: Type[BaseUint]) -> None:
     assert a % b == uint_class(a_val % b_val)
 
     # Exponentiation
-    assert uint_class(b_val) ** 4 == uint_class(b_val**4)
+    assert uint_class(b_val) ** uint_class(4) == uint_class(b_val**4)
     if uint_class.BITS <= 16:  # Pow gets too big quickly
         with pytest.raises(SSZValueError):
-            _ = a ** int(b)
+            _ = a**b
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -205,8 +205,8 @@ def test_bitwise_operators(uint_class: Type[BaseUint]) -> None:
     assert a & b == uint_class(0b1000)
     assert a | b == uint_class(0b1110)
     assert a ^ b == uint_class(0b0110)
-    assert a << 2 == uint_class(0b110000)
-    assert a >> 2 == uint_class(0b11)
+    assert a << uint_class(2) == uint_class(0b110000)
+    assert a >> uint_class(2) == uint_class(0b11)
 
     with pytest.raises(TypeError):
         _ = a & 1
@@ -214,6 +214,10 @@ def test_bitwise_operators(uint_class: Type[BaseUint]) -> None:
         _ = a | 1
     with pytest.raises(TypeError):
         _ = a ^ 1
+    with pytest.raises(TypeError):
+        _ = a << 1
+    with pytest.raises(TypeError):
+        _ = a >> 1
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -487,15 +491,9 @@ class TestPowAndRpow:
     def test_pow_with_modulo(self, uint_class: Type[BaseUint]) -> None:
         """Three-argument pow(base, exp, mod) validates the modulo and returns correct result."""
         # pow(2, 10, 100) == 1024 % 100 == 24
-        result = pow(uint_class(2), 10, 100)
+        result = pow(uint_class(2), uint_class(10), uint_class(100))
         assert result == uint_class(24)
         assert isinstance(result, uint_class)
-
-    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_pow_with_bool_modulo_raises(self, uint_class: Type[BaseUint]) -> None:
-        """Three-argument pow rejects a bool as the modulo operand."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            pow(uint_class(2), 10, True)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_rpow_success(self, uint_class: Type[BaseUint]) -> None:
@@ -505,39 +503,44 @@ class TestPowAndRpow:
         assert result == uint_class(8)
         assert isinstance(result, uint_class)
 
-    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_rpow_rejects_bool(self, uint_class: Type[BaseUint]) -> None:
-        """Reverse pow rejects a bool as the base operand."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            uint_class(3).__rpow__(True)
 
-
-class TestValidateIntOperand:
-    """Tests for _validate_int_operand which rejects bools and non-ints."""
+class TestPowShiftStrictOperands:
+    """Pow and shift operators require same-type operands like every other binary op."""
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_pow_rejects_bool_exponent(self, uint_class: Type[BaseUint]) -> None:
-        """Exponentiation rejects a bool as the exponent."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            uint_class(2) ** True
+    @pytest.mark.parametrize("bad", [3, True, "3", 1.5])
+    def test_pow_rejects_non_uint_exponent(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Exponentiation rejects any exponent of a different type."""
+        with pytest.raises(TypeError, match=r"\*\*"):
+            uint_class(2) ** bad  # type: ignore[operator]
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_pow_rejects_string_exponent(self, uint_class: Type[BaseUint]) -> None:
-        """Exponentiation rejects a string as the exponent."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'str'"):
-            uint_class(2) ** "3"  # type: ignore[operator]
+    @pytest.mark.parametrize("bad", [100, True])
+    def test_pow_rejects_non_uint_modulo(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Three-argument pow rejects any modulo of a different type."""
+        with pytest.raises(TypeError, match=r"\*\*"):
+            pow(uint_class(2), uint_class(10), bad)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_lshift_rejects_bool(self, uint_class: Type[BaseUint]) -> None:
-        """Left shift rejects a bool as the shift amount."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            uint_class(1) << True
+    @pytest.mark.parametrize("bad", [2, True])
+    def test_rpow_rejects_non_uint_base(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Reverse pow rejects any base of a different type."""
+        with pytest.raises(TypeError, match=r"\*\*"):
+            uint_class(3).__rpow__(bad)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_rshift_rejects_bool(self, uint_class: Type[BaseUint]) -> None:
-        """Right shift rejects a bool as the shift amount."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            uint_class(8) >> True
+    @pytest.mark.parametrize("bad", [3, True])
+    def test_lshift_rejects_non_uint(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Left shift rejects any shift amount of a different type."""
+        with pytest.raises(TypeError, match="<<"):
+            uint_class(1) << bad  # type: ignore[operator]
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    @pytest.mark.parametrize("bad", [2, True])
+    def test_rshift_rejects_non_uint(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Right shift rejects any shift amount of a different type."""
+        with pytest.raises(TypeError, match=">>"):
+            uint_class(8) >> bad  # type: ignore[operator]
 
 
 class TestDivmodEdgeCases:
@@ -595,29 +598,31 @@ class TestReverseShiftOperators:
     def test_rlshift_success(self, uint_class: Type[BaseUint]) -> None:
         """Reverse left shift computes other << self."""
         # __rlshift__(other) computes other << self => 1 << 2 == 4
-        result = uint_class(2).__rlshift__(1)
+        result = uint_class(2).__rlshift__(uint_class(1))
         assert result == uint_class(4)
         assert isinstance(result, uint_class)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_rlshift_rejects_bool(self, uint_class: Type[BaseUint]) -> None:
-        """Reverse left shift rejects a bool operand."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            uint_class(2).__rlshift__(True)
+    @pytest.mark.parametrize("bad", [1, True])
+    def test_rlshift_rejects_non_uint(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Reverse left shift rejects any operand of a different type."""
+        with pytest.raises(TypeError, match="<<"):
+            uint_class(2).__rlshift__(bad)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_rrshift_success(self, uint_class: Type[BaseUint]) -> None:
         """Reverse right shift computes other >> self."""
         # __rrshift__(other) computes other >> self => 8 >> 2 == 2
-        result = uint_class(2).__rrshift__(8)
+        result = uint_class(2).__rrshift__(uint_class(8))
         assert result == uint_class(2)
         assert isinstance(result, uint_class)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
-    def test_rrshift_rejects_bool(self, uint_class: Type[BaseUint]) -> None:
-        """Reverse right shift rejects a bool operand."""
-        with pytest.raises(TypeError, match=r"expected 'int' but got 'bool'"):
-            uint_class(2).__rrshift__(True)
+    @pytest.mark.parametrize("bad", [8, True])
+    def test_rrshift_rejects_non_uint(self, uint_class: Type[BaseUint], bad: Any) -> None:
+        """Reverse right shift rejects any operand of a different type."""
+        with pytest.raises(TypeError, match=">>"):
+            uint_class(2).__rrshift__(bad)
 
 
 class TestComparisonTypeErrors:

@@ -165,7 +165,7 @@ class ValidatorService:
                 my_indices,
             )
 
-            if interval == Uint64(0):
+            if interval == Interval(0):
                 # Block production interval.
                 #
                 # Check if any of our validators is the proposer.
@@ -204,7 +204,7 @@ class ValidatorService:
             # Why split eligibility from the sync gate: the skip counter
             # must only tick on real misses, never on wrong-interval
             # iterations.
-            needs_attestation = interval >= Uint64(1) and slot not in self._attested_slots
+            needs_attestation = interval >= Interval(1) and slot not in self._attested_slots
             if needs_attestation:
                 logger.debug(
                     "ValidatorService: producing attestations for slot %d (interval %d)",

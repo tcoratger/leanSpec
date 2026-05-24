@@ -21,7 +21,6 @@ from lean_spec.types import (
     Bytes32,
     Checkpoint,
     Slot,
-    Uint64,
     ValidatorIndex,
     ValidatorIndices,
 )
@@ -643,7 +642,7 @@ class TestTickIntervalAggregation:
         # Set time to interval 1 (so next tick goes to interval 2)
         # time % INTERVALS_PER_SLOT determines current interval
         # We want to end up at interval 2 after tick
-        store = store.model_copy(update={"time": Uint64(1)})
+        store = store.model_copy(update={"time": Interval(1)})
 
         # Tick to interval 2 as aggregator
         updated_store, _ = spec.tick_interval(store, has_proposal=False, is_aggregator=True)
@@ -671,7 +670,7 @@ class TestTickIntervalAggregation:
         )
 
         # Set time to interval 1
-        store = store.model_copy(update={"time": Uint64(1)})
+        store = store.model_copy(update={"time": Interval(1)})
 
         # Tick to interval 2 as NON-aggregator
         updated_store, _ = spec.tick_interval(store, has_proposal=False, is_aggregator=False)
@@ -707,7 +706,7 @@ class TestTickIntervalAggregation:
             # So we need time+1 % 5 == target_interval
             # Therefore time = target_interval - 1 (mod 5)
             pre_tick_time = (target_interval - 1) % int(INTERVALS_PER_SLOT)
-            test_store = store.model_copy(update={"time": Uint64(pre_tick_time)})
+            test_store = store.model_copy(update={"time": Interval(pre_tick_time)})
 
             updated_store, _ = spec.tick_interval(
                 test_store, has_proposal=False, is_aggregator=True
@@ -731,15 +730,15 @@ class TestTickIntervalAggregation:
         )
 
         # Set time to interval 4 (so next tick wraps to interval 0)
-        store = store.model_copy(update={"time": Uint64(4)})
+        store = store.model_copy(update={"time": Interval(4)})
 
         # Tick to interval 0 with proposal
         updated_store, _ = spec.tick_interval(store, has_proposal=True, is_aggregator=True)
 
         # Verify time advanced
-        assert updated_store.time == Uint64(5)
+        assert updated_store.time == Interval(5)
         # Interval should now be 0
-        assert updated_store.time % INTERVALS_PER_SLOT == Uint64(0)
+        assert Interval(int(updated_store.time) % int(INTERVALS_PER_SLOT)) == Interval(0)
 
 
 class TestEndToEndAggregationFlow:
@@ -796,7 +795,7 @@ class TestEndToEndAggregationFlow:
             assert vid in stored_validators, f"Signature for {vid} should be stored"
 
         # Step 2: Advance to interval 2 (aggregation interval)
-        store = store.model_copy(update={"time": Uint64(1)})
+        store = store.model_copy(update={"time": Interval(1)})
         store, _ = spec.tick_interval(store, has_proposal=False, is_aggregator=True)
 
         # Step 3: Verify aggregated proofs were created
