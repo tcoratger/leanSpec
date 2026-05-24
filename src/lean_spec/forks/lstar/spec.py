@@ -444,8 +444,8 @@ class LstarSpec(ForkProtocol):
         # where a root appears to decide whether it is still unfinalized.
         start_slot = int(finalized_slot) + 1
         root_to_slot: dict[Bytes32, Slot] = {}
-        for i in range(start_slot, len(state.historical_block_hashes)):
-            root_to_slot[state.historical_block_hashes[i]] = Slot(i)
+        for i, root in enumerate(state.historical_block_hashes[start_slot:], start=start_slot):
+            root_to_slot[root] = Slot(i)
 
         # Process each attestation independently.
         #

@@ -81,7 +81,7 @@ class AttestationSubnets(BaseBitvector):
 
     def subscribed_subnets(self) -> list[SubnetId]:
         """List of subscribed subnet IDs."""
-        return [SubnetId(i) for i in range(self.LENGTH) if self.data[i]]
+        return [SubnetId(i) for i, bit in enumerate(self.data) if bit]
 
     def subscription_count(self) -> int:
         """Number of subscribed subnets."""
