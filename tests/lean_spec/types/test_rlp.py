@@ -12,14 +12,50 @@ from lean_spec.types.rlp import (
     encode_rlp,
 )
 
-# RLP spec boundaries (Yellow Paper Appendix B). Inlined to match the wire-format literals.
-SINGLE_BYTE_MAX = 0x7F  # Largest value encoded as itself with no prefix.
-SHORT_STRING_PREFIX = 0x80  # Base byte for short strings: prefix = 0x80 + length.
-SHORT_STRING_MAX_LEN = 55  # Largest payload length that fits the short string range.
-LONG_STRING_PREFIX = 0xB8  # First byte of the long string range (= 0xB7 + 1).
-SHORT_LIST_PREFIX = 0xC0  # Base byte for short lists: prefix = 0xC0 + payload length.
-SHORT_LIST_MAX_LEN = 55  # Largest payload length that fits the short list range.
-LONG_LIST_PREFIX = 0xF8  # First byte of the long list range (= 0xF7 + 1).
+# RLP spec boundaries (Yellow Paper Appendix B).
+# Inlined here to match the wire-format literals used throughout the spec.
+
+SINGLE_BYTE_MAX = 0x7F
+"""Largest value that encodes as itself with no prefix.
+
+Bytes above this need a length prefix to stay distinguishable from prefix bytes.
+"""
+
+SHORT_STRING_PREFIX = 0x80
+"""Base byte for short string prefixes.
+
+A short string's prefix is this base plus its length, so the range runs 0x80 through 0xB7.
+"""
+
+SHORT_STRING_MAX_LEN = 55
+"""Largest payload length that fits the short string range.
+
+Anything larger switches to the long form, where the length itself follows the prefix.
+"""
+
+LONG_STRING_PREFIX = 0xB8
+"""First byte of the long string range.
+
+Sits one above the last short-string prefix, marking the boundary between short and long forms.
+"""
+
+SHORT_LIST_PREFIX = 0xC0
+"""Base byte for short list prefixes.
+
+A short list's prefix is this base plus its payload length, so the range runs 0xC0 through 0xF7.
+"""
+
+SHORT_LIST_MAX_LEN = 55
+"""Largest payload length that fits the short list range.
+
+Anything larger switches to the long form, where the length itself follows the prefix.
+"""
+
+LONG_LIST_PREFIX = 0xF8
+"""First byte of the long list range.
+
+Sits one above the last short-list prefix, marking the boundary between short and long forms.
+"""
 
 
 class TestEncodeEmptyString:
