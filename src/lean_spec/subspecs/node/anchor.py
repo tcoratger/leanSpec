@@ -14,9 +14,14 @@ from __future__ import annotations
 
 from typing import cast
 
-from lean_spec.forks import ForkProtocol, Store, Validators
-from lean_spec.forks.lstar.containers import Block, BlockBody
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks import (
+    AggregatedAttestations,
+    Block,
+    BlockBody,
+    ForkProtocol,
+    Store,
+    Validators,
+)
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.ssz.hash import hash_tree_root
