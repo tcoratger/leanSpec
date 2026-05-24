@@ -337,13 +337,15 @@ class BaseUint(int, SSZType):
 
     def __eq__(self, other: object) -> bool:
         """Handle the equality operator (`==`)."""
-        if not isinstance(other, BaseUint):
+        # Two values of different widths must not compare equal.
+        if type(other) is not type(self):
             self._raise_type_error(other, "==")
         return super().__eq__(other)
 
     def __ne__(self, other: object) -> bool:
         """Handle the inequality operator (`!=`)."""
-        if not isinstance(other, BaseUint):
+        # Two values of different widths must not compare equal.
+        if type(other) is not type(self):
             self._raise_type_error(other, "!=")
         return super().__ne__(other)
 

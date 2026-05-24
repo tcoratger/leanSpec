@@ -2,6 +2,7 @@
 
 import io
 import operator
+from itertools import permutations
 from typing import Any, Type
 
 import pytest
@@ -13,6 +14,9 @@ from lean_spec.types.uint import BaseUint
 
 ALL_UINT_TYPES = (Uint8, Uint16, Uint32, Uint64)
 """A collection of all Uint types to test against."""
+
+CROSS_UINT_TYPE_PAIRS = list(permutations(ALL_UINT_TYPES, 2))
+"""Every ordered pair of distinct unsigned integer widths."""
 
 
 # Model classes for Pydantic validation tests
@@ -649,3 +653,32 @@ class TestIndexReturnsPlainInt:
         assert result == 42
         # The type must be plain int, not a BaseUint subclass.
         assert type(result) is int
+
+
+class TestCrossWidthEqualityIsStrict:
+    """Equality across different unsigned integer widths must raise."""
+
+    @pytest.mark.parametrize("type_a, type_b", CROSS_UINT_TYPE_PAIRS)
+    def test_eq_across_widths_raises(self, type_a: Type[BaseUint], type_b: Type[BaseUint]) -> None:
+        """Equality across two distinct widths raises."""
+        with pytest.raises(TypeError, match="=="):
+            _ = type_a(5) == type_b(5)
+
+    @pytest.mark.parametrize("type_a, type_b", CROSS_UINT_TYPE_PAIRS)
+    def test_ne_across_widths_raises(self, type_a: Type[BaseUint], type_b: Type[BaseUint]) -> None:
+        """Inequality across two distinct widths raises."""
+        with pytest.raises(TypeError, match="!="):
+            _ = type_a(5) != type_b(5)
+
+    @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+    def test_eq_same_width_same_value_still_equal(self, uint_class: Type[BaseUint]) -> None:
+        """Within a single width, equal values still compare equal."""
+        assert uint_class(7) == uint_class(7)
+        assert not (uint_class(7) != uint_class(7))
+
+    @pytest.mark.parametrize("type_a, type_b", CROSS_UINT_TYPE_PAIRS)
+    def test_hash_differs_across_widths(
+        self, type_a: Type[BaseUint], type_b: Type[BaseUint]
+    ) -> None:
+        """Equal-by-value instances of different widths hash differently."""
+        assert hash(type_a(5)) != hash(type_b(5))
