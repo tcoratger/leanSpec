@@ -67,9 +67,6 @@ class Interval(Uint64):
             Interval count at the start of the given slot.
         """
         # Slot boundaries fall on exact multiples of the interval count.
-        # The newtype and the constant are distinct types under the strict rule.
-        # The math runs on plain ints.
-        # The result is wrapped explicitly before returning.
         return cls(int(slot) * int(INTERVALS_PER_SLOT))
 
 
