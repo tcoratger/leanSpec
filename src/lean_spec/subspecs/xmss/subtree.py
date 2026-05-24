@@ -310,7 +310,7 @@ class HashSubTree(Container):
         )
 
         # Keep bottom half + single root node.
-        truncated = [full_tree.layers[i] for i in range(depth // 2)]
+        truncated = list(full_tree.layers[: depth // 2])
         return cls(
             depth=Uint64(depth),
             lowest_layer=Uint64(0),
@@ -456,9 +456,7 @@ class HashSubTree(Container):
         pos = position
 
         # Iterate over all layers except the last (root).
-        num_layers = len(self.layers)
-        for i in range(num_layers - 1):
-            layer = self.layers[i]
+        for layer in self.layers[:-1]:
             # Sibling index: flip last bit of position, adjust for layer offset.
             sibling_idx = int((pos ^ Uint64(1)) - layer.start_index)
             if not (0 <= sibling_idx < len(layer.nodes)):

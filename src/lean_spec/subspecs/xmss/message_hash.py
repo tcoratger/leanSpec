@@ -113,8 +113,8 @@ class MessageHasher(StrictBaseModel):
 
             # Decompose d into Z base-BASE digits, least significant first.
             for _ in range(config.Z):
-                digits.append(d % config.BASE)
-                d //= config.BASE
+                d, digit = divmod(d, config.BASE)
+                digits.append(digit)
 
         # Take exactly DIMENSION digits.
         return digits[: config.DIMENSION]

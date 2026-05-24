@@ -2,6 +2,7 @@
 
 import io
 from collections.abc import Iterator, Sequence
+from itertools import pairwise
 from typing import (
     IO,
     Any,
@@ -69,11 +70,10 @@ def _validate_offsets(offsets: list[int], scope: int, type_name: str) -> None:
     if not offsets:
         return
 
-    for i in range(1, len(offsets)):
-        if offsets[i] < offsets[i - 1]:
+    for prev, curr in pairwise(offsets):
+        if curr < prev:
             raise SSZSerializationError(
-                f"{type_name}: offsets not monotonically increasing: "
-                f"{offsets[i - 1]} -> {offsets[i]}"
+                f"{type_name}: offsets not monotonically increasing: {prev} -> {curr}"
             )
 
     if offsets[-1] > scope:
@@ -213,8 +213,7 @@ class SSZVector[T: SSZType](SSZModel):
             # Validate all offsets upfront before processing elements.
             _validate_offsets(offsets, scope, cls.__name__)
             # Read each element's data from its calculated slice.
-            for i in range(cls.LENGTH):
-                start, end = offsets[i], offsets[i + 1]
+            for start, end in pairwise(offsets):
                 elements.append(cls.ELEMENT_TYPE.deserialize(stream, end - start))
             return cls(data=elements)
 
@@ -418,8 +417,7 @@ class SSZList[T: SSZType](SSZModel):
             _validate_offsets(offsets, scope, cls.__name__)
             # Read each element based on the calculated boundaries.
             elements = []
-            for i in range(count):
-                start, end = offsets[i], offsets[i + 1]
+            for start, end in pairwise(offsets):
                 elements.append(cls.ELEMENT_TYPE.deserialize(stream, end - start))
 
             return cls(data=elements)
