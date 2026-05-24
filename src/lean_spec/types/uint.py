@@ -20,14 +20,13 @@ class BaseUint(int, SSZType):
     """The number of bits in the integer (overridden by subclasses)."""
 
     def __new__(cls, value: SupportsInt) -> Self:
-        """
-        Create and validate a new Uint instance.
+        """Create and range-check a new instance.
 
         Raises:
-            SSZTypeError: If `value` is not an int (rejects bool, string, float).
-            SSZValueError: If `value` is outside the allowed range [0, 2**BITS - 1].
+            SSZTypeError: If value is not an int. Bool, string, and float are rejected.
+            SSZValueError: If value is outside [0, 2**BITS - 1].
         """
-        # We should accept only ints.
+        # Bool subclasses int, so reject it explicitly before the value check.
         if not isinstance(value, int) or isinstance(value, bool):
             raise SSZTypeError(f"Expected int, got {type(value).__name__}")
 
@@ -41,23 +40,18 @@ class BaseUint(int, SSZType):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        """
-        Hook into Pydantic's validation system.
-
-        This schema defines how to handle the custom Uint type:
-        1. If the input is already an instance of the class, accept it.
-        2. Otherwise, validate the input as an integer within the defined bit range
-            and then instantiate the class.
-        3. For serialization (e.g., to JSON), convert the instance to a plain int.
-        """
-        # Validator that takes an integer and returns an instance of the class.
+        """Hook into Pydantic's validation system."""
+        # A plain validator wraps a pre-validated int into a typed instance.
         from_int_validator = core_schema.no_info_plain_validator_function(cls)
-
-        # Schema that first validates the input as an int, then calls our validator.
+        # Strict int validation enforces the unsigned range before construction.
+        #
+        # The lt bound is exclusive, so a value equal to 2**BITS is rejected.
         python_schema = core_schema.chain_schema(
             [core_schema.int_schema(ge=0, lt=2**cls.BITS, strict=True), from_int_validator]
         )
-
+        # Existing instances bypass validation.
+        #
+        # Raw values flow through the strict chain instead.
         return core_schema.union_schema(
             [
                 # Case 1: The value is already the correct type.
@@ -65,56 +59,34 @@ class BaseUint(int, SSZType):
                 # Case 2: The value needs to be parsed and validated.
                 python_schema,
             ],
+            # Round-trip to JSON drops the subtype back to a plain int.
             serialization=core_schema.plain_serializer_function_ser_schema(int),
         )
 
     @classmethod
     @override
     def is_fixed_size(cls) -> bool:
-        """
-        Determine if this is a fixed-size type.
-
-        Returns:
-            bool: True, as all Uint types are fixed-size.
-        """
+        """All unsigned integer types are fixed-size."""
         return True
 
     @classmethod
     @override
     def get_byte_length(cls) -> int:
-        """
-        Get the number of bytes for this Uint type.
-
-        Returns:
-            int: The byte length of the integer.
-        """
+        """Byte length derived from the bit width."""
         return cls.BITS // 8
 
     @override
     def encode_bytes(self) -> bytes:
-        """
-        Serializes the Uint to its little-endian byte representation.
-
-        Returns:
-            bytes: The SSZ serialized bytes.
-        """
-        # The `to_bytes` method from `int` is used directly.
+        """Serialize to little-endian bytes."""
         return self.to_bytes(length=self.get_byte_length(), byteorder="little")
 
     @classmethod
     @override
     def decode_bytes(cls, data: bytes) -> Self:
-        """
-        Deserializes a byte string into a Uint instance.
-
-        Args:
-            data (bytes): The SSZ byte string to deserialize.
+        """Deserialize from little-endian bytes.
 
         Raises:
-            SSZDecodeError: If the byte string has an incorrect length.
-
-        Returns:
-            Self: A new instance of the Uint class.
+            SSZSerializationError: If the byte string has the wrong length.
         """
         # Ensure the input data has the correct number of bytes.
         expected_length = cls.get_byte_length()
@@ -122,21 +94,11 @@ class BaseUint(int, SSZType):
             raise SSZSerializationError(
                 f"{cls.__name__}: expected {expected_length} bytes, got {len(data)}"
             )
-        # The `from_bytes` class method from `int` is used to convert the data.
         return cls(int.from_bytes(data, "little"))
 
     @override
     def serialize(self, stream: IO[bytes]) -> int:
-        """
-        Serializes the Uint and writes it to a binary stream.
-
-        Args:
-            stream (IO[bytes]): The stream to write the serialized data to.
-
-        Returns:
-            int: The number of bytes written.
-        """
-        # Get the serialized bytes.
+        """Write little-endian bytes to a stream and return the count written."""
         encoded_data = self.encode_bytes()
         # Write the data to the stream.
         stream.write(encoded_data)
@@ -146,21 +108,11 @@ class BaseUint(int, SSZType):
     @classmethod
     @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
-        """
-        Deserializes a Uint from a binary stream within a given scope.
-
-        Args:
-            stream (IO[bytes]): The stream to read from.
-            scope (int): The number of bytes available to read for this object.
+        """Read little-endian bytes from a stream within a fixed scope.
 
         Raises:
-            SSZDecodeError: If the scope does not match the type's byte length.
-            SSZStreamError: If the stream ends prematurely.
-
-        Returns:
-            Self: A new instance of the Uint class.
+            SSZSerializationError: If the scope mismatches, or the stream ends early.
         """
-        # For a fixed-size type, the scope must exactly match the byte length.
         byte_length = cls.get_byte_length()
         if scope != byte_length:
             raise SSZSerializationError(
@@ -189,61 +141,61 @@ class BaseUint(int, SSZType):
         )
 
     def __add__(self, other: Any) -> Self:
-        """Handle the addition operator (`+`)."""
+        """Forward addition."""
         if type(other) is not type(self):
             self._raise_type_error(other, "+")
         return type(self)(super().__add__(other))
 
     def __radd__(self, other: Any) -> Self:
-        """Handle the reverse addition operator (`+`)."""
+        """Reverse addition."""
         if type(other) is not type(self):
             self._raise_type_error(other, "+")
         return type(self)(int(other) + int(self))
 
     def __sub__(self, other: Any) -> Self:
-        """Handle the subtraction operator (`-`)."""
+        """Forward subtraction."""
         if type(other) is not type(self):
             self._raise_type_error(other, "-")
         return type(self)(super().__sub__(other))
 
     def __rsub__(self, other: Any) -> Self:
-        """Handle the reverse subtraction operator (`-`)."""
+        """Reverse subtraction."""
         if type(other) is not type(self):
             self._raise_type_error(other, "-")
         return type(self)(int(other) - int(self))
 
     def __mul__(self, other: Any) -> Self:
-        """Handle the multiplication operator (`*`)."""
+        """Forward multiplication."""
         if type(other) is not type(self):
             self._raise_type_error(other, "*")
         return type(self)(super().__mul__(other))
 
     def __rmul__(self, other: Any) -> Self:
-        """Handle the reverse multiplication operator (`*`)."""
+        """Reverse multiplication."""
         if type(other) is not type(self):
             self._raise_type_error(other, "*")
         return type(self)(int(other) * int(self))
 
     def __floordiv__(self, other: Any) -> Self:
-        """Handle the floor division operator (`//`)."""
+        """Forward floor division."""
         if type(other) is not type(self):
             self._raise_type_error(other, "//")
         return type(self)(super().__floordiv__(other))
 
     def __rfloordiv__(self, other: Any) -> Self:
-        """Handle the reverse floor division operator (`//`)."""
+        """Reverse floor division."""
         if type(other) is not type(self):
             self._raise_type_error(other, "//")
         return type(self)(int(other) // int(self))
 
     def __mod__(self, other: Any) -> Self:
-        """Handle the modulo operator (`%`)."""
+        """Forward modulo."""
         if type(other) is not type(self):
             self._raise_type_error(other, "%")
         return type(self)(super().__mod__(other))
 
     def __rmod__(self, other: Any) -> Self:
-        """Handle the reverse modulo operator (`%`)."""
+        """Reverse modulo."""
         if type(other) is not type(self):
             self._raise_type_error(other, "%")
         return type(self)(int(other) % int(self))
@@ -257,7 +209,7 @@ class BaseUint(int, SSZType):
     # Narrowing both to a single subtype is safe by Liskov substitution.
     # The strict overload-match check rejects it regardless.
     def __pow__(self, value: int, mod: int | None = None, /) -> Self:  # ty: ignore[invalid-method-override]
-        """Handle the exponentiation operator (`**`) and `pow(self, exp, mod)`."""
+        """Forward exponentiation and three-argument pow."""
         if type(value) is not type(self):
             self._raise_type_error(value, "**")
         if mod is not None and type(mod) is not type(self):
@@ -266,7 +218,7 @@ class BaseUint(int, SSZType):
         return type(self)(result)
 
     def __rpow__(self, base: int, modulo: int | None = None, /) -> Self:
-        """Handle the reverse exponentiation operator and three-argument pow."""
+        """Reverse exponentiation and three-argument pow."""
         if type(base) is not type(self):
             self._raise_type_error(base, "**")
         if modulo is not None and type(modulo) is not type(self):
@@ -275,123 +227,123 @@ class BaseUint(int, SSZType):
         return type(self)(result)
 
     def __divmod__(self, other: Any) -> tuple[Self, Self]:
-        """Handle `divmod(self, other)`."""
+        """Forward divmod."""
         if type(other) is not type(self):
             self._raise_type_error(other, "divmod")
         q, r = super().__divmod__(other)
         return type(self)(q), type(self)(r)
 
     def __rdivmod__(self, other: Any) -> tuple[Self, Self]:
-        """Handle `divmod(other, self)`."""
+        """Reverse divmod."""
         if type(other) is not type(self):
             self._raise_type_error(other, "divmod")
         q, r = super().__rdivmod__(other)
         return type(self)(q), type(self)(r)
 
     def __and__(self, other: Any) -> Self:
-        """Handle the bitwise AND operator (`&`)."""
+        """Forward bitwise AND."""
         if type(other) is not type(self):
             self._raise_type_error(other, "&")
         return type(self)(super().__and__(other))
 
     def __rand__(self, other: Any) -> Self:
-        """Handle the reverse bitwise AND operator (`&`)."""
+        """Reverse bitwise AND."""
         return self.__and__(other)
 
     def __or__(self, other: Any) -> Self:
-        """Handle the bitwise OR operator (`|`)."""
+        """Forward bitwise OR."""
         if type(other) is not type(self):
             self._raise_type_error(other, "|")
         return type(self)(super().__or__(other))
 
     def __ror__(self, other: Any) -> Self:
-        """Handle the reverse bitwise OR operator (`|`)."""
+        """Reverse bitwise OR."""
         return self.__or__(other)
 
     def __xor__(self, other: Any) -> Self:
-        """Handle the bitwise XOR operator (`^`)."""
+        """Forward bitwise XOR."""
         if type(other) is not type(self):
             self._raise_type_error(other, "^")
         return type(self)(super().__xor__(other))
 
     def __rxor__(self, other: Any) -> Self:
-        """Handle the reverse bitwise XOR operator (`^`)."""
+        """Reverse bitwise XOR."""
         return self.__xor__(other)
 
     def __lshift__(self, other: Any) -> Self:
-        """Handle the left bit-shift operator (`<<`)."""
+        """Forward left bit-shift."""
         if type(other) is not type(self):
             self._raise_type_error(other, "<<")
         return type(self)(super().__lshift__(other))
 
     def __rlshift__(self, other: Any) -> Self:
-        """Handle the reverse left bit-shift operator (`<<`)."""
+        """Reverse left bit-shift."""
         if type(other) is not type(self):
             self._raise_type_error(other, "<<")
         return type(self)(int(other) << int(self))
 
     def __rshift__(self, other: Any) -> Self:
-        """Handle the right bit-shift operator (`>>`)."""
+        """Forward right bit-shift."""
         if type(other) is not type(self):
             self._raise_type_error(other, ">>")
         return type(self)(super().__rshift__(other))
 
     def __rrshift__(self, other: Any) -> Self:
-        """Handle the reverse right bit-shift operator (`>>`)."""
+        """Reverse right bit-shift."""
         if type(other) is not type(self):
             self._raise_type_error(other, ">>")
         return type(self)(int(other) >> int(self))
 
     def __eq__(self, other: object) -> bool:
-        """Handle the equality operator (`==`)."""
+        """Equality."""
         if type(other) is not type(self):
             self._raise_type_error(other, "==")
         return super().__eq__(other)
 
     def __ne__(self, other: object) -> bool:
-        """Handle the inequality operator (`!=`)."""
+        """Inequality."""
         if type(other) is not type(self):
             self._raise_type_error(other, "!=")
         return super().__ne__(other)
 
     def __lt__(self, other: Any) -> bool:
-        """Handle the less-than operator (`<`)."""
+        """Less-than."""
         if type(other) is not type(self):
             self._raise_type_error(other, "<")
         return super().__lt__(other)
 
     def __le__(self, other: Any) -> bool:
-        """Handle the less-than-or-equal-to operator (`<=`)."""
+        """Less-than-or-equal."""
         if type(other) is not type(self):
             self._raise_type_error(other, "<=")
         return super().__le__(other)
 
     def __gt__(self, other: Any) -> bool:
-        """Handle the greater-than operator (`>`)."""
+        """Greater-than."""
         if type(other) is not type(self):
             self._raise_type_error(other, ">")
         return super().__gt__(other)
 
     def __ge__(self, other: Any) -> bool:
-        """Handle the greater-than-or-equal-to operator (`>=`)."""
+        """Greater-than-or-equal."""
         if type(other) is not type(self):
             self._raise_type_error(other, ">=")
         return super().__ge__(other)
 
     def __repr__(self) -> str:
-        """Return the official string representation of the object."""
+        """Official representation includes the subtype name."""
         return f"{type(self).__name__}({int(self)})"
 
     def __str__(self) -> str:
-        """Return the informal, user-friendly string representation."""
+        """Informal representation matches the underlying value."""
         return str(int(self))
 
     def __hash__(self) -> int:
-        """Return a hash distinct from raw int."""
+        """Hash mixes in the concrete subtype so distinct widths never collide."""
         return hash((type(self), int(self)))
 
     def __index__(self) -> int:
-        """Return self as an integer for use in slicing and indexing."""
+        """Return a plain integer for slicing and indexing."""
         return int(self)
 
 
