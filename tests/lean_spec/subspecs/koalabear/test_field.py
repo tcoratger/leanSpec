@@ -5,6 +5,7 @@ Tests for the KoalaBear prime field Fp.
 import io
 import json
 import random
+import re
 from typing import Any
 
 import pytest
@@ -45,7 +46,7 @@ def test_base_field_arithmetic() -> None:
     assert a != "5"
 
     # Test error on inverting the zero element
-    with pytest.raises(ZeroDivisionError, match="Cannot invert the zero element."):
+    with pytest.raises(ZeroDivisionError, match=r"^Cannot invert the zero element\.$"):
         Fp(value=0).inverse()
 
 
@@ -82,14 +83,14 @@ def test_ssz_deserialize_wrong_scope() -> None:
     """Test deserialize error when scope doesn't match P_BYTES."""
     data = b"\x2a\x00\x00\x00"
     stream = io.BytesIO(data)
-    with pytest.raises(SSZSerializationError, match="Expected 4 bytes for Fp, got 3"):
+    with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 3$"):
         Fp.deserialize(stream, 3)
 
 
 def test_ssz_deserialize_short_data() -> None:
     """Test deserialize error when stream has insufficient data."""
     stream = io.BytesIO(b"\x01\x02\x03")  # Only 3 bytes
-    with pytest.raises(SSZSerializationError, match="Expected 4 bytes for Fp, got 3"):
+    with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 3$"):
         Fp.deserialize(stream, 4)
 
 
@@ -99,7 +100,7 @@ def test_ssz_deserialize_exceeds_modulus() -> None:
     # Encode a value >= P (use P itself)
     invalid_data = P.to_bytes(4, byteorder="little")
     stream = io.BytesIO(invalid_data)
-    with pytest.raises(SSZValueError, match="exceeds field modulus"):
+    with pytest.raises(SSZValueError, match=rf"^Value {P} exceeds field modulus {P}$"):
         Fp.deserialize(stream, 4)
 
 
@@ -163,7 +164,8 @@ def test_ssz_deterministic() -> None:
 )
 def test_new_rejects_non_int_inputs(bad_value: Any, type_name: str) -> None:
     """Constructing Fp with a non-int input raises SSZTypeError naming the offending type."""
-    with pytest.raises(SSZTypeError, match=f"got {type_name}"):
+    expected = rf"^Field value must be an integer, got {type_name}$"
+    with pytest.raises(SSZTypeError, match=expected):
         Fp(bad_value)
 
 
@@ -194,7 +196,8 @@ def test_reverse_arithmetic_rejects_int_left_operand(op: str) -> None:
         "*": lambda: 1 * a,
         "/": lambda: 1 / a,
     }
-    with pytest.raises(TypeError, match="Unsupported operand type"):
+    expected = rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$"
+    with pytest.raises(TypeError, match=expected):
         table[op]()
 
 
@@ -208,14 +211,15 @@ def test_forward_arithmetic_rejects_raw_int_right_operand(op: str) -> None:
         "*": lambda: a * 3,
         "/": lambda: a / 3,
     }
-    with pytest.raises(TypeError, match="Unsupported operand type"):
+    expected = rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$"
+    with pytest.raises(TypeError, match=expected):
         table[op]()
 
 
 def test_forward_arithmetic_rejects_bool_right_operand() -> None:
     """Forward arithmetic against a bool right operand is rejected as a non-Fp type."""
     a = Fp(2)
-    with pytest.raises(TypeError, match="and 'bool'"):
+    with pytest.raises(TypeError, match=r"^Unsupported operand type\(s\) for \+: 'Fp' and 'bool'$"):
         a + True  # noqa: B015
 
 
@@ -254,7 +258,7 @@ def test_truediv_inverts_multiplication(a: Fp, b: Fp) -> None:
 
 def test_truediv_by_zero_raises_zero_division() -> None:
     """Dividing by the zero element raises ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError, match="Cannot invert the zero element"):
+    with pytest.raises(ZeroDivisionError, match=r"^Cannot invert the zero element\.$"):
         Fp(5) / Fp(0)
 
 
@@ -309,7 +313,7 @@ def test_encode_decode_bytes_round_trip_at_p_minus_one() -> None:
 
 def test_decode_bytes_rejects_oversized_input() -> None:
     """A five-byte buffer is rejected because the scope guard fires before any read."""
-    with pytest.raises(SSZSerializationError, match="Expected 4 bytes for Fp, got 5"):
+    with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 5$"):
         Fp.decode_bytes(b"\x00\x00\x00\x00\x01")
 
 
