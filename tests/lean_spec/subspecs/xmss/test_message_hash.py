@@ -25,7 +25,7 @@ def test_encode_message() -> None:
     msg_zeros = Bytes32(b"\x00" * 32)
     encoded_zeros = hasher.encode_message(msg_zeros)
     assert len(encoded_zeros) == config.MSG_LEN_FE
-    assert all(fe.value == 0 for fe in encoded_zeros)
+    assert all(fe == Fp(value=0) for fe in encoded_zeros)
 
     # All-max message (0xff)
     msg_max = Bytes32(b"\xff" * 32)

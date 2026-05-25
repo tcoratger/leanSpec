@@ -102,7 +102,7 @@ class MessageHasher(StrictBaseModel):
 
         digits: list[int] = []
         for fe in field_elements:
-            a = fe.value
+            a = int(fe)
 
             # Rejection: the only failing case is A_i == P - 1.
             if a >= threshold:

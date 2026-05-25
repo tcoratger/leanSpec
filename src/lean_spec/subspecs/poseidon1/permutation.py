@@ -187,13 +187,11 @@ class Poseidon1:
         self._rounds_p = params.rounds_p
 
         # Build the dense circulant MDS matrix from first row.
-        first_row_ints = [fp.value for fp in params.mds_first_row]
+        first_row_ints = [int(fp) for fp in params.mds_first_row]
         self._mds = _build_circulant_mds(first_row_ints, params.width, P)
 
         # Pre-convert round constants to numpy array.
-        self._round_constants = np.array(
-            [fp.value for fp in params.round_constants], dtype=np.int64
-        )
+        self._round_constants = np.array([int(fp) for fp in params.round_constants], dtype=np.int64)
 
     def permute(self, current_state: list[Fp]) -> list[Fp]:
         """
@@ -214,7 +212,7 @@ class Poseidon1:
         if len(current_state) != self._width:
             raise ValueError(f"Input state must have length {self._width}")
 
-        state = np.array([fp.value for fp in current_state], dtype=np.int64)
+        state = np.array([int(fp) for fp in current_state], dtype=np.int64)
 
         _permute_jit(
             state,
