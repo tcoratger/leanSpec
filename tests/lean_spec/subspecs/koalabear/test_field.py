@@ -164,8 +164,7 @@ def test_ssz_deterministic() -> None:
 )
 def test_new_rejects_non_int_inputs(bad_value: Any, type_name: str) -> None:
     """Constructing Fp with a non-int input raises SSZTypeError naming the offending type."""
-    expected = rf"^Field value must be an integer, got {type_name}$"
-    with pytest.raises(SSZTypeError, match=expected):
+    with pytest.raises(SSZTypeError, match=rf"^Field value must be an integer, got {type_name}$"):
         Fp(bad_value)
 
 
@@ -196,8 +195,10 @@ def test_reverse_arithmetic_rejects_int_left_operand(op: str) -> None:
         "*": lambda: 1 * a,
         "/": lambda: 1 / a,
     }
-    expected = rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$"
-    with pytest.raises(TypeError, match=expected):
+    with pytest.raises(
+        TypeError,
+        match=rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$",
+    ):
         table[op]()
 
 
@@ -211,8 +212,10 @@ def test_forward_arithmetic_rejects_raw_int_right_operand(op: str) -> None:
         "*": lambda: a * 3,
         "/": lambda: a / 3,
     }
-    expected = rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$"
-    with pytest.raises(TypeError, match=expected):
+    with pytest.raises(
+        TypeError,
+        match=rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$",
+    ):
         table[op]()
 
 
