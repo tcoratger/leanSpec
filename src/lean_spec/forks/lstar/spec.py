@@ -1092,7 +1092,8 @@ class LstarSpec(ForkProtocol):
         # let an adversary pre-publish next-slot aggregates ahead of any
         # honest validator.
         attestation_start_interval = Interval.from_slot(data.slot)
-        assert attestation_start_interval <= store.time + GOSSIP_DISPARITY_INTERVALS, (
+        gossip_disparity = Interval(int(GOSSIP_DISPARITY_INTERVALS))
+        assert attestation_start_interval <= store.time + gossip_disparity, (
             "Attestation too far in future"
         )
 
@@ -1761,7 +1762,7 @@ class LstarSpec(ForkProtocol):
         """
         # Advance time by one interval
         store = store.model_copy(update={"time": store.time + Interval(1)})
-        current_interval = store.time % INTERVALS_PER_SLOT
+        current_interval = Interval(int(store.time) % int(INTERVALS_PER_SLOT))
         new_aggregates: list[SignedAggregatedAttestation] = []
 
         if current_interval == Interval(0) and has_proposal:

@@ -66,7 +66,7 @@ class TestOfficialEIP778Vector:
     def test_official_enr_sequence_number(self) -> None:
         """Official ENR has sequence number 1."""
         enr = ENR.from_string(OFFICIAL_ENR_STRING)
-        assert enr.seq == Uint64(OFFICIAL_SEQ)
+        assert enr.seq == SeqNumber(OFFICIAL_SEQ)
 
     def test_official_enr_identity_scheme(self) -> None:
         """Official ENR uses "v4" identity scheme."""
@@ -245,7 +245,7 @@ class TestRLPStructureValidation:
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         enr = ENR.from_string(f"enr:{b64_content}")
-        assert enr.seq == Uint64(1)
+        assert enr.seq == SeqNumber(1)
         assert enr.identity_scheme == "v4"
 
 
@@ -607,7 +607,7 @@ class TestEdgeCases:
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         enr = ENR.from_string(f"enr:{b64_content}")
-        assert enr.seq == Uint64(0)
+        assert enr.seq == SeqNumber(0)
 
     def test_large_sequence_number(self) -> None:
         """ENR with large sequence number parses correctly."""
@@ -625,7 +625,7 @@ class TestEdgeCases:
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
         enr = ENR.from_string(f"enr:{b64_content}")
-        assert enr.seq == Uint64(2**32)
+        assert enr.seq == SeqNumber(2**32)
 
 
 class TestENRConstants:
@@ -906,7 +906,7 @@ class TestRoundTripSerialization:
         enr1 = ENR.from_string(f"enr:{b64}")
         enr2 = ENR.from_string(enr1.to_string())
 
-        assert enr1.seq == enr2.seq == Uint64(0x42)
+        assert enr1.seq == enr2.seq == SeqNumber(0x42)
         assert enr1.ip4 == enr2.ip4 == "192.168.1.1"
         assert enr1.udp_port == enr2.udp_port == Port(9000)
         assert enr1.identity_scheme == enr2.identity_scheme == "v4"
