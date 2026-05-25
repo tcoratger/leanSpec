@@ -7,12 +7,10 @@ from typing import (
     IO,
     Any,
     ClassVar,
-    Protocol,
     Self,
     cast,
     overload,
     override,
-    runtime_checkable,
 )
 
 from pydantic import Field, field_serializer, field_validator
@@ -21,16 +19,6 @@ from .byte_arrays import BaseBytes
 from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 from .ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
 from .uint import Uint32
-
-
-@runtime_checkable
-class IntFieldElement(Protocol):
-    """Protocol for field elements with an integer value attribute.
-
-    Used for JSON serialization of field elements (e.g., Fp).
-    """
-
-    value: int
 
 
 def _extract_element_type_from_generic(cls: type, origin_class: type) -> type[SSZType] | None:
@@ -50,8 +38,9 @@ def _serialize_ssz_elements_to_json(value: Sequence[Any]) -> list[Any]:
     for item in value:
         if isinstance(item, BaseBytes):
             result.append("0x" + item.hex())
-        elif isinstance(item, IntFieldElement):
-            result.append(item.value)
+        elif isinstance(item, int) and not isinstance(item, bool):
+            # Covers Fp, BaseUint, and plain ints — emit a primitive int for JSON.
+            result.append(int(item))
         else:
             result.append(item)
     return result
