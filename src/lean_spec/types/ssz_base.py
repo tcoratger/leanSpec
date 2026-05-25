@@ -2,10 +2,14 @@
 
 import io
 from abc import ABC, abstractmethod
-from typing import IO, Self
+from typing import IO, Final, Self
 
 from .base import StrictBaseModel
 from .exceptions import SSZSerializationError
+
+BYTES_PER_LENGTH_OFFSET: Final = 4
+"""Width of an SSZ offset prefixing each variable-size element.
+Encoded as a uint32 in little-endian byte order."""
 
 
 class SSZType(ABC):

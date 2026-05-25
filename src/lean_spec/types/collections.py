@@ -17,11 +17,9 @@ from typing import (
 
 from pydantic import Field, field_serializer, field_validator
 
-from lean_spec.types.constants import OFFSET_BYTE_LENGTH
-
 from .byte_arrays import BaseBytes
 from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
-from .ssz_base import SSZModel, SSZType
+from .ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
 from .uint import Uint32
 
 
@@ -170,7 +168,7 @@ class SSZVector[T: SSZType](SSZModel):
             # Use a temporary in-memory stream to hold the serialized variable data.
             variable_data_stream = io.BytesIO()
             # The first offset points to the end of all the offset data.
-            offset = self.LENGTH * OFFSET_BYTE_LENGTH
+            offset = self.LENGTH * BYTES_PER_LENGTH_OFFSET
             # Write the offsets to the main stream and the data to the temporary stream.
             for element in self.data:
                 Uint32(offset).serialize(stream)
@@ -199,15 +197,16 @@ class SSZVector[T: SSZType](SSZModel):
         # If elements are variable-size, read offsets to determine element boundaries.
         else:
             # The first offset tells us where the data starts, which must be after all offsets.
-            first_offset = int(Uint32.deserialize(stream, OFFSET_BYTE_LENGTH))
-            if first_offset != cls.LENGTH * OFFSET_BYTE_LENGTH:
-                expected = cls.LENGTH * OFFSET_BYTE_LENGTH
+            first_offset = int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
+            if first_offset != cls.LENGTH * BYTES_PER_LENGTH_OFFSET:
+                expected = cls.LENGTH * BYTES_PER_LENGTH_OFFSET
                 raise SSZSerializationError(
                     f"{cls.__name__}: invalid offset {first_offset}, expected {expected}"
                 )
             # Read the remaining offsets and add the total scope as the final boundary.
             offsets = [first_offset] + [
-                int(Uint32.deserialize(stream, OFFSET_BYTE_LENGTH)) for _ in range(cls.LENGTH - 1)
+                int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
+                for _ in range(cls.LENGTH - 1)
             ]
             offsets.append(scope)
             # Validate all offsets upfront before processing elements.
@@ -356,7 +355,7 @@ class SSZList[T: SSZType](SSZModel):
             # Variable-size elements: serialize offsets, then data
             variable_data_stream = io.BytesIO()
             # The first offset points to the end of all the offset data
-            offset = len(self.data) * OFFSET_BYTE_LENGTH
+            offset = len(self.data) * BYTES_PER_LENGTH_OFFSET
             # Write the offsets to the main stream and the data to the temporary stream
             for element in self.data:
                 Uint32(offset).serialize(stream)
@@ -394,23 +393,23 @@ class SSZList[T: SSZType](SSZModel):
             if scope == 0:
                 # Empty list case
                 return cls(data=[])
-            if scope < OFFSET_BYTE_LENGTH:
+            if scope < BYTES_PER_LENGTH_OFFSET:
                 raise SSZSerializationError(
                     f"{cls.__name__}: scope {scope} too small for variable-size list"
                 )
 
             # Read the first offset to determine the number of elements.
-            first_offset = int(Uint32.deserialize(stream, OFFSET_BYTE_LENGTH))
-            if first_offset > scope or first_offset % OFFSET_BYTE_LENGTH != 0:
+            first_offset = int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
+            if first_offset > scope or first_offset % BYTES_PER_LENGTH_OFFSET != 0:
                 raise SSZSerializationError(f"{cls.__name__}: invalid offset {first_offset}")
 
-            count = first_offset // OFFSET_BYTE_LENGTH
+            count = first_offset // BYTES_PER_LENGTH_OFFSET
             if count > cls.LIMIT:
                 raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {count}")
 
             # Read the rest of the offsets.
             offsets = [first_offset] + [
-                int(Uint32.deserialize(stream, OFFSET_BYTE_LENGTH)) for _ in range(count - 1)
+                int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET)) for _ in range(count - 1)
             ]
             offsets.append(scope)
             # Validate all offsets upfront before processing elements.
