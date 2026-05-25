@@ -9,9 +9,8 @@ Ethereum's serialization format.
 
 from typing import IO, Any, Self, override
 
-from .constants import OFFSET_BYTE_LENGTH
 from .exceptions import SSZSerializationError, SSZTypeError
-from .ssz_base import SSZModel, SSZType
+from .ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
 from .uint import Uint32
 
 
@@ -137,7 +136,7 @@ class Container(SSZModel):
                 variable_data.append(value.encode_bytes())
 
         # Calculate where variable data starts (after all fixed parts)
-        offset = sum(len(part) if part else OFFSET_BYTE_LENGTH for part in fixed_parts)
+        offset = sum(len(part) if part else BYTES_PER_LENGTH_OFFSET for part in fixed_parts)
 
         # Write fixed part with calculated offsets
         var_iter = iter(variable_data)
@@ -194,15 +193,15 @@ class Container(SSZModel):
                 bytes_read += size
             else:
                 # Read offset pointer for variable field
-                offset_bytes = stream.read(OFFSET_BYTE_LENGTH)
-                if len(offset_bytes) != OFFSET_BYTE_LENGTH:
+                offset_bytes = stream.read(BYTES_PER_LENGTH_OFFSET)
+                if len(offset_bytes) != BYTES_PER_LENGTH_OFFSET:
                     raise SSZSerializationError(
                         f"{cls.__name__}.{field_name}: "
-                        f"expected {OFFSET_BYTE_LENGTH} offset bytes, got {len(offset_bytes)}"
+                        f"expected {BYTES_PER_LENGTH_OFFSET} offset bytes, got {len(offset_bytes)}"
                     )
                 offset = int(Uint32.decode_bytes(offset_bytes))
                 var_fields.append((field_name, field_type, offset))
-                bytes_read += OFFSET_BYTE_LENGTH
+                bytes_read += BYTES_PER_LENGTH_OFFSET
 
         # Phase 2: Read variable part if present
         if var_fields:

@@ -18,7 +18,7 @@ from pydantic import model_validator
 
 from lean_spec.config import LEAN_ENV
 from lean_spec.types import StrictBaseModel, Uint64
-from lean_spec.types.constants import OFFSET_BYTE_LENGTH
+from lean_spec.types.ssz_base import BYTES_PER_LENGTH_OFFSET
 
 from ..koalabear import P_BYTES, P
 
@@ -115,7 +115,7 @@ class XmssConfig(StrictBaseModel):
         hashes_size = self.DIMENSION * self.HASH_LEN_FE * P_BYTES
 
         # SSZ offset overhead: 3 variable fields × 4 bytes each
-        ssz_offset_overhead = 3 * OFFSET_BYTE_LENGTH
+        ssz_offset_overhead = 3 * BYTES_PER_LENGTH_OFFSET
 
         return path_siblings_size + rho_size + hashes_size + ssz_offset_overhead
 
