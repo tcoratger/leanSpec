@@ -107,7 +107,7 @@ class TestPoseidon1ParamsValidation:
 
     def test_invalid_mds_first_row_length(self) -> None:
         """Raises error when mds_first_row length doesn't match width."""
-        with pytest.raises(ValueError, match="Length of mds_first_row must equal width"):
+        with pytest.raises(ValueError, match=r"Length of mds_first_row must equal width\."):
             Poseidon1Params(
                 width=3,
                 rounds_f=8,
@@ -118,7 +118,7 @@ class TestPoseidon1ParamsValidation:
 
     def test_invalid_round_constants_count(self) -> None:
         """Raises error when round_constants count is incorrect."""
-        with pytest.raises(ValueError, match="Incorrect number of round constants"):
+        with pytest.raises(ValueError, match=r"Incorrect number of round constants provided\."):
             Poseidon1Params(
                 width=3,
                 rounds_f=8,
@@ -129,7 +129,7 @@ class TestPoseidon1ParamsValidation:
 
     def test_width_must_be_positive(self) -> None:
         """Rejects a non-positive width."""
-        with pytest.raises(ValidationError, match="greater than 0"):
+        with pytest.raises(ValidationError, match=r"Input should be greater than 0"):
             Poseidon1Params(
                 width=0,
                 rounds_f=8,
@@ -140,7 +140,7 @@ class TestPoseidon1ParamsValidation:
 
     def test_rounds_f_must_be_positive(self) -> None:
         """Rejects a non-positive full-round count before the even-check runs."""
-        with pytest.raises(ValidationError, match="greater than 0"):
+        with pytest.raises(ValidationError, match=r"Input should be greater than 0"):
             Poseidon1Params(
                 width=3,
                 rounds_f=0,
@@ -151,7 +151,7 @@ class TestPoseidon1ParamsValidation:
 
     def test_rounds_p_must_be_non_negative(self) -> None:
         """Rejects a negative partial-round count."""
-        with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        with pytest.raises(ValidationError, match=r"Input should be greater than or equal to 0"):
             Poseidon1Params(
                 width=3,
                 rounds_f=8,
@@ -162,7 +162,10 @@ class TestPoseidon1ParamsValidation:
 
     def test_mds_first_row_must_be_non_empty(self) -> None:
         """Rejects an empty MDS first row."""
-        with pytest.raises(ValidationError, match="at least 1 item"):
+        with pytest.raises(
+            ValidationError,
+            match=r"List should have at least 1 item after validation, not 0",
+        ):
             Poseidon1Params(
                 width=3,
                 rounds_f=8,
@@ -173,7 +176,10 @@ class TestPoseidon1ParamsValidation:
 
     def test_round_constants_must_be_non_empty(self) -> None:
         """Rejects an empty round-constants list."""
-        with pytest.raises(ValidationError, match="at least 1 item"):
+        with pytest.raises(
+            ValidationError,
+            match=r"List should have at least 1 item after validation, not 0",
+        ):
             Poseidon1Params(
                 width=3,
                 rounds_f=8,
@@ -184,7 +190,7 @@ class TestPoseidon1ParamsValidation:
 
     def test_rounds_f_must_be_even(self) -> None:
         """Rejects odd full-round counts that would leave constants unused."""
-        with pytest.raises(ValidationError, match="Full-round count must be even."):
+        with pytest.raises(ValidationError, match=r"Full-round count must be even\."):
             Poseidon1Params(
                 width=3,
                 rounds_f=7,
@@ -200,13 +206,13 @@ class TestPoseidon1Engine:
     def test_permute_wrong_state_length_too_short(self) -> None:
         """Raises error when input state is too short."""
         engine = Poseidon1(PARAMS_16)
-        with pytest.raises(ValueError, match="Input state must have length 16"):
+        with pytest.raises(ValueError, match=r"^Input state must have length 16$"):
             engine.permute([Fp(1)] * 10)
 
     def test_permute_wrong_state_length_too_long(self) -> None:
         """Raises error when input state is too long."""
         engine = Poseidon1(PARAMS_16)
-        with pytest.raises(ValueError, match="Input state must have length 16"):
+        with pytest.raises(ValueError, match=r"^Input state must have length 16$"):
             engine.permute([Fp(1)] * 20)
 
     def test_permute_determinism(self) -> None:
