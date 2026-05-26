@@ -4,6 +4,8 @@ A minimal Python specification for the Poseidon1 permutation.
 Based on "Poseidon: A New Hash Function for Zero-Knowledge Proof Systems".
 See https://eprint.iacr.org/2019/458.
 
+This is the original Hades-based design.
+
 Uses Numba JIT compilation for native-speed permutation.
 """
 
@@ -71,8 +73,9 @@ def _permute_jit(
     Modifies state array in-place.
     S-box: x^3 computed as (x*x % p) * x % p to avoid int64 overflow.
 
-    Round structure: AddRoundConstants -> S-box -> MDS multiply.
-    No initial linear layer is applied before the round structure begins.
+    - Round structure: AddRoundConstants -> S-box -> MDS multiply.
+    - No initial linear layer is applied before the round structure begins.
+    - This matches the original Poseidon1 design.
     """
     const_idx = 0
 
@@ -96,6 +99,8 @@ def _permute_jit(
 
     # Phase 2: partial rounds.
     #
+    # AddRoundConstants and the MDS multiply still run on the entire state.
+    # Only the S-box layer is partial.
     # Applying the S-box to only one element is the central Hades optimization.
     # It still saturates algebraic degree while cutting SNARK constraint cost.
     for _ in range(rounds_p):
@@ -126,7 +131,12 @@ def _permute_jit(
 
 
 class Poseidon1Params(StrictBaseModel):
-    """Parameters for a specific Poseidon1 instance."""
+    """Parameters for a specific Poseidon1 instance.
+
+    - The paper requires at least 6 full rounds for statistical-attack security.
+    - Some regimes raise this bound to 10 per Eq. 2 of the paper.
+    - This minimum is not enforced here. Callers must choose secure parameters.
+    """
 
     width: int = Field(gt=0, description="The size of the state (t).")
     rounds_f: int = Field(gt=0, description="Total number of 'full' rounds.")
@@ -145,9 +155,9 @@ class Poseidon1Params(StrictBaseModel):
     def _rounds_f_must_be_even(cls, value: int) -> int:
         """Require an even full-round count.
 
-        The permutation runs equal halves of full rounds before and after the partial middle.
-        An odd count silently drops one full round and orphans a width-sized block of constants.
-        The original Poseidon design assumes an even split.
+        - The permutation runs equal halves of full rounds before and after the partial middle.
+        - An odd count silently drops one full round and orphans a width-sized block of constants.
+        - The original Poseidon design assumes an even split.
         """
         if value % 2 != 0:
             raise ValueError("Full-round count must be even.")
@@ -167,12 +177,7 @@ class Poseidon1Params(StrictBaseModel):
 
 
 class Poseidon1:
-    """
-    Optimized execution engine for Poseidon1.
-
-    Pre-processes parameters into numpy arrays during initialization.
-    Minimizes overhead during permute calls.
-    """
+    """Execution engine for Poseidon1."""
 
     __slots__ = ("_width", "_half_rounds_f", "_rounds_p", "_mds", "_round_constants")
 
@@ -249,7 +254,12 @@ class Poseidon1:
 
 
 _MDS_FIRST_ROW_16: list[int] = [1, 1, 51, 1, 11, 17, 2, 1, 101, 63, 15, 2, 67, 22, 13, 3]
-"""MDS first row for width-16 circulant matrix. From Plonky3: koala-bear/src/mds.rs."""
+"""MDS first row for width-16 circulant matrix.
+
+- From Plonky3: https://github.com/Plonky3/Plonky3/blob/main/koala-bear/src/mds.rs
+- The paper recommends Cauchy matrices over the circulant family used here.
+- The matrix must avoid invariant subspace trails per GRS21.
+"""
 
 _MDS_FIRST_ROW_24: list[int] = [
     0x2D0AAAAB,
@@ -277,7 +287,12 @@ _MDS_FIRST_ROW_24: list[int] = [
     0x17E118F6,
     0x0878A07F,
 ]
-"""MDS first row for width-24 circulant matrix. From Plonky3: koala-bear/src/mds.rs."""
+"""MDS first row for width-24 circulant matrix.
+
+- From Plonky3: https://github.com/Plonky3/Plonky3/blob/main/koala-bear/src/mds.rs
+- The paper recommends Cauchy matrices over the circulant family used here.
+- The matrix must avoid invariant subspace trails per GRS21.
+"""
 
 PARAMS_16 = Poseidon1Params(
     width=16,
