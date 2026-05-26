@@ -11,8 +11,6 @@ from lean_spec.types.boolean import Boolean
 from lean_spec.types.collections import (
     SSZList,
     SSZVector,
-    _extract_element_type_from_generic,
-    _serialize_ssz_elements_to_json,
     _validate_offsets,
 )
 from lean_spec.types.container import Container
@@ -195,27 +193,6 @@ class Uint8Vector2Model(BaseModel):
 
 class TestCollectionHelpers:
     """Tests for SSZ collection helper functions."""
-
-    def test_extract_element_type_from_generic_returns_element_type(self) -> None:
-        """Tests extracting the element type from Pydantic generic metadata."""
-        assert _extract_element_type_from_generic(Uint16Vector2, SSZVector) is Uint16
-
-    def test_extract_element_type_from_generic_returns_none_without_metadata(self) -> None:
-        """Tests that classes without matching generic metadata return None."""
-
-        class PlainClass:
-            pass
-
-        assert _extract_element_type_from_generic(PlainClass, SSZVector) is None
-
-    def test_serialize_ssz_elements_to_json_handles_supported_types(self) -> None:
-        """Tests JSON serialization for bytes, field elements, and plain values."""
-        marker = object()
-        result = _serialize_ssz_elements_to_json([Bytes32.zero(), Fp(7), marker])
-
-        assert result[0] == "0x" + ("00" * 32)
-        assert result[1] == 7
-        assert result[2] is marker
 
     def test_validate_offsets_accepts_empty_and_monotonic_offsets(self) -> None:
         """Tests offset validation success cases."""
@@ -558,8 +535,10 @@ class TestSSZVectorSerialization:
 
     def test_variable_size_vector_deserialization_rejects_invalid_first_offset(self) -> None:
         """Tests variable-size vectors reject an invalid initial offset."""
+        # Payload covers the full offset table (2 * 4 = 8 bytes),
+        # but the first offset is 4 instead of the expected table width 8.
         with pytest.raises(SSZSerializationError, match="invalid offset 4, expected 8"):
-            VariableContainerVector2.decode_bytes(b"\x04\x00\x00\x00")
+            VariableContainerVector2.decode_bytes(b"\x04\x00\x00\x00\x08\x00\x00\x00")
 
 
 class TestSSZListSerialization:
