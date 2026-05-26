@@ -119,7 +119,7 @@ class TestCheckpointSerialization:
         """A 39-byte input is one byte short of the slot field and is rejected."""
         with pytest.raises(SSZSerializationError) as exc_info:
             Checkpoint.decode_bytes(b"\x00" * 39)
-        assert str(exc_info.value) == "Checkpoint.slot: expected 8 bytes, got 7"
+        assert str(exc_info.value) == "Slot: expected 8 bytes, got 7"
 
     def test_decode_rejects_trailing_bytes(self) -> None:
         """A 41-byte input carries one trailing byte past the canonical encoding."""
