@@ -7,8 +7,6 @@ See https://eprint.iacr.org/2019/458.
 Uses Numba JIT compilation for native-speed permutation.
 """
 
-from __future__ import annotations
-
 from typing import Self
 
 import numpy as np
@@ -24,18 +22,6 @@ from .constants import (
 )
 
 
-def _build_circulant_mds(first_row: list[int], n: int, p: int) -> NDArray[np.int64]:
-    """
-    Expand a circulant matrix from its first row into a dense NxN matrix.
-
-    A circulant matrix C defined by first row [r0, r1, ..., rn-1]:
-    C[i][j] = r[(j - i) mod n]
-
-    Row i is the first row rolled right by i positions.
-    """
-    return np.array([np.roll(first_row, i) for i in range(n)], dtype=np.int64) % p
-
-
 @njit(cache=True)
 def _mds_multiply_jit(
     state: NDArray[np.int64], mds: NDArray[np.int64], p: int
@@ -46,13 +32,26 @@ def _mds_multiply_jit(
     Computes y = MDS * x where MDS is the circulant MDS matrix.
     Each product is reduced mod p before accumulation to prevent overflow.
     """
+    # State length doubles as the matrix dimension since MDS is square.
     n = state.shape[0]
+
+    # Output buffer, written in place by the inner loop.
     result = np.empty(n, dtype=np.int64)
+
+    # One iteration computes a single row of the matrix-vector product.
     for i in range(n):
+        # Accumulator collects n pre-reduced contributions before the final fold.
         s = np.int64(0)
+
         for j in range(n):
+            # Each factor sits below p, so the product fits in 62 bits.
+            #
+            # Without per-product reduction, summing n products would risk int64 overflow.
             s += (mds[i, j] * state[j]) % p
+
+        # Final fold back into the field after n already-reduced terms.
         result[i] = s % p
+
     return result
 
 
@@ -77,39 +76,43 @@ def _permute_jit(
     """
     const_idx = 0
 
-    # 1. First half of full rounds.
+    # Phase 1: opening full rounds.
     #
-    # Full rounds apply the S-box to every state element.
-    # Note: for S_BOX_DEGREE=3, state**3 would overflow int64 before modulo.
-    # Expand S-box to `(state*state % P) * state % P` to stay in range.
+    # Full S-boxes at the boundary maximize non-linearity where
+    # attacker control over inputs is highest.
     for _ in range(half_rounds_f):
         # Add round constants to entire state.
         state[:] = (state + round_constants[const_idx : const_idx + width]) % p
         const_idx += width
 
         # Apply S-box (x -> x^d) to full state.
+        #
+        # Cubing in one shot would overflow int64 inside Numba.
+        # Splitting into two modular multiplies keeps each intermediate below p squared.
         state[:] = (state * state % p) * state % p
 
         # Apply dense MDS multiply for diffusion.
         state[:] = _mds_multiply_jit(state, mds, p)
 
-    # 2. Partial rounds.
+    # Phase 2: partial rounds.
     #
-    # Partial rounds add constants to ALL state elements but apply
-    # the S-box only to state[0]. The same dense MDS matrix is used.
+    # Applying the S-box to only one element is the central Hades optimization.
+    # It still saturates algebraic degree while cutting SNARK constraint cost.
     for _ in range(rounds_p):
         # Add round constants to entire state.
         state[:] = (state + round_constants[const_idx : const_idx + width]) % p
         const_idx += width
 
         # Apply S-box to first element only.
-        # This is the main optimization of the Hades design.
         state[0] = (state[0] * state[0] % p) * state[0] % p
 
         # Apply dense MDS multiply.
         state[:] = _mds_multiply_jit(state, mds, p)
 
-    # 3. Second half of full rounds.
+    # Phase 3: closing full rounds.
+    #
+    # A second wall of full S-boxes blocks algebraic attacks that could
+    # unwind the partial-round middle.
     for _ in range(half_rounds_f):
         # Add round constants to entire state.
         state[:] = (state + round_constants[const_idx : const_idx + width]) % p
@@ -186,9 +189,14 @@ class Poseidon1:
         self._half_rounds_f = params.rounds_f // 2
         self._rounds_p = params.rounds_p
 
-        # Build the dense circulant MDS matrix from first row.
-        first_row_ints = [int(fp) for fp in params.mds_first_row]
-        self._mds = _build_circulant_mds(first_row_ints, params.width, P)
+        # Expand the n-by-n circulant MDS matrix from its first row r.
+        #
+        # Row i is r rolled right by i positions.
+        # Equivalently, C[i][j] = r[(j - i) mod n].
+        first_row = [int(fp) for fp in params.mds_first_row]
+        self._mds = (
+            np.array([np.roll(first_row, i) for i in range(self._width)], dtype=np.int64) % P
+        )
 
         # Pre-convert round constants to numpy array.
         self._round_constants = np.array([int(fp) for fp in params.round_constants], dtype=np.int64)
