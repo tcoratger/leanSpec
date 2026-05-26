@@ -5,8 +5,9 @@ To verify independently, run `cargo test` in the Plonky3 koala-bear crate.
 """
 
 import pytest
+from pydantic import ValidationError
 
-from lean_spec.subspecs.koalabear.field import Fp
+from lean_spec.subspecs.koalabear.field import Fp, P
 from lean_spec.subspecs.poseidon1.permutation import (
     PARAMS_16,
     PARAMS_24,
@@ -126,6 +127,72 @@ class TestPoseidon1ParamsValidation:
                 round_constants=[Fp(1)] * 20,
             )
 
+    def test_width_must_be_positive(self) -> None:
+        """Rejects a non-positive width."""
+        with pytest.raises(ValidationError, match="greater than 0"):
+            Poseidon1Params(
+                width=0,
+                rounds_f=8,
+                rounds_p=20,
+                mds_first_row=[Fp(1), Fp(2), Fp(3)],
+                round_constants=[Fp(1)] * 84,
+            )
+
+    def test_rounds_f_must_be_positive(self) -> None:
+        """Rejects a non-positive full-round count before the even-check runs."""
+        with pytest.raises(ValidationError, match="greater than 0"):
+            Poseidon1Params(
+                width=3,
+                rounds_f=0,
+                rounds_p=20,
+                mds_first_row=[Fp(1), Fp(2), Fp(3)],
+                round_constants=[Fp(1)] * 60,
+            )
+
+    def test_rounds_p_must_be_non_negative(self) -> None:
+        """Rejects a negative partial-round count."""
+        with pytest.raises(ValidationError, match="greater than or equal to 0"):
+            Poseidon1Params(
+                width=3,
+                rounds_f=8,
+                rounds_p=-1,
+                mds_first_row=[Fp(1), Fp(2), Fp(3)],
+                round_constants=[Fp(1)] * 21,
+            )
+
+    def test_mds_first_row_must_be_non_empty(self) -> None:
+        """Rejects an empty MDS first row."""
+        with pytest.raises(ValidationError, match="at least 1 item"):
+            Poseidon1Params(
+                width=3,
+                rounds_f=8,
+                rounds_p=20,
+                mds_first_row=[],
+                round_constants=[Fp(1)] * 84,
+            )
+
+    def test_round_constants_must_be_non_empty(self) -> None:
+        """Rejects an empty round-constants list."""
+        with pytest.raises(ValidationError, match="at least 1 item"):
+            Poseidon1Params(
+                width=3,
+                rounds_f=8,
+                rounds_p=20,
+                mds_first_row=[Fp(1), Fp(2), Fp(3)],
+                round_constants=[],
+            )
+
+    def test_rounds_f_must_be_even(self) -> None:
+        """Rejects odd full-round counts that would leave constants unused."""
+        with pytest.raises(ValidationError, match="Full-round count must be even."):
+            Poseidon1Params(
+                width=3,
+                rounds_f=7,
+                rounds_p=20,
+                mds_first_row=[Fp(1)] * 3,
+                round_constants=[Fp(1)] * 81,
+            )
+
 
 class TestPoseidon1Engine:
     """Tests for Poseidon1 engine."""
@@ -160,3 +227,37 @@ class TestPoseidon1Engine:
         output = engine.permute(state)
 
         assert output != state
+
+    @pytest.mark.parametrize(
+        "params, input_state",
+        [
+            (PARAMS_16, INPUT_16),
+            (PARAMS_24, INPUT_24),
+        ],
+        ids=["width_16", "width_24"],
+    )
+    def test_permute_output_in_field(self, params: Poseidon1Params, input_state: list[Fp]) -> None:
+        """Every output element lies strictly below the field modulus."""
+        engine = Poseidon1(params)
+
+        output = engine.permute(input_state)
+
+        assert all(int(x) < P for x in output)
+
+    def test_permute_all_zero_input(self) -> None:
+        """All-zero input produces an in-field output of the expected width."""
+        engine = Poseidon1(PARAMS_16)
+
+        output = engine.permute([Fp(0)] * 16)
+
+        assert len(output) == 16
+        assert all(int(x) < P for x in output)
+
+    def test_permute_field_boundary_input(self) -> None:
+        """Maximum-value input stays in-field and exposes int64 regressions."""
+        engine = Poseidon1(PARAMS_16)
+
+        output = engine.permute([Fp(value=P - 1)] * 16)
+
+        assert len(output) == 16
+        assert all(int(x) < P for x in output)

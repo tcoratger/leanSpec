@@ -12,7 +12,7 @@ from typing import Self
 import numpy as np
 from numba import njit
 from numpy.typing import NDArray
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from ...types import StrictBaseModel
 from ..koalabear.field import Fp, P
@@ -139,6 +139,19 @@ class Poseidon1Params(StrictBaseModel):
         min_length=1,
         description="The list of pre-computed constants for all rounds.",
     )
+
+    @field_validator("rounds_f")
+    @classmethod
+    def _rounds_f_must_be_even(cls, value: int) -> int:
+        """Require an even full-round count.
+
+        The permutation runs equal halves of full rounds before and after the partial middle.
+        An odd count silently drops one full round and orphans a width-sized block of constants.
+        The original Poseidon design assumes an even split.
+        """
+        if value % 2 != 0:
+            raise ValueError("Full-round count must be even.")
+        return value
 
     @model_validator(mode="after")
     def check_lengths(self) -> Self:
