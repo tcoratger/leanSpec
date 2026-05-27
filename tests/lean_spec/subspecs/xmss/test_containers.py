@@ -1,4 +1,4 @@
-"""Behaviour tests for ValidatorKeyPair."""
+"""Behaviour tests for the XMSS containers."""
 
 import json
 
@@ -6,8 +6,17 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 from pydantic import ValidationError
 
-from lean_spec.subspecs.xmss.containers import KeyPair, ValidatorKeyPair
-from lean_spec.types import ValidatorIndex
+from lean_spec.subspecs.koalabear.field import P_BYTES
+from lean_spec.subspecs.xmss.constants import TEST_CONFIG
+from lean_spec.subspecs.xmss.containers import (
+    KeyPair,
+    PublicKey,
+    SecretKey,
+    Signature,
+    ValidatorKeyPair,
+)
+from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 
 
 @pytest.fixture(scope="module")
@@ -213,3 +222,101 @@ def test_keypair_frozen(keypair_a: KeyPair) -> None:
     """KeyPair fields cannot be reassigned (StrictBaseModel is frozen)."""
     with pytest.raises(ValidationError):
         keypair_a.public_key = keypair_a.public_key
+
+
+def test_keypair_decodes_public_and_secret_hex(keypair_a: KeyPair) -> None:
+    """A key pair validates from hex strings for both halves."""
+    decoded = KeyPair.model_validate(
+        {
+            "public_key": keypair_a.public_key.encode_bytes().hex(),
+            "secret_key": keypair_a.secret_key.encode_bytes().hex(),
+        }
+    )
+    assert decoded == keypair_a
+
+
+def test_keypair_rejects_invalid_public_key_hex(keypair_a: KeyPair) -> None:
+    """A malformed public-key hex string surfaces as a validation error."""
+    with pytest.raises(ValidationError, match="invalid public key hex"):
+        KeyPair.model_validate(
+            {
+                "public_key": "deadbeef",
+                "secret_key": keypair_a.secret_key.encode_bytes().hex(),
+            }
+        )
+
+
+def test_keypair_rejects_invalid_secret_key_hex(keypair_a: KeyPair) -> None:
+    """A malformed secret-key hex string surfaces as a validation error."""
+    with pytest.raises(ValidationError, match="invalid secret key hex"):
+        KeyPair.model_validate(
+            {
+                "public_key": keypair_a.public_key.encode_bytes().hex(),
+                "secret_key": "deadbeef",
+            }
+        )
+
+
+@pytest.fixture(scope="module")
+def signed_key_pair() -> KeyPair:
+    """A key pair generated directly from the test scheme."""
+    return TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32))
+
+
+@pytest.fixture(scope="module")
+def sample_signature(signed_key_pair: KeyPair) -> Signature:
+    """A signature over a fixed message at slot zero."""
+    return TEST_SIGNATURE_SCHEME.sign(
+        signed_key_pair.secret_key, Slot(0), Bytes32(bytes([42] * 32))
+    )
+
+
+def test_public_key_ssz_roundtrip(signed_key_pair: KeyPair) -> None:
+    """A public key encodes and decodes back to an equal value."""
+    public_key = signed_key_pair.public_key
+    assert PublicKey.decode_bytes(public_key.encode_bytes()) == public_key
+
+
+def test_public_key_encoded_size_matches_layout(signed_key_pair: KeyPair) -> None:
+    """The encoded public key is the digest plus parameter packed into field bytes."""
+    encoded = signed_key_pair.public_key.encode_bytes()
+    expected = (TEST_CONFIG.HASH_LEN_FE + TEST_CONFIG.PARAMETER_LEN) * P_BYTES
+    assert len(encoded) == expected
+
+
+def test_secret_key_ssz_roundtrip(signed_key_pair: KeyPair) -> None:
+    """A secret key encodes and decodes back to an equal value."""
+    secret_key = signed_key_pair.secret_key
+    assert SecretKey.decode_bytes(secret_key.encode_bytes()) == secret_key
+
+
+def test_signature_is_fixed_size() -> None:
+    """A signature reports as fixed-size on the wire."""
+    assert Signature.is_fixed_size() is True
+
+
+def test_signature_byte_length_matches_config() -> None:
+    """The signature byte length matches the configured fixed length."""
+    assert Signature.get_byte_length() == TEST_CONFIG.SIGNATURE_LEN_BYTES
+
+
+def test_signature_ssz_roundtrip(sample_signature: Signature) -> None:
+    """A signature encodes and decodes back to an equal value."""
+    assert Signature.decode_bytes(sample_signature.encode_bytes()) == sample_signature
+
+
+def test_signature_encoded_size_matches_config(sample_signature: Signature) -> None:
+    """The encoded signature length matches the advertised fixed length."""
+    assert len(sample_signature.encode_bytes()) == TEST_CONFIG.SIGNATURE_LEN_BYTES
+
+
+def test_signature_json_is_prefixed_hex(sample_signature: Signature) -> None:
+    """The JSON form is a hex string prefixed with the byte marker."""
+    dumped = json.loads(sample_signature.model_dump_json())
+    assert dumped == "0x" + sample_signature.encode_bytes().hex()
+
+
+def test_signature_decodes_from_json(sample_signature: Signature) -> None:
+    """A signature decodes back from its JSON hex form."""
+    encoded = "0x" + sample_signature.encode_bytes().hex()
+    assert Signature.from_hex(encoded) == sample_signature

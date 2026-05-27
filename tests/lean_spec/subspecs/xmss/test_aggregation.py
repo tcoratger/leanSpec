@@ -242,6 +242,57 @@ def test_aggregate_mixed_children_and_raw_multiple(key_manager: XmssKeyManager) 
     )
 
 
+def test_type_one_verify_rejects_pubkey_count_mismatch(key_manager: XmssKeyManager) -> None:
+    """Type-1 verification refuses a pubkey set that does not match the bitfield."""
+    source = Checkpoint(root=make_bytes32(160), slot=Slot(0))
+    att_args = (Slot(2), 161, 162, source)
+    vids = [ValidatorIndex(0), ValidatorIndex(1)]
+
+    proof = _sign_and_aggregate(key_manager, vids, att_args)
+    # The bitfield names two validators but only one key is supplied.
+    only_one = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
+
+    with pytest.raises(
+        AggregationError, match="Type-1 verify expected 2 pubkeys for participants, got 1"
+    ):
+        proof.verify(public_keys=only_one, message=make_bytes32(161), slot=att_args[0])
+
+
+def test_type_two_split_by_msg_rejected_under_test_prover(key_manager: XmssKeyManager) -> None:
+    """Splitting a merged proof aborts under the reduced test-config prover.
+
+    The split branch is functional only under the production prover.
+    The test-config build aborts it with an in-circuit assertion.
+    Exercising it here drives the serialization and error-translation path.
+    """
+    source = Checkpoint(root=make_bytes32(600), slot=Slot(0))
+    att_args_a = (Slot(11), 601, 602, source)
+    att_args_b = (Slot(11), 603, 604, source)
+    att_data_a = make_attestation_data_simple(
+        att_args_a[0], make_bytes32(att_args_a[1]), make_bytes32(att_args_a[2]), att_args_a[3]
+    )
+
+    vids_a = [ValidatorIndex(0), ValidatorIndex(1)]
+    vids_b = [ValidatorIndex(2), ValidatorIndex(3)]
+    part_a = _sign_and_aggregate(key_manager, vids_a, att_args_a)
+    part_b = _sign_and_aggregate(key_manager, vids_b, att_args_b)
+
+    pubkeys_a = [key_manager[vid].attestation_keypair.public_key for vid in vids_a]
+    pubkeys_b = [key_manager[vid].attestation_keypair.public_key for vid in vids_b]
+
+    merged = TypeTwoMultiSignature.aggregate(
+        parts=[part_a, part_b],
+        public_keys_per_part=[pubkeys_a, pubkeys_b],
+    )
+
+    with pytest.raises(AggregationError, match="Type-2 split failed"):
+        merged.split_by_msg(
+            message=hash_tree_root(att_data_a),
+            public_keys_per_message=[pubkeys_a, pubkeys_b],
+            participants=part_a.participants,
+        )
+
+
 def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager) -> None:
     """Verification fails when the caller passes a message that does not match the proof."""
     source = Checkpoint(root=make_bytes32(120), slot=Slot(0))
@@ -347,6 +398,24 @@ def test_type_two_aggregate_rejects_mismatched_pubkey_layout(
             parts=[part],
             public_keys_per_part=wrong_layout,
         )
+
+
+def test_type_two_aggregate_propagates_prover_error(key_manager: XmssKeyManager) -> None:
+    """A corrupted component proof makes the merge prover reject the inputs."""
+    source = Checkpoint(root=make_bytes32(210), slot=Slot(0))
+    att_args = (Slot(8), 211, 212, source)
+    vids = [ValidatorIndex(0), ValidatorIndex(1)]
+
+    part = _sign_and_aggregate(key_manager, vids, att_args)
+    pubkeys = [key_manager[vid].attestation_keypair.public_key for vid in vids]
+
+    corrupted_bytes = bytearray(part.proof.data)
+    corrupted_bytes[10] ^= 0xFF
+    corrupted_bytes[20] ^= 0xFF
+    corrupted = part.model_copy(update={"proof": ByteList512KiB(data=bytes(corrupted_bytes))})
+
+    with pytest.raises(AggregationError, match="merge_many_type_1 failed"):
+        TypeTwoMultiSignature.aggregate(parts=[corrupted], public_keys_per_part=[pubkeys])
 
 
 def test_type_two_verify_round_trip(key_manager: XmssKeyManager) -> None:
