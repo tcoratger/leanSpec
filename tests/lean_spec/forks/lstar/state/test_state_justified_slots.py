@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.forks.lstar.containers.state.types import (
+from lean_spec.forks.lstar.containers import (
     JustificationRoots,
     JustificationValidators,
 )

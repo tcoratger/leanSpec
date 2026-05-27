@@ -1,6 +1,6 @@
 """Tests for AggregatedAttestation structure."""
 
-from lean_spec.forks.lstar.containers.attestation import (
+from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
 )

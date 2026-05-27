@@ -13,19 +13,17 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import AttestationSignatureEntry, State, Store
 from lean_spec.forks.lstar.containers import (
+    AggregatedAttestation,
+    AggregatedAttestations,
     AttestationData,
     Block,
     BlockBody,
+    SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
     Validator,
+    Validators,
 )
-from lean_spec.forks.lstar.containers.attestation import (
-    AggregatedAttestation,
-    SignedAggregatedAttestation,
-)
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import Validators
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
 from lean_spec.subspecs.koalabear import Fp

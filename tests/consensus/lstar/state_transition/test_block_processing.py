@@ -8,7 +8,7 @@ from consensus_testing import (
     generate_pre_state,
 )
 
-from lean_spec.forks.lstar.containers.state.types import JustifiedSlots
+from lean_spec.forks.lstar.containers import JustifiedSlots
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Boolean, Bytes32, Slot, ValidatorIndex
 

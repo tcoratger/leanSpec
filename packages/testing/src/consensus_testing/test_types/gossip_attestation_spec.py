@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from lean_spec.forks.lstar.containers.attestation import AttestationData, SignedAttestation
-from lean_spec.forks.lstar.containers.block.block import Block
+from lean_spec.forks.lstar.containers import AttestationData, Block, SignedAttestation
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.ssz.hash import hash_tree_root

@@ -7,25 +7,23 @@ from consensus_testing.keys import create_dummy_signature
 from lean_spec.forks.lstar import State
 from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
+    AggregatedAttestations,
     Attestation,
     AttestationData,
     Block,
     BlockBody,
     BlockHeader,
     Config,
-    SignedAggregatedAttestation,
-    SignedAttestation,
-    SignedBlock,
-    Validator,
-)
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
+    SignedAggregatedAttestation,
+    SignedAttestation,
+    SignedBlock,
+    Validator,
+    Validators,
 )
-from lean_spec.forks.lstar.containers.validator import Validators
 from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import (
     AggregationBits,

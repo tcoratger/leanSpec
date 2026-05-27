@@ -12,18 +12,16 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import State
 from lean_spec.forks.lstar.containers import (
+    AggregatedAttestations,
     Block,
     BlockBody,
-)
-from lean_spec.forks.lstar.containers.block import BlockHeader
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.config import Config
-from lean_spec.forks.lstar.containers.state import Validators
-from lean_spec.forks.lstar.containers.state.types import (
+    BlockHeader,
+    Config,
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
+    Validators,
 )
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.api import ApiServerConfig

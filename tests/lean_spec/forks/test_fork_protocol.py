@@ -15,8 +15,7 @@ from lean_spec.forks import (
     LstarSpec,
     protocol,
 )
-from lean_spec.forks.lstar.containers.block import Block
-from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.containers import Block, State
 from lean_spec.types import Slot, Uint64
 from tests.lean_spec.helpers.builders import make_validators
 

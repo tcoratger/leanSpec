@@ -1,10 +1,195 @@
-"""State-specific SSZ types for the Lean Ethereum consensus specification."""
+"""The container types for the Lean consensus specification."""
 
 from typing import Self
 
 from lean_spec.subspecs.chain.config import HISTORICAL_ROOTS_LIMIT, VALIDATOR_REGISTRY_LIMIT
-from lean_spec.types import Boolean, Bytes32, Slot, SSZList
+from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
+from lean_spec.subspecs.xmss.containers import PublicKey, Signature
+from lean_spec.types import (
+    AggregationBits,
+    Boolean,
+    ByteList512KiB,
+    Bytes32,
+    Bytes52,
+    Checkpoint,
+    Container,
+    Slot,
+    SSZList,
+    Uint64,
+    ValidatorIndex,
+)
 from lean_spec.types.bitfields import BaseBitlist
+
+
+class Config(Container):
+    """
+    Holds temporary configuration properties for simplified consensus.
+
+    Note: These fields support a simplified round-robin block production
+    in the absence of more complex mechanisms like RANDAO or deposits.
+    """
+
+    genesis_time: Uint64
+    """The timestamp of the genesis block."""
+
+
+class Validator(Container):
+    """Represents a validator's static metadata and operational interface."""
+
+    attestation_pubkey: Bytes52
+    """XMSS public key for signing attestations."""
+
+    proposal_pubkey: Bytes52
+    """XMSS public key for signing proposer attestations in blocks."""
+
+    index: ValidatorIndex = ValidatorIndex(0)
+    """Validator index in the registry."""
+
+    def get_attestation_pubkey(self) -> PublicKey:
+        """Get the XMSS public key used for attestation verification."""
+        return PublicKey.decode_bytes(bytes(self.attestation_pubkey))
+
+    def get_proposal_pubkey(self) -> PublicKey:
+        """Get the XMSS public key used for proposer attestation verification."""
+        return PublicKey.decode_bytes(bytes(self.proposal_pubkey))
+
+
+class Validators(SSZList[Validator]):
+    """Validator registry tracked in the state."""
+
+    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
+
+
+class AttestationData(Container):
+    """Attestation content describing the validator's observed chain view."""
+
+    slot: Slot
+    """The slot for which the attestation is made."""
+
+    head: Checkpoint
+    """The checkpoint representing the head block as observed by the validator."""
+
+    target: Checkpoint
+    """The checkpoint representing the target block as observed by the validator."""
+
+    source: Checkpoint
+    """The checkpoint representing the source block as observed by the validator."""
+
+
+class Attestation(Container):
+    """Validator specific attestation wrapping shared attestation data."""
+
+    validator_id: ValidatorIndex
+    """The index of the validator making the attestation."""
+
+    data: AttestationData
+    """The attestation data produced by the validator."""
+
+
+class SignedAttestation(Attestation):
+    """Validator attestation bundled with its signature."""
+
+    signature: Signature
+    """Signature aggregation produced by the leanVM (SNARKs in the future)."""
+
+
+class AggregatedAttestation(Container):
+    """Aggregated attestation consisting of participation bits and message."""
+
+    aggregation_bits: AggregationBits
+    """Bitfield indicating which validators participated in the aggregation."""
+
+    data: AttestationData
+    """Combined attestation data similar to the beacon chain format.
+
+    Multiple validator attestations are aggregated here without the complexity of
+    committee assignments.
+    """
+
+
+class SignedAggregatedAttestation(Container):
+    """
+    A signed aggregated attestation for broadcasting.
+
+    Contains the attestation data and the aggregated signature proof.
+    """
+
+    data: AttestationData
+    """Combined attestation data similar to the beacon chain format."""
+
+    proof: TypeOneMultiSignature
+    """Aggregated single-message proof covering all participating validators."""
+
+
+class AggregatedAttestations(SSZList[AggregatedAttestation]):
+    """List of aggregated attestations included in a block."""
+
+    LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
+
+
+class BlockBody(Container):
+    """Payload of a block containing attestations."""
+
+    attestations: AggregatedAttestations
+    """Attestations in the block. Signatures are folded into the block-level proof."""
+
+
+class BlockHeader(Container):
+    """
+    Metadata summarizing a block.
+
+    Contains parent reference, state root, and body hash.
+    Smaller than full blocks.
+    """
+
+    slot: Slot
+    """The slot in which the block was proposed."""
+
+    proposer_index: ValidatorIndex
+    """The index of the validator that proposed the block."""
+
+    parent_root: Bytes32
+    """The root of the parent block."""
+
+    state_root: Bytes32
+    """The root of the state after applying transactions in this block."""
+
+    body_root: Bytes32
+    """The root of the block body."""
+
+
+class Block(Container):
+    """A complete block including header and body."""
+
+    slot: Slot
+    """The slot in which the block was proposed."""
+
+    proposer_index: ValidatorIndex
+    """The index of the validator that proposed the block."""
+
+    parent_root: Bytes32
+    """The root of the parent block."""
+
+    state_root: Bytes32
+    """The root of the state after applying transactions in this block."""
+
+    body: BlockBody
+    """The block's payload."""
+
+
+class SignedBlock(Container):
+    """Envelope carrying a block with a single aggregated proof for all signatures.
+
+    The proof is the SSZ-encoded form of a Type-2 multi-message proof that
+    binds every attestation in the body plus the proposer's signature over
+    the block root.
+    """
+
+    block: Block
+    """The block being signed."""
+
+    proof: ByteList512KiB
+    """Single full-block proof covering attestations and the proposer signature."""
 
 
 class HistoricalBlockHashes(SSZList[Bytes32]):
@@ -172,3 +357,42 @@ class JustificationValidators(BaseBitlist):
     """
 
     LIMIT = int(HISTORICAL_ROOTS_LIMIT) * int(VALIDATOR_REGISTRY_LIMIT)
+
+
+class State(Container):
+    """The main consensus state object."""
+
+    # Configuration
+    config: Config
+    """The chain's configuration parameters."""
+
+    # Slot and block tracking
+    slot: Slot
+    """The current slot number."""
+
+    latest_block_header: BlockHeader
+    """The header of the most recent block."""
+
+    # Checkpoints
+    latest_justified: Checkpoint
+    """The latest justified checkpoint."""
+
+    latest_finalized: Checkpoint
+    """The latest finalized checkpoint."""
+
+    # Historical data
+    historical_block_hashes: HistoricalBlockHashes
+    """A list of historical block root hashes."""
+
+    justified_slots: JustifiedSlots
+    """A bitfield indicating which historical slots were justified."""
+
+    validators: Validators
+    """Registry of validators tracked by the state."""
+
+    # Justification tracking (flattened for SSZ compatibility)
+    justifications_roots: JustificationRoots
+    """Roots of justified blocks."""
+
+    justifications_validators: JustificationValidators
+    """A bitlist of validators who participated in justifications."""

@@ -8,11 +8,11 @@ from dataclasses import dataclass, field
 import pytest
 
 from lean_spec.forks.lstar.containers import (
+    AggregatedAttestations,
     Block,
     BlockBody,
     SignedBlock,
 )
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.networking.client.reqresp_client import ReqRespClient
 from lean_spec.subspecs.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.reqresp.codec import (
