@@ -1,9 +1,4 @@
-"""Poseidon1 hash engine in compression and sponge modes for the Generalized XMSS scheme.
-
-Poseidon1 is arithmetization-friendly.
-Hashing across hash chains, Merkle nodes, and Merkle leaves uses a single
-permutation, which keeps the in-SNARK aggregation step cheap.
-"""
+"""Poseidon1 hash engine in compression and sponge modes for the Generalized XMSS scheme."""
 
 from itertools import batched
 
@@ -267,5 +262,4 @@ PROD_POSEIDON = PoseidonXmss(params16=PARAMS_16, params24=PARAMS_24)
 """Poseidon1 engine with production parameters."""
 
 TEST_POSEIDON = PROD_POSEIDON
-"""Test environment reuses the production Poseidon1 parameters.
-Only the surrounding configuration differs between modes."""
+"""Test environment reuses the production Poseidon1 parameters."""

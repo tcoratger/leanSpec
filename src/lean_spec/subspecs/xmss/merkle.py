@@ -95,12 +95,13 @@ class HashSubTree(Container):
         start_index: Uint64,
         parameter: Parameter,
         lowest_layer_nodes: list[HashDigestVector],
+        highest_layer: Uint64 | None = None,
     ) -> Self:
-        """Build a subtree from its lowest layer up to the root.
+        """Build a subtree from its lowest layer up to a bounding layer.
 
         Phase 1: pad the input layer to the alignment invariant.
         Phase 2: hash each sibling pair to produce the next layer up.
-        Phase 3: pad each new layer and continue to the root.
+        Phase 3: pad each new layer and continue to the bounding layer.
 
         Args:
             poseidon: Cached Poseidon1 engine.
@@ -110,10 +111,14 @@ class HashSubTree(Container):
             start_index: Absolute index of the first input node.
             parameter: Public parameter for the hash function.
             lowest_layer_nodes: Active nodes at the lowest layer.
+            highest_layer: Layer to stop building at, defaulting to the full depth.
 
         Returns:
-            A subtree containing every layer from lowest_layer to the root.
+            A subtree containing every layer from lowest_layer up to highest_layer.
         """
+        # Build to the global root unless a lower bounding layer is requested.
+        highest_layer = depth if highest_layer is None else highest_layer
+
         # The input nodes must fit in the layer they belong to.
         max_positions = 1 << int(depth - lowest_layer)
         if int(start_index) + len(lowest_layer_nodes) > max_positions:
@@ -128,7 +133,7 @@ class HashSubTree(Container):
         layers.append(current)
 
         # Phases 2 + 3: hash sibling pairs, pad, repeat.
-        for level in range(lowest_layer, depth):
+        for level in range(lowest_layer, highest_layer):
             parent_start = current.start_index // Uint64(2)
             parents = [
                 poseidon.tweak_hash(
@@ -202,9 +207,8 @@ class HashSubTree(Container):
     ) -> Self:
         """Build one bottom tree from leaf hashes up to its standalone root.
 
-        Phase 1: build a full subtree from layer 0 using the provided leaves.
-        Phase 2: drop the layers above depth/2 produced by extra padding.
-        Phase 3: replace the highest layer with a single-node root extracted from middle.
+        Phase 1: build the layers from 0 up to the bottom-tree root layer.
+        Phase 2: replace that padded top layer with its single-node root.
 
         Args:
             poseidon: Cached Poseidon1 engine.
@@ -230,8 +234,8 @@ class HashSubTree(Container):
                 f"Expected {leaves_per_tree} leaves for depth={depth}, got {len(leaves)}."
             )
 
-        # Phase 1: build a full subtree from layer 0.
-        full_tree = cls.new(
+        # Phase 1: build only layers 0 through depth/2, the bottom tree's own height.
+        subtree = cls.new(
             poseidon=poseidon,
             config=config,
             lowest_layer=Uint64(0),
@@ -239,22 +243,22 @@ class HashSubTree(Container):
             start_index=bottom_tree_index * Uint64(leaves_per_tree),
             parameter=parameter,
             lowest_layer_nodes=leaves,
+            highest_layer=Uint64(depth // 2),
         )
 
-        # Phase 3: extract the middle layer's root entry for this bottom tree.
-        middle = full_tree.layers[depth // 2]
-        root_idx = int(bottom_tree_index - middle.start_index)
+        # Phase 2: the top built layer is padded to a sibling pair.
+        # The real root is the node at this tree's index, not always position zero.
+        # An odd index leaves a random pad at position zero, so select by absolute index.
+        top = subtree.layers[-1]
+        root_idx = int(bottom_tree_index - top.start_index)
         root_layer = HashTreeLayer(
             start_index=bottom_tree_index,
-            nodes=HashDigestList(data=[middle.nodes[root_idx]]),
+            nodes=HashDigestList(data=[top.nodes[root_idx]]),
         )
-
-        # Phase 2 + 3: keep layers 0 through depth/2 - 1, then append the standalone root.
-        truncated = list(full_tree.layers[: depth // 2])
         return cls(
             depth=Uint64(depth),
             lowest_layer=Uint64(0),
-            layers=HashTreeLayers(data=truncated + [root_layer]),
+            layers=HashTreeLayers(data=list(subtree.layers[:-1]) + [root_layer]),
         )
 
     @classmethod
@@ -353,18 +357,18 @@ class HashSubTree(Container):
             raise ValueError(f"Position {position} out of bounds.")
 
         siblings: list[HashDigestVector] = []
-        pos = position
+        pos = int(position)
 
         # Stop one short of the root layer.
         # The root has no sibling.
         for layer in self.layers[:-1]:
             # The sibling sits at the position with the last bit flipped, then we
             # rebase by the layer's start_index because the layer is sparse.
-            sibling_idx = int((pos ^ Uint64(1)) - layer.start_index)
+            sibling_idx = (pos ^ 1) - int(layer.start_index)
             if not (0 <= sibling_idx < len(layer.nodes)):
                 raise ValueError(f"Sibling index {sibling_idx} out of bounds.")
             siblings.append(layer.nodes[sibling_idx])
-            pos = pos // Uint64(2)
+            pos //= 2
 
         return HashTreeOpening(siblings=HashDigestList(data=siblings))
 
