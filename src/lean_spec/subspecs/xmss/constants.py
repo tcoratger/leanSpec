@@ -75,6 +75,11 @@ class XmssConfig(StrictBaseModel):
         return Uint64(1 << self.LOG_LIFETIME)
 
     @property
+    def LEAVES_PER_BOTTOM_TREE(self) -> int:
+        """Slots covered by one bottom tree, W = sqrt(LIFETIME) = 2^(LOG_LIFETIME / 2)."""
+        return 1 << (self.LOG_LIFETIME // 2)
+
+    @property
     def MH_HASH_LEN_FE(self) -> int:
         """Number of Poseidon output field elements needed for the aborting decode."""
         return math.ceil(self.DIMENSION / self.Z)

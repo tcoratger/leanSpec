@@ -109,7 +109,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         start_bottom_tree_index, end_bottom_tree_index = _expand_activation_time(
             config.LOG_LIFETIME, int(activation_slot), int(num_active_slots)
         )
-        leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
+        leaves_per_bottom_tree = config.LEAVES_PER_BOTTOM_TREE
         actual_activation_slot = start_bottom_tree_index * leaves_per_bottom_tree
         actual_num_active_slots = (
             end_bottom_tree_index - start_bottom_tree_index
@@ -204,13 +204,11 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # Phase 1b: prepared bound.
         # Without two adjacent bottom trees we cannot produce a path without
         # paying the cost of regenerating them on the fly.
-        leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
-        prepared_start = int(sk.left_bottom_tree_index) * leaves_per_bottom_tree
-        prepared_end = prepared_start + 2 * leaves_per_bottom_tree
-        if not (prepared_start <= slot_int < prepared_end):
+        prepared = self.get_prepared_interval(sk)
+        if slot_int not in prepared:
             raise ValueError(
                 f"Slot {slot} is outside the prepared interval "
-                f"[{prepared_start}, {prepared_end}). "
+                f"[{prepared.start}, {prepared.stop}). "
                 f"Call advance_preparation() to slide the window forward."
             )
 
@@ -247,9 +245,9 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # Phase 4: combined Merkle path through both trees.
         # The signed slot picks the bottom tree on the prepared window's left or right.
-        boundary = (int(sk.left_bottom_tree_index) + 1) * leaves_per_bottom_tree
+        boundary = prepared.start + config.LEAVES_PER_BOTTOM_TREE
         bottom_tree = sk.left_bottom_tree if slot_int < boundary else sk.right_bottom_tree
-        path = combined_path(sk.top_tree, bottom_tree, Uint64(int(slot)))
+        path = combined_path(sk.top_tree, bottom_tree, Uint64(slot))
 
         return Signature(path=path, rho=rho, hashes=HashDigestList(data=ots_hashes))
 
@@ -328,7 +326,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         A signer can sign any slot in this range without paying the cost of
         rebuilding a bottom tree from the PRF.
         """
-        leaves_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
+        leaves_per_bottom_tree = self.config.LEAVES_PER_BOTTOM_TREE
         start = int(sk.left_bottom_tree_index) * leaves_per_bottom_tree
         return range(start, start + 2 * leaves_per_bottom_tree)
 
@@ -347,7 +345,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         Returns:
             A secret key with the window shifted by one bottom tree.
         """
-        leaves_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
+        leaves_per_bottom_tree = self.config.LEAVES_PER_BOTTOM_TREE
         left_index = int(sk.left_bottom_tree_index)
 
         # Phase 1: no advancement once the activation interval is fully consumed.

@@ -283,7 +283,7 @@ class HashSubTree(Container):
             The requested bottom tree.
         """
         # Each bottom tree covers sqrt(LIFETIME) consecutive epochs.
-        leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
+        leaves_per_bottom_tree = config.LEAVES_PER_BOTTOM_TREE
         start_epoch = bottom_tree_index * Uint64(leaves_per_bottom_tree)
         end_epoch = start_epoch + Uint64(leaves_per_bottom_tree)
 
