@@ -9,7 +9,7 @@ from .encoding import target_sum_encode
 from .field import random_parameter
 from .merkle import HashSubTree, combined_path, verify_path
 from .poseidon import PROD_POSEIDON, TEST_POSEIDON, PoseidonXmss
-from .prf import prf_apply, prf_get_randomness, prf_key_gen
+from .prf import PRFKey
 from .types import HashDigestList, HashDigestVector
 
 
@@ -103,7 +103,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # Phase 1: draw the master secret and the public parameter.
         parameter = random_parameter(config)
-        prf_key = prf_key_gen()
+        prf_key = PRFKey.generate()
 
         # Phase 2: align the requested interval onto bottom-tree boundaries.
         start_bottom_tree_index, end_bottom_tree_index = _expand_activation_time(
@@ -226,7 +226,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # The randomness is derived from the PRF, keyed by the message and an attempt counter.
         # Signing the same message twice is therefore reproducible.
         for attempts in range(config.MAX_TRIES):
-            rho = prf_get_randomness(config, sk.prf_key, slot, message, Uint64(attempts))
+            rho = sk.prf_key.derive_randomness(config, slot, message, Uint64(attempts))
             codeword = target_sum_encode(self.poseidon, config, sk.parameter, message, rho, slot)
             if codeword is not None:
                 break
@@ -246,7 +246,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # The verifier later finishes the remaining steps to reach the chain end.
         ots_hashes: list[HashDigestVector] = []
         for chain_index, steps in enumerate(codeword):
-            start_digest = prf_apply(config, sk.prf_key, slot, Uint64(chain_index))
+            start_digest = sk.prf_key.derive_chain_start(config, slot, Uint64(chain_index))
             ots_digest = self.poseidon.hash_chain(
                 config=config,
                 parameter=sk.parameter,

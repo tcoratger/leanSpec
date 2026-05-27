@@ -36,13 +36,12 @@ from lean_spec.types.container import Container
 from .constants import TARGET_CONFIG, XmssConfig
 from .field import random_domain
 from .poseidon import PoseidonXmss
-from .prf import prf_apply
+from .prf import PRFKey
 from .types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
     Parameter,
-    PRFKey,
     TreeTweak,
 )
 
@@ -397,7 +396,9 @@ class HashSubTree(Container):
             # The far end is the chain start hashed forward the full length minus one.
             chain_ends: list[HashDigestVector] = []
             for chain_index in range(config.DIMENSION):
-                start_digest = prf_apply(config, prf_key, Uint64(epoch), Uint64(chain_index))
+                start_digest = prf_key.derive_chain_start(
+                    config, Uint64(epoch), Uint64(chain_index)
+                )
                 end_digest = poseidon.hash_chain(
                     config=config,
                     parameter=parameter,

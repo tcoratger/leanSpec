@@ -11,7 +11,7 @@ from lean_spec.subspecs.xmss.field import int_to_base_p
 from lean_spec.subspecs.xmss.interface import _expand_activation_time
 from lean_spec.subspecs.xmss.merkle import HashSubTree
 from lean_spec.subspecs.xmss.poseidon import TEST_POSEIDON
-from lean_spec.subspecs.xmss.prf import prf_key_gen
+from lean_spec.subspecs.xmss.prf import PRFKey
 from lean_spec.subspecs.xmss.types import Parameter
 from lean_spec.types import Uint64
 
@@ -111,7 +111,7 @@ def test_hash_subtree_from_prf_key() -> None:
     config = TEST_CONFIG
 
     # Generate a PRF key
-    prf_key = prf_key_gen()
+    prf_key = PRFKey.generate()
 
     # Generate a random parameter
     parameter = Parameter(
@@ -145,7 +145,7 @@ def test_hash_subtree_from_prf_key() -> None:
 def test_hash_subtree_from_prf_key_deterministic() -> None:
     """Tests that HashSubTree.from_prf_key is deterministic."""
     config = TEST_CONFIG
-    prf_key = prf_key_gen()
+    prf_key = PRFKey.generate()
     parameter = Parameter(
         data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
     )
@@ -174,7 +174,7 @@ def test_hash_subtree_from_prf_key_deterministic() -> None:
 def test_hash_subtree_from_prf_key_different_indices() -> None:
     """Tests that different bottom tree indices produce different trees."""
     config = TEST_CONFIG
-    prf_key = prf_key_gen()
+    prf_key = PRFKey.generate()
     parameter = Parameter(
         data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
     )

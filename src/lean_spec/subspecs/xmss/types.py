@@ -5,10 +5,9 @@ from typing import Final, NamedTuple
 from lean_spec.subspecs.koalabear import Fp
 
 from ...types import Uint64
-from ...types.byte_arrays import BaseBytes
 from ...types.collections import SSZList, SSZVector
 from ...types.container import Container
-from .constants import PRF_KEY_LENGTH, TARGET_CONFIG
+from .constants import TARGET_CONFIG
 
 
 class TreeTweak(NamedTuple):
@@ -41,35 +40,25 @@ class ChainTweak(NamedTuple):
     """
 
 
-class PRFKey(BaseBytes):
-    """The PRF master secret key.
+NODE_LIST_LIMIT: Final = 2 * TARGET_CONFIG.LEAVES_PER_BOTTOM_TREE
+"""
+Maximum number of nodes a sparse Merkle tree layer can hold.
 
-    High-entropy byte string acting as the single root secret.
-    Every one-time signing key is deterministically derived from this seed.
-    """
-
-    LENGTH = PRF_KEY_LENGTH
-
-
-HASH_DIGEST_LENGTH: Final = TARGET_CONFIG.HASH_LEN_FE
-"""Length of one hash digest in field elements.
-
-Corresponds to the Poseidon1 output length used in the XMSS scheme."""
-
-# Why: a bottom tree spans 2^(LOG_LIFETIME/2) leaves.
-# Padding may add up to two extra siblings.
-# Doubling that bound leaves room for future-proof layouts without resizing.
-NODE_LIST_LIMIT: Final = 1 << (TARGET_CONFIG.LOG_LIFETIME // 2 + 1)
-"""Maximum number of nodes that can be stored in a sparse Merkle tree layer."""
+- The widest layer is a bottom tree's leaf row, the square root of the lifetime in leaves.
+- Padding adds at most one sibling at each end.
+- Twice the leaf count is a generous cap that absorbs the padding with room to spare.
+"""
 
 
 class HashDigestVector(SSZVector[Fp]):
-    """A single hash digest as a fixed-size vector of field elements.
+    """
+    A single hash digest as a fixed-size vector of field elements.
 
     The fixed size lets SSZ pack these back-to-back without per-element offsets.
     """
 
-    LENGTH = HASH_DIGEST_LENGTH
+    LENGTH = TARGET_CONFIG.HASH_LEN_FE
+    """One Poseidon1 digest, measured in field elements."""
 
 
 class HashDigestList(SSZList[HashDigestVector]):
@@ -81,31 +70,34 @@ class HashDigestList(SSZList[HashDigestVector]):
 class Parameter(SSZVector[Fp]):
     """The public parameter P.
 
-    Unique, randomly generated value associated with a single key pair.
-    Mixed into every hash to personalize the function and block cross-key attacks.
-    Public knowledge.
+    - Unique, randomly generated value associated with a single key pair.
+    - Mixed into every hash to personalize the function and block cross-key attacks.
+    - Public knowledge.
     """
 
     LENGTH = TARGET_CONFIG.PARAMETER_LEN
 
 
 class Randomness(SSZVector[Fp]):
-    """The randomness rho used during signing.
+    """
+    Fresh randomness mixed into the message hash during signing.
 
-    Variable input to the message hash so the signer can resample until a
-    valid codeword is found.
-    Included in the final signature so the verifier reproduces the hash.
+    - Signing rehashes the message with new randomness on each attempt.
+    - Retries continue until the resulting codeword hits the target sum.
+    - The chosen randomness travels in the signature so the verifier recomputes the same codeword.
     """
 
     LENGTH = TARGET_CONFIG.RAND_LEN_FE
 
 
 class HashTreeOpening(Container):
-    """A Merkle authentication path.
+    """
+    A Merkle authentication path proving one leaf sits under the root.
 
-    Contains the minimal proof connecting a specific leaf to the Merkle root.
-    Holds every sibling node along the path from the leaf to the tree top.
+    - The path lists the sibling hashes met while climbing from the leaf up to the root.
+    - A verifier rehashes the leaf upward with these siblings.
+    - The reconstructed root must equal the trusted root.
     """
 
     siblings: HashDigestList
-    """SSZ-compliant list of sibling hashes, from bottom to top."""
+    """Sibling hashes, ordered from the leaf upward to the root."""

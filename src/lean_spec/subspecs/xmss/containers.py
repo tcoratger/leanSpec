@@ -12,12 +12,12 @@ from ...types.container import Container
 from ...types.exceptions import SSZError
 from .constants import TARGET_CONFIG
 from .merkle import HashSubTree
+from .prf import PRFKey
 from .types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
     Parameter,
-    PRFKey,
     Randomness,
 )
 
