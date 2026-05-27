@@ -1,30 +1,15 @@
-"""
-Defines the Poseidon1 hash functions for the Generalized XMSS scheme.
+"""Poseidon1 hash engine in compression and sponge modes for the Generalized XMSS scheme.
 
-### The Cryptographic Engine: Why Poseidon1?
-
-This module provides the low-level cryptographic engine for all internal hashing
-operations. It is built on **Poseidon1** hash function.
-
-The choice of Poseidon1 is deliberate and critical for the scheme's ultimate goal.
-Unlike traditional hashes like SHA-3, Poseidon1 is an **arithmetization-friendly**
-(or **SNARK-friendly**) hash function. Its algebraic structure is simple, making it
-exponentially faster to prove and verify inside a zero-knowledge proof system,
-which is essential for aggregating many signatures into a single, compact proof.
-
-This file provides wrappers for the two primary ways Poseidon1 is used:
-
-1.  **Compression Mode**: A fast, fixed-input-size mode for hashing small,
-    predictable data structures like a single hash digest or a pair of them.
-2.  **Sponge Mode**: A flexible, variable-input-size mode for hashing large
-    amounts of data, like the many digests that form a Merkle tree leaf.
+Poseidon1 is arithmetization-friendly.
+Hashing across hash chains, Merkle nodes, and Merkle leaves uses a single
+permutation, which keeps the in-SNARK aggregation step cheap.
 """
 
-from __future__ import annotations
+from itertools import batched
 
 from pydantic import PrivateAttr
 
-from lean_spec.types import StrictBaseModel
+from lean_spec.types import StrictBaseModel, Uint64
 
 from ..koalabear import Fp
 from ..poseidon1.permutation import (
@@ -33,107 +18,93 @@ from ..poseidon1.permutation import (
     Poseidon1,
     Poseidon1Params,
 )
-from .utils import int_to_base_p
+from .constants import TWEAK_PREFIX_CHAIN, TWEAK_PREFIX_TREE, XmssConfig
+from .field import int_to_base_p
+from .types import ChainTweak, HashDigestVector, Parameter, TreeTweak
 
 
 class PoseidonXmss(StrictBaseModel):
-    """An instance of the Poseidon1 hash engine for the XMSS scheme."""
+    """Poseidon1 hash engine wrapper used inside the XMSS scheme."""
 
     params16: Poseidon1Params
-    """Poseidon1 parameters for 16-width permutation."""
+    """Permutation parameters for the width-16 state."""
 
     params24: Poseidon1Params
-    """Poseidon1 parameters for 24-width permutation."""
+    """Permutation parameters for the width-24 state."""
 
-    _engine16: Poseidon1 | None = PrivateAttr(default=None)
-    _engine24: Poseidon1 | None = PrivateAttr(default=None)
+    _engines: dict[int, Poseidon1] = PrivateAttr(default_factory=dict)
 
     def _get_engine(self, width: int) -> Poseidon1:
-        """Return a cached Poseidon1 engine for the given width."""
-        if width == 16:
-            if self._engine16 is None:
-                self._engine16 = Poseidon1(self.params16)
-            return self._engine16
-        if self._engine24 is None:
-            self._engine24 = Poseidon1(self.params24)
-        return self._engine24
+        """Return a cached Poseidon1 engine for the given width.
+
+        Raises:
+            ValueError: When the width is neither 16 nor 24.
+        """
+        if width not in self._engines:
+            match width:
+                case 16:
+                    params = self.params16
+                case 24:
+                    params = self.params24
+                case _:
+                    raise ValueError(f"Width must be 16 or 24, got {width}")
+            self._engines[width] = Poseidon1(params)
+        return self._engines[width]
 
     def compress(self, input_vec: list[Fp], width: int, output_len: int) -> list[Fp]:
-        """
-        Implements the Poseidon1 hash in **compression mode**.
+        """Poseidon1 in compression mode.
 
-        This mode is used for hashing fixed-size inputs and is the most efficient
-        way to use Poseidon1. It is used for traversing hash chains and building
-        the internal nodes of the Merkle tree.
-
-        ### Compression Algorithm
-
-        The function computes: `Truncate(Permute(padded_input) + padded_input)`.
-        1.  **Padding**: The `input_vec` is padded with zeros to match the full state `width`.
-        2.  **Permutation**: The core cryptographic permutation is applied to the padded state.
-        3.  **Feed-Forward**: The original padded input is added element-wise to the
-            permuted state. This is a key feature of the Poseidon1 design that
-            provides security against certain attacks.
-        4.  **Truncation**: The result is truncated to the desired `output_len`.
+        Computes Truncate(Permute(padded_input) + padded_input).
+        The padded input is the original vector zero-extended to the state width.
+        The feed-forward addition is part of the Poseidon1 design and is required
+        for security.
+        Used for hash chains and Merkle interior nodes.
 
         Args:
-            input_vec: The list of field elements to be hashed.
-            width: The state width of the Poseidon1 permutation (16 or 24).
-            output_len: The number of field elements in the output digest.
+            input_vec: Field elements to hash.
+            width: Permutation state width, either 16 or 24.
+            output_len: Number of output field elements to return.
 
         Returns:
-            A hash digest of `output_len` field elements.
+            Truncated digest of output_len field elements.
         """
-        # Check that the input vector is long enough to produce the output.
+        # The output cannot be longer than the input vector after padding.
         if len(input_vec) < output_len:
             raise ValueError("Input vector is too short for requested output length.")
 
-        # Select the correct permutation parameters based on the state width.
-        if width not in (16, 24):
-            raise ValueError(f"Width must be 16 or 24, got {width}")
+        # Select the cached engine matching the requested permutation width.
         engine = self._get_engine(width)
 
-        # Create a padded input by extending with zeros to match the state width.
+        # Zero-pad to the state width before applying the permutation.
         padded_input = list(input_vec) + [Fp(value=0)] * (width - len(input_vec))
 
-        # Apply the Poseidon1 permutation.
+        # Permute, then add the original padded input element-wise.
         permuted_state = engine.permute(padded_input)
-
-        # Apply the feed-forward step, adding the input back element-wise.
         final_state = [p + i for p, i in zip(permuted_state, padded_input, strict=True)]
 
-        # Truncate the state to the desired output length and return.
         return final_state[:output_len]
 
     def safe_domain_separator(self, lengths: list[int], capacity_len: int) -> list[Fp]:
-        """
-        Computes a unique domain separator for the sponge construction (SAFE API).
+        """Build a capacity initialization vector for the sponge construction.
 
-        A sponge's security relies on its initial state being unique for each distinct
-        hashing task. This function creates a unique "configuration" or
-        "initialization vector" (`capacity_value`) by hashing the high-level
-        parameters of the sponge's usage (e.g., the dimensions of the data
-        being hashed). This prevents multi-user or cross-context attacks.
+        Hashes the packed length parameters into a fixed-size capacity value.
+        This prevents collisions between sponges that absorb data of different shapes.
 
         Args:
-            lengths: A list of integer parameters that define the hash context.
-            capacity_len: The desired length of the output capacity value.
+            lengths: Integer parameters that define the hash context.
+            capacity_len: Number of field elements in the returned capacity value.
 
         Returns:
-            A list of `capacity_len` field elements for initializing the sponge.
+            A capacity vector of length capacity_len.
         """
-        # Pack all the length parameters into a single, large, unambiguous integer.
+        # Pack all lengths into a single unambiguous integer using 32-bit slots.
         acc = 0
         for length in lengths:
             acc = (acc << 32) | length
 
-        # Decompose this integer into a fixed-size list of field elements.
-        #
-        # This list serves as the input to a one-off compression hash.
-        # NOTE: we always use this mode with a 24 width.
+        # Compress the decomposed vector through the width-24 engine.
+        # Width 24 is the only mode used for sponge domain separation.
         input_vec = int_to_base_p(acc, 24)
-
-        # Compress the decomposed vector to produce the capacity value.
         return self.compress(input_vec, 24, capacity_len)
 
     def sponge(
@@ -143,80 +114,158 @@ class PoseidonXmss(StrictBaseModel):
         output_len: int,
         width: int,
     ) -> list[Fp]:
-        """
-        Implements the Poseidon1 hash using the **sponge construction**.
+        """Poseidon1 in sponge mode.
 
-        This mode is used for hashing large or variable-length inputs. In this scheme,
-        it is specifically used to hash the Merkle tree leaves, which consist of many
-        concatenated hash digests.
-
-        ### Sponge Algorithm
-
-        1.  **Initialization**: The internal state is divided into a `rate` (for data)
-            and a `capacity` (for security). The `capacity` part is initialized
-            with the domain-separating `capacity_value`.
-
-        2.  **Absorbing**: The input data is processed in `rate`-sized chunks. In each
-            step, a chunk is added to the `rate` part of the state, and then the
-            entire state is scrambled by the `permute` function.
-
-        3.  **Squeezing**: Once all input is absorbed, the `rate` part of the state is
-            extracted as output. If more output is needed, the state is permuted again,
-            and more is extracted, repeating until `output_len` elements are generated.
+        Phase 1: load capacity, zero-extend input to a multiple of the rate.
+        Phase 2: absorb each rate-sized chunk by replacement, then permute.
+        Phase 3: squeeze the rate slots until output_len elements are produced.
 
         Args:
-            input_vec: The input data of arbitrary length.
-            capacity_value: The domain-separating value from `safe_domain_separator`.
-            output_len: The number of field elements in the final output digest.
-            width: The width of the Poseidon1 permutation.
+            input_vec: Variable-length input.
+            capacity_value: Domain-separating capacity initialization.
+            output_len: Desired output length in field elements.
+            width: Permutation state width.
 
         Returns:
-            A hash digest of `output_len` field elements.
+            A digest of output_len field elements.
         """
-        # Ensure that the capacity value is not too long.
+        # The capacity must leave at least one rate slot for absorbing input.
         if len(capacity_value) >= width:
             raise ValueError("Capacity length must be smaller than the state width.")
 
-        # Determine the permutation parameters and the size of the rate.
-        if width not in (16, 24):
-            raise ValueError(f"Width must be 16 or 24, got {width}")
         engine = self._get_engine(width)
         rate = width - len(capacity_value)
 
-        # Pad the input vector with zeros to be an exact multiple of the rate size.
+        # Zero-pad to a multiple of the rate so absorption iterates exact chunks.
         num_extra = (rate - (len(input_vec) % rate)) % rate
         padded_input = input_vec + [Fp(value=0)] * num_extra
 
-        # Initialize the state:
-        # - capacity part (domain separator) at the beginning,
-        # - rate part (zero) follows.
+        # Layout: capacity slots first, then rate slots.
         cap_len = len(capacity_value)
         state = [Fp(value=0)] * width
         state[:cap_len] = capacity_value
 
-        # Absorb the input in rate-sized chunks via replacement.
-        for i in range(0, len(padded_input), rate):
-            chunk = padded_input[i : i + rate]
-            # Replace the rate part of the state with the chunk.
-            for j in range(rate):
-                state[cap_len + j] = chunk[j]
-            # Apply the cryptographic permutation to mix the state.
+        # Phase 2: absorb each chunk by overwriting the rate slots.
+        for chunk in batched(padded_input, rate):
+            for j, value in enumerate(chunk):
+                state[cap_len + j] = value
             state = engine.permute(state)
 
-        # Squeeze the output until enough elements have been generated.
+        # Phase 3: squeeze rate slots, permuting until enough output is available.
         output: list[Fp] = []
         while len(output) < output_len:
-            # Extract the rate part of the state (after capacity) as output.
             output.extend(state[cap_len : cap_len + rate])
-            # Permute the state.
             state = engine.permute(state)
 
-        # Truncate to the final output length and return.
         return output[:output_len]
+
+    def tweak_hash(
+        self,
+        config: XmssConfig,
+        parameter: Parameter,
+        tweak: TreeTweak | ChainTweak,
+        message_parts: list[HashDigestVector],
+    ) -> HashDigestVector:
+        """Apply the tweakable hash to one or more digests.
+
+        Mode selection:
+
+        - One digest input uses width-16 compression for hash chains.
+        - Two digest inputs use width-24 compression for Merkle interior nodes.
+        - More inputs use sponge mode for Merkle leaves.
+
+        Args:
+            config: Active XMSS configuration.
+            parameter: Public parameter that personalizes the hash.
+            tweak: Position tweak for domain separation.
+            message_parts: Digests to hash together.
+
+        Returns:
+            A digest of HASH_LEN_FE field elements.
+        """
+        # Pack the tweak fields into one integer, then split it into base-P field elements.
+        #
+        # The low byte is a per-shape prefix.
+        # It stops a tree tweak and a chain tweak from packing to the same value.
+        # That keeps Merkle hashing domain-separated from chain hashing.
+        #
+        # Every other field sits in its own bit range above the prefix.
+        match tweak:
+            case TreeTweak(level=level, index=index):
+                acc = (level << 40) | (int(index) << 8) | TWEAK_PREFIX_TREE
+            case ChainTweak(epoch=epoch, chain_index=chain_index, step=step):
+                acc = (int(epoch) << 24) | (chain_index << 16) | (step << 8) | TWEAK_PREFIX_CHAIN
+        encoded_tweak = int_to_base_p(acc, config.TWEAK_LEN_FE)
+
+        if len(message_parts) == 1:
+            # Hash chain step: width-16 compression of (digest || parameter || tweak).
+            input_vec = message_parts[0].elements + parameter.elements + encoded_tweak
+            result = self.compress(input_vec, 16, config.HASH_LEN_FE)
+
+        elif len(message_parts) == 2:
+            # Merkle node: width-24 compression of (parameter || tweak || left || right).
+            input_vec = (
+                parameter.elements
+                + encoded_tweak
+                + message_parts[0].elements
+                + message_parts[1].elements
+            )
+            result = self.compress(input_vec, 24, config.HASH_LEN_FE)
+
+        else:
+            # Merkle leaf: sponge mode over many concatenated digests.
+            flattened_message = [elem for part in message_parts for elem in part.elements]
+            input_vec = parameter.elements + encoded_tweak + flattened_message
+
+            # The domain separator binds the sponge to this hashing task shape.
+            lengths = [
+                config.PARAMETER_LEN,
+                config.TWEAK_LEN_FE,
+                config.DIMENSION,
+                config.HASH_LEN_FE,
+            ]
+            capacity_value = self.safe_domain_separator(lengths, config.CAPACITY)
+            result = self.sponge(input_vec, capacity_value, config.HASH_LEN_FE, 24)
+
+        return HashDigestVector(data=result)
+
+    def hash_chain(
+        self,
+        config: XmssConfig,
+        parameter: Parameter,
+        epoch: Uint64,
+        chain_index: int,
+        start_step: int,
+        num_steps: int,
+        start_digest: HashDigestVector,
+    ) -> HashDigestVector:
+        """Iterate the tweakable hash along a Winternitz chain.
+
+        Each iteration uses a distinct chain tweak so every step is domain-separated.
+
+        Args:
+            config: Active XMSS configuration.
+            parameter: Public parameter that personalizes the hash.
+            epoch: Slot identifier for the one-time signature.
+            chain_index: Index of the chain within the one-time signature.
+            start_step: Step number of the input digest.
+            num_steps: Number of additional hash applications.
+            start_digest: Digest at start_step.
+
+        Returns:
+            Digest at start_step + num_steps.
+        """
+        current_digest = start_digest
+        for i in range(num_steps):
+            # Steps are 1-indexed: step 1 is the first hash after the chain start.
+            tweak = ChainTweak(epoch=epoch, chain_index=chain_index, step=start_step + i + 1)
+            current_digest = self.tweak_hash(config, parameter, tweak, [current_digest])
+        return current_digest
 
 
 PROD_POSEIDON = PoseidonXmss(params16=PARAMS_16, params24=PARAMS_24)
-"""An instance configured for production-level parameters."""
+"""Poseidon1 engine with production parameters."""
 
 TEST_POSEIDON = PROD_POSEIDON
-"""Test and production use the same Poseidon1 parameters; only XmssConfig differs."""
+"""Test environment reuses the production Poseidon1 parameters.
+Only the surrounding configuration differs between modes."""

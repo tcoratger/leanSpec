@@ -1,15 +1,4 @@
-"""
-Defines the cryptographic constants and configuration presets for the
-XMSS spec.
-
-This specification corresponds to the "hashing-optimized" Top Level Target Sum
-instantiation from the canonical Rust implementation
-(production instantiation).
-
-We also provide a test instantiation for testing purposes.
-"""
-
-from __future__ import annotations
+"""Cryptographic constants and configuration presets for the XMSS spec."""
 
 import math
 from typing import Final
@@ -26,51 +15,34 @@ from ..koalabear import P_BYTES, P
 class XmssConfig(StrictBaseModel):
     """A model holding the configuration constants for an XMSS preset."""
 
-    # --- Core Scheme Configuration ---
     MESSAGE_LENGTH: int
     """The length in bytes for all messages to be signed."""
 
     LOG_LIFETIME: int
     """The base-2 logarithm of the scheme's maximum lifetime."""
 
-    @property
-    def LIFETIME(self) -> Uint64:  # noqa: N802
-        """
-        The maximum number of slots supported by this configuration.
-
-        An individual key pair can be active for a smaller sub-range.
-        """
-        return Uint64(1 << self.LOG_LIFETIME)
-
     DIMENSION: int
-    """The total number of hash chains, `v`."""
+    """The total number of hash chains, v."""
 
     BASE: int
     """The alphabet size for the digits of the encoded message."""
 
     Z: int
-    """Number of base-`BASE` digits extracted from each field element."""
+    """Number of base-BASE digits extracted from each field element."""
 
     Q: int
-    """Quotient such that `Q * BASE^Z == P - 1`."""
+    """Quotient such that Q * BASE^Z == P - 1."""
 
     TARGET_SUM: int
     """The required sum of all codeword chunks for a signature to be valid."""
 
     MAX_TRIES: int
-    """
-    How often one should try at most to resample a random value.
-
-    This is currently based on experiments with the Rust implementation.
-    Should probably be modified in production.
-    """
+    """How often one should try at most to resample a random value."""
 
     PARAMETER_LEN: int
-    """
-    The length of the public parameter `P`.
+    """The length of the public parameter P.
 
-    It is used to specialize the hash function.
-    """
+    It is used to specialize the hash function."""
 
     TWEAK_LEN_FE: int
     """The length of a domain-separating tweak."""
@@ -79,7 +51,7 @@ class XmssConfig(StrictBaseModel):
     """The length of a message after being encoded into field elements."""
 
     RAND_LEN_FE: int
-    """The length of the randomness `rho` used during message encoding."""
+    """The length of the randomness rho used during message encoding."""
 
     HASH_LEN_FE: int
     """The output length of the main tweakable hash function."""
@@ -88,33 +60,48 @@ class XmssConfig(StrictBaseModel):
     """The capacity of the Poseidon1 sponge, defining its security level."""
 
     @model_validator(mode="after")
-    def _validate_decomposition(self) -> XmssConfig:
+    def _validate_decomposition(self) -> "XmssConfig":
         """Verify that Q * BASE^Z == P - 1."""
         if self.Q * self.BASE**self.Z != P - 1:
             raise ValueError(f"Q * BASE^Z must equal P-1={P - 1}")
         return self
 
     @property
-    def MH_HASH_LEN_FE(self) -> int:  # noqa: N802
+    def LIFETIME(self) -> Uint64:
+        """The maximum number of slots supported by this configuration.
+
+        An individual key pair can be active for a smaller sub-range.
+        """
+        return Uint64(1 << self.LOG_LIFETIME)
+
+    @property
+    def MH_HASH_LEN_FE(self) -> int:
         """Number of Poseidon output field elements needed for the aborting decode."""
         return math.ceil(self.DIMENSION / self.Z)
 
     @property
-    def SIGNATURE_LEN_BYTES(self) -> int:  # noqa: N802
-        """
-        The SSZ-encoded size of a signature in bytes.
+    def SIGNATURE_LEN_BYTES(self) -> int:
+        """The SSZ-encoded size of a signature in bytes.
 
-        Includes raw field data plus SSZ offset overhead for variable-size fields:
+        # Layout
 
-        - Signature container: 2 offsets (path, hashes)
-        - HashTreeOpening container: 1 offset (siblings)
+            authentication path : one sibling digest per tree level   (variable)
+            encoding randomness : fixed run of field elements         (fixed)
+            released chain ends : one digest per hash chain           (variable)
         """
-        # Raw data sizes
+        # One sibling digest per level climbed from leaf to root.
         path_siblings_size = self.LOG_LIFETIME * self.HASH_LEN_FE * P_BYTES
         rho_size = self.RAND_LEN_FE * P_BYTES
+        # One released chain end per chain, so the count is the scheme dimension.
         hashes_size = self.DIMENSION * self.HASH_LEN_FE * P_BYTES
 
-        # SSZ offset overhead: 3 variable fields × 4 bytes each
+        # SSZ writes a four-byte offset ahead of each variable-length field.
+        #
+        #     path        -> offset 1   (top level)
+        #     chain ends  -> offset 2   (top level)
+        #     siblings    -> offset 3   (nested inside the path)
+        #
+        # The randomness is fixed-length, so it carries no offset.
         ssz_offset_overhead = 3 * BYTES_PER_LENGTH_OFFSET
 
         return path_siblings_size + rho_size + hashes_size + ssz_offset_overhead
@@ -170,10 +157,5 @@ TWEAK_PREFIX_MESSAGE: Final[int] = 0x02
 PRF_KEY_LENGTH: Final = 32
 """The length of the PRF secret key in bytes."""
 
-_LEAN_ENV_TO_CONFIG = {
-    "test": TEST_CONFIG,
-    "prod": PROD_CONFIG,
-}
-
-TARGET_CONFIG: Final = _LEAN_ENV_TO_CONFIG[LEAN_ENV]
-"""The active XMSS configuration based on LEAN_ENV environment variable."""
+TARGET_CONFIG: Final = TEST_CONFIG if LEAN_ENV == "test" else PROD_CONFIG
+"""Active configuration selected at import time from the LEAN_ENV environment variable."""

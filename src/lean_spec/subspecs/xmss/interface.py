@@ -1,175 +1,145 @@
-"""
-Defines the core interface for the Generalized XMSS signature scheme.
-
-Specification for the high-level functions (`key_gen`, `sign`, `verify`).
-
-This constitutes the public API of the signature scheme.
-"""
-
-from __future__ import annotations
+"""Public interface for the Generalized XMSS signature scheme."""
 
 from lean_spec.config import LEAN_ENV
-from lean_spec.subspecs.xmss.target_sum import (
-    PROD_TARGET_SUM_ENCODER,
-    TEST_TARGET_SUM_ENCODER,
-    TargetSumEncoder,
-)
 from lean_spec.types import Bytes32, Slot, StrictBaseModel, Uint64
 
-from .constants import (
-    PROD_CONFIG,
-    TEST_CONFIG,
-    XmssConfig,
-)
+from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
 from .containers import KeyPair, PublicKey, SecretKey, Signature
-from .prf import PROD_PRF, TEST_PRF, Prf
-from .rand import PROD_RAND, TEST_RAND, Rand
-from .subtree import HashSubTree, combined_path, verify_path
-from .tweak_hash import (
-    PROD_TWEAK_HASHER,
-    TEST_TWEAK_HASHER,
-    TweakHasher,
-)
+from .encoding import target_sum_encode
+from .field import random_parameter
+from .merkle import HashSubTree, combined_path, verify_path
+from .poseidon import PROD_POSEIDON, TEST_POSEIDON, PoseidonXmss
+from .prf import prf_apply, prf_get_randomness, prf_key_gen
 from .types import HashDigestList, HashDigestVector
-from .utils import expand_activation_time
+
+
+def _expand_activation_time(
+    log_lifetime: int, desired_activation_slot: int, desired_num_active_slots: int
+) -> tuple[int, int]:
+    """Align a requested activation interval to top-bottom tree boundaries.
+
+    Phase 1: round start down to a multiple of sqrt(LIFETIME).
+    Phase 2: round end up to a multiple of sqrt(LIFETIME).
+    Phase 3: enforce a minimum duration of two bottom trees.
+    Phase 4: clamp to the lifetime bound, shifting the interval if needed.
+
+    Args:
+        log_lifetime: Base-2 logarithm of the lifetime.
+        desired_activation_slot: First slot requested.
+        desired_num_active_slots: Number of slots requested.
+
+    Returns:
+        The pair (start_bottom_tree_index, end_bottom_tree_index).
+        Actual slots covered are [start * C, end * C) where C = sqrt(LIFETIME).
+    """
+    # C = sqrt(LIFETIME).
+    # c_mask rounds down to multiples of C.
+    c = 1 << (log_lifetime // 2)
+    c_mask = ~(c - 1)
+
+    desired_end_slot = desired_activation_slot + desired_num_active_slots
+
+    # Phase 1 + 2: snap the interval endpoints onto bottom-tree boundaries.
+    start = desired_activation_slot & c_mask
+    end = (desired_end_slot + c - 1) & c_mask
+
+    # Phase 3: at least two bottom trees so the prepared window always fits.
+    if end - start < 2 * c:
+        end = start + 2 * c
+
+    # Phase 4: clamp to [0, LIFETIME).
+    lifetime = c * c
+    if end > lifetime:
+        duration = end - start
+        if duration > lifetime:
+            # The requested interval is wider than the lifetime.
+            # Use the whole lifetime.
+            start = 0
+            end = lifetime
+        else:
+            # Shift the interval back so it ends exactly at the lifetime boundary.
+            end = lifetime
+            start = (lifetime - duration) & c_mask
+
+    return (start // c, end // c)
 
 
 class GeneralizedXmssScheme(StrictBaseModel):
-    """
-    Instance of the Generalized XMSS signature scheme for a given config.
-
-    This class holds the configuration and component instances needed to
-    perform key generation, signing, and verification operations.
-    """
+    """Generalized XMSS signature scheme bound to one configuration."""
 
     config: XmssConfig
-    """Configuration parameters for the XMSS scheme."""
+    """Configuration parameters for this instance."""
 
-    prf: Prf
-    """Pseudorandom function for deriving secret values."""
-
-    hasher: TweakHasher
-    """Hash function with tweakable domain separation."""
-
-    encoder: TargetSumEncoder
-    """Message encoder that produces valid codewords."""
-
-    rand: Rand
-    """Random data generator for key generation."""
+    poseidon: PoseidonXmss
+    """Cached Poseidon1 engine used by every primitive in the scheme."""
 
     def key_gen(self, activation_slot: Slot, num_active_slots: Uint64) -> KeyPair:
-        """
-        Generates a new cryptographic key pair for a specified range of slots.
+        """Generate a fresh key pair active for an aligned slot range.
 
-        This is a **randomized** algorithm that establishes a signer's identity using
-        the memory-efficient Top-Bottom Tree Traversal approach.
+        Phase 1: align the requested interval to sqrt(LIFETIME) boundaries.
+        Phase 2: draw the master PRF key and public parameter.
+        Phase 3: materialize the two leftmost bottom trees.
+        Phase 4: generate every other bottom tree, retaining only its root.
+        Phase 5: build the top tree from all bottom-tree roots.
 
-        ### Key Generation Algorithm
-
-        1.  **Expand Activation Time**: Align the requested activation interval to
-            `sqrt(LIFETIME)` boundaries to enable efficient tree partitioning.
-            This ensures the interval starts at a multiple of `sqrt(LIFETIME)` and
-            has a minimum duration of `2 * sqrt(LIFETIME)` slots.
-
-        2.  **Generate Master Secrets**: Generate PRF key and public parameter `P`.
-            The PRF key allows deterministic on-demand regeneration of one-time keys.
-
-        3.  **Generate First Two Bottom Trees**: Create the first two bottom trees
-            (covering the initial `2 * sqrt(LIFETIME)` slots) and keep them in memory.
-            Each bottom tree covers `sqrt(LIFETIME)` consecutive slots.
-
-        4.  **Generate Remaining Bottom Tree Roots**: For all other bottom trees in
-            the range, generate only their roots (not the full trees). This saves
-            memory since we only need the first two trees for the prepared window.
-
-        5.  **Build Top Tree**: Construct the top tree from all bottom tree roots.
-            The top tree's lowest layer contains the bottom tree roots, and it is
-            built upward to the global Merkle root.
-
-        ### Memory Efficiency
-
-        Traditional approach: O(LIFETIME) memory
-        Top-Bottom approach: O(sqrt(LIFETIME)) memory
-
-        For LOG_LIFETIME=32 (2^32 slots):
-        - Traditional: ~hundreds of GiB
-        - Top-Bottom: much more reasonable
+        The returned key may cover a wider interval than requested because
+        of boundary alignment and the two-tree minimum window.
 
         Args:
-            activation_slot: The starting slot for which this key is valid.
-            - Will be aligned downward to `sqrt(LIFETIME)` boundary.
-            num_active_slots: The number of consecutive slots the key can be used for.
-            - Will be rounded up to at least `2 * sqrt(LIFETIME)`.
+            activation_slot: Requested first signable slot.
+            num_active_slots: Requested number of signable slots.
 
         Returns:
-            A `KeyPair` containing the public and secret keys.
+            A KeyPair with both halves of the scheme.
 
-        Note:
-            The actual activation slot and num_active_slots in the returned SecretKey
-            may be larger than requested due to alignment requirements.
-
-        For the formal specification of this process, please refer to:
-        - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
-        - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
-        - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
+        Raises:
+            ValueError: When the requested range exceeds the lifetime.
         """
-        # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Ensure the requested activation range is within the scheme's total supported lifetime.
+        # The requested range must fit within the global lifetime.
         if int(activation_slot) + int(num_active_slots) > int(config.LIFETIME):
             raise ValueError("Activation range exceeds the key's lifetime.")
 
-        # Generate the random public parameter `P` and the master PRF key.
-        # - `P` ensures hash function outputs are unique to this key pair.
-        # - PRF key is the single master secret from which all one-time keys are derived.
-        parameter = self.rand.parameter()
-        prf_key = self.prf.key_gen()
+        # Phase 2: draw the master secret and the public parameter.
+        parameter = random_parameter(config)
+        prf_key = prf_key_gen()
 
-        # Step 1: Expand and align activation time to sqrt(LIFETIME) boundaries.
-        start_bottom_tree_index, end_bottom_tree_index = expand_activation_time(
+        # Phase 1: align onto bottom-tree boundaries.
+        start_bottom_tree_index, end_bottom_tree_index = _expand_activation_time(
             config.LOG_LIFETIME, int(activation_slot), int(num_active_slots)
         )
-
-        num_bottom_trees = end_bottom_tree_index - start_bottom_tree_index
         leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
-
-        # Calculate the actual (expanded) activation slot and count.
         actual_activation_slot = start_bottom_tree_index * leaves_per_bottom_tree
-        actual_num_active_slots = num_bottom_trees * leaves_per_bottom_tree
+        actual_num_active_slots = (
+            end_bottom_tree_index - start_bottom_tree_index
+        ) * leaves_per_bottom_tree
 
-        # Step 2: Generate the first two bottom trees (kept in memory).
+        # Phase 3: build the two leftmost bottom trees and keep them resident.
         left_bottom_tree = HashSubTree.from_prf_key(
-            prf=self.prf,
-            hasher=self.hasher,
-            rand=self.rand,
+            poseidon=self.poseidon,
             config=config,
             prf_key=prf_key,
             bottom_tree_index=Uint64(start_bottom_tree_index),
             parameter=parameter,
         )
         right_bottom_tree = HashSubTree.from_prf_key(
-            prf=self.prf,
-            hasher=self.hasher,
-            rand=self.rand,
+            poseidon=self.poseidon,
             config=config,
             prf_key=prf_key,
             bottom_tree_index=Uint64(start_bottom_tree_index + 1),
             parameter=parameter,
         )
 
-        # Collect roots for building the top tree.
         bottom_tree_roots: list[HashDigestVector] = [
             left_bottom_tree.root(),
             right_bottom_tree.root(),
         ]
 
-        # Step 3: Generate remaining bottom trees (only their roots).
+        # Phase 4: build every other bottom tree and remember only its root.
         for i in range(start_bottom_tree_index + 2, end_bottom_tree_index):
             tree = HashSubTree.from_prf_key(
-                prf=self.prf,
-                hasher=self.hasher,
-                rand=self.rand,
+                poseidon=self.poseidon,
                 config=config,
                 prf_key=prf_key,
                 bottom_tree_index=Uint64(i),
@@ -177,21 +147,17 @@ class GeneralizedXmssScheme(StrictBaseModel):
             )
             bottom_tree_roots.append(tree.root())
 
-        # Step 4: Build the top tree from bottom tree roots.
+        # Phase 5: assemble the top tree from all bottom-tree roots.
         top_tree = HashSubTree.new_top_tree(
-            hasher=self.hasher,
-            rand=self.rand,
+            poseidon=self.poseidon,
+            config=config,
             depth=config.LOG_LIFETIME,
             start_bottom_tree_index=Uint64(start_bottom_tree_index),
             parameter=parameter,
             bottom_tree_roots=bottom_tree_roots,
         )
 
-        # Extract the global root.
-        root = top_tree.root()
-
-        # Assemble and return the keys.
-        pk = PublicKey(root=root, parameter=parameter)
+        pk = PublicKey(root=top_tree.root(), parameter=parameter)
         sk = SecretKey(
             prf_key=prf_key,
             parameter=parameter,
@@ -205,64 +171,39 @@ class GeneralizedXmssScheme(StrictBaseModel):
         return KeyPair(public_key=pk, secret_key=sk)
 
     def sign(self, sk: SecretKey, slot: Slot, message: Bytes32) -> Signature:
-        """
-        Produces a digital signature for a given message at a specific slot.
+        """Produce a signature for a message at a specific slot.
 
-        This is a **deterministic** algorithm. Calling `sign` twice with the same
-        (sk, slot, message) triple produces the same signature.
+        Phase 1: enforce that the slot is inside the activation and prepared windows.
+        Phase 2: search for randomness rho whose encoding lands on the target-sum layer.
+        Phase 3: walk each Winternitz chain to the released hash dictated by the codeword.
+        Phase 4: build the combined Merkle path through the bottom and top trees.
 
-        **CRITICAL SECURITY WARNING**: A secret key for a given slot must **NEVER** be used
-        to sign two different messages. Doing so would reveal parts of the secret key
-        and allow an attacker to forge signatures. This is the fundamental security
-        property of a synchronized (stateful) signature scheme.
-
-        ### Signing Algorithm
-
-        1.  **Message Encoding with Randomness (`rho`)**: The "Target Sum" scheme
-            requires the message hash to be encoded into a `codeword` whose digits
-            sum to a predefined target. A direct hash of the message is unlikely to
-            satisfy this. Therefore, the algorithm repeatedly hashes the message
-            combined with deterministic randomness (`rho`) derived from the PRF
-            until a valid `codeword` is found.
-
-        2.  **One-Time Signature**: The `codeword` dictates how the one-time signature is
-            formed. For each digit `x_i` in the codeword, the signer reveals an intermediate
-            hash value by applying the hash function `x_i` times to the secret start of the
-            `i`-th hash chain.
-            The collection of these intermediate hashes forms the one-time signature.
-
-        3.  **Merkle Path**: The signer retrieves the Merkle authentication path for the leaf
-            corresponding to the current `slot`. This path proves that the one-time public key
-            for this slot is part of the main public key (the Merkle root).
+        Signing is deterministic in (sk, slot, message).
+        A secret key must never sign two different messages for the same slot.
 
         Args:
-            sk: The secret key to use for signing.
-            slot: The slot for which the signature is being created.
-            message: The message to be signed.
+            sk: Secret key.
+            slot: Signing slot.
+            message: Message to sign.
 
         Returns:
-            The resulting `Signature` object.
+            A signature carrying the OTS, the Merkle path, and the randomness.
 
-        For the formal specification of this process, please refer to:
-        - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
-        - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
-        - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
+        Raises:
+            ValueError: When the slot is outside the activation or prepared window.
+            RuntimeError: When no valid encoding is found within MAX_TRIES attempts.
         """
-        # Retrieve the scheme's configuration parameters.
         config = self.config
-
-        # Verify that the secret key is currently active for the requested signing slot.
         slot_int = int(slot)
         activation_int = int(sk.activation_slot)
+
+        # Phase 1a: activation bound.
         if not (activation_int <= slot_int < activation_int + int(sk.num_active_slots)):
             raise ValueError("Key is not active for the specified slot.")
 
-        # Verify that the slot is within the prepared interval (covered by loaded bottom trees).
-        #
-        # With top-bottom tree traversal, only slots within the prepared interval can be
-        # signed without computing additional bottom trees.
-        #
-        # If the slot is outside this range, we need to slide the window forward.
+        # Phase 1b: prepared bound.
+        # Without two adjacent bottom trees we cannot produce a path without
+        # paying the cost of regenerating them on the fly.
         leaves_per_bottom_tree = 1 << (config.LOG_LIFETIME // 2)
         prepared_start = int(sk.left_bottom_tree_index) * leaves_per_bottom_tree
         prepared_end = prepared_start + 2 * leaves_per_bottom_tree
@@ -273,45 +214,28 @@ class GeneralizedXmssScheme(StrictBaseModel):
                 f"Call advance_preparation() to slide the window forward."
             )
 
-        # Find a valid message encoding.
-        #
-        # This loop repeatedly tries different randomness `rho` until the encoder
-        # produces a valid codeword (i.e., one that meets the target sum constraint).
-        #
-        # The randomness is deterministically derived from the PRF to ensure
-        # that signing is reproducible for the same (sk, slot, message).
+        # Phase 2: deterministic search for valid randomness.
+        # Randomness comes from the PRF so signing is reproducible.
         for attempts in range(config.MAX_TRIES):
-            # Derive deterministic randomness `rho` from PRF using the attempt counter.
-            rho = self.prf.get_randomness(sk.prf_key, slot, message, Uint64(attempts))
-            # Attempt to encode the message with the deterministic `rho`.
-            codeword = self.encoder.encode(sk.parameter, message, rho, slot)
-            # If encoding is successful, we've found our `rho` and `codeword`.
-            #
-            # We can exit the loop.
+            rho = prf_get_randomness(config, sk.prf_key, slot, message, Uint64(attempts))
+            codeword = target_sum_encode(self.poseidon, config, sk.parameter, message, rho, slot)
             if codeword is not None:
                 break
         else:
-            # This block executes only if the `for` loop completes without a `break`.
-            #
-            # This means that no valid encoding was found after the maximum number of tries.
             raise RuntimeError(
                 f"Failed to find a valid message encoding after {config.MAX_TRIES} tries."
             )
 
-        # Sanity check to ensure the encoder returned a codeword of the correct length.
-        if len(codeword) != self.config.DIMENSION:
+        # Sanity guard against an encoder returning the wrong number of digits.
+        if len(codeword) != config.DIMENSION:
             raise RuntimeError("Encoding is broken: returned too many or too few chunks.")
 
-        # Compute the one-time signature hashes based on the codeword.
+        # Phase 3: walk each Winternitz chain to the released hash.
         ots_hashes: list[HashDigestVector] = []
         for chain_index, steps in enumerate(codeword):
-            # Derive the secret start of the current chain using the master PRF key.
-            start_digest = self.prf.apply(sk.prf_key, slot, Uint64(chain_index))
-            # Walk the hash chain for the number of `steps` specified by the
-            # corresponding digit in the codeword.
-            #
-            # The result is one component of the OTS.
-            ots_digest = self.hasher.hash_chain(
+            start_digest = prf_apply(config, sk.prf_key, slot, Uint64(chain_index))
+            ots_digest = self.poseidon.hash_chain(
+                config=config,
                 parameter=sk.parameter,
                 epoch=slot,
                 chain_index=chain_index,
@@ -321,106 +245,67 @@ class GeneralizedXmssScheme(StrictBaseModel):
             )
             ots_hashes.append(ots_digest)
 
-        # Retrieve the Merkle authentication path for the current slot's leaf.
-        # With top-bottom tree traversal, we use combined_path to merge paths from
-        # the bottom tree and top tree.
-
-        # Determine which bottom tree contains this slot (reuse leaves_per_bottom_tree from above).
+        # Phase 4: combined Merkle path through both trees.
+        # The signed slot picks the bottom tree on the prepared window's left or right.
         boundary = (int(sk.left_bottom_tree_index) + 1) * leaves_per_bottom_tree
         bottom_tree = sk.left_bottom_tree if slot_int < boundary else sk.right_bottom_tree
-
-        # Generate the combined authentication path
         path = combined_path(sk.top_tree, bottom_tree, Uint64(int(slot)))
 
-        # Assemble and return the final signature, which contains:
-        # - The OTS,
-        # - The Merkle path,
-        # - The randomness `rho` needed for verification.
         return Signature(path=path, rho=rho, hashes=HashDigestList(data=ots_hashes))
 
     def verify(self, pk: PublicKey, slot: Slot, message: Bytes32, sig: Signature) -> bool:
-        r"""
-        Verifies a digital signature against a public key, message, and slot.
+        """Verify a signature against a public key, message, and slot.
 
-        This is a **deterministic** algorithm.
-
-        ### Verification Algorithm
-
-        1.  **Re-encode Message**: The verifier uses the randomness `rho` from the
-            signature to re-compute the codeword $x = (x_1, \dots, x_v)$ from the message `m`.
-            If the encoding is invalid (e.g., does not meet the target sum), verification fails.
-
-        2.  **Reconstruct One-Time Public Key**: For each intermediate hash $y_i$ in the
-            signature's `hashes` field, the verifier completes the corresponding hash chain.
-            Since $y_i$ was computed by hashing $x_i$ times, the verifier applies the
-            hash function an additional `BASE - 1 - x_i` times to arrive at the
-            chain's public endpoint, which is one component of the one-time public key.
-
-        3.  **Compute Merkle Leaf**: The verifier hashes the full set of reconstructed
-            chain endpoints to compute the expected Merkle leaf for the given slot.
-
-        4.  **Verify Merkle Path**: The verifier uses the authentication `path` from the
-            signature to compute a candidate Merkle root, starting from the leaf computed
-            in the previous step. Verification succeeds if and only if this candidate root
-            matches the `root` stored in the `PublicKey`.
+        Phase 1: bound-check the slot.
+        Phase 1 rejects without raising on bad input.
+        Phase 2: recompute the codeword using the randomness carried by the signature.
+        Phase 3: complete each Winternitz chain from the released hash to its endpoint.
+        Phase 4: rebuild the Merkle root from the chain endpoints and the opening.
 
         Args:
-            pk: The public key to verify against.
-            slot: The slot the signature corresponds to.
-            message: The message that was supposedly signed.
-            sig: The signature object to be verified.
+            pk: Public key.
+            slot: Signing slot claimed by the signature.
+            message: Message claimed by the signature.
+            sig: Signature to verify.
 
         Returns:
-            `True` if the signature is valid, `False` otherwise.
-
-        For the formal specification of this process, please refer to:
-        - "Hash-Based Multi-Signatures for Post-Quantum Ethereum": https://eprint.iacr.org/2025/055
-        - "Technical Note: LeanSig for Post-Quantum Ethereum": https://eprint.iacr.org/2025/1332
-        - The canonical Rust implementation: https://github.com/b-wagn/hash-sig
+            True when the signature is valid against the public key, false otherwise.
         """
-        # Retrieve the scheme's configuration parameters.
         config = self.config
 
-        # Validate slot bounds.
-        #
-        # Return False instead of raising to avoid panic on invalid signatures.
-        # The slot is attacker-controlled input.
-        if int(slot) >= int(self.config.LIFETIME):
+        # Phase 1: bound check on the slot.
+        # The slot is attacker-controlled, so a malformed value returns False
+        # rather than panicking deep in the verification routine.
+        if int(slot) >= int(config.LIFETIME):
             return False
 
-        # Re-encode the message using the randomness `rho` from the signature.
-        #
-        # If the encoding is invalid (e.g., fails the target sum check), the signature is invalid.
-        codeword = self.encoder.encode(pk.parameter, message, sig.rho, slot)
+        # Phase 2: rederive the codeword from the signature's randomness.
+        # A failing aborting decode means the signature cannot be valid.
+        codeword = target_sum_encode(self.poseidon, config, pk.parameter, message, sig.rho, slot)
         if codeword is None:
             return False
 
-        # Reconstruct the one-time public key (the list of chain endpoints).
+        # Phase 3: finish each chain from the released hash to its endpoint.
         chain_ends: list[HashDigestVector] = []
         for chain_index, xi in enumerate(codeword):
-            # The signature provides `start_digest`, which is the hash value after `xi` steps.
+            # The signature provides the digest after xi steps along the chain.
+            # We hash the remaining BASE - 1 - xi times to reach the endpoint.
             start_digest = sig.hashes[chain_index]
-            # We must perform the remaining `BASE - 1 - xi` hashing steps
-            # to compute the public endpoint of the chain.
-            num_steps_remaining = config.BASE - 1 - xi
-            end_digest = self.hasher.hash_chain(
+            end_digest = self.poseidon.hash_chain(
+                config=config,
                 parameter=pk.parameter,
                 epoch=slot,
                 chain_index=chain_index,
                 start_step=xi,
-                num_steps=num_steps_remaining,
+                num_steps=config.BASE - 1 - xi,
                 start_digest=start_digest,
             )
             chain_ends.append(end_digest)
 
-        # Verify the Merkle path.
-        #
-        # This function internally:
-        # - Hashes the `chain_ends` to get the leaf node for the slot,
-        # - Uses the `opening` path from the signature to compute a candidate root.
-        # - It returns true if and only if this candidate root matches the public key's root.
+        # Phase 4: rebuild and compare against the trusted root.
         return verify_path(
-            hasher=self.hasher,
+            poseidon=self.poseidon,
+            config=config,
             parameter=pk.parameter,
             root=pk.root,
             position=slot,
@@ -429,94 +314,58 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
 
     def get_activation_interval(self, sk: SecretKey) -> range:
-        """
-        Returns the slot range for which this secret key is active.
+        """Return the activation interval as a Python range.
 
-        The activation interval is `[activation_slot, activation_slot + num_active_slots)`.
-        A signature can only be created for a slot within this range.
-
-        Args:
-            sk: The secret key to query.
-
-        Returns:
-            A Python range object representing the valid slot range.
+        A signature is only valid for a slot inside this range.
         """
         start = int(sk.activation_slot)
-        end = start + int(sk.num_active_slots)
-        return range(start, end)
+        return range(start, start + int(sk.num_active_slots))
 
     def get_prepared_interval(self, sk: SecretKey) -> range:
-        """
-        Returns the slot range currently prepared (covered by loaded bottom trees).
+        """Return the prepared interval as a Python range.
 
-        With top-bottom tree traversal, a secret key maintains a sliding window of
-        two consecutive bottom trees. This method returns the range of slots that
-        can be signed with the currently loaded trees, without needing to compute
-        additional bottom trees.
-
-        The prepared interval is:
-        `[left_bottom_tree_index * sqrt(LIFETIME), (left_bottom_tree_index + 2) * sqrt(LIFETIME))`
-
-        Args:
-            sk: The secret key to query.
-
-        Returns:
-            A Python range object representing the prepared slot range.
-
-        Raises:
-            ValueError: If the secret key is missing top-bottom tree structures.
+        The prepared interval is the slot window covered by the two resident bottom trees.
+        A signer can sign any slot in this range without paying the cost of
+        rebuilding a bottom tree from the PRF.
         """
         leaves_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
         start = int(sk.left_bottom_tree_index) * leaves_per_bottom_tree
         return range(start, start + 2 * leaves_per_bottom_tree)
 
     def advance_preparation(self, sk: SecretKey) -> SecretKey:
-        """
-        Advances the prepared interval by computing the next bottom tree.
+        """Slide the prepared window one bottom tree forward.
 
-        This method implements the "sliding window" strategy for top-bottom tree
-        traversal. It:
-        1. Computes a new bottom tree for the next interval
-        2. Shifts the current right tree to become the new left tree
-        3. The newly computed tree becomes the new right tree
-        4. Increments `left_bottom_tree_index`
+        Phase 1: bail out when the next window would exceed the activation interval.
+        Phase 2: regenerate the new right bottom tree from the PRF key.
+        Phase 3: shift the previous right tree to the left slot.
 
-        After this operation, the prepared interval moves forward by `sqrt(LIFETIME)` slots.
-
-        **When to call**: Call this method after signing with a slot that is in the
-        right half of the prepared interval, to ensure the next slot range is ready.
+        Returning the same key when no advancement is possible keeps callers simple.
 
         Args:
-            sk: The secret key to advance.
+            sk: Secret key whose prepared window should advance.
 
         Returns:
-            A new SecretKey with the advanced preparation window.
-
-        Raises:
-            ValueError: If advancing would exceed the activation interval.
+            A secret key with the window shifted by one bottom tree.
         """
         leaves_per_bottom_tree = 1 << (self.config.LOG_LIFETIME // 2)
         left_index = int(sk.left_bottom_tree_index)
 
-        # Check if advancing would exceed the activation interval
+        # Phase 1: no advancement once the activation interval is fully consumed.
         next_prepared_end_slot = (left_index + 3) * leaves_per_bottom_tree
         activation_end = int(sk.activation_slot) + int(sk.num_active_slots)
         if next_prepared_end_slot > activation_end:
-            # Nothing to do - we're already at the end of the activation interval
             return sk
 
-        # Compute the next bottom tree (the one after the current right tree)
+        # Phase 2: rebuild the next bottom tree from the master PRF key.
         new_right_bottom_tree = HashSubTree.from_prf_key(
-            prf=self.prf,
-            hasher=self.hasher,
-            rand=self.rand,
+            poseidon=self.poseidon,
             config=self.config,
             prf_key=sk.prf_key,
             bottom_tree_index=Uint64(left_index + 2),
             parameter=sk.parameter,
         )
 
-        # Return a new SecretKey with the advanced window
+        # Phase 3: rotate the right tree into the left slot, advance the index.
         return sk.model_copy(
             update={
                 "left_bottom_tree": sk.right_bottom_tree,
@@ -526,28 +375,11 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
 
 
-PROD_SIGNATURE_SCHEME = GeneralizedXmssScheme(
-    config=PROD_CONFIG,
-    prf=PROD_PRF,
-    hasher=PROD_TWEAK_HASHER,
-    encoder=PROD_TARGET_SUM_ENCODER,
-    rand=PROD_RAND,
-)
-"""An instance configured for production-level parameters."""
+PROD_SIGNATURE_SCHEME = GeneralizedXmssScheme(config=PROD_CONFIG, poseidon=PROD_POSEIDON)
+"""Signature scheme instance with production parameters."""
 
-TEST_SIGNATURE_SCHEME = GeneralizedXmssScheme(
-    config=TEST_CONFIG,
-    prf=TEST_PRF,
-    hasher=TEST_TWEAK_HASHER,
-    encoder=TEST_TARGET_SUM_ENCODER,
-    rand=TEST_RAND,
-)
-"""A lightweight instance for test environments."""
+TEST_SIGNATURE_SCHEME = GeneralizedXmssScheme(config=TEST_CONFIG, poseidon=TEST_POSEIDON)
+"""Signature scheme instance with test parameters."""
 
-_LEAN_ENV_TO_SCHEME = {
-    "test": TEST_SIGNATURE_SCHEME,
-    "prod": PROD_SIGNATURE_SCHEME,
-}
-
-TARGET_SIGNATURE_SCHEME = _LEAN_ENV_TO_SCHEME[LEAN_ENV]
-"""The active XMSS signature scheme based on LEAN_ENV environment variable."""
+TARGET_SIGNATURE_SCHEME = TEST_SIGNATURE_SCHEME if LEAN_ENV == "test" else PROD_SIGNATURE_SCHEME
+"""Active scheme selected at import time from the LEAN_ENV environment variable."""

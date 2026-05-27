@@ -22,7 +22,6 @@ from lean_spec.types import (
     Checkpoint,
     Slot,
     ValidatorIndex,
-    ValidatorIndices,
 )
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
@@ -293,16 +292,15 @@ class TestOnGossipAggregatedAttestation:
         data_root = hash_tree_root(attestation_data)
 
         # Create valid aggregated proof
-        xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
-        raw_xmss = list(
-            zip(
-                [key_manager[vid].attestation_keypair.public_key for vid in participants],
-                [key_manager.sign_attestation_data(vid, attestation_data) for vid in participants],
-                strict=True,
+        raw_xmss = [
+            (
+                vid,
+                key_manager[vid].attestation_keypair.public_key,
+                key_manager.sign_attestation_data(vid, attestation_data),
             )
-        )
+            for vid in participants
+        ]
         proof = TypeOneMultiSignature.aggregate(
-            xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
             message=data_root,
@@ -340,16 +338,15 @@ class TestOnGossipAggregatedAttestation:
 
         data_root = hash_tree_root(attestation_data)
 
-        xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
-        raw_xmss = list(
-            zip(
-                [key_manager[vid].attestation_keypair.public_key for vid in participants],
-                [key_manager.sign_attestation_data(vid, attestation_data) for vid in participants],
-                strict=True,
+        raw_xmss = [
+            (
+                vid,
+                key_manager[vid].attestation_keypair.public_key,
+                key_manager.sign_attestation_data(vid, attestation_data),
             )
-        )
+            for vid in participants
+        ]
         proof = TypeOneMultiSignature.aggregate(
-            xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
             message=data_root,
@@ -380,16 +377,15 @@ class TestOnGossipAggregatedAttestation:
 
         data_root = hash_tree_root(attestation_data)
 
-        xmss_participants = ValidatorIndices(data=signers).to_aggregation_bits()
-        raw_xmss = list(
-            zip(
-                [key_manager[vid].attestation_keypair.public_key for vid in signers],
-                [key_manager.sign_attestation_data(vid, attestation_data) for vid in signers],
-                strict=True,
+        raw_xmss = [
+            (
+                vid,
+                key_manager[vid].attestation_keypair.public_key,
+                key_manager.sign_attestation_data(vid, attestation_data),
             )
-        )
+            for vid in signers
+        ]
         proof = TypeOneMultiSignature.aggregate(
-            xmss_participants=xmss_participants,
             children=[],
             raw_xmss=raw_xmss,
             message=data_root,
@@ -426,19 +422,15 @@ class TestOnGossipAggregatedAttestation:
 
         # First proof: validators 1 and 2
         participants_1 = [ValidatorIndex(1), ValidatorIndex(2)]
-        xmss_1 = ValidatorIndices(data=participants_1).to_aggregation_bits()
-        raw_xmss_1 = list(
-            zip(
-                [key_manager[vid].attestation_keypair.public_key for vid in participants_1],
-                [
-                    key_manager.sign_attestation_data(vid, attestation_data)
-                    for vid in participants_1
-                ],
-                strict=True,
+        raw_xmss_1 = [
+            (
+                vid,
+                key_manager[vid].attestation_keypair.public_key,
+                key_manager.sign_attestation_data(vid, attestation_data),
             )
-        )
+            for vid in participants_1
+        ]
         proof_1 = TypeOneMultiSignature.aggregate(
-            xmss_participants=xmss_1,
             children=[],
             raw_xmss=raw_xmss_1,
             message=data_root,
@@ -447,19 +439,15 @@ class TestOnGossipAggregatedAttestation:
 
         # Second proof: validators 1 and 3 (validator 1 overlaps)
         participants_2 = [ValidatorIndex(1), ValidatorIndex(3)]
-        xmss_2 = ValidatorIndices(data=participants_2).to_aggregation_bits()
-        raw_xmss_2 = list(
-            zip(
-                [key_manager[vid].attestation_keypair.public_key for vid in participants_2],
-                [
-                    key_manager.sign_attestation_data(vid, attestation_data)
-                    for vid in participants_2
-                ],
-                strict=True,
+        raw_xmss_2 = [
+            (
+                vid,
+                key_manager[vid].attestation_keypair.public_key,
+                key_manager.sign_attestation_data(vid, attestation_data),
             )
-        )
+            for vid in participants_2
+        ]
         proof_2 = TypeOneMultiSignature.aggregate(
-            xmss_participants=xmss_2,
             children=[],
             raw_xmss=raw_xmss_2,
             message=data_root,

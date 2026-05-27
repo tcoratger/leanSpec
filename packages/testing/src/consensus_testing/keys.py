@@ -69,7 +69,6 @@ from lean_spec.types import (
     Slot,
     Uint64,
     ValidatorIndex,
-    ValidatorIndices,
 )
 
 KeyRole = Literal["attestation", "proposal"]
@@ -534,13 +533,13 @@ class XmssKeyManager:
         """
         raw_xmss = [
             (
+                vid,
                 self.get_public_keys(vid)[0],
                 self.sign_attestation_data(vid, attestation_data),
             )
             for vid in validator_ids
         ]
         return TypeOneMultiSignature.aggregate(
-            xmss_participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
             children=[],
             raw_xmss=raw_xmss,
             message=hash_tree_root(attestation_data),
@@ -599,8 +598,7 @@ class XmssKeyManager:
             proofs.append(
                 TypeOneMultiSignature.aggregate(
                     children=[],
-                    raw_xmss=list(zip(public_keys, signatures, strict=True)),
-                    xmss_participants=agg.aggregation_bits,
+                    raw_xmss=list(zip(validator_ids, public_keys, signatures, strict=True)),
                     message=hash_tree_root(agg.data),
                     slot=agg.data.slot,
                 )

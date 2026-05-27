@@ -410,16 +410,15 @@ def make_aggregated_proof(
 ) -> TypeOneMultiSignature:
     """Create a valid Type-1 aggregated proof for the given participants."""
     data_root = hash_tree_root(attestation_data)
-    xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
-    raw_xmss = list(
-        zip(
-            [key_manager.get_public_keys(vid)[0] for vid in participants],
-            [key_manager.sign_attestation_data(vid, attestation_data) for vid in participants],
-            strict=True,
+    raw_xmss = [
+        (
+            vid,
+            key_manager.get_public_keys(vid)[0],
+            key_manager.sign_attestation_data(vid, attestation_data),
         )
-    )
+        for vid in participants
+    ]
     return TypeOneMultiSignature.aggregate(
-        xmss_participants=xmss_participants,
         children=[],
         raw_xmss=raw_xmss,
         message=data_root,
@@ -480,8 +479,7 @@ def make_signed_block_from_store(
     proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
     proposer_type_1 = TypeOneMultiSignature.aggregate(
         children=[],
-        raw_xmss=[(proposer_pubkey, proposer_signature)],
-        xmss_participants=ValidatorIndices(data=[proposer_index]).to_aggregation_bits(),
+        raw_xmss=[(proposer_index, proposer_pubkey, proposer_signature)],
         message=block_root,
         slot=slot,
     )

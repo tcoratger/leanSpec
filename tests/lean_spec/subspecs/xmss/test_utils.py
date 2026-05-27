@@ -7,15 +7,12 @@ import pytest
 
 from lean_spec.subspecs.koalabear.field import Fp, P
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.prf import TEST_PRF
-from lean_spec.subspecs.xmss.rand import TEST_RAND
-from lean_spec.subspecs.xmss.subtree import HashSubTree
-from lean_spec.subspecs.xmss.tweak_hash import TEST_TWEAK_HASHER
+from lean_spec.subspecs.xmss.field import int_to_base_p
+from lean_spec.subspecs.xmss.interface import _expand_activation_time
+from lean_spec.subspecs.xmss.merkle import HashSubTree
+from lean_spec.subspecs.xmss.poseidon import TEST_POSEIDON
+from lean_spec.subspecs.xmss.prf import prf_key_gen
 from lean_spec.subspecs.xmss.types import Parameter
-from lean_spec.subspecs.xmss.utils import (
-    expand_activation_time,
-    int_to_base_p,
-)
 from lean_spec.types import Uint64
 
 
@@ -82,8 +79,8 @@ def test_expand_activation_time(
     expected_start_tree: int,
     expected_end_tree: int,
 ) -> None:
-    """Tests that expand_activation_time correctly aligns and expands activation intervals."""
-    start_tree, end_tree = expand_activation_time(log_lifetime, desired_activation, desired_num)
+    """Tests that _expand_activation_time correctly aligns and expands activation intervals."""
+    start_tree, end_tree = _expand_activation_time(log_lifetime, desired_activation, desired_num)
     assert start_tree == expected_start_tree
     assert end_tree == expected_end_tree
 
@@ -114,7 +111,7 @@ def test_hash_subtree_from_prf_key() -> None:
     config = TEST_CONFIG
 
     # Generate a PRF key
-    prf_key = TEST_PRF.key_gen()
+    prf_key = prf_key_gen()
 
     # Generate a random parameter
     parameter = Parameter(
@@ -123,9 +120,7 @@ def test_hash_subtree_from_prf_key() -> None:
 
     # Generate bottom tree 0
     bottom_tree = HashSubTree.from_prf_key(
-        prf=TEST_PRF,
-        hasher=TEST_TWEAK_HASHER,
-        rand=TEST_RAND,
+        poseidon=TEST_POSEIDON,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -150,16 +145,14 @@ def test_hash_subtree_from_prf_key() -> None:
 def test_hash_subtree_from_prf_key_deterministic() -> None:
     """Tests that HashSubTree.from_prf_key is deterministic."""
     config = TEST_CONFIG
-    prf_key = TEST_PRF.key_gen()
+    prf_key = prf_key_gen()
     parameter = Parameter(
         data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
     )
 
     # Generate the same bottom tree twice
     tree1 = HashSubTree.from_prf_key(
-        prf=TEST_PRF,
-        hasher=TEST_TWEAK_HASHER,
-        rand=TEST_RAND,
+        poseidon=TEST_POSEIDON,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -167,9 +160,7 @@ def test_hash_subtree_from_prf_key_deterministic() -> None:
     )
 
     tree2 = HashSubTree.from_prf_key(
-        prf=TEST_PRF,
-        hasher=TEST_TWEAK_HASHER,
-        rand=TEST_RAND,
+        poseidon=TEST_POSEIDON,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -183,16 +174,14 @@ def test_hash_subtree_from_prf_key_deterministic() -> None:
 def test_hash_subtree_from_prf_key_different_indices() -> None:
     """Tests that different bottom tree indices produce different trees."""
     config = TEST_CONFIG
-    prf_key = TEST_PRF.key_gen()
+    prf_key = prf_key_gen()
     parameter = Parameter(
         data=[Fp(value=secrets.randbelow(P)) for _ in range(config.PARAMETER_LEN)]
     )
 
     # Generate two different bottom trees
     tree0 = HashSubTree.from_prf_key(
-        prf=TEST_PRF,
-        hasher=TEST_TWEAK_HASHER,
-        rand=TEST_RAND,
+        poseidon=TEST_POSEIDON,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(0),
@@ -200,9 +189,7 @@ def test_hash_subtree_from_prf_key_different_indices() -> None:
     )
 
     tree1 = HashSubTree.from_prf_key(
-        prf=TEST_PRF,
-        hasher=TEST_TWEAK_HASHER,
-        rand=TEST_RAND,
+        poseidon=TEST_POSEIDON,
         config=config,
         prf_key=prf_key,
         bottom_tree_index=Uint64(1),

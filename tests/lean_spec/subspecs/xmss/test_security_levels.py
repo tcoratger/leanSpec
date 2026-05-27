@@ -10,7 +10,7 @@ Based on:
 
 The security analysis follows the framework of [DKKW25c] Section 6. Theorem 1
 gives an advantage bound as the sum of five terms. Each term divided by attacker
-running time must be at most `2^{-(k + log5)}`, yielding four independent
+running time must be at most 2^{-(k + log5)}, yielding four independent
 constraints (Parameter Requirements 2 and 3):
 
 1. Digest (SM-UD/SM-PRE via Eq 8-9 / Eq 15)
@@ -20,7 +20,7 @@ constraints (Parameter Requirements 2 and 3):
 
 The abort correction from [HKKTW26] Corollary 1 and Remark 14 adjusts the
 message hash bound: the aborting decode effectively enlarges the output space
-to `|H|/(1 - theta)`, where `theta` is the abort probability.
+to |H|/(1 - theta), where theta is the abort probability.
 """
 
 import math
@@ -51,10 +51,10 @@ def _compute_security_levels(config: XmssConfig) -> dict[str, float]:
 
     Returns a dict with keys:
 
-    - `k_classical`: effective classical security (bits)
-    - `k_quantum`: effective quantum security (bits)
-    - `expected_attempts`: expected signing attempts per message
-    - `signing_failure_log2`: log2 of probability that all MAX_TRIES attempts fail
+    - k_classical: effective classical security (bits)
+    - k_quantum: effective quantum security (bits)
+    - expected_attempts: expected signing attempts per message
+    - signing_failure_log2: log2 of probability that all MAX_TRIES attempts fail
     """
     v = config.DIMENSION
     w_bits = int(math.log2(config.BASE))
@@ -188,8 +188,8 @@ def test_prod_abort_probability_is_negligible() -> None:
     The aborting decode rejection probability must be negligible.
 
     From [HKKTW26] Section 6.1: each FE has abort probability 1/P.
-    Over `ceil(v/Z)` FEs, the total abort probability is approximately
-    `ceil(v/Z) / P`.
+    Over ceil(v/Z) FEs, the total abort probability is approximately
+    ceil(v/Z) / P.
     """
     config = PROD_CONFIG
     ell = math.ceil(config.DIMENSION / config.Z)

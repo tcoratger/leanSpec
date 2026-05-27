@@ -4,6 +4,7 @@ End-to-end tests for the Generalized XMSS signature scheme.
 
 import pytest
 
+from lean_spec.subspecs.xmss.encoding import target_sum_encode
 from lean_spec.subspecs.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
@@ -37,7 +38,7 @@ def _test_correctness_roundtrip(
 
     # Sign the message at the chosen slot.
     #
-    # This might take a moment as it may try multiple `rho` values.
+    # This might take a moment as it may try multiple rho values.
     signature = scheme.sign(sk, test_slot, message)
 
     # Verification of the valid signature must succeed.
@@ -56,9 +57,11 @@ def _test_correctness_roundtrip(
     # In that case, verification will succeed, which is expected behavior for identical codewords.
     #
     # We detect this by checking if both messages encode to the same codeword.
-    original_codeword = scheme.encoder.encode(pk.parameter, message, signature.rho, test_slot)
-    tampered_codeword = scheme.encoder.encode(
-        pk.parameter, tampered_message, signature.rho, test_slot
+    original_codeword = target_sum_encode(
+        scheme.poseidon, scheme.config, pk.parameter, message, signature.rho, test_slot
+    )
+    tampered_codeword = target_sum_encode(
+        scheme.poseidon, scheme.config, pk.parameter, tampered_message, signature.rho, test_slot
     )
 
     if tampered_codeword != original_codeword:

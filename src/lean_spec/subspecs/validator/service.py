@@ -50,7 +50,7 @@ from lean_spec.subspecs.sync import SyncService
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.subspecs.xmss.containers import PublicKey, Signature
-from lean_spec.types import ByteList512KiB, Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
+from lean_spec.types import ByteList512KiB, Bytes32, Slot, Uint64, ValidatorIndex
 
 from .constants import HYSTERESIS_BAND, NETWORK_STALL_THRESHOLD, SYNC_LAG_THRESHOLD
 from .registry import ValidatorEntry, ValidatorRegistry
@@ -447,12 +447,10 @@ class ValidatorService:
         proposer_pubkey = validators[validator_index].get_proposal_pubkey()
 
         # Wrap the proposer's raw XMSS signature into a singleton Type-1.
-        # The participant set is just the proposer index.
-        proposer_participants = ValidatorIndices(data=[validator_index]).to_aggregation_bits()
+        # The single fresh entry carries the proposer index alongside its key and signature.
         proposer_type_1 = TypeOneMultiSignature.aggregate(
             children=[],
-            raw_xmss=[(proposer_pubkey, proposer_signature)],
-            xmss_participants=proposer_participants,
+            raw_xmss=[(validator_index, proposer_pubkey, proposer_signature)],
             message=block_root,
             slot=block.slot,
         )

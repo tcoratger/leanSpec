@@ -1,8 +1,10 @@
-"""
-This package provides a Python specification for the Generalized XMSS
-hash-based signature scheme.
+"""Generalized XMSS hash-based signature scheme.
 
-It exposes the core data structures and the main interface functions.
+References:
+    - Hash-Based Multi-Signatures for Post-Quantum Ethereum.
+      https://eprint.iacr.org/2025/055.pdf
+    - Aborting Random Oracles, How to Build Them, How to Use Them.
+      https://eprint.iacr.org/2026/016.pdf
 """
 
 from .containers import PublicKey, SecretKey

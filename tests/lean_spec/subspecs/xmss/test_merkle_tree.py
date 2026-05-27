@@ -2,21 +2,23 @@
 
 import pytest
 
-from lean_spec.subspecs.xmss.rand import PROD_RAND, Rand
-from lean_spec.subspecs.xmss.subtree import HashSubTree, verify_path
-from lean_spec.subspecs.xmss.tweak_hash import (
-    PROD_TWEAK_HASHER,
+from lean_spec.subspecs.xmss.constants import PROD_CONFIG, XmssConfig
+from lean_spec.subspecs.xmss.field import random_domain, random_parameter
+from lean_spec.subspecs.xmss.merkle import HashSubTree, verify_path
+from lean_spec.subspecs.xmss.poseidon import PROD_POSEIDON, PoseidonXmss
+from lean_spec.subspecs.xmss.types import (
+    HashDigestList,
+    HashDigestVector,
+    HashTreeOpening,
     TreeTweak,
-    TweakHasher,
 )
-from lean_spec.subspecs.xmss.types import HashDigestList, HashDigestVector, HashTreeOpening
 from lean_spec.types import Uint64
 from lean_spec.types.exceptions import SSZValueError
 
 
 def _run_commit_open_verify_roundtrip(
-    hasher: TweakHasher,
-    rand: Rand,
+    poseidon: PoseidonXmss,
+    config: XmssConfig,
     num_leaves: int,
     depth: int,
     start_index: int,
@@ -33,22 +35,23 @@ def _run_commit_open_verify_roundtrip(
     5.  Verify that each path is valid for its corresponding leaf and root.
 
     Args:
-        hasher: The tweakable hash instance for computing parent nodes.
-        rand: Random generator for padding values.
+        poseidon: Cached Poseidon1 engine.
+        config: Active XMSS configuration.
         num_leaves: The number of active leaves in the tree.
         depth: The total depth of the Merkle tree.
         start_index: The starting index of the first active leaf.
         leaf_parts_len: The number of digests that constitute a single leaf.
     """
     # SETUP: Generate a random parameter and the raw leaf data.
-    parameter = rand.parameter()
+    parameter = random_parameter(config)
     leaves: list[list[HashDigestVector]] = [
-        [rand.domain() for _ in range(leaf_parts_len)] for _ in range(num_leaves)
+        [random_domain(config) for _ in range(leaf_parts_len)] for _ in range(num_leaves)
     ]
 
     # HASH LEAVES: Compute the layer 0 nodes by hashing the leaf parts.
     leaf_hashes: list[HashDigestVector] = [
-        hasher.apply(
+        poseidon.tweak_hash(
+            config,
             parameter,
             TreeTweak(level=0, index=Uint64(start_index + i)),
             leaf_parts,
@@ -58,8 +61,8 @@ def _run_commit_open_verify_roundtrip(
 
     # COMMIT: Build the Merkle tree from the leaf hashes.
     tree = HashSubTree.new(
-        hasher=hasher,
-        rand=rand,
+        poseidon=poseidon,
+        config=config,
         lowest_layer=Uint64(0),
         depth=Uint64(depth),
         start_index=Uint64(start_index),
@@ -73,7 +76,8 @@ def _run_commit_open_verify_roundtrip(
         position = Uint64(start_index + i)
         opening = tree.path(position)
         is_valid = verify_path(
-            hasher=hasher,
+            poseidon=poseidon,
+            config=config,
             parameter=parameter,
             root=root,
             position=position,
@@ -107,7 +111,7 @@ def test_commit_open_verify_roundtrip(
     assert start_index + num_leaves <= (1 << depth)
 
     _run_commit_open_verify_roundtrip(
-        PROD_TWEAK_HASHER, PROD_RAND, num_leaves, depth, start_index, leaf_parts_len
+        PROD_POSEIDON, PROD_CONFIG, num_leaves, depth, start_index, leaf_parts_len
     )
 
 
@@ -127,29 +131,26 @@ class TestVerifyPathSecurityBounds:
         creating malformed openings at the SSZ level. The check in
         verify_path is defense-in-depth for deserialized data.
         """
-        rand = PROD_RAND
-
         # Attempting to create a list with 33 siblings raises at the type level.
-        excessive_siblings = [rand.domain() for _ in range(33)]
+        excessive_siblings = [random_domain(PROD_CONFIG) for _ in range(33)]
         with pytest.raises(SSZValueError):
             HashDigestList(data=excessive_siblings)
 
     def test_rejects_position_exceeding_tree_capacity(self) -> None:
         """verify_path returns False when position >= 2^depth."""
-        rand = PROD_RAND
-        hasher = PROD_TWEAK_HASHER
-        parameter = rand.parameter()
+        parameter = random_parameter(PROD_CONFIG)
 
-        root = rand.domain()
-        leaf_parts = [rand.domain()]
+        root = random_domain(PROD_CONFIG)
+        leaf_parts = [random_domain(PROD_CONFIG)]
 
         # Create an opening with depth=4 (supports positions 0-15).
-        siblings = [rand.domain() for _ in range(4)]
+        siblings = [random_domain(PROD_CONFIG) for _ in range(4)]
         opening = HashTreeOpening(siblings=HashDigestList(data=siblings))
 
         # Position 16 is out of bounds for depth 4 (capacity = 2^4 = 16).
         result = verify_path(
-            hasher=hasher,
+            poseidon=PROD_POSEIDON,
+            config=PROD_CONFIG,
             parameter=parameter,
             root=root,
             position=Uint64(16),
@@ -160,7 +161,8 @@ class TestVerifyPathSecurityBounds:
 
         # Position 100 is also out of bounds.
         result = verify_path(
-            hasher=hasher,
+            poseidon=PROD_POSEIDON,
+            config=PROD_CONFIG,
             parameter=parameter,
             root=root,
             position=Uint64(100),
@@ -171,21 +173,20 @@ class TestVerifyPathSecurityBounds:
 
     def test_valid_position_at_boundary(self) -> None:
         """verify_path accepts position at maximum valid value (2^depth - 1)."""
-        rand = PROD_RAND
-        hasher = PROD_TWEAK_HASHER
-        parameter = rand.parameter()
+        parameter = random_parameter(PROD_CONFIG)
 
-        root = rand.domain()
-        leaf_parts = [rand.domain()]
+        root = random_domain(PROD_CONFIG)
+        leaf_parts = [random_domain(PROD_CONFIG)]
 
         # Create an opening with depth=4.
-        siblings = [rand.domain() for _ in range(4)]
+        siblings = [random_domain(PROD_CONFIG) for _ in range(4)]
         opening = HashTreeOpening(siblings=HashDigestList(data=siblings))
 
         # Position 15 is the maximum valid position for depth 4.
         # This should not return False due to bounds check (may still fail root check).
         result = verify_path(
-            hasher=hasher,
+            poseidon=PROD_POSEIDON,
+            config=PROD_CONFIG,
             parameter=parameter,
             root=root,
             position=Uint64(15),

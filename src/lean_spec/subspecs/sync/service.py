@@ -617,13 +617,13 @@ class SyncService:
                 continue
 
             try:
+                # The split takes the bits from the block attestation this
+                # component binds, since the Rust binding does not return them.
                 block_t1 = type_two.split_by_msg(
                     message=data_root,
                     public_keys_per_message=public_keys_per_message,
+                    participants=att.aggregation_bits,
                 )
-                # split_by_msg returns an empty participant bitfield; restore
-                # the bits from the block attestation this component binds.
-                block_t1 = block_t1.model_copy(update={"participants": att.aggregation_bits})
 
                 if local_proofs:
                     combined = TypeOneMultiSignature.aggregate(
@@ -638,7 +638,6 @@ class SyncService:
                             for child in (block_t1, *local_proofs)
                         ],
                         raw_xmss=[],
-                        xmss_participants=None,
                         message=data_root,
                         slot=data.slot,
                     )

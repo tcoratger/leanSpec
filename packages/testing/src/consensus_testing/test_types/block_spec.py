@@ -276,7 +276,6 @@ class BlockSpec(CamelModel):
             Complete signed block.
         """
         block_root = hash_tree_root(final_block)
-        proposer_participants = ValidatorIndices(data=[proposer_index]).to_aggregation_bits()
         proposer_pubkey = key_manager.get_public_keys(proposer_index)[1]
 
         # The binding rejects placeholder bytes; if anything in the merged
@@ -295,8 +294,7 @@ class BlockSpec(CamelModel):
             )
             proposer_type_1 = TypeOneMultiSignature.aggregate(
                 children=[],
-                raw_xmss=[(proposer_pubkey, proposer_signature)],
-                xmss_participants=proposer_participants,
+                raw_xmss=[(proposer_index, proposer_pubkey, proposer_signature)],
                 message=block_root,
                 slot=self.slot,
             )

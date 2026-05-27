@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
+from lean_spec.forks.lstar.aggregation_select import select_greedily
 from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -55,7 +56,6 @@ from lean_spec.types import (
     Uint8,
     Uint64,
     ValidatorIndex,
-    ValidatorIndices,
 )
 
 from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
@@ -763,7 +763,7 @@ class LstarSpec(ForkProtocol):
 
                     found_entries = True
 
-                    selected, _ = TypeOneMultiSignature.select_greedily(proofs)
+                    selected, _ = select_greedily(proofs)
                     aggregated_signatures.extend(selected)
                     for proof in selected:
                         aggregated_attestations.append(
@@ -836,7 +836,6 @@ class LstarSpec(ForkProtocol):
                         for proof in proofs
                     ]
                     sig = TypeOneMultiSignature.aggregate(
-                        xmss_participants=None,
                         children=children,
                         raw_xmss=[],
                         message=hash_tree_root(att_data),
@@ -1661,9 +1660,7 @@ class LstarSpec(ForkProtocol):
             # New payloads go first because they represent uncommitted
             # work — known payloads fill remaining gaps.
 
-            child_proofs, covered = TypeOneMultiSignature.select_greedily(
-                new.get(data), known.get(data)
-            )
+            child_proofs, covered = select_greedily(new.get(data), known.get(data))
 
             # Phase 2: Fill
             #
@@ -1689,17 +1686,6 @@ class LstarSpec(ForkProtocol):
             if not raw_entries and len(child_proofs) < 2:
                 continue
 
-            # Encode raw signers as a compact bitfield when present.
-            # Child-only aggregation (no raw signatures) must pass None.
-            if raw_entries:
-                xmss_participants = ValidatorIndices(
-                    data=[vid for vid, _, _ in raw_entries]
-                ).to_aggregation_bits()
-                raw_xmss = [(pk, sig) for _, pk, sig in raw_entries]
-            else:
-                xmss_participants = None
-                raw_xmss = []
-
             # Phase 3: Aggregate
             #
             # Build the recursive proof tree.
@@ -1719,11 +1705,11 @@ class LstarSpec(ForkProtocol):
             ]
 
             # Hand everything to the XMSS subspec.
+            # Each fresh entry already carries its validator index alongside its key and signature.
             # Out comes a single proof covering all selected validators.
             proof = TypeOneMultiSignature.aggregate(
-                xmss_participants=xmss_participants,
                 children=children,
-                raw_xmss=raw_xmss,
+                raw_xmss=raw_entries,
                 message=hash_tree_root(data),
                 slot=data.slot,
             )
