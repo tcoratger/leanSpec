@@ -10,11 +10,11 @@ from lean_spec.subspecs.xmss.aggregation import (
     TypeOneMultiSignature,
     TypeTwoMultiSignature,
 )
+from lean_spec.subspecs.xmss.merkle import HashTreeLayer
 from lean_spec.subspecs.xmss.types import (
     HASH_DIGEST_LENGTH,
     HashDigestList,
     HashDigestVector,
-    HashTreeLayer,
     HashTreeOpening,
     Parameter,
 )

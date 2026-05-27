@@ -1,28 +1,45 @@
-"""Sparse Merkle subtrees for top-bottom XMSS traversal.
+r"""
+Sparse Merkle subtrees for the top-bottom traversal of an XMSS key.
 
-The XMSS lifetime tree is split into one top tree and many bottom trees.
-Each bottom tree covers sqrt(LIFETIME) consecutive slots.
-The signer keeps the full top tree plus two adjacent bottom trees resident,
-forming a sliding window of 2*sqrt(LIFETIME) signable slots.
+# Overview
 
-This bounds the secret-key memory at O(sqrt(LIFETIME)) instead of O(LIFETIME).
+The long-lived public key of an XMSS signature is the root of one Merkle tree.
+That tree commits to one one-time public key per slot of the key's lifetime.
+A signature opens the leaf for its slot with a path of sibling hashes up to the root.
+
+A full lifetime tree has one leaf per slot.
+For a lifetime of 2^32 slots, holding every node in memory is infeasible.
+
+# The top-bottom split
+
+The tree is cut into one top tree sitting above many bottom trees.
+Each bottom tree covers a contiguous run of leaves, the square root of the lifetime of them.
+There are that many bottom trees, and their roots are exactly the leaves of the top tree.
+
+The signer keeps the whole top tree resident, plus the bottom trees around the active slot.
+As the active slot advances, stale bottom trees are dropped and fresh ones regenerated on demand.
+Resident memory stays near the square root of the lifetime instead of the full lifetime.
+
+# Sparse layers
+
+Only a window of leaves is resident, so a stored layer holds a contiguous slice, not a full level.
+Each layer records the absolute index of its first node, keeping positions in full-tree coordinates.
 """
 
 from itertools import batched
 from typing import Self
 
 from lean_spec.types import Uint64
+from lean_spec.types.collections import SSZList
 from lean_spec.types.container import Container
 
-from .constants import XmssConfig
+from .constants import TARGET_CONFIG, XmssConfig
 from .field import random_domain
 from .poseidon import PoseidonXmss
 from .prf import prf_apply
 from .types import (
     HashDigestList,
     HashDigestVector,
-    HashTreeLayer,
-    HashTreeLayers,
     HashTreeOpening,
     Parameter,
     PRFKey,
@@ -30,60 +47,124 @@ from .types import (
 )
 
 
-def _padded_layer(
-    config: XmssConfig,
-    nodes: list[HashDigestVector],
-    start_index: Uint64,
-) -> HashTreeLayer:
-    """Pad a layer so every node has a sibling and parent generation has no edge cases.
-
-    Invariant: the padded layer starts at an even index and ends at an odd index.
-    A single-node layer is allowed when the layer is the root.
+class HashTreeLayer(Container):
     """
-    nodes_with_padding: list[HashDigestVector] = []
-    end_index = start_index + Uint64(len(nodes)) - Uint64(1)
+    A single horizontal slice of a sparse Merkle subtree.
 
-    # Prepend one random sibling when the layer begins on an odd index.
-    if start_index % Uint64(2) == Uint64(1):
-        nodes_with_padding.append(random_domain(config))
+    The tree is sparse, so a layer stores only the nodes computed for the active leaf range.
+    """
 
-    # The padded layer always starts on the even index at or before start_index.
-    actual_start_index = start_index - (start_index % Uint64(2))
+    start_index: Uint64
+    """Absolute index of the first stored node within its level."""
 
-    nodes_with_padding.extend(nodes)
+    nodes: HashDigestList
+    """Stored hash digests for this layer, ordered left to right."""
 
-    # Append one random sibling when the layer ends on an even index.
-    if end_index % Uint64(2) == Uint64(0):
-        nodes_with_padding.append(random_domain(config))
+    @classmethod
+    def padded(
+        cls,
+        config: XmssConfig,
+        nodes: list[HashDigestVector],
+        start_index: Uint64,
+    ) -> Self:
+        """
+        Build a layer whose nodes can all be paired at the next level up.
 
-    return HashTreeLayer(
-        start_index=actual_start_index,
-        nodes=HashDigestList(data=nodes_with_padding),
-    )
+        # Why pad
+
+        The level above pairs nodes two at a time, then hashes each pair.
+        - A run starting on an odd index lacks a left neighbor for its first node.
+        - A run ending on an even index lacks a right neighbor for its last node.
+
+        Padding either gap with a fresh random digest lets every node pair.
+
+        # Invariant
+
+        The result starts on an even index and ends on an odd index.
+        A single-node layer is the sole exception, since it is a subtree root.
+
+        # Layout
+
+            indices 5, 6, 7   ->   [pad]  5  6  7      starts 4, ends 7
+            indices 4, 5, 6   ->    4  5  6  [pad]     starts 4, ends 7
+
+        Args:
+            config: Active XMSS configuration.
+            nodes: Active nodes at this layer, in ascending index order.
+            start_index: Absolute index of the first active node.
+
+        Returns:
+            A layer satisfying the alignment invariant above.
+        """
+        nodes_with_padding: list[HashDigestVector] = []
+        end_index = start_index + Uint64(len(nodes)) - Uint64(1)
+
+        # Prepend one random sibling when the layer begins on an odd index.
+        if start_index % Uint64(2) == Uint64(1):
+            nodes_with_padding.append(random_domain(config))
+
+        # The padded layer always starts on the even index at or before start_index.
+        actual_start_index = start_index - (start_index % Uint64(2))
+
+        nodes_with_padding.extend(nodes)
+
+        # Append one random sibling when the layer ends on an even index.
+        if end_index % Uint64(2) == Uint64(0):
+            nodes_with_padding.append(random_domain(config))
+
+        return cls(
+            start_index=actual_start_index,
+            nodes=HashDigestList(data=nodes_with_padding),
+        )
+
+
+class HashTreeLayers(SSZList[HashTreeLayer]):
+    """
+    The layers of a subtree, ordered from the lowest layer up to the root.
+
+    A bottom tree and a top tree each cover half the depth.
+    The cap admits the full lifetime tree.
+    """
+
+    LIMIT = TARGET_CONFIG.LOG_LIFETIME + 1
+    """Layers run from level zero, the leaves, up to the lifetime depth, the root, inclusive."""
 
 
 class HashSubTree(Container):
-    """Sparse Merkle subtree of an XMSS lifetime tree.
+    """
+    A contiguous slice of an XMSS lifetime tree, stored layer by layer.
 
-    Stores layers from lowest_layer up to the subtree root.
-    A bottom tree has lowest_layer = 0 and covers a window of leaves.
-    A top tree has lowest_layer = LOG_LIFETIME/2 and covers the bottom-tree roots.
+    # Overview
 
-    Layout invariant: every active layer starts on an even index and ends on
-    an odd index except for the single-node root layer.
+    A subtree holds every node from its lowest layer up to a single root node.
+    Two shapes exist, told apart by where the lowest layer sits.
+
+    - A bottom tree starts at layer zero and covers a window of leaves.
+    - A top tree starts at the split layer and covers the bottom-tree roots.
+
+    # Invariant
+
+    Every stored layer starts on an even index and ends on an odd index.
+    The exception is the top layer, which holds the single subtree root.
     """
 
     depth: Uint64
     """Depth of the full lifetime tree this subtree belongs to.
-    A subtree starting at layer k stores depth - k layers."""
+
+    A subtree starting at layer k stores depth - k layers.
+    """
 
     lowest_layer: Uint64
-    """Lowest layer included in this subtree.
-    Zero for bottom trees, LOG_LIFETIME/2 for top trees."""
+    """Lowest layer included in this subtree:
+    - Zero for bottom trees,
+    - LOG_LIFETIME/2 for top trees.
+    """
 
     layers: HashTreeLayers
     """Layers stored from lowest_layer up to the subtree root.
-    The last entry holds a single node, the subtree root."""
+
+    The last entry holds a single node, the subtree root.
+    """
 
     @classmethod
     def new(
@@ -97,11 +178,14 @@ class HashSubTree(Container):
         lowest_layer_nodes: list[HashDigestVector],
         highest_layer: Uint64 | None = None,
     ) -> Self:
-        """Build a subtree from its lowest layer up to a bounding layer.
+        """
+        Build a subtree from its lowest layer up to a bounding layer.
 
-        Phase 1: pad the input layer to the alignment invariant.
-        Phase 2: hash each sibling pair to produce the next layer up.
-        Phase 3: pad each new layer and continue to the bounding layer.
+        # Overview
+
+        Each layer is hashed pairwise into the layer above, climbing one level per step.
+        Padding keeps every intermediate layer aligned so sibling pairs form cleanly.
+        Building stops at the bounding layer, which defaults to the global root.
 
         Args:
             poseidon: Cached Poseidon1 engine.
@@ -114,7 +198,10 @@ class HashSubTree(Container):
             highest_layer: Layer to stop building at, defaulting to the full depth.
 
         Returns:
-            A subtree containing every layer from lowest_layer up to highest_layer.
+            A subtree holding every layer from the lowest layer up to the bounding layer.
+
+        Raises:
+            ValueError: When the input nodes do not fit the level they start in.
         """
         # Build to the global root unless a lower bounding layer is requested.
         highest_layer = depth if highest_layer is None else highest_layer
@@ -129,7 +216,7 @@ class HashSubTree(Container):
 
         # Phase 1: pad the input layer.
         layers: list[HashTreeLayer] = []
-        current = _padded_layer(config, lowest_layer_nodes, start_index)
+        current = HashTreeLayer.padded(config, lowest_layer_nodes, start_index)
         layers.append(current)
 
         # Phases 2 + 3: hash sibling pairs, pad, repeat.
@@ -144,7 +231,7 @@ class HashSubTree(Container):
                 )
                 for i, (left, right) in enumerate(batched(current.nodes, 2))
             ]
-            current = _padded_layer(config, parents, parent_start)
+            current = HashTreeLayer.padded(config, parents, parent_start)
             layers.append(current)
 
         return cls(
@@ -205,10 +292,13 @@ class HashSubTree(Container):
         parameter: Parameter,
         leaves: list[HashDigestVector],
     ) -> Self:
-        """Build one bottom tree from leaf hashes up to its standalone root.
+        """
+        Build one bottom tree from its leaf hashes up to its standalone root.
 
-        Phase 1: build the layers from 0 up to the bottom-tree root layer.
-        Phase 2: replace that padded top layer with its single-node root.
+        # Overview
+
+        A bottom tree spans the lower half of the lifetime tree for one window of slots.
+        Its root is later placed as a single leaf of the top tree.
 
         Args:
             poseidon: Cached Poseidon1 engine.
@@ -219,10 +309,11 @@ class HashSubTree(Container):
             leaves: Pre-hashed one-time public keys for this bottom tree's slots.
 
         Returns:
-            A subtree with layers 0 through depth/2 ending in the bottom-tree root.
+            A subtree spanning the lower half of the tree, ending in the bottom-tree root.
 
         Raises:
-            ValueError: When depth is odd or the leaf count does not match sqrt(LIFETIME).
+            ValueError: When the depth is odd, or the leaf count is not the square
+                root of the lifetime.
         """
         if depth % 2 != 0:
             raise ValueError(f"Depth must be even for top-bottom split, got {depth}.")
@@ -270,11 +361,20 @@ class HashSubTree(Container):
         bottom_tree_index: Uint64,
         parameter: Parameter,
     ) -> Self:
-        """Regenerate one bottom tree on demand from the master PRF key.
+        """
+        Regenerate one bottom tree on demand from the master secret seed.
 
-        Phase 1: for every epoch in the bottom tree, derive chain starts via PRF.
-        Phase 2: hash each chain for BASE - 1 steps to obtain the chain endpoints.
-        Phase 3: hash chain endpoints into a leaf, then build the bottom tree.
+        # Overview
+
+        The secret key is not stored slot by slot.
+        One short master seed deterministically expands into every chain start.
+        This lets the signer keep only a sliding window resident and rebuild the rest on demand.
+
+        # What a leaf is
+
+        Each slot owns one one-time signature made of many independent hash chains.
+        Walking a chain from its secret start to its far end yields one public chain end.
+        Hashing all of a slot's chain ends together produces the leaf committed at that slot.
 
         Args:
             poseidon: Cached Poseidon1 engine.
@@ -293,7 +393,8 @@ class HashSubTree(Container):
 
         leaf_hashes: list[HashDigestVector] = []
         for epoch in range(start_epoch, end_epoch):
-            # Phases 1 + 2: derive each chain start, then walk it to the public endpoint.
+            # Derive each chain start from the seed, then walk it to its public end.
+            # The far end is the chain start hashed forward the full length minus one.
             chain_ends: list[HashDigestVector] = []
             for chain_index in range(config.DIMENSION):
                 start_digest = prf_apply(config, prf_key, Uint64(epoch), Uint64(chain_index))
@@ -308,7 +409,7 @@ class HashSubTree(Container):
                 )
                 chain_ends.append(end_digest)
 
-            # Phase 3: hash all chain endpoints into the leaf for this epoch.
+            # The leaf for this slot is the hash of all its chain ends together.
             leaf_tweak = TreeTweak(level=0, index=Uint64(epoch))
             leaf_hash = poseidon.tweak_hash(config, parameter, leaf_tweak, chain_ends)
             leaf_hashes.append(leaf_hash)
@@ -335,16 +436,29 @@ class HashSubTree(Container):
         return self.layers[-1].nodes[0]
 
     def path(self, position: Uint64) -> HashTreeOpening:
-        """Build the authentication path from a leaf up to the subtree root.
+        """
+        Collect the sibling hashes that connect one leaf to the subtree root.
 
-        For a subtree covering layers L through H, the opening contains H - L siblings,
-        one per layer between L and H - 1.
+        # Overview
+
+        At each level the node has exactly one sibling, the node sharing its parent.
+        That sibling sits at the current position with its lowest bit flipped.
+        Recording one sibling per level, then halving the position to climb, yields the full path.
+        The root has no sibling, so the walk stops one level below it.
+
+        # Layout
+
+            climbing from leaf position 5 in a three-level subtree:
+
+                position 5  ->  sibling 4   (flip low bit),  then halve to 2
+                position 2  ->  sibling 3   (flip low bit),  then halve to 1
+                position 1  ->  root, no sibling, stop
 
         Args:
-            position: Absolute index of the leaf in the full tree coordinate system.
+            position: Absolute index of the leaf in full-tree coordinates.
 
         Returns:
-            An opening of sibling hashes from bottom to top.
+            An opening of sibling hashes ordered from the leaf upward.
 
         Raises:
             ValueError: When the subtree is empty or the position is out of bounds.
@@ -378,11 +492,18 @@ def combined_path(
     bottom_tree: HashSubTree,
     position: Uint64,
 ) -> HashTreeOpening:
-    """Concatenate the bottom-tree and top-tree openings for one leaf.
+    """
+    Stitch a bottom-tree opening and a top-tree opening into one full path.
 
-    A signature must authenticate the leaf against the global root.
-    The bottom opening proves leaf membership in its bottom tree.
-    The top opening proves the bottom-tree root sits under the global root.
+    # Overview
+
+    A signature authenticates its leaf all the way up to the global root.
+    No single resident subtree spans that whole distance, so two openings are joined.
+
+    # Proof flow
+
+        bottom opening : proves the leaf sits under its bottom-tree root.
+        top opening    : proves that bottom-tree root sits under the global root.
 
     Args:
         top_tree: The top tree containing the global root.
@@ -390,11 +511,11 @@ def combined_path(
         position: Absolute index of the leaf.
 
     Returns:
-        An opening with depth siblings authenticating the leaf against the global root.
+        One opening that authenticates the leaf against the global root.
 
     Raises:
-        ValueError: When tree depths mismatch, depth is odd, or position is out
-            of bounds for the supplied bottom tree.
+        ValueError: When the tree depths disagree, the depth is odd, or the position
+            does not belong to the supplied bottom tree.
     """
     if top_tree.depth != bottom_tree.depth:
         raise ValueError(f"Depth mismatch: top={top_tree.depth}, bottom={bottom_tree.depth}.")
@@ -412,8 +533,7 @@ def combined_path(
             f"got {bottom_tree.layers[0].start_index}."
         )
 
-    # Bottom path proves leaf -> bottom-tree root.
-    # Top path proves bottom root -> global root.
+    # The opening climbs from leaf to root, so bottom siblings come before top siblings.
     bottom_path = bottom_tree.path(position)
     top_path = top_tree.path(position // leaves_per_tree)
     combined = tuple(bottom_path.siblings.data) + tuple(top_path.siblings.data)
@@ -430,13 +550,20 @@ def verify_path(
     leaf_parts: list[HashDigestVector],
     opening: HashTreeOpening,
 ) -> bool:
-    """Verify a Merkle opening against a trusted root.
+    """
+    Recompute a root from a leaf and its opening, then compare against a trusted root.
 
-    Phase 1: hash leaf_parts into the leaf digest.
-    Phase 2: walk the opening, hashing the current node with each sibling.
-    Phase 3: compare the reconstructed root with the trusted one.
+    # Overview
 
-    Returns False on attacker-controlled invalid input instead of raising.
+    Verification mirrors construction in reverse.
+    The leaf is hashed, then folded with each sibling while climbing one level per step.
+    The walk succeeds when the recomputed root equals the trusted root.
+
+    # Why return false instead of raising
+
+    The opening arrives inside an untrusted signature.
+    A malformed opening must be a quiet verification failure, never a crash.
+    So out-of-range input returns false rather than raising.
 
     Args:
         poseidon: Cached Poseidon1 engine.
@@ -448,7 +575,7 @@ def verify_path(
         opening: Sibling path from leaf to root.
 
     Returns:
-        True when the path reconstructs the root, False otherwise.
+        True when the path reconstructs the trusted root, false otherwise.
     """
     # Guard against malformed openings.
     # The opening list caps at 32 entries.

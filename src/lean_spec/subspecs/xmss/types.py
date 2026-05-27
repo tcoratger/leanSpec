@@ -109,31 +109,3 @@ class HashTreeOpening(Container):
 
     siblings: HashDigestList
     """SSZ-compliant list of sibling hashes, from bottom to top."""
-
-
-class HashTreeLayer(Container):
-    """A single horizontal slice of the sparse Merkle tree.
-
-    The tree is sparse: only nodes computed for the active leaf range are stored.
-    """
-
-    start_index: Uint64
-    """The starting index of the first node in this layer."""
-    nodes: HashDigestList
-    """SSZ-compliant list of hash digests stored for this layer."""
-
-
-# Why: layers run from 0 (leaves) up to LOG_LIFETIME (root) inclusive.
-LAYERS_LIMIT: Final = TARGET_CONFIG.LOG_LIFETIME + 1
-"""Maximum number of layers in a subtree."""
-
-
-class HashTreeLayers(SSZList[HashTreeLayer]):
-    """Variable-length list of Merkle tree layers.
-
-    Represents the layers of a subtree, from the lowest layer up to the root.
-    Bottom and top trees each cover half the depth.
-    The cap allows the full tree.
-    """
-
-    LIMIT = LAYERS_LIMIT
