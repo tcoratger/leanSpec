@@ -1,83 +1,78 @@
 """Base types for the XMSS signature scheme."""
 
-from typing import Final
+from typing import Final, NamedTuple
 
 from lean_spec.subspecs.koalabear import Fp
 
 from ...types import Uint64
-from ...types.byte_arrays import BaseBytes
 from ...types.collections import SSZList, SSZVector
 from ...types.container import Container
-from .constants import PRF_KEY_LENGTH, TARGET_CONFIG
+from .constants import TARGET_CONFIG
 
 
-class PRFKey(BaseBytes):
+class TreeTweak(NamedTuple):
+    """Tweak that domain-separates Merkle node hashes by their position."""
+
+    level: int
+    """Height in the Merkle tree.
+
+    Layer 0 is the leaf level.
     """
-    The PRF master secret key.
 
-    This is a high-entropy byte string that acts as the single root secret from
-    which all one-time signing keys are deterministically derived.
+    index: Uint64
+    """Node index within its level, counted from the left."""
+
+
+class ChainTweak(NamedTuple):
+    """Tweak that domain-separates Winternitz chain hashes by their position."""
+
+    epoch: Uint64
+    """Slot identifier for the one-time signature."""
+
+    chain_index: int
+    """Index of the chain within the one-time signature."""
+
+    step: int
+    """
+    - Step number along the chain.
+    - Steps are 1-indexed.
+    - Step zero is the chain start.
     """
 
-    LENGTH = PRF_KEY_LENGTH
 
-
-HASH_DIGEST_LENGTH: Final = TARGET_CONFIG.HASH_LEN_FE
+NODE_LIST_LIMIT: Final = 2 * TARGET_CONFIG.LEAVES_PER_BOTTOM_TREE
 """
-The fixed length of a hash digest in field elements.
+Maximum number of nodes a sparse Merkle tree layer can hold.
 
-Derived from `TARGET_CONFIG.HASH_LEN_FE`. This corresponds to the output length
-of the Poseidon1 hash function used in the XMSS scheme.
-"""
-
-# Calculate the maximum number of nodes in a sparse Merkle tree layer:
-# - A bottom tree has at most 2^(LOG_LIFETIME/2) leaves
-# - With padding, we may add up to 2 additional nodes
-# - To be generous and future-proof, we use 2^(LOG_LIFETIME/2 + 1)
-NODE_LIST_LIMIT: Final = 1 << (TARGET_CONFIG.LOG_LIFETIME // 2 + 1)
-"""
-The maximum number of nodes that can be stored in a sparse Merkle tree layer.
-
-Calculated as `2^(LOG_LIFETIME/2 + 1)` from TARGET_CONFIG to accommodate:
-- Bottom trees with up to `2^(LOG_LIFETIME/2)` nodes
-- Padding overhead (up to 2 additional nodes)
-- Future-proofing with 2x margin
+- The widest layer is a bottom tree's leaf row, the square root of the lifetime in leaves.
+- Padding adds at most one sibling at each end.
+- Twice the leaf count is a generous cap that absorbs the padding with room to spare.
 """
 
 
 class HashDigestVector(SSZVector[Fp]):
     """
-    A single hash digest represented as a fixed-size vector of field elements.
+    A single hash digest as a fixed-size vector of field elements.
 
-    This is the SSZ-compliant representation of a Poseidon1 hash output.
-    In SSZ notation: `Vector[Fp, HASH_DIGEST_LENGTH]`
-
-    The fixed size enables efficient serialization when used in collections,
-    as SSZ can pack these back-to-back without per-element offsets.
+    The fixed size lets SSZ pack these back-to-back without per-element offsets.
     """
 
-    LENGTH = HASH_DIGEST_LENGTH
+    LENGTH = TARGET_CONFIG.HASH_LEN_FE
+    """One Poseidon1 digest, measured in field elements."""
 
 
 class HashDigestList(SSZList[HashDigestVector]):
-    """
-    Variable-length list of hash digests.
-
-    In SSZ notation: `List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]`
-
-    This type is used to represent collections of hash digests in the XMSS scheme.
-    """
+    """Variable-length list of hash digests."""
 
     LIMIT = NODE_LIST_LIMIT
 
 
 class Parameter(SSZVector[Fp]):
-    """
-    The public parameter P.
+    """The public parameter P.
 
-    This is a unique, randomly generated value associated with a single key pair. It
-    is mixed into every hash computation to "personalize" the hash function, preventing
-    certain cross-key attacks. It is public knowledge.
+    - Unique, randomly generated value associated with a single key pair.
+    - Mixed into every hash to personalize the function and block cross-key attacks.
+    - Public knowledge.
     """
 
     LENGTH = TARGET_CONFIG.PARAMETER_LEN
@@ -85,13 +80,11 @@ class Parameter(SSZVector[Fp]):
 
 class Randomness(SSZVector[Fp]):
     """
-    The randomness `rho` (ρ) used during signing.
+    Fresh randomness mixed into the message hash during signing.
 
-    This value provides a variable input to the message hash, allowing the signer to
-    repeatedly try hashing until a valid "codeword" is found. It must be included in
-    the final signature for the verifier to reproduce the same hash.
-
-    SSZ notation: `Vector[Fp, RAND_LEN_FE]`
+    - Signing rehashes the message with new randomness on each attempt.
+    - Retries continue until the resulting codeword hits the target sum.
+    - The chosen randomness travels in the signature so the verifier recomputes the same codeword.
     """
 
     LENGTH = TARGET_CONFIG.RAND_LEN_FE
@@ -99,55 +92,12 @@ class Randomness(SSZVector[Fp]):
 
 class HashTreeOpening(Container):
     """
-    A Merkle authentication path.
+    A Merkle authentication path proving one leaf sits under the root.
 
-    This object contains the minimal proof required to connect a specific leaf
-    to the Merkle root. It consists of the list of all sibling nodes along the
-    path from the leaf to the top of the tree.
-
-    SSZ Container with fields:
-    - siblings: List[Vector[Fp, HASH_DIGEST_LENGTH], NODE_LIST_LIMIT]
+    - The path lists the sibling hashes met while climbing from the leaf up to the root.
+    - A verifier rehashes the leaf upward with these siblings.
+    - The reconstructed root must equal the trusted root.
     """
 
     siblings: HashDigestList
-    """SSZ-compliant list of sibling hashes, from bottom to top."""
-
-
-class HashTreeLayer(Container):
-    """
-    Represents a single horizontal "slice" of the sparse Merkle tree.
-
-    Because the tree is sparse, we only store the nodes that are actually computed
-    for the active range of leaves, not the entire conceptual layer.
-    """
-
-    start_index: Uint64
-    """The starting index of the first node in this layer."""
-    nodes: HashDigestList
-    """SSZ-compliant list of hash digests stored for this layer."""
-
-
-LAYERS_LIMIT: Final = TARGET_CONFIG.LOG_LIFETIME + 1
-"""
-The maximum number of layers in a subtree.
-
-This is `LOG_LIFETIME + 1` to accommodate all layers from 0 (leaves) to LOG_LIFETIME (root),
-inclusive. For example, with LOG_LIFETIME=32, this allows up to 33 layers.
-"""
-
-
-class HashTreeLayers(SSZList[HashTreeLayer]):
-    """
-    Variable-length list of Merkle tree layers.
-
-    In SSZ notation: `List[HashTreeLayer, LAYERS_LIMIT]`
-
-    This type represents the layers of a subtree, from the lowest layer up to the root.
-
-    The number of layers varies based on the subtree structure:
-    - Bottom trees: `LOG_LIFETIME/2` layers
-    - Top trees: `LOG_LIFETIME/2` layers
-    - Maximum: `LOG_LIFETIME + 1` layers
-    """
-
-    LIMIT = LAYERS_LIMIT
+    """Sibling hashes, ordered from the leaf upward to the root."""

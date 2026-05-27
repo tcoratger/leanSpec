@@ -1,12 +1,13 @@
-"""
-End-to-end tests for the Generalized XMSS signature scheme.
-"""
+"""End-to-end tests for the Generalized XMSS signature scheme and its helpers."""
 
 import pytest
 
+from lean_spec.subspecs.xmss import interface
+from lean_spec.subspecs.xmss.encoding import target_sum_encode
 from lean_spec.subspecs.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
+    _expand_activation_time,
 )
 from lean_spec.types import Bytes32, Slot, Uint64
 
@@ -37,7 +38,7 @@ def _test_correctness_roundtrip(
 
     # Sign the message at the chosen slot.
     #
-    # This might take a moment as it may try multiple `rho` values.
+    # This might take a moment as it may try multiple rho values.
     signature = scheme.sign(sk, test_slot, message)
 
     # Verification of the valid signature must succeed.
@@ -56,9 +57,11 @@ def _test_correctness_roundtrip(
     # In that case, verification will succeed, which is expected behavior for identical codewords.
     #
     # We detect this by checking if both messages encode to the same codeword.
-    original_codeword = scheme.encoder.encode(pk.parameter, message, signature.rho, test_slot)
-    tampered_codeword = scheme.encoder.encode(
-        pk.parameter, tampered_message, signature.rho, test_slot
+    original_codeword = target_sum_encode(
+        scheme.poseidon, scheme.config, pk.parameter, message, signature.rho, test_slot
+    )
+    tampered_codeword = target_sum_encode(
+        scheme.poseidon, scheme.config, pk.parameter, tampered_message, signature.rho, test_slot
     )
 
     if tampered_codeword != original_codeword:
@@ -200,6 +203,79 @@ def test_deterministic_signing() -> None:
     assert sig1.rho == sig2.rho
     assert sig1.hashes == sig2.hashes
     assert sig1.path.siblings == sig2.path.siblings
+
+
+@pytest.mark.parametrize(
+    "log_lifetime, desired_activation, desired_num, expected_start, expected_end",
+    [
+        pytest.param(8, 0, 16, 0, 2, id="boundary request widens to minimum two trees"),
+        pytest.param(8, 10, 5, 0, 2, id="unaligned request rounds onto tree boundaries"),
+        pytest.param(8, 0, 100, 0, 7, id="larger request spans seven trees"),
+        pytest.param(4, 0, 300, 0, 4, id="request wider than lifetime covers all of it"),
+        pytest.param(8, 32, 16, 2, 4, id="middle request stays put"),
+        pytest.param(8, 240, 30, 14, 16, id="request near the end slides back to the boundary"),
+    ],
+)
+def test_expand_activation_time(
+    log_lifetime: int,
+    desired_activation: int,
+    desired_num: int,
+    expected_start: int,
+    expected_end: int,
+) -> None:
+    """The requested window snaps onto whole bottom trees, widened and clamped."""
+    assert _expand_activation_time(log_lifetime, desired_activation, desired_num) == (
+        expected_start,
+        expected_end,
+    )
+
+
+def test_key_gen_rejects_range_exceeding_lifetime() -> None:
+    """A requested range past the lifetime is refused."""
+    with pytest.raises(ValueError, match="Activation range exceeds the key's lifetime."):
+        TEST_SIGNATURE_SCHEME.key_gen(Slot(200), Uint64(100))
+
+
+def test_sign_rejects_slot_outside_activation() -> None:
+    """Signing a slot the key was never activated for is refused."""
+    secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32)).secret_key
+    with pytest.raises(ValueError, match="Key is not active for the specified slot."):
+        TEST_SIGNATURE_SCHEME.sign(secret_key, Slot(200), Bytes32(b"\x42" * 32))
+
+
+def test_sign_raises_when_no_encoding_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An encoding search that never succeeds raises after exhausting the attempts.
+
+    The encoding is forced to always reject so the retry loop runs to its limit.
+    """
+    secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32)).secret_key
+    monkeypatch.setattr(interface, "target_sum_encode", lambda *args, **kwargs: None)
+    tries = TEST_SIGNATURE_SCHEME.config.MAX_TRIES
+    with pytest.raises(
+        RuntimeError, match=f"Failed to find a valid message encoding after {tries} tries."
+    ):
+        TEST_SIGNATURE_SCHEME.sign(secret_key, Slot(0), Bytes32(b"\x42" * 32))
+
+
+def test_sign_raises_on_wrong_codeword_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An encoding returning the wrong number of digits raises.
+
+    The encoding is forced to return one digit too few for the scheme dimension.
+    """
+    secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32)).secret_key
+    short = [0] * (TEST_SIGNATURE_SCHEME.config.DIMENSION - 1)
+    monkeypatch.setattr(interface, "target_sum_encode", lambda *args, **kwargs: short)
+    with pytest.raises(
+        RuntimeError, match="Encoding is broken: returned too many or too few chunks."
+    ):
+        TEST_SIGNATURE_SCHEME.sign(secret_key, Slot(0), Bytes32(b"\x42" * 32))
+
+
+def test_advance_preparation_is_a_noop_at_the_end() -> None:
+    """A two-tree key cannot advance and returns the same secret key."""
+    leaves = TEST_SIGNATURE_SCHEME.config.LEAVES_PER_BOTTOM_TREE
+    secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(2 * leaves)).secret_key
+    assert TEST_SIGNATURE_SCHEME.advance_preparation(secret_key) is secret_key
 
 
 class TestVerifySecurityBounds:

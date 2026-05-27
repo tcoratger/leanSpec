@@ -26,7 +26,7 @@ from lean_spec.subspecs.validator.constants import SYNC_LAG_THRESHOLD
 from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex, ValidatorIndices
+from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     MockNetworkRequester,
@@ -1077,11 +1077,9 @@ class TestValidatorServiceIntegration:
             signatures.append(sig)
             public_keys.append(key_manager[vid].attestation_keypair.public_key)
 
-        xmss_participants = ValidatorIndices(data=participants).to_aggregation_bits()
         proof = TypeOneMultiSignature.aggregate(
             children=[],
-            raw_xmss=list(zip(public_keys, signatures, strict=True)),
-            xmss_participants=xmss_participants,
+            raw_xmss=list(zip(participants, public_keys, signatures, strict=True)),
             message=data_root,
             slot=attestation_data.slot,
         )

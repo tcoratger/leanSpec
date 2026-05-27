@@ -11,13 +11,13 @@ from ...types import Uint64
 from ...types.container import Container
 from ...types.exceptions import SSZError
 from .constants import TARGET_CONFIG
-from .subtree import HashSubTree
+from .merkle import HashSubTree
+from .prf import PRFKey
 from .types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
     Parameter,
-    PRFKey,
     Randomness,
 )
 
@@ -33,7 +33,7 @@ class PublicKey(Container):
 
 
 class Signature(Container):
-    """A single XMSS signature for one (slot, message) under one public key."""
+    """A single XMSS signature for one slot and message under one public key."""
 
     path: HashTreeOpening
     """Authentication path from the one-time key up to the Merkle root."""
@@ -58,56 +58,57 @@ class Signature(Container):
 
     @model_serializer(mode="plain", when_used="json")
     def _serialize_as_bytes(self) -> str:
-        """Serialize as "0x"-prefixed hex of the SSZ bytes for JSON output."""
+        """Serialize as a 0x-prefixed hex string for JSON output."""
         return "0x" + self.encode_bytes().hex()
 
 
 class SecretKey(Container):
-    """
-    Private state of an XMSS key pair. MUST BE KEPT CONFIDENTIAL.
+    """Private state of an XMSS key pair.
 
-    The tree of one-time keys is split into a top tree plus many bottom trees.
+    Must be kept confidential.
 
-    Each bottom tree:
-        - has width W = 2^(LOG_LIFETIME / 2),
-        - covers W slots.
+    # Tree layout
 
-    Bottom tree i covers slots [i*W, (i+1)*W).
+    - The one-time keys split into one top tree over many bottom trees.
+    - Each bottom tree spans W = 2^(LOG_LIFETIME / 2) slots.
+    - Bottom tree i covers the W slots starting at i times W.
 
-    The signer keeps the full top tree resident, plus two adjacent bottom trees.
+    # Sliding window
 
-    This means that we have a sliding window of 2W consecutive slots.
-
-    These slots can be signed immediately without recomputing anything.
-
-    Memory stays O(sqrt(LIFETIME)) regardless of how long the key lives.
+    - The signer keeps the top tree resident plus two adjacent bottom trees.
+    - That window can sign 2W consecutive slots.
+    - Resident memory stays near the square root of the lifetime.
     """
 
     prf_key: PRFKey
-    """Master secret seed; every one-time key is derived from this."""
+    """Master secret seed.
+
+    Every one-time key is derived from this.
+    """
 
     parameter: Parameter
     """Public parameter mirrored here so signing is self-contained."""
 
     activation_slot: Slot
-    """
-    First slot this key can sign for.
+    """First slot this key can sign for.
 
-    Aligned down to a multiple of W so each bottom tree covers exactly W slots.
+    - Aligned down to a multiple of W.
+    - Each bottom tree then covers exactly W slots.
     """
 
     num_active_slots: Uint64
-    """
-    Number of consecutive slots this key can sign for.
+    """Number of consecutive slots this key can sign for.
 
-    Rounded up to a multiple of W, with a minimum of 2W so the prepared window always fits.
+    - Rounded up to a multiple of W, with a minimum of 2W.
+    - The prepared window then always fits.
     """
 
     top_tree: HashSubTree
     """
     Full top tree, always resident.
 
-    Its lowest layer holds the bottom-tree roots; its top is the public-key root.
+    - Its lowest layer holds the bottom-tree roots.
+    - Its top layer is the public-key root.
     """
 
     left_bottom_tree_index: Uint64
@@ -137,7 +138,10 @@ class KeyPair(StrictBaseModel):
     @field_validator("public_key", mode="before")
     @classmethod
     def _decode_public_key(cls, value: object) -> object:
-        """Decode a hex string into a PublicKey; pass other inputs through."""
+        """Decode hex strings to a public key.
+
+        Other input shapes pass through unchanged.
+        """
         if not isinstance(value, str):
             return value
         try:
@@ -148,7 +152,10 @@ class KeyPair(StrictBaseModel):
     @field_validator("secret_key", mode="before")
     @classmethod
     def _decode_secret_key(cls, value: object) -> object:
-        """Decode a hex string into a SecretKey; pass other inputs through."""
+        """Decode hex strings to a secret key.
+
+        Other input shapes pass through unchanged.
+        """
         if not isinstance(value, str):
             return value
         try:
@@ -163,25 +170,16 @@ class KeyPair(StrictBaseModel):
 
 
 class ValidatorKeyPair(StrictBaseModel):
-    """
-    Two independent XMSS key pairs for one validator's two signing roles.
+    """Two independent XMSS key pairs for one validator's two signing roles.
 
     A validator signs two messages per slot:
 
-    - one attestation (always),
-    - one block proposal (only when chosen as proposer).
+    - one attestation, always,
+    - one block proposal, only when chosen as proposer.
 
-    A one-time signature exhausts a leaf, so a single XMSS key cannot serve
-    both roles in the same slot.
-    Splitting into two independent pairs lets a validator sign both
-    messages from independent Winternitz chains.
-
-    JSON shape on disk:
-
-        {
-          "attestation_keypair": {"public_key": "<hex>", "secret_key": "<hex>"},
-          "proposal_keypair":    {"public_key": "<hex>", "secret_key": "<hex>"}
-        }
+    A one-time signature exhausts a leaf.
+    So one key cannot cover both roles in the same slot.
+    Two independent pairs let each role sign from its own Winternitz chains.
     """
 
     attestation_keypair: KeyPair

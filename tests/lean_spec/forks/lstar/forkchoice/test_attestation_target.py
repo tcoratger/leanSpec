@@ -23,7 +23,6 @@ from lean_spec.types import (
     Checkpoint,
     Slot,
     ValidatorIndex,
-    ValidatorIndices,
 )
 from tests.lean_spec.helpers import make_store
 
@@ -581,8 +580,7 @@ class TestIntegrationScenarios:
         proposer_pubkey = key_manager.get_public_keys(proposer_1)[1]
         proposer_type_1 = TypeOneMultiSignature.aggregate(
             children=[],
-            raw_xmss=[(proposer_pubkey, proposer_signature)],
-            xmss_participants=ValidatorIndices(data=[proposer_1]).to_aggregation_bits(),
+            raw_xmss=[(proposer_1, proposer_pubkey, proposer_signature)],
             message=block_root,
             slot=slot_1,
         )

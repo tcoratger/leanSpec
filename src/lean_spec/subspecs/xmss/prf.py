@@ -1,209 +1,148 @@
-"""
-Defines the pseudorandom function (PRF) used in the signature scheme.
-
-PRF based on the SHAKE128 extendable-output function (XOF).
-
-The PRF is used to derive the secret starting points of the hash chains
-for each epoch from a single master secret key.
-"""
-
-from __future__ import annotations
+"""SHAKE128-based pseudorandom function for deterministic key derivation."""
 
 import hashlib
 import os
-from typing import Final
+from itertools import batched
+from typing import Final, Self
 
-from lean_spec.subspecs.koalabear import Fp
-from lean_spec.types import Bytes32, StrictBaseModel, Uint64
+from lean_spec.types import Bytes16, Bytes32, Uint64
+from lean_spec.types.byte_arrays import BaseBytes
 
-from .constants import (
-    PRF_KEY_LENGTH,
-    PROD_CONFIG,
-    TEST_CONFIG,
-    XmssConfig,
-)
-from .types import HashDigestVector, PRFKey, Randomness
+from ..koalabear import Fp
+from .constants import PRF_KEY_LENGTH, XmssConfig
+from .types import HashDigestVector, Randomness
 
-PRF_DOMAIN_SEP: Final[bytes] = b"\xae\xae\x22\xff\x00\x01\xfa\xff\x21\xaf\x12\x00\x01\x11\xff\x00"
+PRF_DOMAIN_SEP: Final = Bytes16(b"\xae\xae\x22\xff\x00\x01\xfa\xff\x21\xaf\x12\x00\x01\x11\xff\x00")
 """
-A 16-byte domain separator to ensure PRF outputs are unique to this context.
+Fixed domain separator prefixed to every PRF call.
 
-This prevents any potential conflicts if the same underlying hash function
-(SHAKE128) were used for other purposes in the system.
+Prevents cross-context collisions if SHAKE128 is reused elsewhere in the system.
 """
 
 PRF_DOMAIN_SEP_DOMAIN_ELEMENT: Final[bytes] = b"\x00"
-"""
-A 1-byte domain separator for deriving domain elements (used in `apply`).
-
-This distinguishes the PRF calls for generating hash chain starting points
-from the PRF calls for generating randomness during signing.
-"""
+"""Subdomain tag for hash-chain start derivation."""
 
 PRF_DOMAIN_SEP_RANDOMNESS: Final[bytes] = b"\x01"
-"""
-A 1-byte domain separator for deriving randomness (used in `get_randomness`).
-
-This distinguishes the PRF calls for generating signing randomness from the
-PRF calls for generating domain elements, preventing any potential collisions
-between the two use cases.
-"""
+"""Subdomain tag for signing-randomness derivation."""
 
 PRF_BYTES_PER_FE: Final[int] = 16
 """
-The number of bytes of SHAKE128 output used to generate one field element.
+SHAKE128 bytes consumed per output field element.
 
-We use 16 bytes (128 bits) of pseudorandom output, which is then reduced
-modulo the 31-bit field prime `P`. This provides a significant statistical
-safety margin to ensure the resulting field element is close to uniformly
-random.
+128 bits reduced modulo a 31-bit prime gives a statistical margin against bias.
 """
 
 
-def _bytes_to_field_elements(data: bytes, count: int) -> list[Fp]:
+class PRFKey(BaseBytes):
     """
-    Convert PRF output bytes into a list of field elements.
+    The PRF master secret key.
 
-    Each field element is derived from `PRF_BYTES_PER_FE` bytes,
-    interpreted as a big-endian integer and reduced modulo the field prime.
+    High-entropy byte string acting as the single root secret.
 
-    The extra bits provide statistical uniformity.
-
-    Args:
-        data: Raw bytes from SHAKE128 output. Must be exactly `count * PRF_BYTES_PER_FE` bytes.
-        count: Number of field elements to extract.
-
-    Returns:
-        List of `count` field elements.
+    Every one-time signing key is deterministically derived from this seed.
     """
-    return [
-        Fp(value=int.from_bytes(data[i : i + PRF_BYTES_PER_FE], "big"))
-        for i in range(0, count * PRF_BYTES_PER_FE, PRF_BYTES_PER_FE)
-    ]
 
+    LENGTH = PRF_KEY_LENGTH
 
-class Prf(StrictBaseModel):
-    """An instance of the SHAKE128-based PRF for a given config."""
+    @classmethod
+    def generate(cls) -> Self:
+        """Draw a fresh master key from the operating system entropy pool."""
+        return cls(os.urandom(PRF_KEY_LENGTH))
 
-    config: XmssConfig
-    """Configuration parameters for the PRF."""
-
-    def key_gen(self) -> PRFKey:
+    def derive_chain_start(
+        self, config: XmssConfig, epoch: Uint64, chain_index: Uint64
+    ) -> HashDigestVector:
         """
-        Generates a cryptographically secure random key for the PRF.
+        Derive the secret start of one Winternitz hash chain.
 
-        This function sources randomness from the operating system's
-        entropy pool.
+        # Overview
 
-        Returns:
-            A new, randomly generated PRF key of `PRF_KEY_LENGTH` bytes.
-        """
-        return PRFKey(os.urandom(PRF_KEY_LENGTH))
-
-    def apply(self, key: PRFKey, epoch: Uint64, chain_index: Uint64) -> HashDigestVector:
-        """
-        Applies the PRF to derive the secret starting value for a single hash chain.
-
-        ### PRF Construction
-
-        The function constructs a unique input for the underlying SHAKE128 function
-        by concatenating several components:
-        `SHAKE128(DOMAIN_SEP || 0x00 || key || epoch || chain_index)`
-
-        The 0x00 byte distinguishes this use case (deriving domain elements) from
-        randomness generation (which uses 0x01). The arbitrary-length output of
-        SHAKE128 is then processed to produce a list of field elements, which
-        serves as the secret starting digest for one chain.
+        Each slot signs with many independent hash chains.
+        A chain begins at a secret value.
+        Its public counterpart is that value hashed all the way up to the chain top.
+        Recreating the secret start from the seed means it never has to be stored.
 
         Args:
-            key: The secret master PRF key.
-            epoch: The epoch number, identifying the one-time signature instance.
-            chain_index: The index of the hash chain within that epoch's OTS.
+            config: Active XMSS configuration.
+            epoch: Slot identifier for this one-time signature instance.
+            chain_index: Position of the chain within the one-time signature.
 
         Returns:
-            A hash digest representing the secret start of a single hash chain.
+            The secret digest at the bottom of the chain.
         """
-        # Retrieve the scheme's configuration parameters.
-        config = self.config
-
-        # Construct the unique input for the PRF by concatenating its components:
+        # Layout:
         #
-        # - Domain Separation: Uniquely tag the PRF for this specific use case.
-        # - Domain Element Tag: 0x00 byte to distinguish from randomness generation.
-        # - Key Input: The master secret key.
-        # - Epoch: A 4-byte integer ensuring every epoch derives a different set of secrets.
-        # - Chain Index: An 8-byte integer ensuring each parallel hash chain gets a unique secret.
+        #     domain_sep || 0x00 || key || epoch (4 bytes) || chain_index (8 bytes)
+        #
+        # The 0x00 byte separates chain-start derivation from randomness derivation.
         input_data = (
             PRF_DOMAIN_SEP
             + PRF_DOMAIN_SEP_DOMAIN_ELEMENT
-            + key
+            + self
             + epoch.to_bytes(4, "big")
             + chain_index.to_bytes(8, "big")
         )
 
-        # Determine the total number of bytes to extract from the SHAKE output.
-        #
-        # We need enough bytes to produce `HASH_LEN_FE` field elements.
+        # Pull enough SHAKE128 bytes to fill one digest of field elements.
         num_bytes_to_read = PRF_BYTES_PER_FE * config.HASH_LEN_FE
         prf_output_bytes = hashlib.shake_128(input_data).digest(num_bytes_to_read)
+        return HashDigestVector(
+            data=[
+                Fp(value=int.from_bytes(bytes(chunk), "big"))
+                for chunk in batched(prf_output_bytes, PRF_BYTES_PER_FE)
+            ]
+        )
 
-        # Convert the raw byte output into a list of field elements.
-        return HashDigestVector(data=_bytes_to_field_elements(prf_output_bytes, config.HASH_LEN_FE))
-
-    def get_randomness(
-        self, key: PRFKey, epoch: Uint64, message: Bytes32, counter: Uint64
+    def derive_randomness(
+        self,
+        config: XmssConfig,
+        epoch: Uint64,
+        message: Bytes32,
+        counter: Uint64,
     ) -> Randomness:
         """
-        Derives pseudorandom field elements for use in deterministic signing.
+        Derive deterministic randomness for one signing attempt.
 
-        This method is used to generate deterministic randomness for the Information
-        Encoding step during signing. By deriving randomness from the PRF key, epoch,
-        message, and attempt counter, we ensure that signing is deterministic: calling
-        `sign` twice with the same (sk, epoch, message) triple produces the same signature.
+        # Overview
 
-        This provides additional hardening against implementation errors where sign might
-        be called multiple times with the same epoch. However, calling sign with the same
-        epoch but *different* messages still compromises security.
+        Signing maps the message onto a codeword whose digits must add up to a fixed target.
+        - Each attempt folds in fresh randomness.
+        - It retries with a higher counter until the digit sum lands on the target.
 
-        ### Construction
+        Deriving that randomness from the seed makes the search reproducible.
 
-        Similar to `apply`, but includes the message and a counter in the input:
-        `SHAKE128(DOMAIN_SEP || 0x01 || key || epoch || message || counter)`
+        # Reproducibility
 
-        The 0x01 byte distinguishes this use case (generating randomness) from
-        domain element derivation (which uses 0x00).
+        A synchronized scheme signs each slot at most once.
+        Signing one slot twice is treated as misbehavior.
+        A deterministic attempt order means one slot and message always yield the same signature.
 
         Args:
-            key: The secret master PRF key.
-            epoch: The epoch number for this signature.
-            message: The message being signed (MESSAGE_LENGTH bytes).
-            counter: The attempt number (used when retrying encoding).
+            config: Active XMSS configuration.
+            epoch: Slot identifier for this signature.
+            message: Full message being signed.
+            counter: Attempt number, incremented when a previous attempt aborted.
 
         Returns:
-            Randomness for encoding (i.e., `rho`).
+            Randomness used to encode the message into a valid codeword.
         """
-        config = self.config
-
-        # Construct input: DOMAIN_SEP || 0x01 || key || epoch || message || counter
+        # Layout:
+        #
+        #     domain_sep || 0x01 || key || epoch || message || counter
         input_data = (
             PRF_DOMAIN_SEP
             + PRF_DOMAIN_SEP_RANDOMNESS
-            + key
+            + self
             + epoch.to_bytes(4, "big")
             + message
             + counter.to_bytes(8, "big")
         )
 
-        # Extract enough bytes for RAND_LEN_FE field elements
         num_bytes_to_read = PRF_BYTES_PER_FE * config.RAND_LEN_FE
         prf_output_bytes = hashlib.shake_128(input_data).digest(num_bytes_to_read)
-
-        # Convert to field elements and wrap in Randomness
-        return Randomness(data=_bytes_to_field_elements(prf_output_bytes, config.RAND_LEN_FE))
-
-
-PROD_PRF = Prf(config=PROD_CONFIG)
-"""An instance configured for production-level parameters."""
-
-TEST_PRF = Prf(config=TEST_CONFIG)
-"""A lightweight instance for test environments."""
+        return Randomness(
+            data=[
+                Fp(value=int.from_bytes(bytes(chunk), "big"))
+                for chunk in batched(prf_output_bytes, PRF_BYTES_PER_FE)
+            ]
+        )
