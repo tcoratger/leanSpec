@@ -1,9 +1,12 @@
 """Unit tests for genesis state generation."""
 
-from lean_spec.forks.lstar.containers.block import Block, BlockBody
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import Validators
-from lean_spec.forks.lstar.containers.validator import Validator
+from lean_spec.forks.lstar.containers import (
+    AggregatedAttestations,
+    Block,
+    BlockBody,
+    Validator,
+    Validators,
+)
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Slot, Uint64, ValidatorIndex

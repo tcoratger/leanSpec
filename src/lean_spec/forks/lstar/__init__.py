@@ -1,6 +1,6 @@
 """Lstar fork"""
 
-from .containers.state import State
+from .containers import State
 from .spec import LstarStore as Store
 from .store import AttestationSignatureEntry
 

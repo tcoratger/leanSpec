@@ -5,9 +5,12 @@ from __future__ import annotations
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import AttestationSignatureEntry
-from lean_spec.forks.lstar.containers.attestation import AttestationData
-from lean_spec.forks.lstar.containers.block import Block, BlockBody
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
+from lean_spec.forks.lstar.containers import (
+    AggregatedAttestations,
+    AttestationData,
+    Block,
+    BlockBody,
+)
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex, ValidatorIndices

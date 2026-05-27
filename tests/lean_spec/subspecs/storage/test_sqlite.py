@@ -10,10 +10,10 @@ import pytest
 
 from lean_spec.forks.lstar import State
 from lean_spec.forks.lstar.containers import (
+    AggregatedAttestations,
     Block,
     BlockBody,
 )
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import (
     SQLiteDatabase,

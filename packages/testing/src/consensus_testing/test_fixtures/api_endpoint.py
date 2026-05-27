@@ -4,10 +4,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from lean_spec.forks.lstar import Store
-from lean_spec.forks.lstar.containers import BlockBody
-from lean_spec.forks.lstar.containers.block import Block
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import State
+from lean_spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody, State
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex

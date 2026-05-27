@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from lean_spec.forks.lstar.containers.attestation import (
+from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
+    AggregatedAttestations,
     Attestation,
     AttestationData,
+    Block,
+    BlockBody,
     SignedAttestation,
+    SignedBlock,
+    State,
 )
-from lean_spec.forks.lstar.containers.block import Block, BlockBody, SignedBlock
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import State
 from lean_spec.forks.lstar.spec import LstarSpec
 from lean_spec.forks.lstar.store import Store
 from lean_spec.subspecs.chain.clock import Interval

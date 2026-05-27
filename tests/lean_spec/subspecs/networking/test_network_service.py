@@ -6,8 +6,7 @@ from typing import cast
 
 import pytest
 
-from lean_spec.forks.lstar.containers import AttestationData
-from lean_spec.forks.lstar.containers.attestation import SignedAttestation
+from lean_spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
 from lean_spec.subspecs.networking.reqresp.message import Status

@@ -6,7 +6,7 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.forks.lstar import AttestationSignatureEntry
-from lean_spec.forks.lstar.containers.attestation import (
+from lean_spec.forks.lstar.containers import (
     AttestationData,
     SignedAggregatedAttestation,
     SignedAttestation,

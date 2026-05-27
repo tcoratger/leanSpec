@@ -7,24 +7,22 @@ from typing import Any, ClassVar
 
 from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
+    AggregatedAttestations,
     AttestationData,
     Block,
     BlockBody,
     BlockHeader,
     Config,
-    SignedAggregatedAttestation,
-    SignedAttestation,
-    SignedBlock,
-)
-from lean_spec.forks.lstar.containers.block.types import AggregatedAttestations
-from lean_spec.forks.lstar.containers.state import State
-from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
+    SignedAggregatedAttestation,
+    SignedAttestation,
+    SignedBlock,
+    State,
+    Validators,
 )
-from lean_spec.forks.lstar.containers.validator import Validators
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (
     GOSSIP_DISPARITY_INTERVALS,

@@ -39,11 +39,9 @@ ignoring malformed ones.
 
 from __future__ import annotations
 
-from lean_spec.forks.lstar.containers.attestation import (
+from lean_spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
-)
-from lean_spec.forks.lstar.containers.state.types import (
     HistoricalBlockHashes,
     JustifiedSlots,
 )

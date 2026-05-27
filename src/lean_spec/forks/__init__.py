@@ -4,6 +4,7 @@ from . import capabilities
 from .capabilities import SigScheme
 from .lstar.containers import (
     AggregatedAttestation,
+    AggregatedAttestations,
     Attestation,
     AttestationData,
     Block,
@@ -13,10 +14,10 @@ from .lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    State,
     Validator,
+    Validators,
 )
-from .lstar.containers.block.types import AggregatedAttestations
-from .lstar.containers.state import State, Validators
 from .lstar.spec import LstarSpec, LstarStore
 from .lstar.store import AttestationSignatureEntry
 from .protocol import ForkProtocol, SpecStateType, SpecStoreType
