@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -23,7 +24,6 @@ from lean_spec.subspecs.networking.reqresp.message import (
     BLOCKS_BY_RANGE_PROTOCOL_V1,
 )
 from lean_spec.subspecs.networking.transport import PeerId
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import ByteList512KiB, Bytes32, Slot, Uint64, ValidatorIndex
 
 

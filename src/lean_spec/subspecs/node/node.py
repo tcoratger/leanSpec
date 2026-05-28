@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
     AggregatedAttestations,
     Block,
@@ -38,7 +39,6 @@ from lean_spec.subspecs.chain.service import ChainService
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking import NetworkService
 from lean_spec.subspecs.networking.client.event_source import EventSource
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database, SQLiteDatabase
 from lean_spec.subspecs.sync import BlockCache, NetworkRequester, PeerManager, SyncService
 from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService

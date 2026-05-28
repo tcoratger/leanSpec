@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
@@ -17,7 +18,6 @@ from lean_spec.spec.forks.lstar.containers import (
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager
 from lean_spec.subspecs.sync.service import SyncService

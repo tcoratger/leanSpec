@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import State
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
@@ -33,7 +34,6 @@ from lean_spec.subspecs.chain.config import (
     SECONDS_PER_SLOT,
 )
 from lean_spec.subspecs.node import Node, NodeConfig
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
 from lean_spec.subspecs.validator import ValidatorRegistry
 from lean_spec.subspecs.validator.registry import ValidatorEntry

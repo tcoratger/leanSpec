@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -36,7 +37,6 @@ from lean_spec.subspecs.observability import (
     observe_on_block,
     observe_state_transition,
 )
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import (
     AggregationError,
     TypeOneMultiSignature,

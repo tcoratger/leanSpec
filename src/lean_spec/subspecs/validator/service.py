@@ -37,6 +37,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
     AttestationData,
     Block,
@@ -45,7 +46,6 @@ from lean_spec.spec.forks import (
     SignedBlock,
 )
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync import SyncService
 from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature

@@ -3,10 +3,10 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody, State
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 
 from ..genesis import build_anchor, generate_pre_state

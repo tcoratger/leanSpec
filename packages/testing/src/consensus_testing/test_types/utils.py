@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import Block
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Checkpoint, Slot
 
 

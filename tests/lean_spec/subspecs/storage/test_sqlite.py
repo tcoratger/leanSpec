@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import State
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,
 )
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import (
     SQLiteDatabase,
     StorageCorruptionError,

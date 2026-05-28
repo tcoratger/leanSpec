@@ -6,7 +6,7 @@ from hashlib import sha256
 
 import pytest
 
-from lean_spec.subspecs.ssz.merkleization import (
+from lean_spec.spec.crypto.merkleization import (
     _ZERO_HASHES,
     _next_pow2,
     _zero_tree_root,

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
     AggregatedAttestations,
     Block,
@@ -24,7 +25,6 @@ from lean_spec.spec.forks import (
 )
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.checkpoint_sync import (
     CheckpointSyncError,
     fetch_finalized_state,

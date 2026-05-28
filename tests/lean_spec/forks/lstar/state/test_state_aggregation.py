@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
@@ -12,7 +13,6 @@ from lean_spec.spec.forks.lstar.containers import (
     BlockBody,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import (
     make_aggregated_proof,

@@ -11,6 +11,7 @@ from collections import deque
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
     AttestationData,
     Block,
@@ -24,7 +25,6 @@ from lean_spec.subspecs.chain.clock import SlotClock
 from lean_spec.subspecs.metrics import registry as metrics
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database
 from lean_spec.subspecs.xmss.aggregation import (
     AggregationError,

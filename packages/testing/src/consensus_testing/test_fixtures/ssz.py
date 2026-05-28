@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from pydantic import field_serializer
 
 from lean_spec.spec.crypto.koalabear import Fp
-from lean_spec.subspecs.ssz.hash import hash_tree_root
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.types.base import CamelModel
 from lean_spec.types.boolean import Boolean
 from lean_spec.types.ssz_base import SSZType

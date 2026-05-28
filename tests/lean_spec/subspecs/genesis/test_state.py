@@ -1,5 +1,6 @@
 """Unit tests for genesis state generation."""
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -8,7 +9,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Slot, Uint64, ValidatorIndex
 
 

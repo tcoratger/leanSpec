@@ -12,6 +12,7 @@ from typing import NamedTuple, cast
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.spec.crypto.koalabear import Fp
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, State, Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -31,7 +32,6 @@ from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status
 from lean_spec.subspecs.networking.types import ConnectionState
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.storage import Database
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.peer_manager import PeerManager

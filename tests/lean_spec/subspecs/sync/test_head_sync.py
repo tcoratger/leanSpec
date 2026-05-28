@@ -7,10 +7,10 @@ from typing import Any, cast
 
 import pytest
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import SignedBlock
 from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.sync.backfill_sync import BackfillSync
 from lean_spec.subspecs.sync.block_cache import BlockCache
 from lean_spec.subspecs.sync.head_sync import HeadSync, HeadSyncResult

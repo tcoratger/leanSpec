@@ -11,6 +11,7 @@ from typing import ClassVar, Self
 
 from pydantic import Field, model_validator
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -20,7 +21,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.ssz import hash_tree_root
 from lean_spec.types import Slot, Uint64, ValidatorIndex
 
 from ..keys import (

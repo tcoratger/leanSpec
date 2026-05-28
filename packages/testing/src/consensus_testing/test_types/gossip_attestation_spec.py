@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import AttestationData, Block, SignedAttestation
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.forks.lstar.store import Store
-from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, CamelModel, Checkpoint, Slot, ValidatorIndex
 
 from ..keys import XmssKeyManager, create_dummy_signature
