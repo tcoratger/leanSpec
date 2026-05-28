@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.snappy import SnappyDecompressionError
-from lean_spec.snappy.framing import (
+from lean_spec.node.snappy import SnappyDecompressionError
+from lean_spec.node.snappy.framing import (
     CHUNK_TYPE_COMPRESSED,
     CHUNK_TYPE_UNCOMPRESSED,
     CRC32C_MASK_DELTA,

@@ -8,13 +8,13 @@ from typing import Iterator
 
 import pytest
 
-from lean_spec.snappy import (
+from lean_spec.node.snappy import (
     SnappyDecompressionError,
     compress,
     decompress,
     max_compressed_length,
 )
-from lean_spec.snappy.encoding import (
+from lean_spec.node.snappy.encoding import (
     decode_tag,
     decode_varint32,
     encode_copy_tag,

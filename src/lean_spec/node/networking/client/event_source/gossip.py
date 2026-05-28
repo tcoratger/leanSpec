@@ -45,7 +45,7 @@ from lean_spec.node.networking.gossipsub.topic import (
 )
 from lean_spec.node.networking.transport.protocols import InboundStreamProtocol
 from lean_spec.node.networking.varint import VarintError, decode_varint
-from lean_spec.snappy import SnappyDecompressionError, decompress
+from lean_spec.node.snappy import SnappyDecompressionError, decompress
 from lean_spec.spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
 from lean_spec.types.exceptions import SSZSerializationError
 

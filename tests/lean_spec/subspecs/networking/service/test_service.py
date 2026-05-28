@@ -21,7 +21,7 @@ from lean_spec.node.networking.service.events import (
     PeerStatusEvent,
 )
 from lean_spec.node.networking.types import ConnectionState
-from lean_spec.snappy import compress
+from lean_spec.node.snappy import compress
 from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.types import Bytes32, Checkpoint, Slot, SubnetId, ValidatorIndex
 from tests.lean_spec.helpers import (

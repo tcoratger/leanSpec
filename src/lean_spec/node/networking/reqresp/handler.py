@@ -72,7 +72,7 @@ from lean_spec.node.networking.config import (
 from lean_spec.node.networking.transport.protocols import InboundStreamProtocol
 from lean_spec.node.networking.types import ProtocolId
 from lean_spec.node.networking.varint import VarintError, decode_varint
-from lean_spec.snappy import SnappyDecompressionError, frame_decompress
+from lean_spec.node.snappy import SnappyDecompressionError, frame_decompress
 from lean_spec.spec.forks import SignedBlock
 from lean_spec.types import Bytes32, Slot, Uint64
 
