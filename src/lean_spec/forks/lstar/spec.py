@@ -43,7 +43,7 @@ from lean_spec.subspecs.xmss.aggregation import (
     TypeTwoMultiSignature,
 )
 from lean_spec.subspecs.xmss.containers import PublicKey
-from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
+from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.types import (
     ZERO_HASH,
     Boolean,
@@ -71,9 +71,6 @@ class LstarSpec(ForkProtocol):
     GOSSIP_DIGEST: ClassVar[str] = "12345678"
 
     previous: ClassVar[type[ForkProtocol] | None] = None
-
-    # Capabilities advertised by this fork.
-    sig_scheme: ClassVar[GeneralizedXmssScheme] = TARGET_SIGNATURE_SCHEME
 
     state_class: type[State] = State
     block_class: type[Block] = Block
@@ -874,7 +871,6 @@ class LstarSpec(ForkProtocol):
         The block envelope holds one SSZ-encoded Type-2 proof binding
         every body attestation plus the proposer's signature over the
         block root.
-        The signing scheme is read from this fork's capability.
 
         Args:
             signed_block: The signed block whose merged proof is checked.
@@ -1109,7 +1105,7 @@ class LstarSpec(ForkProtocol):
 
         This method:
 
-        1. Verifies the XMSS signature using this fork's capability
+        1. Verifies the XMSS signature
         2. Stores the signature when the node is in aggregator mode
 
         Subnet filtering happens at the p2p subscription layer — only
@@ -1148,7 +1144,7 @@ class LstarSpec(ForkProtocol):
             )
             public_key = key_state.validators[validator_id].get_attestation_pubkey()
 
-            assert self.sig_scheme.verify(
+            assert TARGET_SIGNATURE_SCHEME.verify(
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
             ), "Signature verification failed"
 
@@ -1250,8 +1246,6 @@ class LstarSpec(ForkProtocol):
         2. Computing the post-state via the state transition function
         3. Processing attestations included in the block body (on-chain)
         4. Updating the forkchoice head
-
-        Signatures are verified using this fork's capability.
 
         Raises:
             AssertionError: If parent block/state not found in store.
