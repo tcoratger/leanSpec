@@ -12,7 +12,7 @@ from lean_spec.spec.crypto.xmss.types import (
     Parameter,
     TreeTweak,
 )
-from lean_spec.types import Uint64
+from lean_spec.spec.ssz import Uint64
 
 
 def _parameter() -> Parameter:

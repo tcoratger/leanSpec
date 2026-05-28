@@ -14,15 +14,8 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import (
-    AggregationBits,
-    Boolean,
-    ByteList512KiB,
-    Bytes32,
-    Checkpoint,
-    Slot,
-    ValidatorIndex,
-)
+from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
+from lean_spec.types import AggregationBits, Checkpoint, Slot, ValidatorIndex
 
 from ..keys import XmssKeyManager
 from ..test_types import BlockSpec

@@ -45,7 +45,8 @@ from dataclasses import dataclass, field
 from lean_spec.node.networking.transport.peer_id import PeerId
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import SignedBlock, Store
-from lean_spec.types import Bytes32, Slot
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Slot
 
 from .config import MAX_CACHED_BLOCKS
 

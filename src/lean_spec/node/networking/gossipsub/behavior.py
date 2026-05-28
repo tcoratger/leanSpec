@@ -89,7 +89,7 @@ from lean_spec.node.networking.transport import PeerId
 from lean_spec.node.networking.transport.quic.stream_adapter import QuicStreamAdapter
 from lean_spec.node.networking.varint import decode_varint, encode_varint
 from lean_spec.node.snappy import decompress as snappy_raw_decompress
-from lean_spec.types import Uint16
+from lean_spec.spec.ssz import Uint16
 
 logger = logging.getLogger(__name__)
 

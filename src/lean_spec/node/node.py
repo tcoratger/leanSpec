@@ -42,7 +42,8 @@ from lean_spec.spec.forks import (
     Store,
     Validators,
 )
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Slot, ValidatorIndex
 
 logger = logging.getLogger(__name__)
 

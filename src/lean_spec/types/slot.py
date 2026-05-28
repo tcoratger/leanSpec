@@ -3,7 +3,7 @@
 import math
 from typing import Final
 
-from lean_spec.types.uint import Uint64
+from lean_spec.spec.ssz.uint import Uint64
 
 IMMEDIATE_JUSTIFICATION_WINDOW: Final = 5
 """First N slots after finalization are always justifiable."""

@@ -7,11 +7,11 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.spec.crypto.koalabear import Fp
-from lean_spec.types import Bytes32, Uint8, Uint16, Uint32
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.collections import SSZList, SSZVector
-from lean_spec.types.container import Container
-from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz import Bytes32, Uint8, Uint16, Uint32
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.collections import SSZList, SSZVector
+from lean_spec.spec.ssz.container import Container
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 
 ValueOrValidationError = (SSZValueError, ValidationError)
 TypeOrValidationError = (SSZTypeError, ValidationError)

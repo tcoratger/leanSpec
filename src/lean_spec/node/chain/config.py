@@ -2,7 +2,8 @@
 
 from typing import Final
 
-from lean_spec.types import VALIDATOR_REGISTRY_LIMIT, Uint8, Uint64
+from lean_spec.spec.ssz import Uint8, Uint64
+from lean_spec.types import VALIDATOR_REGISTRY_LIMIT
 
 __all__ = [
     "ATTESTATION_COMMITTEE_COUNT",

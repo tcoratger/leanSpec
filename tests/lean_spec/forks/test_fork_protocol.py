@@ -16,7 +16,8 @@ from lean_spec.spec.forks import (
     protocol,
 )
 from lean_spec.spec.forks.lstar.containers import Block, State
-from lean_spec.types import Slot, Uint64
+from lean_spec.spec.ssz import Uint64
+from lean_spec.types import Slot
 from tests.lean_spec.helpers.builders import make_validators
 
 _LEAN_SPEC_FILE = lean_spec.__file__

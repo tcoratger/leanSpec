@@ -15,7 +15,8 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Bytes32, ValidatorIndices
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import ValidatorIndices
 
 from ..keys import XmssKeyManager
 from ..test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation

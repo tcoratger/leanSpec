@@ -105,7 +105,7 @@ from lean_spec.node.networking.transport.quic.stream_adapter import (
 )
 from lean_spec.node.networking.types import ProtocolId
 from lean_spec.spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
-from lean_spec.types.exceptions import SSZSerializationError
+from lean_spec.spec.ssz.exceptions import SSZSerializationError
 
 from ..reqresp_client import ReqRespClient
 from .gossip import GossipHandler

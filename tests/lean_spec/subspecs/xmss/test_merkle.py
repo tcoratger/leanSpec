@@ -20,8 +20,8 @@ from lean_spec.spec.crypto.xmss.types import (
     Parameter,
     TreeTweak,
 )
-from lean_spec.types import Uint64
-from lean_spec.types.exceptions import SSZValueError
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.exceptions import SSZValueError
 
 
 def _run_commit_open_verify_roundtrip(

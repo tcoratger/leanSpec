@@ -7,9 +7,9 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.bitfields import BaseBitlist, BaseBitvector
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 
 # Errors that may be raised either directly or wrapped by Pydantic at construction time.
 ValueOrValidationError = (SSZValueError, ValidationError)

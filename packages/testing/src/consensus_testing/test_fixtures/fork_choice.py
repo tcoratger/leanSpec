@@ -21,7 +21,8 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Uint64
+from lean_spec.types import Slot, ValidatorIndex
 
 from ..keys import (
     XmssKeyManager,

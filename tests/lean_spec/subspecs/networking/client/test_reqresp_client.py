@@ -19,7 +19,8 @@ from lean_spec.node.networking.reqresp.message import (
     Status,
 )
 from lean_spec.node.networking.transport import PeerId
-from lean_spec.types import Bytes32, Checkpoint, Slot
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Checkpoint, Slot
 from tests.lean_spec.helpers import make_test_block, make_test_status
 
 

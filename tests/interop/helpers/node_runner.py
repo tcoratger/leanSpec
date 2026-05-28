@@ -26,7 +26,8 @@ from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME, SecretKey
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import Validator, Validators
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Bytes52, Checkpoint, Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Bytes52, Uint64
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 from .diagnostics import PipelineDiagnostics
 from .port_allocator import PortAllocator

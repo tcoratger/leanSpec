@@ -46,7 +46,8 @@ from lean_spec.spec.forks.lstar.containers import (
     JustifiedSlots,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.ssz import Boolean
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
 

@@ -1,7 +1,7 @@
 """Validator-side scalar types"""
 
+from lean_spec.spec.ssz.uint import Uint64
 from lean_spec.types.slot import Slot
-from lean_spec.types.uint import Uint64
 
 
 class SubnetId(Uint64):

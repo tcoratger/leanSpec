@@ -9,7 +9,8 @@ import yaml
 from pydantic import ValidationError
 
 from lean_spec.node.genesis import GenesisConfig
-from lean_spec.types import Bytes52, SSZValueError, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Bytes52, SSZValueError, Uint64
+from lean_spec.types import ValidatorIndex
 
 
 def _load(content: str) -> GenesisConfig:

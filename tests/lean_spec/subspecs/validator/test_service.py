@@ -26,7 +26,8 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedBlock,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     MockNetworkRequester,

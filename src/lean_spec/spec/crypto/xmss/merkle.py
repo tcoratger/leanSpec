@@ -29,9 +29,9 @@ Each layer records the absolute index of its first node, keeping positions in fu
 from itertools import batched
 from typing import Self
 
-from lean_spec.types import Uint64
-from lean_spec.types.collections import SSZList
-from lean_spec.types.container import Container
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.collections import SSZList
+from lean_spec.spec.ssz.container import Container
 
 from .constants import TARGET_CONFIG, XmssConfig
 from .field import random_domain

@@ -50,6 +50,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
     encode_dss_signature,
 )
 
+from lean_spec.base import StrictBaseModel
 from lean_spec.node.networking.types import (
     ForkDigest,
     Multiaddr,
@@ -58,14 +59,8 @@ from lean_spec.node.networking.types import (
     SeqNumber,
     Version,
 )
-from lean_spec.types import (
-    Bytes33,
-    Bytes64,
-    RLPItem,
-    StrictBaseModel,
-    Uint64,
-    rlp,
-)
+from lean_spec.spec.ssz import Bytes33, Bytes64, Uint64
+from lean_spec.types import RLPItem, rlp
 
 from . import keys
 from .eth2 import AttestationSubnets, Eth2Data

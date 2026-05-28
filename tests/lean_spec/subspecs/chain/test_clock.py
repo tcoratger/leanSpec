@@ -11,7 +11,8 @@ from lean_spec.node.chain.config import (
     MILLISECONDS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
-from lean_spec.types import Slot, Uint64
+from lean_spec.spec.ssz import Uint64
+from lean_spec.types import Slot
 
 GENESIS_TIME = Uint64(1_700_000_000)
 

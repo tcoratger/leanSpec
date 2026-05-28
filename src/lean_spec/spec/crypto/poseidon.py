@@ -15,7 +15,7 @@ from numba import njit
 from numpy.typing import NDArray
 from pydantic import Field, field_validator, model_validator
 
-from ...types import StrictBaseModel
+from ...base import StrictBaseModel
 from .koalabear import Fp, P
 
 # For width 16: 28 rounds x 16 = 448 constants

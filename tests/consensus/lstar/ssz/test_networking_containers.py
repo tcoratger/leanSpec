@@ -8,7 +8,8 @@ from lean_spec.node.networking.reqresp.message import (
     RequestedBlockRoots,
     Status,
 )
-from lean_spec.types import Bytes32, Checkpoint, Slot
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Checkpoint, Slot
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

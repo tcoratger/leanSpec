@@ -10,7 +10,8 @@ from lean_spec.node.anchor import Anchor
 from lean_spec.node.genesis import GenesisConfig
 from lean_spec.node.sync.checkpoint_sync import CheckpointSyncError
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Bytes32, Slot
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Slot
 from tests.lean_spec.helpers import make_genesis_state
 
 

@@ -25,17 +25,8 @@ from lean_spec.spec.forks.lstar.containers import (
     Validator,
     Validators,
 )
-from lean_spec.types import (
-    AggregationBits,
-    Boolean,
-    ByteList512KiB,
-    Bytes32,
-    Bytes52,
-    Checkpoint,
-    Slot,
-    Uint64,
-    ValidatorIndex,
-)
+from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Bytes52, Uint64
+from lean_spec.types import AggregationBits, Checkpoint, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

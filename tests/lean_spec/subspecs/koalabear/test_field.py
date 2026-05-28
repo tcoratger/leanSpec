@@ -12,7 +12,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.spec.crypto.koalabear import Fp, P
-from lean_spec.types.exceptions import (
+from lean_spec.spec.ssz.exceptions import (
     SSZSerializationError,
     SSZTypeError,
     SSZValueError,

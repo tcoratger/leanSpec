@@ -15,7 +15,7 @@ from lean_spec.spec.crypto.xmss.encoding import (
 from lean_spec.spec.crypto.xmss.field import int_to_base_p, random_field_elements
 from lean_spec.spec.crypto.xmss.poseidon import TEST_POSEIDON
 from lean_spec.spec.crypto.xmss.types import Parameter, Randomness
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.spec.ssz import Bytes32, Uint64
 
 
 def _parameter() -> Parameter:

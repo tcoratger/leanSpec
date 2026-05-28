@@ -1,10 +1,10 @@
 """Tests for SSZModel and SSZType base class behavior."""
 
-from lean_spec.types import Uint8, Uint16, Uint64
-from lean_spec.types.bitfields import BaseBitlist
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.collections import SSZList
-from lean_spec.types.container import Container
+from lean_spec.spec.ssz import Uint8, Uint16, Uint64
+from lean_spec.spec.ssz.bitfields import BaseBitlist
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.collections import SSZList
+from lean_spec.spec.ssz.container import Container
 
 
 class Uint16List4(SSZList[Uint16]):

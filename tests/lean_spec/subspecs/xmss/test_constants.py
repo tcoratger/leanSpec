@@ -25,8 +25,8 @@ from lean_spec.spec.crypto.xmss.constants import (
     TEST_CONFIG,
     XmssConfig,
 )
-from lean_spec.types import Uint64
-from lean_spec.types.ssz_base import BYTES_PER_LENGTH_OFFSET
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.ssz_base import BYTES_PER_LENGTH_OFFSET
 
 
 def _valid_config_kwargs() -> dict[str, int]:

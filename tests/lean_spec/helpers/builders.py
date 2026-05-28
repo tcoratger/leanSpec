@@ -45,16 +45,8 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import (
-    ByteList512KiB,
-    Bytes32,
-    Bytes52,
-    Checkpoint,
-    Slot,
-    Uint64,
-    ValidatorIndex,
-    ValidatorIndices,
-)
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Bytes52, Uint64
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 
 from .mocks import MockForkchoiceStore, MockNetworkRequester, StoreInterceptingSpec
 

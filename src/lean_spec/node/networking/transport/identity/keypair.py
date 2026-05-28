@@ -16,7 +16,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from lean_spec.types import Bytes33
+from lean_spec.spec.ssz import Bytes33
 
 from ..peer_id import KeyType, PeerId, PublicKeyProto
 

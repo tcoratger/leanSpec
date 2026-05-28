@@ -10,13 +10,13 @@ from math import ceil
 from typing import Final
 
 from lean_spec.spec.crypto.koalabear import Fp
-from lean_spec.types import ZERO_HASH
-from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.byte_arrays import BaseByteList, BaseBytes, Bytes32
-from lean_spec.types.collections import SSZList, SSZVector
-from lean_spec.types.container import Container
-from lean_spec.types.uint import BaseUint
+from lean_spec.spec.ssz import ZERO_HASH
+from lean_spec.spec.ssz.bitfields import BaseBitlist, BaseBitvector
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.byte_arrays import BaseByteList, BaseBytes, Bytes32
+from lean_spec.spec.ssz.collections import SSZList, SSZVector
+from lean_spec.spec.ssz.container import Container
+from lean_spec.spec.ssz.uint import BaseUint
 
 BYTES_PER_CHUNK: Final = 32
 """Width of a Merkle leaf chunk in bytes."""

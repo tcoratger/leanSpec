@@ -5,8 +5,8 @@ from typing import IO, Any, Final, NoReturn, Self, override
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
-from lean_spec.types import SSZType
-from lean_spec.types.exceptions import (
+from lean_spec.spec.ssz import SSZType
+from lean_spec.spec.ssz.exceptions import (
     SSZSerializationError,
     SSZTypeError,
     SSZValueError,

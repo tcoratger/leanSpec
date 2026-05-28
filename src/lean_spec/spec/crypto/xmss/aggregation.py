@@ -18,15 +18,8 @@ from lean_multisig_py import (
 )
 
 from lean_spec.config import LEAN_ENV
-from lean_spec.types import (
-    AggregationBits,
-    ByteList512KiB,
-    Bytes32,
-    Container,
-    Slot,
-    ValidatorIndex,
-    ValidatorIndices,
-)
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Container
+from lean_spec.types import AggregationBits, Slot, ValidatorIndex, ValidatorIndices
 
 from .containers import PublicKey, Signature
 

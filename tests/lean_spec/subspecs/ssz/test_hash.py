@@ -9,19 +9,11 @@ import pytest
 
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.types import (
-    BaseByteList,
-    BaseBytes,
-    Bytes32,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-)
-from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.collections import SSZList, SSZVector
-from lean_spec.types.container import Container
+from lean_spec.spec.ssz import BaseByteList, BaseBytes, Bytes32, Uint8, Uint16, Uint32, Uint64
+from lean_spec.spec.ssz.bitfields import BaseBitlist, BaseBitvector
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.collections import SSZList, SSZVector
+from lean_spec.spec.ssz.container import Container
 
 
 def h(a: bytes, b: bytes) -> Bytes32:

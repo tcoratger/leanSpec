@@ -17,13 +17,8 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedBlock,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import (
-    ByteList512KiB,
-    Bytes32,
-    Checkpoint,
-    Slot,
-    ValidatorIndex,
-)
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import make_store
 
 

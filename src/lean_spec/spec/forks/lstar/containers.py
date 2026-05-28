@@ -5,20 +5,9 @@ from typing import Self
 from lean_spec.node.chain.config import HISTORICAL_ROOTS_LIMIT, VALIDATOR_REGISTRY_LIMIT
 from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
-from lean_spec.types import (
-    AggregationBits,
-    Boolean,
-    ByteList512KiB,
-    Bytes32,
-    Bytes52,
-    Checkpoint,
-    Container,
-    Slot,
-    SSZList,
-    Uint64,
-    ValidatorIndex,
-)
-from lean_spec.types.bitfields import BaseBitlist
+from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Bytes52, Container, SSZList, Uint64
+from lean_spec.spec.ssz.bitfields import BaseBitlist
+from lean_spec.types import AggregationBits, Checkpoint, Slot, ValidatorIndex
 
 
 class Config(Container):

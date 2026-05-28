@@ -7,8 +7,8 @@ from typing import Any, Callable
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 
 
 class BooleanModel(BaseModel):

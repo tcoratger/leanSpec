@@ -12,7 +12,7 @@ from lean_spec.spec.crypto.merkleization import (
     merkleize,
     mix_in_length,
 )
-from lean_spec.types import ZERO_HASH, Bytes32
+from lean_spec.spec.ssz import ZERO_HASH, Bytes32
 
 
 def h(a: Bytes32, b: Bytes32) -> Bytes32:

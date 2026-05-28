@@ -5,7 +5,7 @@ from lean_spec.spec.crypto.xmss.constants import (
     TEST_CONFIG,
 )
 from lean_spec.spec.crypto.xmss.prf import PRFKey
-from lean_spec.types import Uint64
+from lean_spec.spec.ssz import Uint64
 
 
 def test_key_gen_is_random() -> None:

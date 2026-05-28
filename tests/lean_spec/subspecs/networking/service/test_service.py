@@ -23,7 +23,8 @@ from lean_spec.node.networking.service.events import (
 from lean_spec.node.networking.types import ConnectionState
 from lean_spec.node.snappy import compress
 from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
-from lean_spec.types import Bytes32, Checkpoint, Slot, SubnetId, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Checkpoint, Slot, SubnetId, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
     create_mock_sync_service,

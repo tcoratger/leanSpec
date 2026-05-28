@@ -54,7 +54,8 @@ from lean_spec.node.networking.transport.quic.connection import (
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import SignedBlock
-from lean_spec.types import Bytes32, Slot, Uint64
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Slot
 
 logger = logging.getLogger(__name__)
 

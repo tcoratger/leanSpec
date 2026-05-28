@@ -14,7 +14,8 @@ from lean_spec.spec.forks.lstar.containers import (
     JustificationValidators,
     JustifiedSlots,
 )
-from lean_spec.types import ZERO_HASH, Boolean, Bytes32, Slot, ValidatorIndex
+from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32
+from lean_spec.types import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

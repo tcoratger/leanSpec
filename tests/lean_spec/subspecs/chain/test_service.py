@@ -10,7 +10,8 @@ from lean_spec.node.chain.clock import Interval
 from lean_spec.node.chain.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.node.chain.service import ChainService
 from lean_spec.spec.forks.lstar.containers import SignedAggregatedAttestation
-from lean_spec.types import ZERO_HASH, Bytes32, Slot, Uint64
+from lean_spec.spec.ssz import ZERO_HASH, Bytes32, Uint64
+from lean_spec.types import Slot
 from tests.lean_spec.helpers.mocks import StoreInterceptingSpec
 
 

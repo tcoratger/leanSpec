@@ -5,9 +5,10 @@ from typing import Final
 
 from pydantic import model_validator
 
+from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
-from lean_spec.types import StrictBaseModel, Uint64
-from lean_spec.types.ssz_base import BYTES_PER_LENGTH_OFFSET
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.ssz_base import BYTES_PER_LENGTH_OFFSET
 
 from ..koalabear import P_BYTES, P
 

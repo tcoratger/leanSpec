@@ -4,7 +4,8 @@ from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.peer import PeerInfo
 from lean_spec.node.networking.reqresp import Status
 from lean_spec.node.networking.types import ConnectionState, Direction, Multiaddr
-from lean_spec.types import Bytes32, Checkpoint, Slot
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Checkpoint, Slot
 
 
 def peer(name: str) -> PeerId:

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.types.base import CamelModel, StrictBaseModel
+from lean_spec.base import CamelModel, StrictBaseModel
 
 
 class SampleCamelModel(CamelModel):

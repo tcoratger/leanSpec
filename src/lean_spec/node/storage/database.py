@@ -15,7 +15,8 @@ from lean_spec.spec.forks.protocol import (
     SpecBlockType,
     SpecStateType,
 )
-from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Checkpoint, Slot
 
 
 class Database(Protocol):

@@ -7,7 +7,8 @@ from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody, State
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Slot, ValidatorIndex
 
 from ..genesis import build_anchor, generate_pre_state
 from .base import BaseConsensusFixture

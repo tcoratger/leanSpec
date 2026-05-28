@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 from lean_spec.node.networking.enr import ENR, keys
 from lean_spec.node.networking.enr.enr import ENR_PREFIX
 from lean_spec.node.networking.types import Port, SeqNumber
-from lean_spec.types import Bytes4, Bytes64, SSZValueError, Uint64
+from lean_spec.spec.ssz import Bytes4, Bytes64, SSZValueError, Uint64
 from lean_spec.types.rlp import RLPItem, encode_rlp
 
 # From: https://eips.ethereum.org/EIPS/eip-778

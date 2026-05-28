@@ -18,7 +18,8 @@ from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
 )
-from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockForkchoiceStore,
     RecordedCall,

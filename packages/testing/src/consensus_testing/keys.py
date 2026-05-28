@@ -63,12 +63,8 @@ from lean_spec.spec.crypto.xmss.types import (
     Randomness,
 )
 from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, AttestationData
-from lean_spec.types import (
-    Bytes32,
-    Slot,
-    Uint64,
-    ValidatorIndex,
-)
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Slot, ValidatorIndex
 
 KeyRole = Literal["attestation", "proposal"]
 """Discriminator for which signing role's key to load from a validator key pair."""

@@ -4,10 +4,10 @@ import io
 
 import pytest
 
-from lean_spec.types.collections import SSZList
-from lean_spec.types.container import Container
-from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError
-from lean_spec.types.uint import Uint8, Uint16, Uint32, Uint64
+from lean_spec.spec.ssz.collections import SSZList
+from lean_spec.spec.ssz.container import Container
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError
+from lean_spec.spec.ssz.uint import Uint8, Uint16, Uint32, Uint64
 
 
 class Uint16List4(SSZList[Uint16]):

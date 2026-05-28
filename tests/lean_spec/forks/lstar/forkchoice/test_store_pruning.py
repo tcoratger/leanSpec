@@ -3,7 +3,8 @@
 from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, Store
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import ByteList512KiB, Bytes32, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.types import Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import (
     make_attestation_data,
     make_bytes32,

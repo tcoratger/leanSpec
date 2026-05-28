@@ -9,7 +9,8 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Bytes32, Bytes52, Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32, Bytes52, Uint64
+from lean_spec.types import Slot, ValidatorIndex
 
 
 def test_genesis_block_hash_comparison(spec: LstarSpec) -> None:

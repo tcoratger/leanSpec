@@ -4,7 +4,8 @@ from itertools import batched
 
 from pydantic import PrivateAttr
 
-from lean_spec.types import StrictBaseModel, Uint64
+from lean_spec.base import StrictBaseModel
+from lean_spec.spec.ssz import Uint64
 
 from ..koalabear import Fp
 from ..poseidon import (

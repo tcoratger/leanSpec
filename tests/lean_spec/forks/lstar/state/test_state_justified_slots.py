@@ -14,7 +14,8 @@ from lean_spec.spec.forks.lstar.containers import (
     JustificationValidators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Boolean, Checkpoint, Slot, ValidatorIndex
+from lean_spec.spec.ssz import Boolean
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import make_aggregated_attestation, make_block, make_genesis_state
 
 

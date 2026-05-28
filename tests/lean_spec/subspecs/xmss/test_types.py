@@ -15,8 +15,8 @@ from lean_spec.spec.crypto.xmss.types import (
     Randomness,
     TreeTweak,
 )
-from lean_spec.types import Uint64
-from lean_spec.types.exceptions import SSZValueError
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.exceptions import SSZValueError
 
 
 def test_tree_tweak_fields() -> None:

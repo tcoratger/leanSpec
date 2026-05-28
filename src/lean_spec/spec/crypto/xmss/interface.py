@@ -1,7 +1,9 @@
 """Public interface for the Generalized XMSS signature scheme."""
 
+from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
-from lean_spec.types import Bytes32, Slot, StrictBaseModel, Uint64
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Slot
 
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
 from .containers import KeyPair, PublicKey, SecretKey, Signature

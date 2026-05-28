@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from lean_spec.base import CamelModel
 from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.aggregation import (
@@ -24,14 +25,8 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.forks.lstar.store import Store
-from lean_spec.types import (
-    ByteList512KiB,
-    Bytes32,
-    CamelModel,
-    Slot,
-    ValidatorIndex,
-    ValidatorIndices,
-)
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.types import Slot, ValidatorIndex, ValidatorIndices
 
 from ..keys import XmssKeyManager, create_dummy_signature
 from .aggregated_attestation_spec import AggregatedAttestationSpec

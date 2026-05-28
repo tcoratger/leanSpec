@@ -9,7 +9,8 @@ from lean_spec.node.sync.block_cache import BlockCache, PendingBlock
 from lean_spec.node.sync.config import MAX_CACHED_BLOCKS
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
-from lean_spec.types import Bytes32, Slot, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Slot, ValidatorIndex
 from tests.lean_spec.helpers import MockForkchoiceStore, make_signed_block
 
 

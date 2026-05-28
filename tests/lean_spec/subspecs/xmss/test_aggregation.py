@@ -11,12 +11,8 @@ from lean_spec.spec.crypto.xmss.aggregation import (
     TypeOneMultiSignature,
     TypeTwoMultiSignature,
 )
-from lean_spec.types import (
-    ByteList512KiB,
-    Checkpoint,
-    Slot,
-    ValidatorIndex,
-)
+from lean_spec.spec.ssz import ByteList512KiB
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import make_attestation_data_simple, make_bytes32
 
 

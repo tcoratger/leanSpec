@@ -9,7 +9,8 @@ from typing import Any, ClassVar
 
 from lean_spec.node.sync.checkpoint_sync import verify_checkpoint_state
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.types import Slot, Uint64
+from lean_spec.spec.ssz import Uint64
+from lean_spec.types import Slot
 
 from ..genesis import build_anchor, generate_pre_state
 from .base import BaseConsensusFixture

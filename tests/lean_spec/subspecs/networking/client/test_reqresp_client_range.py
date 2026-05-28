@@ -24,7 +24,8 @@ from lean_spec.spec.forks.lstar.containers import (
     BlockBody,
     SignedBlock,
 )
-from lean_spec.types import ByteList512KiB, Bytes32, Slot, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
+from lean_spec.types import Slot, ValidatorIndex
 
 
 @dataclass

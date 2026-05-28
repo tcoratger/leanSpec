@@ -44,17 +44,8 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
     Validators,
 )
-from lean_spec.types import (
-    ZERO_HASH,
-    Boolean,
-    Bytes32,
-    Checkpoint,
-    Slot,
-    SSZList,
-    Uint8,
-    Uint64,
-    ValidatorIndex,
-)
+from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32, SSZList, Uint8, Uint64
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
 from .store import AttestationSignatureEntry, Store

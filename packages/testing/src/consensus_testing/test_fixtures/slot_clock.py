@@ -13,7 +13,8 @@ from lean_spec.node.chain.config import (
     MILLISECONDS_PER_INTERVAL,
     SECONDS_PER_SLOT,
 )
-from lean_spec.types import Slot, Uint64
+from lean_spec.spec.ssz import Uint64
+from lean_spec.types import Slot
 
 from .base import BaseConsensusFixture
 

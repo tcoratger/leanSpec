@@ -47,7 +47,7 @@ The value P - 1 falls outside every group.
 The decode rejects it, a rare event near 4.7e-10 that barely affects signing.
 """
 
-from lean_spec.types import Bytes32, Uint64
+from lean_spec.spec.ssz import Bytes32, Uint64
 
 from ..koalabear import Fp
 from .constants import TWEAK_PREFIX_MESSAGE, XmssConfig

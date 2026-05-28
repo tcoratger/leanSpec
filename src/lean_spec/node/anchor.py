@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from lean_spec.base import StrictBaseModel
 from lean_spec.node.genesis import GenesisConfig
 from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.sync.checkpoint_sync import (
@@ -30,7 +31,8 @@ from lean_spec.spec.forks import (
     Store,
     Validators,
 )
-from lean_spec.types import Bytes32, Checkpoint, Slot, StrictBaseModel, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 
 class Anchor(StrictBaseModel):

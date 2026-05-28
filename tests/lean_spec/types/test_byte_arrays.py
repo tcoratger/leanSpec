@@ -9,14 +9,14 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from lean_spec.types.byte_arrays import (
+from lean_spec.spec.ssz.byte_arrays import (
     ZERO_HASH,
     BaseByteList,
     BaseBytes,
     Bytes4,
     Bytes32,
 )
-from lean_spec.types.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 
 
 class ByteList5(BaseByteList):
