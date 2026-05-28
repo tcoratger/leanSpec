@@ -43,10 +43,12 @@ _ZERO_HASHES: Final[tuple[Bytes32, ...]] = tuple(
         initial=ZERO_HASH,
     )
 )
-"""Roots of perfect zero subtrees, indexed by depth.
+"""
+Roots of perfect zero subtrees, indexed by depth.
 
-Index 0 is the all-zero leaf.
-Index d is the root of a perfect binary tree of 2**d zero leaves.
+- Index 0 is the all-zero leaf.
+- Index d is the root of a perfect binary tree of 2**d zero leaves.
+
 Depth 64 covers any chunk count the protocol uses.
 """
 
@@ -60,6 +62,7 @@ def _zero_tree_root(width: int) -> Bytes32:
     if width <= 1:
         return ZERO_HASH
     # A perfect binary tree with 2**d leaves has depth d.
+    #
     # Subtract one before taking bit_length so a power of two maps to its own depth.
     # - Width 2 -> depth 1,
     # - Width 4 -> depth 2,
