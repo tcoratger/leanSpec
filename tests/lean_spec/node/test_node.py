@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.node import Node, NodeConfig
 from lean_spec.node.api import ApiServerConfig
 from lean_spec.node.chain.clock import Interval
 from lean_spec.node.chain.config import (
@@ -19,6 +18,7 @@ from lean_spec.node.chain.config import (
     INTERVALS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
+from lean_spec.node.node import Node, NodeConfig
 from lean_spec.node.storage.sqlite import SQLiteDatabase
 from lean_spec.node.validator import ValidatorRegistry
 from lean_spec.node.validator.registry import ValidatorEntry

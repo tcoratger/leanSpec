@@ -12,7 +12,6 @@ import time
 from dataclasses import dataclass, field
 from typing import cast
 
-from lean_spec.node import Node, NodeConfig
 from lean_spec.node.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.client import LiveNetworkEventSource
@@ -20,6 +19,7 @@ from lean_spec.node.networking.gossipsub.types import TopicId
 from lean_spec.node.networking.peer import PeerInfo
 from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.networking.types import ConnectionState
+from lean_spec.node.node import Node, NodeConfig
 from lean_spec.node.validator import ValidatorRegistry
 from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME, SecretKey
