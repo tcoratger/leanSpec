@@ -9,14 +9,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.gossipsub.behavior import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.gossipsub.behavior import (
     GossipsubBehavior,
     GossipsubMessageEvent,
     GossipsubPeerEvent,
 )
-from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.node.networking.gossipsub.types import TopicId
 
 from .stream import create_stream_pair
 

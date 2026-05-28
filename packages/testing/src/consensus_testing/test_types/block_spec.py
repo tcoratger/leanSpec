@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import (
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
+)
+from lean_spec.spec.crypto.xmss.containers import Signature
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -18,12 +24,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.forks.lstar.store import Store
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.xmss.aggregation import (
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
-)
-from lean_spec.subspecs.xmss.containers import Signature
 from lean_spec.types import (
     ByteList512KiB,
     Bytes32,

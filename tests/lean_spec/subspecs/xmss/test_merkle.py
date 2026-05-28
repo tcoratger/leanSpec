@@ -2,18 +2,18 @@
 
 import pytest
 
-from lean_spec.subspecs.xmss.constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from lean_spec.subspecs.xmss.field import random_domain, random_parameter
-from lean_spec.subspecs.xmss.merkle import (
+from lean_spec.spec.crypto.xmss.constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
+from lean_spec.spec.crypto.xmss.field import random_domain, random_parameter
+from lean_spec.spec.crypto.xmss.merkle import (
     HashSubTree,
     HashTreeLayer,
     HashTreeLayers,
     combined_path,
     verify_path,
 )
-from lean_spec.subspecs.xmss.poseidon import PROD_POSEIDON, TEST_POSEIDON, PoseidonXmss
-from lean_spec.subspecs.xmss.prf import PRFKey
-from lean_spec.subspecs.xmss.types import (
+from lean_spec.spec.crypto.xmss.poseidon import PROD_POSEIDON, TEST_POSEIDON, PoseidonXmss
+from lean_spec.spec.crypto.xmss.prf import PRFKey
+from lean_spec.spec.crypto.xmss.types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,

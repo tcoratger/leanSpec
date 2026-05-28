@@ -19,7 +19,7 @@ import math
 import pytest
 
 from lean_spec.spec.crypto.koalabear import P_BYTES, P
-from lean_spec.subspecs.xmss.constants import (
+from lean_spec.spec.crypto.xmss.constants import (
     PROD_CONFIG,
     TARGET_CONFIG,
     TEST_CONFIG,

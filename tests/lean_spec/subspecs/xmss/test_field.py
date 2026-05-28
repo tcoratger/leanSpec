@@ -5,14 +5,14 @@ import secrets
 import pytest
 
 from lean_spec.spec.crypto.koalabear import Fp, P
-from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.field import (
+from lean_spec.spec.crypto.xmss.constants import TEST_CONFIG
+from lean_spec.spec.crypto.xmss.field import (
     int_to_base_p,
     random_domain,
     random_field_elements,
     random_parameter,
 )
-from lean_spec.subspecs.xmss.types import HashDigestVector, Parameter
+from lean_spec.spec.crypto.xmss.types import HashDigestVector, Parameter
 
 
 @pytest.mark.parametrize(

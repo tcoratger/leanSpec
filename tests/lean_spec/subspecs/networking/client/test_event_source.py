@@ -7,36 +7,36 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lean_spec.snappy import compress
-from lean_spec.spec.forks.lstar.containers import SignedAttestation, SignedBlock
-from lean_spec.subspecs.networking.client.event_source import (
+from lean_spec.node.networking.client.event_source import (
     SUPPORTED_PROTOCOLS,
     GossipHandler,
     GossipMessageError,
     LiveNetworkEventSource,
     read_gossip_message,
 )
-from lean_spec.subspecs.networking.client.reqresp_client import ReqRespClient
-from lean_spec.subspecs.networking.config import (
+from lean_spec.node.networking.client.reqresp_client import ReqRespClient
+from lean_spec.node.networking.config import (
     GOSSIPSUB_DEFAULT_PROTOCOL_ID,
     GOSSIPSUB_PROTOCOL_ID_V12,
 )
-from lean_spec.subspecs.networking.gossipsub.topic import (
+from lean_spec.node.networking.gossipsub.topic import (
     ENCODING_POSTFIX,
     TOPIC_PREFIX,
     ForkMismatchError,
     GossipTopic,
     TopicKind,
 )
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
-from lean_spec.subspecs.networking.reqresp.handler import REQRESP_PROTOCOL_IDS
-from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.transport import PeerId
-from lean_spec.subspecs.networking.transport.quic.connection import (
+from lean_spec.node.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.reqresp.handler import REQRESP_PROTOCOL_IDS
+from lean_spec.node.networking.reqresp.message import Status
+from lean_spec.node.networking.transport import PeerId
+from lean_spec.node.networking.transport.quic.connection import (
     QuicConnection,
     QuicConnectionManager,
 )
-from lean_spec.subspecs.networking.varint import encode_varint
+from lean_spec.node.networking.varint import encode_varint
+from lean_spec.snappy import compress
+from lean_spec.spec.forks.lstar.containers import SignedAttestation, SignedBlock
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 
@@ -474,7 +474,7 @@ class TestLiveNetworkEventSourceDisconnect:
         assert peer_id not in es._connections
         mock_conn.close.assert_awaited_once()
 
-        from lean_spec.subspecs.networking.service.events import PeerDisconnectedEvent
+        from lean_spec.node.networking.service.events import PeerDisconnectedEvent
 
         event = es._events.get_nowait()
         assert event == PeerDisconnectedEvent(peer_id=peer_id)

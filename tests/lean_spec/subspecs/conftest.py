@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer import PeerInfo
-from lean_spec.subspecs.networking.types import ConnectionState, Multiaddr
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.peer import PeerInfo
+from lean_spec.node.networking.types import ConnectionState, Multiaddr
 
 
 @pytest.fixture

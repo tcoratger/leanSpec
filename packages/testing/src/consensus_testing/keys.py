@@ -43,26 +43,26 @@ from typing import ClassVar, Literal
 from lean_spec.config import LEAN_ENV
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, AttestationData
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
-from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
-from lean_spec.subspecs.xmss.containers import (
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
+from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
+from lean_spec.spec.crypto.xmss.containers import (
     PublicKey,
     SecretKey,
     Signature,
     ValidatorKeyPair,
 )
-from lean_spec.subspecs.xmss.interface import (
+from lean_spec.spec.crypto.xmss.interface import (
     PROD_SIGNATURE_SCHEME,
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
 )
-from lean_spec.subspecs.xmss.types import (
+from lean_spec.spec.crypto.xmss.types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
     Randomness,
 )
+from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, AttestationData
 from lean_spec.types import (
     Bytes32,
     Slot,

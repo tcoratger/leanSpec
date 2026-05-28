@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-from lean_spec.subspecs.networking.transport.peer_id import (
+from lean_spec.node.networking.transport.identity import IdentityKeypair
+from lean_spec.node.networking.transport.peer_id import (
     Base58,
     KeyType,
     Multihash,

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.networking.varint import VarintError, decode_varint, encode_varint
+from lean_spec.node.networking.varint import VarintError, decode_varint, encode_varint
 
 # Hardcoded test vectors from the Protocol Buffers specification and LEB128 spec.
 # Each entry is (integer_value, expected_encoded_bytes).

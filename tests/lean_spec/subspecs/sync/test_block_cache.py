@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import cast
 
+from lean_spec.node.networking import PeerId
+from lean_spec.node.sync.block_cache import BlockCache, PendingBlock
+from lean_spec.node.sync.config import MAX_CACHED_BLOCKS
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.sync.block_cache import BlockCache, PendingBlock
-from lean_spec.subspecs.sync.config import MAX_CACHED_BLOCKS
 from lean_spec.types import Bytes32, Slot, ValidatorIndex
 from tests.lean_spec.helpers import MockForkchoiceStore, make_signed_block
 

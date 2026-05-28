@@ -5,14 +5,14 @@ from consensus_testing import SSZTestFiller
 from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 
 from lean_spec.spec.crypto.koalabear import Fp
-from lean_spec.subspecs.xmss import PublicKey
-from lean_spec.subspecs.xmss.aggregation import (
+from lean_spec.spec.crypto.xmss import PublicKey
+from lean_spec.spec.crypto.xmss.aggregation import (
     TypeOneMultiSignature,
     TypeTwoMultiSignature,
 )
-from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
-from lean_spec.subspecs.xmss.merkle import HashTreeLayer
-from lean_spec.subspecs.xmss.types import (
+from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
+from lean_spec.spec.crypto.xmss.merkle import HashTreeLayer
+from lean_spec.spec.crypto.xmss.types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,

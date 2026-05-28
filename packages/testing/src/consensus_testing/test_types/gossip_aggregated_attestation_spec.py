@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     SignedAggregatedAttestation,
     State,
 )
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import (
     ByteList512KiB,
     Bytes32,

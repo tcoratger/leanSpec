@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from lean_spec.node.anchor import Anchor
+from lean_spec.node.genesis import GenesisConfig
+from lean_spec.node.sync.checkpoint_sync import CheckpointSyncError
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.genesis import GenesisConfig
-from lean_spec.subspecs.node.anchor import Anchor
-from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError
 from lean_spec.types import Bytes32, Slot
 from tests.lean_spec.helpers import make_genesis_state
 
@@ -43,7 +43,7 @@ class TestAnchorFromCheckpoint:
 
         with (
             patch(
-                "lean_spec.subspecs.node.anchor.fetch_finalized_state",
+                "lean_spec.node.anchor.fetch_finalized_state",
                 new_callable=AsyncMock,
                 return_value=checkpoint_state,
             ),
@@ -65,12 +65,12 @@ class TestAnchorFromCheckpoint:
 
         with (
             patch(
-                "lean_spec.subspecs.node.anchor.fetch_finalized_state",
+                "lean_spec.node.anchor.fetch_finalized_state",
                 new_callable=AsyncMock,
                 return_value=checkpoint_state,
             ),
             patch(
-                "lean_spec.subspecs.node.anchor.verify_checkpoint_state",
+                "lean_spec.node.anchor.verify_checkpoint_state",
                 return_value=False,
             ),
             pytest.raises(CheckpointSyncError, match="structural verification"),
@@ -90,7 +90,7 @@ class TestAnchorFromCheckpoint:
 
         with (
             patch(
-                "lean_spec.subspecs.node.anchor.fetch_finalized_state",
+                "lean_spec.node.anchor.fetch_finalized_state",
                 new_callable=AsyncMock,
                 side_effect=CheckpointSyncError("connection refused"),
             ),
@@ -112,7 +112,7 @@ class TestAnchorFromCheckpoint:
         )
 
         with patch(
-            "lean_spec.subspecs.node.anchor.fetch_finalized_state",
+            "lean_spec.node.anchor.fetch_finalized_state",
             new_callable=AsyncMock,
             return_value=checkpoint_state,
         ):

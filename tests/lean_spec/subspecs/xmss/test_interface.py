@@ -2,9 +2,9 @@
 
 import pytest
 
-from lean_spec.subspecs.xmss import interface
-from lean_spec.subspecs.xmss.encoding import target_sum_encode
-from lean_spec.subspecs.xmss.interface import (
+from lean_spec.spec.crypto.xmss import interface
+from lean_spec.spec.crypto.xmss.encoding import target_sum_encode
+from lean_spec.spec.crypto.xmss.interface import (
     TEST_SIGNATURE_SCHEME,
     GeneralizedXmssScheme,
     _expand_activation_time,

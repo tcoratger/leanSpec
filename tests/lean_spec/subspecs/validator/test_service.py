@@ -7,7 +7,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.node.chain.clock import SlotClock
+from lean_spec.node.chain.config import MILLISECONDS_PER_INTERVAL
+from lean_spec.node.sync.block_cache import BlockCache
+from lean_spec.node.sync.peer_manager import PeerManager
+from lean_spec.node.sync.service import SyncService
+from lean_spec.node.validator import ValidatorRegistry, ValidatorService
+from lean_spec.node.validator.constants import SYNC_LAG_THRESHOLD
+from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
@@ -16,16 +26,6 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedBlock,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.chain.clock import SlotClock
-from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
-from lean_spec.subspecs.sync.block_cache import BlockCache
-from lean_spec.subspecs.sync.peer_manager import PeerManager
-from lean_spec.subspecs.sync.service import SyncService
-from lean_spec.subspecs.validator import ValidatorRegistry, ValidatorService
-from lean_spec.subspecs.validator.constants import SYNC_LAG_THRESHOLD
-from lean_spec.subspecs.validator.registry import ValidatorEntry
-from lean_spec.subspecs.xmss import TARGET_SIGNATURE_SCHEME
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
@@ -36,7 +36,7 @@ from tests.lean_spec.helpers import (
 )
 
 # Patch target for the XMSS scheme reference inside service.py.
-_SCHEME = "lean_spec.subspecs.validator.service.TARGET_SIGNATURE_SCHEME"
+_SCHEME = "lean_spec.node.validator.service.TARGET_SIGNATURE_SCHEME"
 
 _INTERVAL_SECONDS = int(MILLISECONDS_PER_INTERVAL) / 1000
 

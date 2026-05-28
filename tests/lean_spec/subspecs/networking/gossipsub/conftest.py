@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.gossipsub.behavior import GossipsubBehavior, PeerState
-from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
-from lean_spec.subspecs.networking.gossipsub.rpc import RPC
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.gossipsub.behavior import GossipsubBehavior, PeerState
+from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.node.networking.gossipsub.rpc import RPC
+from lean_spec.node.networking.gossipsub.types import TopicId
 
 
 def make_peer(name: str) -> PeerId:

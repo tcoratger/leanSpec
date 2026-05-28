@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from lean_spec.subspecs.api import AggregatorController
-from lean_spec.subspecs.networking import NetworkService, PeerId
-from lean_spec.subspecs.sync import SyncService
+from lean_spec.node.api import AggregatorController
+from lean_spec.node.networking import NetworkService, PeerId
+from lean_spec.node.sync import SyncService
 from tests.lean_spec.helpers import MockEventSource, create_mock_sync_service
 
 FORK_DIGEST = "0x00000000"

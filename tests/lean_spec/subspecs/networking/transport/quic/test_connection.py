@@ -13,9 +13,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lean_spec.subspecs.networking.config import LIBP2P_ALPN_PROTOCOL
-from lean_spec.subspecs.networking.transport.peer_id import PeerId
-from lean_spec.subspecs.networking.transport.quic.connection import (
+from lean_spec.node.networking.config import LIBP2P_ALPN_PROTOCOL
+from lean_spec.node.networking.transport.peer_id import PeerId
+from lean_spec.node.networking.transport.quic.connection import (
     ConnectionTerminated,
     HandshakeCompleted,
     LibP2PQuicProtocol,
@@ -27,11 +27,11 @@ from lean_spec.subspecs.networking.transport.quic.connection import (
     is_quic_multiaddr,
     parse_multiaddr,
 )
-from lean_spec.subspecs.networking.transport.quic.stream import (
+from lean_spec.node.networking.transport.quic.stream import (
     QuicStreamResetError,
     QuicTransportError,
 )
-from lean_spec.subspecs.networking.types import ProtocolId
+from lean_spec.node.networking.types import ProtocolId
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -880,7 +880,7 @@ class TestQuicConnectionOpenStreamHappyPath:
     """
 
     @patch(
-        "lean_spec.subspecs.networking.transport.quic.connection.QuicStreamAdapter",
+        "lean_spec.node.networking.transport.quic.connection.QuicStreamAdapter",
     )
     async def test_open_stream_creates_and_negotiates(
         self,
@@ -948,7 +948,7 @@ class TestQuicConnectionManagerCreate:
     certificate extension, not a CA chain).
     """
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.generate_libp2p_certificate")
+    @patch("lean_spec.node.networking.transport.quic.connection.generate_libp2p_certificate")
     async def test_create_generates_cert_and_configures_quic(
         self, mock_gen_cert: MagicMock
     ) -> None:
@@ -968,7 +968,7 @@ class TestQuicConnectionManagerCreate:
 
         # Intercept QUIC configuration to avoid real TLS operations.
         with patch(
-            "lean_spec.subspecs.networking.transport.quic.connection.QuicConfiguration"
+            "lean_spec.node.networking.transport.quic.connection.QuicConfiguration"
         ) as mock_config_cls:
             mock_config = MagicMock()
             mock_config_cls.return_value = mock_config
@@ -1019,7 +1019,7 @@ class TestQuicConnectionManagerConnect:
         with pytest.raises(QuicTransportError, match=r"Not a QUIC multiaddr"):
             await manager.connect("/ip4/127.0.0.1/udp/9000")
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.quic_connect")
+    @patch("lean_spec.node.networking.transport.quic.connection.quic_connect")
     async def test_connect_happy_path_with_peer_id(
         self, mock_quic_connect: MagicMock, manager: QuicConnectionManager
     ) -> None:
@@ -1052,8 +1052,8 @@ class TestQuicConnectionManagerConnect:
         # Buffered events from the handshake window are replayed.
         mock_protocol._replay_buffered_events.assert_called_once()
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.IdentityKeypair")
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.quic_connect")
+    @patch("lean_spec.node.networking.transport.quic.connection.IdentityKeypair")
+    @patch("lean_spec.node.networking.transport.quic.connection.quic_connect")
     async def test_connect_happy_path_without_peer_id(
         self,
         mock_quic_connect: MagicMock,
@@ -1091,7 +1091,7 @@ class TestQuicConnectionManagerConnect:
         # A temporary peer ID was generated and used.
         assert conn.peer_id == temp_peer
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.quic_connect")
+    @patch("lean_spec.node.networking.transport.quic.connection.quic_connect")
     async def test_connect_wraps_exception(
         self, mock_quic_connect: MagicMock, manager: QuicConnectionManager
     ) -> None:
@@ -1146,8 +1146,8 @@ class TestQuicConnectionManagerListen:
         with pytest.raises(QuicTransportError, match=r"Not a QUIC multiaddr"):
             await manager_with_temp_dir.listen("/ip4/0.0.0.0/udp/9000", callback)
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.QuicConfiguration")
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.quic_serve")
+    @patch("lean_spec.node.networking.transport.quic.connection.QuicConfiguration")
+    @patch("lean_spec.node.networking.transport.quic.connection.quic_serve")
     async def test_listen_configures_server_and_serves(
         self,
         mock_quic_serve: MagicMock,
@@ -1173,7 +1173,7 @@ class TestQuicConnectionManagerListen:
 
         with (
             patch(
-                "lean_spec.subspecs.networking.transport.quic.connection.asyncio.Event"
+                "lean_spec.node.networking.transport.quic.connection.asyncio.Event"
             ) as mock_event_cls,
             pytest.raises(asyncio.CancelledError),
         ):
@@ -1189,9 +1189,9 @@ class TestQuicConnectionManagerListen:
         mock_server_config.load_cert_chain.assert_called_once()
         mock_quic_serve.assert_awaited_once()
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.QuicConfiguration")
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.quic_serve")
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.IdentityKeypair")
+    @patch("lean_spec.node.networking.transport.quic.connection.QuicConfiguration")
+    @patch("lean_spec.node.networking.transport.quic.connection.quic_serve")
+    @patch("lean_spec.node.networking.transport.quic.connection.IdentityKeypair")
     async def test_listen_handle_handshake_creates_connection(
         self,
         mock_identity_cls: MagicMock,
@@ -1231,7 +1231,7 @@ class TestQuicConnectionManagerListen:
 
         with (
             patch(
-                "lean_spec.subspecs.networking.transport.quic.connection.asyncio.Event"
+                "lean_spec.node.networking.transport.quic.connection.asyncio.Event"
             ) as mock_event_cls,
             pytest.raises(asyncio.CancelledError),
         ):
@@ -1263,8 +1263,8 @@ class TestQuicConnectionManagerListen:
         assert proto_instance.connection.peer_id == temp_peer
         assert temp_peer in manager_with_temp_dir._connections
 
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.QuicConfiguration")
-    @patch("lean_spec.subspecs.networking.transport.quic.connection.quic_serve")
+    @patch("lean_spec.node.networking.transport.quic.connection.QuicConfiguration")
+    @patch("lean_spec.node.networking.transport.quic.connection.quic_serve")
     async def test_listen_without_temp_dir_skips_cert_loading(
         self,
         mock_quic_serve: MagicMock,
@@ -1296,7 +1296,7 @@ class TestQuicConnectionManagerListen:
 
         with (
             patch(
-                "lean_spec.subspecs.networking.transport.quic.connection.asyncio.Event"
+                "lean_spec.node.networking.transport.quic.connection.asyncio.Event"
             ) as mock_event_cls,
             pytest.raises(asyncio.CancelledError),
         ):

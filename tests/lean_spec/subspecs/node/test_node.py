@@ -10,6 +10,18 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.node import Node, NodeConfig
+from lean_spec.node.api import ApiServerConfig
+from lean_spec.node.chain.clock import Interval
+from lean_spec.node.chain.config import (
+    ATTESTATION_COMMITTEE_COUNT,
+    HISTORICAL_ROOTS_LIMIT,
+    INTERVALS_PER_SLOT,
+    SECONDS_PER_SLOT,
+)
+from lean_spec.node.storage.sqlite import SQLiteDatabase
+from lean_spec.node.validator import ValidatorRegistry
+from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import State
 from lean_spec.spec.forks.lstar.containers import (
@@ -25,18 +37,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.api import ApiServerConfig
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import (
-    ATTESTATION_COMMITTEE_COUNT,
-    HISTORICAL_ROOTS_LIMIT,
-    INTERVALS_PER_SLOT,
-    SECONDS_PER_SLOT,
-)
-from lean_spec.subspecs.node import Node, NodeConfig
-from lean_spec.subspecs.storage.sqlite import SQLiteDatabase
-from lean_spec.subspecs.validator import ValidatorRegistry
-from lean_spec.subspecs.validator.registry import ValidatorEntry
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
@@ -442,7 +442,7 @@ class TestDatabaseResumeFromGenesis:
 
         # Patch SQLiteDatabase to reuse the same in-memory DB.
         with patch(
-            "lean_spec.subspecs.node.node.SQLiteDatabase",
+            "lean_spec.node.node.SQLiteDatabase",
             return_value=original_node.database,
         ):
             resumed = Node.from_genesis(config)
@@ -592,7 +592,7 @@ class TestPeriodicLogging:
         """
         from prometheus_client import CollectorRegistry
 
-        from lean_spec.subspecs.metrics import registry as metrics_registry
+        from lean_spec.node.metrics import registry as metrics_registry
 
         test_reg = CollectorRegistry()
         metrics_registry.init(registry=test_reg)
@@ -607,7 +607,7 @@ class TestPeriodicLogging:
                 node._shutdown.set()
 
             with (
-                patch("lean_spec.subspecs.node.node._JUSTIFIED_FINALIZED_LOG_INTERVAL_SEC", 0),
+                patch("lean_spec.node.node._JUSTIFIED_FINALIZED_LOG_INTERVAL_SEC", 0),
                 patch.object(
                     metrics_registry.lean_validators_count, "set", side_effect=trigger_shutdown
                 ),
@@ -635,7 +635,7 @@ class TestPeriodicLogging:
         """
         from prometheus_client import CollectorRegistry
 
-        from lean_spec.subspecs.metrics import registry as metrics_registry
+        from lean_spec.node.metrics import registry as metrics_registry
 
         test_reg = CollectorRegistry()
         metrics_registry.init(registry=test_reg)
@@ -651,7 +651,7 @@ class TestPeriodicLogging:
                 node._shutdown.set()
 
             with (
-                patch("lean_spec.subspecs.node.node._JUSTIFIED_FINALIZED_LOG_INTERVAL_SEC", 0),
+                patch("lean_spec.node.node._JUSTIFIED_FINALIZED_LOG_INTERVAL_SEC", 0),
                 patch.object(
                     metrics_registry.lean_validators_count, "set", side_effect=trigger_shutdown
                 ),

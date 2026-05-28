@@ -23,8 +23,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lean_spec.subspecs.networking.transport.quic import QuicStream
-from lean_spec.subspecs.networking.transport.quic.stream_adapter import (
+from lean_spec.node.networking.transport.quic import QuicStream
+from lean_spec.node.networking.transport.quic.stream_adapter import (
     MAX_MESSAGE_SIZE,
     MAX_NEGOTIATION_ATTEMPTS,
     MULTISTREAM_PROTOCOL_ID,
@@ -32,8 +32,8 @@ from lean_spec.subspecs.networking.transport.quic.stream_adapter import (
     NegotiationError,
     QuicStreamAdapter,
 )
-from lean_spec.subspecs.networking.types import ProtocolId
-from lean_spec.subspecs.networking.varint import decode_varint, encode_varint
+from lean_spec.node.networking.types import ProtocolId
+from lean_spec.node.networking.varint import decode_varint, encode_varint
 
 GOSSIPSUB_ID = ProtocolId("/meshsub/1.1.0")
 GOSSIPSUB_V12_ID = ProtocolId("/meshsub/1.2.0")
@@ -396,7 +396,7 @@ class TestMessageFormat:
         stream, peer = _create_stream_pair()
         peer.write(b"\x01")
         await peer.drain()
-        import lean_spec.subspecs.networking.transport.quic.stream_adapter as module
+        import lean_spec.node.networking.transport.quic.stream_adapter as module
 
         def fake_decode_varint(_):
             raise ValueError("bad varint")
@@ -543,7 +543,7 @@ class TestReadNegotiationMessage:
         """Raises error when varint decoding fails."""
         stream, _ = _create_stream_pair()
         with patch(
-            "lean_spec.subspecs.networking.transport.quic.stream_adapter.decode_varint",
+            "lean_spec.node.networking.transport.quic.stream_adapter.decode_varint",
             side_effect=ValueError("Invalid varint encoding"),
         ):
             stream._stream.read = AsyncMock(return_value=bytes([0x7F]))  # type: ignore[method-assign]

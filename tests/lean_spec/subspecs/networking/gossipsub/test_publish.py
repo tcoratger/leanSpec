@@ -8,16 +8,16 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
-from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.subspecs.networking.gossipsub.rpc import (
+from lean_spec.node.networking.config import PRUNE_BACKOFF
+from lean_spec.node.networking.gossipsub.message import GossipsubMessage
+from lean_spec.node.networking.gossipsub.rpc import (
     RPC,
     ControlMessage,
     ControlPrune,
     Message,
     SubOpts,
 )
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.gossipsub.types import TopicId
 
 from .conftest import add_peer, make_behavior
 

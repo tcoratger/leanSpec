@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 from pydantic import ConfigDict, PrivateAttr, field_serializer
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -14,7 +15,6 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import Bytes32, ValidatorIndices
 
 from ..keys import XmssKeyManager

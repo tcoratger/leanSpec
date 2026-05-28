@@ -6,7 +6,7 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.subspecs.xmss.aggregation import (
+from lean_spec.spec.crypto.xmss.aggregation import (
     AggregationError,
     TypeOneMultiSignature,
     TypeTwoMultiSignature,

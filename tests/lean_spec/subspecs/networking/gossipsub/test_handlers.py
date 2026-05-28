@@ -6,14 +6,14 @@ import time
 
 import pytest
 
-from lean_spec.subspecs.networking.config import PRUNE_BACKOFF
-from lean_spec.subspecs.networking.gossipsub.behavior import (
+from lean_spec.node.networking.config import PRUNE_BACKOFF
+from lean_spec.node.networking.gossipsub.behavior import (
     IDONTWANT_SIZE_THRESHOLD,
     GossipsubMessageEvent,
     GossipsubPeerEvent,
 )
-from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.subspecs.networking.gossipsub.rpc import (
+from lean_spec.node.networking.gossipsub.message import GossipsubMessage
+from lean_spec.node.networking.gossipsub.rpc import (
     RPC,
     ControlGraft,
     ControlIDontWant,
@@ -24,7 +24,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
 )
-from lean_spec.subspecs.networking.gossipsub.types import MessageId, Timestamp, TopicId
+from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
 from .conftest import add_peer, make_behavior, make_peer
 

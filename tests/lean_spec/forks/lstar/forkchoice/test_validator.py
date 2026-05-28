@@ -3,7 +3,9 @@
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, Store
 from lean_spec.spec.forks.lstar.containers import (
     Attestation,
@@ -14,8 +16,6 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAttestation,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_aggregated_proof, make_store
 

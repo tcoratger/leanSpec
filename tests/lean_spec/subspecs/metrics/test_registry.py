@@ -7,7 +7,7 @@ from collections.abc import Iterator
 import pytest
 from prometheus_client import CollectorRegistry
 
-from lean_spec.subspecs.metrics.registry import (
+from lean_spec.node.metrics.registry import (
     ATTESTATION_AGGREGATE_COVERAGE_DIFF_DIRECTIONS,
     ATTESTATION_AGGREGATE_COVERAGE_SECTIONS,
     registry,

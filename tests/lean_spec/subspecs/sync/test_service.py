@@ -8,16 +8,16 @@ from typing import cast
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.reqresp.message import Status
+from lean_spec.node.storage.database import Database
+from lean_spec.node.sync.config import MAX_PENDING_ATTESTATIONS
+from lean_spec.node.sync.service import SyncService
+from lean_spec.node.sync.states import SyncState
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
 )
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.storage.database import Database
-from lean_spec.subspecs.sync.config import MAX_PENDING_ATTESTATIONS
-from lean_spec.subspecs.sync.service import SyncService
-from lean_spec.subspecs.sync.states import SyncState
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockForkchoiceStore,

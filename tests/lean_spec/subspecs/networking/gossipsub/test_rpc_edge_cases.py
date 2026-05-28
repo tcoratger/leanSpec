@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.networking.gossipsub.rpc import (
+from lean_spec.node.networking.gossipsub.rpc import (
     RPC,
     WIRE_TYPE_32BIT,
     WIRE_TYPE_64BIT,
@@ -22,7 +22,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     encode_bytes,
     encode_tag,
 )
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.gossipsub.types import TopicId
 
 
 class TestSkipField:

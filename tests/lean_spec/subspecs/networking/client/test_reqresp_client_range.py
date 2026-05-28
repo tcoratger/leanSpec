@@ -7,6 +7,16 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from lean_spec.node.networking.client.reqresp_client import ReqRespClient
+from lean_spec.node.networking.config import MAX_REQUEST_BLOCKS
+from lean_spec.node.networking.reqresp.codec import (
+    CodecError,
+    ResponseCode,
+)
+from lean_spec.node.networking.reqresp.message import (
+    BLOCKS_BY_RANGE_PROTOCOL_V1,
+)
+from lean_spec.node.networking.transport import PeerId
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
@@ -14,16 +24,6 @@ from lean_spec.spec.forks.lstar.containers import (
     BlockBody,
     SignedBlock,
 )
-from lean_spec.subspecs.networking.client.reqresp_client import ReqRespClient
-from lean_spec.subspecs.networking.config import MAX_REQUEST_BLOCKS
-from lean_spec.subspecs.networking.reqresp.codec import (
-    CodecError,
-    ResponseCode,
-)
-from lean_spec.subspecs.networking.reqresp.message import (
-    BLOCKS_BY_RANGE_PROTOCOL_V1,
-)
-from lean_spec.subspecs.networking.transport import PeerId
 from lean_spec.types import ByteList512KiB, Bytes32, Slot, Uint64, ValidatorIndex
 
 

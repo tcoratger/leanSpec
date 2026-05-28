@@ -8,18 +8,18 @@ from pathlib import Path
 
 import pytest
 
+from lean_spec.node.storage import (
+    SQLiteDatabase,
+    StorageCorruptionError,
+    StorageReadError,
+    StorageWriteError,
+)
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import State
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,
-)
-from lean_spec.subspecs.storage import (
-    SQLiteDatabase,
-    StorageCorruptionError,
-    StorageReadError,
-    StorageWriteError,
 )
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 

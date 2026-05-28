@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lean_spec.subspecs.sync.states import SyncState
+from lean_spec.node.sync.states import SyncState
 
 
 class TestSyncStateValues:

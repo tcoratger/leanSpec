@@ -1,6 +1,6 @@
 """Greedy proof selection for lstar block production."""
 
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import ValidatorIndex
 
 

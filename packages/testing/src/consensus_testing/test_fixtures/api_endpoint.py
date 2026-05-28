@@ -150,7 +150,7 @@ def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, A
     so the fixture pins only the stable contract: status, content-type,
     and the full list of metric names clients must expose.
     """
-    from lean_spec.subspecs.metrics.registry import registry as metrics_registry
+    from lean_spec.node.metrics.registry import registry as metrics_registry
 
     # Names enumerated from the leanMetrics spec. Any change to this list
     # is a cross-client-visible metrics surface change and should be

@@ -6,14 +6,12 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from lean_spec.snappy import compress
-from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
-from lean_spec.subspecs.networking.peer import PeerInfo
-from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.service import NetworkService
-from lean_spec.subspecs.networking.service.events import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.gossipsub.topic import GossipTopic
+from lean_spec.node.networking.peer import PeerInfo
+from lean_spec.node.networking.reqresp.message import Status
+from lean_spec.node.networking.service import NetworkService
+from lean_spec.node.networking.service.events import (
     GossipAggregatedAttestationEvent,
     GossipAttestationEvent,
     GossipBlockEvent,
@@ -22,7 +20,9 @@ from lean_spec.subspecs.networking.service.events import (
     PeerDisconnectedEvent,
     PeerStatusEvent,
 )
-from lean_spec.subspecs.networking.types import ConnectionState
+from lean_spec.node.networking.types import ConnectionState
+from lean_spec.snappy import compress
+from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.types import Bytes32, Checkpoint, Slot, SubnetId, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
@@ -164,7 +164,7 @@ class TestAggregatedAttestationDispatch:
 
     async def test_gossip_aggregated_attestation_routed(self, peer_id: PeerId) -> None:
         """GossipAggregatedAttestationEvent calls sync_service.on_gossip_aggregated_attestation."""
-        from lean_spec.subspecs.sync.service import SyncService as _SyncService
+        from lean_spec.node.sync.service import SyncService as _SyncService
 
         sync_service = create_mock_sync_service(peer_id)
 
@@ -197,7 +197,7 @@ class TestSecondaryEventDispatch:
 
     async def test_gossip_block_routed(self, peer_id: PeerId) -> None:
         """GossipBlockEvent calls sync_service.on_gossip_block."""
-        from lean_spec.subspecs.sync.service import SyncService as _SyncService
+        from lean_spec.node.sync.service import SyncService as _SyncService
 
         sync_service = create_mock_sync_service(peer_id)
         block = make_signed_block(
@@ -218,7 +218,7 @@ class TestSecondaryEventDispatch:
 
     async def test_gossip_attestation_routed(self, peer_id: PeerId) -> None:
         """GossipAttestationEvent calls sync_service.on_gossip_attestation."""
-        from lean_spec.subspecs.sync.service import SyncService as _SyncService
+        from lean_spec.node.sync.service import SyncService as _SyncService
 
         sync_service = create_mock_sync_service(peer_id)
         attestation = SignedAttestation(
@@ -243,7 +243,7 @@ class TestSecondaryEventDispatch:
 
     async def test_peer_status_routed(self, peer_id: PeerId) -> None:
         """PeerStatusEvent calls sync_service.on_peer_status."""
-        from lean_spec.subspecs.sync.service import SyncService as _SyncService
+        from lean_spec.node.sync.service import SyncService as _SyncService
 
         sync_service = create_mock_sync_service(peer_id)
         status = Status(

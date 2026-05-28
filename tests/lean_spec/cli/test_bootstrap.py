@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed, decode_dss_signature
 
 from lean_spec.cli import CliValidationError, NodeBootstrap, parse_args
-from lean_spec.subspecs.api import ApiServerConfig
+from lean_spec.node.api import ApiServerConfig
 from lean_spec.types import Slot, SubnetId, ValidatorIndex
 from lean_spec.types.rlp import RLPItem, encode_rlp
 

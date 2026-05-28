@@ -7,15 +7,15 @@ from consensus_testing.keys import XmssKeyManager
 from pydantic import ValidationError
 
 from lean_spec.spec.crypto.koalabear import P_BYTES
-from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.containers import (
+from lean_spec.spec.crypto.xmss.constants import TEST_CONFIG
+from lean_spec.spec.crypto.xmss.containers import (
     KeyPair,
     PublicKey,
     SecretKey,
     Signature,
     ValidatorKeyPair,
 )
-from lean_spec.subspecs.xmss.interface import TEST_SIGNATURE_SCHEME
+from lean_spec.spec.crypto.xmss.interface import TEST_SIGNATURE_SCHEME
 from lean_spec.types import Bytes32, Slot, Uint64, ValidatorIndex
 
 

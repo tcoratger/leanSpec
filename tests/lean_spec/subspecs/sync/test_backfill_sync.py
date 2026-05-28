@@ -6,13 +6,13 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer import PeerInfo
-from lean_spec.subspecs.networking.types import ConnectionState
-from lean_spec.subspecs.sync.backfill_sync import BackfillSync
-from lean_spec.subspecs.sync.block_cache import BlockCache, PendingBlock
-from lean_spec.subspecs.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
-from lean_spec.subspecs.sync.peer_manager import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.peer import PeerInfo
+from lean_spec.node.networking.types import ConnectionState
+from lean_spec.node.sync.backfill_sync import BackfillSync
+from lean_spec.node.sync.block_cache import BlockCache, PendingBlock
+from lean_spec.node.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
+from lean_spec.node.sync.peer_manager import (
     INITIAL_PEER_SCORE,
     SCORE_FAILURE_PENALTY,
     SCORE_SUCCESS_BONUS,

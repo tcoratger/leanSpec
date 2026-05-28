@@ -3,18 +3,18 @@
 import pytest
 
 from lean_spec.spec.crypto.koalabear import Fp, P
-from lean_spec.subspecs.xmss import encoding
-from lean_spec.subspecs.xmss.constants import TEST_CONFIG, TWEAK_PREFIX_MESSAGE
-from lean_spec.subspecs.xmss.encoding import (
+from lean_spec.spec.crypto.xmss import encoding
+from lean_spec.spec.crypto.xmss.constants import TEST_CONFIG, TWEAK_PREFIX_MESSAGE
+from lean_spec.spec.crypto.xmss.encoding import (
     aborting_decode,
     encode_epoch,
     encode_message,
     message_hash,
     target_sum_encode,
 )
-from lean_spec.subspecs.xmss.field import int_to_base_p, random_field_elements
-from lean_spec.subspecs.xmss.poseidon import TEST_POSEIDON
-from lean_spec.subspecs.xmss.types import Parameter, Randomness
+from lean_spec.spec.crypto.xmss.field import int_to_base_p, random_field_elements
+from lean_spec.spec.crypto.xmss.poseidon import TEST_POSEIDON
+from lean_spec.spec.crypto.xmss.types import Parameter, Randomness
 from lean_spec.types import Bytes32, Uint64
 
 

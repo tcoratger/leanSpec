@@ -11,9 +11,9 @@ import asyncio
 
 import pytest
 
-from lean_spec.subspecs.networking.gossipsub.behavior import GossipsubMessageEvent
-from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.gossipsub.behavior import GossipsubMessageEvent
+from lean_spec.node.networking.gossipsub.message import GossipsubMessage
+from lean_spec.node.networking.gossipsub.types import TopicId
 
 from .conftest import fast_params
 from .network import GossipsubTestNetwork

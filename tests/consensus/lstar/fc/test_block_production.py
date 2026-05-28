@@ -16,7 +16,7 @@ from consensus_testing import (
     TickStep,
 )
 
-from lean_spec.subspecs.chain.config import (
+from lean_spec.node.chain.config import (
     INTERVALS_PER_SLOT,
     MAX_ATTESTATIONS_DATA,
     MILLISECONDS_PER_INTERVAL,

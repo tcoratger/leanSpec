@@ -2,9 +2,9 @@
 
 from typing import Self
 
-from lean_spec.subspecs.chain.config import HISTORICAL_ROOTS_LIMIT, VALIDATOR_REGISTRY_LIMIT
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
-from lean_spec.subspecs.xmss.containers import PublicKey, Signature
+from lean_spec.node.chain.config import HISTORICAL_ROOTS_LIMIT, VALIDATOR_REGISTRY_LIMIT
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
+from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.types import (
     AggregationBits,
     Boolean,

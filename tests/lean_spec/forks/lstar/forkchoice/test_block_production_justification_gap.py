@@ -6,11 +6,11 @@ from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_types.aggregated_attestation_spec import AggregatedAttestationSpec
 from consensus_testing.test_types.block_spec import BlockSpec
 
+from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import Block
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 

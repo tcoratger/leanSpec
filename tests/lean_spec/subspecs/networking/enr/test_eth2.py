@@ -3,12 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.subspecs.networking.enr import Eth2Data
-from lean_spec.subspecs.networking.enr.eth2 import (
+from lean_spec.node.networking.enr import Eth2Data
+from lean_spec.node.networking.enr.eth2 import (
     FAR_FUTURE_EPOCH,
     AttestationSubnets,
 )
-from lean_spec.subspecs.networking.types import ForkDigest, Version
+from lean_spec.node.networking.types import ForkDigest, Version
 from lean_spec.types import SubnetId, Uint64
 
 

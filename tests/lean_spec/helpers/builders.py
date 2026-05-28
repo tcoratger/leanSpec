@@ -11,8 +11,26 @@ from typing import NamedTuple, cast
 
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.node.chain.clock import Interval, SlotClock
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.peer import PeerInfo
+from lean_spec.node.networking.reqresp.message import Status
+from lean_spec.node.networking.types import ConnectionState
+from lean_spec.node.storage import Database
+from lean_spec.node.sync.block_cache import BlockCache
+from lean_spec.node.sync.peer_manager import PeerManager
+from lean_spec.node.sync.service import SyncService
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
+from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
+from lean_spec.spec.crypto.xmss.containers import Signature
+from lean_spec.spec.crypto.xmss.types import (
+    HashDigestList,
+    HashDigestVector,
+    HashTreeOpening,
+    Randomness,
+)
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, State, Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -27,24 +45,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.chain.clock import Interval, SlotClock
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer import PeerInfo
-from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.types import ConnectionState
-from lean_spec.subspecs.storage import Database
-from lean_spec.subspecs.sync.block_cache import BlockCache
-from lean_spec.subspecs.sync.peer_manager import PeerManager
-from lean_spec.subspecs.sync.service import SyncService
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
-from lean_spec.subspecs.xmss.constants import TARGET_CONFIG
-from lean_spec.subspecs.xmss.containers import Signature
-from lean_spec.subspecs.xmss.types import (
-    HashDigestList,
-    HashDigestVector,
-    HashTreeOpening,
-    Randomness,
-)
 from lean_spec.types import (
     ByteList512KiB,
     Bytes32,

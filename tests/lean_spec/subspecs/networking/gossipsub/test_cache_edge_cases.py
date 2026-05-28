@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 
-from lean_spec.subspecs.networking.gossipsub.mcache import MessageCache, SeenCache
-from lean_spec.subspecs.networking.gossipsub.message import GossipsubMessage
-from lean_spec.subspecs.networking.gossipsub.types import MessageId, Timestamp, TopicId
+from lean_spec.node.networking.gossipsub.mcache import MessageCache, SeenCache
+from lean_spec.node.networking.gossipsub.message import GossipsubMessage
+from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
 
 class TestMessageCacheShift:
@@ -241,7 +241,7 @@ class TestGossipsubMessageId:
 
     def test_compute_id_default_domain_invalid_snappy(self) -> None:
         """compute_id uses the invalid-snappy domain when domain is omitted."""
-        from lean_spec.subspecs.networking.config import (
+        from lean_spec.node.networking.config import (
             MESSAGE_DOMAIN_INVALID_SNAPPY,
             MESSAGE_DOMAIN_VALID_SNAPPY,
         )

@@ -3,9 +3,9 @@
 import pytest
 
 from lean_spec.spec.crypto.koalabear import Fp
-from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.field import random_domain
-from lean_spec.subspecs.xmss.types import (
+from lean_spec.spec.crypto.xmss.constants import TEST_CONFIG
+from lean_spec.spec.crypto.xmss.field import random_domain
+from lean_spec.spec.crypto.xmss.types import (
     NODE_LIST_LIMIT,
     ChainTweak,
     HashDigestList,

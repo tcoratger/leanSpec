@@ -5,20 +5,20 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 
-from lean_spec.subspecs.networking.client.reqresp_client import (
+from lean_spec.node.networking.client.reqresp_client import (
     REQUEST_TIMEOUT_SECONDS,
     ReqRespClient,
 )
-from lean_spec.subspecs.networking.reqresp.codec import (
+from lean_spec.node.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
 )
-from lean_spec.subspecs.networking.reqresp.message import (
+from lean_spec.node.networking.reqresp.message import (
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
     Status,
 )
-from lean_spec.subspecs.networking.transport import PeerId
+from lean_spec.node.networking.transport import PeerId
 from lean_spec.types import Bytes32, Checkpoint, Slot
 from tests.lean_spec.helpers import make_test_block, make_test_status
 

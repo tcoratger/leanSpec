@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.node.chain.clock import Interval
+from lean_spec.node.chain.config import INTERVALS_PER_SLOT
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
@@ -13,9 +16,6 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAttestation,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import INTERVALS_PER_SLOT
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import (
     ByteList512KiB,
     Bytes32,

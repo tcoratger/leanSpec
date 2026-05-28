@@ -1,10 +1,10 @@
 """Tests for the SHAKE128-based pseudorandom function (PRF)."""
 
-from lean_spec.subspecs.xmss.constants import (
+from lean_spec.spec.crypto.xmss.constants import (
     PRF_KEY_LENGTH,
     TEST_CONFIG,
 )
-from lean_spec.subspecs.xmss.prf import PRFKey
+from lean_spec.spec.crypto.xmss.prf import PRFKey
 from lean_spec.types import Uint64
 
 

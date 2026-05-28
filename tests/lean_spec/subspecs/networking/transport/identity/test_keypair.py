@@ -1,7 +1,7 @@
 """Tests for secp256k1 identity keypair."""
 
-from lean_spec.subspecs.networking.transport.identity import IdentityKeypair
-from lean_spec.subspecs.networking.transport.peer_id import KeyType
+from lean_spec.node.networking.transport.identity import IdentityKeypair
+from lean_spec.node.networking.transport.peer_id import KeyType
 
 
 class TestSecp256k1PublicKey:

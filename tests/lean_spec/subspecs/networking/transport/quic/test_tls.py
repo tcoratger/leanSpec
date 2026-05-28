@@ -17,9 +17,9 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from lean_spec.subspecs.networking.transport.identity.keypair import IdentityKeypair
-from lean_spec.subspecs.networking.transport.peer_id import KeyType
-from lean_spec.subspecs.networking.transport.quic.tls import (
+from lean_spec.node.networking.transport.identity.keypair import IdentityKeypair
+from lean_spec.node.networking.transport.peer_id import KeyType
+from lean_spec.node.networking.transport.quic.tls import (
     LIBP2P_EXTENSION_OID,
     SIGNATURE_PREFIX,
     _create_extension_payload,

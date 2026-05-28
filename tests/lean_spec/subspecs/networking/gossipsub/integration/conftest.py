@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
 
 from .network import GossipsubTestNetwork
 from .node import GossipsubTestNode

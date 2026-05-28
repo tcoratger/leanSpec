@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import patch
 
+from lean_spec.node.chain import SlotClock
+from lean_spec.node.chain.clock import Interval
+from lean_spec.node.chain.config import MILLISECONDS_PER_INTERVAL
+from lean_spec.node.chain.service import ChainService
 from lean_spec.spec.forks.lstar.containers import SignedAggregatedAttestation
-from lean_spec.subspecs.chain import SlotClock
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL
-from lean_spec.subspecs.chain.service import ChainService
 from lean_spec.types import ZERO_HASH, Bytes32, Slot, Uint64
 from tests.lean_spec.helpers.mocks import StoreInterceptingSpec
 

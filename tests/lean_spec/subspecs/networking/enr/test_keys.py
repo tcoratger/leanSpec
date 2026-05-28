@@ -1,6 +1,6 @@
 """Tests for ENR key constants."""
 
-from lean_spec.subspecs.networking.enr import keys
+from lean_spec.node.networking.enr import keys
 
 
 class TestEnrKeys:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.subspecs.chain import Interval, SlotClock
-from lean_spec.subspecs.chain.config import (
+from lean_spec.node.chain import Interval, SlotClock
+from lean_spec.node.chain.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
     MILLISECONDS_PER_SLOT,

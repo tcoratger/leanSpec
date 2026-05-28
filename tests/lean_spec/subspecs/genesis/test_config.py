@@ -8,7 +8,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from lean_spec.subspecs.genesis import GenesisConfig
+from lean_spec.node.genesis import GenesisConfig
 from lean_spec.types import Bytes52, SSZValueError, Uint64, ValidatorIndex
 
 

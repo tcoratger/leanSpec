@@ -8,21 +8,19 @@ from typing import Final
 
 import pytest
 
-from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar.containers import SignedBlock
-from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_REQUEST_BLOCKS
-from lean_spec.subspecs.networking.reqresp.codec import (
+from lean_spec.node.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_REQUEST_BLOCKS
+from lean_spec.node.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
 )
-from lean_spec.subspecs.networking.reqresp.handler import (
+from lean_spec.node.networking.reqresp.handler import (
     REQRESP_PROTOCOL_IDS,
     AsyncBlockBySlotLookup,
     ReqRespServer,
     RequestHandler,
     StreamResponseAdapter,
 )
-from lean_spec.subspecs.networking.reqresp.message import (
+from lean_spec.node.networking.reqresp.message import (
     BLOCKS_BY_RANGE_PROTOCOL_V1,
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
@@ -31,8 +29,10 @@ from lean_spec.subspecs.networking.reqresp.message import (
     RequestedBlockRoots,
     Status,
 )
-from lean_spec.subspecs.networking.types import ProtocolId
-from lean_spec.subspecs.networking.varint import encode_varint
+from lean_spec.node.networking.types import ProtocolId
+from lean_spec.node.networking.varint import encode_varint
+from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar.containers import SignedBlock
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64
 from lean_spec.types.exceptions import SSZSerializationError
 from tests.lean_spec.helpers import make_test_block, make_test_status

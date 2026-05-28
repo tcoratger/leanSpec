@@ -11,8 +11,8 @@ from consensus_testing import (
     TickStep,
 )
 
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import GOSSIP_DISPARITY_INTERVALS
+from lean_spec.node.chain.clock import Interval
+from lean_spec.node.chain.config import GOSSIP_DISPARITY_INTERVALS
 from lean_spec.types import Bytes32, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

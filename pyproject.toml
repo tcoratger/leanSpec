@@ -78,7 +78,7 @@ known-first-party = ["lean_spec"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
-"src/lean_spec/subspecs/xmss/constants.py" = ["N802"]
+"src/lean_spec/spec/crypto/xmss/constants.py" = ["N802"]
 
 [tool.ty.environment]
 python-version = "3.12"

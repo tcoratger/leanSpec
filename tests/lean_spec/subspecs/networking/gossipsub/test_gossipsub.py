@@ -2,17 +2,17 @@
 
 import pytest
 
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.client.event_source import GossipHandler
-from lean_spec.subspecs.networking.gossipsub import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.client.event_source import GossipHandler
+from lean_spec.node.networking.gossipsub import (
     ForkMismatchError,
     GossipsubParameters,
     GossipTopic,
     TopicKind,
     parse_topic_string,
 )
-from lean_spec.subspecs.networking.gossipsub.mesh import FanoutEntry, MeshState, TopicMesh
-from lean_spec.subspecs.networking.gossipsub.rpc import (
+from lean_spec.node.networking.gossipsub.mesh import FanoutEntry, MeshState, TopicMesh
+from lean_spec.node.networking.gossipsub.rpc import (
     RPC,
     ControlGraft,
     ControlIDontWant,
@@ -23,7 +23,7 @@ from lean_spec.subspecs.networking.gossipsub.rpc import (
     Message,
     SubOpts,
 )
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.gossipsub.types import TopicId
 from lean_spec.types import SubnetId
 
 

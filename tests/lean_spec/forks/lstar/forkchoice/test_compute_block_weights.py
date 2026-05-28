@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.types.byte_arrays import ByteList512KiB, Bytes32
 from tests.lean_spec.helpers import make_bytes32, make_signed_block

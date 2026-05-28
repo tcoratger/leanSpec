@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.peer import PeerInfo
-from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.types import ConnectionState
-from lean_spec.subspecs.sync.config import MAX_CONCURRENT_REQUESTS
-from lean_spec.subspecs.sync.peer_manager import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.peer import PeerInfo
+from lean_spec.node.networking.reqresp.message import Status
+from lean_spec.node.networking.types import ConnectionState
+from lean_spec.node.sync.config import MAX_CONCURRENT_REQUESTS
+from lean_spec.node.sync.peer_manager import (
     INITIAL_PEER_SCORE,
     MIN_PEER_SCORE,
     SCORE_FAILURE_PENALTY,

@@ -5,7 +5,26 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
+from lean_spec.node.chain.clock import Interval
+from lean_spec.node.chain.config import (
+    GOSSIP_DISPARITY_INTERVALS,
+    INTERVALS_PER_SLOT,
+    JUSTIFICATION_LOOKBACK_SLOTS,
+    MAX_ATTESTATIONS_DATA,
+)
+from lean_spec.node.observability import (
+    observe_on_attestation,
+    observe_on_block,
+    observe_state_transition,
+)
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.aggregation import (
+    AggregationError,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
+)
+from lean_spec.spec.crypto.xmss.containers import PublicKey
+from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -25,25 +44,6 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
     Validators,
 )
-from lean_spec.subspecs.chain.clock import Interval
-from lean_spec.subspecs.chain.config import (
-    GOSSIP_DISPARITY_INTERVALS,
-    INTERVALS_PER_SLOT,
-    JUSTIFICATION_LOOKBACK_SLOTS,
-    MAX_ATTESTATIONS_DATA,
-)
-from lean_spec.subspecs.observability import (
-    observe_on_attestation,
-    observe_on_block,
-    observe_state_transition,
-)
-from lean_spec.subspecs.xmss.aggregation import (
-    AggregationError,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
-)
-from lean_spec.subspecs.xmss.containers import PublicKey
-from lean_spec.subspecs.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.types import (
     ZERO_HASH,
     Boolean,

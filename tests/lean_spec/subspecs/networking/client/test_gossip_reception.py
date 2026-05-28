@@ -15,20 +15,20 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.snappy import compress, decompress
-from lean_spec.spec.forks.lstar.containers import SignedAttestation, SignedBlock
-from lean_spec.subspecs.networking.client.event_source import (
+from lean_spec.node.networking.client.event_source import (
     GossipHandler,
     GossipMessageError,
     read_gossip_message,
 )
-from lean_spec.subspecs.networking.gossipsub.topic import (
+from lean_spec.node.networking.gossipsub.topic import (
     ENCODING_POSTFIX,
     TOPIC_PREFIX,
     GossipTopic,
     TopicKind,
 )
-from lean_spec.subspecs.networking.varint import encode_varint
+from lean_spec.node.networking.varint import encode_varint
+from lean_spec.snappy import compress, decompress
+from lean_spec.spec.forks.lstar.containers import SignedAttestation, SignedBlock
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 

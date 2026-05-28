@@ -6,19 +6,19 @@ from typing import cast
 
 import pytest
 
-from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic, TopicKind
-from lean_spec.subspecs.networking.reqresp.message import Status
-from lean_spec.subspecs.networking.service import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.gossipsub.topic import GossipTopic, TopicKind
+from lean_spec.node.networking.reqresp.message import Status
+from lean_spec.node.networking.service import (
     GossipAttestationEvent,
     GossipBlockEvent,
     NetworkEvent,
     NetworkService,
     PeerStatusEvent,
 )
-from lean_spec.subspecs.sync.states import SyncState
+from lean_spec.node.sync.states import SyncState
+from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.types import Bytes32, Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,

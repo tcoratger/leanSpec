@@ -7,16 +7,16 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from lean_spec.spec.forks.lstar import State, Store
-from lean_spec.spec.forks.lstar.containers import Validators
-from lean_spec.subspecs.api import ApiServer, ApiServerConfig
-from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
-from lean_spec.subspecs.sync.checkpoint_sync import (
+from lean_spec.node.api import ApiServer, ApiServerConfig
+from lean_spec.node.chain.config import VALIDATOR_REGISTRY_LIMIT
+from lean_spec.node.sync.checkpoint_sync import (
     FINALIZED_STATE_ENDPOINT,
     CheckpointSyncError,
     fetch_finalized_state,
     verify_checkpoint_state,
 )
+from lean_spec.spec.forks.lstar import State, Store
+from lean_spec.spec.forks.lstar.containers import Validators
 from lean_spec.types import Slot
 
 
@@ -92,7 +92,7 @@ class TestStateVerification:
         as a verification failure so startup can abort cleanly.
         """
         with patch(
-            "lean_spec.subspecs.sync.checkpoint_sync.hash_tree_root",
+            "lean_spec.node.sync.checkpoint_sync.hash_tree_root",
             side_effect=RuntimeError("hash error"),
         ):
             result = verify_checkpoint_state(genesis_state)
@@ -123,7 +123,7 @@ class TestFetchFinalizedState:
 
         with (
             patch(
-                "lean_spec.subspecs.sync.checkpoint_sync.httpx.AsyncClient",
+                "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=transport),
             ),
             pytest.raises(CheckpointSyncError, match="Network error"),
@@ -149,7 +149,7 @@ class TestFetchFinalizedState:
 
         with (
             patch(
-                "lean_spec.subspecs.sync.checkpoint_sync.httpx.AsyncClient",
+                "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=transport),
             ),
             pytest.raises(CheckpointSyncError, match=f"HTTP error {status_code}"),
@@ -167,7 +167,7 @@ class TestFetchFinalizedState:
 
         with (
             patch(
-                "lean_spec.subspecs.sync.checkpoint_sync.httpx.AsyncClient",
+                "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=transport),
             ),
             pytest.raises(CheckpointSyncError, match="Failed to fetch state"),
@@ -189,7 +189,7 @@ class TestFetchFinalizedState:
 
         with (
             patch(
-                "lean_spec.subspecs.sync.checkpoint_sync.httpx.AsyncClient",
+                "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=_CapturingTransport()),
             ),
             pytest.raises(CheckpointSyncError),

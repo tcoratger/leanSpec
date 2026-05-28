@@ -21,14 +21,14 @@ import hashlib
 
 import pytest
 
-from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_PAYLOAD_SIZE
-from lean_spec.subspecs.networking.reqresp import (
+from lean_spec.node.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_PAYLOAD_SIZE
+from lean_spec.node.networking.reqresp import (
     CodecError,
     ResponseCode,
     decode_request,
     encode_request,
 )
-from lean_spec.subspecs.networking.varint import (
+from lean_spec.node.networking.varint import (
     VarintError,
     decode_varint,
     encode_varint,

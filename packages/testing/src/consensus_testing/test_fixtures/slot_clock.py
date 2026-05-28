@@ -7,8 +7,8 @@ to coordinate block proposals and attestations.
 
 from typing import Any, ClassVar
 
-from lean_spec.subspecs.chain.clock import Interval, SlotClock
-from lean_spec.subspecs.chain.config import (
+from lean_spec.node.chain.clock import Interval, SlotClock
+from lean_spec.node.chain.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
     SECONDS_PER_SLOT,

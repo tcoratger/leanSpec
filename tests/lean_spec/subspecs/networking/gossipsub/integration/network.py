@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import asyncio
 
-from lean_spec.subspecs.networking.gossipsub.parameters import GossipsubParameters
-from lean_spec.subspecs.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.node.networking.gossipsub.types import TopicId
 
 from .node import GossipsubTestNode
 

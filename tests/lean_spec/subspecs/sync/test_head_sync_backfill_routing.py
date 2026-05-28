@@ -13,13 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, cast
 
+from lean_spec.node.networking import PeerId
+from lean_spec.node.sync.backfill_sync import BackfillSync
+from lean_spec.node.sync.block_cache import BlockCache
+from lean_spec.node.sync.head_sync import HeadSync, HeadSyncResult
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import SignedBlock
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.sync.backfill_sync import BackfillSync
-from lean_spec.subspecs.sync.block_cache import BlockCache
-from lean_spec.subspecs.sync.head_sync import HeadSync, HeadSyncResult
 from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64, ValidatorIndex
 from tests.lean_spec.helpers import MockForkchoiceStore, make_signed_block
 

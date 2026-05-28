@@ -3,10 +3,10 @@
 import pytest
 
 from lean_spec.spec.crypto.koalabear import Fp
-from lean_spec.subspecs.xmss.constants import TEST_CONFIG
-from lean_spec.subspecs.xmss.field import random_domain
-from lean_spec.subspecs.xmss.poseidon import TEST_POSEIDON
-from lean_spec.subspecs.xmss.types import (
+from lean_spec.spec.crypto.xmss.constants import TEST_CONFIG
+from lean_spec.spec.crypto.xmss.field import random_domain
+from lean_spec.spec.crypto.xmss.poseidon import TEST_POSEIDON
+from lean_spec.spec.crypto.xmss.types import (
     ChainTweak,
     HashDigestVector,
     Parameter,
