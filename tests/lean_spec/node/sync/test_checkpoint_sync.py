@@ -8,16 +8,15 @@ import httpx
 import pytest
 
 from lean_spec.node.api import ApiServer, ApiServerConfig
-from lean_spec.node.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.node.sync.checkpoint_sync import (
     FINALIZED_STATE_ENDPOINT,
     CheckpointSyncError,
     fetch_finalized_state,
     verify_checkpoint_state,
 )
+from lean_spec.spec.forks import VALIDATOR_REGISTRY_LIMIT, Slot
 from lean_spec.spec.forks.lstar import State, Store
 from lean_spec.spec.forks.lstar.containers import Validators
-from lean_spec.types import Slot
 
 
 class _MockTransport(httpx.AsyncBaseTransport):

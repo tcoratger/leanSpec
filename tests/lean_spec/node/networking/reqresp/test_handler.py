@@ -32,10 +32,10 @@ from lean_spec.node.networking.reqresp.message import (
 from lean_spec.node.networking.types import ProtocolId
 from lean_spec.node.networking.varint import encode_varint
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot
 from lean_spec.spec.forks.lstar.containers import SignedBlock
 from lean_spec.spec.ssz import Bytes32, Uint64
 from lean_spec.spec.ssz.exceptions import SSZSerializationError
-from lean_spec.types import Checkpoint, Slot
 from tests.lean_spec.helpers import make_test_block, make_test_status
 
 

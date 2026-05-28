@@ -16,9 +16,9 @@ from lean_spec.node.validator.registry import (
     ValidatorManifestEntry,
     load_node_validator_mapping,
 )
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes52
 from lean_spec.spec.ssz.exceptions import SSZValueError
-from lean_spec.types import Slot, ValidatorIndex
 
 
 def registry_state(registry: ValidatorRegistry) -> dict[ValidatorIndex, tuple[object, object]]:

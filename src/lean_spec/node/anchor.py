@@ -27,12 +27,14 @@ from lean_spec.spec.forks import (
     AggregatedAttestations,
     Block,
     BlockBody,
+    Checkpoint,
     ForkProtocol,
+    Slot,
     Store,
+    ValidatorIndex,
     Validators,
 )
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 
 class Anchor(StrictBaseModel):

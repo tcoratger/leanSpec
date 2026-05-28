@@ -16,8 +16,8 @@ from lean_spec.spec.crypto.xmss.containers import (
     ValidatorKeyPair,
 )
 from lean_spec.spec.crypto.xmss.interface import TEST_SIGNATURE_SCHEME
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 
 
 @pytest.fixture(scope="module")

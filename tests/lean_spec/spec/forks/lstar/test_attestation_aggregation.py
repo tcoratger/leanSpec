@@ -1,11 +1,11 @@
 """Tests for AggregatedAttestation structure."""
 
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
 )
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 
 
 class TestAggregatedAttestation:

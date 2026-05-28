@@ -39,11 +39,12 @@ from lean_spec.spec.forks import (
     LstarSpec,
     SignedAttestation,
     SignedBlock,
+    Slot,
     Store,
+    ValidatorIndex,
     Validators,
 )
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 
 logger = logging.getLogger(__name__)
 

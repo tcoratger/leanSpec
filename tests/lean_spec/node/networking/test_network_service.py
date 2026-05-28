@@ -18,9 +18,9 @@ from lean_spec.node.networking.service import (
 )
 from lean_spec.node.sync.states import SyncState
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
     MockForkchoiceStore,

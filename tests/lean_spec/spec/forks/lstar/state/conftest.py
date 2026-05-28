@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.types import Slot
+from lean_spec.spec.forks import Slot
 
 
 @pytest.fixture

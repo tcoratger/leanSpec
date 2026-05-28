@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.types.rlp import (
+from lean_spec.node.networking.enr.rlp import (
     RLPDecodingError,
     RLPItem,
     decode_rlp,

@@ -3,7 +3,6 @@
 from typing import Final
 
 from lean_spec.spec.ssz import Uint8, Uint64
-from lean_spec.types import VALIDATOR_REGISTRY_LIMIT
 
 __all__ = [
     "ATTESTATION_COMMITTEE_COUNT",
@@ -15,7 +14,6 @@ __all__ = [
     "MILLISECONDS_PER_INTERVAL",
     "MILLISECONDS_PER_SLOT",
     "SECONDS_PER_SLOT",
-    "VALIDATOR_REGISTRY_LIMIT",
 ]
 
 INTERVALS_PER_SLOT: Final = Uint64(5)

@@ -30,11 +30,11 @@ from lean_spec.spec.forks import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    Slot,
     Store,
 )
 from lean_spec.spec.ssz import Bytes32
 from lean_spec.spec.ssz.exceptions import SSZError
-from lean_spec.types import Slot
 
 from .backfill_sync import BackfillSync, NetworkRequester
 from .block_cache import BlockCache

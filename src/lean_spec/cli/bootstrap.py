@@ -15,8 +15,7 @@ from lean_spec.node.api import ApiServerConfig
 from lean_spec.node.genesis import GenesisConfig
 from lean_spec.node.networking.enr import ENR
 from lean_spec.node.validator import ValidatorRegistry
-from lean_spec.spec.forks import DEFAULT_REGISTRY, ForkProtocol
-from lean_spec.types import SubnetId
+from lean_spec.spec.forks import DEFAULT_REGISTRY, ForkProtocol, SubnetId
 
 from .args import CliArgs
 
