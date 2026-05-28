@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.forks import DEFAULT_REGISTRY, ForkProtocol
+from lean_spec.spec.forks import DEFAULT_REGISTRY, ForkProtocol
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.networking.enr import ENR

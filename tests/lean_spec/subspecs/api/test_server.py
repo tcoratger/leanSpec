@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from lean_spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar import Store
 from lean_spec.subspecs.api import AggregatorController, ApiServer, ApiServerConfig
 
 

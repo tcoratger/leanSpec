@@ -5,8 +5,8 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
-from lean_spec.forks.lstar.aggregation_select import select_greedily
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
     AttestationData,

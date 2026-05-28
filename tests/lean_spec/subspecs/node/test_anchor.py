@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.genesis import GenesisConfig
 from lean_spec.subspecs.node.anchor import Anchor
 from lean_spec.subspecs.sync.checkpoint_sync import CheckpointSyncError

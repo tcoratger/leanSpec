@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
 )
 from lean_spec.subspecs.networking import PeerId

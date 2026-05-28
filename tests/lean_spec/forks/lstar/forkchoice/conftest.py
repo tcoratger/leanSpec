@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from lean_spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar import Store
 from lean_spec.subspecs.chain.clock import Interval
 from tests.lean_spec.helpers import TEST_VALIDATOR_ID, make_store
 

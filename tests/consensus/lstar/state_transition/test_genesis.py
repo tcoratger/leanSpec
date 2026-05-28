@@ -16,7 +16,7 @@ from consensus_testing import (
     generate_pre_state,
 )
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     BlockBody,
     HistoricalBlockHashes,
@@ -27,7 +27,7 @@ from lean_spec.forks.lstar.containers import (
     Validator,
     Validators,
 )
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Bytes52, Slot, Uint64, ValidatorIndex

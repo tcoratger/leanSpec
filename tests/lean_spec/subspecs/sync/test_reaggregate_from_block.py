@@ -24,8 +24,8 @@ from __future__ import annotations
 
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.lstar.containers import AttestationData
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.containers import AttestationData
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Checkpoint, Slot, ValidatorIndex

@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from lean_spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.snappy import compress
+from lean_spec.spec.forks.lstar.containers import AttestationData, SignedAttestation
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.gossipsub.topic import GossipTopic
 from lean_spec.subspecs.networking.peer import PeerInfo

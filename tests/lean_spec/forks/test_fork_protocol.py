@@ -7,7 +7,7 @@ from typing import ClassVar
 import pytest
 
 import lean_spec
-from lean_spec.forks import (
+from lean_spec.spec.forks import (
     DEFAULT_REGISTRY,
     FORK_SEQUENCE,
     ForkProtocol,
@@ -15,7 +15,7 @@ from lean_spec.forks import (
     LstarSpec,
     protocol,
 )
-from lean_spec.forks.lstar.containers import Block, State
+from lean_spec.spec.forks.lstar.containers import Block, State
 from lean_spec.types import Slot, Uint64
 from tests.lean_spec.helpers.builders import make_validators
 
@@ -24,7 +24,7 @@ assert _LEAN_SPEC_FILE is not None  # noqa: S101
 _SUBSPECS_ROOT: Path = Path(_LEAN_SPEC_FILE).parent / "subspecs"
 """Filesystem root for subspec source files. Used by import-guard tests."""
 
-_FORBIDDEN_FORK_PREFIXES: tuple[str, ...] = ("lean_spec.forks.lstar",)
+_FORBIDDEN_FORK_PREFIXES: tuple[str, ...] = ("lean_spec.spec.forks.lstar",)
 """
 Module prefixes that subspec code must never import directly.
 

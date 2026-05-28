@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from lean_spec.forks.lstar import State
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar import State
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,

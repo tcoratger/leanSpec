@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     Block,
     HistoricalBlockHashes,
     JustificationRoots,

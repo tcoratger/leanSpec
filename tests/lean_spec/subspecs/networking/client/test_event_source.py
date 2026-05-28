@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from lean_spec.forks.lstar.containers import SignedAttestation, SignedBlock
 from lean_spec.snappy import compress
+from lean_spec.spec.forks.lstar.containers import SignedAttestation, SignedBlock
 from lean_spec.subspecs.networking.client.event_source import (
     SUPPORTED_PROTOCOLS,
     GossipHandler,

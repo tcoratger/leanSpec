@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.lstar import State
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar import State
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,
@@ -23,7 +23,7 @@ from lean_spec.forks.lstar.containers import (
     JustifiedSlots,
     Validators,
 )
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.api import ApiServerConfig
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import (

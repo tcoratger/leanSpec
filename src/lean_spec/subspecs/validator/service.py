@@ -37,7 +37,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lean_spec.forks import (
+from lean_spec.spec.forks import (
     AttestationData,
     Block,
     LstarSpec,

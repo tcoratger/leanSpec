@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 from pydantic import ConfigDict, PrivateAttr, field_serializer
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
     AttestationData,
@@ -12,7 +12,7 @@ from lean_spec.forks.lstar.containers import (
     BlockBody,
     State,
 )
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.types import Bytes32, ValidatorIndices

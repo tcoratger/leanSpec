@@ -12,9 +12,9 @@ import time
 from dataclasses import dataclass, field
 from typing import cast
 
-from lean_spec.forks.lstar import Store
-from lean_spec.forks.lstar.containers import Validator, Validators
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar.containers import Validator, Validators
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.client import LiveNetworkEventSource

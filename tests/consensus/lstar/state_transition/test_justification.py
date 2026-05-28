@@ -9,7 +9,7 @@ from consensus_testing import (
     generate_pre_state,
 )
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,

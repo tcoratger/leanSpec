@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import ConfigDict, Field, PrivateAttr, field_serializer, model_validator
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     Block,
     SignedAggregatedAttestation,
     SignedAttestation,

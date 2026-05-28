@@ -8,8 +8,8 @@ from consensus_testing import (
     generate_pre_state,
 )
 
-from lean_spec.forks.lstar.containers import JustifiedSlots
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.containers import JustifiedSlots
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import Boolean, Bytes32, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

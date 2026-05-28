@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from pydantic import Field
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Config,
 )

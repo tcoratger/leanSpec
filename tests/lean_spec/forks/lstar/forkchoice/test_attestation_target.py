@@ -5,14 +5,14 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 
-from lean_spec.forks.lstar import Store
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar.containers import (
     Attestation,
     AttestationData,
     SignedAttestation,
     SignedBlock,
 )
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import JUSTIFICATION_LOOKBACK_SLOTS
 from lean_spec.subspecs.ssz.hash import hash_tree_root

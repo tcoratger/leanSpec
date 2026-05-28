@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from lean_spec.forks import (
+from lean_spec.spec.forks import (
     AggregatedAttestations,
     Block,
     BlockBody,

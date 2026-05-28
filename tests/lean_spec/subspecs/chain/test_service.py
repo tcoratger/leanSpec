@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import patch
 
-from lean_spec.forks.lstar.containers import SignedAggregatedAttestation
+from lean_spec.spec.forks.lstar.containers import SignedAggregatedAttestation
 from lean_spec.subspecs.chain import SlotClock
 from lean_spec.subspecs.chain.clock import Interval
 from lean_spec.subspecs.chain.config import MILLISECONDS_PER_INTERVAL

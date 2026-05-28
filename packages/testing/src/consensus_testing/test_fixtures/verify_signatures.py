@@ -6,14 +6,14 @@ from typing import Any, ClassVar
 
 from pydantic import Field
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
     AttestationData,
     SignedBlock,
     State,
 )
-from lean_spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.types import (
     AggregationBits,
     Boolean,

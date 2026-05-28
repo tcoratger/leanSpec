@@ -23,7 +23,7 @@ from typing import Final
 
 import httpx
 
-from lean_spec.forks import State
+from lean_spec.spec.forks import State
 from lean_spec.subspecs.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 

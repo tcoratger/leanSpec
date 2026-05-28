@@ -8,7 +8,7 @@ from typing import Final
 
 import pytest
 
-from lean_spec.forks.lstar.containers import SignedBlock
+from lean_spec.spec.forks.lstar.containers import SignedBlock
 from lean_spec.subspecs.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_REQUEST_BLOCKS
 from lean_spec.subspecs.networking.reqresp.codec import (
     ResponseCode,

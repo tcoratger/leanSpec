@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,

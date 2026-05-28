@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
-from lean_spec.forks import (
+from lean_spec.spec.forks import (
     AggregatedAttestations,
     Block,
     BlockBody,

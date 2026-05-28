@@ -23,7 +23,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from lean_spec.forks.protocol import (
+from lean_spec.spec.forks.protocol import (
     SpecBlockType,
     SpecStateType,
 )

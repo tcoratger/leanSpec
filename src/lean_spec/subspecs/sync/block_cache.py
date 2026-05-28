@@ -42,7 +42,7 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 
-from lean_spec.forks import SignedBlock, Store
+from lean_spec.spec.forks import SignedBlock, Store
 from lean_spec.subspecs.networking.transport.peer_id import PeerId
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import Bytes32, Slot

@@ -71,8 +71,8 @@ def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:
 
         leaves   :  c0     c1     c2     ZERO     (padded to next power of two)
                      \____/        \______/
-                      h01           h(c2, ZERO)
-                       \______________/
+                       h01        h(c2, ZERO)
+                        \______________/
                               root
 
     When a limit is provided, the tree width is the next power of two of that limit.

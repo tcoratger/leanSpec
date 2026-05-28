@@ -61,7 +61,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from lean_spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
+from lean_spec.spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
 from lean_spec.subspecs.networking.config import (
     GOSSIPSUB_DEFAULT_PROTOCOL_ID,
     GOSSIPSUB_PROTOCOL_ID_V12,

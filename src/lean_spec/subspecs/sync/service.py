@@ -11,7 +11,7 @@ from collections import deque
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 
-from lean_spec.forks import (
+from lean_spec.spec.forks import (
     AttestationData,
     Block,
     LstarSpec,
