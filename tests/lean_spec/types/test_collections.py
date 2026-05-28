@@ -6,7 +6,7 @@ from typing import Any, cast
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from lean_spec.subspecs.koalabear import Fp
+from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.types import Bytes32, Uint8, Uint16, Uint32
 from lean_spec.types.boolean import Boolean
 from lean_spec.types.collections import SSZList, SSZVector

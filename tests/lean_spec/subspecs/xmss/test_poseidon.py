@@ -1,8 +1,8 @@
-"""Tests for the Poseidon1 hash engine wrapper used by the XMSS scheme."""
+"""Tests for the Poseidon hash engine wrapper used by the XMSS scheme."""
 
 import pytest
 
-from lean_spec.subspecs.koalabear import Fp
+from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
 from lean_spec.subspecs.xmss.field import random_domain
 from lean_spec.subspecs.xmss.poseidon import TEST_POSEIDON

@@ -7,7 +7,7 @@ from hashlib import sha256
 
 import pytest
 
-from lean_spec.subspecs.koalabear import Fp
+from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.subspecs.ssz.hash import hash_tree_root
 from lean_spec.types import (
     BaseByteList,

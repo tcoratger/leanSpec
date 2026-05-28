@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from functools import singledispatch
 from math import ceil
 
-from lean_spec.subspecs.koalabear import Fp
+from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.subspecs.ssz.constants import BITS_PER_CHUNK, BYTES_PER_CHUNK
 from lean_spec.types.bitfields import BaseBitlist, BaseBitvector
 from lean_spec.types.boolean import Boolean

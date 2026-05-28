@@ -1,6 +1,6 @@
-"""Poseidon1 permutation: width-24 known-answer vectors.
+"""Poseidon permutation: width-24 known-answer vectors.
 
-Pins the output state of the Poseidon1 permutation over the KoalaBear
+Pins the output state of the Poseidon permutation over the KoalaBear
 field at state width 24 for four structural input patterns. Mirrors
 the width-16 coverage on the larger parameter set.
 """
@@ -8,7 +8,7 @@ the width-16 coverage on the larger parameter set.
 import pytest
 from consensus_testing import PoseidonPermutationTestFiller
 
-from lean_spec.subspecs.koalabear.field import P
+from lean_spec.spec.crypto.koalabear import P
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

@@ -1,4 +1,4 @@
-"""Tests for the Poseidon1 permutation for widths 16 and 24.
+"""Tests for the Poseidon permutation for widths 16 and 24.
 
 Test vectors are taken from Plonky3 (koala-bear/src/poseidon1.rs).
 To verify independently, run `cargo test` in the Plonky3 koala-bear crate.
@@ -7,12 +7,12 @@ To verify independently, run `cargo test` in the Plonky3 koala-bear crate.
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.subspecs.koalabear.field import Fp, P
-from lean_spec.subspecs.poseidon1.permutation import (
+from lean_spec.spec.crypto.koalabear import Fp, P
+from lean_spec.spec.crypto.poseidon import (
     PARAMS_16,
     PARAMS_24,
-    Poseidon1,
-    Poseidon1Params,
+    Poseidon,
+    PoseidonParams,
 )
 
 # --- Test Vectors (from Plonky3 koala-bear/src/poseidon1.rs) ---
@@ -85,15 +85,15 @@ EXPECTED_24 = [
     ids=["width_16", "width_24"],
 )
 def test_permutation_vector(
-    params: Poseidon1Params, input_state: list[Fp], expected_output: list[Fp]
+    params: PoseidonParams, input_state: list[Fp], expected_output: list[Fp]
 ) -> None:
     """
-    Test the Poseidon1 permutation against known answer vectors.
+    Test the Poseidon permutation against known answer vectors.
 
     Serves as a regression test to ensure logic consistency.
     Reference: Plonky3 koala-bear/src/poseidon1.rs tests.
     """
-    engine = Poseidon1(params)
+    engine = Poseidon(params)
     output_state = engine.permute(input_state)
 
     assert len(output_state) == params.width
@@ -102,13 +102,13 @@ def test_permutation_vector(
     )
 
 
-class TestPoseidon1ParamsValidation:
-    """Tests for Poseidon1Params validation."""
+class TestPoseidonParamsValidation:
+    """Tests for PoseidonParams validation."""
 
     def test_invalid_mds_first_row_length(self) -> None:
         """Raises error when mds_first_row length doesn't match width."""
         with pytest.raises(ValueError, match=r"Length of mds_first_row must equal width\."):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=8,
                 rounds_p=20,
@@ -119,7 +119,7 @@ class TestPoseidon1ParamsValidation:
     def test_invalid_round_constants_count(self) -> None:
         """Raises error when round_constants count is incorrect."""
         with pytest.raises(ValueError, match=r"Incorrect number of round constants provided\."):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=8,
                 rounds_p=20,
@@ -130,7 +130,7 @@ class TestPoseidon1ParamsValidation:
     def test_width_must_be_positive(self) -> None:
         """Rejects a non-positive width."""
         with pytest.raises(ValidationError, match=r"Input should be greater than 0"):
-            Poseidon1Params(
+            PoseidonParams(
                 width=0,
                 rounds_f=8,
                 rounds_p=20,
@@ -141,7 +141,7 @@ class TestPoseidon1ParamsValidation:
     def test_rounds_f_must_be_positive(self) -> None:
         """Rejects a non-positive full-round count before the even-check runs."""
         with pytest.raises(ValidationError, match=r"Input should be greater than 0"):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=0,
                 rounds_p=20,
@@ -152,7 +152,7 @@ class TestPoseidon1ParamsValidation:
     def test_rounds_p_must_be_non_negative(self) -> None:
         """Rejects a negative partial-round count."""
         with pytest.raises(ValidationError, match=r"Input should be greater than or equal to 0"):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=8,
                 rounds_p=-1,
@@ -166,7 +166,7 @@ class TestPoseidon1ParamsValidation:
             ValidationError,
             match=r"List should have at least 1 item after validation, not 0",
         ):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=8,
                 rounds_p=20,
@@ -180,7 +180,7 @@ class TestPoseidon1ParamsValidation:
             ValidationError,
             match=r"List should have at least 1 item after validation, not 0",
         ):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=8,
                 rounds_p=20,
@@ -191,7 +191,7 @@ class TestPoseidon1ParamsValidation:
     def test_rounds_f_must_be_even(self) -> None:
         """Rejects odd full-round counts that would leave constants unused."""
         with pytest.raises(ValidationError, match=r"Full-round count must be even\."):
-            Poseidon1Params(
+            PoseidonParams(
                 width=3,
                 rounds_f=7,
                 rounds_p=20,
@@ -200,24 +200,24 @@ class TestPoseidon1ParamsValidation:
             )
 
 
-class TestPoseidon1Engine:
-    """Tests for Poseidon1 engine."""
+class TestPoseidonEngine:
+    """Tests for Poseidon engine."""
 
     def test_permute_wrong_state_length_too_short(self) -> None:
         """Raises error when input state is too short."""
-        engine = Poseidon1(PARAMS_16)
+        engine = Poseidon(PARAMS_16)
         with pytest.raises(ValueError, match=r"^Input state must have length 16$"):
             engine.permute([Fp(1)] * 10)
 
     def test_permute_wrong_state_length_too_long(self) -> None:
         """Raises error when input state is too long."""
-        engine = Poseidon1(PARAMS_16)
+        engine = Poseidon(PARAMS_16)
         with pytest.raises(ValueError, match=r"^Input state must have length 16$"):
             engine.permute([Fp(1)] * 20)
 
     def test_permute_determinism(self) -> None:
         """Same input produces same output."""
-        engine = Poseidon1(PARAMS_16)
+        engine = Poseidon(PARAMS_16)
         state = [Fp(value=i) for i in range(16)]
 
         output1 = engine.permute(state)
@@ -227,7 +227,7 @@ class TestPoseidon1Engine:
 
     def test_permute_output_differs_from_input(self) -> None:
         """Permutation changes the state."""
-        engine = Poseidon1(PARAMS_16)
+        engine = Poseidon(PARAMS_16)
         state = [Fp(value=i) for i in range(16)]
 
         output = engine.permute(state)
@@ -242,9 +242,9 @@ class TestPoseidon1Engine:
         ],
         ids=["width_16", "width_24"],
     )
-    def test_permute_output_in_field(self, params: Poseidon1Params, input_state: list[Fp]) -> None:
+    def test_permute_output_in_field(self, params: PoseidonParams, input_state: list[Fp]) -> None:
         """Every output element lies strictly below the field modulus."""
-        engine = Poseidon1(params)
+        engine = Poseidon(params)
 
         output = engine.permute(input_state)
 
@@ -252,7 +252,7 @@ class TestPoseidon1Engine:
 
     def test_permute_all_zero_input(self) -> None:
         """All-zero input produces an in-field output of the expected width."""
-        engine = Poseidon1(PARAMS_16)
+        engine = Poseidon(PARAMS_16)
 
         output = engine.permute([Fp(0)] * 16)
 
@@ -261,7 +261,7 @@ class TestPoseidon1Engine:
 
     def test_permute_field_boundary_input(self) -> None:
         """Maximum-value input stays in-field and exposes int64 regressions."""
-        engine = Poseidon1(PARAMS_16)
+        engine = Poseidon(PARAMS_16)
 
         output = engine.permute([Fp(value=P - 1)] * 16)
 

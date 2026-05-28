@@ -4,7 +4,7 @@ import pytest
 from consensus_testing import SSZTestFiller
 from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 
-from lean_spec.subspecs.koalabear import Fp
+from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.subspecs.xmss import PublicKey
 from lean_spec.subspecs.xmss.aggregation import (
     TypeOneMultiSignature,

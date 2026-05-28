@@ -2,7 +2,7 @@
 
 from typing import Final, NamedTuple
 
-from lean_spec.subspecs.koalabear import Fp
+from lean_spec.spec.crypto.koalabear import Fp
 
 from ...types import Uint64
 from ...types.collections import SSZList, SSZVector
@@ -58,7 +58,7 @@ class HashDigestVector(SSZVector[Fp]):
     """
 
     LENGTH = TARGET_CONFIG.HASH_LEN_FE
-    """One Poseidon1 digest, measured in field elements."""
+    """One Poseidon digest, measured in field elements."""
 
 
 class HashDigestList(SSZList[HashDigestVector]):

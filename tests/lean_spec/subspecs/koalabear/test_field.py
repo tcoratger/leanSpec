@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from lean_spec.subspecs.koalabear.field import Fp, P
+from lean_spec.spec.crypto.koalabear import Fp, P
 from lean_spec.types.exceptions import (
     SSZSerializationError,
     SSZTypeError,

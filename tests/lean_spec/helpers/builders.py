@@ -11,6 +11,7 @@ from typing import NamedTuple, cast
 
 from consensus_testing.keys import XmssKeyManager
 
+from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, State, Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -26,7 +27,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.subspecs.chain.clock import Interval, SlotClock
-from lean_spec.subspecs.koalabear import Fp
 from lean_spec.subspecs.networking import PeerId
 from lean_spec.subspecs.networking.peer import PeerInfo
 from lean_spec.subspecs.networking.reqresp.message import Status

@@ -49,7 +49,7 @@ The decode rejects it, a rare event near 4.7e-10 that barely affects signing.
 
 from lean_spec.types import Bytes32, Uint64
 
-from ..koalabear import Fp
+from ...spec.crypto.koalabear import Fp
 from .constants import TWEAK_PREFIX_MESSAGE, XmssConfig
 from .field import int_to_base_p
 from .poseidon import PoseidonXmss
@@ -116,10 +116,10 @@ def message_hash(
     rho: Randomness,
     message: Bytes32,
 ) -> list[int] | None:
-    """Hash the inputs with Poseidon1 and decode into a candidate codeword.
+    """Hash the inputs with Poseidon and decode into a candidate codeword.
 
     Args:
-        poseidon: Cached Poseidon1 engine.
+        poseidon: Cached Poseidon engine.
         config: Active XMSS configuration.
         parameter: Public parameter P.
         epoch: Current epoch.
@@ -133,7 +133,7 @@ def message_hash(
     message_fe = encode_message(config, message)
     epoch_fe = encode_epoch(config, epoch)
 
-    # One Poseidon1 call produces enough output for the aborting decode.
+    # One Poseidon call produces enough output for the aborting decode.
     base_input = message_fe + parameter.elements + epoch_fe + rho.elements
     poseidon_output = poseidon.compress(base_input, 24, config.MH_HASH_LEN_FE)
 
@@ -153,7 +153,7 @@ def target_sum_encode(
     The signer retries with fresh randomness on rejection.
 
     Args:
-        poseidon: Cached Poseidon1 engine.
+        poseidon: Cached Poseidon engine.
         config: Active XMSS configuration.
         parameter: Public parameter for domain separation.
         message: Message being signed.
@@ -163,7 +163,7 @@ def target_sum_encode(
     Returns:
         Codeword on success, None when the attempt must be retried.
     """
-    # Phase 1: aborting hypercube decode of the Poseidon1 output.
+    # Phase 1: aborting hypercube decode of the Poseidon output.
     codeword_candidate = message_hash(poseidon, config, parameter, epoch, rho, message)
     if codeword_candidate is None:
         return None

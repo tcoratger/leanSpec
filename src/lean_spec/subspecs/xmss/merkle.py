@@ -187,7 +187,7 @@ class HashSubTree(Container):
         Building stops at the bounding layer, which defaults to the global root.
 
         Args:
-            poseidon: Cached Poseidon1 engine.
+            poseidon: Cached Poseidon engine.
             config: Active XMSS configuration.
             lowest_layer: Starting layer for this subtree.
             depth: Total depth of the full lifetime tree.
@@ -254,7 +254,7 @@ class HashSubTree(Container):
         The top tree starts at layer depth/2 and treats bottom-tree roots as its leaves.
 
         Args:
-            poseidon: Cached Poseidon1 engine.
+            poseidon: Cached Poseidon engine.
             config: Active XMSS configuration.
             depth: Total depth of the full lifetime tree.
             start_bottom_tree_index: Index of the first bottom tree in the range.
@@ -300,7 +300,7 @@ class HashSubTree(Container):
         Its root is later placed as a single leaf of the top tree.
 
         Args:
-            poseidon: Cached Poseidon1 engine.
+            poseidon: Cached Poseidon engine.
             config: Active XMSS configuration.
             depth: Total depth of the full lifetime tree.
             bottom_tree_index: Index of this bottom tree.
@@ -376,7 +376,7 @@ class HashSubTree(Container):
         Hashing all of a slot's chain ends together produces the leaf committed at that slot.
 
         Args:
-            poseidon: Cached Poseidon1 engine.
+            poseidon: Cached Poseidon engine.
             config: Active XMSS configuration.
             prf_key: Master secret seed.
             bottom_tree_index: Index of the bottom tree to regenerate.
@@ -567,7 +567,7 @@ def verify_path(
     So out-of-range input returns false rather than raising.
 
     Args:
-        poseidon: Cached Poseidon1 engine.
+        poseidon: Cached Poseidon engine.
         config: Active XMSS configuration.
         parameter: Public parameter for the hash function.
         root: Trusted root taken from the public key.

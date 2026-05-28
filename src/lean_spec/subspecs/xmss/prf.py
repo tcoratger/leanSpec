@@ -8,7 +8,7 @@ from typing import Final, Self
 from lean_spec.types import Bytes16, Bytes32, Uint64
 from lean_spec.types.byte_arrays import BaseBytes
 
-from ..koalabear import Fp
+from ...spec.crypto.koalabear import Fp
 from .constants import PRF_KEY_LENGTH, XmssConfig
 from .types import HashDigestVector, Randomness
 

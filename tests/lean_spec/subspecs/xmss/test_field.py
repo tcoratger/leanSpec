@@ -4,7 +4,7 @@ import secrets
 
 import pytest
 
-from lean_spec.subspecs.koalabear import Fp, P
+from lean_spec.spec.crypto.koalabear import Fp, P
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG
 from lean_spec.subspecs.xmss.field import (
     int_to_base_p,

@@ -9,7 +9,7 @@ from lean_spec.config import LEAN_ENV
 from lean_spec.types import StrictBaseModel, Uint64
 from lean_spec.types.ssz_base import BYTES_PER_LENGTH_OFFSET
 
-from ..koalabear import P_BYTES, P
+from ...spec.crypto.koalabear import P_BYTES, P
 
 
 class XmssConfig(StrictBaseModel):
@@ -57,7 +57,7 @@ class XmssConfig(StrictBaseModel):
     """The output length of the main tweakable hash function."""
 
     CAPACITY: int
-    """The capacity of the Poseidon1 sponge, defining its security level."""
+    """The capacity of the Poseidon sponge, defining its security level."""
 
     @model_validator(mode="after")
     def _validate_decomposition(self) -> "XmssConfig":

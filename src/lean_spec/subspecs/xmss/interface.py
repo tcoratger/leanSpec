@@ -72,7 +72,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
     """Configuration parameters for this instance."""
 
     poseidon: PoseidonXmss
-    """Cached Poseidon1 engine used by every primitive in the scheme."""
+    """Cached Poseidon engine used by every primitive in the scheme."""
 
     def key_gen(self, activation_slot: Slot, num_active_slots: Uint64) -> KeyPair:
         """Generate a fresh key pair active for an aligned slot range.

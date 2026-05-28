@@ -1,4 +1,4 @@
-"""Poseidon1 hash engine in compression and sponge modes for the Generalized XMSS scheme."""
+"""Poseidon hash engine in compression and sponge modes for the Generalized XMSS scheme."""
 
 from itertools import batched
 
@@ -6,12 +6,12 @@ from pydantic import PrivateAttr
 
 from lean_spec.types import StrictBaseModel, Uint64
 
-from ..koalabear import Fp
-from ..poseidon1.permutation import (
+from ...spec.crypto.koalabear import Fp
+from ...spec.crypto.poseidon import (
     PARAMS_16,
     PARAMS_24,
-    Poseidon1,
-    Poseidon1Params,
+    Poseidon,
+    PoseidonParams,
 )
 from .constants import TWEAK_PREFIX_CHAIN, TWEAK_PREFIX_TREE, XmssConfig
 from .field import int_to_base_p
@@ -19,18 +19,18 @@ from .types import ChainTweak, HashDigestVector, Parameter, TreeTweak
 
 
 class PoseidonXmss(StrictBaseModel):
-    """Poseidon1 hash engine wrapper used inside the XMSS scheme."""
+    """Poseidon hash engine wrapper used inside the XMSS scheme."""
 
-    params16: Poseidon1Params
+    params16: PoseidonParams
     """Permutation parameters for the width-16 state."""
 
-    params24: Poseidon1Params
+    params24: PoseidonParams
     """Permutation parameters for the width-24 state."""
 
-    _engines: dict[int, Poseidon1] = PrivateAttr(default_factory=dict)
+    _engines: dict[int, Poseidon] = PrivateAttr(default_factory=dict)
 
-    def _get_engine(self, width: int) -> Poseidon1:
-        """Return a cached Poseidon1 engine for the given width.
+    def _get_engine(self, width: int) -> Poseidon:
+        """Return a cached Poseidon engine for the given width.
 
         Raises:
             ValueError: When the width is neither 16 nor 24.
@@ -43,15 +43,15 @@ class PoseidonXmss(StrictBaseModel):
                     params = self.params24
                 case _:
                     raise ValueError(f"Width must be 16 or 24, got {width}")
-            self._engines[width] = Poseidon1(params)
+            self._engines[width] = Poseidon(params)
         return self._engines[width]
 
     def compress(self, input_vec: list[Fp], width: int, output_len: int) -> list[Fp]:
-        """Poseidon1 in compression mode.
+        """Poseidon in compression mode.
 
         Computes Truncate(Permute(padded_input) + padded_input).
         The padded input is the original vector zero-extended to the state width.
-        The feed-forward addition is part of the Poseidon1 design and is required
+        The feed-forward addition is part of the Poseidon design and is required
         for security.
         Used for hash chains and Merkle interior nodes.
 
@@ -109,7 +109,7 @@ class PoseidonXmss(StrictBaseModel):
         output_len: int,
         width: int,
     ) -> list[Fp]:
-        """Poseidon1 in sponge mode.
+        """Poseidon in sponge mode.
 
         Phase 1: load capacity, zero-extend input to a multiple of the rate.
         Phase 2: absorb each rate-sized chunk by replacement, then permute.
@@ -259,7 +259,7 @@ class PoseidonXmss(StrictBaseModel):
 
 
 PROD_POSEIDON = PoseidonXmss(params16=PARAMS_16, params24=PARAMS_24)
-"""Poseidon1 engine with production parameters."""
+"""Poseidon engine with production parameters."""
 
 TEST_POSEIDON = PROD_POSEIDON
-"""Test environment reuses the production Poseidon1 parameters."""
+"""Test environment reuses the production Poseidon parameters."""

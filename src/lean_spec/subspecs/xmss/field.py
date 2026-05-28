@@ -2,7 +2,7 @@
 
 import secrets
 
-from ..koalabear import Fp, P
+from ...spec.crypto.koalabear import Fp, P
 from .constants import XmssConfig
 from .types import HashDigestVector, Parameter
 

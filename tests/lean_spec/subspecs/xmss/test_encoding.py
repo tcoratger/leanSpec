@@ -2,7 +2,7 @@
 
 import pytest
 
-from lean_spec.subspecs.koalabear import Fp, P
+from lean_spec.spec.crypto.koalabear import Fp, P
 from lean_spec.subspecs.xmss import encoding
 from lean_spec.subspecs.xmss.constants import TEST_CONFIG, TWEAK_PREFIX_MESSAGE
 from lean_spec.subspecs.xmss.encoding import (
