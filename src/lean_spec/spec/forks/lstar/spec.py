@@ -129,9 +129,10 @@ class LstarSpec(ForkProtocol):
         The function returns a new state with slot == target_slot.
 
         Raises:
-            AssertionError: If state.slot is past target_slot.
+            AssertionError: If target_slot is not in the future.
         """
-        assert state.slot <= target_slot, "Target slot must not be in the past"
+        # The target must be strictly greater than the current slot.
+        assert state.slot < target_slot, "Target slot must be in the future"
 
         # Work on a copy so the caller's state is untouched.
         state = copy.deepcopy(state)
