@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, ClassVar, Protocol, Self
 
+from lean_spec.spec.forks.lstar.containers import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32, SSZList, Uint64
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 
 class SpecSSZType(Protocol):

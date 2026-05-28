@@ -31,6 +31,7 @@ from lean_spec.spec.crypto.xmss.types import (
     HashTreeOpening,
     Randomness,
 )
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, State, Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -46,7 +47,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Bytes52, Uint64
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 
 from .mocks import MockForkchoiceStore, MockNetworkRequester, StoreInterceptingSpec
 

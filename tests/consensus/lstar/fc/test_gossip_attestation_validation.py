@@ -13,8 +13,8 @@ from consensus_testing import (
 
 from lean_spec.node.chain.clock import Interval
 from lean_spec.node.chain.config import GOSSIP_DISPARITY_INTERVALS
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.types import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

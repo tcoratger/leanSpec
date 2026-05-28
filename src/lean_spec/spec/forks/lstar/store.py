@@ -16,11 +16,12 @@ from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.crypto.xmss.containers import Signature
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
+    Checkpoint,
     Config,
+    ValidatorIndex,
 )
 from lean_spec.spec.ssz import Bytes32
 from lean_spec.spec.ssz.container import Container
-from lean_spec.types import Checkpoint, ValidatorIndex
 
 
 class AttestationSignatureEntry(NamedTuple):

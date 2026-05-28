@@ -15,6 +15,7 @@ from typing import Any
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.service.events import NetworkEvent
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
@@ -22,7 +23,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Checkpoint, Slot
 
 
 class StoreInterceptingSpec(LstarSpec):

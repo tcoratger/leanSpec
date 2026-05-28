@@ -31,8 +31,12 @@ from lean_spec.node.networking.peer import PeerInfo
 from lean_spec.node.networking.types import ConnectionState
 from lean_spec.node.snappy import compress
 from lean_spec.node.sync import SyncService
-from lean_spec.spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
-from lean_spec.types import SubnetId
+from lean_spec.spec.forks import (
+    SignedAggregatedAttestation,
+    SignedAttestation,
+    SignedBlock,
+    SubnetId,
+)
 
 from .events import (
     GossipAggregatedAttestationEvent,

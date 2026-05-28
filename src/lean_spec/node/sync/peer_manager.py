@@ -14,7 +14,7 @@ from typing import Final
 from lean_spec.node.networking.peer import PeerInfo
 from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.networking.transport.peer_id import PeerId
-from lean_spec.types import Slot
+from lean_spec.spec.forks import Slot
 
 from .config import MAX_CONCURRENT_REQUESTS
 

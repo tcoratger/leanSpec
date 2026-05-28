@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from time import time as wall_time
 
 from lean_spec.spec.ssz import Uint64
-from lean_spec.types import Slot
 
 from .config import (
     INTERVALS_PER_SLOT,
@@ -54,7 +53,7 @@ class Interval(Uint64):
         return cls(delta_ms // MILLISECONDS_PER_INTERVAL)
 
     @classmethod
-    def from_slot(cls, slot: Slot) -> Interval:
+    def from_slot(cls, slot: Slot) -> Interval:  # noqa: F821  # ty: ignore[unresolved-reference]
         """
         Convert a slot number to the interval at that slot's start.
 
@@ -100,8 +99,10 @@ class SlotClock:
             return Uint64(0)
         return Uint64(now_ms - genesis_ms)
 
-    def current_slot(self) -> Slot:
+    def current_slot(self) -> Slot:  # noqa: F821  # ty: ignore[unresolved-reference]
         """Get the current slot number (0 if before genesis)."""
+        from lean_spec.spec.forks import Slot
+
         return Slot(self._seconds_since_genesis() // SECONDS_PER_SLOT)
 
     def current_interval(self) -> Interval:

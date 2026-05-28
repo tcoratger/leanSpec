@@ -63,7 +63,7 @@ from enum import Enum
 from typing import Final
 
 from lean_spec.node.networking.gossipsub.types import TopicId
-from lean_spec.types import SubnetId
+from lean_spec.spec.forks import SubnetId
 
 
 class ForkMismatchError(ValueError):

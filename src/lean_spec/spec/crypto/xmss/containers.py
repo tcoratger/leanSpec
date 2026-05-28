@@ -5,10 +5,10 @@ from typing import override
 from pydantic import field_serializer, field_validator, model_serializer
 
 from lean_spec.base import StrictBaseModel
+from lean_spec.spec.forks.lstar.containers import Slot
 from lean_spec.spec.ssz import Uint64
 from lean_spec.spec.ssz.container import Container
 from lean_spec.spec.ssz.exceptions import SSZError
-from lean_spec.types import Slot
 
 from .constants import TARGET_CONFIG
 from .merkle import HashSubTree

@@ -44,9 +44,8 @@ from typing import Protocol
 
 from lean_spec.node.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.node.networking.transport.peer_id import PeerId
-from lean_spec.spec.forks import SignedBlock
+from lean_spec.spec.forks import SignedBlock, Slot
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Slot
 
 from .block_cache import BlockCache
 from .config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST

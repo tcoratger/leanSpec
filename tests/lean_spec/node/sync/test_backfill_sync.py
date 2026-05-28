@@ -19,8 +19,8 @@ from lean_spec.node.sync.peer_manager import (
     PeerManager,
     SyncPeer,
 )
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 from tests.lean_spec.helpers import MockNetworkRequester, make_signed_block
 
 

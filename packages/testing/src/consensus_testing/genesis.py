@@ -1,6 +1,7 @@
 """Consensus layer pre-state generation."""
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -11,7 +12,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes52, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 
 from .keys import XmssKeyManager
 

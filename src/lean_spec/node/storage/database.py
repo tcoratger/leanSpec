@@ -11,12 +11,12 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Protocol
 
+from lean_spec.spec.forks import Checkpoint, Slot
 from lean_spec.spec.forks.protocol import (
     SpecBlockType,
     SpecStateType,
 )
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Checkpoint, Slot
 
 
 class Database(Protocol):

@@ -28,9 +28,9 @@ from lean_spec.node.networking.gossipsub.topic import (
 )
 from lean_spec.node.networking.varint import encode_varint
 from lean_spec.node.snappy import compress, decompress
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import SignedAttestation, SignedBlock
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers.builders import make_signed_attestation, make_signed_block
 
 

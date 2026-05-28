@@ -18,10 +18,10 @@ from lean_spec.node.sync.backfill_sync import BackfillSync
 from lean_spec.node.sync.block_cache import BlockCache
 from lean_spec.node.sync.head_sync import HeadSync, HeadSyncResult
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import SignedBlock
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import MockForkchoiceStore, make_signed_block
 
 

@@ -39,6 +39,7 @@ ignoring malformed ones.
 
 from __future__ import annotations
 
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -47,7 +48,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from tests.lean_spec.helpers import make_bytes32, make_genesis_state
 
 

@@ -16,8 +16,7 @@ from lean_spec.node.genesis import GenesisConfig
 from lean_spec.node.networking.gossipsub import GossipTopic
 from lean_spec.node.validator import ValidatorRegistry
 from lean_spec.node.validator.registry import ValidatorEntry
-from lean_spec.spec.forks import DEFAULT_REGISTRY
-from lean_spec.types import Slot, ValidatorIndex
+from lean_spec.spec.forks import DEFAULT_REGISTRY, Slot, ValidatorIndex
 
 
 class _RecordingEventSource:
