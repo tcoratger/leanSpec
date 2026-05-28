@@ -332,7 +332,10 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
     corrupted_bytes = bytearray(proof.proof.data)
     corrupted_bytes[10] ^= 0xFF
     corrupted_bytes[20] ^= 0xFF
-    proof.proof = ByteList512KiB(data=bytes(corrupted_bytes))
+    proof = TypeOneMultiSignature(
+        participants=proof.participants,
+        proof=ByteList512KiB(data=bytes(corrupted_bytes)),
+    )
 
     with pytest.raises(AggregationError, match="verification failed"):
         proof.verify(
@@ -407,7 +410,10 @@ def test_type_two_aggregate_propagates_prover_error(key_manager: XmssKeyManager)
     corrupted_bytes = bytearray(part.proof.data)
     corrupted_bytes[10] ^= 0xFF
     corrupted_bytes[20] ^= 0xFF
-    part.proof = ByteList512KiB(data=bytes(corrupted_bytes))
+    part = TypeOneMultiSignature(
+        participants=part.participants,
+        proof=ByteList512KiB(data=bytes(corrupted_bytes)),
+    )
 
     with pytest.raises(AggregationError, match="merge_many_type_1 failed"):
         TypeTwoMultiSignature.aggregate(parts=[part], public_keys_per_part=[pubkeys])

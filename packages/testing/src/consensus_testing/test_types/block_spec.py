@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections import defaultdict
 
 from lean_spec.base import CamelModel
@@ -474,6 +475,7 @@ class BlockSpec(CamelModel):
         # head, finalization checkpoints, time) survive the simulated pipeline.
         # Only the freshly aggregated Type-1 payloads merge back at the end.
         caller_store = store
+        store = copy.deepcopy(store)
 
         # Build attestations from this spec's attestation fields.
         parent_state = store.states[parent_root]

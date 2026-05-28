@@ -16,6 +16,8 @@ from lean_spec.types.slot import Slot
 class Checkpoint(Container):
     """Represents a checkpoint in the chain's history."""
 
+    model_config = Container.model_config | {"frozen": True}
+
     root: Bytes32
     """The root hash of the checkpoint's block."""
 

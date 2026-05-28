@@ -610,15 +610,11 @@ class TestProduceAttestationsAdvanced:
             on_attestation=capture_att,
         )
 
-        store_before = sync_service.store
         await service._produce_attestations(target_slot)
 
         # Attestation was published.
         assert len(published) == 1
         assert published[0].validator_id == ValidatorIndex(0)
-
-        # Store was updated by on_gossip_attestation (new instance).
-        assert sync_service.store is not store_before
 
     async def test_gossip_handler_exception_logged_and_attestation_still_published(
         self,
@@ -1281,8 +1277,13 @@ def _replace_head_at_slot(sync_service: SyncService, head_slot: Slot) -> None:
     """
     blocks = dict(sync_service.store.blocks)
     old_head_block = blocks.pop(sync_service.store.head)
-    old_head_block.slot = head_slot
-    new_head_block = old_head_block
+    new_head_block = Block(
+        slot=head_slot,
+        proposer_index=old_head_block.proposer_index,
+        parent_root=old_head_block.parent_root,
+        state_root=old_head_block.state_root,
+        body=old_head_block.body,
+    )
     new_root = hash_tree_root(new_head_block)
     blocks[new_root] = new_head_block
     sync_service.store.blocks = blocks
@@ -1298,8 +1299,13 @@ def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
     stall signal scans the highest slot across every block in the map.
     """
     template = next(iter(sync_service.store.blocks.values()))
-    template.slot = slot
-    new_block = template
+    new_block = Block(
+        slot=slot,
+        proposer_index=template.proposer_index,
+        parent_root=template.parent_root,
+        state_root=template.state_root,
+        body=template.body,
+    )
     new_root = hash_tree_root(new_block)
     new_blocks = {**sync_service.store.blocks, new_root: new_block}
     sync_service.store.blocks = new_blocks

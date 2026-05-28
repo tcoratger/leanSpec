@@ -1,5 +1,6 @@
 """Lstar fork — identity and construction facade."""
 
+import copy
 import math
 from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
@@ -128,10 +129,12 @@ class LstarSpec(ForkProtocol):
         The function returns a new state with slot == target_slot.
 
         Raises:
-            AssertionError: If target_slot is not in the future.
+            AssertionError: If state.slot is past target_slot.
         """
-        # The target must be strictly greater than the current slot.
-        assert state.slot < target_slot, "Target slot must be in the future"
+        assert state.slot <= target_slot, "Target slot must not be in the past"
+
+        # Work on a copy so the caller's state is untouched.
+        state = copy.deepcopy(state)
 
         # Step through each missing slot.
         while state.slot < target_slot:
@@ -239,8 +242,8 @@ class LstarSpec(ForkProtocol):
         #   updates rely entirely on validator attestations which are processed
         #   later in the block body.
         if is_genesis_parent:
-            state.latest_justified.root = parent_root
-            state.latest_finalized.root = parent_root
+            state.latest_justified = Checkpoint(slot=state.latest_justified.slot, root=parent_root)
+            state.latest_finalized = Checkpoint(slot=state.latest_finalized.slot, root=parent_root)
 
         # Historical Data Management
 

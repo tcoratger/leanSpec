@@ -382,9 +382,10 @@ class TestOnGossipAggregatedAttestation:
         corrupted_data = bytearray(proof.proof.data)
         corrupted_data[10] ^= 0xFF
         corrupted_data[20] ^= 0xFF
-        corrupted_blob = ByteList512KiB(data=bytes(corrupted_data))
-        proof.proof = corrupted_blob
-        corrupted_proof = proof
+        corrupted_proof = TypeOneMultiSignature(
+            participants=proof.participants,
+            proof=ByteList512KiB(data=bytes(corrupted_data)),
+        )
 
         signed_aggregated = SignedAggregatedAttestation(
             data=attestation_data,

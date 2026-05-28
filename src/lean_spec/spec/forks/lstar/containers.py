@@ -52,6 +52,8 @@ class Validators(SSZList[Validator]):
 class AttestationData(Container):
     """Attestation content describing the validator's observed chain view."""
 
+    model_config = Container.model_config | {"frozen": True}
+
     slot: Slot
     """The slot for which the attestation is made."""
 
@@ -67,6 +69,8 @@ class AttestationData(Container):
 
 class Attestation(Container):
     """Validator specific attestation wrapping shared attestation data."""
+
+    model_config = Container.model_config | {"frozen": True}
 
     validator_id: ValidatorIndex
     """The index of the validator making the attestation."""
