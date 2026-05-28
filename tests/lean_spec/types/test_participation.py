@@ -2,10 +2,10 @@
 
 import pytest
 
+from lean_spec.spec.ssz import Boolean
 from lean_spec.types import (
     VALIDATOR_REGISTRY_LIMIT,
     AggregationBits,
-    Boolean,
     ValidatorIndex,
     ValidatorIndices,
 )

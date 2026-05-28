@@ -2,7 +2,8 @@
 
 import pytest
 
-from lean_spec.types import Slot, SubnetId, Uint64, ValidatorIndex
+from lean_spec.spec.ssz import Uint64
+from lean_spec.types import Slot, SubnetId, ValidatorIndex
 
 
 class TestSubnetId:

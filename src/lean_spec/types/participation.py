@@ -2,10 +2,10 @@
 
 from typing import Final
 
-from lean_spec.types.bitfields import BaseBitlist
-from lean_spec.types.boolean import Boolean
-from lean_spec.types.collections import SSZList
-from lean_spec.types.uint import Uint64
+from lean_spec.spec.ssz.bitfields import BaseBitlist
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.collections import SSZList
+from lean_spec.spec.ssz.uint import Uint64
 from lean_spec.types.validator import ValidatorIndex
 
 VALIDATOR_REGISTRY_LIMIT: Final = Uint64(2**12)

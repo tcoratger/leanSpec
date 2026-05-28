@@ -5,9 +5,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Checkpoint, Slot
-from lean_spec.types.exceptions import SSZSerializationError
+from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.ssz import Bytes32
+from lean_spec.spec.ssz.exceptions import SSZSerializationError
+from lean_spec.types import Checkpoint, Slot
 
 
 class TestCheckpointConstruction:

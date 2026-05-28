@@ -12,16 +12,17 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.service.events import NetworkEvent
+from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
 )
-from lean_spec.forks.lstar.spec import LstarSpec
-from lean_spec.subspecs.networking import PeerId
-from lean_spec.subspecs.networking.service.events import NetworkEvent
-from lean_spec.subspecs.ssz.hash import hash_tree_root
-from lean_spec.types import Bytes32, Checkpoint, Slot, Uint64
+from lean_spec.spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.types import Checkpoint, Slot
 
 
 class StoreInterceptingSpec(LstarSpec):

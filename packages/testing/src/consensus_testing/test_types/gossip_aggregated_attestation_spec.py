@@ -2,22 +2,16 @@
 
 from __future__ import annotations
 
-from lean_spec.forks.lstar.containers import (
+from lean_spec.base import CamelModel
+from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
+from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     SignedAggregatedAttestation,
     State,
 )
-from lean_spec.subspecs.xmss.aggregation import TypeOneMultiSignature
-from lean_spec.types import (
-    ByteList512KiB,
-    Bytes32,
-    CamelModel,
-    Checkpoint,
-    Slot,
-    ValidatorIndex,
-    ValidatorIndices,
-)
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.types import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 
 from ..keys import XmssKeyManager
 from .utils import resolve_checkpoint
