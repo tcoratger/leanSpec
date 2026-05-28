@@ -580,9 +580,7 @@ class TestProduceAttestationsAdvanced:
                     state_root=Bytes32.zero(),
                 )
                 root = hash_tree_root(sb.block)
-                sync_service.store = sync_service.store.model_copy(
-                    update={"blocks": {**sync_service.store.blocks, root: sb.block}}
-                )
+                sync_service.store.blocks = {**sync_service.store.blocks, root: sb.block}
 
         with patch("asyncio.sleep", new=mock_sleep):
             await service._produce_attestations(target_slot)
@@ -1085,9 +1083,8 @@ class TestValidatorServiceIntegration:
             slot=attestation_data.slot,
         )
 
-        updated_store = store.model_copy(
-            update={"latest_known_aggregated_payloads": {attestation_data: {proof}}}
-        )
+        store.latest_known_aggregated_payloads = {attestation_data: {proof}}
+        updated_store = store
         real_sync_service.store = updated_store
 
         blocks_produced: list[SignedBlock] = []
@@ -1284,10 +1281,12 @@ def _replace_head_at_slot(sync_service: SyncService, head_slot: Slot) -> None:
     """
     blocks = dict(sync_service.store.blocks)
     old_head_block = blocks.pop(sync_service.store.head)
-    new_head_block = old_head_block.model_copy(update={"slot": head_slot})
+    old_head_block.slot = head_slot
+    new_head_block = old_head_block
     new_root = hash_tree_root(new_head_block)
     blocks[new_root] = new_head_block
-    sync_service.store = sync_service.store.model_copy(update={"blocks": blocks, "head": new_root})
+    sync_service.store.blocks = blocks
+    sync_service.store.head = new_root
 
 
 def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
@@ -1299,10 +1298,11 @@ def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
     stall signal scans the highest slot across every block in the map.
     """
     template = next(iter(sync_service.store.blocks.values()))
-    new_block = template.model_copy(update={"slot": slot})
+    template.slot = slot
+    new_block = template
     new_root = hash_tree_root(new_block)
     new_blocks = {**sync_service.store.blocks, new_root: new_block}
-    sync_service.store = sync_service.store.model_copy(update={"blocks": new_blocks})
+    sync_service.store.blocks = new_blocks
     return new_root
 
 

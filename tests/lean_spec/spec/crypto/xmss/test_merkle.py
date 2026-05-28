@@ -253,9 +253,9 @@ def test_combined_path_rejects_depth_mismatch(
 ) -> None:
     """Top and bottom trees of disagreeing depth cannot be stitched."""
     _, top, bottom_zero, _ = prf_trees
-    mismatched = bottom_zero.model_copy(update={"depth": Uint64(6)})
+    bottom_zero.depth = Uint64(6)
     with pytest.raises(ValueError, match=r"Depth mismatch: top=8, bottom=6."):
-        combined_path(top, mismatched, Uint64(0))
+        combined_path(top, bottom_zero, Uint64(0))
 
 
 def test_combined_path_rejects_odd_depth(
@@ -263,10 +263,10 @@ def test_combined_path_rejects_odd_depth(
 ) -> None:
     """Stitching requires an even depth."""
     _, top, bottom_zero, _ = prf_trees
-    odd_top = top.model_copy(update={"depth": Uint64(7)})
-    odd_bottom = bottom_zero.model_copy(update={"depth": Uint64(7)})
+    top.depth = Uint64(7)
+    bottom_zero.depth = Uint64(7)
     with pytest.raises(ValueError, match=r"Depth must be even, got 7."):
-        combined_path(odd_top, odd_bottom, Uint64(7))
+        combined_path(top, bottom_zero, Uint64(7))
 
 
 def test_combined_path_rejects_wrong_bottom_tree(
