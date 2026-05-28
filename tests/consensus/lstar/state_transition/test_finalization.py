@@ -10,6 +10,7 @@ from consensus_testing import (
 )
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     JustificationRoots,
     JustificationValidators,
@@ -17,7 +18,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean
-from lean_spec.types import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

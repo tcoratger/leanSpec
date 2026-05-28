@@ -25,7 +25,7 @@ from lean_spec.node.networking.reqresp.codec import (
 from lean_spec.node.networking.transport.peer_id import KeyType, PeerId, PublicKeyProto
 from lean_spec.node.networking.varint import decode_varint, encode_varint
 from lean_spec.node.snappy import compress, decompress, frame_compress, frame_decompress
-from lean_spec.types import SubnetId
+from lean_spec.spec.forks import SubnetId
 
 from .base import BaseConsensusFixture
 

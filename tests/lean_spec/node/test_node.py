@@ -23,6 +23,7 @@ from lean_spec.node.storage.sqlite import SQLiteDatabase
 from lean_spec.node.validator import ValidatorRegistry
 from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import State
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
@@ -38,7 +39,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockEventSource,
     MockNetworkRequester,

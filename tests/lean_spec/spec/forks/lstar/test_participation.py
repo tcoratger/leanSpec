@@ -2,13 +2,13 @@
 
 import pytest
 
-from lean_spec.spec.ssz import Boolean
-from lean_spec.types import (
+from lean_spec.spec.forks import (
     VALIDATOR_REGISTRY_LIMIT,
     AggregationBits,
     ValidatorIndex,
     ValidatorIndices,
 )
+from lean_spec.spec.ssz import Boolean
 
 
 class TestAggregationBitsToValidatorIndices:

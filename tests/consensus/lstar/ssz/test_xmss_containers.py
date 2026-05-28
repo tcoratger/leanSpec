@@ -18,8 +18,8 @@ from lean_spec.spec.crypto.xmss.types import (
     HashTreeOpening,
     Parameter,
 )
+from lean_spec.spec.forks import AggregationBits, Slot, ValidatorIndex
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Uint64
-from lean_spec.types import AggregationBits, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 

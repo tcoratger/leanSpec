@@ -18,6 +18,7 @@ from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
@@ -27,7 +28,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     TEST_VALIDATOR_ID,
     MockNetworkRequester,

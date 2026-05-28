@@ -6,9 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot
 from lean_spec.spec.ssz import Bytes32
 from lean_spec.spec.ssz.exceptions import SSZSerializationError
-from lean_spec.types import Checkpoint, Slot
 
 
 class TestCheckpointConstruction:

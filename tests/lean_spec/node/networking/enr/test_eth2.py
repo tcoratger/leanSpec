@@ -9,8 +9,8 @@ from lean_spec.node.networking.enr.eth2 import (
     AttestationSubnets,
 )
 from lean_spec.node.networking.types import ForkDigest, Version
+from lean_spec.spec.forks import SubnetId
 from lean_spec.spec.ssz import Uint64
-from lean_spec.types import SubnetId
 
 
 class TestEth2Data:

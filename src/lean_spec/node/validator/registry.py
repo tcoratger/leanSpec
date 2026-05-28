@@ -33,8 +33,8 @@ import yaml
 from pydantic import BaseModel, field_validator
 
 from lean_spec.spec.crypto.xmss import SecretKey
+from lean_spec.spec.forks import ValidatorIndex, ValidatorIndices
 from lean_spec.spec.ssz import Bytes52
-from lean_spec.types import ValidatorIndex, ValidatorIndices
 
 logger = logging.getLogger(__name__)
 

@@ -34,6 +34,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     BlockBody,
     BlockHeader,
+    Checkpoint,
     Config,
     HistoricalBlockHashes,
     JustificationRoots,
@@ -42,11 +43,12 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    Slot,
     State,
+    ValidatorIndex,
     Validators,
 )
 from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32, SSZList, Uint8, Uint64
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
 from .store import AttestationSignatureEntry, Store

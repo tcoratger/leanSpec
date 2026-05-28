@@ -18,6 +18,7 @@ from lean_spec.node.networking.reqresp.message import (
 )
 from lean_spec.node.networking.transport import PeerId
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -25,7 +26,6 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedBlock,
 )
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 
 
 @dataclass

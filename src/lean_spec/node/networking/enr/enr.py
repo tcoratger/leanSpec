@@ -60,11 +60,11 @@ from lean_spec.node.networking.types import (
     Version,
 )
 from lean_spec.spec.ssz import Bytes33, Bytes64, Uint64
-from lean_spec.types import RLPItem, rlp
 
 from . import keys
 from .eth2 import AttestationSubnets, Eth2Data
 from .keys import EnrKey
+from .rlp import RLPDecodingError, RLPItem, decode_rlp_list, encode_rlp
 
 ENR_PREFIX: Final = "enr:"
 """Text prefix for ENR strings."""
@@ -205,7 +205,7 @@ class ENR(StrictBaseModel):
 
         Returns the RLP encoding of [seq, k1, v1, k2, v2, ...].
         """
-        return rlp.encode_rlp(self._build_content_items())
+        return encode_rlp(self._build_content_items())
 
     def verify_signature(self) -> bool:
         """
@@ -280,7 +280,7 @@ class ENR(StrictBaseModel):
         Keys are sorted lexicographically per EIP-778.
         """
         items = [bytes(self.signature)] + self._build_content_items()
-        return rlp.encode_rlp(items)
+        return encode_rlp(items)
 
     def to_string(self) -> str:
         """
@@ -329,8 +329,8 @@ class ENR(StrictBaseModel):
 
         # RLP decode: [signature, seq, k1, v1, k2, v2, ...]
         try:
-            items = rlp.decode_rlp_list(rlp_data)
-        except rlp.RLPDecodingError as e:
+            items = decode_rlp_list(rlp_data)
+        except RLPDecodingError as e:
             raise ValueError(f"Invalid RLP encoding: {e}") from e
 
         if len(items) < 2:

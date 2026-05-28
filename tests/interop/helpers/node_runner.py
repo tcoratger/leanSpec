@@ -23,11 +23,11 @@ from lean_spec.node.node import Node, NodeConfig
 from lean_spec.node.validator import ValidatorRegistry
 from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME, SecretKey
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import Validator, Validators
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes52, Uint64
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 
 from .diagnostics import PipelineDiagnostics
 from .port_allocator import PortAllocator

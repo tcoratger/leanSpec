@@ -9,8 +9,8 @@ from lean_spec.spec.crypto.xmss.interface import (
     GeneralizedXmssScheme,
     _expand_activation_time,
 )
+from lean_spec.spec.forks import Slot
 from lean_spec.spec.ssz import Bytes32, Uint64
-from lean_spec.types import Slot
 
 
 def _test_correctness_roundtrip(

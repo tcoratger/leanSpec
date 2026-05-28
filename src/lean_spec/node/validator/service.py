@@ -49,9 +49,10 @@ from lean_spec.spec.forks import (
     LstarSpec,
     SignedAttestation,
     SignedBlock,
+    Slot,
+    ValidatorIndex,
 )
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
-from lean_spec.types import Slot, ValidatorIndex
 
 from .constants import HYSTERESIS_BAND, NETWORK_STALL_THRESHOLD, SYNC_LAG_THRESHOLD
 from .registry import ValidatorEntry, ValidatorRegistry

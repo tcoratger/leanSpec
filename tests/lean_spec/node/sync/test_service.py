@@ -15,11 +15,11 @@ from lean_spec.node.sync.config import MAX_PENDING_ATTESTATIONS
 from lean_spec.node.sync.service import SyncService
 from lean_spec.node.sync.states import SyncState
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
 )
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.types import Checkpoint, Slot, ValidatorIndex
 from tests.lean_spec.helpers import (
     MockForkchoiceStore,
     RecordedCall,

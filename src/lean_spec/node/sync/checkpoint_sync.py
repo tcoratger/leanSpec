@@ -23,9 +23,8 @@ from typing import Final
 
 import httpx
 
-from lean_spec.node.chain.config import VALIDATOR_REGISTRY_LIMIT
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import State
+from lean_spec.spec.forks import VALIDATOR_REGISTRY_LIMIT, State
 
 logger = logging.getLogger(__name__)
 
