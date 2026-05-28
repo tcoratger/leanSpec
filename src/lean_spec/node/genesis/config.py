@@ -36,15 +36,16 @@ class GenesisValidatorEntry(StrictBaseModel):
 
     @field_validator("attestation_pubkey", "proposal_pubkey", mode="before")
     @classmethod
-    def parse_hex_pubkey(cls, v: Any) -> Bytes52:
+    def _yaml_int_to_hex(cls, v: Any) -> Any:
         """
-        Convert hex strings or integers to validated Bytes52 pubkeys.
+        Re-encode integer inputs as hex strings before standard validation.
 
-        YAML parsers may interpret 0x-prefixed values as integers.
+        A YAML parser may interpret an unquoted 0x-prefixed value as an int.
+        Converting it back to a hex string lets the byte-array schema handle it.
         """
         if isinstance(v, int):
-            v = f"0x{v:0104x}"
-        return Bytes52(v)
+            return f"0x{v:0104x}"
+        return v
 
 
 class GenesisConfig(StrictBaseModel):
