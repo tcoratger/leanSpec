@@ -1115,12 +1115,6 @@ class LstarSpec(ForkProtocol):
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
             ), "Signature verification failed"
 
-            # Store signature and attestation data for later aggregation.
-            # Copy the inner sets so we can add to them without mutating the previous store.
-            store.attestation_signatures = {
-                k: set(v) for k, v in store.attestation_signatures.items()
-            }
-
             # Aggregators store all received gossip signatures.
             # The p2p layer only delivers attestations from subscribed subnets,
             # so subnet filtering happens at subscription time, not here.
@@ -1184,10 +1178,6 @@ class LstarSpec(ForkProtocol):
                 f"Committee aggregation signature verification failed: {exc}"
             ) from exc
 
-        # Shallow-copy the dict and its inner sets to preserve immutability.
-        store.latest_new_aggregated_payloads = {
-            k: set(v) for k, v in store.latest_new_aggregated_payloads.items()
-        }
         store.latest_new_aggregated_payloads.setdefault(data, set()).add(proof)
 
         return store
@@ -1280,11 +1270,6 @@ class LstarSpec(ForkProtocol):
             # the known pool at the next acceptance tick.
             # Head weight from block-imported votes is therefore deferred
             # by up to one slot.
-            # Shallow-copy the dict and its inner sets to preserve immutability.
-            store.latest_known_aggregated_payloads = {
-                k: set(v) for k, v in store.latest_known_aggregated_payloads.items()
-            }
-
             for aggregated_attestation in aggregated_attestations:
                 store.latest_known_aggregated_payloads.setdefault(
                     aggregated_attestation.data, set()
@@ -1465,10 +1450,6 @@ class LstarSpec(ForkProtocol):
         influence on fork choice decisions.
         """
         # Merge new aggregated payloads into known aggregated payloads
-        store.latest_known_aggregated_payloads = {
-            attestation_data: set(proofs)
-            for attestation_data, proofs in store.latest_known_aggregated_payloads.items()
-        }
         for attestation_data, proofs in store.latest_new_aggregated_payloads.items():
             store.latest_known_aggregated_payloads.setdefault(attestation_data, set()).update(
                 proofs
@@ -1663,11 +1644,8 @@ class LstarSpec(ForkProtocol):
                 signed_att.proof
             )
 
-        store.attestation_signatures = {
-            data: sigs
-            for data, sigs in store.attestation_signatures.items()
-            if data not in store.latest_new_aggregated_payloads
-        }
+        for data in store.latest_new_aggregated_payloads:
+            store.attestation_signatures.pop(data, None)
         return store, new_aggregates
 
     def tick_interval(
