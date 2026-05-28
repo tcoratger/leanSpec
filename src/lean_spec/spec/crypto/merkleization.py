@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from functools import singledispatch
 from hashlib import sha256
+from itertools import accumulate, repeat
 from math import ceil
 from typing import Final
 
@@ -35,47 +36,39 @@ def _next_pow2(x: int) -> int:
     return 1 << (x - 1).bit_length()
 
 
-_MAX_ZERO_HASH_DEPTH: Final = 64
-"""
-Depth covered by the pre-computed zero-subtree cache.
-
-Trees up to 2^64 leaves are covered directly.
-
-That is well past any chunk count the protocol uses.
-"""
-
-
-def _precompute_zero_hashes() -> tuple[Bytes32, ...]:
-    """Compute the all-zero subtree root at every depth up to the cache limit."""
-    hashes: list[Bytes32] = [ZERO_HASH]
-    for _ in range(_MAX_ZERO_HASH_DEPTH):
-        prev = hashes[-1]
-        hashes.append(Bytes32(sha256(prev + prev).digest()))
-    return tuple(hashes)
-
-
-_ZERO_HASHES: tuple[Bytes32, ...] = _precompute_zero_hashes()
+_ZERO_HASHES: Final[tuple[Bytes32, ...]] = tuple(
+    accumulate(
+        repeat(None, 64),
+        lambda prev, _: Bytes32(sha256(prev + prev).digest()),
+        initial=ZERO_HASH,
+    )
+)
 """Roots of perfect zero subtrees, indexed by depth.
 
-Index 0 holds the all-zero leaf.
-Index d holds the root of a perfect binary tree of 2 to the d leaves."""
+Index 0 is the all-zero leaf.
+Index d is the root of a perfect binary tree of 2**d zero leaves.
+Depth 64 covers any chunk count the protocol uses.
+"""
 
 
 def _zero_tree_root(width: int) -> Bytes32:
     """Root of an all-zero perfect binary tree with the given leaf count.
 
     The width must be a power of two.
-    Trees beyond the cache extend by hashing the last cached root with itself.
     """
+    # A single-leaf tree has no parent to hash; the root is the leaf itself.
     if width <= 1:
         return ZERO_HASH
+    # A perfect binary tree with 2**d leaves has depth d.
+    # Subtract one before taking bit_length so a power of two maps to its own depth.
+    # - Width 2 -> depth 1,
+    # - Width 4 -> depth 2,
+    # - Width 1024 -> depth 10,
+    # - And so on.
     depth = (width - 1).bit_length()
-    if depth < len(_ZERO_HASHES):
-        return _ZERO_HASHES[depth]
-    h = _ZERO_HASHES[-1]
-    for _ in range(depth - len(_ZERO_HASHES) + 1):
-        h = Bytes32(sha256(h + h).digest())
-    return h
+    # The cache stores the all-zero subtree root at every depth.
+    # Index by depth to skip materializing 2**d zero leaves and the layers above them.
+    return _ZERO_HASHES[depth]
 
 
 def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:

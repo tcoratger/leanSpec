@@ -7,7 +7,6 @@ from hashlib import sha256
 import pytest
 
 from lean_spec.spec.crypto.merkleization import (
-    _ZERO_HASHES,
     _next_pow2,
     _zero_tree_root,
     merkleize,
@@ -153,28 +152,3 @@ def test_zero_tree_root_internal() -> None:
     assert _zero_tree_root(4) == Z[2]
     assert _zero_tree_root(8) == Z[3]
     assert _zero_tree_root(16) == Z[4]
-
-
-def test_zero_tree_root_fallback_beyond_precomputed_depth() -> None:
-    """Trees one step beyond the cache fall back to a single extra hash step."""
-    # _ZERO_HASHES has 65 entries (indices 0..64).
-    # width = 2**65 gives depth = 65, which equals len(_ZERO_HASHES),
-    # triggering the fallback that hashes upward from _ZERO_HASHES[-1].
-    width = 2**65
-    result = _zero_tree_root(width)
-
-    # The fallback computes one extra hash step beyond the last cached value.
-    # depth=65, len(_ZERO_HASHES)=65, so range(65 - 65 + 1) = range(1) -> one iteration.
-    expected = h(_ZERO_HASHES[-1], _ZERO_HASHES[-1])
-    assert result == expected
-
-
-def test_zero_tree_root_fallback_two_steps_beyond_cache() -> None:
-    """Trees two steps beyond the cache fall back to two hash steps."""
-    # width = 2**66 gives depth = 66, requiring two hash steps beyond cache.
-    width = 2**66
-    result = _zero_tree_root(width)
-
-    step1 = h(_ZERO_HASHES[-1], _ZERO_HASHES[-1])
-    expected = h(step1, step1)
-    assert result == expected
