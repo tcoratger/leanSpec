@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from lean_spec.spec.crypto.xmss import SecretKey
 from lean_spec.spec.forks import ValidatorIndex, ValidatorIndices
@@ -59,21 +59,6 @@ class ValidatorManifestEntry(BaseModel):
 
     proposal_privkey_file: str
     """Filename of the proposal private key file."""
-
-    @field_validator("attestation_pubkey_hex", "proposal_pubkey_hex", mode="before")
-    @classmethod
-    def parse_pubkey(cls, v: object) -> Bytes52:
-        """
-        Convert hex strings to validated Bytes52 pubkeys.
-
-        Only accepts hex strings and existing Bytes52 instances.
-        Integers and other types are rejected.
-        """
-        if isinstance(v, Bytes52):
-            return v
-        if isinstance(v, str):
-            return Bytes52(v)
-        raise TypeError(f"Expected hex string or Bytes52, got {type(v).__name__}")
 
 
 class ValidatorManifest(BaseModel):

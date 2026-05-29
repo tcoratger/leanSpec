@@ -238,7 +238,7 @@ def test_keypair_decodes_public_and_secret_hex(keypair_a: KeyPair) -> None:
 
 def test_keypair_rejects_invalid_public_key_hex(keypair_a: KeyPair) -> None:
     """A malformed public-key hex string surfaces as a validation error."""
-    with pytest.raises(ValidationError, match="invalid public key hex"):
+    with pytest.raises(ValidationError, match="invalid PublicKey hex"):
         KeyPair.model_validate(
             {
                 "public_key": "deadbeef",
@@ -249,7 +249,7 @@ def test_keypair_rejects_invalid_public_key_hex(keypair_a: KeyPair) -> None:
 
 def test_keypair_rejects_invalid_secret_key_hex(keypair_a: KeyPair) -> None:
     """A malformed secret-key hex string surfaces as a validation error."""
-    with pytest.raises(ValidationError, match="invalid secret key hex"):
+    with pytest.raises(ValidationError, match="invalid SecretKey hex"):
         KeyPair.model_validate(
             {
                 "public_key": keypair_a.public_key.encode_bytes().hex(),
