@@ -19,8 +19,8 @@ The registry supports two YAML files:
        num_validators: 3
        validators:
        - index: 0
-         pubkey_hex: 0xe2a03c...
-         privkey_file: validator_0_sk.ssz
+         public_key_hex: 0xe2a03c...
+         private_key_file: validator_0_secret_key.ssz
 """
 
 from __future__ import annotations
@@ -48,16 +48,16 @@ class ValidatorManifestEntry(BaseModel):
     index: ValidatorIndex
     """Validator index in the registry."""
 
-    attestation_pubkey_hex: Bytes52
+    attestation_public_key_hex: Bytes52
     """XMSS public key for signing attestations."""
 
-    proposal_pubkey_hex: Bytes52
+    proposal_public_key_hex: Bytes52
     """XMSS public key for signing block proposals."""
 
-    attestation_privkey_file: str
+    attestation_private_key_file: str
     """Filename of the attestation private key file."""
 
-    proposal_privkey_file: str
+    proposal_private_key_file: str
     """Filename of the proposal private key file."""
 
 
@@ -216,7 +216,7 @@ class ValidatorRegistry:
         return len(self._validators)
 
     @classmethod
-    def from_keys_directory(cls, node_id: str, base_dir: Path | str) -> ValidatorRegistry:
+    def from_keys_directory(cls, node_id: str, base_directory: Path | str) -> ValidatorRegistry:
         """Load a validator registry from the ream/zeam keystore layout.
 
         Two files relative to the base directory:
@@ -227,7 +227,7 @@ class ValidatorRegistry:
 
         Args:
             node_id: Identifier looked up in the node-to-validator mapping.
-            base_dir: Directory containing the two layout files.
+            base_directory: Directory containing the two layout files.
 
         Returns:
             Registry populated with the keys assigned to the node.
@@ -236,7 +236,7 @@ class ValidatorRegistry:
             FileNotFoundError: If the manifest file is missing.
                 A missing validators mapping is allowed and yields an empty registry.
         """
-        base = Path(base_dir)
+        base = Path(base_directory)
         manifest_path = base / "hash-sig-keys" / "validator-keys-manifest.yaml"
         if not manifest_path.exists():
             raise FileNotFoundError(f"Validator keys manifest not found: {manifest_path}")
@@ -289,7 +289,7 @@ class ValidatorRegistry:
 
         # Load keys for assigned validators.
         registry = cls()
-        manifest_dir = manifest_path.parent
+        manifest_directory = manifest_path.parent
 
         for index in assigned_indices:
             entry = manifest_by_index.get(ValidatorIndex(index))
@@ -304,22 +304,22 @@ class ValidatorRegistry:
                 continue
 
             # Load attestation secret key from SSZ file.
-            att_key_path = manifest_dir / entry.attestation_privkey_file
+            attestation_key_path = manifest_directory / entry.attestation_private_key_file
             try:
-                attestation_secret_key = SecretKey.decode_bytes(att_key_path.read_bytes())
+                attestation_secret_key = SecretKey.decode_bytes(attestation_key_path.read_bytes())
             except FileNotFoundError as e:
-                raise ValueError(f"Attestation key file not found: {att_key_path}") from e
+                raise ValueError(f"Attestation key file not found: {attestation_key_path}") from e
             except Exception as e:
                 raise ValueError(
                     f"Failed to load attestation key for validator {index}: {e}"
                 ) from e
 
             # Load proposal secret key from SSZ file.
-            prop_key_path = manifest_dir / entry.proposal_privkey_file
+            proposal_key_path = manifest_directory / entry.proposal_private_key_file
             try:
-                proposal_secret_key = SecretKey.decode_bytes(prop_key_path.read_bytes())
+                proposal_secret_key = SecretKey.decode_bytes(proposal_key_path.read_bytes())
             except FileNotFoundError as e:
-                raise ValueError(f"Proposal key file not found: {prop_key_path}") from e
+                raise ValueError(f"Proposal key file not found: {proposal_key_path}") from e
             except Exception as e:
                 raise ValueError(f"Failed to load proposal key for validator {index}: {e}") from e
 

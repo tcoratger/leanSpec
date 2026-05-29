@@ -27,7 +27,7 @@ class AggregatedAttestationSpec(CamelModel):
     Source defaults to the latest justified checkpoint unless overridden.
     """
 
-    validator_ids: list[ValidatorIndex]
+    validator_indices: list[ValidatorIndex]
     """The indices of validators making the attestation (required)."""
 
     slot: Slot
@@ -79,14 +79,14 @@ class AggregatedAttestationSpec(CamelModel):
     """
     Override which validators actually sign the attestation.
 
-    When None (default), signatures are generated using the validators in validator_ids.
+    When None (default), signatures are generated using the validators in validator_indices.
     When specified, signatures are generated using these validator indices instead.
 
     This creates a mismatch between claimed participants and actual signers.
     Useful for testing that verification rejects attestations where valid signatures
     don't correspond to the claimed validators.
 
-    Must have same length as validator_ids when specified.
+    Must have same length as validator_indices when specified.
     """
 
     def build_attestation_data(
@@ -181,7 +181,7 @@ class AggregatedAttestationSpec(CamelModel):
         """
         attestation_data = self.build_attestation_data(block_registry, state)
 
-        aggregation_bits = ValidatorIndices(data=self.validator_ids).to_aggregation_bits()
+        aggregation_bits = ValidatorIndices(data=self.validator_indices).to_aggregation_bits()
         invalid_aggregated = AggregatedAttestation(
             aggregation_bits=aggregation_bits,
             data=attestation_data,

@@ -55,7 +55,7 @@ class Signature(Container):
     @override
     def get_byte_length(cls) -> int:
         """Fixed byte length of an SSZ-encoded signature."""
-        return TARGET_CONFIG.SIGNATURE_LEN_BYTES
+        return TARGET_CONFIG.SIGNATURE_LENGTH_BYTES
 
     @model_serializer(mode="plain", when_used="json")
     def _serialize_as_bytes(self) -> str:

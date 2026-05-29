@@ -24,7 +24,7 @@ class GossipAggregatedAttestationSpec(CamelModel):
     The spec allows overriding head/source checkpoints to exercise validation logic.
     """
 
-    validator_ids: list[ValidatorIndex]
+    validator_indices: list[ValidatorIndex]
     """Claimed validators participating in the aggregation."""
 
     slot: Slot
@@ -176,8 +176,8 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # - Claimed validators appear in the proof's participant bitfield.
         # - Actual signers produce the cryptographic material.
         # They default to the same set for honest attestations.
-        validator_ids = self.validator_ids
-        signer_ids = self.signer_ids or self.validator_ids
+        validator_indices = self.validator_indices
+        signer_ids = self.signer_ids or self.validator_indices
 
         # Path 1: Invalid signature.
         #
@@ -186,7 +186,7 @@ class GossipAggregatedAttestationSpec(CamelModel):
         if not self.valid_signature:
             placeholder = ByteList512KiB(data=b"\x00" * 32)
             proof = SingleMessageAggregate(
-                participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
+                participants=ValidatorIndices(data=validator_indices).to_aggregation_bits(),
                 proof=placeholder,
             )
             return SignedAggregatedAttestation(data=attestation_data, proof=proof)
@@ -201,9 +201,9 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # The proof is cryptographically valid for the actual signers,
         # but the claimed participants no longer match.
         # The store must detect and reject this inconsistency.
-        if self.signer_ids and self.signer_ids != self.validator_ids:
+        if self.signer_ids and self.signer_ids != self.validator_indices:
             proof = SingleMessageAggregate(
-                participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
+                participants=ValidatorIndices(data=validator_indices).to_aggregation_bits(),
                 proof=proof.proof,
             )
 

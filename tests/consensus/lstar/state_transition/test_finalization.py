@@ -54,7 +54,7 @@ def test_finalization_on_next_justifiable_step(
                 label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -70,7 +70,7 @@ def test_finalization_on_next_justifiable_step(
                 parent_label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -129,7 +129,7 @@ def test_pending_justification_survives_finalization_rebase(
                 label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -155,7 +155,7 @@ def test_pending_justification_survives_finalization_rebase(
                 parent_label="block_4",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                         ],
                         slot=Slot(4),
@@ -163,7 +163,7 @@ def test_pending_justification_survives_finalization_rebase(
                         target_root_label="block_3",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -231,7 +231,7 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
                 label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -257,7 +257,7 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
                 parent_label="block_4",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -317,7 +317,7 @@ def test_mid_block_finalized_slot_visibility(
                 label="block_3",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -337,7 +337,7 @@ def test_mid_block_finalized_slot_visibility(
                 parent_label="block_7",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -347,7 +347,7 @@ def test_mid_block_finalized_slot_visibility(
                         target_root_label="block_2",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -414,7 +414,7 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
                 label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -431,7 +431,7 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
                 label="block_3",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                         ],
@@ -452,7 +452,7 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
                 label="block_5",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -468,7 +468,7 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
                 parent_label="block_5",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -531,7 +531,7 @@ def test_non_adjacent_justification_finalizes_across_non_justifiable_gap(
                 label="block_7",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -549,7 +549,7 @@ def test_non_adjacent_justification_finalizes_across_non_justifiable_gap(
                 parent_label="block_9",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -608,7 +608,7 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
                 label="block_3",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -629,7 +629,7 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
                 label="block_8",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -639,7 +639,7 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
                         target_root_label="block_2",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -660,7 +660,7 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
                 parent_label="block_13",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -732,7 +732,7 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
                 label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -755,7 +755,7 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
                 parent_label="block_9",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -765,7 +765,7 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
                         target_root_label="block_2",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -838,7 +838,7 @@ def test_merged_attestations_for_same_target_justify_and_finalize_cleanly(
                 label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -854,7 +854,7 @@ def test_merged_attestations_for_same_target_justify_and_finalize_cleanly(
                 parent_label="block_2",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -864,7 +864,7 @@ def test_merged_attestations_for_same_target_justify_and_finalize_cleanly(
                         target_root_label="block_2",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(3),
                         ],
                         slot=Slot(3),
@@ -924,7 +924,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                 label="block_3",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -942,7 +942,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                 label="block_5",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                         ],
@@ -960,7 +960,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                 label="block_8",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -970,7 +970,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                         target_root_label="block_2",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),
@@ -991,7 +991,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                 parent_label="block_13",
                 attestations=[
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                         ],
                         slot=Slot(14),
@@ -999,7 +999,7 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
                         target_root_label="block_13",
                     ),
                     AggregatedAttestationSpec(
-                        validator_ids=[
+                        validator_indices=[
                             ValidatorIndex(0),
                             ValidatorIndex(1),
                             ValidatorIndex(2),

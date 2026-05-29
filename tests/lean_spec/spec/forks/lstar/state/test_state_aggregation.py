@@ -31,14 +31,14 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     store = make_store(num_validators=2, key_manager=container_key_manager)
     head_state = store.states[store.head]
     source = Checkpoint(root=make_bytes32(1), slot=Slot(0))
-    att_data = make_attestation_data_simple(
+    attestation_data = make_attestation_data_simple(
         Slot(2), make_bytes32(3), make_bytes32(4), source=source
     )
     attestation_signatures = {
-        att_data: {
+        attestation_data: {
             AttestationSignatureEntry(
                 ValidatorIndex(i),
-                container_key_manager.sign_attestation_data(ValidatorIndex(i), att_data),
+                container_key_manager.sign_attestation_data(ValidatorIndex(i), attestation_data),
             )
             for i in range(2)
         }
@@ -54,10 +54,12 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     }
 
     public_keys = [
-        head_state.validators[ValidatorIndex(i)].get_attestation_pubkey() for i in range(2)
+        head_state.validators[ValidatorIndex(i)].get_attestation_public_key() for i in range(2)
     ]
     results[0].proof.verify(
-        public_keys=public_keys, message=hash_tree_root(att_data), slot=att_data.slot
+        public_keys=public_keys,
+        message=hash_tree_root(attestation_data),
+        slot=attestation_data.slot,
     )
 
 
@@ -70,16 +72,16 @@ def test_build_block_collects_valid_available_attestations(
     parent_root = hash_tree_root(state.latest_block_header)
     source = Checkpoint(root=parent_root, slot=Slot(0))
     target = Checkpoint(root=parent_root, slot=Slot(0))
-    att_data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=parent_root, slot=Slot(0)),
         target=target,
         source=source,
     )
-    data_root = hash_tree_root(att_data)
+    data_root = hash_tree_root(attestation_data)
 
-    proof = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], att_data)
-    aggregated_payloads = {att_data: {proof}}
+    proof = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], attestation_data)
+    aggregated_payloads = {attestation_data: {proof}}
 
     block, post_state, aggregated_atts, aggregated_proofs = spec.build_block(
         state,
@@ -103,7 +105,7 @@ def test_build_block_collects_valid_available_attestations(
     aggregated_proofs[0].verify(
         public_keys=[container_key_manager[ValidatorIndex(0)].attestation_keypair.public_key],
         message=data_root,
-        slot=att_data.slot,
+        slot=attestation_data.slot,
     )
 
 
@@ -148,32 +150,32 @@ def test_aggregated_signatures_with_multiple_data_groups(
     """Multiple attestation data groups should be processed independently."""
     store = make_store(num_validators=4, key_manager=container_key_manager)
     source = Checkpoint(root=make_bytes32(22), slot=Slot(0))
-    att_data1 = make_attestation_data_simple(
+    attestation_data1 = make_attestation_data_simple(
         Slot(9), make_bytes32(23), make_bytes32(24), source=source
     )
-    att_data2 = make_attestation_data_simple(
+    attestation_data2 = make_attestation_data_simple(
         Slot(10), make_bytes32(25), make_bytes32(26), source=source
     )
 
     attestation_signatures = {
-        att_data1: {
+        attestation_data1: {
             AttestationSignatureEntry(
                 ValidatorIndex(0),
-                container_key_manager.sign_attestation_data(ValidatorIndex(0), att_data1),
+                container_key_manager.sign_attestation_data(ValidatorIndex(0), attestation_data1),
             ),
             AttestationSignatureEntry(
                 ValidatorIndex(1),
-                container_key_manager.sign_attestation_data(ValidatorIndex(1), att_data1),
+                container_key_manager.sign_attestation_data(ValidatorIndex(1), attestation_data1),
             ),
         },
-        att_data2: {
+        attestation_data2: {
             AttestationSignatureEntry(
                 ValidatorIndex(2),
-                container_key_manager.sign_attestation_data(ValidatorIndex(2), att_data2),
+                container_key_manager.sign_attestation_data(ValidatorIndex(2), attestation_data2),
             ),
             AttestationSignatureEntry(
                 ValidatorIndex(3),
-                container_key_manager.sign_attestation_data(ValidatorIndex(3), att_data2),
+                container_key_manager.sign_attestation_data(ValidatorIndex(3), attestation_data2),
             ),
         },
     }
@@ -183,15 +185,16 @@ def test_aggregated_signatures_with_multiple_data_groups(
 
     assert len(results) == 2
 
-    for signed_att in results:
-        participants = signed_att.proof.participants.to_validator_indices()
+    for signed_attestation in results:
+        participants = signed_attestation.proof.participants.to_validator_indices()
         public_keys = [
-            container_key_manager[vid].attestation_keypair.public_key for vid in participants
+            container_key_manager[validator_index].attestation_keypair.public_key
+            for validator_index in participants
         ]
-        signed_att.proof.verify(
+        signed_attestation.proof.verify(
             public_keys=public_keys,
-            message=hash_tree_root(signed_att.data),
-            slot=signed_att.data.slot,
+            message=hash_tree_root(signed_attestation.data),
+            slot=signed_attestation.data.slot,
         )
 
 
@@ -231,19 +234,19 @@ def test_build_block_state_root_valid_when_signatures_split(
     source = Checkpoint(root=parent_root, slot=Slot(0))
     target = Checkpoint(root=parent_root, slot=Slot(0))
 
-    att_data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=parent_root, slot=Slot(0)),
         target=target,
         source=source,
     )
 
-    proof_0 = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], att_data)
+    proof_0 = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], attestation_data)
 
     fallback_proof = make_aggregated_proof(
-        container_key_manager, [ValidatorIndex(1), ValidatorIndex(2)], att_data
+        container_key_manager, [ValidatorIndex(1), ValidatorIndex(2)], attestation_data
     )
-    aggregated_payloads = {att_data: {proof_0, fallback_proof}}
+    aggregated_payloads = {attestation_data: {proof_0, fallback_proof}}
 
     block, _, aggregated_atts, _ = spec.build_block(
         pre_state,
@@ -283,21 +286,25 @@ def test_build_block_skips_other_chain_source(
     correct_source = Checkpoint(root=parent_root, slot=Slot(0))
     wrong_source = Checkpoint(root=make_bytes32(99), slot=Slot(0))
 
-    att_data_good = AttestationData(
+    attestation_data_good = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=parent_root, slot=Slot(0)),
         target=Checkpoint(root=parent_root, slot=Slot(0)),
         source=correct_source,
     )
-    att_data_bad = AttestationData(
+    attestation_data_bad = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=parent_root, slot=Slot(0)),
         target=Checkpoint(root=parent_root, slot=Slot(0)),
         source=wrong_source,
     )
 
-    proof_good = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], att_data_good)
-    proof_bad = make_aggregated_proof(container_key_manager, [ValidatorIndex(1)], att_data_bad)
+    proof_good = make_aggregated_proof(
+        container_key_manager, [ValidatorIndex(0)], attestation_data_good
+    )
+    proof_bad = make_aggregated_proof(
+        container_key_manager, [ValidatorIndex(1)], attestation_data_bad
+    )
 
     _, _, aggregated_atts, _ = spec.build_block(
         state,
@@ -305,11 +312,14 @@ def test_build_block_skips_other_chain_source(
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
         known_block_roots={parent_root},
-        aggregated_payloads={att_data_good: {proof_good}, att_data_bad: {proof_bad}},
+        aggregated_payloads={
+            attestation_data_good: {proof_good},
+            attestation_data_bad: {proof_bad},
+        },
     )
 
     assert len(aggregated_atts) == 1
-    assert aggregated_atts[0].data == att_data_good
+    assert aggregated_atts[0].data == attestation_data_good
 
 
 def test_build_block_skips_unknown_head_root(
@@ -323,22 +333,24 @@ def test_build_block_skips_unknown_head_root(
     source = Checkpoint(root=parent_root, slot=Slot(0))
     unknown_root = make_bytes32(200)
 
-    att_data_known = AttestationData(
+    attestation_data_known = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=parent_root, slot=Slot(0)),
         target=Checkpoint(root=parent_root, slot=Slot(0)),
         source=source,
     )
-    att_data_unknown = AttestationData(
+    attestation_data_unknown = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=unknown_root, slot=Slot(0)),
         target=Checkpoint(root=parent_root, slot=Slot(0)),
         source=source,
     )
 
-    proof_known = make_aggregated_proof(container_key_manager, [ValidatorIndex(0)], att_data_known)
+    proof_known = make_aggregated_proof(
+        container_key_manager, [ValidatorIndex(0)], attestation_data_known
+    )
     proof_unknown = make_aggregated_proof(
-        container_key_manager, [ValidatorIndex(1)], att_data_unknown
+        container_key_manager, [ValidatorIndex(1)], attestation_data_unknown
     )
 
     _, _, aggregated_atts, _ = spec.build_block(
@@ -347,11 +359,14 @@ def test_build_block_skips_unknown_head_root(
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
         known_block_roots={parent_root},
-        aggregated_payloads={att_data_known: {proof_known}, att_data_unknown: {proof_unknown}},
+        aggregated_payloads={
+            attestation_data_known: {proof_known},
+            attestation_data_unknown: {proof_unknown},
+        },
     )
 
     assert len(aggregated_atts) == 1
-    assert aggregated_atts[0].data == att_data_known
+    assert aggregated_atts[0].data == attestation_data_known
 
 
 def test_aggregate_with_no_signatures(
@@ -440,7 +455,7 @@ def test_build_block_fixed_point_closes_justified_divergence(
     source = Checkpoint(root=genesis_root, slot=Slot(0))
     target = Checkpoint(root=block_1_root, slot=Slot(1))
 
-    att_data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(3),
         head=target,
         target=target,
@@ -450,7 +465,7 @@ def test_build_block_fixed_point_closes_justified_divergence(
     proof = make_aggregated_proof(
         container_key_manager,
         [ValidatorIndex(1), ValidatorIndex(2), ValidatorIndex(3)],
-        att_data,
+        attestation_data,
     )
 
     # Call build_block with the divergent attestations in the pool.
@@ -465,12 +480,12 @@ def test_build_block_fixed_point_closes_justified_divergence(
         proposer_index=ValidatorIndex(3),
         parent_root=block_2_root,
         known_block_roots={genesis_root, block_1_root, block_2_root},
-        aggregated_payloads={att_data: {proof}},
+        aggregated_payloads={attestation_data: {proof}},
     )
 
     # The block must include the justifying attestations.
     assert len(aggregated_atts) == 1
-    assert aggregated_atts[0].data == att_data
+    assert aggregated_atts[0].data == attestation_data
 
     # Justification must have advanced: the fixed-point loop closed the gap.
     assert post_state.latest_justified.slot >= Slot(1)
