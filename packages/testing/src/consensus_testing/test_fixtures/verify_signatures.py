@@ -11,9 +11,9 @@ from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
     AttestationData,
+    MultiMessageAggregate,
     SignedBlock,
     State,
-    TypeTwoMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
@@ -69,7 +69,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
       set bit. Exercises the empty-participants check inside
       signature verification.
     - `{"operation": "corrupt_proof"}`: Replace the merged proof with
-      a short non-decodable blob. Exercises the Type-2 decode check.
+      a short non-decodable blob. Exercises the multi-message aggregate decode check.
     - `{"operation": "append_phantom_attestation"}`: Add a body
       attestation with no matching proof component. Exercises the
       component count check between the body and the merged proof.
@@ -180,7 +180,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         if operation == "corrupt_proof":
             # Replace the merged proof with a short bogus payload.
             # The verifier rejects the malformed proof bytes.
-            signed_block.proof = TypeTwoMultiSignature(
+            signed_block.proof = MultiMessageAggregate(
                 proof=ByteList512KiB(data=b"\x00\x01\x02\x03"),
             )
             return signed_block

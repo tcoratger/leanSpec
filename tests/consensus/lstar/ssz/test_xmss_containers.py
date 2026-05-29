@@ -16,8 +16,8 @@ from lean_spec.spec.crypto.xmss.types import (
 )
 from lean_spec.spec.forks import AggregationBits, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
+    MultiMessageAggregate,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Uint64
 
@@ -65,7 +65,7 @@ def test_signature_actual(ssz: SSZTestFiller) -> None:
     ssz(type_name="Signature", value=signature)
 
 
-# --- TypeOneMultiSignature / TypeTwoMultiSignature ---
+# --- SingleMessageAggregate / MultiMessageAggregate ---
 
 
 def _bits(participants: list[bool]) -> AggregationBits:
@@ -73,35 +73,35 @@ def _bits(participants: list[bool]) -> AggregationBits:
     return AggregationBits(data=[Boolean(b) for b in participants])
 
 
-def test_type_one_multi_signature_empty(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for a Type-1 proof with empty proof bytes."""
+def test_single_message_aggregate_empty(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for a single-message aggregate proof with empty proof bytes."""
     ssz(
-        type_name="TypeOneMultiSignature",
-        value=TypeOneMultiSignature(
+        type_name="SingleMessageAggregate",
+        value=SingleMessageAggregate(
             participants=_bits([True]),
             proof=ByteList512KiB(data=b""),
         ),
     )
 
 
-def test_type_one_multi_signature_with_proof(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for a Type-1 proof with non-empty proof bytes."""
+def test_single_message_aggregate_with_proof(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for a single-message aggregate proof with non-empty proof bytes."""
     wire = b"\xde\xad\xbe\xef"
     ssz(
-        type_name="TypeOneMultiSignature",
-        value=TypeOneMultiSignature(
+        type_name="SingleMessageAggregate",
+        value=SingleMessageAggregate(
             participants=_bits([True, False, True]),
             proof=ByteList512KiB(data=wire),
         ),
     )
 
 
-def test_type_two_multi_signature_roundtrip(ssz: SSZTestFiller) -> None:
-    """SSZ roundtrip for a Type-2 proof envelope."""
+def test_multi_message_aggregate_roundtrip(ssz: SSZTestFiller) -> None:
+    """SSZ roundtrip for a multi-message aggregate proof envelope."""
     wire = b"\x01\x02\x03"
     ssz(
-        type_name="TypeTwoMultiSignature",
-        value=TypeTwoMultiSignature(proof=ByteList512KiB(data=wire)),
+        type_name="MultiMessageAggregate",
+        value=MultiMessageAggregate(proof=ByteList512KiB(data=wire)),
     )
 
 

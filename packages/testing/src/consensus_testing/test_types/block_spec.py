@@ -17,11 +17,11 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     BlockBody,
+    MultiMessageAggregate,
     SignedAttestation,
     SignedBlock,
+    SingleMessageAggregate,
     State,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.forks.lstar.store import Store
@@ -239,29 +239,30 @@ class BlockSpec(CamelModel):
     def _sign_block(
         self,
         final_block: Block,
-        attestation_proofs: list[TypeOneMultiSignature],
+        attestation_proofs: list[SingleMessageAggregate],
         proposer_index: ValidatorIndex,
         key_manager: XmssKeyManager,
         state: State,
     ) -> SignedBlock:
         """Sign a block and assemble the final SignedBlock with the merged proof.
 
-        Builds a Type-1 wrapping the proposer's XMSS signature, then merges
-        that with the per-attestation Type-1 proofs into a single Type-2 proof
-        and SSZ-encodes it onto the envelope. Consumers of this filler feed
-        the block through spec.on_block / verify_signatures, which decodes
-        the proof and verifies it, so an honest merged proof is required.
+        Builds a single-message aggregate wrapping the proposer's XMSS
+        signature, then merges that with the per-attestation single-message
+        aggregate proofs into a single multi-message aggregate proof and
+        stores it on the envelope. Consumers of this filler feed the block
+        through spec.on_block / verify_signatures, which decodes the proof
+        and verifies it, so an honest merged proof is required.
 
         When valid_signature is False, the proposer signature is a dummy
         XMSS one and the binding-driven aggregation would reject it before
-        verify_signatures ever runs. The Type-2 envelope is then assembled
+        verify_signatures ever runs. The multi-message aggregate envelope is then assembled
         directly from the info entries with empty proof bytes — that
         decodes structurally and lets verify_signatures reach (and reject
         at) the verify_type_2 call, which is the contract the test exercises.
 
         Args:
             final_block: The unsigned block.
-            attestation_proofs: Per-attestation Type-1 proofs (parallel to
+            attestation_proofs: Per-attestation single-message aggregate proofs (parallel to
                 final_block.body.attestations).
             proposer_index: Which validator proposes this block.
             key_manager: XMSS key manager for signing.
@@ -277,7 +278,7 @@ class BlockSpec(CamelModel):
         # The binding rejects placeholder bytes; if anything in the merged
         # input is a dummy (invalid proposer sig or a build_invalid_proof
         # attestation), bypass aggregate_type_2 entirely and assemble the
-        # Type-2 envelope by hand. The result still SSZ-decodes so
+        # multi-message aggregate envelope by hand. The result still SSZ-decodes so
         # verify_signatures reaches verify_type_2 for the rejection.
         any_placeholder_attestation = any(not proof.proof.data for proof in attestation_proofs)
         use_placeholder = not self.valid_signature or any_placeholder_attestation
@@ -288,7 +289,7 @@ class BlockSpec(CamelModel):
                 self.slot,
                 block_root,
             )
-            proposer_type_1 = TypeOneMultiSignature.aggregate(
+            proposer_single_message_aggregate = SingleMessageAggregate.aggregate(
                 children=[],
                 raw_xmss=[(proposer_index, proposer_pubkey, proposer_signature)],
                 message=block_root,
@@ -304,12 +305,12 @@ class BlockSpec(CamelModel):
             ]
             public_keys_per_part.append([proposer_pubkey])
 
-            proof = TypeTwoMultiSignature.aggregate(
-                [*attestation_proofs, proposer_type_1],
+            proof = MultiMessageAggregate.aggregate(
+                [*attestation_proofs, proposer_single_message_aggregate],
                 public_keys_per_part=public_keys_per_part,
             )
         else:
-            proof = TypeTwoMultiSignature(proof=ByteList512KiB(data=b""))
+            proof = MultiMessageAggregate(proof=ByteList512KiB(data=b""))
 
         return SignedBlock(
             block=final_block,
@@ -433,11 +434,11 @@ class BlockSpec(CamelModel):
         Simulates what a real node does when proposing a block.
         Replays the gossip, aggregation, and proposal pipeline through the Store.
 
-        Returns a Store enriched with the aggregated Type-1 payloads built
+        Returns a Store enriched with the aggregated single-message aggregate payloads built
         during the simulated pipeline. The caller can persist these so future
         block builds can re-aggregate the same attestations rather than
         reconstructing them from on-chain block bodies (which would require
-        splitting the block-level Type-2 proof — a heavy and, in the test
+        splitting the block-level multi-message aggregate proof — a heavy and, in the test
         recursive-aggregation mode, unreliable operation). Other fields of
         the original Store (gossip signatures, time, head, etc.) are
         preserved so the simulated build does not consume state the caller
@@ -468,7 +469,7 @@ class BlockSpec(CamelModel):
 
         # Preserve the caller's Store so unrelated fields (gossip signatures,
         # head, finalization checkpoints, time) survive the simulated pipeline.
-        # Only the freshly aggregated Type-1 payloads merge back at the end.
+        # Only the freshly aggregated single-message aggregate payloads merge back at the end.
         caller_store = store
         store = copy.deepcopy(store)
 
@@ -509,7 +510,7 @@ class BlockSpec(CamelModel):
         # Trigger Store aggregation to merge gossip signatures into known payloads.
         # Aggregation runs on a local clone: gossip pools mutate here, but the
         # caller's gossip-signature view must not be consumed by this simulated
-        # build. Only the freshly aggregated Type-1 payloads propagate back.
+        # build. Only the freshly aggregated single-message aggregate payloads propagate back.
         aggregation_store, _ = spec.aggregate(store)
         merged_store = spec.accept_new_attestations(aggregation_store)
 

@@ -30,7 +30,7 @@ from lean_spec.spec.forks import (
 )
 from lean_spec.spec.forks.lstar.containers import (
     AggregationError,
-    TypeOneMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.ssz import Bytes32
 
@@ -515,17 +515,18 @@ class SyncService:
 
         On block import we already trust the block-attestation participant
         bitfields via spec on_block signature verification. The block carries
-        one merged Type-2 proof binding every attestation in its body.
+        one merged multi-message aggregate proof binding every attestation in its body.
 
         For each block attestation that covers validators not already held
         in the given store:
 
-        1. Extract that data's Type-1 proof out of the block's Type-2 proof.
-        2. Merge it with all local partial Type-1 proofs for the same data
-           into one Type-1 proof whose participant bits are the union.
+        1. Extract that data's single-message aggregate proof
+           out of the block's multi-message aggregate proof.
+        2. Merge it with all local partial single-message aggregate proofs for the same data
+           into one single-message aggregate proof whose participant bits are the union.
         3. Write the combined proof into the pending pool.
 
-        If the data was never seen locally, the extracted Type-1 is used
+        If the data was never seen locally, the extracted single-message aggregate is used
         as-is.
 
         Runs for every node, including non-validators, so the per-attestation
@@ -541,7 +542,7 @@ class SyncService:
         if not block_attestations:
             return store, []
 
-        # The Type-2 proof was built against the parent state's validator set.
+        # The multi-message aggregate proof was built against the parent state's validator set.
         # Without it we cannot resolve the pubkey layout the proof was bound to.
         parent_state = store.states.get(block.block.parent_root)
         if parent_state is None:
@@ -564,10 +565,10 @@ class SyncService:
             [validators[block.block.proposer_index].get_proposal_pubkey()]
         )
 
-        # Index local partial Type-1 proofs by AttestationData root. Equivalent
+        # Index local partial single-message aggregate proofs by AttestationData root. Equivalent
         # AttestationData instances from different code paths may not share a
         # dict key, so match on the hash tree root instead.
-        local_proofs_by_root: dict[Bytes32, list[TypeOneMultiSignature]] = {}
+        local_proofs_by_root: dict[Bytes32, list[SingleMessageAggregate]] = {}
         for data, proofs in store.latest_new_aggregated_payloads.items():
             local_proofs_by_root.setdefault(hash_tree_root(data), []).extend(proofs)
 
@@ -575,7 +576,7 @@ class SyncService:
         # The combined proof is retained locally so the block-sourced
         # aggregate survives without depending on gossip loopback. Shallow
         # copy the dict and its inner sets to preserve store immutability.
-        new_payloads: dict[AttestationData, set[TypeOneMultiSignature]] = {
+        new_payloads: dict[AttestationData, set[SingleMessageAggregate]] = {
             k: set(v) for k, v in store.latest_new_aggregated_payloads.items()
         }
         aggregates: list[SignedAggregatedAttestation] = []
@@ -605,14 +606,14 @@ class SyncService:
             try:
                 # The split takes the bits from the block attestation this
                 # component binds, since the Rust binding does not return them.
-                block_t1 = block.proof.split_by_msg(
+                block_single_message_aggregate = block.proof.split_by_msg(
                     message=data_root,
                     public_keys_per_message=public_keys_per_message,
                     participants=att.aggregation_bits,
                 )
 
                 if local_proofs:
-                    combined = TypeOneMultiSignature.aggregate(
+                    combined = SingleMessageAggregate.aggregate(
                         children=[
                             (
                                 child,
@@ -621,7 +622,7 @@ class SyncService:
                                     for vid in child.participants.to_validator_indices()
                                 ],
                             )
-                            for child in (block_t1, *local_proofs)
+                            for child in (block_single_message_aggregate, *local_proofs)
                         ],
                         raw_xmss=[],
                         message=data_root,
@@ -629,7 +630,7 @@ class SyncService:
                     )
                 else:
                     # Data unseen locally: nothing to merge, use as-is.
-                    combined = block_t1
+                    combined = block_single_message_aggregate
             except (AggregationError, AssertionError, KeyError, ValueError) as exc:
                 logger.debug("Post-block re-aggregation failed for %s: %s", data_root, exc)
                 continue

@@ -14,7 +14,7 @@ from lean_spec.spec.forks.lstar.containers import (
     BlockBody,
     Config,
     SignedAttestation,
-    TypeOneMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
@@ -90,7 +90,7 @@ class TestBlockProduction:
 
         # Build payloads keyed by attestation data.
         # If data_5 == data_6 (same slot/head/target/source), they share a key.
-        known_payloads: dict[AttestationData, set[TypeOneMultiSignature]] = {}
+        known_payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
         known_payloads.setdefault(signed_5.data, set()).add(proof_5)
         known_payloads.setdefault(signed_6.data, set()).add(proof_6)
 

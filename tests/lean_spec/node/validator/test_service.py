@@ -24,7 +24,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     SignedAttestation,
     SignedBlock,
-    TypeOneMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
@@ -1063,7 +1063,7 @@ class TestValidatorServiceIntegration:
             signatures.append(sig)
             public_keys.append(key_manager[vid].attestation_keypair.public_key)
 
-        proof = TypeOneMultiSignature.aggregate(
+        proof = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=list(zip(participants, public_keys, signatures, strict=True)),
             message=data_root,

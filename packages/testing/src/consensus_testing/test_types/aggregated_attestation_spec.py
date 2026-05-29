@@ -9,8 +9,8 @@ from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     AttestationData,
     Block,
+    SingleMessageAggregate,
     State,
-    TypeOneMultiSignature,
 )
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32
 
@@ -161,7 +161,7 @@ class AggregatedAttestationSpec(CamelModel):
         state: State,
         key_manager: XmssKeyManager,
         block: Block,
-    ) -> tuple[Block, TypeOneMultiSignature]:
+    ) -> tuple[Block, SingleMessageAggregate]:
         """
         Build an invalid attestation proof and append it to the block body.
 
@@ -187,20 +187,20 @@ class AggregatedAttestationSpec(CamelModel):
             data=attestation_data,
         )
 
-        # Empty proof bytes flag "no real Type-1 here" — the caller treats
+        # Empty proof bytes flag "no real single-message aggregate here" — the caller treats
         # any such entry as a placeholder and bypasses real binding merges.
         placeholder = ByteList512KiB(data=b"")
 
         if not self.valid_signature:
-            invalid_proof = TypeOneMultiSignature(participants=aggregation_bits, proof=placeholder)
+            invalid_proof = SingleMessageAggregate(participants=aggregation_bits, proof=placeholder)
         elif self.signer_ids is not None:
             # Valid proof from wrong validators (participant mismatch).
             valid_proof = key_manager.sign_and_aggregate(self.signer_ids, attestation_data)
-            invalid_proof = TypeOneMultiSignature(
+            invalid_proof = SingleMessageAggregate(
                 participants=aggregation_bits, proof=valid_proof.proof
             )
         else:
-            invalid_proof = TypeOneMultiSignature(participants=aggregation_bits, proof=placeholder)
+            invalid_proof = SingleMessageAggregate(participants=aggregation_bits, proof=placeholder)
 
         # Append invalid attestation to the block body.
         block.body.attestations = AggregatedAttestations(

@@ -33,7 +33,7 @@ def test_corrupt_proof_rejected(
 
     Expected Behavior
     -----------------
-    Verification fails with AssertionError because the Type-2 envelope
+    Verification fails with AssertionError because the multi-message aggregate envelope
     cannot be decoded.
 
     Why This Matters

@@ -23,8 +23,8 @@ from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,
+    MultiMessageAggregate,
     SignedBlock,
-    TypeTwoMultiSignature,
 )
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
 
@@ -116,7 +116,7 @@ def empty_signed_block(slot: Slot, parent_root: Bytes32, state_seed: int) -> Sig
         state_root=Bytes32(bytes([state_seed]) * 32),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
-    return SignedBlock(block=block, proof=TypeTwoMultiSignature(proof=ByteList512KiB(data=b"")))
+    return SignedBlock(block=block, proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"")))
 
 
 def build_chain(start_slot: int, count: int, root_seed: int = 0xAA) -> list[SignedBlock]:

@@ -17,7 +17,7 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Checkpoint,
     Config,
-    TypeOneMultiSignature,
+    SingleMessageAggregate,
     ValidatorIndex,
 )
 from lean_spec.spec.ssz import Bytes32
@@ -124,7 +124,7 @@ class Store[StateT: Container, BlockT: Container](StrictBaseModel):
     Keyed by AttestationData.
     """
 
-    latest_new_aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]] = Field(
+    latest_new_aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] = Field(
         default_factory=dict
     )
     """
@@ -134,12 +134,12 @@ class Store[StateT: Container, BlockT: Container](StrictBaseModel):
     They migrate to known payloads via interval ticks.
     Populated from gossip aggregated attestations.
     Block import does not feed individual proofs into this map directly.
-    The block-level proof is a merged Type-2 blob verified as a whole.
-    On gossip-block import, any validator deconstructs that Type-2 into
+    The block-level proof is a merged multi-message aggregate blob verified as a whole.
+    On gossip-block import, any validator deconstructs that multi-message aggregate into
     per-message proofs, writes them back here, and gossips the aggregate.
     """
 
-    latest_known_aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]] = Field(
+    latest_known_aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] = Field(
         default_factory=dict
     )
     """

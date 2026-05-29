@@ -14,7 +14,7 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     SignedAggregatedAttestation,
     SignedAttestation,
-    TypeOneMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32
@@ -286,7 +286,7 @@ class TestOnGossipAggregatedAttestation:
             )
             for vid in participants
         ]
-        proof = TypeOneMultiSignature.aggregate(
+        proof = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=raw_xmss,
             message=data_root,
@@ -332,7 +332,7 @@ class TestOnGossipAggregatedAttestation:
             )
             for vid in participants
         ]
-        proof = TypeOneMultiSignature.aggregate(
+        proof = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=raw_xmss,
             message=data_root,
@@ -371,7 +371,7 @@ class TestOnGossipAggregatedAttestation:
             )
             for vid in signers
         ]
-        proof = TypeOneMultiSignature.aggregate(
+        proof = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=raw_xmss,
             message=data_root,
@@ -382,7 +382,7 @@ class TestOnGossipAggregatedAttestation:
         corrupted_data = bytearray(proof.proof.data)
         corrupted_data[10] ^= 0xFF
         corrupted_data[20] ^= 0xFF
-        corrupted_proof = TypeOneMultiSignature(
+        corrupted_proof = SingleMessageAggregate(
             participants=proof.participants,
             proof=ByteList512KiB(data=bytes(corrupted_data)),
         )
@@ -418,7 +418,7 @@ class TestOnGossipAggregatedAttestation:
             )
             for vid in participants_1
         ]
-        proof_1 = TypeOneMultiSignature.aggregate(
+        proof_1 = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=raw_xmss_1,
             message=data_root,
@@ -435,7 +435,7 @@ class TestOnGossipAggregatedAttestation:
             )
             for vid in participants_2
         ]
-        proof_2 = TypeOneMultiSignature.aggregate(
+        proof_2 = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=raw_xmss_2,
             message=data_root,

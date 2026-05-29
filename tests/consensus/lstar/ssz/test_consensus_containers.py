@@ -19,11 +19,11 @@ from lean_spec.spec.forks.lstar.containers import (
     JustificationRoots,
     JustificationValidators,
     JustifiedSlots,
+    MultiMessageAggregate,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
+    SingleMessageAggregate,
     Validator,
     Validators,
 )
@@ -259,7 +259,7 @@ def test_signed_block_minimal(ssz: SSZTestFiller) -> None:
         type_name="SignedBlock",
         value=SignedBlock(
             block=block,
-            proof=TypeTwoMultiSignature(proof=ByteList512KiB(data=b"")),
+            proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"")),
         ),
     )
 
@@ -277,7 +277,7 @@ def test_signed_block_with_proof_bytes(ssz: SSZTestFiller) -> None:
         type_name="SignedBlock",
         value=SignedBlock(
             block=block,
-            proof=TypeTwoMultiSignature(proof=ByteList512KiB(data=b"\xde\xad\xbe\xef")),
+            proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"\xde\xad\xbe\xef")),
         ),
     )
 
@@ -422,7 +422,7 @@ def test_signed_aggregated_attestation_minimal(ssz: SSZTestFiller) -> None:
         type_name="SignedAggregatedAttestation",
         value=SignedAggregatedAttestation(
             data=data,
-            proof=TypeOneMultiSignature(
+            proof=SingleMessageAggregate(
                 participants=AggregationBits(data=[Boolean(True)]),
                 proof=ByteList512KiB(data=b""),
             ),
@@ -438,7 +438,7 @@ def test_signed_aggregated_attestation_typical(ssz: SSZTestFiller) -> None:
         type_name="SignedAggregatedAttestation",
         value=SignedAggregatedAttestation(
             data=data,
-            proof=TypeOneMultiSignature(
+            proof=SingleMessageAggregate(
                 participants=AggregationBits(
                     data=[Boolean(True), Boolean(False), Boolean(True), Boolean(True)]
                 ),

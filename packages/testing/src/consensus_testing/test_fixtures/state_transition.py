@@ -12,8 +12,8 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     BlockBody,
+    SingleMessageAggregate,
     State,
-    TypeOneMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32
@@ -255,7 +255,7 @@ class StateTransitionTest(BaseConsensusFixture):
 
         # Path 3: normal block construction via the spec's builder.
         else:
-            aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]] = {}
+            aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
             if spec.attestations:
                 aggregated_payloads = StateTransitionTest._build_aggregated_payloads_from_spec(
                     spec.attestations, state, block_registry
@@ -301,7 +301,7 @@ class StateTransitionTest(BaseConsensusFixture):
         attestation_specs: list[AggregatedAttestationSpec],
         state: State,
         block_registry: dict[str, Block],
-    ) -> dict[AttestationData, set[TypeOneMultiSignature]]:
+    ) -> dict[AttestationData, set[SingleMessageAggregate]]:
         """
         Build aggregated signature payloads from attestation specifications.
 
@@ -317,7 +317,7 @@ class StateTransitionTest(BaseConsensusFixture):
         # XMSS keys require precomputation up to the highest slot used.
         max_slot = max(spec.slot for spec in attestation_specs)
         key_manager = XmssKeyManager.shared(max_slot=max_slot)
-        payloads: dict[AttestationData, set[TypeOneMultiSignature]] = {}
+        payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
 
         for spec in attestation_specs:
             if not spec.valid_signature:
