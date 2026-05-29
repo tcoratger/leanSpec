@@ -1,7 +1,6 @@
 """Greedy proof selection for lstar block production."""
 
-from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
-from lean_spec.spec.forks.lstar.containers import ValidatorIndex
+from lean_spec.spec.forks.lstar.containers import TypeOneMultiSignature, ValidatorIndex
 
 
 def select_greedily(

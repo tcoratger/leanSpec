@@ -6,12 +6,12 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.aggregation import (
+from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar.containers import (
     AggregationError,
     TypeOneMultiSignature,
     TypeTwoMultiSignature,
 )
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.ssz import ByteList512KiB
 from tests.lean_spec.helpers import make_attestation_data_simple, make_bytes32
 

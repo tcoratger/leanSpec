@@ -12,12 +12,12 @@ from pydantic import Field
 
 from lean_spec.base import StrictBaseModel
 from lean_spec.node.chain.clock import Interval
-from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.crypto.xmss.containers import Signature
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Checkpoint,
     Config,
+    TypeOneMultiSignature,
     ValidatorIndex,
 )
 from lean_spec.spec.ssz import Bytes32

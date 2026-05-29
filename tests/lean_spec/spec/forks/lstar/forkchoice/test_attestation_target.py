@@ -8,7 +8,6 @@ from consensus_testing.keys import XmssKeyManager
 from lean_spec.node.chain.clock import Interval
 from lean_spec.node.chain.config import JUSTIFICATION_LOOKBACK_SLOTS
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
@@ -16,6 +15,8 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     SignedAttestation,
     SignedBlock,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32

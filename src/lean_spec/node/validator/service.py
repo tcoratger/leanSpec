@@ -41,7 +41,6 @@ from lean_spec.node.chain.clock import Interval, SlotClock
 from lean_spec.node.sync import SyncService
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME
-from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.spec.forks import (
     AttestationData,
@@ -52,6 +51,7 @@ from lean_spec.spec.forks import (
     Slot,
     ValidatorIndex,
 )
+from lean_spec.spec.forks.lstar.containers import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
 
 from .constants import HYSTERESIS_BAND, NETWORK_STALL_THRESHOLD, SYNC_LAG_THRESHOLD

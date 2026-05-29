@@ -19,17 +19,13 @@ from lean_spec.node.observability import (
     observe_state_transition,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.aggregation import (
-    AggregationError,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
-)
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
+    AggregationError,
     AttestationData,
     Block,
     BlockBody,
@@ -45,6 +41,8 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedBlock,
     Slot,
     State,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
     ValidatorIndex,
     Validators,
 )

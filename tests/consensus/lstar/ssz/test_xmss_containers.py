@@ -6,10 +6,6 @@ from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.xmss import PublicKey
-from lean_spec.spec.crypto.xmss.aggregation import (
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
-)
 from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
 from lean_spec.spec.crypto.xmss.merkle import HashTreeLayer
 from lean_spec.spec.crypto.xmss.types import (
@@ -19,6 +15,10 @@ from lean_spec.spec.crypto.xmss.types import (
     Parameter,
 )
 from lean_spec.spec.forks import AggregationBits, Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar.containers import (
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
+)
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Uint64
 
 pytestmark = pytest.mark.valid_until("Lstar")
