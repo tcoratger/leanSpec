@@ -548,8 +548,6 @@ class SyncService:
             return store, []
         validators = parent_state.validators
 
-        type_two = block.proof
-
         # Build the per-message pubkey layout once.
         # The layout is invariant per block: one entry per body attestation
         # in order, then the proposer entry. Hoisted out of the per-att loop
@@ -607,7 +605,7 @@ class SyncService:
             try:
                 # The split takes the bits from the block attestation this
                 # component binds, since the Rust binding does not return them.
-                block_t1 = type_two.split_by_msg(
+                block_t1 = block.proof.split_by_msg(
                     message=data_root,
                     public_keys_per_message=public_keys_per_message,
                     participants=att.aggregation_bits,

@@ -851,7 +851,6 @@ class LstarSpec(ForkProtocol):
         """
         block = signed_block.block
         aggregated_attestations = block.body.attestations
-        type_two = signed_block.proof
 
         num_validators = Uint64(len(validators))
         public_keys_per_message: list[list[PublicKey]] = []
@@ -895,7 +894,7 @@ class LstarSpec(ForkProtocol):
         message_bindings.append((hash_tree_root(block), block.slot))
 
         try:
-            type_two.verify(
+            signed_block.proof.verify(
                 public_keys_per_message=public_keys_per_message,
                 messages=message_bindings,
             )
