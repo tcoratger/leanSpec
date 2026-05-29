@@ -2,16 +2,16 @@
 
 from typing import Final, Self
 
-from lean_spec.config import LEAN_ENV
-from lean_spec.node.chain.config import HISTORICAL_ROOTS_LIMIT
-from lean_spec.spec.crypto.xmss.aggregation import (
-    LOG_INV_RATE,
+from lean_multisig_py import (
     aggregate_type_1,
     merge_many_type_1,
     split_type_2_by_msg,
     verify_type_1,
     verify_type_2_with_messages,
 )
+
+from lean_spec.config import LEAN_ENV
+from lean_spec.node.chain.config import HISTORICAL_ROOTS_LIMIT
 from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Bytes52, Container, SSZList, Uint64
 from lean_spec.spec.ssz.bitfields import BaseBitlist
@@ -27,6 +27,13 @@ __all__ = [
 
 VALIDATOR_REGISTRY_LIMIT: Final = Uint64(2**12)
 """The maximum number of validators that can be in the registry."""
+
+LOG_INV_RATE: int = 1 if LEAN_ENV == "test" else 2
+"""Inverse-rate exponent forwarded to the SNARK backend.
+
+A smaller rate trades verifier cost for prover speed.
+Test mode favors prover speed.
+"""
 
 
 class SubnetId(Uint64):
