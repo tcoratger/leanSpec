@@ -204,7 +204,7 @@ class TestBoundaryConditions:
         malformed = bytes([0x80] * 10 + [0x01])
         assert len(malformed) == 11
 
-        with pytest.raises(VarintError, match="too long"):
+        with pytest.raises(VarintError, match="exceeds 10 bytes"):
             decode_varint(malformed)
 
     def test_payload_at_max_size(self) -> None:
