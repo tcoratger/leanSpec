@@ -23,12 +23,12 @@ from lean_spec.node.snappy.encoding import (
 )
 
 # Path to test data files
-TESTDATA_DIR = Path(__file__).parent / "testdata"
+TESTDATA_DIRECTORY = Path(__file__).parent / "testdata"
 
 
 def load_test_file(filename: str, size_limit: int = 0) -> bytes:
     """Load a test data file, optionally truncated to size_limit."""
-    path = TESTDATA_DIR / filename
+    path = TESTDATA_DIRECTORY / filename
     data = path.read_bytes()
     if size_limit > 0:
         data = data[:size_limit]
@@ -206,9 +206,9 @@ class TestSimpleCompression:
 
     def test_single_byte(self) -> None:
         """Single byte roundtrips correctly."""
-        for char in [b"a", b"X", b"\x00", b"\xff"]:
-            compressed = compress(char)
-            assert decompress(compressed) == char
+        for character in [b"a", b"X", b"\x00", b"\xff"]:
+            compressed = compress(character)
+            assert decompress(compressed) == character
 
     def test_short_strings(self) -> None:
         """Short strings roundtrip correctly."""
@@ -430,11 +430,11 @@ class TestUtilities:
     def test_max_compressed_length(self) -> None:
         """max_compressed_length returns a valid upper bound."""
         for size in [0, 100, 1000, 65536, 100000]:
-            max_len = max_compressed_length(size)
+            max_length = max_compressed_length(size)
             data = bytes(range(256)) * (size // 256 + 1)
             data = data[:size]
             compressed = compress(data)
-            assert len(compressed) <= max_len
+            assert len(compressed) <= max_length
 
 
 class TestSpecificPatterns:

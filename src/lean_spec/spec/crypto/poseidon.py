@@ -1286,7 +1286,7 @@ def _permute_jit(
     - No initial linear layer is applied before the round structure begins.
     - This matches the original Poseidon design.
     """
-    const_idx = 0
+    const_index = 0
 
     # Phase 1: opening full rounds.
     #
@@ -1294,8 +1294,8 @@ def _permute_jit(
     # attacker control over inputs is highest.
     for _ in range(half_rounds_f):
         # Add round constants to entire state.
-        state[:] = (state + round_constants[const_idx : const_idx + width]) % p
-        const_idx += width
+        state[:] = (state + round_constants[const_index : const_index + width]) % p
+        const_index += width
 
         # Apply S-box (x -> x^d) to full state.
         #
@@ -1314,8 +1314,8 @@ def _permute_jit(
     # It still saturates algebraic degree while cutting SNARK constraint cost.
     for _ in range(rounds_p):
         # Add round constants to entire state.
-        state[:] = (state + round_constants[const_idx : const_idx + width]) % p
-        const_idx += width
+        state[:] = (state + round_constants[const_index : const_index + width]) % p
+        const_index += width
 
         # Apply S-box to first element only.
         state[0] = (state[0] * state[0] % p) * state[0] % p
@@ -1329,8 +1329,8 @@ def _permute_jit(
     # unwind the partial-round middle.
     for _ in range(half_rounds_f):
         # Add round constants to entire state.
-        state[:] = (state + round_constants[const_idx : const_idx + width]) % p
-        const_idx += width
+        state[:] = (state + round_constants[const_index : const_index + width]) % p
+        const_index += width
 
         # Apply S-box to full state.
         state[:] = (state * state % p) * state % p

@@ -6,10 +6,10 @@ The expected YAML format matches the cross-client convention:
 
     GENESIS_TIME: 1704085200
     GENESIS_VALIDATORS:
-    - attestation_pubkey: 0xe2a03c16122c7e0f...
-      proposal_pubkey: 0x0767e65924063f79...
-    - attestation_pubkey: 0xabcdef0123456789...
-      proposal_pubkey: 0x9876543210fedcba...
+    - attestation_public_key: 0xe2a03c16122c7e0f...
+      proposal_public_key: 0x0767e65924063f79...
+    - attestation_public_key: 0xabcdef0123456789...
+      proposal_public_key: 0x9876543210fedcba...
 """
 
 from __future__ import annotations
@@ -28,13 +28,13 @@ from lean_spec.spec.ssz import Bytes52, Uint64
 class GenesisValidatorEntry(StrictBaseModel):
     """A single validator's public keys in the genesis configuration."""
 
-    attestation_pubkey: Bytes52
+    attestation_public_key: Bytes52
     """XMSS public key for signing attestations."""
 
-    proposal_pubkey: Bytes52
+    proposal_public_key: Bytes52
     """XMSS public key for signing proposer attestations in blocks."""
 
-    @field_validator("attestation_pubkey", "proposal_pubkey", mode="before")
+    @field_validator("attestation_public_key", "proposal_public_key", mode="before")
     @classmethod
     def _yaml_int_to_hex(cls, v: Any) -> Any:
         """
@@ -87,8 +87,8 @@ class GenesisConfig(StrictBaseModel):
 
     Each entry contains two XMSS public keys:
 
-    - attestation_pubkey: for signing attestations
-    - proposal_pubkey: for signing proposer attestations in blocks
+    - attestation_public_key: for signing attestations
+    - proposal_public_key: for signing proposer attestations in blocks
 
     Security note: 2/3+ collusion controls the chain until new validators join.
     """
@@ -103,8 +103,8 @@ class GenesisConfig(StrictBaseModel):
         return Validators(
             data=[
                 Validator(
-                    attestation_pubkey=entry.attestation_pubkey,
-                    proposal_pubkey=entry.proposal_pubkey,
+                    attestation_public_key=entry.attestation_public_key,
+                    proposal_public_key=entry.proposal_public_key,
                     index=ValidatorIndex(i),
                 )
                 for i, entry in enumerate(self.genesis_validators)

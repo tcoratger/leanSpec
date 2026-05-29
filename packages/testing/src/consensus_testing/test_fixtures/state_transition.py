@@ -63,7 +63,7 @@ class StateTransitionTest(BaseConsensusFixture):
     make_fixture() and stores them in the private _filled_blocks attribute.
     """
 
-    # TODO: We should figure out a configuration to raise if a private attr is
+    # TODO: We should figure out a configuration to raise if a private attribute is
     #  attempted to be set during model initialization.
     _filled_blocks: list[Block] = PrivateAttr(default_factory=list)
     """
@@ -278,7 +278,9 @@ class StateTransitionTest(BaseConsensusFixture):
         if spec.forced_attestations:
             forced = [
                 AggregatedAttestation(
-                    aggregation_bits=ValidatorIndices(data=fa.validator_ids).to_aggregation_bits(),
+                    aggregation_bits=ValidatorIndices(
+                        data=fa.validator_indices
+                    ).to_aggregation_bits(),
                     data=fa.build_attestation_data(block_registry, state),
                 )
                 for fa in spec.forced_attestations
@@ -328,7 +330,7 @@ class StateTransitionTest(BaseConsensusFixture):
                 raise NotImplementedError("signer_ids not yet supported in StateTransitionTest")
 
             attestation_data = spec.build_attestation_data(block_registry, state)
-            proof = key_manager.sign_and_aggregate(spec.validator_ids, attestation_data)
+            proof = key_manager.sign_and_aggregate(spec.validator_indices, attestation_data)
             payloads.setdefault(attestation_data, set()).add(proof)
 
         return payloads

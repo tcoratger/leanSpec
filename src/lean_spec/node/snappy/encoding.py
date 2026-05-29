@@ -112,20 +112,20 @@ def encode_literal_tag(length: int) -> bytes:
         # Large literal: tag indicates 2-byte length follows.
         # Format: [61 (6 bits)][LITERAL (2 bits)] + [length-1 (16 bits LE)]
         tag = (LITERAL_LENGTH_2_BYTES << 2) | LITERAL
-        len_minus_1 = length - 1
-        return bytes([tag, len_minus_1 & 0xFF, (len_minus_1 >> 8) & 0xFF])
+        length_minus_1 = length - 1
+        return bytes([tag, length_minus_1 & 0xFF, (length_minus_1 >> 8) & 0xFF])
 
     elif length <= 16777216:
         # Very large literal: tag indicates 3-byte length follows.
         # Format: [62 (6 bits)][LITERAL (2 bits)] + [length-1 (24 bits LE)]
         tag = (LITERAL_LENGTH_3_BYTES << 2) | LITERAL
-        len_minus_1 = length - 1
+        length_minus_1 = length - 1
         return bytes(
             [
                 tag,
-                len_minus_1 & 0xFF,
-                (len_minus_1 >> 8) & 0xFF,
-                (len_minus_1 >> 16) & 0xFF,
+                length_minus_1 & 0xFF,
+                (length_minus_1 >> 8) & 0xFF,
+                (length_minus_1 >> 16) & 0xFF,
             ]
         )
 
@@ -133,14 +133,14 @@ def encode_literal_tag(length: int) -> bytes:
         # Maximum literal: tag indicates 4-byte length follows.
         # Format: [63 (6 bits)][LITERAL (2 bits)] + [length-1 (32 bits LE)]
         tag = (LITERAL_LENGTH_4_BYTES << 2) | LITERAL
-        len_minus_1 = length - 1
+        length_minus_1 = length - 1
         return bytes(
             [
                 tag,
-                len_minus_1 & 0xFF,
-                (len_minus_1 >> 8) & 0xFF,
-                (len_minus_1 >> 16) & 0xFF,
-                (len_minus_1 >> 24) & 0xFF,
+                length_minus_1 & 0xFF,
+                (length_minus_1 >> 8) & 0xFF,
+                (length_minus_1 >> 16) & 0xFF,
+                (length_minus_1 >> 24) & 0xFF,
             ]
         )
 

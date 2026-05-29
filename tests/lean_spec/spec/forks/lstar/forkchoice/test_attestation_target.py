@@ -155,12 +155,12 @@ class TestSafeTargetAdvancement:
 
         # Create signed attestations and process them
         for i in range(threshold - 1):
-            vid = ValidatorIndex(i)
-            sig = key_manager.sign_attestation_data(vid, attestation_data)
+            validator_index = ValidatorIndex(i)
+            signature = key_manager.sign_attestation_data(validator_index, attestation_data)
             signed_attestation = SignedAttestation(
-                validator_id=vid,
+                validator_index=validator_index,
                 data=attestation_data,
-                signature=sig,
+                signature=signature,
             )
             # Process as gossip (requires aggregator flag)
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
@@ -201,12 +201,12 @@ class TestSafeTargetAdvancement:
 
         # Create signed attestations and process them
         for i in range(threshold + 1):
-            vid = ValidatorIndex(i)
-            sig = key_manager.sign_attestation_data(vid, attestation_data)
+            validator_index = ValidatorIndex(i)
+            signature = key_manager.sign_attestation_data(validator_index, attestation_data)
             signed_attestation = SignedAttestation(
-                validator_id=vid,
+                validator_index=validator_index,
                 data=attestation_data,
-                signature=sig,
+                signature=signature,
             )
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
@@ -240,12 +240,12 @@ class TestSafeTargetAdvancement:
 
         # Create signed attestations and process them
         for i in range(num_validators):
-            vid = ValidatorIndex(i)
-            sig = key_manager.sign_attestation_data(vid, attestation_data)
+            validator_index = ValidatorIndex(i)
+            signature = key_manager.sign_attestation_data(validator_index, attestation_data)
             signed_attestation = SignedAttestation(
-                validator_id=vid,
+                validator_index=validator_index,
                 data=attestation_data,
-                signature=sig,
+                signature=signature,
             )
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
@@ -294,12 +294,12 @@ class TestJustificationLogic:
 
         # Add attestations from threshold validators using the new workflow
         for i in range(threshold + 1):
-            vid = ValidatorIndex(i)
-            sig = key_manager.sign_attestation_data(vid, attestation_data)
+            validator_index = ValidatorIndex(i)
+            signature = key_manager.sign_attestation_data(validator_index, attestation_data)
             signed_attestation = SignedAttestation(
-                validator_id=vid,
+                validator_index=validator_index,
                 data=attestation_data,
-                signature=sig,
+                signature=signature,
             )
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
@@ -341,7 +341,7 @@ class TestJustificationLogic:
         )
 
         attestation = Attestation(
-            validator_id=ValidatorIndex(5),
+            validator_index=ValidatorIndex(5),
             data=AttestationData(
                 slot=slot,
                 head=Checkpoint(root=block_root, slot=slot),
@@ -377,12 +377,12 @@ class TestJustificationLogic:
         attestation_data_head = spec.produce_attestation_data(store, head_block.slot)
 
         for i in range(num_validators // 2):
-            vid = ValidatorIndex(i)
-            sig = key_manager.sign_attestation_data(vid, attestation_data_head)
+            validator_index = ValidatorIndex(i)
+            signature = key_manager.sign_attestation_data(validator_index, attestation_data_head)
             signed_attestation = SignedAttestation(
-                validator_id=vid,
+                validator_index=validator_index,
                 data=attestation_data_head,
-                signature=sig,
+                signature=signature,
             )
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
@@ -416,22 +416,22 @@ class TestFinalizationFollowsJustification:
 
             # Create attestations from all validators for the previous block
             if slot_num > 1:
-                prev_head = store.head
-                prev_block = store.blocks[prev_head]
+                previous_head = store.head
+                previous_block = store.blocks[previous_head]
                 attestation_data = AttestationData(
-                    slot=prev_block.slot,
-                    head=Checkpoint(root=prev_head, slot=prev_block.slot),
-                    target=Checkpoint(root=prev_head, slot=prev_block.slot),
+                    slot=previous_block.slot,
+                    head=Checkpoint(root=previous_head, slot=previous_block.slot),
+                    target=Checkpoint(root=previous_head, slot=previous_block.slot),
                     source=store.latest_justified,
                 )
 
                 for i in range(threshold + 1):
-                    vid = ValidatorIndex(i)
-                    sig = key_manager.sign_attestation_data(vid, attestation_data)
+                    validator_index = ValidatorIndex(i)
+                    signature = key_manager.sign_attestation_data(validator_index, attestation_data)
                     signed_attestation = SignedAttestation(
-                        validator_id=vid,
+                        validator_index=validator_index,
                         data=attestation_data,
-                        signature=sig,
+                        signature=signature,
                     )
                     store = spec.on_gossip_attestation(
                         store, signed_attestation, is_aggregator=True
@@ -475,7 +475,7 @@ class TestAttestationTargetEdgeCases:
         key_manager: XmssKeyManager,
     ) -> None:
         """Attestation target computation should work with single validator."""
-        store = make_store(num_validators=1, key_manager=key_manager, validator_id=None)
+        store = make_store(num_validators=1, key_manager=key_manager, validator_index=None)
 
         # Should be able to get attestation target
         target = spec.get_attestation_target(store)
@@ -526,12 +526,12 @@ class TestIntegrationScenarios:
 
         num_validators = len(store.states[block_1_root].validators)
         for i in range(num_validators):
-            vid = ValidatorIndex(i)
-            sig = key_manager.sign_attestation_data(vid, attestation_data)
+            validator_index = ValidatorIndex(i)
+            signature = key_manager.sign_attestation_data(validator_index, attestation_data)
             signed_attestation = SignedAttestation(
-                validator_id=vid,
+                validator_index=validator_index,
                 data=attestation_data,
-                signature=sig,
+                signature=signature,
             )
             # Process as gossip
             store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
@@ -573,10 +573,10 @@ class TestIntegrationScenarios:
         # Wrap the proposer's signature into a singleton Type-1, then merge
         # with the per-attestation Type-1s into the block-level Type-2.
         proposer_signature = key_manager.sign_block_root(proposer_1, slot_1, block_root)
-        proposer_pubkey = key_manager.get_public_keys(proposer_1)[1]
+        proposer_public_key = key_manager.get_public_keys(proposer_1)[1]
         proposer_type_1 = TypeOneMultiSignature.aggregate(
             children=[],
-            raw_xmss=[(proposer_1, proposer_pubkey, proposer_signature)],
+            raw_xmss=[(proposer_1, proposer_public_key, proposer_signature)],
             message=block_root,
             slot=slot_1,
         )
@@ -584,12 +584,12 @@ class TestIntegrationScenarios:
         head_state = store.states[store.head]
         public_keys_per_part: list[list] = [
             [
-                head_state.validators[vid].get_attestation_pubkey()
-                for vid in proof.participants.to_validator_indices()
+                head_state.validators[validator_index].get_attestation_public_key()
+                for validator_index in proof.participants.to_validator_indices()
             ]
             for proof in signatures
         ]
-        public_keys_per_part.append([proposer_pubkey])
+        public_keys_per_part.append([proposer_public_key])
 
         merged = TypeTwoMultiSignature.aggregate(
             [*signatures, proposer_type_1],

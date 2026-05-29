@@ -241,9 +241,9 @@ class EmptyContainer(Container):
     """Container with zero fields."""
 
 
-def le_padded(value: int, byte_len: int) -> Bytes32:
+def le_padded(value: int, byte_length: int) -> Bytes32:
     """Encode an integer little-endian and right-pad to one chunk."""
-    return pad(value.to_bytes(byte_len, "little"))
+    return pad(value.to_bytes(byte_length, "little"))
 
 
 @pytest.mark.parametrize(
@@ -264,9 +264,9 @@ def le_padded(value: int, byte_len: int) -> Bytes32:
         (Uint64, 8, 0xFFFFFFFFFFFFFFFF),
     ],
 )
-def test_hash_tree_root_uints(uint_type: type, byte_len: int, value: int) -> None:
+def test_hash_tree_root_uints(uint_type: type, byte_length: int, value: int) -> None:
     """Unsigned integers hash as their little-endian bytes padded to one chunk."""
-    assert hash_tree_root(uint_type(value)) == le_padded(value, byte_len)
+    assert hash_tree_root(uint_type(value)) == le_padded(value, byte_length)
 
 
 @pytest.mark.parametrize(

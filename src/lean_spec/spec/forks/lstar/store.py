@@ -32,7 +32,7 @@ class AttestationSignatureEntry(NamedTuple):
     that attested to the same AttestationData.
     """
 
-    validator_id: ValidatorIndex
+    validator_index: ValidatorIndex
     signature: Signature
 
 
@@ -112,7 +112,7 @@ class Store[StateT: Container, BlockT: Container](StrictBaseModel):
     `Store`'s latest justified and latest finalized checkpoints.
     """
 
-    validator_id: ValidatorIndex | None
+    validator_index: ValidatorIndex | None
     """Index of the validator running this store instance."""
 
     attestation_signatures: dict[AttestationData, set[AttestationSignatureEntry]] = Field(

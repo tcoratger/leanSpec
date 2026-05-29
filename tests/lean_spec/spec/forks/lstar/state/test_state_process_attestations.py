@@ -110,7 +110,7 @@ class TestProcessAttestationsBoundsCheck:
         target_slot = Slot(10)
         target_root = make_bytes32(99)
 
-        att_data = AttestationData(
+        attestation_data = AttestationData(
             slot=target_slot,
             head=Checkpoint(root=target_root, slot=target_slot),
             target=Checkpoint(root=target_root, slot=target_slot),
@@ -123,7 +123,7 @@ class TestProcessAttestationsBoundsCheck:
             aggregation_bits=ValidatorIndices(
                 data=[ValidatorIndex(0), ValidatorIndex(1)]
             ).to_aggregation_bits(),
-            data=att_data,
+            data=attestation_data,
         )
 
         # Process the attestation.
@@ -192,7 +192,7 @@ class TestProcessAttestationsBoundsCheck:
         target_slot = Slot(10)
         some_root = make_bytes32(42)
 
-        att_data = AttestationData(
+        attestation_data = AttestationData(
             slot=target_slot,
             head=Checkpoint(root=some_root, slot=target_slot),
             target=Checkpoint(root=some_root, slot=target_slot),
@@ -203,7 +203,7 @@ class TestProcessAttestationsBoundsCheck:
             aggregation_bits=ValidatorIndices(
                 data=[ValidatorIndex(0), ValidatorIndex(1)]
             ).to_aggregation_bits(),
-            data=att_data,
+            data=attestation_data,
         )
 
         # Process the attestation.

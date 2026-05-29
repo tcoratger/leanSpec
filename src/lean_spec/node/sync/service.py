@@ -387,17 +387,17 @@ class SyncService:
             return
 
         slot = attestation.data.slot
-        validator_id = attestation.validator_id
+        validator_index = attestation.validator_index
         peer_str = str(peer_id) if peer_id is not None else "local"
         logger.info(
             "Attestation received from peer %s slot=%s validator=%s",
             peer_str,
             slot,
-            validator_id,
+            validator_index,
         )
 
         # Aggregator role requires both an active validator and operator opt-in.
-        is_aggregator_role = self.store.validator_id is not None and self.is_aggregator
+        is_aggregator_role = self.store.validator_index is not None and self.is_aggregator
 
         # The store validates the signature and updates branch weights.
         #
@@ -413,7 +413,7 @@ class SyncService:
                 "Attestation from peer %s slot=%s validator=%s: validation and signature ok",
                 peer_str,
                 slot,
-                validator_id,
+                validator_index,
             )
         except (AssertionError, KeyError) as e:
             metrics.lean_attestations_invalid_total.labels(source="gossip").inc()
@@ -421,7 +421,7 @@ class SyncService:
                 "Attestation from peer %s slot=%s validator=%s: validation or signature failed: %s",
                 peer_str,
                 slot,
-                validator_id,
+                validator_index,
                 e,
             )
             # Target block has not arrived yet; buffer for post-block replay.
@@ -474,7 +474,7 @@ class SyncService:
     def _replay_pending_attestations(self) -> None:
         """Retry buffered attestations after a block is processed."""
         # Aggregator role for this replay matches the live gossip path.
-        is_aggregator_role = self.store.validator_id is not None and self.is_aggregator
+        is_aggregator_role = self.store.validator_index is not None and self.is_aggregator
 
         # Drain the queue into a local and iterate it.
         # Successful retries disappear into the store.
@@ -498,9 +498,9 @@ class SyncService:
                 self._pending_attestations.append(attestation)
 
         # Same mechanism for aggregated attestations.
-        pending_agg = self._pending_aggregated_attestations
+        pending_aggregate = self._pending_aggregated_attestations
         self._pending_aggregated_attestations = deque(maxlen=MAX_PENDING_ATTESTATIONS)
-        for signed_attestation in pending_agg:
+        for signed_attestation in pending_aggregate:
             try:
                 self.store = self.spec.on_gossip_aggregated_attestation(
                     self.store, signed_attestation
@@ -544,7 +544,7 @@ class SyncService:
             return store, []
 
         # The Type-2 proof was built against the parent state's validator set.
-        # Without it we cannot resolve the pubkey layout the proof was bound to.
+        # Without it we cannot resolve the public_key layout the proof was bound to.
         parent_state = store.states.get(block.block.parent_root)
         if parent_state is None:
             return store, []
@@ -559,20 +559,20 @@ class SyncService:
             logger.debug("Post-block Type-2 decode failed: %s", exc)
             return store, []
 
-        # Build the per-message pubkey layout once.
+        # Build the per-message public_key layout once.
         # The layout is invariant per block: one entry per body attestation
         # in order, then the proposer entry. Hoisted out of the per-att loop
         # to avoid quadratic work when many block attestations need splitting.
         public_keys_per_message: list[list[PublicKey]] = []
-        for att in block_attestations:
+        for attestation in block_attestations:
             public_keys_per_message.append(
                 [
-                    validators[vid].get_attestation_pubkey()
-                    for vid in att.aggregation_bits.to_validator_indices()
+                    validators[validator_index].get_attestation_public_key()
+                    for validator_index in attestation.aggregation_bits.to_validator_indices()
                 ]
             )
         public_keys_per_message.append(
-            [validators[block.block.proposer_index].get_proposal_pubkey()]
+            [validators[block.block.proposer_index].get_proposal_public_key()]
         )
 
         # Index local partial Type-1 proofs by AttestationData root. Equivalent
@@ -591,8 +591,8 @@ class SyncService:
         }
         aggregates: list[SignedAggregatedAttestation] = []
 
-        for att in block_attestations:
-            data = att.data
+        for attestation in block_attestations:
+            data = attestation.data
 
             # Only spend a split on attestations that can still move
             # justification forward. A target at or behind the store's
@@ -601,7 +601,7 @@ class SyncService:
                 continue
 
             data_root = hash_tree_root(data)
-            block_participants = set(att.aggregation_bits.to_validator_indices())
+            block_participants = set(attestation.aggregation_bits.to_validator_indices())
 
             local_proofs = local_proofs_by_root.get(data_root, [])
             local_union: set = set()
@@ -616,10 +616,10 @@ class SyncService:
             try:
                 # The split takes the bits from the block attestation this
                 # component binds, since the Rust binding does not return them.
-                block_t1 = type_two.split_by_msg(
+                block_t1 = type_two.split_by_message(
                     message=data_root,
                     public_keys_per_message=public_keys_per_message,
-                    participants=att.aggregation_bits,
+                    participants=attestation.aggregation_bits,
                 )
 
                 if local_proofs:
@@ -628,8 +628,8 @@ class SyncService:
                             (
                                 child,
                                 [
-                                    validators[vid].get_attestation_pubkey()
-                                    for vid in child.participants.to_validator_indices()
+                                    validators[validator_index].get_attestation_public_key()
+                                    for validator_index in child.participants.to_validator_indices()
                                 ],
                             )
                             for child in (block_t1, *local_proofs)
