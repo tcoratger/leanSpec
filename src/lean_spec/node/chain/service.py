@@ -130,8 +130,8 @@ class ChainService:
             # No publisher is wired in tests and offline runs.
             publish = self.sync_service.publish_aggregated_attestation
             if new_aggregated_attestations and publish is not None:
-                for agg in new_aggregated_attestations:
-                    await publish(agg)
+                for aggregate in new_aggregated_attestations:
+                    await publish(aggregate)
 
             logger.info(
                 "Tick: slot=%d interval=%d head=%s finalized=slot%d",

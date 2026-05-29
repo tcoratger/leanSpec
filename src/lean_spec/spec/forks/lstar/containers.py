@@ -150,7 +150,7 @@ class SingleMessageAggregate(Container):
     """Bitfield indicating which validators contributed signatures."""
 
     proof: ByteList512KiB
-    """Aggregated proof bytes in compact no-pubkeys representation."""
+    """Aggregated proof bytes in compact public-key-free representation."""
 
     @classmethod
     def aggregate(
@@ -194,24 +194,24 @@ class SingleMessageAggregate(Container):
         #
         # Fresh signers bring their own index.
         # Child proofs expose theirs through the participant bitfield.
-        all_indices = {vid for vid, _, _ in raw_xmss}.union(
+        all_indices = {validator_index for validator_index, _, _ in raw_xmss}.union(
             *(child.participants.to_validator_indices() for child, _ in children)
         )
         participants = ValidatorIndices(data=sorted(all_indices)).to_aggregation_bits()
 
         # Phase 2: serialize inputs to the prover's wire format.
-        raw_pubkeys_ssz = [pk.encode_bytes() for _, pk, _ in raw_xmss]
-        raw_signatures_ssz = [sig.encode_bytes() for _, _, sig in raw_xmss]
+        raw_public_keys_ssz = [public_key.encode_bytes() for _, public_key, _ in raw_xmss]
+        raw_signatures_ssz = [signature.encode_bytes() for _, _, signature in raw_xmss]
         children_bytes = [
-            ([pk.encode_bytes() for pk in pubkeys], bytes(child.proof.data))
-            for child, pubkeys in children
+            ([public_key.encode_bytes() for public_key in public_keys], bytes(child.proof.data))
+            for child, public_keys in children
         ]
 
         # Phase 3: hand off to the Rust prover.
         # The mode argument routes the call to the matching backend bytecode.
         try:
             _, single_message_aggregate_wire = aggregate_type_1(
-                raw_pubkeys_ssz,
+                raw_public_keys_ssz,
                 raw_signatures_ssz,
                 bytes(message),
                 int(slot),
@@ -233,15 +233,15 @@ class SingleMessageAggregate(Container):
         message: Bytes32,
         slot: Slot,
     ) -> None:
-        """Verify this single-message single-message aggregate proof against a pubkey set.
+        """Verify this single-message single-message aggregate proof against a public_key set.
 
         Args:
-            public_keys: Pubkeys for the validators named by participants.
+            public_keys: PublicKeys for the validators named by participants.
             message: Message bound by the proof.
             slot: Slot bound by the proof.
 
         Raises:
-            AggregationError: When the pubkey count does not match the bitfield
+            AggregationError: When the public_key count does not match the bitfield
                 or the Rust verifier rejects the proof.
         """
         # The bitfield names one validator per set bit.
@@ -258,7 +258,7 @@ class SingleMessageAggregate(Container):
         # The mode argument selects the matching backend bytecode.
         try:
             verify_type_1(
-                [pk.encode_bytes() for pk in public_keys],
+                [public_key.encode_bytes() for public_key in public_keys],
                 bytes(message),
                 int(slot),
                 bytes(self.proof.data),
@@ -282,7 +282,7 @@ class MultiMessageAggregate(Container):
     model_config = Container.model_config | {"frozen": True}
 
     proof: ByteList512KiB
-    """Compact no-pubkeys serialized multi-message aggregate proof bytes."""
+    """Compact public-key-free serialized multi-message aggregate proof bytes."""
 
     @classmethod
     def aggregate(
@@ -306,7 +306,7 @@ class MultiMessageAggregate(Container):
             A merged proof binding every component to its own message.
 
         Raises:
-            AggregationError: When no proofs are given, a pubkey list disagrees
+            AggregationError: When no proofs are given, a public_key list disagrees
                 with its participant count, or the prover rejects the inputs.
         """
         if not parts:
@@ -318,15 +318,15 @@ class MultiMessageAggregate(Container):
         #
         # A miscount would otherwise fail deep in the prover with an opaque error.
         single_message_aggregate_entries: list[tuple[list[bytes], bytes]] = []
-        for idx, (part, pubkeys) in enumerate(zip(parts, public_keys_per_part, strict=True)):
+        for index, (part, public_keys) in enumerate(zip(parts, public_keys_per_part, strict=True)):
             expected = len(part.participants.to_validator_indices())
-            if len(pubkeys) != expected:
+            if len(public_keys) != expected:
                 raise AggregationError(
-                    f"multi-message aggregate entry {idx} "
-                    f"expected {expected} pubkeys, got {len(pubkeys)}"
+                    f"multi-message aggregate entry {index} "
+                    f"expected {expected} pubkeys, got {len(public_keys)}"
                 )
             single_message_aggregate_entries.append(
-                ([pk.encode_bytes() for pk in pubkeys], bytes(part.proof.data))
+                ([public_key.encode_bytes() for public_key in public_keys], bytes(part.proof.data))
             )
 
         # Hand the per-component keys and proof bytes to the Rust prover.
@@ -343,7 +343,7 @@ class MultiMessageAggregate(Container):
 
         return cls(proof=ByteList512KiB(data=multi_message_aggregate_wire))
 
-    def split_by_msg(
+    def split_by_message(
         self,
         message: Bytes32,
         public_keys_per_message: list[list[PublicKey]],
@@ -362,7 +362,7 @@ class MultiMessageAggregate(Container):
 
         Args:
             message: Message that selects the single-message aggregate component.
-            public_keys_per_message: Pubkey layout this multi-message aggregate was built with.
+            public_keys_per_message: PublicKey layout this multi-message aggregate was built with.
             participants: Bitfield naming the validators of the recovered component.
 
         Returns:
@@ -372,8 +372,9 @@ class MultiMessageAggregate(Container):
             AggregationError: When the Rust binding rejects the split.
         """
         # Each component carries the public keys named by its bitfield, in the same order.
-        pub_keys_per_component_ssz: list[list[bytes]] = [
-            [pk.encode_bytes() for pk in pks] for pks in public_keys_per_message
+        public_keys_per_component_ssz: list[list[bytes]] = [
+            [public_key.encode_bytes() for public_key in public_keys]
+            for public_keys in public_keys_per_message
         ]
 
         # Hand the key layout, merged proof, and selector message to the Rust prover.
@@ -381,7 +382,7 @@ class MultiMessageAggregate(Container):
         # The mode argument selects the matching backend bytecode.
         try:
             _, single_message_aggregate_wire = split_type_2_by_msg(
-                pub_keys_per_component_ssz,
+                public_keys_per_component_ssz,
                 bytes(self.proof.data),
                 bytes(message),
                 LOG_INV_RATE,
@@ -426,17 +427,18 @@ class MultiMessageAggregate(Container):
             )
 
         # Serialize the key layout and the per-component message bindings.
-        pub_keys_per_component_ssz: list[list[bytes]] = [
-            [pk.encode_bytes() for pk in pks] for pks in public_keys_per_message
+        public_keys_per_component_ssz: list[list[bytes]] = [
+            [public_key.encode_bytes() for public_key in public_keys]
+            for public_keys in public_keys_per_message
         ]
-        expected_messages = [(bytes(msg), int(slot)) for msg, slot in messages]
+        expected_messages = [(bytes(message), int(slot)) for message, slot in messages]
 
         # Hand the layout, bindings, and merged proof to the Rust verifier.
         #
         # The mode argument selects the matching backend bytecode.
         try:
             verify_type_2_with_messages(
-                pub_keys_per_component_ssz,
+                public_keys_per_component_ssz,
                 expected_messages,
                 bytes(self.proof.data),
                 mode=LEAN_ENV,
@@ -464,22 +466,22 @@ class Config(Container):
 class Validator(Container):
     """Represents a validator's static metadata and operational interface."""
 
-    attestation_pubkey: Bytes52
+    attestation_public_key: Bytes52
     """XMSS public key for signing attestations."""
 
-    proposal_pubkey: Bytes52
+    proposal_public_key: Bytes52
     """XMSS public key for signing proposer attestations in blocks."""
 
     index: ValidatorIndex = ValidatorIndex(0)
     """Validator index in the registry."""
 
-    def get_attestation_pubkey(self) -> PublicKey:
+    def get_attestation_public_key(self) -> PublicKey:
         """Get the XMSS public key used for attestation verification."""
-        return PublicKey.decode_bytes(bytes(self.attestation_pubkey))
+        return PublicKey.decode_bytes(bytes(self.attestation_public_key))
 
-    def get_proposal_pubkey(self) -> PublicKey:
+    def get_proposal_public_key(self) -> PublicKey:
         """Get the XMSS public key used for proposer attestation verification."""
-        return PublicKey.decode_bytes(bytes(self.proposal_pubkey))
+        return PublicKey.decode_bytes(bytes(self.proposal_public_key))
 
 
 class Validators(SSZList[Validator]):
@@ -541,7 +543,7 @@ class Attestation(Container):
 
     model_config = Container.model_config | {"frozen": True}
 
-    validator_id: ValidatorIndex
+    validator_index: ValidatorIndex
     """The index of the validator making the attestation."""
 
     data: AttestationData

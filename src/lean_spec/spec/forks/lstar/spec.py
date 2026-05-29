@@ -483,9 +483,9 @@ class LstarSpec(ForkProtocol):
             #
             # A vote is represented as a boolean flag.
             # If it was previously absent, flip it to True.
-            for validator_id in attestation.aggregation_bits.to_validator_indices():
-                if not justifications[target.root][validator_id]:
-                    justifications[target.root][validator_id] = Boolean(True)
+            for validator_index in attestation.aggregation_bits.to_validator_indices():
+                if not justifications[target.root][validator_index]:
+                    justifications[target.root][validator_index] = Boolean(True)
 
             # Check whether the vote count crosses the supermajority threshold.
             #
@@ -668,21 +668,21 @@ class LstarSpec(ForkProtocol):
                 list(state.historical_block_hashes) + [parent_root] + [ZERO_HASH] * num_empty_slots
             )
 
-            processed_att_data: set[AttestationData] = set()
+            processed_attestation_data: set[AttestationData] = set()
 
             while True:
                 found_entries = False
 
-                for att_data, proofs in sorted(
+                for attestation_data, proofs in sorted(
                     aggregated_payloads.items(), key=lambda item: item[0].target.slot
                 ):
-                    if att_data in processed_att_data:
+                    if attestation_data in processed_attestation_data:
                         continue
 
-                    if Uint8(len(processed_att_data)) >= MAX_ATTESTATIONS_DATA:
+                    if Uint8(len(processed_attestation_data)) >= MAX_ATTESTATIONS_DATA:
                         break
 
-                    if att_data.head.root not in known_block_roots:
+                    if attestation_data.head.root not in known_block_roots:
                         continue
 
                     # Chain-match runs first.
@@ -690,13 +690,13 @@ class LstarSpec(ForkProtocol):
                     # It rejects checkpoints whose slot is past the chain view.
                     # That prevents the bounded queries below from indexing out of range.
                     if not self._attestation_data_matches_chain(
-                        att_data, extended_historical_block_hashes
+                        attestation_data, extended_historical_block_hashes
                     ):
                         continue
 
                     # The source slot must already be justified on this chain.
                     if not current_justified_slots.is_slot_justified(
-                        current_finalized_slot, att_data.source.slot
+                        current_finalized_slot, attestation_data.source.slot
                     ):
                         continue
 
@@ -707,8 +707,8 @@ class LstarSpec(ForkProtocol):
                     # Including them in the body propagates them into peers' payload pool.
                     # The bypass below keeps them past the target-already-justified check,
                     # since slot 0 is implicitly justified and would otherwise filter them.
-                    is_genesis_self_vote = att_data.source.slot == Slot(0) and (
-                        att_data.target.slot == Slot(0)
+                    is_genesis_self_vote = attestation_data.source.slot == Slot(0) and (
+                        attestation_data.target.slot == Slot(0)
                     )
 
                     # Skip attestations whose target slot is already justified.
@@ -717,11 +717,11 @@ class LstarSpec(ForkProtocol):
                     # Entries the state transition will later drop are still kept here.
                     # They carry head-vote weight for fork choice.
                     if not is_genesis_self_vote and current_justified_slots.is_slot_justified(
-                        current_finalized_slot, att_data.target.slot
+                        current_finalized_slot, attestation_data.target.slot
                     ):
                         continue
 
-                    processed_att_data.add(att_data)
+                    processed_attestation_data.add(attestation_data)
 
                     found_entries = True
 
@@ -731,7 +731,7 @@ class LstarSpec(ForkProtocol):
                         aggregated_attestations.append(
                             self.aggregated_attestation_class(
                                 aggregation_bits=proof.participants,
-                                data=att_data,
+                                data=attestation_data,
                             )
                         )
 
@@ -775,14 +775,16 @@ class LstarSpec(ForkProtocol):
             # selected for the same AttestationData across iterations. Group them
             # and merge each group into a single recursive proof.
             proof_groups: dict[AttestationData, list[SingleMessageAggregate]] = {}
-            for att, sig in zip(aggregated_attestations, aggregated_signatures, strict=True):
-                proof_groups.setdefault(att.data, []).append(sig)
+            for attestation, signature in zip(
+                aggregated_attestations, aggregated_signatures, strict=True
+            ):
+                proof_groups.setdefault(attestation.data, []).append(signature)
 
             aggregated_attestations = []
             aggregated_signatures = []
-            for att_data, proofs in proof_groups.items():
+            for attestation_data, proofs in proof_groups.items():
                 if len(proofs) == 1:
-                    sig = proofs[0]
+                    signature = proofs[0]
                 else:
                     # Multiple proofs for the same data were aggregated separately.
                     # Merge them into one recursive proof using children-only
@@ -791,22 +793,22 @@ class LstarSpec(ForkProtocol):
                         (
                             proof,
                             [
-                                state.validators[vid].get_attestation_pubkey()
-                                for vid in proof.participants.to_validator_indices()
+                                state.validators[validator_index].get_attestation_public_key()
+                                for validator_index in proof.participants.to_validator_indices()
                             ],
                         )
                         for proof in proofs
                     ]
-                    sig = SingleMessageAggregate.aggregate(
+                    signature = SingleMessageAggregate.aggregate(
                         children=children,
                         raw_xmss=[],
-                        message=hash_tree_root(att_data),
-                        slot=att_data.slot,
+                        message=hash_tree_root(attestation_data),
+                        slot=attestation_data.slot,
                     )
-                aggregated_signatures.append(sig)
+                aggregated_signatures.append(signature)
                 aggregated_attestations.append(
                     self.aggregated_attestation_class(
-                        aggregation_bits=sig.participants, data=att_data
+                        aggregation_bits=signature.participants, data=attestation_data
                     )
                 )
 
@@ -859,21 +861,24 @@ class LstarSpec(ForkProtocol):
         #
         # Without this binding a proposer could pair honest signatures
         # with attacker-chosen attestation data that resolves to the same
-        # pubkeys, crediting validators for votes they never cast.
+        # public_keys, crediting validators for votes they never cast.
         message_bindings: list[tuple[Bytes32, Slot]] = []
 
-        # One pubkey set per attestation, in body order.
+        # One public_key set per attestation, in body order.
         #
         # The attestation list and the proof component list are parallel.
         # Each attestation names the validators that voted for its data.
         # Its matching proof component proves those validators signed.
         for aggregated_attestation in aggregated_attestations:
-            validator_ids = aggregated_attestation.aggregation_bits.to_validator_indices()
-            for validator_id in validator_ids:
-                assert validator_id.is_valid(num_validators), "Validator index out of range"
+            validator_indices = aggregated_attestation.aggregation_bits.to_validator_indices()
+            for validator_index in validator_indices:
+                assert validator_index.is_valid(num_validators), "Validator index out of range"
 
             public_keys_per_message.append(
-                [validators[vid].get_attestation_pubkey() for vid in validator_ids]
+                [
+                    validators[validator_index].get_attestation_public_key()
+                    for validator_index in validator_indices
+                ]
             )
             message_bindings.append(
                 (
@@ -890,7 +895,7 @@ class LstarSpec(ForkProtocol):
         proposer_index = block.proposer_index
         assert proposer_index.is_valid(num_validators), "Proposer index out of range"
 
-        public_keys_per_message.append([validators[proposer_index].get_proposal_pubkey()])
+        public_keys_per_message.append([validators[proposer_index].get_proposal_public_key()])
         message_bindings.append((hash_tree_root(block), block.slot))
 
         try:
@@ -909,7 +914,7 @@ class LstarSpec(ForkProtocol):
         self,
         state: SpecStateType,
         anchor_block: SpecBlockType,
-        validator_id: ValidatorIndex | None,
+        validator_index: ValidatorIndex | None,
     ) -> LstarStore:
         """Initialize a forkchoice store from an anchor state and block.
 
@@ -964,7 +969,7 @@ class LstarSpec(ForkProtocol):
             latest_finalized=anchor_checkpoint,
             blocks={anchor_root: anchor_block},
             states={anchor_root: state},
-            validator_id=validator_id,
+            validator_index=validator_index,
         )
 
     def prune_stale_attestation_data(self, store: LstarStore) -> LstarStore:
@@ -985,8 +990,8 @@ class LstarSpec(ForkProtocol):
         # Each mapping is keyed by attestation data, so we check membership by slot
         # against the finalized slot.
         store.attestation_signatures = {
-            attestation_data: sigs
-            for attestation_data, sigs in store.attestation_signatures.items()
+            attestation_data: signatures
+            for attestation_data, signatures in store.attestation_signatures.items()
             if attestation_data.target.slot > store.latest_finalized.slot
         }
         store.latest_new_aggregated_payloads = {
@@ -1085,7 +1090,7 @@ class LstarSpec(ForkProtocol):
             AssertionError: If signature verification fails.
         """
         with observe_on_attestation():
-            validator_id = signed_attestation.validator_id
+            validator_index = signed_attestation.validator_index
             attestation_data = signed_attestation.data
             signature = signed_attestation.signature
 
@@ -1098,10 +1103,11 @@ class LstarSpec(ForkProtocol):
                 f"No state available to verify attestation signature for target block "
                 f"{attestation_data.target.root.hex()}"
             )
-            assert validator_id.is_valid(Uint64(len(key_state.validators))), (
-                f"Validator {validator_id} not found in state {attestation_data.target.root.hex()}"
+            assert validator_index.is_valid(Uint64(len(key_state.validators))), (
+                f"Validator {validator_index} not found in state "
+                f"{attestation_data.target.root.hex()}"
             )
-            public_key = key_state.validators[validator_id].get_attestation_pubkey()
+            public_key = key_state.validators[validator_index].get_attestation_public_key()
 
             assert TARGET_SIGNATURE_SCHEME.verify(
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
@@ -1113,7 +1119,7 @@ class LstarSpec(ForkProtocol):
             # Non-aggregator nodes validate and drop — they never store gossip signatures.
             if is_aggregator:
                 store.attestation_signatures.setdefault(attestation_data, set()).add(
-                    AttestationSignatureEntry(validator_id, signature)
+                    AttestationSignatureEntry(validator_index, signature)
                 )
 
             return store
@@ -1139,7 +1145,7 @@ class LstarSpec(ForkProtocol):
         self.validate_attestation(store, data)
 
         # Get validator IDs who participated in this aggregation
-        validator_ids = proof.participants.to_validator_indices()
+        validator_indices = proof.participants.to_validator_indices()
 
         # Retrieve the relevant state to look up public keys for verification.
         key_state = store.states.get(data.target.root)
@@ -1150,13 +1156,16 @@ class LstarSpec(ForkProtocol):
 
         # Ensure all participants exist in the active set
         validators = key_state.validators
-        for validator_id in validator_ids:
-            assert validator_id.is_valid(Uint64(len(validators))), (
-                f"Validator {validator_id} not found in state {data.target.root.hex()}"
+        for validator_index in validator_indices:
+            assert validator_index.is_valid(Uint64(len(validators))), (
+                f"Validator {validator_index} not found in state {data.target.root.hex()}"
             )
 
         # Prepare public keys for verification
-        public_keys = [validators[vid].get_attestation_pubkey() for vid in validator_ids]
+        public_keys = [
+            validators[validator_index].get_attestation_public_key()
+            for validator_index in validator_indices
+        ]
 
         # Verify the single-message aggregate single-message aggregated proof.
         try:
@@ -1216,13 +1225,13 @@ class LstarSpec(ForkProtocol):
             # The block body constrains how many distinct AttestationData
             # entries it may carry.
             aggregated_attestations = block.body.attestations
-            att_data_set = {att.data for att in aggregated_attestations}
-            assert len(att_data_set) == len(aggregated_attestations), (
+            attestation_data_set = {attestation.data for attestation in aggregated_attestations}
+            assert len(attestation_data_set) == len(aggregated_attestations), (
                 "Block contains duplicate AttestationData entries; "
                 "each AttestationData must appear at most once"
             )
-            assert len(att_data_set) <= int(MAX_ATTESTATIONS_DATA), (
-                f"Block contains {len(att_data_set)} distinct AttestationData entries; "
+            assert len(attestation_data_set) <= int(MAX_ATTESTATIONS_DATA), (
+                f"Block contains {len(attestation_data_set)} distinct AttestationData entries; "
                 f"maximum is {MAX_ATTESTATIONS_DATA}"
             )
 
@@ -1290,10 +1299,10 @@ class LstarSpec(ForkProtocol):
 
         for attestation_data, proofs in aggregated_payloads.items():
             for proof in proofs:
-                for validator_id in proof.participants.to_validator_indices():
-                    existing = attestations.get(validator_id)
+                for validator_index in proof.participants.to_validator_indices():
+                    existing = attestations.get(validator_index)
                     if existing is None or existing.slot < attestation_data.slot:
-                        attestations[validator_id] = attestation_data
+                        attestations[validator_index] = attestation_data
         return attestations
 
     def compute_block_weights(self, store: LstarStore) -> dict[Bytes32, int]:
@@ -1549,7 +1558,7 @@ class LstarSpec(ForkProtocol):
         - Newly produced proofs are recorded for future reuse.
         """
         validators = store.states[store.head].validators
-        gossip_sigs = store.attestation_signatures
+        gossip_signatures = store.attestation_signatures
         new = store.latest_new_aggregated_payloads
         known = store.latest_known_aggregated_payloads
 
@@ -1558,7 +1567,7 @@ class LstarSpec(ForkProtocol):
         # Only attestation data with a new payload or a raw gossip signature
         # can trigger aggregation. Known payloads alone cannot — they exist
         # only to help extend coverage when combined with fresh evidence.
-        for data in new.keys() | gossip_sigs.keys():
+        for data in new.keys() | gossip_signatures.keys():
             # Phase 1: Select
             #
             # Start with the cheapest option: reuse proofs that already
@@ -1582,12 +1591,12 @@ class LstarSpec(ForkProtocol):
             # construction regardless of network arrival order.
             raw_entries = [
                 (
-                    e.validator_id,
-                    validators[e.validator_id].get_attestation_pubkey(),
+                    e.validator_index,
+                    validators[e.validator_index].get_attestation_public_key(),
                     e.signature,
                 )
-                for e in sorted(gossip_sigs.get(data, set()), key=lambda e: e.validator_id)
-                if e.validator_id not in covered
+                for e in sorted(gossip_signatures.get(data, set()), key=lambda e: e.validator_index)
+                if e.validator_index not in covered
             ]
 
             # The aggregation layer enforces a minimum: either at least one
@@ -1608,8 +1617,8 @@ class LstarSpec(ForkProtocol):
                 (
                     child,
                     [
-                        validators[vid].get_attestation_pubkey()
-                        for vid in child.participants.to_validator_indices()
+                        validators[validator_index].get_attestation_public_key()
+                        for validator_index in child.participants.to_validator_indices()
                     ],
                 )
                 for child in child_proofs
@@ -1631,9 +1640,9 @@ class LstarSpec(ForkProtocol):
         # Record freshly produced proofs so future rounds can reuse them.
         # Remove gossip signatures that were consumed by this aggregation.
         store.latest_new_aggregated_payloads = {}
-        for signed_att in new_aggregates:
-            store.latest_new_aggregated_payloads.setdefault(signed_att.data, set()).add(
-                signed_att.proof
+        for signed_attestation in new_aggregates:
+            store.latest_new_aggregated_payloads.setdefault(signed_attestation.data, set()).add(
+                signed_attestation.proof
             )
 
         for data in store.latest_new_aggregated_payloads:

@@ -29,7 +29,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 def _zero_hash_digest_vector() -> HashDigestVector:
     """Build a hash digest vector with all field elements set to zero."""
-    return HashDigestVector(data=[Fp(0) for _ in range(TARGET_CONFIG.HASH_LEN_FE)])
+    return HashDigestVector(data=[Fp(0) for _ in range(TARGET_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)])
 
 
 def _zero_parameter() -> Parameter:
@@ -60,8 +60,8 @@ def test_signature_actual(ssz: SSZTestFiller) -> None:
     """SSZ roundtrip for a real Signature produced by the XMSS signing algorithm."""
     key_manager = XmssKeyManager.shared()
     scheme = key_manager.scheme
-    sk = key_manager[ValidatorIndex(0)].attestation_keypair.secret_key
-    signature = scheme.sign(sk, Slot(0), Bytes32(b"\x42" * 32))
+    secret_key = key_manager[ValidatorIndex(0)].attestation_keypair.secret_key
+    signature = scheme.sign(secret_key, Slot(0), Bytes32(b"\x42" * 32))
     ssz(type_name="Signature", value=signature)
 
 
@@ -113,7 +113,9 @@ def test_public_key_typical(ssz: SSZTestFiller) -> None:
     ssz(
         type_name="PublicKey",
         value=PublicKey(
-            root=HashDigestVector(data=[Fp(i + 1) for i in range(TARGET_CONFIG.HASH_LEN_FE)]),
+            root=HashDigestVector(
+                data=[Fp(i + 1) for i in range(TARGET_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)]
+            ),
             parameter=Parameter(data=[Fp(100 + i) for i in range(Parameter.LENGTH)]),
         ),
     )
@@ -138,7 +140,9 @@ def test_hash_tree_opening_typical(ssz: SSZTestFiller) -> None:
             siblings=HashDigestList(
                 data=[
                     HashDigestVector(
-                        data=[Fp(i + j * 10) for i in range(TARGET_CONFIG.HASH_LEN_FE)]
+                        data=[
+                            Fp(i + j * 10) for i in range(TARGET_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)
+                        ]
                     )
                     for j in range(3)
                 ]
@@ -169,7 +173,11 @@ def test_hash_tree_layer_typical(ssz: SSZTestFiller) -> None:
             start_index=Uint64(42),
             nodes=HashDigestList(
                 data=[
-                    HashDigestVector(data=[Fp(i + j * 7) for i in range(TARGET_CONFIG.HASH_LEN_FE)])
+                    HashDigestVector(
+                        data=[
+                            Fp(i + j * 7) for i in range(TARGET_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)
+                        ]
+                    )
                     for j in range(2)
                 ]
             ),

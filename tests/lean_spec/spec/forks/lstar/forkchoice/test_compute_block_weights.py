@@ -56,7 +56,7 @@ def test_linear_chain_weight_accumulates_upward(spec: LstarSpec, base_store: Sto
     new_states[block1_root] = genesis_state
     new_states[block2_root] = genesis_state
 
-    att_data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(2),
         head=Checkpoint(root=block2_root, slot=Slot(2)),
         target=Checkpoint(root=block2_root, slot=Slot(2)),
@@ -64,7 +64,7 @@ def test_linear_chain_weight_accumulates_upward(spec: LstarSpec, base_store: Sto
     )
     proof = _make_empty_proof([ValidatorIndex(0)])
     aggregated_payloads = {
-        att_data: {proof},
+        attestation_data: {proof},
     }
 
     base_store.blocks = new_blocks
@@ -99,7 +99,7 @@ def test_multiple_attestations_accumulate(spec: LstarSpec, base_store: Store) ->
     new_states = dict(base_store.states)
     new_states[block1_root] = base_store.states[genesis_root]
 
-    att_data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(1),
         head=Checkpoint(root=block1_root, slot=Slot(1)),
         target=Checkpoint(root=block1_root, slot=Slot(1)),
@@ -108,7 +108,7 @@ def test_multiple_attestations_accumulate(spec: LstarSpec, base_store: Store) ->
 
     proof = _make_empty_proof([ValidatorIndex(0), ValidatorIndex(1)])
     aggregated_payloads = {
-        att_data: {proof},
+        attestation_data: {proof},
     }
 
     base_store.blocks = new_blocks

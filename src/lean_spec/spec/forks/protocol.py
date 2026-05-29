@@ -146,7 +146,7 @@ class SpecSignedAttestationType(SpecSSZType, Protocol):
         ...
 
     @property
-    def validator_id(self) -> ValidatorIndex:
+    def validator_index(self) -> ValidatorIndex:
         """Index of the validator that produced this attestation."""
         ...
 
@@ -205,7 +205,7 @@ class SpecStoreType(Protocol):
         ...
 
     @property
-    def validator_id(self) -> ValidatorIndex | None:
+    def validator_index(self) -> ValidatorIndex | None:
         """Index of the local validator owning this store, if any."""
         ...
 
@@ -224,7 +224,7 @@ class SpecStoreType(Protocol):
         cls,
         state: SpecStateType,
         anchor_block: SpecBlockType,
-        validator_id: ValidatorIndex | None,
+        validator_index: ValidatorIndex | None,
     ) -> Self:
         """Construct a forkchoice store anchored at the given state/block."""
         ...
@@ -310,7 +310,7 @@ class ForkProtocol(ABC):
         self,
         state: SpecStateType,
         anchor_block: SpecBlockType,
-        validator_id: ValidatorIndex | None,
+        validator_index: ValidatorIndex | None,
     ) -> SpecStoreType:
         """Construct a forkchoice store anchored at the given state and block."""
 

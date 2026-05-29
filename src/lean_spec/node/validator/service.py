@@ -377,7 +377,8 @@ class ValidatorService:
             # validator's attestation in attestation_signatures, reducing the
             # aggregation count below the 2/3 safe-target threshold.
             is_aggregator_role = (
-                self.sync_service.store.validator_id is not None and self.sync_service.is_aggregator
+                self.sync_service.store.validator_index is not None
+                and self.sync_service.is_aggregator
             )
             try:
                 self.sync_service.store = self.spec.on_gossip_attestation(
@@ -435,7 +436,7 @@ class ValidatorService:
             "proposal_secret_key",
         )
 
-        # Resolve validator pubkeys from state using validator indices.
+        # Resolve validator public_keys from state using validator indices.
         key_state = self.sync_service.store.states.get(block_root)
         if key_state is None:
             key_state = self.sync_service.store.states.get(self.sync_service.store.head)
@@ -447,13 +448,13 @@ class ValidatorService:
         validators = key_state.validators
         if not validator_index.is_valid(Uint64(len(validators))):
             raise ValueError(f"Validator {validator_index} not found in state validators")
-        proposer_pubkey = validators[validator_index].get_proposal_pubkey()
+        proposer_public_key = validators[validator_index].get_proposal_public_key()
 
         # Wrap the proposer's raw XMSS signature into a singleton single-message aggregate.
         # The single fresh entry carries the proposer index alongside its key and signature.
         proposer_single_message_aggregate = SingleMessageAggregate.aggregate(
             children=[],
-            raw_xmss=[(validator_index, proposer_pubkey, proposer_signature)],
+            raw_xmss=[(validator_index, proposer_public_key, proposer_signature)],
             message=block_root,
             slot=block.slot,
         )
@@ -461,23 +462,23 @@ class ValidatorService:
         # Merge the per-attestation proofs and the proposer single-message aggregate into one
         # multi-message aggregate proof. Order matters: verify_signatures expects the proposer
         # entry to be last, parallel to block.body.attestations + 1.
-        # The pubkey lookup below indexes the active validator set, so each
+        # The public_key lookup below indexes the active validator set, so each
         # participant must fall within it.
         # A stale partial aggregate would otherwise blow up deep inside
         # the aggregator with an opaque KeyError.
         num_validators = Uint64(len(validators))
         public_keys_per_part: list[list[PublicKey]] = []
         for proof in attestation_proofs:
-            part_pubkeys: list[PublicKey] = []
-            for vid in proof.participants.to_validator_indices():
-                if not vid.is_valid(num_validators):
+            part_public_keys: list[PublicKey] = []
+            for validator_index in proof.participants.to_validator_indices():
+                if not validator_index.is_valid(num_validators):
                     raise ValueError(
-                        f"Attestation proof references validator {vid}; "
+                        f"Attestation proof references validator {validator_index}; "
                         f"active set has {num_validators} validators"
                     )
-                part_pubkeys.append(validators[vid].get_attestation_pubkey())
-            public_keys_per_part.append(part_pubkeys)
-        public_keys_per_part.append([proposer_pubkey])
+                part_public_keys.append(validators[validator_index].get_attestation_public_key())
+            public_keys_per_part.append(part_public_keys)
+        public_keys_per_part.append([proposer_public_key])
 
         merged = MultiMessageAggregate.aggregate(
             [*attestation_proofs, proposer_single_message_aggregate],
@@ -520,7 +521,7 @@ class ValidatorService:
         )
 
         return SignedAttestation(
-            validator_id=validator_index,
+            validator_index=validator_index,
             data=attestation_data,
             signature=signature,
         )
