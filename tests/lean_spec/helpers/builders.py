@@ -22,7 +22,6 @@ from lean_spec.node.sync.peer_manager import PeerManager
 from lean_spec.node.sync.service import SyncService
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature, TypeTwoMultiSignature
 from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
 from lean_spec.spec.crypto.xmss.containers import Signature
 from lean_spec.spec.crypto.xmss.types import (
@@ -42,6 +41,8 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
     Validator,
     Validators,
 )

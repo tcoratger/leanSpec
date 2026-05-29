@@ -4,7 +4,6 @@ import pytest
 from consensus_testing import SSZTestFiller
 from consensus_testing.keys import create_dummy_signature
 
-from lean_spec.spec.crypto.xmss.aggregation import TypeOneMultiSignature
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import State
 from lean_spec.spec.forks.lstar.containers import (
@@ -23,6 +22,7 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    TypeOneMultiSignature,
     Validator,
     Validators,
 )

@@ -8,10 +8,6 @@ from collections import defaultdict
 from lean_spec.base import CamelModel
 from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.aggregation import (
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
-)
 from lean_spec.spec.crypto.xmss.containers import Signature
 from lean_spec.spec.forks import Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.spec.forks.lstar.containers import (
@@ -24,6 +20,8 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAttestation,
     SignedBlock,
     State,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.forks.lstar.store import Store

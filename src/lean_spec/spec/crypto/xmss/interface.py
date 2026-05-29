@@ -2,7 +2,7 @@
 
 from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
-from lean_spec.spec.forks.lstar.containers import Slot
+from lean_spec.spec.forks.lstar.slot import Slot
 from lean_spec.spec.ssz import Bytes32, Uint64
 
 from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig

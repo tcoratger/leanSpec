@@ -17,11 +17,6 @@ from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.networking.transport.peer_id import PeerId
 from lean_spec.node.storage import Database
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.aggregation import (
-    AggregationError,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
-)
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import (
     AttestationData,
@@ -32,6 +27,11 @@ from lean_spec.spec.forks import (
     SignedBlock,
     Slot,
     Store,
+)
+from lean_spec.spec.forks.lstar.containers import (
+    AggregationError,
+    TypeOneMultiSignature,
+    TypeTwoMultiSignature,
 )
 from lean_spec.spec.ssz import Bytes32
 from lean_spec.spec.ssz.exceptions import SSZError
