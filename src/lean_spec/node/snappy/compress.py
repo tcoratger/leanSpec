@@ -63,14 +63,17 @@ Reference: https://github.com/google/snappy
 
 from __future__ import annotations
 
+from lean_spec.node.networking.varint import encode_varint
+
 from .constants import (
     BLOCK_SIZE,
     HASH_MULTIPLIER,
     INPUT_MARGIN_BYTES,
     MAX_HASH_TABLE_BITS,
     MIN_HASH_TABLE_BITS,
+    SNAPPY_VARINT_MAX_BYTES,
 )
-from .encoding import encode_copy_tag, encode_literal_tag, encode_varint32
+from .encoding import encode_copy_tag, encode_literal_tag
 
 
 def compress(data: bytes) -> bytes:
@@ -91,13 +94,13 @@ def compress(data: bytes) -> bytes:
     #
     # Even empty data needs a length prefix (varint 0).
     if not data:
-        return encode_varint32(0)
+        return encode_varint(0, max_bytes=SNAPPY_VARINT_MAX_BYTES)
 
     # Build output buffer.
     #
     # Start with the uncompressed length as a varint.
     # The decompressor reads this first to allocate the output buffer.
-    output = bytearray(encode_varint32(len(data)))
+    output = bytearray(encode_varint(len(data), max_bytes=SNAPPY_VARINT_MAX_BYTES))
 
     # Process input in blocks.
     #
