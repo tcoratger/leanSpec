@@ -184,7 +184,7 @@ class XmssKeyManager:
         "max_slot",
         "scheme_name",
         "scheme",
-        "_keys_dir",
+        "_keys_directory",
         "_json_cache",
         "_public_cache",
         "_available_indices",
