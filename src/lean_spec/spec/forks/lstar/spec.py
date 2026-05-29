@@ -27,6 +27,7 @@ from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     AggregationError,
     AttestationData,
+    AttestationSignatureEntry,
     Block,
     BlockBody,
     BlockHeader,
@@ -42,13 +43,13 @@ from lean_spec.spec.forks.lstar.containers import (
     SingleMessageAggregate,
     Slot,
     State,
+    Store,
     ValidatorIndex,
     Validators,
 )
 from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32, SSZList, Uint8, Uint64
 
 from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
-from .store import AttestationSignatureEntry, Store
 
 LstarStore = Store[State, Block]
 """Concrete Store specialization owned by the lstar fork."""
