@@ -466,6 +466,7 @@ class TestValidatorPublishWrappers:
     ) -> None:
         """Block wrapper publishes to network and processes locally."""
         assert node_with_validator.validator_service is not None
+        assert node_with_validator.validator_service.on_block is not None
 
         mock_block = MagicMock()
         publish_block = AsyncMock()
@@ -492,6 +493,7 @@ class TestValidatorPublishWrappers:
         verifies the computed value is forwarded correctly to the network.
         """
         assert node_with_validator.validator_service is not None
+        assert node_with_validator.validator_service.on_attestation is not None
 
         mock_attestation = MagicMock()
         # The wrapper calls validator_id.compute_subnet_id(ATTESTATION_COMMITTEE_COUNT).

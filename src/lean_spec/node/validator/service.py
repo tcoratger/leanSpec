@@ -65,14 +65,6 @@ type AttestationPublisher = Callable[[SignedAttestation], Awaitable[None]]
 """Callback for publishing produced attestations."""
 
 
-async def _noop_block_publisher(block: SignedBlock) -> None:  # noqa: ARG001
-    """Default no-op block publisher."""
-
-
-async def _noop_attestation_publisher(attestation: SignedAttestation) -> None:  # noqa: ARG001
-    """Default no-op attestation publisher."""
-
-
 @dataclass(slots=True)
 class ValidatorService:
     """
@@ -94,11 +86,17 @@ class ValidatorService:
     spec: LstarSpec = field(default_factory=LstarSpec)
     """Fork spec driving consensus methods. Default lets tests skip wiring."""
 
-    on_block: BlockPublisher = field(default=_noop_block_publisher)
-    """Callback invoked when a block is produced."""
+    on_block: BlockPublisher | None = field(default=None)
+    """Callback invoked when a block is produced.
 
-    on_attestation: AttestationPublisher = field(default=_noop_attestation_publisher)
-    """Callback invoked when an attestation is produced."""
+    Defaults to None so tests and offline runs do not need a publisher wired.
+    """
+
+    on_attestation: AttestationPublisher | None = field(default=None)
+    """Callback invoked when an attestation is produced.
+
+    Defaults to None so tests and offline runs do not need a publisher wired.
+    """
 
     _running: bool = field(default=False, repr=False)
     """Whether the service is running."""
@@ -314,7 +312,8 @@ class ValidatorService:
                 self._blocks_produced += 1
 
                 # Emit the block for network propagation.
-                await self.on_block(signed_block)
+                if self.on_block is not None:
+                    await self.on_block(signed_block)
 
             except AssertionError as e:
                 # Proposer validation failed.
@@ -396,7 +395,8 @@ class ValidatorService:
                 )
 
             # Emit the attestation for network propagation.
-            await self.on_attestation(signed_attestation)
+            if self.on_attestation is not None:
+                await self.on_attestation(signed_attestation)
 
     def _sign_block(
         self,

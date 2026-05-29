@@ -46,10 +46,6 @@ from .states import SyncState
 logger = logging.getLogger(__name__)
 
 
-async def _noop_publish_agg(signed_attestation: SignedAggregatedAttestation) -> None:
-    """No-op default for aggregated attestation publishing."""
-
-
 @dataclass(slots=True)
 class SyncService:
     """Central coordinator for the sync state machine."""
@@ -78,12 +74,12 @@ class SyncService:
     is_aggregator: bool = field(default=False)
     """Whether this node functions as an aggregator."""
 
-    publish_aggregated_attestation: Callable[
-        [SignedAggregatedAttestation], Coroutine[None, None, None]
-    ] = field(default=_noop_publish_agg)
+    publish_aggregated_attestation: (
+        Callable[[SignedAggregatedAttestation], Coroutine[None, None, None]] | None
+    ) = field(default=None)
     """Async callback for publishing aggregated attestations to the network.
 
-    Defaults to a no-op so tests and offline runs do not need a publisher wired.
+    Defaults to None so tests and offline runs do not need a publisher wired.
     Assign after construction once NetworkService is built.
     """
 
@@ -684,6 +680,9 @@ class SyncService:
             return
         pending = self._pending_block_aggregates
         self._pending_block_aggregates = []
+        # No publisher wired (tests, offline runs): drop the drained aggregates.
+        if self.publish_aggregated_attestation is None:
+            return
         for signed_attestation in pending:
             await self.publish_aggregated_attestation(signed_attestation)
 
