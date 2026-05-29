@@ -31,10 +31,8 @@ from lean_spec.spec.forks import (
 from lean_spec.spec.forks.lstar.containers import (
     AggregationError,
     TypeOneMultiSignature,
-    TypeTwoMultiSignature,
 )
 from lean_spec.spec.ssz import Bytes32
-from lean_spec.spec.ssz.exceptions import SSZError
 
 from .backfill_sync import BackfillSync, NetworkRequester
 from .block_cache import BlockCache
@@ -550,14 +548,7 @@ class SyncService:
             return store, []
         validators = parent_state.validators
 
-        # The wrapper must not raise on a malformed proof.
-        # The block already passed signature verification upstream, so this
-        # catches the realistic SSZ deserialization failure modes only.
-        try:
-            type_two = TypeTwoMultiSignature.decode_bytes(block.proof.data)
-        except (SSZError, ValueError, IndexError) as exc:
-            logger.debug("Post-block Type-2 decode failed: %s", exc)
-            return store, []
+        type_two = block.proof
 
         # Build the per-message pubkey layout once.
         # The layout is invariant per block: one entry per body attestation

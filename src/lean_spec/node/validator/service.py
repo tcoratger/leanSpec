@@ -52,7 +52,7 @@ from lean_spec.spec.forks import (
     ValidatorIndex,
 )
 from lean_spec.spec.forks.lstar.containers import TypeOneMultiSignature, TypeTwoMultiSignature
-from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
+from lean_spec.spec.ssz import Bytes32, Uint64
 
 from .constants import HYSTERESIS_BAND, NETWORK_STALL_THRESHOLD, SYNC_LAG_THRESHOLD
 from .registry import ValidatorEntry, ValidatorRegistry
@@ -485,7 +485,7 @@ class ValidatorService:
 
         return SignedBlock(
             block=block,
-            proof=ByteList512KiB(data=merged.encode_bytes()),
+            proof=merged,
         )
 
     def _sign_attestation(

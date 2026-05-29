@@ -23,6 +23,7 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAttestation,
     SignedBlock,
     TypeOneMultiSignature,
+    TypeTwoMultiSignature,
     Validator,
     Validators,
 )
@@ -256,7 +257,10 @@ def test_signed_block_minimal(ssz: SSZTestFiller) -> None:
     )
     ssz(
         type_name="SignedBlock",
-        value=SignedBlock(block=block, proof=ByteList512KiB(data=b"")),
+        value=SignedBlock(
+            block=block,
+            proof=TypeTwoMultiSignature(proof=ByteList512KiB(data=b"")),
+        ),
     )
 
 
@@ -271,7 +275,10 @@ def test_signed_block_with_proof_bytes(ssz: SSZTestFiller) -> None:
     )
     ssz(
         type_name="SignedBlock",
-        value=SignedBlock(block=block, proof=ByteList512KiB(data=b"\xde\xad\xbe\xef")),
+        value=SignedBlock(
+            block=block,
+            proof=TypeTwoMultiSignature(proof=ByteList512KiB(data=b"\xde\xad\xbe\xef")),
+        ),
     )
 
 

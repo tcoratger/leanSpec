@@ -13,6 +13,7 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     SignedBlock,
     State,
+    TypeTwoMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
@@ -177,9 +178,11 @@ class VerifySignaturesTest(BaseConsensusFixture):
             return signed_block
 
         if operation == "corrupt_proof":
-            # Replace the merged proof with a short non-decodable blob.
-            # Decoding the Type-2 envelope must fail before verification.
-            signed_block.proof = ByteList512KiB(data=b"\x00\x01\x02\x03")
+            # Replace the merged proof with a short bogus payload.
+            # The verifier rejects the malformed proof bytes.
+            signed_block.proof = TypeTwoMultiSignature(
+                proof=ByteList512KiB(data=b"\x00\x01\x02\x03"),
+            )
             return signed_block
 
         if operation == "append_phantom_attestation":

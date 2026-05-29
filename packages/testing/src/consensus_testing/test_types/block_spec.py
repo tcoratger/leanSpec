@@ -304,19 +304,16 @@ class BlockSpec(CamelModel):
             ]
             public_keys_per_part.append([proposer_pubkey])
 
-            merged = TypeTwoMultiSignature.aggregate(
+            proof = TypeTwoMultiSignature.aggregate(
                 [*attestation_proofs, proposer_type_1],
                 public_keys_per_part=public_keys_per_part,
             )
-            proof_bytes = merged.encode_bytes()
         else:
-            placeholder = ByteList512KiB(data=b"")
-            envelope = TypeTwoMultiSignature(proof=placeholder)
-            proof_bytes = envelope.encode_bytes()
+            proof = TypeTwoMultiSignature(proof=ByteList512KiB(data=b""))
 
         return SignedBlock(
             block=final_block,
-            proof=ByteList512KiB(data=proof_bytes),
+            proof=proof,
         )
 
     def build_signed_block(

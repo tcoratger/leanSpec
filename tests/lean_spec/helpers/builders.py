@@ -210,7 +210,7 @@ def make_signed_block(
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
 
-    return SignedBlock(block=block, proof=ByteList512KiB(data=b""))
+    return SignedBlock(block=block, proof=TypeTwoMultiSignature(proof=ByteList512KiB(data=b"")))
 
 
 def make_aggregated_attestation(
@@ -477,7 +477,7 @@ def make_signed_block_from_store(
 
     signed_block = SignedBlock(
         block=block,
-        proof=ByteList512KiB(data=merged.encode_bytes()),
+        proof=merged,
     )
 
     target_interval = Interval.from_slot(block.slot)

@@ -628,15 +628,15 @@ class Block(Container):
 class SignedBlock(Container):
     """Envelope carrying a block with a single aggregated proof for all signatures.
 
-    The proof is the SSZ-encoded form of a Type-2 multi-message proof that
-    binds every attestation in the body plus the proposer's signature over
-    the block root.
+    The proof is a Type-2 multi-message proof.
+    It binds every attestation in the body plus the proposer's signature
+    over the block root.
     """
 
     block: Block
     """The block being signed."""
 
-    proof: ByteList512KiB
+    proof: TypeTwoMultiSignature
     """Single full-block proof covering attestations and the proposer signature."""
 
 

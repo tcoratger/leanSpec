@@ -19,7 +19,7 @@ from lean_spec.spec.forks.lstar.containers import (
     TypeTwoMultiSignature,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.spec.ssz import Bytes32
 from tests.lean_spec.helpers import make_store
 
 
@@ -597,7 +597,7 @@ class TestIntegrationScenarios:
         )
         signed_block = SignedBlock(
             block=block,
-            proof=ByteList512KiB(data=merged.encode_bytes()),
+            proof=merged,
         )
 
         # Process block via on_block on a fresh consumer store

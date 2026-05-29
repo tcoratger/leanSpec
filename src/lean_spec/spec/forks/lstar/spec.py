@@ -42,7 +42,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Slot,
     State,
     TypeOneMultiSignature,
-    TypeTwoMultiSignature,
     ValidatorIndex,
     Validators,
 )
@@ -836,7 +835,7 @@ class LstarSpec(ForkProtocol):
         """
         Verify the merged Type-2 proof carried by a signed block.
 
-        The block envelope holds one SSZ-encoded Type-2 proof binding
+        The block envelope holds one Type-2 proof binding
         every body attestation plus the proposer's signature over the
         block root.
 
@@ -852,11 +851,7 @@ class LstarSpec(ForkProtocol):
         """
         block = signed_block.block
         aggregated_attestations = block.body.attestations
-
-        try:
-            type_two = TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
-        except Exception as exc:
-            raise AssertionError(f"Block proof decoding failed: {exc}") from exc
+        type_two = signed_block.proof
 
         num_validators = Uint64(len(validators))
         public_keys_per_message: list[list[PublicKey]] = []
