@@ -8,8 +8,8 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     SignedAggregatedAttestation,
+    SingleMessageAggregate,
     State,
-    TypeOneMultiSignature,
 )
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32
 
@@ -185,7 +185,7 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # Exercises signature verification rejection.
         if not self.valid_signature:
             placeholder = ByteList512KiB(data=b"\x00" * 32)
-            proof = TypeOneMultiSignature(
+            proof = SingleMessageAggregate(
                 participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
                 proof=placeholder,
             )
@@ -202,7 +202,7 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # but the claimed participants no longer match.
         # The store must detect and reject this inconsistency.
         if self.signer_ids and self.signer_ids != self.validator_ids:
-            proof = TypeOneMultiSignature(
+            proof = SingleMessageAggregate(
                 participants=ValidatorIndices(data=validator_ids).to_aggregation_bits(),
                 proof=proof.proof,
             )

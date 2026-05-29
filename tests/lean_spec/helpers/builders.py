@@ -38,11 +38,11 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     BlockBody,
+    MultiMessageAggregate,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
+    SingleMessageAggregate,
     Validator,
     Validators,
 )
@@ -210,7 +210,7 @@ def make_signed_block(
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
 
-    return SignedBlock(block=block, proof=ByteList512KiB(data=b""))
+    return SignedBlock(block=block, proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"")))
 
 
 def make_aggregated_attestation(
@@ -393,8 +393,8 @@ def make_aggregated_proof(
     key_manager: XmssKeyManager,
     participants: list[ValidatorIndex],
     attestation_data: AttestationData,
-) -> TypeOneMultiSignature:
-    """Create a valid Type-1 aggregated proof for the given participants."""
+) -> SingleMessageAggregate:
+    """Create a valid single-message aggregate aggregated proof for the given participants."""
     data_root = hash_tree_root(attestation_data)
     raw_xmss = [
         (
@@ -404,7 +404,7 @@ def make_aggregated_proof(
         )
         for vid in participants
     ]
-    return TypeOneMultiSignature.aggregate(
+    return SingleMessageAggregate.aggregate(
         children=[],
         raw_xmss=raw_xmss,
         message=data_root,
@@ -442,7 +442,7 @@ def make_signed_block_from_store(
     """Produce a signed block and advance the consumer store to accept it.
 
     Returns the updated store (with time advanced) and the signed block.
-    The merged Type-2 proof is built honestly because callers usually
+    The merged multi-message aggregate proof is built honestly because callers usually
     feed the result through spec.on_block, which decodes and verifies
     the proof.
     """
@@ -463,21 +463,21 @@ def make_signed_block_from_store(
     public_keys_per_part.append([proposer_pubkey])
 
     proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
-    proposer_type_1 = TypeOneMultiSignature.aggregate(
+    proposer_single_message_aggregate = SingleMessageAggregate.aggregate(
         children=[],
         raw_xmss=[(proposer_index, proposer_pubkey, proposer_signature)],
         message=block_root,
         slot=slot,
     )
 
-    merged = TypeTwoMultiSignature.aggregate(
-        [*attestation_proofs, proposer_type_1],
+    merged = MultiMessageAggregate.aggregate(
+        [*attestation_proofs, proposer_single_message_aggregate],
         public_keys_per_part=public_keys_per_part,
     )
 
     signed_block = SignedBlock(
         block=block,
-        proof=ByteList512KiB(data=merged.encode_bytes()),
+        proof=merged,
     )
 
     target_interval = Interval.from_slot(block.slot)

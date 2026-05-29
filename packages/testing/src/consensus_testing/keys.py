@@ -65,7 +65,7 @@ from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     AttestationData,
-    TypeOneMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.ssz import Bytes32, Uint64
 
@@ -513,13 +513,16 @@ class XmssKeyManager:
         self,
         validator_ids: list[ValidatorIndex],
         attestation_data: AttestationData,
-    ) -> TypeOneMultiSignature:
+    ) -> SingleMessageAggregate:
         """
-        Sign attestation data with each validator and aggregate into a Type-1 proof.
+        Sign attestation data with each validator and aggregate the result.
+
+        Returns a single-message aggregate proof binding all participants
+        to the (data, slot) pair.
 
         Each validator's XMSS attestation key signs the attestation data
         root. The signatures are then handed to the multi-signature
-        binding to produce a single cryptographically valid Type-1 proof
+        binding to produce a single cryptographically valid single-message aggregate proof
         binding all participants to (data, slot).
 
         Args:
@@ -527,7 +530,7 @@ class XmssKeyManager:
             attestation_data: The attestation data to sign.
 
         Returns:
-            Cryptographically valid Type-1 proof covering validator_ids.
+            Cryptographically valid single-message aggregate proof covering validator_ids.
         """
         raw_xmss = [
             (
@@ -537,7 +540,7 @@ class XmssKeyManager:
             )
             for vid in validator_ids
         ]
-        return TypeOneMultiSignature.aggregate(
+        return SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=raw_xmss,
             message=hash_tree_root(attestation_data),
@@ -549,15 +552,15 @@ class XmssKeyManager:
         aggregated_attestations: AggregatedAttestations,
         signature_lookup: Mapping[AttestationData, Mapping[ValidatorIndex, Signature]]
         | None = None,
-    ) -> list[TypeOneMultiSignature]:
+    ) -> list[SingleMessageAggregate]:
         """
-        Produce Type-1 proofs aligned with the given attestations.
+        Produce single-message aggregate proofs aligned with the given attestations.
 
         For each aggregated attestation:
 
         1. Identify participating validators from the aggregation bitfield.
         2. Collect each participant's attestation public key and signature.
-        3. Combine them into a single Type-1 single-message proof via the
+        3. Combine them into a single single-message aggregate single-message proof via the
            multi-signature binding.
 
         Pre-computed signatures can be supplied via the lookup to avoid
@@ -569,11 +572,11 @@ class XmssKeyManager:
                 attestation data then validator index.
 
         Returns:
-            One Type-1 single-message proof per attestation, parallel to the input.
+            One single-message aggregate proof per attestation, parallel to the input.
         """
         lookup = signature_lookup or {}
 
-        proofs: list[TypeOneMultiSignature] = []
+        proofs: list[SingleMessageAggregate] = []
         for agg in aggregated_attestations:
             # Decode which validators participated from the bitfield.
             validator_ids = agg.aggregation_bits.to_validator_indices()
@@ -594,7 +597,7 @@ class XmssKeyManager:
             # Produce a single aggregated proof that the leanVM can verify
             # in one pass over all participants.
             proofs.append(
-                TypeOneMultiSignature.aggregate(
+                SingleMessageAggregate.aggregate(
                     children=[],
                     raw_xmss=list(zip(validator_ids, public_keys, signatures, strict=True)),
                     message=hash_tree_root(agg.data),

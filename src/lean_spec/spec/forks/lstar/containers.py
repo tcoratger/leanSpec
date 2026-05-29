@@ -135,7 +135,7 @@ class AggregationError(Exception):
     """Raised when aggregation, merging, splitting, or verification fails."""
 
 
-class TypeOneMultiSignature(Container):
+class SingleMessageAggregate(Container):
     """Single-message proof aggregating signatures from many validators.
 
     Every validator signs the same message for the same slot.
@@ -155,11 +155,11 @@ class TypeOneMultiSignature(Container):
     @classmethod
     def aggregate(
         cls,
-        children: list[tuple["TypeOneMultiSignature", list[PublicKey]]],
+        children: list[tuple["SingleMessageAggregate", list[PublicKey]]],
         raw_xmss: list[tuple[ValidatorIndex, PublicKey, Signature]],
         message: Bytes32,
         slot: Slot,
-    ) -> "TypeOneMultiSignature":
+    ) -> "SingleMessageAggregate":
         """Fold fresh signatures and child proofs into one single-message proof.
 
         # Overview
@@ -210,7 +210,7 @@ class TypeOneMultiSignature(Container):
         # Phase 3: hand off to the Rust prover.
         # The mode argument routes the call to the matching backend bytecode.
         try:
-            _, type1_wire = aggregate_type_1(
+            _, single_message_aggregate_wire = aggregate_type_1(
                 raw_pubkeys_ssz,
                 raw_signatures_ssz,
                 bytes(message),
@@ -222,7 +222,10 @@ class TypeOneMultiSignature(Container):
         except Exception as exc:
             raise AggregationError(str(exc)) from exc
 
-        return cls(participants=participants, proof=ByteList512KiB(data=type1_wire))
+        return cls(
+            participants=participants,
+            proof=ByteList512KiB(data=single_message_aggregate_wire),
+        )
 
     def verify(
         self,
@@ -230,7 +233,7 @@ class TypeOneMultiSignature(Container):
         message: Bytes32,
         slot: Slot,
     ) -> None:
-        """Verify this single-message Type-1 proof against a pubkey set.
+        """Verify this single-message single-message aggregate proof against a pubkey set.
 
         Args:
             public_keys: Pubkeys for the validators named by participants.
@@ -247,7 +250,7 @@ class TypeOneMultiSignature(Container):
         expected = len(self.participants.to_validator_indices())
         if len(public_keys) != expected:
             raise AggregationError(
-                f"Type-1 verify expected {expected} pubkeys for participants, "
+                f"single-message aggregate verify expected {expected} pubkeys for participants, "
                 f"got {len(public_keys)}"
             )
 
@@ -262,33 +265,31 @@ class TypeOneMultiSignature(Container):
                 mode=LEAN_ENV,
             )
         except Exception as exc:
-            raise AggregationError(f"Type-1 verification failed: {exc}") from exc
+            raise AggregationError(f"single-message aggregate verification failed: {exc}") from exc
 
     def __hash__(self) -> int:
         """Content-deterministic hash via SSZ encoding."""
         return hash(self.encode_bytes())
 
 
-class TypeTwoMultiSignature(Container):
+class MultiMessageAggregate(Container):
     """Merged proof covering many distinct messages.
 
     Each component is a single-message proof over its own message.
     Merging binds the components into one proof the block can carry whole.
-
-    A signed block stores this proof as a single serialized blob.
     """
 
     model_config = Container.model_config | {"frozen": True}
 
     proof: ByteList512KiB
-    """Compact no-pubkeys serialized Type-2 proof bytes."""
+    """Compact no-pubkeys serialized multi-message aggregate proof bytes."""
 
     @classmethod
     def aggregate(
         cls,
-        parts: list[TypeOneMultiSignature],
+        parts: list[SingleMessageAggregate],
         public_keys_per_part: list[list[PublicKey]],
-    ) -> "TypeTwoMultiSignature":
+    ) -> "MultiMessageAggregate":
         """Merge several single-message proofs over distinct messages into one.
 
         # Why the public keys are passed in
@@ -309,37 +310,49 @@ class TypeTwoMultiSignature(Container):
                 with its participant count, or the prover rejects the inputs.
         """
         if not parts:
-            raise AggregationError("Type-2 aggregate requires at least one Type-1 input")
+            raise AggregationError(
+                "multi-message aggregate requires at least one single-message aggregate input"
+            )
 
         # Each component carries the public keys named by its bitfield, in the same order.
         #
         # A miscount would otherwise fail deep in the prover with an opaque error.
-        type1_entries: list[tuple[list[bytes], bytes]] = []
+        single_message_aggregate_entries: list[tuple[list[bytes], bytes]] = []
         for idx, (part, pubkeys) in enumerate(zip(parts, public_keys_per_part, strict=True)):
             expected = len(part.participants.to_validator_indices())
             if len(pubkeys) != expected:
                 raise AggregationError(
-                    f"Type-2 aggregate entry {idx} expected {expected} pubkeys, got {len(pubkeys)}"
+                    f"multi-message aggregate entry {idx} "
+                    f"expected {expected} pubkeys, got {len(pubkeys)}"
                 )
-            type1_entries.append(([pk.encode_bytes() for pk in pubkeys], bytes(part.proof.data)))
+            single_message_aggregate_entries.append(
+                ([pk.encode_bytes() for pk in pubkeys], bytes(part.proof.data))
+            )
 
         # Hand the per-component keys and proof bytes to the Rust prover.
         #
         # The mode argument selects the matching backend bytecode.
         try:
-            _, type2_wire = merge_many_type_1(type1_entries, LOG_INV_RATE, mode=LEAN_ENV)
+            _, multi_message_aggregate_wire = merge_many_type_1(
+                single_message_aggregate_entries,
+                LOG_INV_RATE,
+                mode=LEAN_ENV,
+            )
         except Exception as exc:
             raise AggregationError(str(exc)) from exc
 
-        return cls(proof=ByteList512KiB(data=type2_wire))
+        return cls(proof=ByteList512KiB(data=multi_message_aggregate_wire))
 
     def split_by_msg(
         self,
         message: Bytes32,
         public_keys_per_message: list[list[PublicKey]],
         participants: AggregationBits,
-    ) -> TypeOneMultiSignature:
-        """Recover the Type-1 proof bound to one message from this Type-2 merge.
+    ) -> SingleMessageAggregate:
+        """Recover the single-message aggregate proof bound to one message.
+
+        Splits this multi-message aggregate to extract the component
+        bound to the given message.
 
         # Why the layout and participants are passed in
 
@@ -348,12 +361,12 @@ class TypeTwoMultiSignature(Container):
         - The caller supplies both, drawn from the block attestation this component binds.
 
         Args:
-            message: Message that selects the Type-1 component.
-            public_keys_per_message: Pubkey layout this Type-2 was built with.
+            message: Message that selects the single-message aggregate component.
+            public_keys_per_message: Pubkey layout this multi-message aggregate was built with.
             participants: Bitfield naming the validators of the recovered component.
 
         Returns:
-            The Type-1 proof bound to the message.
+            The single-message aggregate proof bound to the message.
 
         Raises:
             AggregationError: When the Rust binding rejects the split.
@@ -367,7 +380,7 @@ class TypeTwoMultiSignature(Container):
         #
         # The mode argument selects the matching backend bytecode.
         try:
-            _, type1_wire = split_type_2_by_msg(
+            _, single_message_aggregate_wire = split_type_2_by_msg(
                 pub_keys_per_component_ssz,
                 bytes(self.proof.data),
                 bytes(message),
@@ -375,11 +388,11 @@ class TypeTwoMultiSignature(Container):
                 mode=LEAN_ENV,
             )
         except Exception as exc:
-            raise AggregationError(f"Type-2 split failed: {exc}") from exc
+            raise AggregationError(f"multi-message aggregate split failed: {exc}") from exc
 
-        return TypeOneMultiSignature(
+        return SingleMessageAggregate(
             participants=participants,
-            proof=ByteList512KiB(data=type1_wire),
+            proof=ByteList512KiB(data=single_message_aggregate_wire),
         )
 
     def verify(
@@ -407,7 +420,8 @@ class TypeTwoMultiSignature(Container):
         # A length mismatch would leave components unbound or misaligned.
         if len(messages) != len(public_keys_per_message):
             raise AggregationError(
-                f"Type-2 verify expected {len(public_keys_per_message)} message bindings, "
+                f"multi-message aggregate verify expected "
+                f"{len(public_keys_per_message)} message bindings, "
                 f"got {len(messages)}"
             )
 
@@ -428,7 +442,7 @@ class TypeTwoMultiSignature(Container):
                 mode=LEAN_ENV,
             )
         except Exception as exc:
-            raise AggregationError(f"Type-2 verification failed: {exc}") from exc
+            raise AggregationError(f"multi-message aggregate verification failed: {exc}") from exc
 
     def __hash__(self) -> int:
         """Content-deterministic hash via SSZ encoding."""
@@ -565,7 +579,7 @@ class SignedAggregatedAttestation(Container):
     data: AttestationData
     """Combined attestation data similar to the beacon chain format."""
 
-    proof: TypeOneMultiSignature
+    proof: SingleMessageAggregate
     """Aggregated single-message proof covering all participating validators."""
 
 
@@ -628,15 +642,15 @@ class Block(Container):
 class SignedBlock(Container):
     """Envelope carrying a block with a single aggregated proof for all signatures.
 
-    The proof is the SSZ-encoded form of a Type-2 multi-message proof that
-    binds every attestation in the body plus the proposer's signature over
-    the block root.
+    The proof is a multi-message aggregate multi-message proof.
+    It binds every attestation in the body plus the proposer's signature
+    over the block root.
     """
 
     block: Block
     """The block being signed."""
 
-    proof: ByteList512KiB
+    proof: MultiMessageAggregate
     """Single full-block proof covering attestations and the proposer signature."""
 
 

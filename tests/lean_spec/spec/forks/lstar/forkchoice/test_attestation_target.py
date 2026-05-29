@@ -13,13 +13,13 @@ from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
     Attestation,
     AttestationData,
+    MultiMessageAggregate,
     SignedAttestation,
     SignedBlock,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.spec.ssz import Bytes32
 from tests.lean_spec.helpers import make_store
 
 
@@ -570,11 +570,12 @@ class TestIntegrationScenarios:
         store, block, signatures = spec.produce_block_with_signatures(store, slot_1, proposer_1)
         block_root = hash_tree_root(block)
 
-        # Wrap the proposer's signature into a singleton Type-1, then merge
-        # with the per-attestation Type-1s into the block-level Type-2.
+        # Wrap the proposer's signature into a singleton single-message aggregate.
+        # Merge it with the per-attestation single-message aggregates
+        # into the block-level multi-message aggregate.
         proposer_signature = key_manager.sign_block_root(proposer_1, slot_1, block_root)
         proposer_pubkey = key_manager.get_public_keys(proposer_1)[1]
-        proposer_type_1 = TypeOneMultiSignature.aggregate(
+        proposer_single_message_aggregate = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=[(proposer_1, proposer_pubkey, proposer_signature)],
             message=block_root,
@@ -591,13 +592,13 @@ class TestIntegrationScenarios:
         ]
         public_keys_per_part.append([proposer_pubkey])
 
-        merged = TypeTwoMultiSignature.aggregate(
-            [*signatures, proposer_type_1],
+        merged = MultiMessageAggregate.aggregate(
+            [*signatures, proposer_single_message_aggregate],
             public_keys_per_part=public_keys_per_part,
         )
         signed_block = SignedBlock(
             block=block,
-            proof=ByteList512KiB(data=merged.encode_bytes()),
+            proof=merged,
         )
 
         # Process block via on_block on a fresh consumer store

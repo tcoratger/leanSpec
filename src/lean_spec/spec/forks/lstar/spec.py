@@ -39,10 +39,9 @@ from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    SingleMessageAggregate,
     Slot,
     State,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
     ValidatorIndex,
     Validators,
 )
@@ -622,8 +621,8 @@ class LstarSpec(ForkProtocol):
         proposer_index: ValidatorIndex,
         parent_root: Bytes32,
         known_block_roots: AbstractSet[Bytes32],
-        aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]] | None = None,
-    ) -> tuple[Block, State, list[AggregatedAttestation], list[TypeOneMultiSignature]]:
+        aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] | None = None,
+    ) -> tuple[Block, State, list[AggregatedAttestation], list[SingleMessageAggregate]]:
         """
         Build a valid block on top of the given pre-state.
 
@@ -635,7 +634,7 @@ class LstarSpec(ForkProtocol):
         repeats with the new checkpoint.
         """
         aggregated_attestations: list[AggregatedAttestation] = []
-        aggregated_signatures: list[TypeOneMultiSignature] = []
+        aggregated_signatures: list[SingleMessageAggregate] = []
 
         if aggregated_payloads:
             # Fixed-point loop: find attestation_data entries matching the current
@@ -775,7 +774,7 @@ class LstarSpec(ForkProtocol):
             # During the fixed-point loop above, multiple proofs may have been
             # selected for the same AttestationData across iterations. Group them
             # and merge each group into a single recursive proof.
-            proof_groups: dict[AttestationData, list[TypeOneMultiSignature]] = {}
+            proof_groups: dict[AttestationData, list[SingleMessageAggregate]] = {}
             for att, sig in zip(aggregated_attestations, aggregated_signatures, strict=True):
                 proof_groups.setdefault(att.data, []).append(sig)
 
@@ -798,7 +797,7 @@ class LstarSpec(ForkProtocol):
                         )
                         for proof in proofs
                     ]
-                    sig = TypeOneMultiSignature.aggregate(
+                    sig = SingleMessageAggregate.aggregate(
                         children=children,
                         raw_xmss=[],
                         message=hash_tree_root(att_data),
@@ -834,9 +833,9 @@ class LstarSpec(ForkProtocol):
         validators: Validators,
     ) -> bool:
         """
-        Verify the merged Type-2 proof carried by a signed block.
+        Verify the merged multi-message aggregate proof carried by a signed block.
 
-        The block envelope holds one SSZ-encoded Type-2 proof binding
+        The block envelope holds one multi-message aggregate proof binding
         every body attestation plus the proposer's signature over the
         block root.
 
@@ -852,11 +851,6 @@ class LstarSpec(ForkProtocol):
         """
         block = signed_block.block
         aggregated_attestations = block.body.attestations
-
-        try:
-            type_two = TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
-        except Exception as exc:
-            raise AssertionError(f"Block proof decoding failed: {exc}") from exc
 
         num_validators = Uint64(len(validators))
         public_keys_per_message: list[list[PublicKey]] = []
@@ -900,7 +894,7 @@ class LstarSpec(ForkProtocol):
         message_bindings.append((hash_tree_root(block), block.slot))
 
         try:
-            type_two.verify(
+            signed_block.proof.verify(
                 public_keys_per_message=public_keys_per_message,
                 messages=message_bindings,
             )
@@ -1164,7 +1158,7 @@ class LstarSpec(ForkProtocol):
         # Prepare public keys for verification
         public_keys = [validators[vid].get_attestation_pubkey() for vid in validator_ids]
 
-        # Verify the Type-1 single-message aggregated proof.
+        # Verify the single-message aggregate single-message aggregated proof.
         try:
             proof.verify(
                 public_keys=public_keys,
@@ -1264,7 +1258,7 @@ class LstarSpec(ForkProtocol):
             #
             # Consequence: a block's own attestations contribute zero weight
             # to the head computation triggered by this import.
-            # Recovered Type-1 proofs land in the new pool and migrate to
+            # Recovered single-message aggregate proofs land in the new pool and migrate to
             # the known pool at the next acceptance tick.
             # Head weight from block-imported votes is therefore deferred
             # by up to one slot.
@@ -1285,7 +1279,7 @@ class LstarSpec(ForkProtocol):
     def extract_attestations_from_aggregated_payloads(
         self,
         store: LstarStore,
-        aggregated_payloads: dict[AttestationData, set[TypeOneMultiSignature]],
+        aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]],
     ) -> dict[ValidatorIndex, AttestationData]:
         """Extract attestations from aggregated payloads.
 
@@ -1624,7 +1618,7 @@ class LstarSpec(ForkProtocol):
             # Hand everything to the XMSS subspec.
             # Each fresh entry already carries its validator index alongside its key and signature.
             # Out comes a single proof covering all selected validators.
-            proof = TypeOneMultiSignature.aggregate(
+            proof = SingleMessageAggregate.aggregate(
                 children=children,
                 raw_xmss=raw_entries,
                 message=hash_tree_root(data),
@@ -1787,8 +1781,11 @@ class LstarSpec(ForkProtocol):
         store: LstarStore,
         slot: Slot,
         validator_index: ValidatorIndex,
-    ) -> tuple[LstarStore, Block, list[TypeOneMultiSignature]]:
-        """Produce a block and its per-attestation Type-1 proofs for the target slot.
+    ) -> tuple[LstarStore, Block, list[SingleMessageAggregate]]:
+        """Produce a block for the target slot.
+
+        Returns the block alongside its per-attestation single-message
+        aggregate proofs.
 
         Block production proceeds in four stages:
         1. Retrieve the current chain head as the parent block
@@ -1799,10 +1796,10 @@ class LstarSpec(ForkProtocol):
         The block builder uses a fixed-point algorithm to collect attestations.
         Each iteration may update the justified checkpoint.
 
-        Returns the per-attestation Type-1 proofs unmerged. The validator
+        Returns the per-attestation single-message aggregate proofs unmerged. The validator
         service signs the block root with the proposal key, wraps that into
-        a singleton Type-1, and merges all of them into the block-level
-        Type-2 proof carried by SignedBlock.proof.
+        a singleton single-message aggregate, and merges all of them into the block-level
+        multi-message aggregate proof carried by SignedBlock.proof.
 
         Raises:
             AssertionError: If validator is not the proposer for this slot,

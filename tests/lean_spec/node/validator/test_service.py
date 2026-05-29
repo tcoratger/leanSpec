@@ -24,8 +24,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     SignedAttestation,
     SignedBlock,
-    TypeOneMultiSignature,
-    TypeTwoMultiSignature,
+    SingleMessageAggregate,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
@@ -139,7 +138,6 @@ class TestSignBlock:
 
         result = service._sign_block(block, ValidatorIndex(0), [agg_proof])
 
-        TypeTwoMultiSignature.decode_bytes(result.proof.data)
         assert result.block.proposer_index == ValidatorIndex(0)
 
     def test_missing_validator_raises_value_error(
@@ -939,9 +937,6 @@ class TestValidatorServiceIntegration:
         assert signed_block.block.slot == Slot(1)
         assert signed_block.block.proposer_index == ValidatorIndex(1)
 
-        # The merged proof must decode and the block carries the proposer index.
-        TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
-
     async def test_produce_real_attestation_with_valid_signature(
         self,
         key_manager: XmssKeyManager,
@@ -1041,11 +1036,6 @@ class TestValidatorServiceIntegration:
         await service._maybe_produce_block(Slot(2))
 
         assert len(blocks_produced) == 1
-        signed_block = blocks_produced[0]
-
-        # The merged proof decodes cleanly; the proposer identity now lives
-        # on the block, not inside the proof envelope.
-        TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
 
     async def test_block_includes_pending_attestations(
         self,
@@ -1073,7 +1063,7 @@ class TestValidatorServiceIntegration:
             signatures.append(sig)
             public_keys.append(key_manager[vid].attestation_keypair.public_key)
 
-        proof = TypeOneMultiSignature.aggregate(
+        proof = SingleMessageAggregate.aggregate(
             children=[],
             raw_xmss=list(zip(participants, public_keys, signatures, strict=True)),
             message=data_root,
@@ -1103,10 +1093,6 @@ class TestValidatorServiceIntegration:
 
         body_attestations = signed_block.block.body.attestations
         assert len(body_attestations) > 0
-
-        # The merged proof decodes; its component count is rederived from
-        # the block body (one Type-1 per attestation plus the proposer).
-        TypeTwoMultiSignature.decode_bytes(signed_block.proof.data)
 
     async def test_multiple_slots_produce_different_attestations(
         self,

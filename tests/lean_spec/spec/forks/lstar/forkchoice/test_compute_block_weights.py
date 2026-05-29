@@ -7,16 +7,16 @@ import pytest
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
 from lean_spec.spec.forks.lstar import Store
-from lean_spec.spec.forks.lstar.containers import AttestationData, TypeOneMultiSignature
+from lean_spec.spec.forks.lstar.containers import AttestationData, SingleMessageAggregate
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz.byte_arrays import ByteList512KiB, Bytes32
 from tests.lean_spec.helpers import make_bytes32, make_signed_block
 
 
-def _make_empty_proof(participants: list[ValidatorIndex]) -> TypeOneMultiSignature:
-    """Create a placeholder Type-1 proof carrying a participant bitfield."""
+def _make_empty_proof(participants: list[ValidatorIndex]) -> SingleMessageAggregate:
+    """Create a placeholder single-message aggregate proof carrying a participant bitfield."""
     placeholder = ByteList512KiB(data=b"")
-    return TypeOneMultiSignature(
+    return SingleMessageAggregate(
         participants=ValidatorIndices(data=participants).to_aggregation_bits(),
         proof=placeholder,
     )

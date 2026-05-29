@@ -1,8 +1,8 @@
-"""Tests for post-block Type-1 deconstruction in SyncService.
+"""Tests for post-block single-message aggregate deconstruction in SyncService.
 
 Exercises `SyncService._deconstruct_block_into_store`: for every processed
-block (gossip, head-sync, or backfilled), the merged Type-2 proof is split
-into per-attestation Type-1 proofs, merged with locally held partials, and
+block (gossip, head-sync, or backfilled), the merged multi-message aggregate proof is split
+into per-attestation single-message aggregate proofs, merged with locally held partials, and
 written into the pending pool, replacing the partials it subsumes.
 
 Deconstruction only runs for an attestation when:
@@ -54,7 +54,7 @@ def _setup(
     The chain block sits at slot 1. The returned signed block sits at slot
     2 and carries one attestation whose target is the slot-1 block, ahead
     of the still-genesis justified checkpoint. The returned store holds the
-    slot-1 block and its state (the parent state the Type-2 pubkey layout
+    slot-1 block and its state (the parent state the multi-message aggregate pubkey layout
     is resolved against) with the justified checkpoint still at genesis.
     """
     spec = LstarSpec()
