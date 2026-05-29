@@ -129,10 +129,10 @@ def validator_keys_directory(tmp_path: Path) -> Path:
         "num_validators: 1\n"
         "validators:\n"
         "  - index: 0\n"
-        f"    attestation_pubkey_hex: '0x{'00' * 52}'\n"
-        f"    proposal_pubkey_hex: '0x{'00' * 52}'\n"
-        "    attestation_privkey_file: att_key_0.ssz\n"
-        "    proposal_privkey_file: prop_key_0.ssz\n"
+        f"    attestation_public_key_hex: '0x{'00' * 52}'\n"
+        f"    proposal_public_key_hex: '0x{'00' * 52}'\n"
+        "    attestation_private_key_file: att_key_0.ssz\n"
+        "    proposal_private_key_file: prop_key_0.ssz\n"
     )
 
     # Node-to-validator mapping assigns the only validator to the default node id.

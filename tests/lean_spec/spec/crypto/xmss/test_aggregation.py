@@ -453,7 +453,7 @@ def test_type_two_aggregate_rejects_mismatched_public_key_layout(
     # Layout claims one public_key for a part that binds two participants.
     wrong_layout = [[key_manager[ValidatorIndex(0)].attestation_keypair.public_key]]
 
-    with pytest.raises(AggregationError, match="expected 2 pubkeys, got 1"):
+    with pytest.raises(AggregationError, match="expected 2 public keys, got 1"):
         TypeTwoMultiSignature.aggregate(
             parts=[part],
             public_keys_per_part=wrong_layout,

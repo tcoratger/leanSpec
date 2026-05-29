@@ -247,7 +247,7 @@ def le_padded(value: int, byte_length: int) -> Bytes32:
 
 
 @pytest.mark.parametrize(
-    "uint_type, byte_len, value",
+    "uint_type, byte_length, value",
     [
         (Uint8, 1, 0x00),
         (Uint8, 1, 0x01),

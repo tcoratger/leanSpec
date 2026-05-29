@@ -74,7 +74,7 @@ def _run_commit_open_verify_roundtrip(
 
 
 @pytest.mark.parametrize(
-    "num_leaves, depth, start_index, leaf_parts_len",
+    "num_leaves, depth, start_index, leaf_parts_length",
     [
         pytest.param(16, 4, 0, 3, id="Full tree (depth 4)", marks=pytest.mark.slow),
         pytest.param(12, 5, 0, 5, id="Half tree, left-aligned (depth 5)", marks=pytest.mark.slow),
