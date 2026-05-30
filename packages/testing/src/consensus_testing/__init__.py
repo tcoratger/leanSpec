@@ -9,13 +9,17 @@ from .test_fixtures import (
     BaseConsensusFixture,
     ForkChoiceTest,
     GossipsubHandlerTest,
+    IncrementEmittedSlot,
     JustifiabilityTest,
     NetworkingCodecTest,
     PoseidonPermutationTest,
+    RebindToAlternateHeadRoot,
     SlotClockTest,
     SSZTest,
     StateTransitionTest,
+    SwapParticipantPublicKey,
     SyncTest,
+    VerifyProofsTest,
     VerifySignaturesTest,
 )
 from .test_types import (
@@ -37,6 +41,7 @@ from .test_types import (
 
 StateTransitionTestFiller = Type[StateTransitionTest]
 ForkChoiceTestFiller = Type[ForkChoiceTest]
+VerifyProofsTestFiller = Type[VerifyProofsTest]
 VerifySignaturesTestFiller = Type[VerifySignaturesTest]
 SSZTestFiller = Type[SSZTest]
 NetworkingCodecTestFiller = Type[NetworkingCodecTest]
@@ -61,6 +66,10 @@ __all__ = [
     "BaseConsensusFixture",
     "StateTransitionTest",
     "ForkChoiceTest",
+    "VerifyProofsTest",
+    "RebindToAlternateHeadRoot",
+    "IncrementEmittedSlot",
+    "SwapParticipantPublicKey",
     "VerifySignaturesTest",
     "SSZTest",
     "NetworkingCodecTest",
@@ -84,6 +93,7 @@ __all__ = [
     # Type aliases for test function signatures
     "StateTransitionTestFiller",
     "ForkChoiceTestFiller",
+    "VerifyProofsTestFiller",
     "VerifySignaturesTestFiller",
     "SSZTestFiller",
     "NetworkingCodecTestFiller",

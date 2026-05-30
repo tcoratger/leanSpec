@@ -11,12 +11,22 @@ from .slot_clock import SlotClockTest
 from .ssz import SSZTest
 from .state_transition import StateTransitionTest
 from .sync import SyncTest
+from .verify_proofs import (
+    IncrementEmittedSlot,
+    RebindToAlternateHeadRoot,
+    SwapParticipantPublicKey,
+    VerifyProofsTest,
+)
 from .verify_signatures import VerifySignaturesTest
 
 __all__ = [
     "BaseConsensusFixture",
     "StateTransitionTest",
     "ForkChoiceTest",
+    "VerifyProofsTest",
+    "RebindToAlternateHeadRoot",
+    "IncrementEmittedSlot",
+    "SwapParticipantPublicKey",
     "VerifySignaturesTest",
     "SSZTest",
     "NetworkingCodecTest",
