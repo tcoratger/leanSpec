@@ -631,8 +631,8 @@ class SyncService:
                 else:
                     # Data unseen locally: nothing to merge, use as-is.
                     combined = block_single_message_aggregate
-            except (AggregationError, AssertionError, KeyError, ValueError) as exc:
-                logger.debug("Post-block re-aggregation failed for %s: %s", data_root, exc)
+            except (AggregationError, AssertionError, KeyError, ValueError) as exception:
+                logger.debug("Post-block re-aggregation failed for %s: %s", data_root, exception)
                 continue
 
             # The combined proof is a superset of every local partial that

@@ -144,8 +144,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
         exception_raised: Exception | None = None
         try:
             decoder(raw)
-        except Exception as exc:
-            exception_raised = exc
+        except Exception as exception:
+            exception_raised = exception
 
         if exception_raised is None:
             raise AssertionError(

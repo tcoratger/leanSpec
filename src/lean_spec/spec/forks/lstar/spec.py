@@ -904,8 +904,8 @@ class LstarSpec(ForkProtocol):
                 public_keys_per_message=public_keys_per_message,
                 messages=message_bindings,
             )
-        except AggregationError as exc:
-            raise AssertionError(f"Block proof verification failed: {exc}") from exc
+        except AggregationError as exception:
+            raise AssertionError(f"Block proof verification failed: {exception}") from exception
 
         return True
 
@@ -1175,10 +1175,10 @@ class LstarSpec(ForkProtocol):
                 message=hash_tree_root(data),
                 slot=data.slot,
             )
-        except AggregationError as exc:
+        except AggregationError as exception:
             raise AssertionError(
-                f"Committee aggregation signature verification failed: {exc}"
-            ) from exc
+                f"Committee aggregation signature verification failed: {exception}"
+            ) from exception
 
         store.latest_new_aggregated_payloads.setdefault(data, set()).add(proof)
 
