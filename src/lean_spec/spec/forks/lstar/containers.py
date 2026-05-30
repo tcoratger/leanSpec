@@ -222,8 +222,8 @@ class SingleMessageAggregate(Container):
                 children_bytes or None,
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(str(exc)) from exc
+        except Exception as exception:
+            raise AggregationError(str(exception)) from exception
 
         return cls(
             participants=participants,
@@ -267,8 +267,10 @@ class SingleMessageAggregate(Container):
                 bytes(self.proof.data),
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(f"single-message aggregate verification failed: {exc}") from exc
+        except Exception as exception:
+            raise AggregationError(
+                f"single-message aggregate verification failed: {exception}"
+            ) from exception
 
     def __hash__(self) -> int:
         """Content-deterministic hash via SSZ encoding."""
@@ -341,8 +343,8 @@ class MultiMessageAggregate(Container):
                 LOG_INV_RATE,
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(str(exc)) from exc
+        except Exception as exception:
+            raise AggregationError(str(exception)) from exception
 
         return cls(proof=ByteList512KiB(data=multi_message_aggregate_wire))
 
@@ -391,8 +393,10 @@ class MultiMessageAggregate(Container):
                 LOG_INV_RATE,
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(f"multi-message aggregate split failed: {exc}") from exc
+        except Exception as exception:
+            raise AggregationError(
+                f"multi-message aggregate split failed: {exception}"
+            ) from exception
 
         return SingleMessageAggregate(
             participants=participants,
@@ -446,8 +450,10 @@ class MultiMessageAggregate(Container):
                 bytes(self.proof.data),
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(f"multi-message aggregate verification failed: {exc}") from exc
+        except Exception as exception:
+            raise AggregationError(
+                f"multi-message aggregate verification failed: {exception}"
+            ) from exception
 
     def __hash__(self) -> int:
         """Content-deterministic hash via SSZ encoding."""

@@ -40,6 +40,8 @@ subspecifications that the Lean Ethereum protocol relies on.
     - `prop` → `proposal`, `conn` → `connection`, `addr` → `address`, `cert` → `certificate`
     - `privkey` → `private_key`, `elem` → `element`, `buf` → `buffer`, `dir` → `directory`
     - `len` → `length` (inside a name, never the `len()` builtin), `fe` → `field_elements`
+    - `exc` / `e` → `exception` (in `except X as exc:` clauses, use `exception`; the stdlib
+      `exc_info` name is still kept verbatim)
   - Use the correct domain term, not just any expansion: a validator is referenced by its
     INDEX, so `validator_id` → `validator_index` (never `validator_id`).
   - KEEP canonical protocol identifiers that genuinely use "ID": `peer_id`, `node_id`,

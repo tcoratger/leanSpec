@@ -155,8 +155,8 @@ class VerifyProofsTest(BaseConsensusFixture):
         # a comparable "expected X got Y" message instead of crashing the filler.
         try:
             candidate.verify(public_keys, message, slot)
-        except Exception as exc:
-            exception_raised = exc
+        except Exception as exception:
+            exception_raised = exception
 
         if self.expect_exception is None:
             if exception_raised is not None:

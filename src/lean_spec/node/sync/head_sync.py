@@ -310,10 +310,10 @@ class HeadSync:
                     )
                     processed_count += description_count
 
-                except Exception as exc:
+                except Exception as exception:
                     # Processing failed. Leave in cache for retry or discard.
                     # Do not cascade the error; continue with other children.
-                    logger.debug("Failed to process cached descendant: %s", exc)
+                    logger.debug("Failed to process cached descendant: %s", exception)
 
             finally:
                 self._processing.discard(child_root)
