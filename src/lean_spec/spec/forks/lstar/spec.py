@@ -243,8 +243,8 @@ class LstarSpec(ForkProtocol):
         #   updates rely entirely on validator attestations which are processed
         #   later in the block body.
         if is_genesis_parent:
-            state.latest_justified = Checkpoint(slot=state.latest_justified.slot, root=parent_root)
-            state.latest_finalized = Checkpoint(slot=state.latest_finalized.slot, root=parent_root)
+            state.latest_justified = Checkpoint(slot=Slot(0), root=parent_root)
+            state.latest_finalized = Checkpoint(slot=Slot(0), root=parent_root)
 
         # Historical Data Management
 
@@ -644,7 +644,7 @@ class LstarSpec(ForkProtocol):
             # updates the justified root to parent_root. Apply the same
             # derivation here so attestation sources match.
             if state.latest_block_header.slot == Slot(0):
-                current_justified = Checkpoint(slot=state.latest_justified.slot, root=parent_root)
+                current_justified = Checkpoint(slot=Slot(0), root=parent_root)
             else:
                 current_justified = state.latest_justified
 
