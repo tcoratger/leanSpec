@@ -586,24 +586,20 @@ class LstarSpec(ForkProtocol):
         self,
         state: State,
         block: Block,
-        valid_signatures: bool = True,
     ) -> State:
         """
         Apply the complete state transition function for a block.
 
         This method represents the full state transition function:
-        1. Validate signatures if required
-        2. Process slots up to the block's slot
-        3. Process the block header and body
-        4. Validate the computed state root
+        1. Process slots up to the block's slot
+        2. Process the block header and body
+        3. Validate the computed state root
+
+        Signatures are verified outside this function, before it is called.
 
         Raises:
-            AssertionError: If signature validation fails or state root is invalid.
+            AssertionError: If the computed state root is invalid.
         """
-        # Validate signatures if required
-        if not valid_signatures:
-            raise AssertionError("Block signatures must be valid")
-
         with observe_state_transition():
             # First, process any intermediate slots.
             advanced = self.process_slots(state, block.slot)
@@ -1239,11 +1235,13 @@ class LstarSpec(ForkProtocol):
                 f"maximum is {MAX_ATTESTATIONS_DATA}"
             )
 
-            # Validate cryptographic signatures
-            valid_signatures = self.verify_signatures(signed_block, parent_state.validators)
+            # Validate cryptographic signatures.
+            #
+            # This raises on any invalid signature, aborting the import.
+            self.verify_signatures(signed_block, parent_state.validators)
 
             # Execute state transition function to compute post-block state
-            post_state = self.state_transition(parent_state, block, valid_signatures)
+            post_state = self.state_transition(parent_state, block)
 
             # Propagate checkpoint advances from the post-state.
             #
