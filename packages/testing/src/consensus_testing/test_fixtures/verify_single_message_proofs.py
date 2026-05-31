@@ -13,7 +13,6 @@ from lean_spec.spec.forks import (
     Checkpoint,
     Slot,
     ValidatorIndex,
-    ValidatorIndices,
 )
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
@@ -108,7 +107,7 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         message = hash_tree_root(self.attestation_data)
         slot = self.attestation_data.slot
         public_keys = [key_manager.get_public_keys(i)[0] for i in self.validator_indices]
-        aggregation_bits = ValidatorIndices(data=self.validator_indices).to_aggregation_bits()
+        aggregation_bits = AggregationBits.from_indices(self.validator_indices)
         proof = self._aggregate_proof(
             key_manager, self.attestation_data, self.validator_indices, public_keys
         )

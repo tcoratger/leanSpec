@@ -39,7 +39,7 @@ ignoring malformed ones.
 
 from __future__ import annotations
 
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -120,9 +120,7 @@ class TestProcessAttestationsBoundsCheck:
 
         attestation = AggregatedAttestation(
             # Two validators participate in this attestation.
-            aggregation_bits=ValidatorIndices(
-                data=[ValidatorIndex(0), ValidatorIndex(1)]
-            ).to_aggregation_bits(),
+            aggregation_bits=AggregationBits.from_indices([ValidatorIndex(0), ValidatorIndex(1)]),
             data=attestation_data,
         )
 
@@ -200,9 +198,7 @@ class TestProcessAttestationsBoundsCheck:
         )
 
         attestation = AggregatedAttestation(
-            aggregation_bits=ValidatorIndices(
-                data=[ValidatorIndex(0), ValidatorIndex(1)]
-            ).to_aggregation_bits(),
+            aggregation_bits=AggregationBits.from_indices([ValidatorIndex(0), ValidatorIndex(1)]),
             data=attestation_data,
         )
 

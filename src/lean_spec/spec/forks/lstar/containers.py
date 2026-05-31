@@ -1,5 +1,6 @@
 """The container types for the Lean consensus specification."""
 
+from collections.abc import Iterable
 from typing import Final, NamedTuple, Self
 
 from lean_multisig_py import (
@@ -80,9 +81,9 @@ class AggregationBits(BaseBitlist):
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
 
     @classmethod
-    def from_indices(cls, indices: set[ValidatorIndex]) -> "AggregationBits":
+    def from_indices(cls, indices: Iterable[ValidatorIndex]) -> "AggregationBits":
         """
-        Build aggregation bits from a set of validator indices.
+        Build aggregation bits from validator indices.
 
         Returns:
             Aggregation bits with exactly the given indices set to True.
@@ -91,12 +92,14 @@ class AggregationBits(BaseBitlist):
             AssertionError: If no indices are provided.
             AssertionError: If any index is outside the supported LIMIT.
         """
-        # Require at least one validator for a valid aggregation.
-        if not indices:
-            raise AssertionError("Aggregated attestation must reference at least one validator")
-
         # Convert to native ints once for bounds checking and membership tests.
+        #
+        # This also deduplicates and lets any iterable be passed in.
         ids = {int(i) for i in indices}
+
+        # Require at least one validator for a valid aggregation.
+        if not ids:
+            raise AssertionError("Aggregated attestation must reference at least one validator")
 
         # Validate bounds: max index must be within registry limit.
         if (max_id := max(ids)) >= cls.LIMIT:
@@ -129,19 +132,6 @@ class ValidatorIndices(SSZList[ValidatorIndex]):
     """List of validator indices up to the registry limit."""
 
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
-
-    def to_aggregation_bits(self) -> AggregationBits:
-        """
-        Convert to aggregation bits marking which validators are present.
-
-        Returns:
-            `AggregationBits` with the corresponding indices set to True.
-
-        Raises:
-            `AssertionError`: If no indices are provided.
-            `AssertionError`: If any index is outside the supported LIMIT.
-        """
-        return AggregationBits.from_indices(set(self.data))
 
 
 class AggregationError(Exception):
