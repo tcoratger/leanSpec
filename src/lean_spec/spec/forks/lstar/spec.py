@@ -248,18 +248,16 @@ class LstarSpec(ForkProtocol):
 
         # Historical Data Management
 
-        # Calculate the gap between the parent and the current block.
-        #
-        # If slots were skipped (missed proposals), we must record them.
-        #
-        # Formula: (Current - Parent - 1). Adjacent blocks have a gap of 0.
-        num_empty_slots = int(block.slot - parent_header.slot - Slot(1))
-
-        # Update the list of historical block roots.
+        # Record the parent root, plus a zero hash for any skipped slot.
         #
         # Structure: [Existing history] + [Parent root] + [Zero hash for gaps]
-        state.historical_block_hashes = (
-            state.historical_block_hashes + [parent_root] + [ZERO_HASH] * num_empty_slots
+        state.historical_block_hashes = HistoricalBlockHashes(
+            data=self.extend_historical_block_hashes(
+                state.historical_block_hashes.data,
+                parent_root,
+                parent_header.slot,
+                block.slot,
+            )
         )
 
         # Update the list of justified slot flags.
@@ -307,6 +305,34 @@ class LstarSpec(ForkProtocol):
         state = self.process_block_header(state, block)
 
         return self.process_attestations(state, block.body.attestations)
+
+    @staticmethod
+    def extend_historical_block_hashes(
+        history: Sequence[Bytes32],
+        parent_root: Bytes32,
+        parent_slot: Slot,
+        new_slot: Slot,
+    ) -> list[Bytes32]:
+        """Project the slot-indexed chain view onto the slot of a new block.
+
+        The recorded history is followed by the parent root at the parent's slot,
+        then one zero-hash entry per slot skipped between the parent and the new
+        block.
+
+        Adjacent blocks skip no slots and contribute only the parent root.
+
+        Args:
+            history: Recorded block roots indexed by slot, up to the parent.
+            parent_root: Root of the block the new block builds on.
+            parent_slot: Slot of the parent block.
+            new_slot: Slot of the new block.
+
+        Returns:
+            The chain view as it will appear once the new block is recorded.
+        """
+        # Gap formula: (new - parent - 1). Adjacent blocks have a gap of 0.
+        num_empty_slots = int(new_slot - parent_slot - Slot(1))
+        return [*history, parent_root, *([ZERO_HASH] * num_empty_slots)]
 
     @staticmethod
     def _attestation_data_matches_chain(
@@ -663,13 +689,12 @@ class LstarSpec(ForkProtocol):
 
             # Build the chain view as it will appear on the candidate block.
             #
-            # The view is the recorded history up to the parent.
-            # Then comes the parent root at the parent's slot.
-            # Then zero-hash entries for any skipped slots up to the new block.
             # The chain-match helper uses this view to validate source and target roots.
-            num_empty_slots = int(slot - state.latest_block_header.slot - Slot(1))
-            extended_historical_block_hashes: list[Bytes32] = (
-                list(state.historical_block_hashes) + [parent_root] + [ZERO_HASH] * num_empty_slots
+            extended_historical_block_hashes = self.extend_historical_block_hashes(
+                state.historical_block_hashes.data,
+                parent_root,
+                state.latest_block_header.slot,
+                slot,
             )
 
             processed_attestation_data: set[AttestationData] = set()
