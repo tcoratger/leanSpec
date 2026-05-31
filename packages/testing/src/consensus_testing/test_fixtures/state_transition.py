@@ -145,11 +145,7 @@ class StateTransitionTest(BaseConsensusFixture):
                 elif getattr(block_spec, "skip_slot_processing", False):
                     state = spec.process_block(state, block)
                 else:
-                    state = spec.state_transition(
-                        state,
-                        block=block,
-                        valid_signatures=True,
-                    )
+                    state = spec.state_transition(state, block=block)
 
             actual_post_state = state
         except (AssertionError, ValueError) as e:
