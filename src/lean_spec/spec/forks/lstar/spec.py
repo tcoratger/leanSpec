@@ -1309,6 +1309,32 @@ class LstarSpec(ForkProtocol):
                         attestations[validator_index] = attestation_data
         return attestations
 
+    def _accumulate_ancestor_weights(
+        self,
+        store: LstarStore,
+        attestations: dict[ValidatorIndex, AttestationData],
+        start_slot: Slot,
+    ) -> dict[Bytes32, int]:
+        """Accumulate one unit of voting weight per ancestor of each head vote.
+
+        For every vote, follow the chosen head upward through its ancestors.
+        Each visited block above the start slot accumulates one unit of weight
+        from that validator.
+
+        Climbing stops at the start slot or as soon as the chain leaves the
+        known tree, so partial views and ongoing sync are handled naturally.
+        """
+        weights: dict[Bytes32, int] = defaultdict(int)
+
+        for attestation_data in attestations.values():
+            current_root = attestation_data.head.root
+
+            while current_root in store.blocks and store.blocks[current_root].slot > start_slot:
+                weights[current_root] += 1
+                current_root = store.blocks[current_root].parent_root
+
+        return weights
+
     def compute_block_weights(self, store: LstarStore) -> dict[Bytes32, int]:
         """Compute attestation-based weight for each block above the finalized slot.
 
@@ -1319,16 +1345,9 @@ class LstarSpec(ForkProtocol):
             store, store.latest_known_aggregated_payloads
         )
 
-        start_slot = store.latest_finalized.slot
-
-        weights: dict[Bytes32, int] = defaultdict(int)
-
-        for attestation_data in attestations.values():
-            current_root = attestation_data.head.root
-
-            while current_root in store.blocks and store.blocks[current_root].slot > start_slot:
-                weights[current_root] += 1
-                current_root = store.blocks[current_root].parent_root
+        weights = self._accumulate_ancestor_weights(
+            store, attestations, store.latest_finalized.slot
+        )
 
         return dict(weights)
 
@@ -1366,23 +1385,8 @@ class LstarSpec(ForkProtocol):
         # This avoids repeated lookups inside the inner loop.
         start_slot = store.blocks[start_root].slot
 
-        # Prepare a table that will collect voting weight for each block.
-        #
-        # Each entry starts conceptually at zero and then accumulates contributions.
-        weights: dict[Bytes32, int] = defaultdict(int)
-
-        # For every vote, follow the chosen head upward through its ancestors.
-        #
-        # Each visited block accumulates one unit of weight from that validator.
-        for attestation_data in attestations.values():
-            current_root = attestation_data.head.root
-
-            # Climb towards the anchor while staying inside the known tree.
-            #
-            # This naturally handles partial views and ongoing sync.
-            while current_root in store.blocks and store.blocks[current_root].slot > start_slot:
-                weights[current_root] += 1
-                current_root = store.blocks[current_root].parent_root
+        # Collect voting weight for every block above the anchor slot.
+        weights = self._accumulate_ancestor_weights(store, attestations, start_slot)
 
         # Build the parent -> children adjacency.
         #
