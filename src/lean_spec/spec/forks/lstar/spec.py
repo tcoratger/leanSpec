@@ -139,28 +139,11 @@ class LstarSpec(ForkProtocol):
 
         # Step through each missing slot.
         while state.slot < target_slot:
-            # Per-Slot Housekeeping & Slot Increment
+            # Cache the pre-block state root into the latest header, then bump the slot.
             #
-            # This single statement performs two tasks for each empty slot
-            # in a single, immutable update:
-            #
-            # 1. State Root Caching (Conditional):
-            #    It checks if the latest block header has an empty state root.
-            #    This is true only for the *first* empty slot immediately
-            #    following a block.
-            #
-            #    - If it is empty, we must cache the pre-block state root
-            #    (the hash of the state *before* this slot increment) into that
-            #    header. We do this by:
-            #    a) Computing the root of the current (pre-block) state.
-            #    b) Creating a *new* header object with this computed state root
-            #       to be included in the update.
-            #
-            #    - If the state root is *not* empty, it means we are in a
-            #    sequence of empty slots, and we simply use the existing header.
-            #
-            # 2. Slot Increment:
-            #    It always increments the slot number by one.
+            # Invariant: the header's state root is empty only for the first empty
+            # slot after a block, so this caching happens at most once per block.
+            # Later empty slots in a run find a populated root and reuse it.
             needs_state_root = state.latest_block_header.state_root == Bytes32.zero()
             cached_state_root = (
                 hash_tree_root(state) if needs_state_root else state.latest_block_header.state_root
@@ -387,16 +370,12 @@ class LstarSpec(ForkProtocol):
         assert not any(root == ZERO_HASH for root in state.justifications_roots), (
             "zero hash is not allowed in justifications roots"
         )
-        justifications = (
-            {
-                root: state.justifications_validators[
-                    i * len(state.validators) : (i + 1) * len(state.validators)
-                ]
-                for i, root in enumerate(state.justifications_roots)
-            }
-            if state.justifications_roots
-            else {}
-        )
+        justifications = {
+            root: state.justifications_validators[
+                i * len(state.validators) : (i + 1) * len(state.validators)
+            ]
+            for i, root in enumerate(state.justifications_roots)
+        }
 
         # Track state changes to be applied at the end
         latest_justified = state.latest_justified
@@ -409,9 +388,10 @@ class LstarSpec(ForkProtocol):
         # Votes for zero hash are ignored, so we only need the most recent slot
         # where a root appears to decide whether it is still unfinalized.
         start_slot = int(finalized_slot) + 1
-        root_to_slot: dict[Bytes32, Slot] = {}
-        for i, root in enumerate(state.historical_block_hashes[start_slot:], start=start_slot):
-            root_to_slot[root] = Slot(i)
+        root_to_slot: dict[Bytes32, Slot] = {
+            root: Slot(i)
+            for i, root in enumerate(state.historical_block_hashes[start_slot:], start=start_slot)
+        }
 
         # Process each attestation independently.
         #
@@ -1747,7 +1727,7 @@ class LstarSpec(ForkProtocol):
         #
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
-        for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
+        for _ in range(int(JUSTIFICATION_LOOKBACK_SLOTS)):
             if store.blocks[target_block_root].slot > store.blocks[store.safe_target].slot:
                 target_block_root = store.blocks[target_block_root].parent_root
             else:

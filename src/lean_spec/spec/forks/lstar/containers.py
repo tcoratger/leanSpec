@@ -79,6 +79,34 @@ class AggregationBits(BaseBitlist):
 
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
 
+    @classmethod
+    def from_indices(cls, indices: set[ValidatorIndex]) -> "AggregationBits":
+        """
+        Build aggregation bits from a set of validator indices.
+
+        Returns:
+            Aggregation bits with exactly the given indices set to True.
+
+        Raises:
+            AssertionError: If no indices are provided.
+            AssertionError: If any index is outside the supported LIMIT.
+        """
+        # Require at least one validator for a valid aggregation.
+        if not indices:
+            raise AssertionError("Aggregated attestation must reference at least one validator")
+
+        # Convert to native ints once for bounds checking and membership tests.
+        ids = {int(i) for i in indices}
+
+        # Validate bounds: max index must be within registry limit.
+        if (max_id := max(ids)) >= cls.LIMIT:
+            raise AssertionError("Validator index out of range for aggregation bits")
+
+        # Build bit list:
+        # - True at positions present in indices,
+        # - False elsewhere.
+        return cls(data=[Boolean(i in ids) for i in range(max_id + 1)])
+
     def to_validator_indices(self) -> "ValidatorIndices":
         """
         Extract all validator indices encoded in these aggregation bits.
@@ -113,25 +141,7 @@ class ValidatorIndices(SSZList[ValidatorIndex]):
             `AssertionError`: If no indices are provided.
             `AssertionError`: If any index is outside the supported LIMIT.
         """
-        index_list = self.data
-
-        # Require at least one validator for a valid aggregation.
-        if not index_list:
-            raise AssertionError("Aggregated attestation must reference at least one validator")
-
-        # Convert to a set of native ints.
-        #
-        # This combines int conversion and deduplication in a single O(N) pass.
-        ids = {int(i) for i in index_list}
-
-        # Validate bounds: max index must be within registry limit.
-        if (max_id := max(ids)) >= AggregationBits.LIMIT:
-            raise AssertionError("Validator index out of range for aggregation bits")
-
-        # Build bit list:
-        # - True at positions present in indices,
-        # - False elsewhere.
-        return AggregationBits(data=[Boolean(i in ids) for i in range(max_id + 1)])
+        return AggregationBits.from_indices(set(self.data))
 
 
 class AggregationError(Exception):
@@ -200,7 +210,7 @@ class SingleMessageAggregate(Container):
         all_indices = {validator_index for validator_index, _, _ in raw_xmss}.union(
             *(child.participants.to_validator_indices() for child, _ in children)
         )
-        participants = ValidatorIndices(data=sorted(all_indices)).to_aggregation_bits()
+        participants = AggregationBits.from_indices(all_indices)
 
         # Phase 2: serialize inputs to the prover's wire format.
         raw_public_keys_ssz = [public_key.encode_bytes() for _, public_key, _ in raw_xmss]
