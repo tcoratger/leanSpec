@@ -63,7 +63,6 @@ def test_block_builder_fixed_point_advances_justification(
     fork_choice_test(
         steps=[
             # Chain setup
-            # ===========
             #
             #   genesis(0) -> block_1(1) -> block_2(2) -> block_3(3) -> block_4(4) -> block_5(5)
             #
@@ -119,7 +118,6 @@ def test_block_builder_fixed_point_advances_justification(
                 ),
             ),
             # Attestation delivery
-            # ====================
             #
             # Why gossip instead of in-block attestations?
             # In-block specs derive the source from the parent state's
@@ -201,7 +199,6 @@ def test_block_builder_fixed_point_advances_justification(
                 ),
             ),
             # Fixed-point block production
-            # ============================
             #
             # No explicit attestations -- the builder reads from the
             # "known" pool and iterates:

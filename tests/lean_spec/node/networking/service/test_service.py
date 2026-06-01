@@ -35,9 +35,7 @@ from tests.lean_spec.helpers import (
 
 FORK_DIGEST = "0x12345678"
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_network_service(
@@ -74,9 +72,7 @@ class _StopAfterFirstEvent(MockEventSource):
         return event
 
 
-# ---------------------------------------------------------------------------
 # run() lifecycle
-# ---------------------------------------------------------------------------
 
 
 class TestRunLifecycle:
@@ -155,9 +151,7 @@ class TestRunLifecycle:
         assert not svc.is_running
 
 
-# ---------------------------------------------------------------------------
 # Event dispatch — aggregated attestation
-# ---------------------------------------------------------------------------
 
 
 class TestAggregatedAttestationDispatch:
@@ -188,9 +182,7 @@ class TestAggregatedAttestationDispatch:
             mock_handler.assert_awaited_once_with(signed_aggregate, peer_id)
 
 
-# ---------------------------------------------------------------------------
 # Event dispatch — secondary events
-# ---------------------------------------------------------------------------
 
 
 class TestSecondaryEventDispatch:
@@ -304,9 +296,7 @@ class TestPeerConnectionEvents:
         assert peer_id_2 not in sync_service.peer_manager
 
 
-# ---------------------------------------------------------------------------
 # Publish methods
-# ---------------------------------------------------------------------------
 
 
 class TestPublishBlock:
@@ -412,9 +402,7 @@ class TestPublishAggregatedAttestation:
         assert data == compress(signed_aggregate.encode_bytes())
 
 
-# ---------------------------------------------------------------------------
 # Edge cases for _handle_event match exhaustiveness
-# ---------------------------------------------------------------------------
 
 
 class TestHandleEventEdgeCases:
@@ -450,9 +438,7 @@ class TestHandleEventEdgeCases:
         assert peer_id_2 not in sync_service.peer_manager
 
 
-# ---------------------------------------------------------------------------
 # Constructor / init field defaults
-# ---------------------------------------------------------------------------
 
 
 class TestNetworkServiceInit:

@@ -30,9 +30,7 @@ from lean_spec.node.networking.transport.quic.tls import (
     generate_libp2p_certificate,
 )
 
-# ---------------------------------------------------------------------------
 # Shared fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -41,9 +39,7 @@ def identity_key() -> IdentityKeypair:
     return IdentityKeypair.generate()
 
 
-# ---------------------------------------------------------------------------
 # Constants — sanity checks for protocol-defined values
-# ---------------------------------------------------------------------------
 
 
 class TestConstants:
@@ -62,14 +58,12 @@ class TestConstants:
         assert KeyType.SECP256K1 == 2
 
 
-# ---------------------------------------------------------------------------
 # ASN.1 length encoding — must cover all 3 branches
 #
 # DER length encoding:
 #   - Short form:    length < 128 → single byte
 #   - Long 1-byte:   128 ≤ length < 256 → 0x81 + 1 byte
 #   - Long 2-byte:   length ≥ 256 → 0x82 + 2 bytes (big-endian)
-# ---------------------------------------------------------------------------
 
 
 class TestEncodeAsn1Length:
@@ -115,9 +109,7 @@ class TestEncodeAsn1Length:
         assert _encode_asn1_length(length) == expected
 
 
-# ---------------------------------------------------------------------------
 # ASN.1 OCTET STRING encoding
-# ---------------------------------------------------------------------------
 
 
 class TestEncodeAsn1OctetString:
@@ -142,9 +134,7 @@ class TestEncodeAsn1OctetString:
         assert result[4:] == data
 
 
-# ---------------------------------------------------------------------------
 # ASN.1 SEQUENCE encoding
-# ---------------------------------------------------------------------------
 
 
 class TestEncodeAsn1Sequence:
@@ -162,9 +152,7 @@ class TestEncodeAsn1Sequence:
         assert result == bytes([0x30, 0])
 
 
-# ---------------------------------------------------------------------------
 # ASN.1 SignedKey — SEQUENCE { OCTET STRING, OCTET STRING }
-# ---------------------------------------------------------------------------
 
 
 class TestEncodeAsn1SignedKey:
@@ -191,9 +179,7 @@ class TestEncodeAsn1SignedKey:
         assert rest2 == b""
 
 
-# ---------------------------------------------------------------------------
 # Extension payload — protobuf + ASN.1 wrapping
-# ---------------------------------------------------------------------------
 
 
 class TestCreateExtensionPayload:
@@ -254,9 +240,7 @@ class TestCreateExtensionPayload:
         assert identity_key.public_key.verify(expected_message, signature)
 
 
-# ---------------------------------------------------------------------------
 # Full certificate generation
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateLibp2pCertificate:
@@ -367,11 +351,9 @@ class TestGenerateLibp2pCertificate:
         assert reparsed == certificate
 
 
-# ---------------------------------------------------------------------------
 # DER parsing helpers (test-only)
 #
 # Minimal DER TLV parser for verifying hand-encoded ASN.1 output.
-# ---------------------------------------------------------------------------
 
 
 def _parse_der_length(data: bytes, offset: int) -> tuple[int, int]:
