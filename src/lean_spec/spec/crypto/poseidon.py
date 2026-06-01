@@ -13,7 +13,7 @@ from typing import Self
 import numpy as np
 from numba import njit
 from numpy.typing import NDArray
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from ...base import StrictBaseModel
 from .koalabear import Fp, P
@@ -1347,30 +1347,26 @@ class PoseidonParams(StrictBaseModel):
     - This minimum is not enforced here. Callers must choose secure parameters.
     """
 
-    width: int = Field(gt=0, description="The size of the state (t).")
-    rounds_f: int = Field(gt=0, description="Total number of 'full' rounds.")
-    rounds_p: int = Field(ge=0, description="Total number of 'partial' rounds.")
-    mds_first_row: list[Fp] = Field(
-        min_length=1,
-        description="First row of the circulant MDS matrix.",
-    )
-    round_constants: list[Fp] = Field(
-        min_length=1,
-        description="The list of pre-computed constants for all rounds.",
-    )
+    width: int = Field(gt=0)
+    """The size of the state (t)."""
 
-    @field_validator("rounds_f")
-    @classmethod
-    def _rounds_f_must_be_even(cls, value: int) -> int:
-        """Require an even full-round count.
+    rounds_f: int = Field(gt=0, multiple_of=2)
+    """Total number of 'full' rounds.
 
-        - The permutation runs equal halves of full rounds before and after the partial middle.
-        - An odd count silently drops one full round and orphans a width-sized block of constants.
-        - The original Poseidon design assumes an even split.
-        """
-        if value % 2 != 0:
-            raise ValueError("Full-round count must be even.")
-        return value
+    Must be even:
+    - The permutation runs equal halves of full rounds before and after the partial middle.
+    - An odd count silently drops one full round and orphans a width-sized block of constants.
+    - The original Poseidon design assumes an even split.
+    """
+
+    rounds_p: int = Field(ge=0)
+    """Total number of 'partial' rounds."""
+
+    mds_first_row: list[Fp] = Field(min_length=1)
+    """First row of the circulant MDS matrix."""
+
+    round_constants: list[Fp] = Field(min_length=1)
+    """The list of pre-computed constants for all rounds."""
 
     @model_validator(mode="after")
     def check_lengths(self) -> Self:
