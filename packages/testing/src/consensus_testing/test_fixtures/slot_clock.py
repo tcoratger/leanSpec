@@ -7,13 +7,13 @@ to coordinate block proposals and attestations.
 
 from typing import Any, ClassVar
 
-from lean_spec.node.chain.clock import Interval, SlotClock
-from lean_spec.node.chain.config import (
+from lean_spec.node.chain.clock import SlotClock
+from lean_spec.spec.forks import Interval, Slot
+from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
     SECONDS_PER_SLOT,
 )
-from lean_spec.spec.forks import Slot
 from lean_spec.spec.ssz import Uint64
 
 from .base import BaseConsensusFixture
@@ -66,10 +66,10 @@ class SlotClockTest(BaseConsensusFixture):
 
     def _make_from_unix_time(self) -> dict[str, Any]:
         """Convert unix timestamp to interval count since genesis."""
-        unix_seconds = Uint64(self.input["unixSeconds"])
         genesis_time = Uint64(self.input["genesisTime"])
-        interval = Interval.from_unix_time(unix_seconds, genesis_time)
-        return {"interval": int(interval)}
+        unix_seconds = float(self.input["unixSeconds"])
+        clock = SlotClock(genesis_time=genesis_time, time_fn=lambda: unix_seconds)
+        return {"interval": int(clock.total_intervals())}
 
     def _make_from_slot(self) -> dict[str, Any]:
         """Convert slot number to interval at that slot's start."""

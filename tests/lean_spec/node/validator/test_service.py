@@ -8,7 +8,6 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.node.chain.clock import SlotClock
-from lean_spec.node.chain.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.node.sync.block_cache import BlockCache
 from lean_spec.node.sync.peer_manager import PeerManager
 from lean_spec.node.sync.service import SyncService
@@ -19,6 +18,7 @@ from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,

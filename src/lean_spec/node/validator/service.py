@@ -37,7 +37,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lean_spec.node.chain.clock import Interval, SlotClock
+from lean_spec.node.chain.clock import SlotClock
 from lean_spec.node.sync import SyncService
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME
@@ -45,6 +45,7 @@ from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.spec.forks import (
     AttestationData,
     Block,
+    Interval,
     LstarSpec,
     SignedAttestation,
     SignedBlock,

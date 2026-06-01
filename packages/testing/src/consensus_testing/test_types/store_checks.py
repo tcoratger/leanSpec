@@ -3,9 +3,8 @@
 from typing import Literal
 
 from lean_spec.base import CamelModel
-from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AttestationData, Block, Store
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ZERO_HASH, Bytes32

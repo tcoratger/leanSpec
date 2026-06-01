@@ -12,7 +12,6 @@ import time
 from dataclasses import dataclass, field
 from typing import cast
 
-from lean_spec.node.chain.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.client import LiveNetworkEventSource
 from lean_spec.node.networking.gossipsub.types import TopicId
@@ -25,6 +24,7 @@ from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME, SecretKey
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.spec.forks.lstar.containers import Validator, Validators
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes52, Uint64

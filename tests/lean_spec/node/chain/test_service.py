@@ -6,10 +6,9 @@ from dataclasses import dataclass, field
 from unittest.mock import patch
 
 from lean_spec.node.chain import SlotClock
-from lean_spec.node.chain.clock import Interval
-from lean_spec.node.chain.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.node.chain.service import ChainService
-from lean_spec.spec.forks import Slot
+from lean_spec.spec.forks import Interval, Slot
+from lean_spec.spec.forks.lstar.config import MILLISECONDS_PER_INTERVAL
 from lean_spec.spec.forks.lstar.containers import SignedAggregatedAttestation
 from lean_spec.spec.ssz import ZERO_HASH, Bytes32, Uint64
 from tests.lean_spec.helpers.mocks import StoreInterceptingSpec
