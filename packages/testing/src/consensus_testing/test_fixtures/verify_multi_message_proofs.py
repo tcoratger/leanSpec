@@ -169,9 +169,7 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
             slots.append(attestation_data.slot)
             public_keys = [key_manager.get_public_keys(i)[0] for i in validator_indices]
             public_keys_per_message.append(public_keys)
-            aggregation_bits_per_message.append(
-                AggregationBits.from_indices(validator_indices)
-            )
+            aggregation_bits_per_message.append(AggregationBits.from_indices(validator_indices))
             components.append(
                 self._single_message_aggregate(
                     key_manager, attestation_data, validator_indices, public_keys
