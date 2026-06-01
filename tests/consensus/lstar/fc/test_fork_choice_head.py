@@ -571,7 +571,6 @@ def test_head_selection_by_weight_not_depth(
                 checks=StoreChecks(head_slot=Slot(1)),
             ),
             # Fork A: 5 blocks deep, minimal attestation weight
-            # ===================================================
             #
             #   common(1) -> a_2 -> a_3 -> a_4 -> a_5 -> a_6
             #
@@ -602,7 +601,6 @@ def test_head_selection_by_weight_not_depth(
                 checks=StoreChecks(head_slot=Slot(6), head_root_label="a_6"),
             ),
             # Fork B: 2 blocks deep, heavy attestation weight
-            # =================================================
             #
             #   common(1) -> b_9 -> b_12
             #
@@ -694,7 +692,6 @@ def test_fork_from_before_finalization_not_considered(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
             # Canonical justification / finalization chain
-            # =============================================
             #
             #   genesis -> 1 -> 2 -> 3 -> 4 -> 5
             #
@@ -796,7 +793,6 @@ def test_fork_from_before_finalization_not_considered(
                 ),
             ),
             # Dead fork with majority weight
-            # ================================
             #
             #   block_2(2) -> dead_6(6) -> dead_7(7)
             #

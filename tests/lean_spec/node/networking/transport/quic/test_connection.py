@@ -33,9 +33,7 @@ from lean_spec.node.networking.transport.quic.stream import (
 )
 from lean_spec.node.networking.types import ProtocolId
 
-# ---------------------------------------------------------------------------
 # Shared fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -70,10 +68,8 @@ def quic_connection(mock_protocol: MagicMock, peer_a: PeerId) -> QuicConnection:
     )
 
 
-# ---------------------------------------------------------------------------
 # Multiaddr detection — per the multiaddr spec, protocol names are
 # case-sensitive and always lowercase.
-# ---------------------------------------------------------------------------
 
 
 class TestIsQuicMultiaddr:
@@ -113,9 +109,7 @@ class TestIsQuicMultiaddr:
         assert is_quic_multiaddr(multiaddr) == expected
 
 
-# ---------------------------------------------------------------------------
 # Multiaddr parsing
-# ---------------------------------------------------------------------------
 
 
 class TestParseMultiaddr:
@@ -172,13 +166,11 @@ class TestParseMultiaddr:
         assert (host, port, transport) == ("10.0.0.1", 3000, None)
 
 
-# ---------------------------------------------------------------------------
 # ALPN protocol — per the libp2p TLS spec
 #
 # https://github.com/libp2p/specs/blob/master/tls/tls.md
 # "Endpoints MUST NOT send (and MUST NOT accept) any ALPN extension that
 #  does not include "libp2p" as the ALPN protocol string."
-# ---------------------------------------------------------------------------
 
 
 class TestAlpnProtocol:
@@ -193,13 +185,11 @@ class TestAlpnProtocol:
         assert LIBP2P_ALPN_PROTOCOL == "libp2p"
 
 
-# ---------------------------------------------------------------------------
 # QuicStream — read behavior per RFC 9000 Section 3
 #
 # - Data arrives in order per-stream.
 # - FIN (end_stream=True) signals graceful half-close — all data delivered.
 # - RESET_STREAM signals abrupt termination — data may be lost.
-# ---------------------------------------------------------------------------
 
 
 class TestQuicStreamRead:
@@ -237,12 +227,10 @@ class TestQuicStreamRead:
         assert await quic_stream.read() == b""
 
 
-# ---------------------------------------------------------------------------
 # QuicStream — RESET_STREAM handling per RFC 9000 Section 3.2
 #
 # RESET_STREAM is an error/abort, NOT a clean end-of-stream.
 # Data may have been lost. The application must be notified.
-# ---------------------------------------------------------------------------
 
 
 class TestQuicStreamReset:
@@ -280,11 +268,9 @@ class TestQuicStreamReset:
         assert issubclass(QuicStreamResetError, QuicTransportError)
 
 
-# ---------------------------------------------------------------------------
 # QuicStream — write behavior per RFC 9000 Section 3
 #
 # After FIN is sent (or stream is closed), further writes must fail.
-# ---------------------------------------------------------------------------
 
 
 class TestQuicStreamWrite:
@@ -305,11 +291,9 @@ class TestQuicStreamWrite:
             await quic_stream.write(b"data")
 
 
-# ---------------------------------------------------------------------------
 # QuicStream — half-close (FIN) per RFC 9000 Section 3
 #
 # Sending FIN closes the write side. Read side stays open.
-# ---------------------------------------------------------------------------
 
 
 class TestQuicStreamFinishWrite:
@@ -335,9 +319,7 @@ class TestQuicStreamFinishWrite:
         mock_protocol._quic.send_stream_data.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
 # QuicStream — full close (both directions)
-# ---------------------------------------------------------------------------
 
 
 class TestQuicStreamClose:
@@ -363,13 +345,11 @@ class TestQuicStreamClose:
         mock_protocol._quic.send_stream_data.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
 # QuicConnection — event handling per RFC 9000
 #
 # - StreamDataReceived: data from peer, may create new remote-initiated stream
 # - StreamReset: abrupt stream termination by peer
 # - ConnectionTerminated: all streams implicitly closed (RFC 9000 Section 10)
-# ---------------------------------------------------------------------------
 
 
 class TestQuicConnectionHandleEvent:
@@ -469,9 +449,7 @@ class TestQuicConnectionHandleEvent:
         assert s2._reset_error.error_code == 0
 
 
-# ---------------------------------------------------------------------------
 # QuicConnection — open/accept/close
-# ---------------------------------------------------------------------------
 
 
 class TestQuicConnectionOpenStream:
@@ -532,12 +510,10 @@ class TestQuicConnectionClose:
         mock_protocol._quic.close.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
 # LibP2PQuicProtocol — handshake, event routing, buffering
 #
 # Per libp2p-QUIC spec, ALPN protocol is "libp2p".
 # Events between handshake completion and connection assignment must be buffered.
-# ---------------------------------------------------------------------------
 
 
 class TestLibP2PQuicProtocol:
