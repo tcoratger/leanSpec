@@ -13,7 +13,6 @@ from lean_spec.spec.forks import (
     Checkpoint,
     Slot,
     ValidatorIndex,
-    ValidatorIndices,
 )
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
@@ -171,7 +170,7 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
             public_keys = [key_manager.get_public_keys(i)[0] for i in validator_indices]
             public_keys_per_message.append(public_keys)
             aggregation_bits_per_message.append(
-                ValidatorIndices(data=validator_indices).to_aggregation_bits()
+                AggregationBits.from_indices(validator_indices)
             )
             components.append(
                 self._single_message_aggregate(
