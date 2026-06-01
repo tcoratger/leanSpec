@@ -1,5 +1,6 @@
 """The container types for the Lean consensus specification."""
 
+from collections.abc import Iterable
 from typing import Final, NamedTuple, Self
 
 from lean_multisig_py import (
@@ -79,6 +80,36 @@ class AggregationBits(BaseBitlist):
 
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
 
+    @classmethod
+    def from_indices(cls, indices: Iterable[ValidatorIndex]) -> "AggregationBits":
+        """
+        Build aggregation bits from validator indices.
+
+        Returns:
+            Aggregation bits with exactly the given indices set to True.
+
+        Raises:
+            AssertionError: If no indices are provided.
+            AssertionError: If any index is outside the supported LIMIT.
+        """
+        # Convert to native ints once for bounds checking and membership tests.
+        #
+        # This also deduplicates and lets any iterable be passed in.
+        ids = {int(i) for i in indices}
+
+        # Require at least one validator for a valid aggregation.
+        if not ids:
+            raise AssertionError("Aggregated attestation must reference at least one validator")
+
+        # Validate bounds: max index must be within registry limit.
+        if (max_id := max(ids)) >= cls.LIMIT:
+            raise AssertionError("Validator index out of range for aggregation bits")
+
+        # Build bit list:
+        # - True at positions present in indices,
+        # - False elsewhere.
+        return cls(data=[Boolean(i in ids) for i in range(max_id + 1)])
+
     def to_validator_indices(self) -> "ValidatorIndices":
         """
         Extract all validator indices encoded in these aggregation bits.
@@ -101,37 +132,6 @@ class ValidatorIndices(SSZList[ValidatorIndex]):
     """List of validator indices up to the registry limit."""
 
     LIMIT = int(VALIDATOR_REGISTRY_LIMIT)
-
-    def to_aggregation_bits(self) -> AggregationBits:
-        """
-        Convert to aggregation bits marking which validators are present.
-
-        Returns:
-            `AggregationBits` with the corresponding indices set to True.
-
-        Raises:
-            `AssertionError`: If no indices are provided.
-            `AssertionError`: If any index is outside the supported LIMIT.
-        """
-        index_list = self.data
-
-        # Require at least one validator for a valid aggregation.
-        if not index_list:
-            raise AssertionError("Aggregated attestation must reference at least one validator")
-
-        # Convert to a set of native ints.
-        #
-        # This combines int conversion and deduplication in a single O(N) pass.
-        ids = {int(i) for i in index_list}
-
-        # Validate bounds: max index must be within registry limit.
-        if (max_id := max(ids)) >= AggregationBits.LIMIT:
-            raise AssertionError("Validator index out of range for aggregation bits")
-
-        # Build bit list:
-        # - True at positions present in indices,
-        # - False elsewhere.
-        return AggregationBits(data=[Boolean(i in ids) for i in range(max_id + 1)])
 
 
 class AggregationError(Exception):
@@ -200,7 +200,7 @@ class SingleMessageAggregate(Container):
         all_indices = {validator_index for validator_index, _, _ in raw_xmss}.union(
             *(child.participants.to_validator_indices() for child, _ in children)
         )
-        participants = ValidatorIndices(data=sorted(all_indices)).to_aggregation_bits()
+        participants = AggregationBits.from_indices(all_indices)
 
         # Phase 2: serialize inputs to the prover's wire format.
         raw_public_keys_ssz = [public_key.encode_bytes() for _, public_key, _ in raw_xmss]
@@ -222,8 +222,8 @@ class SingleMessageAggregate(Container):
                 children_bytes or None,
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(str(exc)) from exc
+        except Exception as exception:
+            raise AggregationError(str(exception)) from exception
 
         return cls(
             participants=participants,
@@ -267,8 +267,10 @@ class SingleMessageAggregate(Container):
                 bytes(self.proof.data),
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(f"single-message aggregate verification failed: {exc}") from exc
+        except Exception as exception:
+            raise AggregationError(
+                f"single-message aggregate verification failed: {exception}"
+            ) from exception
 
     def __hash__(self) -> int:
         """Content-deterministic hash via SSZ encoding."""
@@ -341,8 +343,8 @@ class MultiMessageAggregate(Container):
                 LOG_INV_RATE,
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(str(exc)) from exc
+        except Exception as exception:
+            raise AggregationError(str(exception)) from exception
 
         return cls(proof=ByteList512KiB(data=multi_message_aggregate_wire))
 
@@ -391,8 +393,10 @@ class MultiMessageAggregate(Container):
                 LOG_INV_RATE,
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(f"multi-message aggregate split failed: {exc}") from exc
+        except Exception as exception:
+            raise AggregationError(
+                f"multi-message aggregate split failed: {exception}"
+            ) from exception
 
         return SingleMessageAggregate(
             participants=participants,
@@ -446,8 +450,10 @@ class MultiMessageAggregate(Container):
                 bytes(self.proof.data),
                 mode=LEAN_ENV,
             )
-        except Exception as exc:
-            raise AggregationError(f"multi-message aggregate verification failed: {exc}") from exc
+        except Exception as exception:
+            raise AggregationError(
+                f"multi-message aggregate verification failed: {exception}"
+            ) from exception
 
     def __hash__(self) -> int:
         """Content-deterministic hash via SSZ encoding."""

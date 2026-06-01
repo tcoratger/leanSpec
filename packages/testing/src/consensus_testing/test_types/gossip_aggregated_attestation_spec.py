@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lean_spec.base import CamelModel
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
@@ -186,7 +186,7 @@ class GossipAggregatedAttestationSpec(CamelModel):
         if not self.valid_signature:
             placeholder = ByteList512KiB(data=b"\x00" * 32)
             proof = SingleMessageAggregate(
-                participants=ValidatorIndices(data=validator_indices).to_aggregation_bits(),
+                participants=AggregationBits.from_indices(validator_indices),
                 proof=placeholder,
             )
             return SignedAggregatedAttestation(data=attestation_data, proof=proof)
@@ -203,7 +203,7 @@ class GossipAggregatedAttestationSpec(CamelModel):
         # The store must detect and reject this inconsistency.
         if self.signer_ids and self.signer_ids != self.validator_indices:
             proof = SingleMessageAggregate(
-                participants=ValidatorIndices(data=validator_indices).to_aggregation_bits(),
+                participants=AggregationBits.from_indices(validator_indices),
                 proof=proof.proof,
             )
 

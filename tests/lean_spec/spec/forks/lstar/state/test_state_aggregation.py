@@ -264,7 +264,7 @@ def test_build_block_state_root_valid_when_signatures_split(
         "Compacted attestation should cover all three validators"
     )
 
-    result_state = spec.state_transition(pre_state, block, valid_signatures=True)
+    result_state = spec.state_transition(pre_state, block)
 
     assert result_state.slot == Slot(1)
     assert result_state.latest_block_header.slot == Slot(1)

@@ -30,7 +30,7 @@ from lean_spec.spec.crypto.xmss.types import (
     HashTreeOpening,
     Randomness,
 )
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, State, Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -232,7 +232,7 @@ def make_aggregated_attestation(
     )
 
     return AggregatedAttestation(
-        aggregation_bits=ValidatorIndices(data=participant_ids).to_aggregation_bits(),
+        aggregation_bits=AggregationBits.from_indices(participant_ids),
         data=data,
     )
 

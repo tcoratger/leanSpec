@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from pydantic import ConfigDict, PrivateAttr, field_serializer
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import ValidatorIndices
+from lean_spec.spec.forks import AggregationBits
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -145,11 +145,7 @@ class StateTransitionTest(BaseConsensusFixture):
                 elif getattr(block_spec, "skip_slot_processing", False):
                     state = spec.process_block(state, block)
                 else:
-                    state = spec.state_transition(
-                        state,
-                        block=block,
-                        valid_signatures=True,
-                    )
+                    state = spec.state_transition(state, block=block)
 
             actual_post_state = state
         except (AssertionError, ValueError) as e:
@@ -278,9 +274,7 @@ class StateTransitionTest(BaseConsensusFixture):
         if spec.forced_attestations:
             forced = [
                 AggregatedAttestation(
-                    aggregation_bits=ValidatorIndices(
-                        data=fa.validator_indices
-                    ).to_aggregation_bits(),
+                    aggregation_bits=AggregationBits.from_indices(fa.validator_indices),
                     data=fa.build_attestation_data(block_registry, state),
                 )
                 for fa in spec.forced_attestations

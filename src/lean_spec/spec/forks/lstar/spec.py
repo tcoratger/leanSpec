@@ -139,28 +139,11 @@ class LstarSpec(ForkProtocol):
 
         # Step through each missing slot.
         while state.slot < target_slot:
-            # Per-Slot Housekeeping & Slot Increment
+            # Cache the pre-block state root into the latest header, then bump the slot.
             #
-            # This single statement performs two tasks for each empty slot
-            # in a single, immutable update:
-            #
-            # 1. State Root Caching (Conditional):
-            #    It checks if the latest block header has an empty state root.
-            #    This is true only for the *first* empty slot immediately
-            #    following a block.
-            #
-            #    - If it is empty, we must cache the pre-block state root
-            #    (the hash of the state *before* this slot increment) into that
-            #    header. We do this by:
-            #    a) Computing the root of the current (pre-block) state.
-            #    b) Creating a *new* header object with this computed state root
-            #       to be included in the update.
-            #
-            #    - If the state root is *not* empty, it means we are in a
-            #    sequence of empty slots, and we simply use the existing header.
-            #
-            # 2. Slot Increment:
-            #    It always increments the slot number by one.
+            # Invariant: the header's state root is empty only for the first empty
+            # slot after a block, so this caching happens at most once per block.
+            # Later empty slots in a run find a populated root and reuse it.
             needs_state_root = state.latest_block_header.state_root == Bytes32.zero()
             cached_state_root = (
                 hash_tree_root(state) if needs_state_root else state.latest_block_header.state_root
@@ -243,8 +226,8 @@ class LstarSpec(ForkProtocol):
         #   updates rely entirely on validator attestations which are processed
         #   later in the block body.
         if is_genesis_parent:
-            state.latest_justified = Checkpoint(slot=state.latest_justified.slot, root=parent_root)
-            state.latest_finalized = Checkpoint(slot=state.latest_finalized.slot, root=parent_root)
+            state.latest_justified = Checkpoint(slot=Slot(0), root=parent_root)
+            state.latest_finalized = Checkpoint(slot=Slot(0), root=parent_root)
 
         # Historical Data Management
 
@@ -387,16 +370,12 @@ class LstarSpec(ForkProtocol):
         assert not any(root == ZERO_HASH for root in state.justifications_roots), (
             "zero hash is not allowed in justifications roots"
         )
-        justifications = (
-            {
-                root: state.justifications_validators[
-                    i * len(state.validators) : (i + 1) * len(state.validators)
-                ]
-                for i, root in enumerate(state.justifications_roots)
-            }
-            if state.justifications_roots
-            else {}
-        )
+        justifications = {
+            root: state.justifications_validators[
+                i * len(state.validators) : (i + 1) * len(state.validators)
+            ]
+            for i, root in enumerate(state.justifications_roots)
+        }
 
         # Track state changes to be applied at the end
         latest_justified = state.latest_justified
@@ -409,9 +388,10 @@ class LstarSpec(ForkProtocol):
         # Votes for zero hash are ignored, so we only need the most recent slot
         # where a root appears to decide whether it is still unfinalized.
         start_slot = int(finalized_slot) + 1
-        root_to_slot: dict[Bytes32, Slot] = {}
-        for i, root in enumerate(state.historical_block_hashes[start_slot:], start=start_slot):
-            root_to_slot[root] = Slot(i)
+        root_to_slot: dict[Bytes32, Slot] = {
+            root: Slot(i)
+            for i, root in enumerate(state.historical_block_hashes[start_slot:], start=start_slot)
+        }
 
         # Process each attestation independently.
         #
@@ -522,13 +502,16 @@ class LstarSpec(ForkProtocol):
                 # Finalization requires a continuous chain of trust from the
                 # previously finalized checkpoint up to the new justified point.
                 #
-                # If every slot in between is justifiable relative to the old
-                # finalized point, then the earlier source checkpoint becomes finalized.
+                # Finalization advances only when the source lies past the old finalized point.
+                # A source at or behind that boundary is already final.
+                # Such a source may still justify a newer target, but it must not re-finalize.
+                # When the source is newer and every slot in between is justifiable
+                # relative to that old finalized point, the source checkpoint becomes finalized.
                 #
                 # In short:
                 #
                 #     If there is no break in the chain, advance finalization.
-                if not any(
+                if source.slot > finalized_slot and not any(
                     Slot(slot).is_justifiable_after(finalized_slot)
                     for slot in range(source.slot + Slot(1), target.slot)
                 ):
@@ -583,24 +566,20 @@ class LstarSpec(ForkProtocol):
         self,
         state: State,
         block: Block,
-        valid_signatures: bool = True,
     ) -> State:
         """
         Apply the complete state transition function for a block.
 
         This method represents the full state transition function:
-        1. Validate signatures if required
-        2. Process slots up to the block's slot
-        3. Process the block header and body
-        4. Validate the computed state root
+        1. Process slots up to the block's slot
+        2. Process the block header and body
+        3. Validate the computed state root
+
+        Signatures are verified outside this function, before it is called.
 
         Raises:
-            AssertionError: If signature validation fails or state root is invalid.
+            AssertionError: If the computed state root is invalid.
         """
-        # Validate signatures if required
-        if not valid_signatures:
-            raise AssertionError("Block signatures must be valid")
-
         with observe_state_transition():
             # First, process any intermediate slots.
             advanced = self.process_slots(state, block.slot)
@@ -645,7 +624,7 @@ class LstarSpec(ForkProtocol):
             # updates the justified root to parent_root. Apply the same
             # derivation here so attestation sources match.
             if state.latest_block_header.slot == Slot(0):
-                current_justified = Checkpoint(slot=state.latest_justified.slot, root=parent_root)
+                current_justified = Checkpoint(slot=Slot(0), root=parent_root)
             else:
                 current_justified = state.latest_justified
 
@@ -904,8 +883,8 @@ class LstarSpec(ForkProtocol):
                 public_keys_per_message=public_keys_per_message,
                 messages=message_bindings,
             )
-        except AggregationError as exc:
-            raise AssertionError(f"Block proof verification failed: {exc}") from exc
+        except AggregationError as exception:
+            raise AssertionError(f"Block proof verification failed: {exception}") from exception
 
         return True
 
@@ -1175,10 +1154,10 @@ class LstarSpec(ForkProtocol):
                 message=hash_tree_root(data),
                 slot=data.slot,
             )
-        except AggregationError as exc:
+        except AggregationError as exception:
             raise AssertionError(
-                f"Committee aggregation signature verification failed: {exc}"
-            ) from exc
+                f"Committee aggregation signature verification failed: {exception}"
+            ) from exception
 
         store.latest_new_aggregated_payloads.setdefault(data, set()).add(proof)
 
@@ -1236,11 +1215,13 @@ class LstarSpec(ForkProtocol):
                 f"maximum is {MAX_ATTESTATIONS_DATA}"
             )
 
-            # Validate cryptographic signatures
-            valid_signatures = self.verify_signatures(signed_block, parent_state.validators)
+            # Validate cryptographic signatures.
+            #
+            # This raises on any invalid signature, aborting the import.
+            self.verify_signatures(signed_block, parent_state.validators)
 
             # Execute state transition function to compute post-block state
-            post_state = self.state_transition(parent_state, block, valid_signatures)
+            post_state = self.state_transition(parent_state, block)
 
             # Propagate checkpoint advances from the post-state.
             #
@@ -1306,6 +1287,32 @@ class LstarSpec(ForkProtocol):
                         attestations[validator_index] = attestation_data
         return attestations
 
+    def _accumulate_ancestor_weights(
+        self,
+        store: LstarStore,
+        attestations: dict[ValidatorIndex, AttestationData],
+        start_slot: Slot,
+    ) -> dict[Bytes32, int]:
+        """Accumulate one unit of voting weight per ancestor of each head vote.
+
+        For every vote, follow the chosen head upward through its ancestors.
+        Each visited block above the start slot accumulates one unit of weight
+        from that validator.
+
+        Climbing stops at the start slot or as soon as the chain leaves the
+        known tree, so partial views and ongoing sync are handled naturally.
+        """
+        weights: dict[Bytes32, int] = defaultdict(int)
+
+        for attestation_data in attestations.values():
+            current_root = attestation_data.head.root
+
+            while current_root in store.blocks and store.blocks[current_root].slot > start_slot:
+                weights[current_root] += 1
+                current_root = store.blocks[current_root].parent_root
+
+        return weights
+
     def compute_block_weights(self, store: LstarStore) -> dict[Bytes32, int]:
         """Compute attestation-based weight for each block above the finalized slot.
 
@@ -1316,16 +1323,9 @@ class LstarSpec(ForkProtocol):
             store, store.latest_known_aggregated_payloads
         )
 
-        start_slot = store.latest_finalized.slot
-
-        weights: dict[Bytes32, int] = defaultdict(int)
-
-        for attestation_data in attestations.values():
-            current_root = attestation_data.head.root
-
-            while current_root in store.blocks and store.blocks[current_root].slot > start_slot:
-                weights[current_root] += 1
-                current_root = store.blocks[current_root].parent_root
+        weights = self._accumulate_ancestor_weights(
+            store, attestations, store.latest_finalized.slot
+        )
 
         return dict(weights)
 
@@ -1363,23 +1363,8 @@ class LstarSpec(ForkProtocol):
         # This avoids repeated lookups inside the inner loop.
         start_slot = store.blocks[start_root].slot
 
-        # Prepare a table that will collect voting weight for each block.
-        #
-        # Each entry starts conceptually at zero and then accumulates contributions.
-        weights: dict[Bytes32, int] = defaultdict(int)
-
-        # For every vote, follow the chosen head upward through its ancestors.
-        #
-        # Each visited block accumulates one unit of weight from that validator.
-        for attestation_data in attestations.values():
-            current_root = attestation_data.head.root
-
-            # Climb towards the anchor while staying inside the known tree.
-            #
-            # This naturally handles partial views and ongoing sync.
-            while current_root in store.blocks and store.blocks[current_root].slot > start_slot:
-                weights[current_root] += 1
-                current_root = store.blocks[current_root].parent_root
+        # Collect voting weight for every block above the anchor slot.
+        weights = self._accumulate_ancestor_weights(store, attestations, start_slot)
 
         # Build the parent -> children adjacency.
         #
@@ -1742,7 +1727,7 @@ class LstarSpec(ForkProtocol):
         #
         # This ensures the target doesn't advance too far ahead of safe target,
         # providing a balance between liveness and safety.
-        for _ in range(JUSTIFICATION_LOOKBACK_SLOTS):
+        for _ in range(int(JUSTIFICATION_LOOKBACK_SLOTS)):
             if store.blocks[target_block_root].slot > store.blocks[store.safe_target].slot:
                 target_block_root = store.blocks[target_block_root].parent_root
             else:

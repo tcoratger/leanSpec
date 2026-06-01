@@ -424,8 +424,8 @@ class LiveNetworkEventSource:
             logger.info("Connecting to bootnode %s", multiaddr)
             try:
                 peer_id = await self.dial(multiaddr)
-            except Exception as exc:
-                logger.warning("Failed to connect to bootnode %s: %s", multiaddr, exc)
+            except Exception as exception:
+                logger.warning("Failed to connect to bootnode %s: %s", multiaddr, exception)
                 continue
             if peer_id is not None:
                 logger.info("Connected to bootnode, peer_id=%s", peer_id)

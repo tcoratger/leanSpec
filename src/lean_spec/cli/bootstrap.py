@@ -118,11 +118,11 @@ class NodeBootstrap:
                     for s in args.aggregate_subnet_ids_raw.split(",")
                     if s.strip()
                 )
-            except ValueError as exc:
+            except ValueError as exception:
                 raise CliValidationError(
                     "--aggregate-subnet-ids expects comma-separated integers, "
                     f"got {args.aggregate_subnet_ids_raw!r}"
-                ) from exc
+                ) from exception
 
         # Genesis load.
         logger.info("Loading genesis from %s", args.genesis_path)

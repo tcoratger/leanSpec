@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import AttestationData, SingleMessageAggregate
 from lean_spec.spec.forks.lstar.spec import LstarSpec
@@ -17,7 +17,7 @@ def _make_empty_proof(participants: list[ValidatorIndex]) -> SingleMessageAggreg
     """Create a placeholder single-message aggregate proof carrying a participant bitfield."""
     placeholder = ByteList512KiB(data=b"")
     return SingleMessageAggregate(
-        participants=ValidatorIndices(data=participants).to_aggregation_bits(),
+        participants=AggregationBits.from_indices(participants),
         proof=placeholder,
     )
 

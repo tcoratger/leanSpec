@@ -1,6 +1,6 @@
 """Tests for Store attestation data pruning."""
 
-from lean_spec.spec.forks import Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import AggregationBits, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, Store
 from lean_spec.spec.forks.lstar.containers import SingleMessageAggregate
 from lean_spec.spec.forks.lstar.spec import LstarSpec
@@ -122,7 +122,7 @@ def test_prunes_related_structures_together(spec: LstarSpec, pruning_store: Stor
     # Create mock aggregated proof (empty proof data for testing)
     placeholder = ByteList512KiB(data=b"")
     mock_proof = SingleMessageAggregate(
-        participants=ValidatorIndices(data=[ValidatorIndex(1)]).to_aggregation_bits(),
+        participants=AggregationBits.from_indices([ValidatorIndex(1)]),
         proof=placeholder,
     )
 
