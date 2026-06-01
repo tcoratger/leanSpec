@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lean_spec.base import CamelModel
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -181,7 +181,7 @@ class AggregatedAttestationSpec(CamelModel):
         """
         attestation_data = self.build_attestation_data(block_registry, state)
 
-        aggregation_bits = ValidatorIndices(data=self.validator_indices).to_aggregation_bits()
+        aggregation_bits = AggregationBits.from_indices(self.validator_indices)
         invalid_aggregated = AggregatedAttestation(
             aggregation_bits=aggregation_bits,
             data=attestation_data,

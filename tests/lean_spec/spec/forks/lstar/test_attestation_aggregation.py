@@ -1,6 +1,12 @@
 """Tests for AggregatedAttestation structure."""
 
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex, ValidatorIndices
+from lean_spec.spec.forks import (
+    AggregationBits,
+    Checkpoint,
+    Slot,
+    ValidatorIndex,
+    ValidatorIndices,
+)
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -20,7 +26,7 @@ class TestAggregatedAttestation:
             source=Checkpoint(root=Bytes32.zero(), slot=Slot(2)),
         )
 
-        bits = ValidatorIndices(data=[ValidatorIndex(2), ValidatorIndex(7)]).to_aggregation_bits()
+        bits = AggregationBits.from_indices([ValidatorIndex(2), ValidatorIndex(7)])
         aggregate = AggregatedAttestation(aggregation_bits=bits, data=attestation_data)
 
         # Verify we can extract validator indices
@@ -40,7 +46,7 @@ class TestAggregatedAttestation:
         validator_indices = ValidatorIndices(
             data=[ValidatorIndex(i) for i in [0, 5, 10, 15, 20, 25]]
         )
-        bits = validator_indices.to_aggregation_bits()
+        bits = AggregationBits.from_indices(validator_indices)
         aggregate = AggregatedAttestation(aggregation_bits=bits, data=attestation_data)
 
         recovered = aggregate.aggregation_bits.to_validator_indices()
