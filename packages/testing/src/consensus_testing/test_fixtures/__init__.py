@@ -11,6 +11,14 @@ from .slot_clock import SlotClockTest
 from .ssz import SSZTest
 from .state_transition import StateTransitionTest
 from .sync import SyncTest
+from .verify_multi_message_proofs import (
+    DropComponentMessageBinding,
+    IncrementComponentSlot,
+    RebindComponentToAlternateHeadRoot,
+    SwapComponentMessageBindings,
+    SwapComponentParticipantPublicKey,
+    VerifyMultiMessageProofsTest,
+)
 from .verify_signatures import VerifySignaturesTest
 from .verify_single_message_proofs import (
     IncrementEmittedSlot,
@@ -27,6 +35,12 @@ __all__ = [
     "RebindToAlternateHeadRoot",
     "IncrementEmittedSlot",
     "SwapParticipantPublicKey",
+    "VerifyMultiMessageProofsTest",
+    "RebindComponentToAlternateHeadRoot",
+    "IncrementComponentSlot",
+    "SwapComponentParticipantPublicKey",
+    "SwapComponentMessageBindings",
+    "DropComponentMessageBinding",
     "VerifySignaturesTest",
     "SSZTest",
     "NetworkingCodecTest",
