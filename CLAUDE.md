@@ -57,3 +57,16 @@ subspecifications that the Lean Ethereum protocol relies on.
     or any on-the-wire string. Rename the Python identifier, never the serialized contract.
   - When a fully-expanded name becomes unwieldy, prefer a shorter but still complete phrasing
     (drop redundant words) rather than re-introducing an abbreviation.
+- **CRITICAL - TEST STRUCTURE MIRRORS SOURCE STRUCTURE**: This is a STRICT requirement. The
+  test tree under `tests/lean_spec/` mirrors the source tree under `src/lean_spec/` one-to-one.
+  A source module `src/lean_spec/<path>/<name>.py` has its unit tests in
+  `tests/lean_spec/<path>/test_<name>.py`, and every test file tests the single source module it
+  mirrors.
+  - When you MOVE a class or function to a different module, MOVE its tests to the matching test
+    module in the SAME change. Never leave tests behind in the old location.
+  - When you CREATE a new source module, its tests go in the mirrored test path, not appended to
+    an unrelated test file.
+  - When you DELETE or RENAME a source module, delete or rename its test module to match.
+  - A test file must never test a type that lives in a different source module. For example, tests
+    for `Interval` (in `spec/forks/lstar/interval.py`) belong in
+    `tests/lean_spec/spec/forks/lstar/test_interval.py`, never in `node/chain/test_clock.py`.

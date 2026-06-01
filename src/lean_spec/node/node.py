@@ -21,7 +21,6 @@ from typing import Final
 
 from lean_spec.node.api import AggregatorController, ApiServer, ApiServerConfig
 from lean_spec.node.chain import SlotClock
-from lean_spec.node.chain.clock import Interval
 from lean_spec.node.chain.service import ChainService
 from lean_spec.node.metrics import registry as metrics
 from lean_spec.node.networking import NetworkService
@@ -35,6 +34,7 @@ from lean_spec.spec.forks import (
     Block,
     BlockBody,
     ForkProtocol,
+    Interval,
     LstarSpec,
     SignedAttestation,
     SignedBlock,

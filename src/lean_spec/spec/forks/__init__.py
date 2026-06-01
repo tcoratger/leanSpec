@@ -25,6 +25,7 @@ from .lstar.containers import (
     ValidatorIndices,
     Validators,
 )
+from .lstar.interval import Interval
 from .lstar.spec import LstarSpec, LstarStore
 from .protocol import ForkProtocol, SpecStateType, SpecStoreType
 from .registry import ForkRegistry
@@ -55,6 +56,7 @@ __all__ = [
     "ForkProtocol",
     "ForkRegistry",
     "IMMEDIATE_JUSTIFICATION_WINDOW",
+    "Interval",
     "LstarSpec",
     "LstarStore",
     "SignedAggregatedAttestation",

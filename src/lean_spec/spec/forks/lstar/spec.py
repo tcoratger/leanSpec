@@ -6,7 +6,6 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
-from lean_spec.node.chain.clock import Interval
 from lean_spec.node.observability import (
     observe_on_attestation,
     observe_on_block,
@@ -50,6 +49,7 @@ from lean_spec.spec.forks.lstar.containers import (
 from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32, SSZList, Uint8, Uint64
 
 from ..protocol import ForkProtocol, SpecBlockType, SpecStateType
+from .interval import Interval
 
 LstarStore = Store[State, Block]
 """Concrete Store specialization owned by the lstar fork."""

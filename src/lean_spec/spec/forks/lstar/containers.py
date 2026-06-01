@@ -14,12 +14,12 @@ from pydantic import Field
 
 from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
-from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.spec.forks.lstar.config import HISTORICAL_ROOTS_LIMIT
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Bytes52, Container, SSZList, Uint64
 from lean_spec.spec.ssz.bitfields import BaseBitlist
 
+from .interval import Interval
 from .slot import IMMEDIATE_JUSTIFICATION_WINDOW, Slot
 
 __all__ = [

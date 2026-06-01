@@ -27,10 +27,10 @@ import logging
 from dataclasses import dataclass, field
 
 from lean_spec.node.sync import SyncService
-from lean_spec.spec.forks import LstarSpec, SignedAggregatedAttestation
+from lean_spec.spec.forks import Interval, LstarSpec, SignedAggregatedAttestation
 from lean_spec.spec.forks.lstar.config import INTERVALS_PER_SLOT
 
-from .clock import Interval, SlotClock
+from .clock import SlotClock
 
 logger = logging.getLogger(__name__)
 

@@ -2,352 +2,280 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
-from lean_spec.node.chain import Interval, SlotClock
-from lean_spec.spec.forks import Slot
-from lean_spec.spec.forks.lstar.config import (
-    INTERVALS_PER_SLOT,
-    MILLISECONDS_PER_INTERVAL,
-    MILLISECONDS_PER_SLOT,
-    SECONDS_PER_SLOT,
-)
+from lean_spec.node.chain import SlotClock
+from lean_spec.spec.forks import Interval, Slot
+from lean_spec.spec.forks.lstar.config import INTERVALS_PER_SLOT
 from lean_spec.spec.ssz import Uint64
 
-GENESIS_TIME = Uint64(1_700_000_000)
 
-
-class TestIntervalFromUnixTime:
-    """Tests for Interval.from_unix_time()."""
-
-    def test_at_genesis(self) -> None:
-        """Returns interval 0 when unix_seconds equals genesis_time."""
-        assert Interval.from_unix_time(GENESIS_TIME, GENESIS_TIME) == Interval(0)
-
-    def test_one_second_after_genesis(self) -> None:
-        """One second equals 1000ms, yielding 1000 // 800 = 1 interval."""
-        result = Interval.from_unix_time(GENESIS_TIME + Uint64(1), GENESIS_TIME)
-        assert result == Interval(1)
-
-    def test_one_slot_after_genesis(self) -> None:
-        """One full slot (4s = 4000ms) yields 4000 // 800 = 5 intervals."""
-        result = Interval.from_unix_time(GENESIS_TIME + SECONDS_PER_SLOT, GENESIS_TIME)
-        expected = Interval(int(MILLISECONDS_PER_SLOT // MILLISECONDS_PER_INTERVAL))
-        assert result == expected
-
-    def test_sub_interval_rounds_down(self) -> None:
-        """Partial intervals are truncated by integer division.
-
-        At 0 full seconds past genesis the delta_ms is 0, so the result is 0.
-        The method only accepts whole-second Uint64 values, so sub-interval
-        precision only surfaces when 1000ms is not a multiple of the interval.
-        Here we verify the floor behaviour across the first few seconds.
-        """
-        # 0s -> 0ms -> 0 intervals
-        assert Interval.from_unix_time(GENESIS_TIME, GENESIS_TIME) == Interval(0)
-        # 1s -> 1000ms -> 1000 // 800 = 1 (remainder 200ms truncated)
-        assert Interval.from_unix_time(GENESIS_TIME + Uint64(1), GENESIS_TIME) == Interval(1)
-        # 2s -> 2000ms -> 2000 // 800 = 2 (remainder 400ms truncated)
-        assert Interval.from_unix_time(GENESIS_TIME + Uint64(2), GENESIS_TIME) == Interval(2)
-        # 3s -> 3000ms -> 3000 // 800 = 3 (remainder 600ms truncated)
-        assert Interval.from_unix_time(GENESIS_TIME + Uint64(3), GENESIS_TIME) == Interval(3)
-
-    def test_multiple_slots(self) -> None:
-        """Ten slots (40s = 40000ms) yields 40000 // 800 = 50 intervals."""
-        ten_slots = Uint64(10) * SECONDS_PER_SLOT
-        result = Interval.from_unix_time(GENESIS_TIME + ten_slots, GENESIS_TIME)
-        expected_intervals = (ten_slots * Uint64(1000)) // MILLISECONDS_PER_INTERVAL
-        assert result == Interval(expected_intervals)
-
-    def test_return_type_is_interval(self) -> None:
-        """Return value is an Interval instance, not a plain Uint64."""
-        result = Interval.from_unix_time(GENESIS_TIME + Uint64(5), GENESIS_TIME)
-        assert isinstance(result, Interval)
-
-    def test_large_time_delta(self) -> None:
-        """Works correctly with a large time delta (one day = 86400s)."""
-        one_day = Uint64(86400)
-        result = Interval.from_unix_time(GENESIS_TIME + one_day, GENESIS_TIME)
-        expected = Interval((one_day * Uint64(1000)) // MILLISECONDS_PER_INTERVAL)
-        assert result == expected
-
-    def test_genesis_time_zero(self) -> None:
-        """Works when genesis_time is zero."""
-        result = Interval.from_unix_time(Uint64(4), Uint64(0))
-        # 4s = 4000ms -> 4000 // 800 = 5
-        assert result == Interval(5)
-
-
-class TestIntervalFromSlot:
-    """Tests for Interval.from_slot()."""
-
-    def test_slot_zero(self) -> None:
-        """Slot 0 maps to interval 0."""
-        assert Interval.from_slot(Slot(0)) == Interval(0)
-
-    def test_slot_one(self) -> None:
-        """Slot 1 maps to interval equal to INTERVALS_PER_SLOT."""
-        assert Interval.from_slot(Slot(1)) == Interval(INTERVALS_PER_SLOT)
-
-    def test_slot_three(self) -> None:
-        """Slot 3 maps to interval 3 * INTERVALS_PER_SLOT."""
-        assert Interval.from_slot(Slot(3)) == Interval(3 * int(INTERVALS_PER_SLOT))
-
-    def test_multiple_slots(self) -> None:
-        """Each slot N maps to interval N * INTERVALS_PER_SLOT."""
-        for n in range(10):
-            slot = Slot(n)
-            assert Interval.from_slot(slot) == Interval(int(slot) * int(INTERVALS_PER_SLOT))
-
-    def test_return_type_is_interval(self) -> None:
-        """Return value is an Interval instance, not a plain Uint64."""
-        result = Interval.from_slot(Slot(2))
-        assert isinstance(result, Interval)
-
-    def test_consistent_with_from_unix_time(self) -> None:
-        """from_slot(N) equals from_unix_time at genesis + N * SECONDS_PER_SLOT."""
-        for n in range(5):
-            slot = Slot(n)
-            from_slot_result = Interval.from_slot(slot)
-            from_unix_result = Interval.from_unix_time(
-                GENESIS_TIME + Uint64(int(slot) * int(SECONDS_PER_SLOT)), GENESIS_TIME
-            )
-            assert from_slot_result == from_unix_result
+def clock_at(genesis_seconds: int, now_seconds: float) -> SlotClock:
+    """Build a SlotClock frozen at the given genesis and current time, both in seconds."""
+    return SlotClock(genesis_time=Uint64(genesis_seconds), time_fn=lambda: now_seconds)
 
 
 class TestCurrentSlot:
     """Tests for current_slot()."""
 
-    def test_at_genesis(self) -> None:
-        """Slot is 0 at exactly genesis time."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis))
-        assert clock.current_slot() == Slot(0)
+    @pytest.mark.parametrize(
+        ("genesis", "now", "expected_slot"),
+        [
+            # Exactly at genesis.
+            (0, 0.0, 0),
+            # Just before the slot 1 boundary: a slot is 4s = 4000ms.
+            (0, 3.999, 0),
+            # Slot 1 begins exactly at 4s.
+            (0, 4.0, 1),
+            # 10s -> 10000ms // 4000 = slot 2.
+            (0, 10.0, 2),
+            # Non-zero genesis: 6s elapsed lands in slot 1.
+            (1000, 1006.0, 1),
+            # One second before genesis clamps to slot 0.
+            (1000, 999.0, 0),
+            # Large elapsed time stays exact.
+            (0, 4000.0, 1000),
+        ],
+    )
+    def test_floors_elapsed_time_to_whole_slots(
+        self, genesis: int, now: float, expected_slot: int
+    ) -> None:
+        """The slot number is elapsed milliseconds floored to whole slots."""
+        assert clock_at(genesis, now).current_slot() == Slot(expected_slot)
 
-    def test_before_genesis(self) -> None:
-        """Slot is 0 before genesis."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis - Uint64(100)))
-        assert clock.current_slot() == Slot(0)
-
-    def test_progression(self) -> None:
-        """Slot increments every 4 seconds (SECONDS_PER_SLOT)."""
-        genesis = Uint64(1700000000)
-        for expected_slot in range(5):
-            slot_duration_seconds = Uint64(expected_slot) * SECONDS_PER_SLOT
-            time = genesis + slot_duration_seconds
-            clock = SlotClock(genesis_time=genesis, time_fn=lambda t=time: float(t))
-            assert clock.current_slot() == Slot(expected_slot)
-
-    def test_mid_slot(self) -> None:
-        """Slot remains constant within a slot."""
-        genesis = Uint64(1700000000)
-        slot_3_seconds = Uint64(3) * SECONDS_PER_SLOT
-        time = genesis + slot_3_seconds + Uint64(2)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
-        assert clock.current_slot() == Slot(3)
-
-    def test_at_slot_boundary_minus_one(self) -> None:
-        """Slot does not increment until boundary is reached."""
-        genesis = Uint64(1700000000)
-        slot_duration_seconds = SECONDS_PER_SLOT
-        time = genesis + slot_duration_seconds - Uint64(1)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
-        assert clock.current_slot() == Slot(0)
+    def test_constant_within_a_slot(self) -> None:
+        """The slot does not change between its first and last interval."""
+        assert clock_at(0, 8.0).current_slot() == Slot(2)
+        assert clock_at(0, 11.999).current_slot() == Slot(2)
 
 
 class TestCurrentInterval:
     """Tests for current_interval()."""
 
-    def test_at_slot_start(self) -> None:
-        """Interval is 0 at slot start."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis))
-        assert clock.current_interval() == Interval(0)
-
-    def test_progression(self) -> None:
-        """Interval increments based on milliseconds since genesis.
-
-        With MILLISECONDS_PER_INTERVAL = 800:
-        - 0ms → interval 0
-        - 800ms → interval 1
-        - 1600ms → interval 2
-        - 2400ms → interval 3
-        - 3200ms → interval 4
-        """
-        genesis = Uint64(1700000000)
-        # Test with sub-second precision
-        expected_intervals = [
+    @pytest.mark.parametrize(
+        ("now", "expected_interval"),
+        [
+            # Each interval is 800ms; a slot holds 5 of them.
             (0.0, 0),  # 0ms -> interval 0
-            (0.8, 1),  # 800ms -> interval 1 (exactly at boundary)
-            (1.0, 1),  # 1000ms -> interval 1
+            (0.8, 1),  # 800ms exactly -> interval 1
+            (1.0, 1),  # 1000ms // 800 -> interval 1
             (1.6, 2),  # 1600ms -> interval 2
-            (2.0, 2),  # 2000ms -> interval 2
             (2.4, 3),  # 2400ms -> interval 3
-            (3.0, 3),  # 3000ms -> interval 3
-            (3.2, 4),  # 3200ms -> interval 4 (previously unreachable)
-            (3.9, 4),  # 3900ms -> interval 4
-        ]
-        for secs_after_genesis, expected_interval in expected_intervals:
-            time = float(genesis) + secs_after_genesis
-            clock = SlotClock(genesis_time=genesis, time_fn=lambda t=time: t)
-            assert clock.current_interval() == Interval(expected_interval), (
-                f"At {secs_after_genesis}s, expected interval {expected_interval}"
-            )
+            (3.2, 4),  # 3200ms -> interval 4, the last interval of the slot
+            (3.9, 4),  # 3900ms -> still interval 4
+            (4.0, 0),  # next slot resets the interval to 0
+            (4.8, 1),  # 800ms into slot 1 -> interval 1
+        ],
+    )
+    def test_position_within_slot(self, now: float, expected_interval: int) -> None:
+        """The interval is the sub-slot position floored to 800ms steps."""
+        assert clock_at(0, now).current_interval() == Interval(expected_interval)
 
-    def test_wraps_at_slot_boundary(self) -> None:
-        """Interval resets to 0 at next slot."""
-        genesis = Uint64(1700000000)
-        slot_duration_seconds = SECONDS_PER_SLOT
-        time = genesis + slot_duration_seconds
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(time))
-        assert clock.current_interval() == Interval(0)
+    @pytest.mark.parametrize(
+        ("now", "expected_interval"),
+        [
+            # Sub-second precision decides the interval at the boundary.
+            (0.75, 0),  # 750ms is still inside interval 0
+            (0.85, 1),  # 850ms has crossed into interval 1
+        ],
+    )
+    def test_sub_second_precision(self, now: float, expected_interval: int) -> None:
+        """Milliseconds below one second still move the interval."""
+        assert clock_at(0, now).current_interval() == Interval(expected_interval)
 
-    def test_before_genesis(self) -> None:
-        """Interval is 0 before genesis."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis - Uint64(100)))
-        assert clock.current_interval() == Interval(0)
-
-    def test_last_interval_of_slot(self) -> None:
-        """Interval 4 at 3.2s (3200ms // 800 = 4)."""
-        genesis = Uint64(1700000000)
-        time = float(genesis) + 3.2
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: time)
-        assert clock.current_interval() == Interval(4)
-
-    def test_subsecond_precision(self) -> None:
-        """Verifies sub-second timing affects interval calculation."""
-        genesis = Uint64(1700000000)
-        # 750ms into genesis should give interval 0 (not 1)
-        clock_750ms = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis) + 0.75)
-        assert clock_750ms.current_interval() == Interval(0)
-
-        # 850ms into genesis should give interval 1
-        clock_850ms = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis) + 0.85)
-        assert clock_850ms.current_interval() == Interval(1)
+    def test_before_genesis_is_zero(self) -> None:
+        """The interval is 0 for any time before genesis."""
+        assert clock_at(1000, 900.0).current_interval() == Interval(0)
 
 
 class TestTotalIntervals:
     """Tests for total_intervals()."""
 
-    def test_counts_all_intervals(self) -> None:
-        """total_intervals counts all intervals since genesis with sub-second precision.
+    @pytest.mark.parametrize(
+        ("genesis", "now", "expected_total"),
+        [
+            # Counts every 800ms interval since genesis.
+            (0, 0.0, 0),  # 0ms
+            (0, 0.8, 1),  # 800ms
+            (0, 4.0, 5),  # one full slot is 5 intervals
+            (0, 14.4, 18),  # 14400ms // 800
+            (1000, 1004.0, 5),  # non-zero genesis, one slot elapsed
+        ],
+    )
+    def test_counts_intervals_since_genesis(
+        self, genesis: int, now: float, expected_total: int
+    ) -> None:
+        """The total is elapsed milliseconds floored to whole intervals."""
+        assert clock_at(genesis, now).total_intervals() == Interval(expected_total)
 
-        With MILLISECONDS_PER_INTERVAL = 800:
-        14.4 seconds = 14400ms = 18 intervals (14400 // 800)
-        """
-        genesis = Uint64(1700000000)
-        # 14.4 seconds = 14400ms = 18 intervals (14400 // 800)
-        time = float(genesis) + 14.4
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: time)
-        assert clock.total_intervals() == Interval(18)
+    def test_before_genesis_is_zero(self) -> None:
+        """The total is 0 for any time before genesis."""
+        assert clock_at(1000, 900.0).total_intervals() == Interval(0)
 
-    def test_before_genesis(self) -> None:
-        """total_intervals is 0 before genesis."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis - Uint64(100)))
-        assert clock.total_intervals() == Interval(0)
+
+class TestCurrentTime:
+    """Tests for current_time()."""
+
+    @pytest.mark.parametrize(
+        ("now", "expected_seconds"),
+        [
+            # Whole seconds pass through unchanged.
+            (1_700_000_000.0, 1_700_000_000),
+            # Sub-second precision truncates toward zero.
+            (123.999, 123),
+            (0.0, 0),
+        ],
+    )
+    def test_truncates_to_whole_seconds(self, now: float, expected_seconds: int) -> None:
+        """The wall-clock reading floors to whole Unix seconds."""
+        assert clock_at(0, now).current_time() == Uint64(expected_seconds)
+
+    def test_default_time_source_is_wall_clock(self) -> None:
+        """Without an injected source the clock reads real wall-clock time."""
+        clock = SlotClock(genesis_time=Uint64(0))
+        # Real Unix time is well past the test's reference epoch.
+        assert int(clock.current_time()) > 1_700_000_000
+
+
+class TestSecondsUntilNextInterval:
+    """Tests for seconds_until_next_interval()."""
+
+    @pytest.mark.parametrize(
+        ("genesis", "now", "expected_seconds"),
+        [
+            # 250ms into an 800ms interval leaves 550ms.
+            (1000, 1000.25, 0.55),
+            # 500ms into the interval leaves 300ms.
+            (1000, 1000.5, 0.3),
+            # 1000ms past genesis sits 200ms into an interval, leaving 600ms.
+            (1000, 1001.0, 0.6),
+            # Exactly on a boundary returns a full interval, never zero.
+            (1000, 1000.0, 0.8),
+            # Before genesis returns the time remaining until genesis.
+            (1000, 900.0, 100.0),
+        ],
+    )
+    def test_time_until_boundary(self, genesis: int, now: float, expected_seconds: float) -> None:
+        """Returns the seconds remaining until the next interval boundary."""
+        result = clock_at(genesis, now).seconds_until_next_interval()
+        assert result == pytest.approx(expected_seconds, abs=1e-3)
+
+
+class TestSleepUntilNextInterval:
+    """Tests for sleep_until_next_interval()."""
+
+    @pytest.mark.parametrize(
+        ("genesis", "now", "expected_sleep"),
+        [
+            # 500ms into an 800ms interval sleeps the remaining 300ms.
+            (1000, 1000.5, 0.3),
+            # Called before genesis sleeps until genesis arrives.
+            (1000, 900.0, 100.0),
+        ],
+    )
+    async def test_sleeps_until_next_boundary(
+        self, genesis: int, now: float, expected_sleep: float
+    ) -> None:
+        """Awaits a sleep equal to the time until the next interval boundary."""
+        captured: list[float] = []
+
+        async def capture_sleep(duration: float) -> None:
+            captured.append(duration)
+
+        with patch("asyncio.sleep", new=capture_sleep):
+            await clock_at(genesis, now).sleep_until_next_interval()
+
+        assert captured == [pytest.approx(expected_sleep, abs=1e-3)]
+
+    async def test_skips_sleep_when_no_time_remains(self) -> None:
+        """The guard avoids a zero-length sleep when nothing is left to wait."""
+        clock = clock_at(1000, 1000.0)
+        slept = False
+
+        async def record_sleep(duration: float) -> None:
+            nonlocal slept
+            slept = True
+
+        # The boundary calculation never yields a non-positive wait on its own.
+        # Force one to exercise the guard that skips the sleep.
+        with (
+            patch.object(SlotClock, "seconds_until_next_interval", return_value=0.0),
+            patch("asyncio.sleep", new=record_sleep),
+        ):
+            await clock.sleep_until_next_interval()
+
+        assert slept is False
+
+
+class TestClockConsistency:
+    """Cross-method invariants that must hold at every instant."""
+
+    @pytest.mark.parametrize(
+        "milliseconds_since_genesis",
+        [
+            # genesis
+            0,
+            # first millisecond
+            1,
+            # last millisecond of interval 0
+            799,
+            # first interval boundary
+            800,
+            # just past the boundary
+            801,
+            # interval 2 boundary
+            1600,
+            # interval 4 boundary
+            3200,
+            # last millisecond of slot 0
+            3999,
+            # slot 1 boundary
+            4000,
+            # just into slot 1
+            4001,
+            # slot 2 boundary
+            8000,
+            # arbitrary mid-slot offset
+            12345,
+            # far from genesis
+            1_000_000,
+        ],
+    )
+    def test_slot_and_interval_decompose_total_intervals(
+        self, milliseconds_since_genesis: int
+    ) -> None:
+        """Slot and interval are the quotient and remainder of total intervals over a slot."""
+        clock = clock_at(0, milliseconds_since_genesis / 1000.0)
+        total = int(clock.total_intervals())
+
+        # The slot is total intervals divided by the intervals in one slot.
+        assert clock.current_slot() == Slot(total // int(INTERVALS_PER_SLOT))
+        # The interval is the leftover position inside the current slot.
+        assert clock.current_interval() == Interval(total % int(INTERVALS_PER_SLOT))
+        # The interval index always stays within a single slot.
+        assert 0 <= int(clock.current_interval()) < int(INTERVALS_PER_SLOT)
 
 
 class TestSlotClockImmutability:
     """Tests for SlotClock immutability."""
 
     def test_is_frozen(self) -> None:
-        """SlotClock is immutable."""
-        clock = SlotClock(genesis_time=Uint64(1700000000))
+        """The clock is immutable, so reassigning a field raises."""
+        clock = SlotClock(genesis_time=Uint64(1_700_000_000))
         with pytest.raises(AttributeError):
-            clock.genesis_time = Uint64(1700000001)  # type: ignore[misc]
-
-
-class TestCurrentTime:
-    """Tests for current_time()."""
-
-    def test_returns_uint64(self) -> None:
-        """current_time returns Uint64."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1700000005.5)
-        result = clock.current_time()
-        assert isinstance(result, Uint64)
-        assert result == Uint64(1700000005)
-
-    def test_truncates_to_integer(self) -> None:
-        """current_time truncates float to integer seconds."""
-        genesis = Uint64(0)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 123.999)
-        assert clock.current_time() == Uint64(123)
-
-    def test_at_genesis(self) -> None:
-        """current_time returns genesis time at genesis."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis))
-        assert clock.current_time() == genesis
-
-
-class TestSecondsUntilNextInterval:
-    """Tests for seconds_until_next_interval()."""
-
-    def test_mid_interval(self) -> None:
-        """Returns time until next boundary when mid-interval."""
-        genesis = Uint64(1000)
-        interval_seconds = float(MILLISECONDS_PER_INTERVAL) / 1000.0
-        # Half way into first interval.
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.0 + interval_seconds / 2)
-        result = clock.seconds_until_next_interval()
-        assert abs(result - interval_seconds / 2) < 0.01
-
-    def test_at_interval_boundary(self) -> None:
-        """Returns one full interval when exactly at boundary.
-
-        With MILLISECONDS_PER_INTERVAL = 800:
-        At 1s = 1000ms, time_into_interval = 1000 % 800 = 200ms
-        At 800ms exactly (0.8s), time_into_interval = 0
-        But using fractional seconds has FP precision issues.
-
-        Instead test at 1s: should return 800 - 200 = 600ms = 0.6s
-        """
-        genesis = Uint64(1000)
-        # At 1 second after genesis: 1000ms % 800 = 200ms into interval
-        # Time until next = 800 - 200 = 600ms = 0.6s
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1001.0)
-        result = clock.seconds_until_next_interval()
-        assert abs(result - 0.6) < 0.01
-
-    def test_before_genesis(self) -> None:
-        """Returns time until genesis when before genesis."""
-        genesis = Uint64(1000)
-        # 100 seconds before genesis.
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 900.0)
-        result = clock.seconds_until_next_interval()
-        assert abs(result - 100.0) < 0.001
-
-    def test_at_genesis(self) -> None:
-        """Returns one full interval at exactly genesis."""
-        genesis = Uint64(1000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.0)
-        result = clock.seconds_until_next_interval()
-        assert abs(result - (float(MILLISECONDS_PER_INTERVAL) / 1000.0)) < 0.001
-
-    def test_fractional_precision(self) -> None:
-        """Preserves fractional seconds in calculation."""
-        genesis = Uint64(1000)
-        # 0.123 seconds into interval.
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: 1000.123)
-        result = clock.seconds_until_next_interval()
-        expected = (float(MILLISECONDS_PER_INTERVAL) / 1000.0) - 0.123
-        assert abs(result - expected) < 0.001
+            clock.genesis_time = Uint64(1_700_000_001)  # type: ignore[misc]
 
 
 class TestReturnTypes:
-    """Tests for proper return types."""
+    """Tests for domain-specific return types."""
 
-    def test_types_are_correct(self) -> None:
-        """All return types are domain-specific."""
-        genesis = Uint64(1700000000)
-        clock = SlotClock(genesis_time=genesis, time_fn=lambda: float(genesis))
-
+    def test_methods_return_domain_types(self) -> None:
+        """Each accessor returns its narrow domain type, not a plain integer or float."""
+        clock = clock_at(1_700_000_000, 1_700_000_005.5)
         assert isinstance(clock.current_slot(), Slot)
-        assert isinstance(clock.current_interval(), Uint64)
-        assert isinstance(clock.total_intervals(), Uint64)
+        assert isinstance(clock.current_interval(), Interval)
+        assert isinstance(clock.total_intervals(), Interval)
         assert isinstance(clock.current_time(), Uint64)
         assert isinstance(clock.seconds_until_next_interval(), float)
