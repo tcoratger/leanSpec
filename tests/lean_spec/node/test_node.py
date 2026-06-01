@@ -12,12 +12,6 @@ from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.node.api import ApiServerConfig
 from lean_spec.node.chain.clock import Interval
-from lean_spec.node.chain.config import (
-    ATTESTATION_COMMITTEE_COUNT,
-    HISTORICAL_ROOTS_LIMIT,
-    INTERVALS_PER_SLOT,
-    SECONDS_PER_SLOT,
-)
 from lean_spec.node.node import Node, NodeConfig
 from lean_spec.node.storage.sqlite import SQLiteDatabase
 from lean_spec.node.validator import ValidatorRegistry
@@ -25,6 +19,12 @@ from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import State
+from lean_spec.spec.forks.lstar.config import (
+    ATTESTATION_COMMITTEE_COUNT,
+    HISTORICAL_ROOTS_LIMIT,
+    INTERVALS_PER_SLOT,
+    SECONDS_PER_SLOT,
+)
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,

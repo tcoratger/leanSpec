@@ -26,9 +26,9 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from lean_spec.node.chain.config import INTERVALS_PER_SLOT
 from lean_spec.node.sync import SyncService
 from lean_spec.spec.forks import LstarSpec, SignedAggregatedAttestation
+from lean_spec.spec.forks.lstar.config import INTERVALS_PER_SLOT
 
 from .clock import Interval, SlotClock
 

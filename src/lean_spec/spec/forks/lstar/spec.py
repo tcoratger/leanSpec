@@ -7,12 +7,6 @@ from collections.abc import Iterable, Sequence, Set as AbstractSet
 from typing import Any, ClassVar
 
 from lean_spec.node.chain.clock import Interval
-from lean_spec.node.chain.config import (
-    GOSSIP_DISPARITY_INTERVALS,
-    INTERVALS_PER_SLOT,
-    JUSTIFICATION_LOOKBACK_SLOTS,
-    MAX_ATTESTATIONS_DATA,
-)
 from lean_spec.node.observability import (
     observe_on_attestation,
     observe_on_block,
@@ -22,6 +16,12 @@ from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
+from lean_spec.spec.forks.lstar.config import (
+    GOSSIP_DISPARITY_INTERVALS,
+    INTERVALS_PER_SLOT,
+    JUSTIFICATION_LOOKBACK_SLOTS,
+    MAX_ATTESTATIONS_DATA,
+)
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,

@@ -15,14 +15,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from time import time as wall_time
 
-from lean_spec.spec.ssz import Uint64
-
-from .config import (
+from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
     MILLISECONDS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
+from lean_spec.spec.ssz import Uint64
 
 
 class Interval(Uint64):

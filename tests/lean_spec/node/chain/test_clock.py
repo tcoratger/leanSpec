@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from lean_spec.node.chain import Interval, SlotClock
-from lean_spec.node.chain.config import (
+from lean_spec.spec.forks import Slot
+from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
     MILLISECONDS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
-from lean_spec.spec.forks import Slot
 from lean_spec.spec.ssz import Uint64
 
 GENESIS_TIME = Uint64(1_700_000_000)

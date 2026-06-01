@@ -3,15 +3,15 @@
 from hypothesis import given, settings, strategies as st
 
 from lean_spec.node.chain.clock import Interval
-from lean_spec.node.chain.config import (
+from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar import Store
+from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,
     MILLISECONDS_PER_INTERVAL,
     MILLISECONDS_PER_SLOT,
     SECONDS_PER_SLOT,
 )
-from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Slot, ValidatorIndex
-from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import Block, Validators
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64

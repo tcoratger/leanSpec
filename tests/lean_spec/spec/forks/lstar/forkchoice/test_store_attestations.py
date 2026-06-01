@@ -6,10 +6,10 @@ import pytest
 from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.node.chain.clock import Interval
-from lean_spec.node.chain.config import INTERVALS_PER_SLOT
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry
+from lean_spec.spec.forks.lstar.config import INTERVALS_PER_SLOT
 from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     SignedAggregatedAttestation,
