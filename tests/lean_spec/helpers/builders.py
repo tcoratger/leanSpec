@@ -48,8 +48,11 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Bytes52, Uint64
-
-from .mocks import MockForkchoiceStore, MockNetworkRequester, StoreInterceptingSpec
+from tests.lean_spec.helpers.mocks import (
+    MockForkchoiceStore,
+    MockNetworkRequester,
+    StoreInterceptingSpec,
+)
 
 
 def make_bytes32(seed: int) -> Bytes32:

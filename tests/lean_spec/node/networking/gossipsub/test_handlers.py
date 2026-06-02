@@ -25,8 +25,7 @@ from lean_spec.node.networking.gossipsub.rpc import (
     SubOpts,
 )
 from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
-
-from .conftest import add_peer, make_behavior, make_peer
+from tests.lean_spec.node.networking.gossipsub.conftest import add_peer, make_behavior, make_peer
 
 
 class TestHandleGraft:

@@ -1,14 +1,13 @@
 """Lstar fork — interval ticking and time progression."""
 
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
 from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,
 )
 from lean_spec.spec.forks.lstar.containers import (
+    Interval,
     SignedAggregatedAttestation,
 )
-
-from ._contract import LstarSpecContract, LstarStore
-from .interval import Interval
 
 
 class TimelineMixin(LstarSpecContract):

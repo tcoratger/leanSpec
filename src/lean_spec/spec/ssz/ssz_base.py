@@ -5,8 +5,7 @@ from abc import ABC, abstractmethod
 from typing import IO, Final, Self
 
 from lean_spec.base import StrictBaseModel
-
-from .exceptions import SSZSerializationError
+from lean_spec.spec.ssz.exceptions import SSZSerializationError
 
 BYTES_PER_LENGTH_OFFSET: Final = 4
 """Width of an SSZ offset prefixing each variable-size element.

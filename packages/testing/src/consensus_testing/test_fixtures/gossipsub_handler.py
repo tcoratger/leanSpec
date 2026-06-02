@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from unittest.mock import patch
 
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.gossipsub.behavior import GossipsubBehavior, PeerState
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
@@ -28,8 +29,6 @@ from lean_spec.node.networking.gossipsub.rpc import (
     Message,
 )
 from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
-
-from .base import BaseConsensusFixture
 
 # Sentinel that satisfies `outbound_stream is not None` checks.
 # The patched _send_rpc never touches the stream, so any non-None value works.

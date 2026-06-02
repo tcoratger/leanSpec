@@ -1,13 +1,12 @@
 """Lstar fork — attestation aggregation."""
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
 from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SingleMessageAggregate,
 )
-
-from ._contract import LstarSpecContract, LstarStore
 
 
 class AggregationMixin(LstarSpecContract):

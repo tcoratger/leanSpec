@@ -61,6 +61,12 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from lean_spec.node.networking.client.event_source.gossip import GossipHandler
+from lean_spec.node.networking.client.event_source.protocol import (
+    SUPPORTED_PROTOCOLS,
+    GossipMessageError,
+)
+from lean_spec.node.networking.client.reqresp_client import ReqRespClient
 from lean_spec.node.networking.config import (
     GOSSIPSUB_DEFAULT_PROTOCOL_ID,
     GOSSIPSUB_PROTOCOL_ID_V12,
@@ -106,10 +112,6 @@ from lean_spec.node.networking.transport.quic.stream_adapter import (
 from lean_spec.node.networking.types import ProtocolId
 from lean_spec.spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
 from lean_spec.spec.ssz.exceptions import SSZSerializationError
-
-from ..reqresp_client import ReqRespClient
-from .gossip import GossipHandler
-from .protocol import SUPPORTED_PROTOCOLS, GossipMessageError
 
 logger = logging.getLogger(__name__)
 

@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from consensus_testing.test_types.utils import resolve_block_root
 from lean_spec.base import CamelModel
 from lean_spec.spec.forks import Slot
 from lean_spec.spec.forks.lstar.containers import (
@@ -14,8 +15,6 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
 )
 from lean_spec.spec.ssz import Bytes32
-
-from .utils import resolve_block_root
 
 
 class StateExpectation(CamelModel):

@@ -4,8 +4,8 @@ from typing import Type
 
 from framework.forks import BaseFork, BaseForkMeta, ForkRegistry
 
-from . import forks as _forks_module
-from .forks import Lstar
+from consensus_testing.forks import forks as _forks_module
+from consensus_testing.forks.forks import Lstar
 
 Fork = Type[BaseFork]
 

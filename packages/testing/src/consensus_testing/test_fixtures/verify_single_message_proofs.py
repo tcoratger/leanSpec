@@ -6,6 +6,8 @@ from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
+from consensus_testing.keys import XmssKeyManager
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import (
@@ -19,9 +21,6 @@ from lean_spec.spec.forks.lstar.containers import (
     SingleMessageAggregate,
 )
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32
-
-from ..keys import XmssKeyManager
-from .base import BaseConsensusFixture
 
 ALTERNATE_HEAD_ROOT: Bytes32 = Bytes32(b"\xee" * 32)
 """Sentinel head root used by the rebind tamper to bind the proof off-target."""

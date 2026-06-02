@@ -58,8 +58,7 @@ import hashlib
 from dataclasses import dataclass, field
 
 from lean_spec.node.networking.config import MESSAGE_DOMAIN_INVALID_SNAPPY
-
-from .types import MessageId
+from lean_spec.node.networking.gossipsub.types import MessageId
 
 
 @dataclass(slots=True)

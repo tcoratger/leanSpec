@@ -7,8 +7,8 @@ from typing import IO, Any, ClassVar, NoReturn, Self, SupportsInt, overload, ove
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
-from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
-from .ssz_base import SSZType
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.ssz_base import SSZType
 
 
 class BaseUint(int, SSZType):

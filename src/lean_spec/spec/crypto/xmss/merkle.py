@@ -29,21 +29,20 @@ Each layer records the absolute index of its first node, keeping positions in fu
 from itertools import batched
 from typing import Self
 
-from lean_spec.spec.ssz import Uint64
-from lean_spec.spec.ssz.collections import SSZList
-from lean_spec.spec.ssz.container import Container
-
-from .constants import TARGET_CONFIG, XmssConfig
-from .field import random_domain
-from .poseidon import PoseidonXmss
-from .prf import PRFKey
-from .types import (
+from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG, XmssConfig
+from lean_spec.spec.crypto.xmss.field import random_domain
+from lean_spec.spec.crypto.xmss.poseidon import PoseidonXmss
+from lean_spec.spec.crypto.xmss.prf import PRFKey
+from lean_spec.spec.crypto.xmss.types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
     Parameter,
     TreeTweak,
 )
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.collections import SSZList
+from lean_spec.spec.ssz.container import Container
 
 
 class HashTreeLayer(Container):

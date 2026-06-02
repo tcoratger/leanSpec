@@ -40,13 +40,12 @@ from aioquic.quic.events import (
 )
 
 from lean_spec.node.networking.config import LIBP2P_ALPN_PROTOCOL
+from lean_spec.node.networking.transport.identity import IdentityKeypair
+from lean_spec.node.networking.transport.peer_id import PeerId
+from lean_spec.node.networking.transport.quic.stream import QuicStream, QuicTransportError
+from lean_spec.node.networking.transport.quic.stream_adapter import QuicStreamAdapter
+from lean_spec.node.networking.transport.quic.tls import generate_libp2p_certificate
 from lean_spec.node.networking.types import ProtocolId
-
-from ..identity import IdentityKeypair
-from ..peer_id import PeerId
-from .stream import QuicStream, QuicTransportError
-from .stream_adapter import QuicStreamAdapter
-from .tls import generate_libp2p_certificate
 
 logger = logging.getLogger(__name__)
 

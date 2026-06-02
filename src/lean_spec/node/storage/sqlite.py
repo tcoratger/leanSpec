@@ -23,15 +23,12 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from lean_spec.spec.forks import Checkpoint, Slot
-from lean_spec.spec.forks.protocol import (
-    SpecBlockType,
-    SpecStateType,
+from lean_spec.node.storage.exceptions import (
+    StorageCorruptionError,
+    StorageReadError,
+    StorageWriteError,
 )
-from lean_spec.spec.ssz import Bytes32, Uint64
-
-from .exceptions import StorageCorruptionError, StorageReadError, StorageWriteError
-from .namespaces import (
+from lean_spec.node.storage.namespaces import (
     BLOCKS_CREATE_INDEX,
     BLOCKS_CREATE_TABLE,
     BLOCKS_TABLE_NAME,
@@ -49,6 +46,12 @@ from .namespaces import (
     STATES_CREATE_TABLE,
     STATES_TABLE_NAME,
 )
+from lean_spec.spec.forks import Checkpoint, Slot
+from lean_spec.spec.forks.protocol import (
+    SpecBlockType,
+    SpecStateType,
+)
+from lean_spec.spec.ssz import Bytes32, Uint64
 
 
 class SQLiteDatabase:

@@ -1,6 +1,7 @@
 """Lstar fork — validator duties: proposal head and production."""
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
 from lean_spec.spec.forks.lstar.config import (
     JUSTIFICATION_LOOKBACK_SLOTS,
 )
@@ -8,14 +9,12 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     Checkpoint,
+    Interval,
     SingleMessageAggregate,
     Slot,
     ValidatorIndex,
 )
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-from ._contract import LstarSpecContract, LstarStore
-from .interval import Interval
 
 
 class ValidatorDutiesMixin(LstarSpecContract):

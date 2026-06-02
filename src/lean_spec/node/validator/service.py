@@ -39,6 +39,12 @@ from typing import Literal
 
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.node.sync import SyncService
+from lean_spec.node.validator.constants import (
+    HYSTERESIS_BAND,
+    NETWORK_STALL_THRESHOLD,
+    SYNC_LAG_THRESHOLD,
+)
+from lean_spec.node.validator.registry import ValidatorEntry, ValidatorRegistry
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
@@ -54,9 +60,6 @@ from lean_spec.spec.forks import (
 )
 from lean_spec.spec.forks.lstar.containers import MultiMessageAggregate, SingleMessageAggregate
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-from .constants import HYSTERESIS_BAND, NETWORK_STALL_THRESHOLD, SYNC_LAG_THRESHOLD
-from .registry import ValidatorEntry, ValidatorRegistry
 
 logger = logging.getLogger(__name__)
 

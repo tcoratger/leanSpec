@@ -5,20 +5,19 @@ from typing import override
 from pydantic import field_serializer, model_serializer
 
 from lean_spec.base import StrictBaseModel
-from lean_spec.spec.forks.lstar.slot import Slot
-from lean_spec.spec.ssz import Uint64
-from lean_spec.spec.ssz.container import Container
-
-from .constants import TARGET_CONFIG
-from .merkle import HashSubTree
-from .prf import PRFKey
-from .types import (
+from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
+from lean_spec.spec.crypto.xmss.merkle import HashSubTree
+from lean_spec.spec.crypto.xmss.prf import PRFKey
+from lean_spec.spec.crypto.xmss.types import (
     HashDigestList,
     HashDigestVector,
     HashTreeOpening,
     Parameter,
     Randomness,
 )
+from lean_spec.spec.forks.lstar.slot import Slot
+from lean_spec.spec.ssz import Uint64
+from lean_spec.spec.ssz.container import Container
 
 
 class PublicKey(Container):

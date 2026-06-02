@@ -9,6 +9,7 @@ from lean_spec.node.observability import (
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
 from lean_spec.spec.forks.lstar.config import (
     GOSSIP_DISPARITY_INTERVALS,
     MAX_ATTESTATIONS_DATA,
@@ -19,6 +20,7 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationSignatureEntry,
     Block,
     Checkpoint,
+    Interval,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
@@ -27,11 +29,8 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
     ValidatorIndex,
 )
+from lean_spec.spec.forks.protocol import SpecBlockType, SpecStateType
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-from ..protocol import SpecBlockType, SpecStateType
-from ._contract import LstarSpecContract, LstarStore
-from .interval import Interval
 
 
 class ForkChoiceMixin(LstarSpecContract):

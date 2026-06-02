@@ -8,6 +8,7 @@ from lean_spec.node.observability import (
     observe_state_transition,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -22,10 +23,8 @@ from lean_spec.spec.forks.lstar.containers import (
     ValidatorIndex,
     Validators,
 )
+from lean_spec.spec.forks.protocol import SpecStateType
 from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32, SSZList, Uint64
-
-from ..protocol import SpecStateType
-from ._contract import LstarSpecContract
 
 
 def attestation_data_matches_chain(

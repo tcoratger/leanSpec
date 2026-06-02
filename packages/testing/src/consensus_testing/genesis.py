@@ -1,5 +1,6 @@
 """Consensus layer pre-state generation."""
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
@@ -12,8 +13,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes52, Uint64
-
-from .keys import XmssKeyManager
 
 _DEFAULT_GENESIS_TIME = Uint64(0)
 

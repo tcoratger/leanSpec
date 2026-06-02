@@ -17,8 +17,7 @@ from lean_spec.node.networking.gossipsub.behavior import (
 )
 from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
 from lean_spec.node.networking.gossipsub.types import TopicId
-
-from .stream import create_stream_pair
+from tests.lean_spec.node.networking.gossipsub.integration.stream import create_stream_pair
 
 
 @dataclass

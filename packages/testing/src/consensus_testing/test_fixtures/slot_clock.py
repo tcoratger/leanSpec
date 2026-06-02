@@ -7,6 +7,7 @@ to coordinate block proposals and attestations.
 
 from typing import Any, ClassVar
 
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.forks import Interval, Slot
 from lean_spec.spec.forks.lstar.config import (
@@ -15,8 +16,6 @@ from lean_spec.spec.forks.lstar.config import (
     SECONDS_PER_SLOT,
 )
 from lean_spec.spec.ssz import Uint64
-
-from .base import BaseConsensusFixture
 
 
 class SlotClockTest(BaseConsensusFixture):

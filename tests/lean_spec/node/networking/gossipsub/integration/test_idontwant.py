@@ -18,9 +18,8 @@ from lean_spec.node.networking.gossipsub.behavior import (
 )
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
 from lean_spec.node.networking.gossipsub.types import TopicId
-
-from .conftest import fast_params
-from .network import GossipsubTestNetwork
+from tests.lean_spec.node.networking.gossipsub.integration.conftest import fast_params
+from tests.lean_spec.node.networking.gossipsub.integration.network import GossipsubTestNetwork
 
 TOPIC = TopicId("test/idontwant")
 

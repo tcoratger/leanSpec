@@ -1,17 +1,17 @@
 """Consensus test fixture format definitions (Pydantic models)."""
 
-from .api_endpoint import ApiEndpointTest
-from .base import BaseConsensusFixture
-from .fork_choice import ForkChoiceTest
-from .gossipsub_handler import GossipsubHandlerTest
-from .justifiability import JustifiabilityTest
-from .networking_codec import NetworkingCodecTest
-from .poseidon_permutation import PoseidonPermutationTest
-from .slot_clock import SlotClockTest
-from .ssz import SSZTest
-from .state_transition import StateTransitionTest
-from .sync import SyncTest
-from .verify_multi_message_proofs import (
+from consensus_testing.test_fixtures.api_endpoint import ApiEndpointTest
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.fork_choice import ForkChoiceTest
+from consensus_testing.test_fixtures.gossipsub_handler import GossipsubHandlerTest
+from consensus_testing.test_fixtures.justifiability import JustifiabilityTest
+from consensus_testing.test_fixtures.networking_codec import NetworkingCodecTest
+from consensus_testing.test_fixtures.poseidon_permutation import PoseidonPermutationTest
+from consensus_testing.test_fixtures.slot_clock import SlotClockTest
+from consensus_testing.test_fixtures.ssz import SSZTest
+from consensus_testing.test_fixtures.state_transition import StateTransitionTest
+from consensus_testing.test_fixtures.sync import SyncTest
+from consensus_testing.test_fixtures.verify_multi_message_proofs import (
     DropComponentMessageBinding,
     IncrementComponentSlot,
     RebindComponentToAlternateHeadRoot,
@@ -19,8 +19,8 @@ from .verify_multi_message_proofs import (
     SwapComponentParticipantPublicKey,
     VerifyMultiMessageProofsTest,
 )
-from .verify_signatures import VerifySignaturesTest
-from .verify_single_message_proofs import (
+from consensus_testing.test_fixtures.verify_signatures import VerifySignaturesTest
+from consensus_testing.test_fixtures.verify_single_message_proofs import (
     IncrementEmittedSlot,
     RebindToAlternateHeadRoot,
     SwapParticipantPublicKey,

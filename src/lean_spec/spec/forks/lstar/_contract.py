@@ -11,6 +11,7 @@ from lean_spec.spec.forks.lstar.containers import (
     BlockBody,
     BlockHeader,
     Config,
+    Interval,
     SignedAggregatedAttestation,
     SignedBlock,
     SingleMessageAggregate,
@@ -20,10 +21,8 @@ from lean_spec.spec.forks.lstar.containers import (
     ValidatorIndex,
     Validators,
 )
+from lean_spec.spec.forks.protocol import ForkProtocol
 from lean_spec.spec.ssz import Bytes32
-
-from ..protocol import ForkProtocol
-from .interval import Interval
 
 LstarStore = Store[State, Block]
 """Concrete Store specialization owned by the lstar fork."""

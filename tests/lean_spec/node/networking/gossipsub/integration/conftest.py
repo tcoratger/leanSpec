@@ -8,9 +8,8 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
-
-from .network import GossipsubTestNetwork
-from .node import GossipsubTestNode
+from tests.lean_spec.node.networking.gossipsub.integration.network import GossipsubTestNetwork
+from tests.lean_spec.node.networking.gossipsub.integration.node import GossipsubTestNode
 
 
 def fast_params(**overrides: int | float | str) -> GossipsubParameters:
