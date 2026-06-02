@@ -7,10 +7,9 @@ output states bit-for-bit for every input state.
 
 from typing import Any, ClassVar
 
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.poseidon import PARAMS_16, PARAMS_24, Poseidon
-
-from .base import BaseConsensusFixture
 
 
 class PoseidonPermutationTest(BaseConsensusFixture):

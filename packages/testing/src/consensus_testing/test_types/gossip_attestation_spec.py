@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+from consensus_testing.keys import XmssKeyManager, create_dummy_signature
+from consensus_testing.test_types.utils import resolve_checkpoint
 from lean_spec.base import CamelModel
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AttestationData, Block, SignedAttestation, Store
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32
-
-from ..keys import XmssKeyManager, create_dummy_signature
-from .utils import resolve_checkpoint
 
 
 class GossipAttestationSpec(CamelModel):

@@ -1,11 +1,13 @@
 """Test types for consensus test fixtures."""
 
-from .aggregated_attestation_spec import AggregatedAttestationSpec
-from .block_spec import BlockSpec
-from .gossip_aggregated_attestation_spec import GossipAggregatedAttestationSpec
-from .gossip_attestation_spec import GossipAttestationSpec
-from .state_expectation import StateExpectation
-from .step_types import (
+from consensus_testing.test_types.aggregated_attestation_spec import AggregatedAttestationSpec
+from consensus_testing.test_types.block_spec import BlockSpec
+from consensus_testing.test_types.gossip_aggregated_attestation_spec import (
+    GossipAggregatedAttestationSpec,
+)
+from consensus_testing.test_types.gossip_attestation_spec import GossipAttestationSpec
+from consensus_testing.test_types.state_expectation import StateExpectation
+from consensus_testing.test_types.step_types import (
     AttestationStep,
     BaseForkChoiceStep,
     BlockStep,
@@ -13,7 +15,11 @@ from .step_types import (
     GossipAggregatedAttestationStep,
     TickStep,
 )
-from .store_checks import AggregatedAttestationCheck, AttestationCheck, StoreChecks
+from consensus_testing.test_types.store_checks import (
+    AggregatedAttestationCheck,
+    AttestationCheck,
+    StoreChecks,
+)
 
 __all__ = [
     "AggregatedAttestationSpec",

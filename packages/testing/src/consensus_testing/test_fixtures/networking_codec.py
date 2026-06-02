@@ -2,6 +2,7 @@
 
 from typing import Any, ClassVar
 
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.networking.enr.enr import ENR
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
 from lean_spec.node.networking.gossipsub.rpc import (
@@ -26,8 +27,6 @@ from lean_spec.node.networking.transport.peer_id import KeyType, PeerId, PublicK
 from lean_spec.node.networking.varint import decode_varint, encode_varint
 from lean_spec.node.snappy import compress, decompress, frame_compress, frame_decompress
 from lean_spec.spec.forks import SubnetId
-
-from .base import BaseConsensusFixture
 
 
 def _to_hex(data: bytes) -> str:

@@ -11,6 +11,15 @@ from typing import ClassVar, Self
 
 from pydantic import Field, model_validator
 
+from consensus_testing.keys import XmssKeyManager
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_types import (
+    AttestationStep,
+    BlockStep,
+    ForkChoiceStep,
+    GossipAggregatedAttestationStep,
+    TickStep,
+)
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
@@ -22,18 +31,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-
-from ..keys import (
-    XmssKeyManager,
-)
-from ..test_types import (
-    AttestationStep,
-    BlockStep,
-    ForkChoiceStep,
-    GossipAggregatedAttestationStep,
-    TickStep,
-)
-from .base import BaseConsensusFixture
 
 
 class ForkChoiceTest(BaseConsensusFixture):

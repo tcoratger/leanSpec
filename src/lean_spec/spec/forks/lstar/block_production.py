@@ -3,6 +3,7 @@
 from collections.abc import Set as AbstractSet
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract
 from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
 from lean_spec.spec.forks.lstar.config import (
     MAX_ATTESTATIONS_DATA,
@@ -17,10 +18,8 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
     ValidatorIndex,
 )
+from lean_spec.spec.forks.lstar.state_transition import attestation_data_matches_chain
 from lean_spec.spec.ssz import ZERO_HASH, Bytes32, Uint8
-
-from ._contract import LstarSpecContract
-from .state_transition import attestation_data_matches_chain
 
 
 class BlockProductionMixin(LstarSpecContract):

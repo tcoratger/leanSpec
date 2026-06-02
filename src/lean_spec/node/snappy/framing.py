@@ -89,8 +89,8 @@ from __future__ import annotations
 
 from typing import Final
 
-from .compress import compress as raw_compress
-from .decompress import SnappyDecompressionError, decompress as raw_decompress
+from lean_spec.node.snappy.compress import compress as raw_compress
+from lean_spec.node.snappy.decompress import SnappyDecompressionError, decompress as raw_decompress
 
 STREAM_IDENTIFIER: Final = b"\xff\x06\x00\x00sNaPpY"
 """Stream identifier marking the start of a Snappy framed stream.

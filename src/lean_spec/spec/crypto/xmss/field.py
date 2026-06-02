@@ -2,9 +2,9 @@
 
 import secrets
 
-from ..koalabear import Fp, P
-from .constants import XmssConfig
-from .types import HashDigestVector, Parameter
+from lean_spec.spec.crypto.koalabear import Fp, P
+from lean_spec.spec.crypto.xmss.constants import XmssConfig
+from lean_spec.spec.crypto.xmss.types import HashDigestVector, Parameter
 
 
 def int_to_base_p(value: int, num_limbs: int) -> list[Fp]:

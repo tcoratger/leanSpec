@@ -7,13 +7,12 @@ sync-layer decisions bit-for-bit.
 
 from typing import Any, ClassVar
 
+from consensus_testing.genesis import build_anchor, generate_pre_state
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.sync.checkpoint_sync import verify_checkpoint_state
 from lean_spec.spec.forks import Slot
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Uint64
-
-from ..genesis import build_anchor, generate_pre_state
-from .base import BaseConsensusFixture
 
 
 class SyncTest(BaseConsensusFixture):

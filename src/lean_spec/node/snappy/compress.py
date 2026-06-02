@@ -64,8 +64,7 @@ Reference: https://github.com/google/snappy
 from __future__ import annotations
 
 from lean_spec.node.networking.varint import encode_varint
-
-from .constants import (
+from lean_spec.node.snappy.constants import (
     BLOCK_SIZE,
     HASH_MULTIPLIER,
     INPUT_MARGIN_BYTES,
@@ -73,7 +72,7 @@ from .constants import (
     MIN_HASH_TABLE_BITS,
     SNAPPY_VARINT_MAX_BYTES,
 )
-from .encoding import encode_copy_tag, encode_literal_tag
+from lean_spec.node.snappy.encoding import encode_copy_tag, encode_literal_tag
 
 
 def compress(data: bytes) -> bytes:

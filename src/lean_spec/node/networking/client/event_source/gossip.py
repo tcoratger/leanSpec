@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from lean_spec.node.networking.client.event_source.protocol import GossipMessageError
 from lean_spec.node.networking.gossipsub.topic import (
     ForkMismatchError,
     GossipTopic,
@@ -48,8 +49,6 @@ from lean_spec.node.networking.varint import VarintError, decode_varint
 from lean_spec.node.snappy import SnappyDecompressionError, decompress
 from lean_spec.spec.forks import SignedAggregatedAttestation, SignedAttestation, SignedBlock
 from lean_spec.spec.ssz.exceptions import SSZSerializationError
-
-from .protocol import GossipMessageError
 
 
 @dataclass(slots=True)

@@ -1,6 +1,6 @@
 """Specifications for chain and consensus parameters."""
 
-from .clock import SlotClock
+from lean_spec.node.chain.clock import SlotClock
 
 __all__ = [
     "SlotClock",

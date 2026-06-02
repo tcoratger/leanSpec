@@ -6,6 +6,9 @@ from typing import Any, ClassVar
 
 from pydantic import Field
 
+from consensus_testing.keys import XmssKeyManager
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_types import BlockSpec
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
@@ -18,10 +21,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
-
-from ..keys import XmssKeyManager
-from ..test_types import BlockSpec
-from .base import BaseConsensusFixture
 
 
 class VerifySignaturesTest(BaseConsensusFixture):

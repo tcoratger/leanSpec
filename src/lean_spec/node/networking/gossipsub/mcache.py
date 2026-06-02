@@ -66,8 +66,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from itertools import islice
 
-from .message import GossipsubMessage
-from .types import MessageId, Timestamp, TopicId
+from lean_spec.node.networking.gossipsub.message import GossipsubMessage
+from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
 
 @dataclass(slots=True)

@@ -14,9 +14,8 @@ from typing import Final
 from lean_spec.node.networking.peer import PeerInfo
 from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.networking.transport.peer_id import PeerId
+from lean_spec.node.sync.config import MAX_CONCURRENT_REQUESTS
 from lean_spec.spec.forks import Slot
-
-from .config import MAX_CONCURRENT_REQUESTS
 
 INITIAL_PEER_SCORE: Final = 100
 """Starting score for newly added peers."""

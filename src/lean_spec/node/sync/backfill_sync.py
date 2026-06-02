@@ -44,12 +44,11 @@ from typing import Protocol
 
 from lean_spec.node.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.node.networking.transport.peer_id import PeerId
+from lean_spec.node.sync.block_cache import BlockCache
+from lean_spec.node.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
+from lean_spec.node.sync.peer_manager import PeerManager
 from lean_spec.spec.forks import SignedBlock, Slot
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-from .block_cache import BlockCache
-from .config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
-from .peer_manager import PeerManager
 
 logger = logging.getLogger(__name__)
 

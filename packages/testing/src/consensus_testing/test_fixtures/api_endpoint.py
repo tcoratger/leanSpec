@@ -3,15 +3,14 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from consensus_testing.genesis import build_anchor, generate_pre_state
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody, State
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-from ..genesis import build_anchor, generate_pre_state
-from .base import BaseConsensusFixture
 
 EndpointHandler = Callable[[Store, "ApiEndpointTest"], dict[str, Any]]
 """Uniform signature for all endpoint response builders.

@@ -10,9 +10,8 @@ References:
 from lean_multisig_py import setup_prover
 
 from lean_spec.config import LEAN_ENV
-
-from .containers import PublicKey, SecretKey
-from .interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
+from lean_spec.spec.crypto.xmss.containers import PublicKey, SecretKey
+from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME, GeneralizedXmssScheme
 
 # Side effect: configures the Rust prover for the lifetime of the process.
 # One call covers every aggregation, verification, split, and merge.

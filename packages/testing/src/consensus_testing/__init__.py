@@ -2,9 +2,9 @@
 
 from typing import Type
 
-from . import forks
-from .genesis import build_anchor, generate_pre_state
-from .test_fixtures import (
+from consensus_testing import forks
+from consensus_testing.genesis import build_anchor, generate_pre_state
+from consensus_testing.test_fixtures import (
     ApiEndpointTest,
     BaseConsensusFixture,
     DropComponentMessageBinding,
@@ -28,7 +28,7 @@ from .test_fixtures import (
     VerifySignaturesTest,
     VerifySingleMessageProofsTest,
 )
-from .test_types import (
+from consensus_testing.test_types import (
     AggregatedAttestationCheck,
     AggregatedAttestationSpec,
     AttestationCheck,

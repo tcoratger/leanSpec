@@ -1,6 +1,6 @@
 """Multi-fork dispatch layer for leanSpec consensus specification."""
 
-from .lstar.containers import (
+from lean_spec.spec.forks.lstar.containers import (
     IMMEDIATE_JUSTIFICATION_WINDOW,
     VALIDATOR_REGISTRY_LIMIT,
     AggregatedAttestation,
@@ -14,6 +14,7 @@ from .lstar.containers import (
     BlockHeader,
     Checkpoint,
     Config,
+    Interval,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
@@ -25,10 +26,9 @@ from .lstar.containers import (
     ValidatorIndices,
     Validators,
 )
-from .lstar.interval import Interval
-from .lstar.spec import LstarSpec, LstarStore
-from .protocol import ForkProtocol, SpecStateType, SpecStoreType
-from .registry import ForkRegistry
+from lean_spec.spec.forks.lstar.spec import LstarSpec, LstarStore
+from lean_spec.spec.forks.protocol import ForkProtocol, SpecStateType, SpecStoreType
+from lean_spec.spec.forks.registry import ForkRegistry
 
 Store = LstarStore
 """Public alias resolving to the concrete LstarStore until other forks land."""

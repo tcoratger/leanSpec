@@ -72,9 +72,8 @@ Reference: https://github.com/google/snappy/blob/main/format_description.txt
 from __future__ import annotations
 
 from lean_spec.node.networking.varint import VarintError, decode_varint
-
-from .constants import SNAPPY_VARINT_MAX_BYTES
-from .encoding import decode_tag
+from lean_spec.node.snappy.constants import SNAPPY_VARINT_MAX_BYTES
+from lean_spec.node.snappy.encoding import decode_tag
 
 
 class SnappyDecompressionError(Exception):

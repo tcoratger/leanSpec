@@ -13,9 +13,8 @@ Every client must implement this identically for consensus.
 
 from typing import Any, ClassVar
 
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.spec.forks import Slot
-
-from .base import BaseConsensusFixture
 
 
 class JustifiabilityTest(BaseConsensusFixture):

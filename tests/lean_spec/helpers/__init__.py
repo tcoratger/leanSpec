@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from lean_spec.spec.forks import ValidatorIndex
-
-from .builders import (
+from tests.lean_spec.helpers.builders import (
     GenesisData,
     create_mock_sync_service,
     make_aggregated_attestation,
@@ -32,7 +31,7 @@ from .builders import (
     make_validators,
     make_validators_from_key_manager,
 )
-from .mocks import (
+from tests.lean_spec.helpers.mocks import (
     MockEventSource,
     MockForkchoiceStore,
     MockNetworkRequester,

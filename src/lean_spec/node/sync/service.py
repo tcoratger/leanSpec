@@ -16,6 +16,12 @@ from lean_spec.node.metrics import registry as metrics
 from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.networking.transport.peer_id import PeerId
 from lean_spec.node.storage import Database
+from lean_spec.node.sync.backfill_sync import BackfillSync, NetworkRequester
+from lean_spec.node.sync.block_cache import BlockCache
+from lean_spec.node.sync.config import MAX_PENDING_ATTESTATIONS
+from lean_spec.node.sync.head_sync import HeadSync
+from lean_spec.node.sync.peer_manager import PeerManager
+from lean_spec.node.sync.states import SyncState
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import (
@@ -33,13 +39,6 @@ from lean_spec.spec.forks.lstar.containers import (
     SingleMessageAggregate,
 )
 from lean_spec.spec.ssz import Bytes32
-
-from .backfill_sync import BackfillSync, NetworkRequester
-from .block_cache import BlockCache
-from .config import MAX_PENDING_ATTESTATIONS
-from .head_sync import HeadSync
-from .peer_manager import PeerManager
-from .states import SyncState
 
 logger = logging.getLogger(__name__)
 

@@ -51,6 +51,10 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 )
 
 from lean_spec.base import StrictBaseModel
+from lean_spec.node.networking.enr import keys
+from lean_spec.node.networking.enr.eth2 import AttestationSubnets, Eth2Data
+from lean_spec.node.networking.enr.keys import EnrKey
+from lean_spec.node.networking.enr.rlp import RLPDecodingError, RLPItem, decode_rlp_list, encode_rlp
 from lean_spec.node.networking.types import (
     ForkDigest,
     Multiaddr,
@@ -60,11 +64,6 @@ from lean_spec.node.networking.types import (
     Version,
 )
 from lean_spec.spec.ssz import Bytes33, Bytes64, Uint64
-
-from . import keys
-from .eth2 import AttestationSubnets, Eth2Data
-from .keys import EnrKey
-from .rlp import RLPDecodingError, RLPItem, decode_rlp_list, encode_rlp
 
 ENR_PREFIX: Final = "enr:"
 """Text prefix for ENR strings."""

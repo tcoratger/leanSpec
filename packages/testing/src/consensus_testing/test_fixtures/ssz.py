@@ -4,13 +4,12 @@ from typing import Any, ClassVar
 
 from pydantic import field_serializer
 
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.base import CamelModel
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.ssz.boolean import Boolean
 from lean_spec.spec.ssz.ssz_base import SSZType
-
-from .base import BaseConsensusFixture
 
 
 class SSZTest(BaseConsensusFixture):

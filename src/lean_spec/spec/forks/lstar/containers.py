@@ -15,12 +15,10 @@ from pydantic import Field
 from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
 from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
-from lean_spec.spec.forks.lstar.config import HISTORICAL_ROOTS_LIMIT
+from lean_spec.spec.forks.lstar.config import HISTORICAL_ROOTS_LIMIT, INTERVALS_PER_SLOT
+from lean_spec.spec.forks.lstar.slot import IMMEDIATE_JUSTIFICATION_WINDOW, Slot
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Bytes52, Container, SSZList, Uint64
 from lean_spec.spec.ssz.bitfields import BaseBitlist
-
-from .interval import Interval
-from .slot import IMMEDIATE_JUSTIFICATION_WINDOW, Slot
 
 __all__ = [
     # Re-exports from the slot module so downstream callers can keep
@@ -38,6 +36,29 @@ LOG_INV_RATE: int = 1 if LEAN_ENV == "test" else 2
 A smaller rate trades verifier cost for prover speed.
 Test mode favors prover speed.
 """
+
+
+class Interval(Uint64):
+    """Interval count since genesis."""
+
+    @classmethod
+    def from_slot(cls, slot: Slot) -> "Interval":
+        """
+        Convert a slot number to the interval at that slot's start.
+
+        Each slot spans a fixed number of intervals.
+        This gives the first interval of the given slot.
+
+        Args:
+            slot: Slot number since genesis.
+
+        Returns:
+            Interval count at the start of the given slot.
+        """
+        # Slot boundaries fall on exact multiples of the interval count.
+        #
+        # The two values are distinct unsigned types, so drop to plain ints to multiply.
+        return cls(int(slot) * int(INTERVALS_PER_SLOT))
 
 
 class SubnetId(Uint64):

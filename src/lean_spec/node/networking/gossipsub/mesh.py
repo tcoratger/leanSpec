@@ -46,9 +46,9 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from ..transport import PeerId
-from .parameters import GossipsubParameters
-from .types import TopicId
+from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
+from lean_spec.node.networking.gossipsub.types import TopicId
+from lean_spec.node.networking.transport import PeerId
 
 
 @dataclass(slots=True)

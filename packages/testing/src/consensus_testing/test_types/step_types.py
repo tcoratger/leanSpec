@@ -4,17 +4,18 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import ConfigDict, Field, PrivateAttr, field_serializer, model_validator
 
+from consensus_testing.test_types.block_spec import BlockSpec
+from consensus_testing.test_types.gossip_aggregated_attestation_spec import (
+    GossipAggregatedAttestationSpec,
+)
+from consensus_testing.test_types.gossip_attestation_spec import GossipAttestationSpec
+from consensus_testing.test_types.store_checks import StoreChecks
 from lean_spec.base import CamelModel
 from lean_spec.spec.forks.lstar.containers import (
     Block,
     SignedAggregatedAttestation,
     SignedAttestation,
 )
-
-from .block_spec import BlockSpec
-from .gossip_aggregated_attestation_spec import GossipAggregatedAttestationSpec
-from .gossip_attestation_spec import GossipAttestationSpec
-from .store_checks import StoreChecks
 
 
 class BaseForkChoiceStep(CamelModel):

@@ -28,9 +28,8 @@ from lean_spec.spec.forks.lstar.config import ATTESTATION_COMMITTEE_COUNT
 from lean_spec.spec.forks.lstar.containers import Validator, Validators
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes52, Uint64
-
-from .diagnostics import PipelineDiagnostics
-from .port_allocator import PortAllocator
+from tests.interop.helpers.diagnostics import PipelineDiagnostics
+from tests.interop.helpers.port_allocator import PortAllocator
 
 logger = logging.getLogger(__name__)
 

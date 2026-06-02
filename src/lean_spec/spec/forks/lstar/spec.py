@@ -2,11 +2,10 @@
 
 from typing import ClassVar
 
-from ..protocol import ForkProtocol
-from ._contract import LstarSpecContract, LstarStore
-from .aggregation import AggregationMixin
-from .block_production import BlockProductionMixin
-from .containers import (
+from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
+from lean_spec.spec.forks.lstar.aggregation import AggregationMixin
+from lean_spec.spec.forks.lstar.block_production import BlockProductionMixin
+from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
     AttestationData,
@@ -16,11 +15,12 @@ from .containers import (
     Config,
     State,
 )
-from .fork_choice import ForkChoiceMixin
-from .signatures import SignatureMixin
-from .state_transition import StateTransitionMixin
-from .timeline import TimelineMixin
-from .validator_duties import ValidatorDutiesMixin
+from lean_spec.spec.forks.lstar.fork_choice import ForkChoiceMixin
+from lean_spec.spec.forks.lstar.signatures import SignatureMixin
+from lean_spec.spec.forks.lstar.state_transition import StateTransitionMixin
+from lean_spec.spec.forks.lstar.timeline import TimelineMixin
+from lean_spec.spec.forks.lstar.validator_duties import ValidatorDutiesMixin
+from lean_spec.spec.forks.protocol import ForkProtocol
 
 __all__ = ["LstarSpec", "LstarStore"]
 

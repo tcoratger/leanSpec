@@ -2,7 +2,7 @@
 
 from itertools import pairwise
 
-from .protocol import ForkProtocol
+from lean_spec.spec.forks.protocol import ForkProtocol
 
 
 class ForkRegistry:

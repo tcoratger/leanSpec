@@ -2,17 +2,16 @@
 
 from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
+from lean_spec.spec.crypto.xmss.constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
+from lean_spec.spec.crypto.xmss.containers import KeyPair, PublicKey, SecretKey, Signature
+from lean_spec.spec.crypto.xmss.encoding import target_sum_encode
+from lean_spec.spec.crypto.xmss.field import random_parameter
+from lean_spec.spec.crypto.xmss.merkle import HashSubTree, combined_path, verify_path
+from lean_spec.spec.crypto.xmss.poseidon import PROD_POSEIDON, TEST_POSEIDON, PoseidonXmss
+from lean_spec.spec.crypto.xmss.prf import PRFKey
+from lean_spec.spec.crypto.xmss.types import HashDigestList, HashDigestVector
 from lean_spec.spec.forks.lstar.slot import Slot
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-from .constants import PROD_CONFIG, TEST_CONFIG, XmssConfig
-from .containers import KeyPair, PublicKey, SecretKey, Signature
-from .encoding import target_sum_encode
-from .field import random_parameter
-from .merkle import HashSubTree, combined_path, verify_path
-from .poseidon import PROD_POSEIDON, TEST_POSEIDON, PoseidonXmss
-from .prf import PRFKey
-from .types import HashDigestList, HashDigestVector
 
 
 def _expand_activation_time(

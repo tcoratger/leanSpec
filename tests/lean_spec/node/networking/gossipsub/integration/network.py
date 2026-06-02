@@ -10,8 +10,7 @@ import asyncio
 
 from lean_spec.node.networking.gossipsub.parameters import GossipsubParameters
 from lean_spec.node.networking.gossipsub.types import TopicId
-
-from .node import GossipsubTestNode
+from tests.lean_spec.node.networking.gossipsub.integration.node import GossipsubTestNode
 
 # PeerId uses Base58 encoding, which excludes 0, O, I, and l to prevent
 # visual ambiguity. These names use only characters in the Base58 alphabet.
