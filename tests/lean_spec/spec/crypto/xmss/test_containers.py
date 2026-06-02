@@ -34,7 +34,7 @@ def keypair_b() -> KeyPair:
 
 @pytest.fixture(scope="module")
 def hex_dict(keypair_a: KeyPair, keypair_b: KeyPair) -> dict[str, dict[str, str]]:
-    """Nested-hex JSON mapping that mirrors the on-disk format."""
+    """Nested plain-hex mapping accepted as a JSON-load input shape."""
     return {
         "attestation_keypair": {
             "public_key": keypair_a.public_key.encode_bytes().hex(),
@@ -95,12 +95,19 @@ def test_validator_accepts_mixed_inputs(keypair_a: KeyPair, keypair_b: KeyPair) 
     assert vkp.proposal_keypair == keypair_b
 
 
-def test_json_dump_emits_nested_hex_shape(
-    keypair_a: KeyPair, keypair_b: KeyPair, hex_dict: dict[str, dict[str, str]]
-) -> None:
-    """JSON dump produces the on-disk nested-hex layout."""
+def test_json_dump_emits_nested_hex_shape(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
+    """JSON dump emits each key half as a 0x-prefixed hex string."""
     vkp = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
-    assert json.loads(vkp.model_dump_json()) == hex_dict
+    assert json.loads(vkp.model_dump_json()) == {
+        "attestation_keypair": {
+            "public_key": "0x" + keypair_a.public_key.encode_bytes().hex(),
+            "secret_key": "0x" + keypair_a.secret_key.encode_bytes().hex(),
+        },
+        "proposal_keypair": {
+            "public_key": "0x" + keypair_b.public_key.encode_bytes().hex(),
+            "secret_key": "0x" + keypair_b.secret_key.encode_bytes().hex(),
+        },
+    }
 
 
 def test_json_roundtrip_preserves_equality(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
