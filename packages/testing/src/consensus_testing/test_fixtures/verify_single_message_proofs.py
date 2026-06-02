@@ -72,6 +72,9 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
     tamper: Tamper | None = Field(default=None, exclude=True)
     """Optional post-generation mutation that produces a rejection vector."""
 
+    child_groups: list[list[ValidatorIndex]] = Field(default_factory=list, exclude=True)
+    """Optional partition of the participating validators into pre-aggregated child subsets."""
+
     # Fields below are populated during generation.
     #
     # Together they form the client-visible portion of the JSON vector.
@@ -173,7 +176,21 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         validator_indices: list[ValidatorIndex],
         public_keys: list[PublicKey],
     ) -> ByteList512KiB:
-        """Aggregate raw signatures from each validator into proof bytes for the bundle."""
+        """Aggregate signatures into proof bytes, recursively when child subsets are provided."""
+        if self.child_groups:
+            return self._aggregate_recursive(
+                key_manager, attestation_data, validator_indices, public_keys
+            )
+        return self._aggregate_flat(key_manager, attestation_data, validator_indices, public_keys)
+
+    def _aggregate_flat(
+        self,
+        key_manager: XmssKeyManager,
+        attestation_data: AttestationData,
+        validator_indices: list[ValidatorIndex],
+        public_keys: list[PublicKey],
+    ) -> ByteList512KiB:
+        """Aggregate every validator's leaf signature into one single-message proof."""
         signatures = [
             key_manager.sign_attestation_data(i, attestation_data) for i in validator_indices
         ]
@@ -182,5 +199,70 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
             raw_xmss=list(zip(validator_indices, public_keys, signatures, strict=True)),
             message=hash_tree_root(attestation_data),
             slot=attestation_data.slot,
+        )
+        return aggregate.proof
+
+    def _aggregate_recursive(
+        self,
+        key_manager: XmssKeyManager,
+        attestation_data: AttestationData,
+        validator_indices: list[ValidatorIndex],
+        public_keys: list[PublicKey],
+    ) -> ByteList512KiB:
+        """Build a two-level proof so the verifier is exercised on the recursive path.
+
+        Children are leaf-only sub-proofs, so the folded tree is exactly two levels deep.
+
+        Raises:
+            ValueError: If a child group names an unknown validator or reuses one.
+            AggregationError: If the prover rejects the inputs.
+        """
+        message = hash_tree_root(attestation_data)
+        slot = attestation_data.slot
+        index_to_public_key = dict(zip(validator_indices, public_keys, strict=True))
+
+        # Phase 1: reject a malformed partition before signing anything.
+        #
+        # Every grouped index must name a participant the bundle already carries.
+        # No validator may appear in more than one child group.
+        grouped_indices = [i for group in self.child_groups for i in group]
+        grouped_index_set = set(grouped_indices)
+        unknown_indices = grouped_index_set - set(validator_indices)
+        if unknown_indices:
+            raise ValueError(
+                "child_groups reference indices not in validator_indices: "
+                f"{sorted(map(int, unknown_indices))}"
+            )
+        if len(grouped_indices) != len(grouped_index_set):
+            raise ValueError("child_groups assign a validator to more than one child group")
+
+        # Phase 2: pre-aggregate each child group into its own single-message proof.
+        children: list[tuple[SingleMessageAggregate, list[PublicKey]]] = []
+        for group in self.child_groups:
+            group_public_keys = [index_to_public_key[i] for i in group]
+            group_signatures = [
+                key_manager.sign_attestation_data(i, attestation_data) for i in group
+            ]
+            child = SingleMessageAggregate.aggregate(
+                children=[],
+                raw_xmss=list(zip(group, group_public_keys, group_signatures, strict=True)),
+                message=message,
+                slot=slot,
+            )
+            children.append((child, group_public_keys))
+
+        # Phase 3: collect leaf signatures from validators not in any child group.
+        raw_indices = [i for i in validator_indices if i not in grouped_index_set]
+        raw_public_keys = [index_to_public_key[i] for i in raw_indices]
+        raw_signatures = [
+            key_manager.sign_attestation_data(i, attestation_data) for i in raw_indices
+        ]
+
+        # Phase 4: fold the child proofs and leaf signatures into one outer aggregate.
+        aggregate = SingleMessageAggregate.aggregate(
+            children=children,
+            raw_xmss=list(zip(raw_indices, raw_public_keys, raw_signatures, strict=True)),
+            message=message,
+            slot=slot,
         )
         return aggregate.proof
