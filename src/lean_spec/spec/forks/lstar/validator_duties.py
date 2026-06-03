@@ -1,7 +1,7 @@
 """Lstar fork — validator duties: proposal head and production."""
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
+from lean_spec.spec.forks.lstar._base import LstarSpecBase, LstarStore
 from lean_spec.spec.forks.lstar.config import (
     JUSTIFICATION_LOOKBACK_SLOTS,
 )
@@ -17,7 +17,7 @@ from lean_spec.spec.forks.lstar.containers import (
 from lean_spec.spec.ssz import Bytes32, Uint64
 
 
-class ValidatorDutiesMixin(LstarSpecContract):
+class ValidatorDutiesMixin(LstarSpecBase):
     """Validator duties for the lstar fork."""
 
     def get_proposal_head(self, store: LstarStore, slot: Slot) -> tuple[LstarStore, Bytes32]:

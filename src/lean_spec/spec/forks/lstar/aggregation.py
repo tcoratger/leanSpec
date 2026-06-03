@@ -1,7 +1,7 @@
 """Lstar fork — attestation aggregation."""
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
+from lean_spec.spec.forks.lstar._base import LstarSpecBase, LstarStore
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
     SingleMessageAggregate,
@@ -84,7 +84,7 @@ def select_proofs_for_coverage(
     return selected_proofs, covered_validators
 
 
-class AggregationMixin(LstarSpecContract):
+class AggregationMixin(LstarSpecBase):
     """Attestation aggregation for the lstar fork."""
 
     def aggregate(self, store: LstarStore) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:

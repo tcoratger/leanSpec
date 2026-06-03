@@ -8,7 +8,7 @@ from lean_spec.node.observability import (
     observe_state_transition,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar._contract import LstarSpecContract
+from lean_spec.spec.forks.lstar._base import LstarSpecBase
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -67,7 +67,7 @@ def attestation_data_matches_chain(
     )
 
 
-class StateTransitionMixin(LstarSpecContract):
+class StateTransitionMixin(LstarSpecBase):
     """State transition function for the lstar fork."""
 
     def upgrade_state(self, state: SpecStateType) -> State:

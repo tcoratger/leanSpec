@@ -1,6 +1,6 @@
 """Lstar fork — interval ticking and time progression."""
 
-from lean_spec.spec.forks.lstar._contract import LstarSpecContract, LstarStore
+from lean_spec.spec.forks.lstar._base import LstarSpecBase, LstarStore
 from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,
 )
@@ -10,7 +10,7 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 
 
-class TimelineMixin(LstarSpecContract):
+class TimelineMixin(LstarSpecBase):
     """Interval ticking and time progression for the lstar fork."""
 
     def tick_interval(
