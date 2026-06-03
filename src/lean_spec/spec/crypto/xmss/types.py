@@ -3,11 +3,10 @@
 from typing import Final, NamedTuple
 
 from lean_spec.spec.crypto.koalabear import Fp
+from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
 from lean_spec.spec.ssz import Uint64
 from lean_spec.spec.ssz.collections import SSZList, SSZVector
 from lean_spec.spec.ssz.container import Container
-
-from .constants import TARGET_CONFIG
 
 
 class TreeTweak(NamedTuple):

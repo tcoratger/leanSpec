@@ -5,11 +5,12 @@ from __future__ import annotations
 import copy
 from collections import defaultdict
 
+from consensus_testing.keys import XmssKeyManager, create_dummy_signature
+from consensus_testing.test_types.aggregated_attestation_spec import AggregatedAttestationSpec
 from lean_spec.base import CamelModel
-from lean_spec.node.chain.clock import Interval
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import Signature
-from lean_spec.spec.forks import AggregationBits, Slot, ValidatorIndex
+from lean_spec.spec.forks import AggregationBits, Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -26,9 +27,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32
-
-from ..keys import XmssKeyManager, create_dummy_signature
-from .aggregated_attestation_spec import AggregatedAttestationSpec
 
 
 class BlockSpec(CamelModel):

@@ -45,8 +45,7 @@ HISTORICAL_ROOTS_LIMIT: Final = Uint64(2**18)
 """
 The maximum number of historical block roots to store in the state.
 
-With a 4-second slot, this corresponds to a history
-of approximately 12.1 days.
+With a 4-second slot, this corresponds to a history of approximately 12.1 days.
 """
 
 ATTESTATION_COMMITTEE_COUNT: Final = Uint64(1)

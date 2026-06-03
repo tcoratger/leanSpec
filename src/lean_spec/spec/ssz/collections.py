@@ -46,10 +46,10 @@ from typing import (
 
 from pydantic import Field, field_serializer, field_validator
 
-from .byte_arrays import BaseBytes
-from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
-from .ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
-from .uint import Uint32
+from lean_spec.spec.ssz.byte_arrays import BaseBytes
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
+from lean_spec.spec.ssz.uint import Uint32
 
 
 def _validate_offsets(offsets: list[int], scope: int, type_name: str) -> None:

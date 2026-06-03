@@ -60,9 +60,9 @@ References:
 from __future__ import annotations
 
 from lean_spec.base import StrictBaseModel
-from lean_spec.node.chain.config import JUSTIFICATION_LOOKBACK_SLOTS, SECONDS_PER_SLOT
 from lean_spec.node.networking.config import GOSSIPSUB_DEFAULT_PROTOCOL_ID
 from lean_spec.node.networking.types import ProtocolId
+from lean_spec.spec.forks.lstar.config import JUSTIFICATION_LOOKBACK_SLOTS, SECONDS_PER_SLOT
 
 
 class GossipsubParameters(StrictBaseModel):

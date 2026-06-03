@@ -7,9 +7,9 @@ from typing import IO, Any, Self, override
 from pydantic import model_validator
 from pydantic.functional_validators import ModelWrapValidatorHandler
 
-from .exceptions import SSZError, SSZSerializationError, SSZTypeError
-from .ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
-from .uint import Uint32
+from lean_spec.spec.ssz.exceptions import SSZError, SSZSerializationError, SSZTypeError
+from lean_spec.spec.ssz.ssz_base import BYTES_PER_LENGTH_OFFSET, SSZModel, SSZType
+from lean_spec.spec.ssz.uint import Uint32
 
 
 class Container(SSZModel):

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from .constants import (
+from lean_spec.node.snappy.constants import (
     COPY_1_BYTE_OFFSET,
     COPY_2_BYTE_OFFSET,
     COPY_4_BYTE_OFFSET,

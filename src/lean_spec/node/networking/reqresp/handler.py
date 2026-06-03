@@ -69,15 +69,8 @@ from lean_spec.node.networking.config import (
     MAX_REQUEST_BLOCKS,
     MIN_SLOTS_FOR_BLOCK_REQUESTS,
 )
-from lean_spec.node.networking.transport.protocols import InboundStreamProtocol
-from lean_spec.node.networking.types import ProtocolId
-from lean_spec.node.networking.varint import VarintError, decode_varint
-from lean_spec.node.snappy import SnappyDecompressionError, frame_decompress
-from lean_spec.spec.forks import SignedBlock, Slot
-from lean_spec.spec.ssz import Bytes32, Uint64
-
-from .codec import ResponseCode
-from .message import (
+from lean_spec.node.networking.reqresp.codec import ResponseCode
+from lean_spec.node.networking.reqresp.message import (
     BLOCKS_BY_RANGE_PROTOCOL_V1,
     BLOCKS_BY_ROOT_PROTOCOL_V1,
     STATUS_PROTOCOL_V1,
@@ -85,6 +78,12 @@ from .message import (
     BlocksByRootRequest,
     Status,
 )
+from lean_spec.node.networking.transport.protocols import InboundStreamProtocol
+from lean_spec.node.networking.types import ProtocolId
+from lean_spec.node.networking.varint import VarintError, decode_varint
+from lean_spec.node.snappy import SnappyDecompressionError, frame_decompress
+from lean_spec.spec.forks import SignedBlock, Slot
+from lean_spec.spec.ssz import Bytes32, Uint64
 
 logger = logging.getLogger(__name__)
 

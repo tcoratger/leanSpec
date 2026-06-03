@@ -11,9 +11,18 @@ from typing import ClassVar, Self
 
 from pydantic import Field, model_validator
 
-from lean_spec.node.chain.clock import Interval
+from consensus_testing.keys import XmssKeyManager
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_types import (
+    AttestationStep,
+    BlockStep,
+    ForkChoiceStep,
+    GossipAggregatedAttestationStep,
+    TickStep,
+)
+from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -22,19 +31,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import Uint64
-
-from ..keys import (
-    XmssKeyManager,
-)
-from ..test_types import (
-    AttestationStep,
-    BlockStep,
-    ForkChoiceStep,
-    GossipAggregatedAttestationStep,
-    TickStep,
-)
-from .base import BaseConsensusFixture
 
 
 class ForkChoiceTest(BaseConsensusFixture):
@@ -278,10 +274,11 @@ class ForkChoiceTest(BaseConsensusFixture):
                         else:
                             assert step.time is not None
                             # TickStep.time is a Unix timestamp in seconds.
-                            # Convert to intervals since genesis for the store.
-                            target_interval = Interval.from_unix_time(
-                                Uint64(step.time), store.config.genesis_time
-                            )
+                            # The slot clock converts it to intervals since genesis.
+                            target_interval = SlotClock(
+                                genesis_time=store.config.genesis_time,
+                                time_fn=lambda t=step.time: float(t),
+                            ).total_intervals()
                         store, _ = spec.on_tick(
                             store,
                             target_interval,

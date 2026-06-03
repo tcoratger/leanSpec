@@ -20,8 +20,7 @@ import logging
 import pytest
 
 from lean_spec.spec.forks import ValidatorIndex
-
-from .helpers import (
+from tests.interop.helpers import (
     NodeCluster,
     PipelineDiagnostics,
     assert_checkpoint_monotonicity,

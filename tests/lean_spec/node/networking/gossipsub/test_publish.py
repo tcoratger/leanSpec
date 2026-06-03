@@ -18,8 +18,7 @@ from lean_spec.node.networking.gossipsub.rpc import (
     SubOpts,
 )
 from lean_spec.node.networking.gossipsub.types import TopicId
-
-from .conftest import add_peer, make_behavior
+from tests.lean_spec.node.networking.gossipsub.conftest import add_peer, make_behavior
 
 
 class TestPublish:

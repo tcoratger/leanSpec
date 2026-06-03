@@ -25,9 +25,9 @@ from typing import (
 
 from pydantic import Field, field_validator
 
-from .boolean import Boolean
-from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
-from .ssz_base import SSZModel
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.ssz_base import SSZModel
 
 
 class BaseBitvector(SSZModel):

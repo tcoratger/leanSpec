@@ -1,8 +1,8 @@
 """SSZ primitive types and (de)serialization for the Lean Ethereum specification."""
 
-from .bitfields import BaseBitlist, BaseBitvector
-from .boolean import Boolean
-from .byte_arrays import (
+from lean_spec.spec.ssz.bitfields import BaseBitlist, BaseBitvector
+from lean_spec.spec.ssz.boolean import Boolean
+from lean_spec.spec.ssz.byte_arrays import (
     ZERO_HASH,
     BaseByteList,
     BaseBytes,
@@ -17,16 +17,16 @@ from .byte_arrays import (
     Bytes64,
     Bytes65,
 )
-from .collections import SSZList, SSZVector
-from .container import Container
-from .exceptions import (
+from lean_spec.spec.ssz.collections import SSZList, SSZVector
+from lean_spec.spec.ssz.container import Container
+from lean_spec.spec.ssz.exceptions import (
     SSZError,
     SSZSerializationError,
     SSZTypeError,
     SSZValueError,
 )
-from .ssz_base import SSZType
-from .uint import Uint8, Uint16, Uint32, Uint64
+from lean_spec.spec.ssz.ssz_base import SSZType
+from lean_spec.spec.ssz.uint import Uint8, Uint16, Uint32, Uint64
 
 __all__ = [
     "ZERO_HASH",

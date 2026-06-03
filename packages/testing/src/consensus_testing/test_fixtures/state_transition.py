@@ -4,6 +4,9 @@ from typing import Any, ClassVar
 
 from pydantic import ConfigDict, PrivateAttr, field_serializer
 
+from consensus_testing.keys import XmssKeyManager
+from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits
 from lean_spec.spec.forks.lstar.containers import (
@@ -17,10 +20,6 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32
-
-from ..keys import XmssKeyManager
-from ..test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
-from .base import BaseConsensusFixture
 
 
 class StateTransitionTest(BaseConsensusFixture):

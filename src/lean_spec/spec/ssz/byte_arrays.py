@@ -18,8 +18,8 @@ from pydantic import Field, field_serializer, field_validator
 from pydantic.annotated_handlers import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
-from .exceptions import SSZSerializationError, SSZTypeError, SSZValueError
-from .ssz_base import SSZModel, SSZType
+from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
+from lean_spec.spec.ssz.ssz_base import SSZModel, SSZType
 
 
 class BaseBytes(bytes, SSZType):

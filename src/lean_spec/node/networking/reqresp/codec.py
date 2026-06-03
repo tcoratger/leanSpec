@@ -75,10 +75,9 @@ from __future__ import annotations
 
 from enum import IntEnum
 
+from lean_spec.node.networking.config import MAX_PAYLOAD_SIZE
+from lean_spec.node.networking.varint import VarintError, decode_varint, encode_varint
 from lean_spec.node.snappy import SnappyDecompressionError, frame_compress, frame_decompress
-
-from ..config import MAX_PAYLOAD_SIZE
-from ..varint import VarintError, decode_varint, encode_varint
 
 
 class CodecError(Exception):

@@ -5,18 +5,12 @@ from itertools import batched
 from pydantic import PrivateAttr
 
 from lean_spec.base import StrictBaseModel
+from lean_spec.spec.crypto.koalabear import Fp
+from lean_spec.spec.crypto.poseidon import PARAMS_16, PARAMS_24, Poseidon, PoseidonParams
+from lean_spec.spec.crypto.xmss.constants import TWEAK_PREFIX_CHAIN, TWEAK_PREFIX_TREE, XmssConfig
+from lean_spec.spec.crypto.xmss.field import int_to_base_p
+from lean_spec.spec.crypto.xmss.types import ChainTweak, HashDigestVector, Parameter, TreeTweak
 from lean_spec.spec.ssz import Uint64
-
-from ..koalabear import Fp
-from ..poseidon import (
-    PARAMS_16,
-    PARAMS_24,
-    Poseidon,
-    PoseidonParams,
-)
-from .constants import TWEAK_PREFIX_CHAIN, TWEAK_PREFIX_TREE, XmssConfig
-from .field import int_to_base_p
-from .types import ChainTweak, HashDigestVector, Parameter, TreeTweak
 
 
 class PoseidonXmss(StrictBaseModel):

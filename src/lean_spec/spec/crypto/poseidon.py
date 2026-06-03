@@ -15,8 +15,8 @@ from numba import njit
 from numpy.typing import NDArray
 from pydantic import Field, model_validator
 
-from ...base import StrictBaseModel
-from .koalabear import Fp, P
+from lean_spec.base import StrictBaseModel
+from lean_spec.spec.crypto.koalabear import Fp, P
 
 # For width 16: 28 rounds x 16 = 448 constants
 # Layout: initial_full (4 x 16) + partial (20 x 16) + terminal_full (4 x 16)
