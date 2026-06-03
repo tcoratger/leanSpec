@@ -4,7 +4,7 @@ from collections.abc import Set as AbstractSet
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar._contract import LstarSpecContract
-from lean_spec.spec.forks.lstar.aggregation_select import select_greedily
+from lean_spec.spec.forks.lstar.aggregation import select_proofs_for_coverage
 from lean_spec.spec.forks.lstar.config import (
     MAX_ATTESTATIONS_DATA,
 )
@@ -136,7 +136,7 @@ class BlockProductionMixin(LstarSpecContract):
 
                     found_entries = True
 
-                    selected, _ = select_greedily(proofs)
+                    selected, _ = select_proofs_for_coverage(proofs)
                     aggregated_signatures.extend(selected)
                     for proof in selected:
                         aggregated_attestations.append(
