@@ -151,7 +151,7 @@ class ValidatorDutiesMixin(LstarSpecBase):
         # Only one validator may propose per slot.
         # Unauthorized proposals would be rejected by other nodes.
         num_validators = Uint64(len(head_state.validators))
-        assert validator_index.is_proposer_for(slot, num_validators), (
+        assert validator_index == ValidatorIndex.proposer_for_slot(slot, num_validators), (
             f"Validator {validator_index} is not the proposer for slot {slot}"
         )
 

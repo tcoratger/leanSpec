@@ -70,24 +70,7 @@ class TestProposerForSlot:
         assert isinstance(result, ValidatorIndex)
 
 
-class TestIsProposerFor:
-    """Boolean predicate counterpart to the round-robin proposer selection."""
-
-    @pytest.mark.parametrize("num_validators", [1, 2, 5, 10, 100, 1000])
-    def test_predicate_matches_classmethod(self, num_validators: int) -> None:
-        """A validator is the proposer exactly when it matches the round-robin selection."""
-        registry_size = Uint64(num_validators)
-        # Sweep a slot window that crosses the registry boundary at least once.
-        slot_window = range(min(num_validators * 2, 20))
-        for slot_num in slot_window:
-            slot = Slot(slot_num)
-            chosen = ValidatorIndex.proposer_for_slot(slot, registry_size)
-            for validator_index in range(num_validators):
-                candidate = ValidatorIndex(validator_index)
-                assert candidate.is_proposer_for(slot, registry_size) == (candidate == chosen)
-
-
-class TestIsValid:
+class TestIsWithinRegistry:
     """Bounds check for validator indices against the registry size."""
 
     @pytest.mark.parametrize(
@@ -110,7 +93,7 @@ class TestIsValid:
     )
     def test_is_in_bounds(self, index: int, num_validators: int, expected: bool) -> None:
         """An index is valid exactly when it is strictly less than the registry size."""
-        assert ValidatorIndex(index).is_valid(Uint64(num_validators)) is expected
+        assert ValidatorIndex(index).is_within_registry(Uint64(num_validators)) is expected
 
 
 class TestComputeSubnetId:

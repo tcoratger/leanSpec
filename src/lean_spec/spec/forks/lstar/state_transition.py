@@ -190,7 +190,7 @@ class StateTransitionMixin(LstarSpecBase):
         # Verify the block proposer.
         #
         # Ensures the block was proposed by the assigned validator for this round.
-        assert block.proposer_index.is_proposer_for(
+        assert block.proposer_index == ValidatorIndex.proposer_for_slot(
             slot=state.slot,
             num_validators=Uint64(len(state.validators)),
         ), "Incorrect block proposer"

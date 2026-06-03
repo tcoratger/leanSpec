@@ -282,7 +282,7 @@ class ValidatorService:
         #
         # Only one validator can be the proposer per slot.
         for validator_index in self.registry.indices():
-            if not validator_index.is_proposer_for(slot, num_validators):
+            if validator_index != ValidatorIndex.proposer_for_slot(slot, num_validators):
                 continue
 
             # We are the proposer for this slot.
@@ -450,7 +450,7 @@ class ValidatorService:
             )
 
         validators = key_state.validators
-        if not validator_index.is_valid(Uint64(len(validators))):
+        if not validator_index.is_within_registry(Uint64(len(validators))):
             raise ValueError(f"Validator {validator_index} not found in state validators")
         proposer_public_key = validators[validator_index].get_proposal_public_key()
 
@@ -475,7 +475,7 @@ class ValidatorService:
         for proof in attestation_proofs:
             part_public_keys: list[PublicKey] = []
             for validator_index in proof.participants.to_validator_indices():
-                if not validator_index.is_valid(num_validators):
+                if not validator_index.is_within_registry(num_validators):
                     raise ValueError(
                         f"Attestation proof references validator {validator_index}; "
                         f"active set has {num_validators} validators"
