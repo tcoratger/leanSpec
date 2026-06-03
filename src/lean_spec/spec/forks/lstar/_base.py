@@ -1,4 +1,4 @@
-"""Internal typing contract shared by the lstar spec mixins."""
+"""Shared typed base for the lstar spec mixins."""
 
 from abc import abstractmethod
 from collections.abc import Set as AbstractSet
@@ -28,13 +28,8 @@ LstarStore = Store[State, Block]
 """Concrete Store specialization owned by the lstar fork."""
 
 
-class LstarSpecContract(ForkProtocol):
-    """Shared typing contract for the lstar fork mixins.
-
-    Declares the concrete container factory types.
-    Declares the cross-mixin method surface.
-    Lets each mixin call siblings without importing the other mixins.
-    """
+class LstarSpecBase(ForkProtocol):
+    """Shared typed base every lstar behavior mixin inherits."""
 
     state_class: type[State]
     block_class: type[Block]
@@ -95,11 +90,6 @@ class LstarSpecContract(ForkProtocol):
     @abstractmethod
     def accept_new_attestations(self, store: LstarStore) -> LstarStore:
         """Migrate pending payloads into the known pool and update the head."""
-        ...
-
-    @abstractmethod
-    def update_safe_target(self, store: LstarStore) -> LstarStore:
-        """Update the deepest block with supermajority attestation weight."""
         ...
 
     @abstractmethod

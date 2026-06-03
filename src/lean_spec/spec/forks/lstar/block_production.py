@@ -3,7 +3,7 @@
 from collections.abc import Set as AbstractSet
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks.lstar._contract import LstarSpecContract
+from lean_spec.spec.forks.lstar._base import LstarSpecBase
 from lean_spec.spec.forks.lstar.aggregation import select_proofs_for_coverage
 from lean_spec.spec.forks.lstar.config import (
     MAX_ATTESTATIONS_DATA,
@@ -22,7 +22,7 @@ from lean_spec.spec.forks.lstar.state_transition import attestation_data_matches
 from lean_spec.spec.ssz import ZERO_HASH, Bytes32, Uint8
 
 
-class BlockProductionMixin(LstarSpecContract):
+class BlockProductionMixin(LstarSpecBase):
     """Proposer-side block building for the lstar fork."""
 
     def build_block(

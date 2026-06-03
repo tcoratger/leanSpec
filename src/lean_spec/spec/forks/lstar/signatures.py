@@ -2,7 +2,7 @@
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import PublicKey
-from lean_spec.spec.forks.lstar._contract import LstarSpecContract
+from lean_spec.spec.forks.lstar._base import LstarSpecBase
 from lean_spec.spec.forks.lstar.containers import (
     AggregationError,
     SignedBlock,
@@ -12,7 +12,7 @@ from lean_spec.spec.forks.lstar.containers import (
 from lean_spec.spec.ssz import Bytes32, Uint64
 
 
-class SignatureMixin(LstarSpecContract):
+class SignatureMixin(LstarSpecBase):
     """Block signature verification for the lstar fork."""
 
     def verify_signatures(
