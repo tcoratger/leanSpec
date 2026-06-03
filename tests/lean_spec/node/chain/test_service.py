@@ -55,7 +55,7 @@ class ProbeSpec(LstarSpec):
         self.ticks: list[tuple[int, bool, bool]] = []
         self.emit = emit or []
 
-    def tick_interval(  # type: ignore[override]
+    def tick_interval(
         self, store: Store, has_proposal: bool, is_aggregator: bool = False
     ) -> tuple[Store, list[SignedAggregatedAttestation]]:
         """Advance the real store, record the call, then emit at the aggregation interval."""

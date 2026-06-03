@@ -216,8 +216,11 @@ class _SSZSequence[T: SSZType](SSZModel):
         """Return the number of elements in the sequence."""
         return len(self.data)
 
+    # The parent Pydantic model iterates field name and value pairs.
+    # Yielding elements instead is the intended collection behavior.
+    # The narrower element type violates strict Liskov substitution, so it is suppressed.
     @override
-    def __iter__(self) -> Iterator[T]:  # type: ignore[override]
+    def __iter__(self) -> Iterator[T]:  # ty: ignore[invalid-method-override]
         """
         Iterate over the elements.
 

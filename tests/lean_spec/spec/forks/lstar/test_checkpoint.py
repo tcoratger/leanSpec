@@ -75,13 +75,13 @@ class TestCheckpointImmutability:
         """Assigning a new root on a constructed checkpoint raises."""
         cp = Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0))
         with pytest.raises(ValidationError, match="frozen"):
-            cp.root = Bytes32(b"\xff" * 32)  # type: ignore[misc]
+            cp.root = Bytes32(b"\xff" * 32)
 
     def test_assigning_slot_raises(self) -> None:
         """Assigning a new slot on a constructed checkpoint raises."""
         cp = Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0))
         with pytest.raises(ValidationError, match="frozen"):
-            cp.slot = Slot(99)  # type: ignore[misc]
+            cp.slot = Slot(99)
 
 
 class TestCheckpointSSZShape:

@@ -36,7 +36,7 @@ from lean_spec.spec.ssz import Bytes32, Uint64
 class ForkChoiceMixin(LstarSpecContract):
     """Fork choice and store maintenance for the lstar fork."""
 
-    def create_store(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def create_store(
         self,
         state: SpecStateType,
         anchor_block: SpecBlockType,

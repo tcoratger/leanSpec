@@ -285,7 +285,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         return
 
     fork_class = config.test_fork_class
-    layer_module = config.layer_module  # type: ignore[attribute-defined]
+    layer_module = config.layer_module
     registry = layer_module.forks.registry
     verbose = config.getoption("verbose")
     deselected = []
@@ -469,7 +469,7 @@ def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
     ) -> Any:
         """Fixture used to instantiate an auto-fillable fixture object."""
 
-        class FixtureWrapper(fixture_class):  # type: ignore[misc]
+        class FixtureWrapper(fixture_class):
             """Wrapper class that auto-fills and collects fixtures on instantiation."""
 
             def __init__(self, **kwargs: Any) -> None:
