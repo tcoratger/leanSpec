@@ -229,7 +229,7 @@ class ForkChoiceMixin(LstarSpecContract):
                 f"No state available to verify attestation signature for target block "
                 f"{attestation_data.target.root.hex()}"
             )
-            assert validator_index.is_valid(Uint64(len(key_state.validators))), (
+            assert validator_index.is_within_registry(Uint64(len(key_state.validators))), (
                 f"Validator {validator_index} not found in state "
                 f"{attestation_data.target.root.hex()}"
             )
@@ -283,7 +283,7 @@ class ForkChoiceMixin(LstarSpecContract):
         # Ensure all participants exist in the active set
         validators = key_state.validators
         for validator_index in validator_indices:
-            assert validator_index.is_valid(Uint64(len(validators))), (
+            assert validator_index.is_within_registry(Uint64(len(validators))), (
                 f"Validator {validator_index} not found in state {data.target.root.hex()}"
             )
 

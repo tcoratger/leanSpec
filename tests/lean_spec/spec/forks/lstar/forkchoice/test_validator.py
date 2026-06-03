@@ -422,8 +422,10 @@ class TestValidatorErrorHandling:
         state = sample_store.states[genesis_hash]
         num_validators = len(state.validators)
 
-        # is_proposer_for should work (though likely return False)
-        result = large_validator.is_proposer_for(large_slot, Uint64(num_validators))
+        # Proposer comparison should work (though likely not match).
+        result = large_validator == ValidatorIndex.proposer_for_slot(
+            large_slot, Uint64(num_validators)
+        )
         assert isinstance(result, bool)
 
         # Attestation can be created for any validator

@@ -76,11 +76,7 @@ class ValidatorIndex(Uint64):
         """
         return cls(int(slot) % int(num_validators))
 
-    def is_proposer_for(self, slot: Slot, num_validators: Uint64) -> bool:
-        """Check if this validator is the proposer for the given slot."""
-        return self == ValidatorIndex.proposer_for_slot(slot, num_validators)
-
-    def is_valid(self, num_validators: Uint64) -> bool:
+    def is_within_registry(self, num_validators: Uint64) -> bool:
         """Check if this index is within valid bounds for a registry of given size."""
         return int(self) < int(num_validators)
 

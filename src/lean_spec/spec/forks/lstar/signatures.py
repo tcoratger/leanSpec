@@ -58,7 +58,9 @@ class SignatureMixin(LstarSpecContract):
         for aggregated_attestation in aggregated_attestations:
             validator_indices = aggregated_attestation.aggregation_bits.to_validator_indices()
             for validator_index in validator_indices:
-                assert validator_index.is_valid(num_validators), "Validator index out of range"
+                assert validator_index.is_within_registry(num_validators), (
+                    "Validator index out of range"
+                )
 
             public_keys_per_message.append(
                 [
@@ -79,7 +81,7 @@ class SignatureMixin(LstarSpecContract):
         # This proves the proposer endorsed this specific block.
         # It is a single-participant entry, distinct from the vote entries.
         proposer_index = block.proposer_index
-        assert proposer_index.is_valid(num_validators), "Proposer index out of range"
+        assert proposer_index.is_within_registry(num_validators), "Proposer index out of range"
 
         public_keys_per_message.append([validators[proposer_index].get_proposal_public_key()])
         message_bindings.append((hash_tree_root(block), block.slot))
