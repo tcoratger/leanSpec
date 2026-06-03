@@ -93,6 +93,11 @@ class LstarSpecBase(ForkProtocol):
         ...
 
     @abstractmethod
+    def update_safe_target(self, store: LstarStore) -> LstarStore:
+        """Update the deepest block with supermajority attestation weight."""
+        ...
+
+    @abstractmethod
     def aggregate(self, store: LstarStore) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
         """Combine raw validator votes into compact aggregated attestations."""
         ...

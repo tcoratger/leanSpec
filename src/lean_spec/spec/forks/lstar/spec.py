@@ -18,6 +18,7 @@ from lean_spec.spec.forks.lstar.containers import (
 from lean_spec.spec.forks.lstar.fork_choice import ForkChoiceMixin
 from lean_spec.spec.forks.lstar.signatures import SignatureMixin
 from lean_spec.spec.forks.lstar.state_transition import StateTransitionMixin
+from lean_spec.spec.forks.lstar.timeline import TimelineMixin
 from lean_spec.spec.forks.lstar.validator_duties import ValidatorDutiesMixin
 from lean_spec.spec.forks.protocol import ForkProtocol
 
@@ -30,6 +31,7 @@ class LstarSpec(
     BlockProductionMixin,
     ForkChoiceMixin,
     AggregationMixin,
+    TimelineMixin,
     ValidatorDutiesMixin,
     LstarSpecBase,
 ):
