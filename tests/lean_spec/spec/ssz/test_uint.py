@@ -201,7 +201,7 @@ def test_divmod(uint_class: Type[BaseUint]) -> None:
 
     expected = f"Unsupported operand type(s) for divmod: '{uint_class.__name__}' and 'int'"
     with pytest.raises(TypeError, match=rf"^{re.escape(expected)}$"):
-        _ = divmod(100, uint_class(3))  # type: ignore[call-overload]
+        _ = divmod(100, uint_class(3))
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -573,7 +573,7 @@ class TestPowShiftStrictOperands:
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
         with pytest.raises(TypeError, match=rf"^{re.escape(expected)}$"):
-            uint_class(2) ** bad  # type: ignore[operator]
+            uint_class(2) ** bad
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [100, True])
@@ -617,7 +617,7 @@ class TestPowShiftStrictOperands:
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
         with pytest.raises(TypeError, match=rf"^{re.escape(expected)}$"):
-            uint_class(1) << bad  # type: ignore[operator]
+            uint_class(1) << bad
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [2, True])
@@ -628,7 +628,7 @@ class TestPowShiftStrictOperands:
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
         with pytest.raises(TypeError, match=rf"^{re.escape(expected)}$"):
-            uint_class(8) >> bad  # type: ignore[operator]
+            uint_class(8) >> bad
 
 
 class TestDivmodEdgeCases:
@@ -639,7 +639,7 @@ class TestDivmodEdgeCases:
         """Forward divmod raises TypeError when the divisor is a plain int."""
         expected = f"Unsupported operand type(s) for divmod: '{uint_class.__name__}' and 'int'"
         with pytest.raises(TypeError, match=rf"^{re.escape(expected)}$"):
-            divmod(uint_class(10), 3)  # type: ignore[call-overload]
+            divmod(uint_class(10), 3)
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_rdivmod_success(self, uint_class: Type[BaseUint]) -> None:

@@ -16,7 +16,7 @@ class BaseConsensusFixture(BaseFixture):
 
     # Class-level registry of all consensus fixture formats
     # Override parent's formats to maintain a separate registry
-    formats: ClassVar[dict[str, type["BaseConsensusFixture"]]] = {}  # type: ignore[assignment]
+    formats: ClassVar[dict[str, type["BaseConsensusFixture"]]] = {}
 
     expect_exception: type[Exception] | None = None
     """

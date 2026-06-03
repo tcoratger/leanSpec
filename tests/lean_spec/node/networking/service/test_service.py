@@ -144,7 +144,7 @@ class TestRunLifecycle:
         sync_service = create_mock_sync_service(peer_id)
         svc = NetworkService(
             sync_service=sync_service,
-            event_source=source,  # type: ignore[arg-type]
+            event_source=source,
             network_name=FORK_DIGEST,
         )
         await svc.run()

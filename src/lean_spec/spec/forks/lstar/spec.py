@@ -888,9 +888,7 @@ class LstarSpec(ForkProtocol):
 
         return True
 
-    # Pydantic fields don't structurally match Protocol @property in ty;
-    # the concrete return is Liskov-safe (Store satisfies SpecStoreType structurally).
-    def create_store(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def create_store(
         self,
         state: SpecStateType,
         anchor_block: SpecBlockType,

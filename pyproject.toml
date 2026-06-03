@@ -86,6 +86,11 @@ python-version = "3.12"
 [tool.ty.src]
 exclude = [".claude/"]
 
+[tool.ty.rules]
+# Flag any suppression comment that no longer matches a real diagnostic.
+# Keeps the ignore set honest as the code evolves and prevents stale or duplicate suppressions.
+unused-ignore-comment = "error"
+
 [tool.ty.terminal]
 error-on-warning = true
 

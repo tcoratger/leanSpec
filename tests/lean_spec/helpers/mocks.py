@@ -28,29 +28,25 @@ from lean_spec.spec.ssz import Bytes32, Uint64
 class StoreInterceptingSpec(LstarSpec):
     """Spec stub that forwards consensus calls to the store argument."""
 
-    def on_block(  # type: ignore[override]
-        self, store: Any, signed_block: Any, *args: Any, **kwargs: Any
-    ) -> Any:
+    def on_block(self, store: Any, signed_block: Any, *args: Any, **kwargs: Any) -> Any:
         """Forward to store.on_block."""
         kwargs.pop("scheme", None)
         return store.on_block(signed_block, *args, **kwargs)
 
-    def on_gossip_attestation(  # type: ignore[override]
+    def on_gossip_attestation(
         self, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
     ) -> Any:
         """Forward to store.on_gossip_attestation."""
         kwargs.pop("scheme", None)
         return store.on_gossip_attestation(signed_attestation, *args, **kwargs)
 
-    def on_gossip_aggregated_attestation(  # type: ignore[override]
+    def on_gossip_aggregated_attestation(
         self, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
     ) -> Any:
         """Forward to store.on_gossip_aggregated_attestation."""
         return store.on_gossip_aggregated_attestation(signed_attestation, *args, **kwargs)
 
-    def tick_interval(  # type: ignore[override]
-        self, store: Any, has_proposal: bool, is_aggregator: bool = False
-    ) -> Any:
+    def tick_interval(self, store: Any, has_proposal: bool, is_aggregator: bool = False) -> Any:
         """Forward to store.tick_interval."""
         return store.tick_interval(has_proposal, is_aggregator)
 

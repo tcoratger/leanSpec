@@ -25,7 +25,7 @@ from .network import GossipsubTestNetwork
 TOPIC = TopicId("test/mesh")
 
 
-def _all_meshes_in_bounds(network: GossipsubTestNetwork, params, topic: str) -> bool:  # type: ignore[no-untyped-def]
+def _all_meshes_in_bounds(network: GossipsubTestNetwork, params, topic: str) -> bool:
     """Check whether every node's mesh is within [D_low, D_high]."""
     return all(params.d_low <= node.get_mesh_size(topic) <= params.d_high for node in network.nodes)
 

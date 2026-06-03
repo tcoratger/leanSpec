@@ -257,7 +257,7 @@ class TestBitlist:
         """Adding an unsupported type returns NotImplemented and Python raises TypeError."""
         bitlist = Bitlist8(data=[Boolean(True)])
         with pytest.raises(TypeError):
-            _ = bitlist + 42  # type: ignore[operator]
+            _ = bitlist + 42
 
     def test_add_exceeding_limit_raises_error(self) -> None:
         """Concatenation beyond LIMIT raises with the exact size in the message."""

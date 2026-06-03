@@ -193,7 +193,7 @@ class TestSSZVectorValidator:
     def test_missing_element_type_and_length_rejected(self) -> None:
         """A subclass without ELEMENT_TYPE or LENGTH cannot validate any input."""
 
-        class MissingBoth(SSZVector):  # type: ignore[type-arg]
+        class MissingBoth(SSZVector):
             pass
 
         with pytest.raises(
@@ -408,7 +408,7 @@ class TestSSZListValidator:
     def test_missing_element_type_and_limit_rejected(self) -> None:
         """A subclass without ELEMENT_TYPE or LIMIT cannot validate any input."""
 
-        class MissingBoth(SSZList):  # type: ignore[type-arg]
+        class MissingBoth(SSZList):
             pass
 
         with pytest.raises(

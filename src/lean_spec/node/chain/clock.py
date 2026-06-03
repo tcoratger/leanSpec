@@ -52,6 +52,9 @@ class Interval(Uint64):
         # Truncate to whole intervals.
         return cls(delta_ms // MILLISECONDS_PER_INTERVAL)
 
+    # Importing the slot type at module scope would cycle through the spec containers,
+    # which import the interval type defined just above.
+    # The annotation stays a forward reference, so name resolution is suppressed here.
     @classmethod
     def from_slot(cls, slot: Slot) -> Interval:  # noqa: F821  # ty: ignore[unresolved-reference]
         """
@@ -99,6 +102,8 @@ class SlotClock:
             return Uint64(0)
         return Uint64(now_ms - genesis_ms)
 
+    # The slot type is imported locally below to avoid a module-scope import cycle.
+    # The return annotation stays a forward reference, so name resolution is suppressed.
     def current_slot(self) -> Slot:  # noqa: F821  # ty: ignore[unresolved-reference]
         """Get the current slot number (0 if before genesis)."""
         from lean_spec.spec.forks import Slot

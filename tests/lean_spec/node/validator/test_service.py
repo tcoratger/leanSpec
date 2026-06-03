@@ -455,7 +455,7 @@ class TestMaybeProduceBlock:
             sync_service=sync_service,
             clock=SlotClock(genesis_time=Uint64(0)),
             registry=registry,
-            on_block=lambda b: blocks.append(b),  # type: ignore[arg-type, return-value]
+            on_block=lambda b: blocks.append(b),
         )
 
         await service._maybe_produce_block(Slot(5))
@@ -475,7 +475,7 @@ class TestMaybeProduceBlock:
             sync_service=sync_service,
             clock=SlotClock(genesis_time=Uint64(0)),
             registry=real_registry,
-            on_block=lambda b: blocks.append(b),  # type: ignore[arg-type, return-value]
+            on_block=lambda b: blocks.append(b),
         )
 
         with patch.object(

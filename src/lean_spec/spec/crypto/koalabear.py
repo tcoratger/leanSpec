@@ -148,6 +148,10 @@ class Fp(int, SSZType):
         """Reverse multiplication: reject non-Fp left operand to prevent silent int fallback."""
         self._reject(other, "*")
 
+    # The int base declares a three-argument pow with an optional modulus.
+    #
+    # The field already reduces modulo P, so the modulus argument is meaningless here.
+    # Narrowing to the field type is intentional and safe by Liskov substitution.
     def __pow__(self, exponent: int) -> Self:  # ty: ignore[invalid-method-override]
         """Field exponentiation."""
         return type(self)(pow(int(self), exponent, P))

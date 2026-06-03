@@ -47,7 +47,7 @@ class TestForkProtocolGeneric:
     def test_cannot_instantiate_directly(self) -> None:
         """ForkProtocol is abstract; concrete forks must implement upgrade_state."""
         with pytest.raises(TypeError, match="abstract"):
-            ForkProtocol()  # type: ignore[abstract]
+            ForkProtocol()
 
     def test_protocol_module_imports_no_devnet_package(self) -> None:
         """The protocol module must not import any devnet package."""
