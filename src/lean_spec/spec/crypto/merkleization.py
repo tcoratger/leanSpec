@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from functools import singledispatch
 from hashlib import sha256
 from itertools import accumulate, repeat
-from math import ceil
 from typing import Final
 
 from lean_spec.spec.crypto.koalabear import Fp
@@ -192,7 +192,7 @@ def _pack_bits(bits: Sequence[Boolean]) -> list[Bytes32]:
     handled by the caller when needed.
     """
     value = sum(1 << i for i, bit in enumerate(bits) if bit)
-    return _pack_bytes(value.to_bytes(ceil(len(bits) / 8), "little"))
+    return _pack_bytes(value.to_bytes(math.ceil(len(bits) / 8), "little"))
 
 
 @singledispatch
@@ -243,19 +243,19 @@ def _htr_bytevector(value: BaseBytes) -> Bytes32:
 @hash_tree_root.register
 def _htr_bytelist(value: BaseByteList) -> Bytes32:
     data = value.encode_bytes()
-    limit_chunks = ceil(type(value).LIMIT / BYTES_PER_CHUNK)
+    limit_chunks = math.ceil(type(value).LIMIT / BYTES_PER_CHUNK)
     return mix_in_length(merkleize(_pack_bytes(data), limit=limit_chunks), len(data))
 
 
 @hash_tree_root.register
 def _htr_bitvector_base(value: BaseBitvector) -> Bytes32:
-    limit = ceil(type(value).LENGTH / BITS_PER_CHUNK)
+    limit = math.ceil(type(value).LENGTH / BITS_PER_CHUNK)
     return merkleize(_pack_bits(value.data), limit=limit)
 
 
 @hash_tree_root.register
 def _htr_bitlist_base(value: BaseBitlist) -> Bytes32:
-    limit = ceil(type(value).LIMIT / BITS_PER_CHUNK)
+    limit = math.ceil(type(value).LIMIT / BITS_PER_CHUNK)
     return mix_in_length(
         merkleize(_pack_bits(value.data), limit=limit),
         len(value.data),
@@ -269,7 +269,7 @@ def _htr_vector(value: SSZVector) -> Bytes32:
     if issubclass(element_t, (BaseUint, Boolean, Fp)):
         # Basic elements pack their serialized bytes into a single byte stream before chunking.
         element_size = element_t.get_byte_length()
-        limit_chunks = ceil(length * element_size / BYTES_PER_CHUNK)
+        limit_chunks = math.ceil(length * element_size / BYTES_PER_CHUNK)
         return merkleize(
             _pack_bytes(b"".join(e.encode_bytes() for e in value)),
             limit=limit_chunks,
@@ -284,7 +284,7 @@ def _htr_list(value: SSZList) -> Bytes32:
     element_t, limit = cls.ELEMENT_TYPE, cls.LIMIT
     if issubclass(element_t, (BaseUint, Boolean, Fp)):
         element_size = element_t.get_byte_length()
-        limit_chunks = ceil(limit * element_size / BYTES_PER_CHUNK)
+        limit_chunks = math.ceil(limit * element_size / BYTES_PER_CHUNK)
         root = merkleize(
             _pack_bytes(b"".join(e.encode_bytes() for e in value)),
             limit=limit_chunks,
