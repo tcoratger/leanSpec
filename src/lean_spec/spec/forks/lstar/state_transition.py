@@ -84,7 +84,7 @@ class StateTransitionMixin(LstarSpecBase):
         assert isinstance(validators, Validators)
 
         # Configure the genesis state.
-        genesis_config = self.config_class(
+        genesis_config = self.genesis_config_class(
             genesis_time=genesis_time,
         )
 

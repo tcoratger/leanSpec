@@ -14,7 +14,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     BlockBody,
     BlockHeader,
-    Config,
+    GenesisConfig,
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
@@ -287,12 +287,12 @@ def test_signed_block_with_proof_bytes(ssz: SSZTestFiller) -> None:
 
 def test_config_zero(ssz: SSZTestFiller) -> None:
     """SSZ roundtrip for Config with zero genesis time."""
-    ssz(type_name="Config", value=Config(genesis_time=Uint64(0)))
+    ssz(type_name="Config", value=GenesisConfig(genesis_time=Uint64(0)))
 
 
 def test_config_typical(ssz: SSZTestFiller) -> None:
     """SSZ roundtrip for Config with typical genesis time."""
-    ssz(type_name="Config", value=Config(genesis_time=Uint64(1609459200)))
+    ssz(type_name="Config", value=GenesisConfig(genesis_time=Uint64(1609459200)))
 
 
 # --- Validator ---
@@ -338,7 +338,7 @@ def test_state_minimal(ssz: SSZTestFiller) -> None:
     ssz(
         type_name="State",
         value=State(
-            config=Config(genesis_time=Uint64(0)),
+            config=GenesisConfig(genesis_time=Uint64(0)),
             slot=Slot(0),
             latest_block_header=zero_header,
             latest_justified=zero_cp,
@@ -365,7 +365,7 @@ def test_state_with_validators(ssz: SSZTestFiller) -> None:
     ssz(
         type_name="State",
         value=State(
-            config=Config(genesis_time=Uint64(1609459200)),
+            config=GenesisConfig(genesis_time=Uint64(1609459200)),
             slot=Slot(100),
             latest_block_header=BlockHeader(
                 slot=Slot(99),
@@ -514,7 +514,7 @@ def test_state_with_full_history(ssz: SSZTestFiller) -> None:
     ssz(
         type_name="State",
         value=State(
-            config=Config(genesis_time=Uint64(1700000000)),
+            config=GenesisConfig(genesis_time=Uint64(1700000000)),
             slot=Slot(500),
             latest_block_header=BlockHeader(
                 slot=Slot(499),
