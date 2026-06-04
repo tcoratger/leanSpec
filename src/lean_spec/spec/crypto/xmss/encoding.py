@@ -60,8 +60,8 @@ def encode_message(config: XmssConfig, message: Bytes32) -> list[Fp]:
 
     The bytes are read little-endian as a single integer.
     """
-    acc = int.from_bytes(message, "little")
-    return int_to_base_p(acc, config.MESSAGE_LENGTH_FIELD_ELEMENTS)
+    message_integer = int.from_bytes(message, "little")
+    return int_to_base_p(message_integer, config.MESSAGE_LENGTH_FIELD_ELEMENTS)
 
 
 def encode_epoch(config: XmssConfig, epoch: Uint64) -> list[Fp]:
@@ -72,8 +72,8 @@ def encode_epoch(config: XmssConfig, epoch: Uint64) -> list[Fp]:
     # Layout:
     #
     #     (epoch << 8) | MESSAGE_PREFIX
-    acc = (int(epoch) << 8) | TWEAK_PREFIX_MESSAGE
-    return int_to_base_p(acc, config.TWEAK_LENGTH_FIELD_ELEMENTS)
+    encoded_tweak = (int(epoch) << 8) | TWEAK_PREFIX_MESSAGE
+    return int_to_base_p(encoded_tweak, config.TWEAK_LENGTH_FIELD_ELEMENTS)
 
 
 def aborting_decode(config: XmssConfig, field_elements: list[Fp]) -> list[int] | None:
@@ -90,18 +90,18 @@ def aborting_decode(config: XmssConfig, field_elements: list[Fp]) -> list[int] |
     threshold = config.Q * config.BASE**config.Z
 
     digits: list[int] = []
-    for fe in field_elements:
-        a = int(fe)
+    for field_element in field_elements:
+        element_value = int(field_element)
 
         # The only rejection case is A_i == P - 1.
-        if a >= threshold:
+        if element_value >= threshold:
             return None
 
         # Quotient by Q strips the residue.
         # The remainder is uniform in [0, BASE^Z - 1].
-        d = a // config.Q
+        quotient = element_value // config.Q
         for _ in range(config.Z):
-            d, digit = divmod(d, config.BASE)
+            quotient, digit = divmod(quotient, config.BASE)
             digits.append(digit)
 
     return digits[: config.DIMENSION]

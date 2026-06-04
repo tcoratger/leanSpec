@@ -20,6 +20,7 @@ subspecifications that the Lean Ethereum protocol relies on.
 - Keep specs simple, readable, and clear
 - Repository is `leanSpec` not `lean-spec`
 - **Always run linter checks before finishing**: Run `just check` at the end of any code changes to ensure all linting, formatting, type checking, and spell checking passes.
+- **Pull requests target the main repo by default**: Unless the user explicitly says otherwise, open pull requests against the upstream main repository (`leanEthereum/leanSpec`, the `upstream` remote, base `main`) — NOT against a personal fork. Push the branch to the fork and open a cross-fork PR with `gh pr create --repo leanEthereum/leanSpec --base main --head <fork-owner>:<branch>`.
 - **CRITICAL - NO BACKWARD COMPATIBILITY**: This is a STRICT requirement. NEVER add backward compatibility code under any circumstances. This means:
   - NO legacy constants (like `KEY_TYPE_ED25519 = KeyType.ED25519`)
   - NO wrapper functions that delegate to new classes
