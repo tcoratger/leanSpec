@@ -300,11 +300,11 @@ class HeadSync:
                     self.block_cache.remove(child_root)
 
                     # Recursively process this child's descendants.
-                    description_count, store = await self._process_cached_descendants(
+                    descendant_count, store = await self._process_cached_descendants(
                         parent_root=child_root,
                         store=store,
                     )
-                    processed_count += description_count
+                    processed_count += descendant_count
 
                 except Exception as exception:
                     # Processing failed. Leave in cache for retry or discard.

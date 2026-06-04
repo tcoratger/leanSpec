@@ -88,13 +88,13 @@ class PoseidonXmss(StrictBaseModel):
             A capacity vector of length capacity_length.
         """
         # Pack all lengths into a single unambiguous integer using 32-bit slots.
-        acc = 0
+        packed_lengths = 0
         for length in lengths:
-            acc = (acc << 32) | length
+            packed_lengths = (packed_lengths << 32) | length
 
         # Compress the decomposed vector through the width-24 engine.
         # Width 24 is the only mode used for sponge domain separation.
-        input_vec = int_to_base_p(acc, 24)
+        input_vec = int_to_base_p(packed_lengths, 24)
         return self.compress(input_vec, 24, capacity_length)
 
     def sponge(
@@ -182,10 +182,12 @@ class PoseidonXmss(StrictBaseModel):
         # Every other field sits in its own bit range above the prefix.
         match tweak:
             case TreeTweak(level=level, index=index):
-                acc = (level << 40) | (int(index) << 8) | TWEAK_PREFIX_TREE
+                packed_tweak = (level << 40) | (int(index) << 8) | TWEAK_PREFIX_TREE
             case ChainTweak(epoch=epoch, chain_index=chain_index, step=step):
-                acc = (int(epoch) << 24) | (chain_index << 16) | (step << 8) | TWEAK_PREFIX_CHAIN
-        encoded_tweak = int_to_base_p(acc, config.TWEAK_LENGTH_FIELD_ELEMENTS)
+                packed_tweak = (
+                    (int(epoch) << 24) | (chain_index << 16) | (step << 8) | TWEAK_PREFIX_CHAIN
+                )
+        encoded_tweak = int_to_base_p(packed_tweak, config.TWEAK_LENGTH_FIELD_ELEMENTS)
 
         if len(message_parts) == 1:
             # Hash chain step: width-16 compression of (digest || parameter || tweak).
