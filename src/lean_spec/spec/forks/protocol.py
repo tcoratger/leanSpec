@@ -26,7 +26,7 @@ class SpecSSZType(Protocol):
 
 
 class SpecConfigType(SpecSSZType, Protocol):
-    """Structural contract: any fork's genesis Config container class."""
+    """Structural contract: any fork's genesis configuration container class."""
 
 
 class SpecStateType(SpecSSZType, Protocol):
@@ -224,8 +224,8 @@ class ForkProtocol(ABC):
     aggregated_attestation_class: type[SpecAggregatedAttestationType]
     """Concrete AggregatedAttestation container class."""
 
-    config_class: type[SpecConfigType]
-    """Concrete genesis Config container class."""
+    genesis_config_class: type[SpecConfigType]
+    """Concrete genesis configuration container class."""
 
     @abstractmethod
     def generate_genesis(self, genesis_time: Uint64, validators: SSZList[Any]) -> SpecStateType:

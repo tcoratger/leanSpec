@@ -12,7 +12,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     BlockBody,
     BlockHeader,
-    Config,
+    GenesisConfig,
     State,
 )
 from lean_spec.spec.forks.lstar.fork_choice import ForkChoiceMixin
@@ -51,4 +51,4 @@ class LstarSpec(
     store_class: type[LstarStore] = LstarStore
     attestation_data_class: type[AttestationData] = AttestationData
     aggregated_attestation_class: type[AggregatedAttestation] = AggregatedAttestation
-    config_class: type[Config] = Config
+    genesis_config_class: type[GenesisConfig] = GenesisConfig

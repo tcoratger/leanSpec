@@ -86,5 +86,6 @@ subspecifications that the Lean Ethereum protocol relies on.
     an unrelated test file.
   - When you DELETE or RENAME a source module, delete or rename its test module to match.
   - A test file must never test a type that lives in a different source module. For example, tests
-    for `Interval` (in `spec/forks/lstar/interval.py`) belong in
-    `tests/lean_spec/spec/forks/lstar/test_interval.py`, never in `node/chain/test_clock.py`.
+    for `Interval` (in `spec/forks/lstar/containers/interval.py`) belong in
+    `tests/lean_spec/spec/forks/lstar/containers/test_interval.py`, never in
+    `node/chain/test_clock.py`.

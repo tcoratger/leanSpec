@@ -10,7 +10,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     BlockBody,
     BlockHeader,
-    Config,
+    GenesisConfig,
     Interval,
     SignedAggregatedAttestation,
     SignedBlock,
@@ -39,7 +39,7 @@ class LstarSpecBase(ForkProtocol):
     store_class: type[LstarStore]
     attestation_data_class: type[AttestationData]
     aggregated_attestation_class: type[AggregatedAttestation]
-    config_class: type[Config]
+    genesis_config_class: type[GenesisConfig]
 
     @abstractmethod
     def process_slots(self, state: State, target_slot: Slot) -> State:

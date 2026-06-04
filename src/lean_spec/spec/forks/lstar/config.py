@@ -14,6 +14,7 @@ __all__ = [
     "MILLISECONDS_PER_INTERVAL",
     "MILLISECONDS_PER_SLOT",
     "SECONDS_PER_SLOT",
+    "VALIDATOR_REGISTRY_LIMIT",
 ]
 
 INTERVALS_PER_SLOT: Final = Uint64(5)
@@ -50,6 +51,9 @@ With a 4-second slot, this corresponds to a history of approximately 12.1 days.
 
 ATTESTATION_COMMITTEE_COUNT: Final = Uint64(1)
 """The number of attestation committees per slot."""
+
+VALIDATOR_REGISTRY_LIMIT: Final = Uint64(2**12)
+"""The maximum number of validators that can be in the registry."""
 
 MAX_ATTESTATIONS_DATA: Final = Uint8(8)
 """Maximum number of distinct attestation data entries per block."""
