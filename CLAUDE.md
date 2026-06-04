@@ -57,6 +57,24 @@ subspecifications that the Lean Ethereum protocol relies on.
     or any on-the-wire string. Rename the Python identifier, never the serialized contract.
   - When a fully-expanded name becomes unwieldy, prefer a shorter but still complete phrasing
     (drop redundant words) rather than re-introducing an abbreviation.
+- **CRITICAL - DESCRIPTIVE, SELF-DOCUMENTING NAMES**: This is a STRICT requirement, separate from
+  the no-abbreviations rule above. Every identifier must let the reader understand what it holds by
+  reading it alone, without scanning the surrounding code. A name that is fully spelled out but
+  still vague is NOT acceptable. This applies to source, tests, and `packages/`.
+  - BAN vague placeholder names that describe nothing: `selected`, `result`, `data`, `value`,
+    `item`, `temp`, `obj`, `info`, `payload` (when unqualified), `current`, `entry`, `thing`,
+    `out`, `ret`, single-letter names (except a conventional math index `i`/`j` in a tight numeric
+    loop). Name the THING, not its role: `selected` → `selected_proofs`, `result` →
+    `post_state` / `merged_signature`, `current` → `current_justified_checkpoint`.
+  - Encode the type or domain meaning when a bare word is ambiguous. A variable holding a
+    `Checkpoint` is `justified_checkpoint`, not `justified`; a bitfield of justified slots is
+    `justified_slots`, not `slots`; a boolean is a predicate phrase (`found_new_entries`,
+    `is_genesis_self_vote`), never a noun.
+  - NEVER reuse one vague name for two different things in the same scope. If an inner loop holds
+    something different from an outer variable of the same name, rename it (e.g. payload proofs vs.
+    grouped signatures → `proofs` and `grouped_signatures`).
+  - The bar: a reviewer reading any single line in isolation should know what each name refers to.
+    If they would have to scroll up to find out, the name is wrong.
 - **CRITICAL - TEST STRUCTURE MIRRORS SOURCE STRUCTURE**: This is a STRICT requirement. The
   test tree under `tests/lean_spec/` mirrors the source tree under `src/lean_spec/` one-to-one.
   A source module `src/lean_spec/<path>/<name>.py` has its unit tests in
