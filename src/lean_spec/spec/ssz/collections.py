@@ -84,6 +84,29 @@ def _validate_offsets(offsets: list[int], scope: int, type_name: str) -> None:
         )
 
 
+def _coerce_elements(element_type: type[SSZType], items: Sequence[Any]) -> tuple[SSZType, ...]:
+    """
+    Coerce every element of an already-shaped sequence into the declared type.
+
+    - Already-typed elements pass through untouched.
+    - Every other element goes through the element type's constructor.
+    - A coercion failure re-raises with the high-level expectation in the message.
+    - The chained cause preserves the underlying coercion detail.
+    """
+    coerced: list[SSZType] = []
+    for item in items:
+        if isinstance(item, element_type):
+            coerced.append(item)
+            continue
+        try:
+            coerced.append(cast(Any, element_type)(item))
+        except (SSZTypeError, SSZValueError, TypeError, ValueError) as exception:
+            raise SSZTypeError(
+                f"Expected {element_type.__name__}, got {type(item).__name__}: {exception}"
+            ) from exception
+    return tuple(coerced)
+
+
 class _SSZSequence[T: SSZType](SSZModel):
     """
     Shared scaffolding for fixed- and variable-length SSZ sequences.
@@ -319,21 +342,7 @@ class SSZVector[T: SSZType](_SSZSequence[T]):
                 f"{cls.__name__} requires exactly {cls.LENGTH} elements, got {len(items)}"
             )
 
-        # Coerce each non-typed element through the declared element type.
-        # Inner errors are re-raised with the high-level expectation.
-        # The chained cause preserves the underlying coercion detail.
-        result: list[SSZType] = []
-        for item in items:
-            if isinstance(item, cls.ELEMENT_TYPE):
-                result.append(item)
-                continue
-            try:
-                result.append(cast(Any, cls.ELEMENT_TYPE)(item))
-            except (SSZTypeError, SSZValueError, TypeError, ValueError) as e:
-                raise SSZTypeError(
-                    f"Expected {cls.ELEMENT_TYPE.__name__}, got {type(item).__name__}: {e}"
-                ) from e
-        return tuple(result)
+        return _coerce_elements(cls.ELEMENT_TYPE, items)
 
     @classmethod
     @override
@@ -495,21 +504,7 @@ class SSZList[T: SSZType](_SSZSequence[T]):
         if len(items) > cls.LIMIT:
             raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(items)}")
 
-        # Coerce each non-typed element through the declared element type.
-        # Inner errors are re-raised with the high-level expectation.
-        # The chained cause preserves the underlying coercion detail.
-        result: list[SSZType] = []
-        for item in items:
-            if isinstance(item, cls.ELEMENT_TYPE):
-                result.append(item)
-                continue
-            try:
-                result.append(cast(Any, cls.ELEMENT_TYPE)(item))
-            except (SSZTypeError, SSZValueError, TypeError, ValueError) as e:
-                raise SSZTypeError(
-                    f"Expected {cls.ELEMENT_TYPE.__name__}, got {type(item).__name__}: {e}"
-                ) from e
-        return tuple(result)
+        return _coerce_elements(cls.ELEMENT_TYPE, items)
 
     def __add__(self, other: Any) -> Self:
         """
