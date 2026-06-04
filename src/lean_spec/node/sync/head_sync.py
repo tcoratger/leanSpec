@@ -228,15 +228,15 @@ class HeadSync:
                     slot,
                     len(store.blocks),
                 )
-            except Exception as e:
+            except Exception as exception:
                 logger.debug(
                     "_process_block_with_descendants: FAILED for slot %s: %s",
                     slot,
-                    e,
+                    exception,
                 )
                 return HeadSyncResult(
                     processed=False,
-                    error=str(e),
+                    error=str(exception),
                 ), store
 
             # Process cached descendants.

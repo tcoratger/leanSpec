@@ -118,13 +118,15 @@ class QuicStream:
         try:
             quic.send_stream_data(self._stream_id, data)
             self._protocol.transmit()
-        except Exception as e:
+        except Exception as exception:
             # If aioquic raises an exception, mark our stream as write-closed
             # to prevent further attempts.
-            error_message = str(e)
+            error_message = str(exception)
             if "FIN" in error_message or "closed" in error_message.lower():
                 self._write_closed = True
-            raise QuicTransportError(f"Write failed on stream {self._stream_id}: {e}") from e
+            raise QuicTransportError(
+                f"Write failed on stream {self._stream_id}: {exception}"
+            ) from exception
 
     async def finish_write(self) -> None:
         """

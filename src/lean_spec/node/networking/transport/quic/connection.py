@@ -451,8 +451,8 @@ class QuicConnectionManager:
             self._connections[peer_id] = connection
             return connection
 
-        except Exception as e:
-            raise QuicTransportError(f"Failed to connect: {e}") from e
+        except Exception as exception:
+            raise QuicTransportError(f"Failed to connect: {exception}") from exception
 
     async def listen(
         self,

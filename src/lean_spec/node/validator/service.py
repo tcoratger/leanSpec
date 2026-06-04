@@ -319,7 +319,7 @@ class ValidatorService:
                 if self.on_block is not None:
                     await self.on_block(signed_block)
 
-            except AssertionError as e:
+            except AssertionError as exception:
                 # Proposer validation failed.
                 #
                 # This can happen during slot boundary transitions.
@@ -328,7 +328,7 @@ class ValidatorService:
                     "Block production skipped for validator %d at slot %d: %s",
                     validator_index,
                     slot,
-                    e,
+                    exception,
                 )
 
             # Only one proposer per slot.

@@ -307,21 +307,25 @@ class ValidatorRegistry:
             attestation_key_path = manifest_directory / entry.attestation_private_key_file
             try:
                 attestation_secret_key = SecretKey.decode_bytes(attestation_key_path.read_bytes())
-            except FileNotFoundError as e:
-                raise ValueError(f"Attestation key file not found: {attestation_key_path}") from e
-            except Exception as e:
+            except FileNotFoundError as exception:
                 raise ValueError(
-                    f"Failed to load attestation key for validator {index}: {e}"
-                ) from e
+                    f"Attestation key file not found: {attestation_key_path}"
+                ) from exception
+            except Exception as exception:
+                raise ValueError(
+                    f"Failed to load attestation key for validator {index}: {exception}"
+                ) from exception
 
             # Load proposal secret key from SSZ file.
             proposal_key_path = manifest_directory / entry.proposal_private_key_file
             try:
                 proposal_secret_key = SecretKey.decode_bytes(proposal_key_path.read_bytes())
-            except FileNotFoundError as e:
-                raise ValueError(f"Proposal key file not found: {proposal_key_path}") from e
-            except Exception as e:
-                raise ValueError(f"Failed to load proposal key for validator {index}: {e}") from e
+            except FileNotFoundError as exception:
+                raise ValueError(f"Proposal key file not found: {proposal_key_path}") from exception
+            except Exception as exception:
+                raise ValueError(
+                    f"Failed to load proposal key for validator {index}: {exception}"
+                ) from exception
 
             registry.add(
                 ValidatorEntry(

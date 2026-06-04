@@ -329,8 +329,8 @@ class ENR(StrictBaseModel):
         # RLP decode: [signature, seq, k1, v1, k2, v2, ...]
         try:
             items = decode_rlp_list(rlp_data)
-        except RLPDecodingError as e:
-            raise ValueError(f"Invalid RLP encoding: {e}") from e
+        except RLPDecodingError as exception:
+            raise ValueError(f"Invalid RLP encoding: {exception}") from exception
 
         if len(items) < 2:
             raise ValueError("ENR must have at least signature and seq")
@@ -407,7 +407,7 @@ class ENR(StrictBaseModel):
 
         try:
             rlp_data = base64.urlsafe_b64decode(b64_content)
-        except Exception as e:
-            raise ValueError(f"Invalid base64 encoding: {e}") from e
+        except Exception as exception:
+            raise ValueError(f"Invalid base64 encoding: {exception}") from exception
 
         return cls.from_rlp(rlp_data)

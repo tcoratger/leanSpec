@@ -412,14 +412,14 @@ class SyncService:
                 slot,
                 validator_index,
             )
-        except (AssertionError, KeyError) as e:
+        except (AssertionError, KeyError) as exception:
             metrics.lean_attestations_invalid_total.labels(source="gossip").inc()
             logger.warning(
                 "Attestation from peer %s slot=%s validator=%s: validation or signature failed: %s",
                 peer_str,
                 slot,
                 validator_index,
-                e,
+                exception,
             )
             # Target block has not arrived yet; buffer for post-block replay.
             #
@@ -456,12 +456,12 @@ class SyncService:
                 peer_str,
                 slot,
             )
-        except (AssertionError, KeyError) as e:
+        except (AssertionError, KeyError) as exception:
             logger.warning(
                 "Aggregated attestation from peer %s slot=%s: validation or signature failed: %s",
                 peer_str,
                 slot,
-                e,
+                exception,
             )
             # Target block has not arrived yet; buffer for post-block replay.
             #
