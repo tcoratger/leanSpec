@@ -29,7 +29,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Block,
     BlockBody,
     BlockHeader,
-    Config,
+    GenesisConfig,
     HistoricalBlockHashes,
     JustificationRoots,
     JustificationValidators,
@@ -65,7 +65,7 @@ def _make_populated_db(
     )
     checkpoint = Checkpoint(root=head_root, slot=test_slot)
     state = State(
-        config=Config(genesis_time=GENESIS_TIME),
+        config=GenesisConfig(genesis_time=GENESIS_TIME),
         slot=test_slot,
         latest_block_header=BlockHeader(
             slot=test_slot,

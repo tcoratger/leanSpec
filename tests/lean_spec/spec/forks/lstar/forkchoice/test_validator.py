@@ -11,7 +11,7 @@ from lean_spec.spec.forks.lstar.containers import (
     AttestationData,
     Block,
     BlockBody,
-    Config,
+    GenesisConfig,
     SignedAttestation,
     SingleMessageAggregate,
 )
@@ -387,7 +387,7 @@ class TestValidatorErrorHandling:
 
     def test_produce_block_missing_parent_state(self, spec: LstarSpec) -> None:
         """Test error when parent state is missing."""
-        config = Config(genesis_time=Uint64(1000))
+        config = GenesisConfig(genesis_time=Uint64(1000))
         checkpoint = Checkpoint(root=Bytes32(b"missing" + b"\x00" * 25), slot=Slot(0))
 
         # Create store with missing parent state
