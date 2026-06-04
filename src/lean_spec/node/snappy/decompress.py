@@ -105,8 +105,8 @@ def decompress(data: bytes) -> bytes:
         uncompressed_length, varint_bytes = decode_varint(
             data, 0, max_bytes=SNAPPY_VARINT_MAX_BYTES
         )
-    except VarintError as e:
-        raise SnappyDecompressionError(f"Invalid length varint: {e}") from e
+    except VarintError as exception:
+        raise SnappyDecompressionError(f"Invalid length varint: {exception}") from exception
 
     # Length = 0 is valid: the original data was empty.
     if uncompressed_length == 0:
@@ -143,8 +143,10 @@ def decompress(data: bytes) -> bytes:
         #   tag_bytes: how many bytes the tag consumed
         try:
             tag_type, length, copy_offset, tag_bytes = decode_tag(data, pos)
-        except ValueError as e:
-            raise SnappyDecompressionError(f"Invalid tag at position {pos}: {e}") from e
+        except ValueError as exception:
+            raise SnappyDecompressionError(
+                f"Invalid tag at position {pos}: {exception}"
+            ) from exception
 
         pos += tag_bytes
 

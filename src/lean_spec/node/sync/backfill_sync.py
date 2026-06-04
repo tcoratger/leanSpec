@@ -304,12 +304,12 @@ class BackfillSync:
                 start_slot=start_slot,
                 count=count,
             )
-        except Exception as e:
+        except Exception as exception:
             # Peer-side failure.
             #
             # Do not advance the watermark.
             # A retry against another peer can still re-cover the range.
-            logger.warning("Range fetch failed from %s: %s", peer.peer_id, e)
+            logger.warning("Range fetch failed from %s: %s", peer.peer_id, exception)
             self.peer_manager.on_request_failure(peer.peer_id)
             return
 

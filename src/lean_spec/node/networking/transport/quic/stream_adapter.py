@@ -260,8 +260,8 @@ class QuicStreamAdapter:
 
         try:
             length, _ = decode_varint(bytes(length_bytes))
-        except Exception as e:
-            raise NegotiationError(f"Invalid varint: {e}") from e
+        except Exception as exception:
+            raise NegotiationError(f"Invalid varint: {exception}") from exception
 
         if length > MAX_MESSAGE_SIZE:
             raise NegotiationError(f"Message too large: {length}")

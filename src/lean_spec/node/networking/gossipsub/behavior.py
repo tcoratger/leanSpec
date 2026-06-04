@@ -765,8 +765,8 @@ class GossipsubBehavior:
                 await self._heartbeat()
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.warning("Heartbeat error: %s", e)
+            except Exception as exception:
+                logger.warning("Heartbeat error: %s", exception)
 
     async def _heartbeat(self) -> None:
         """Perform heartbeat maintenance.
@@ -912,8 +912,8 @@ class GossipsubBehavior:
             await state.outbound_stream.drain()
 
             state.last_rpc_time = time.time()
-        except Exception as e:
-            logger.warning("Failed to send RPC to %s: %s", peer_id, e)
+        except Exception as exception:
+            logger.warning("Failed to send RPC to %s: %s", peer_id, exception)
 
     async def _receive_loop(self, peer_id: PeerId, stream: QuicStreamAdapter) -> None:
         """Process incoming RPCs from a peer for the lifetime of the connection.
@@ -956,16 +956,16 @@ class GossipsubBehavior:
                         try:
                             rpc = RPC.decode(rpc_data)
                             await self._handle_rpc(peer_id, rpc)
-                        except Exception as e:
+                        except Exception as exception:
                             # Frame was already extracted; skip this RPC
                             # but continue parsing subsequent frames.
-                            logger.warning("Error decoding RPC from %s: %s", peer_id, e)
+                            logger.warning("Error decoding RPC from %s: %s", peer_id, exception)
                             continue
 
                 except asyncio.CancelledError:
                     break
-                except Exception as e:
-                    logger.warning("Error receiving from %s: %s", peer_id, e)
+                except Exception as exception:
+                    logger.warning("Error receiving from %s: %s", peer_id, exception)
                     break
         finally:
             await self.remove_peer(peer_id)

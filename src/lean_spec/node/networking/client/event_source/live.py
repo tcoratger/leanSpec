@@ -446,8 +446,8 @@ class LiveNetworkEventSource:
                     # from killing the entire forwarding loop.
                     try:
                         await self._handle_gossipsub_message(event)
-                    except Exception as e:
-                        logger.warning("Error handling gossipsub message: %s", e)
+                    except Exception as exception:
+                        logger.warning("Error handling gossipsub message: %s", exception)
         except asyncio.CancelledError:
             pass
 
@@ -480,13 +480,13 @@ class LiveNetworkEventSource:
                     case TopicKind.AGGREGATED_ATTESTATION:
                         aggregate = SignedAggregatedAttestation.decode_bytes(event.data)
                         await self._emit_gossip_aggregated_attestation(aggregate, event.peer_id)
-            except SSZSerializationError as e:
-                raise GossipMessageError(f"SSZ decode failed: {e}") from e
+            except SSZSerializationError as exception:
+                raise GossipMessageError(f"SSZ decode failed: {exception}") from exception
 
             logger.debug("Processed gossipsub message %s from %s", topic.kind.value, event.peer_id)
 
-        except GossipMessageError as e:
-            logger.warning("Failed to process gossipsub message: %s", e)
+        except GossipMessageError as exception:
+            logger.warning("Failed to process gossipsub message: %s", exception)
 
     def __aiter__(self) -> LiveNetworkEventSource:
         """Return self as async iterator."""
@@ -575,8 +575,8 @@ class LiveNetworkEventSource:
             logger.info("Connected to peer %s at %s", peer_id, multiaddr)
             return peer_id
 
-        except Exception as e:
-            logger.warning("Failed to connect to %s: %s", multiaddr, e)
+        except Exception as exception:
+            logger.warning("Failed to connect to %s: %s", multiaddr, exception)
             return None
 
     async def _ensure_quic_manager(self) -> None:
@@ -705,8 +705,8 @@ class LiveNetworkEventSource:
                     peer_status.head.root.hex()[:8],
                 )
 
-        except Exception as e:
-            logger.warning("Status exchange failed with %s: %s", peer_id, e)
+        except Exception as exception:
+            logger.warning("Status exchange failed with %s: %s", peer_id, exception)
 
     async def _setup_gossipsub_stream(
         self,
@@ -759,8 +759,8 @@ class LiveNetworkEventSource:
                     stream.stream_id,
                 )
 
-            except Exception as e:
-                logger.warning("Failed to setup gossipsub stream with %s: %s", peer_id, e)
+            except Exception as exception:
+                logger.warning("Failed to setup gossipsub stream with %s: %s", peer_id, exception)
 
     async def disconnect(self, peer_id: PeerId) -> None:
         """
@@ -904,12 +904,12 @@ class LiveNetworkEventSource:
                     # This blocks until a peer opens a stream or the connection closes.
                     # QUIC handles the low-level multiplexing.
                     stream = await connection.accept_stream()
-                except Exception as e:
+                except Exception as exception:
                     # Connection closed or other transport error.
                     #
                     # This is expected when the peer disconnects.
                     # Exit the loop cleanly rather than propagating.
-                    logger.debug("Stream accept failed for %s: %s", peer_id, e)
+                    logger.debug("Stream accept failed for %s: %s", peer_id, exception)
                     break
 
                 negotiated = await self._negotiate_inbound_stream(peer_id, stream)
@@ -940,12 +940,12 @@ class LiveNetworkEventSource:
             # This is normal cleanup behavior. Log and exit.
             logger.debug("Stream acceptor cancelled for %s", peer_id)
 
-        except Exception as e:
+        except Exception as exception:
             # Unexpected error.
             #
             # Log as warning since this may indicate a bug.
             # The connection will be cleaned up elsewhere.
-            logger.warning("Stream acceptor error for %s: %s", peer_id, e)
+            logger.warning("Stream acceptor error for %s: %s", peer_id, exception)
 
     async def _negotiate_inbound_stream(
         self,
@@ -1002,12 +1002,12 @@ class LiveNetworkEventSource:
             )
             await stream.close()
             return None
-        except NegotiationError as e:
+        except NegotiationError as exception:
             logger.debug(
                 "Protocol negotiation failed for %s stream %d: %s",
                 peer_id,
                 stream.stream_id,
-                e,
+                exception,
             )
             await stream.close()
             return None
@@ -1019,12 +1019,12 @@ class LiveNetworkEventSource:
             )
             await stream.close()
             return None
-        except Exception as e:
+        except Exception as exception:
             logger.warning(
                 "Unexpected negotiation error for %s stream %d: %s",
                 peer_id,
                 stream.stream_id,
-                e,
+                exception,
             )
             await stream.close()
             return None
@@ -1139,5 +1139,5 @@ class LiveNetworkEventSource:
         try:
             await self._gossipsub_behavior.publish(topic, data)
             logger.debug("Published message to gossipsub topic %s", topic)
-        except Exception as e:
-            logger.warning("Failed to publish to gossipsub: %s", e)
+        except Exception as exception:
+            logger.warning("Failed to publish to gossipsub: %s", exception)

@@ -144,8 +144,8 @@ class GossipHandler:
             topic = GossipTopic.from_string_validated(topic_str, self.network_name)
         except ForkMismatchError:
             raise
-        except ValueError as e:
-            raise GossipMessageError(f"Invalid topic: {e}") from e
+        except ValueError as exception:
+            raise GossipMessageError(f"Invalid topic: {exception}") from exception
 
         # Step 2: Decompress raw Snappy data.
         #
@@ -155,8 +155,8 @@ class GossipHandler:
         # Failed decompression indicates network corruption or a malicious peer.
         try:
             ssz_bytes = decompress(compressed_data)
-        except SnappyDecompressionError as e:
-            raise GossipMessageError(f"Snappy decompression failed: {e}") from e
+        except SnappyDecompressionError as exception:
+            raise GossipMessageError(f"Snappy decompression failed: {exception}") from exception
 
         # Step 3: Decode SSZ based on topic kind.
         #
@@ -173,8 +173,8 @@ class GossipHandler:
                     return SignedAttestation.decode_bytes(ssz_bytes)
                 case TopicKind.AGGREGATED_ATTESTATION:
                     return SignedAggregatedAttestation.decode_bytes(ssz_bytes)
-        except SSZSerializationError as e:
-            raise GossipMessageError(f"SSZ decode failed: {e}") from e
+        except SSZSerializationError as exception:
+            raise GossipMessageError(f"SSZ decode failed: {exception}") from exception
 
     def get_topic(self, topic_str: str) -> GossipTopic:
         """
@@ -197,8 +197,8 @@ class GossipHandler:
             return GossipTopic.from_string_validated(topic_str, self.network_name)
         except ForkMismatchError:
             raise
-        except ValueError as e:
-            raise GossipMessageError(f"Invalid topic: {e}") from e
+        except ValueError as exception:
+            raise GossipMessageError(f"Invalid topic: {exception}") from exception
 
 
 async def read_gossip_message(stream: InboundStreamProtocol) -> tuple[str, bytes]:
@@ -315,12 +315,12 @@ async def read_gossip_message(stream: InboundStreamProtocol) -> tuple[str, bytes
             # Continue reading more data from the stream.
             continue
 
-        except UnicodeDecodeError as e:
+        except UnicodeDecodeError as exception:
             # Topic bytes are not valid UTF-8.
             #
             # This indicates a protocol violation or corruption.
             # Fail immediately rather than trying to recover.
-            raise GossipMessageError(f"Invalid topic encoding: {e}") from e
+            raise GossipMessageError(f"Invalid topic encoding: {exception}") from exception
 
     # Loop exited without returning a complete message.
     #
