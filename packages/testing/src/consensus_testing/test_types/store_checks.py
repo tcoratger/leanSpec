@@ -79,38 +79,38 @@ class AttestationCheck(CamelModel):
         fields_to_check = self.model_fields_set - {"validator", "location"}
 
         for field_name in fields_to_check:
-            expected = getattr(self, field_name)
+            expected_slot = getattr(self, field_name)
 
             if field_name == "attestation_slot":
-                actual = attestation.slot
-                if actual != expected:
+                actual_slot = attestation.slot
+                if actual_slot != expected_slot:
                     raise AssertionError(
                         f"Step {step_index}: validator {self.validator} {location} "
-                        f"attestation slot = {actual}, expected {expected}"
+                        f"attestation slot = {actual_slot}, expected {expected_slot}"
                     )
 
             elif field_name == "head_slot":
-                actual = attestation.head.slot
-                if actual != expected:
+                actual_slot = attestation.head.slot
+                if actual_slot != expected_slot:
                     raise AssertionError(
                         f"Step {step_index}: validator {self.validator} {location} "
-                        f"head slot = {actual}, expected {expected}"
+                        f"head slot = {actual_slot}, expected {expected_slot}"
                     )
 
             elif field_name == "source_slot":
-                actual = attestation.source.slot
-                if actual != expected:
+                actual_slot = attestation.source.slot
+                if actual_slot != expected_slot:
                     raise AssertionError(
                         f"Step {step_index}: validator {self.validator} {location} "
-                        f"source slot = {actual}, expected {expected}"
+                        f"source slot = {actual_slot}, expected {expected_slot}"
                     )
 
             elif field_name == "target_slot":
-                actual = attestation.target.slot
-                if actual != expected:
+                actual_slot = attestation.target.slot
+                if actual_slot != expected_slot:
                     raise AssertionError(
                         f"Step {step_index}: validator {self.validator} {location} "
-                        f"target slot = {actual}, expected {expected}"
+                        f"target slot = {actual_slot}, expected {expected_slot}"
                     )
 
 
@@ -338,8 +338,8 @@ class StoreChecks(CamelModel):
         # Label-based root checks (resolve label -> root, then compare)
         if "head_root_label" in fields:
             assert self.head_root_label is not None
-            expected = _resolve(self.head_root_label)
-            _check("head.root", store.head, expected)
+            expected_head_root = _resolve(self.head_root_label)
+            _check("head.root", store.head, expected_head_root)
         if "filled_block_root_label" in fields:
             if filled_block is None:
                 raise ValueError(
@@ -347,81 +347,105 @@ class StoreChecks(CamelModel):
                     f"filled_block not provided"
                 )
             assert self.filled_block_root_label is not None
-            expected = _resolve(self.filled_block_root_label)
-            _check("filled_block.root", hash_tree_root(filled_block), expected)
+            expected_filled_block_root = _resolve(self.filled_block_root_label)
+            _check("filled_block.root", hash_tree_root(filled_block), expected_filled_block_root)
         if "latest_justified_root_label" in fields:
             assert self.latest_justified_root_label is not None
-            expected = _resolve(self.latest_justified_root_label)
-            _check("latest_justified.root", store.latest_justified.root, expected)
+            expected_justified_root = _resolve(self.latest_justified_root_label)
+            _check("latest_justified.root", store.latest_justified.root, expected_justified_root)
         if "latest_finalized_root_label" in fields:
             assert self.latest_finalized_root_label is not None
-            expected = _resolve(self.latest_finalized_root_label)
-            _check("latest_finalized.root", store.latest_finalized.root, expected)
+            expected_finalized_root = _resolve(self.latest_finalized_root_label)
+            _check("latest_finalized.root", store.latest_finalized.root, expected_finalized_root)
         if "safe_target_root_label" in fields:
             assert self.safe_target_root_label is not None
-            expected = _resolve(self.safe_target_root_label)
-            _check("safe_target", store.safe_target, expected)
+            expected_safe_target_root = _resolve(self.safe_target_root_label)
+            _check("safe_target", store.safe_target, expected_safe_target_root)
 
         # Attestation target checkpoint (slot + root consistency)
         if "attestation_target_slot" in fields:
-            target = LstarSpec().get_attestation_target(store)
-            _check("attestation_target.slot", target.slot, self.attestation_target_slot)
+            attestation_target = LstarSpec().get_attestation_target(store)
+            _check("attestation_target.slot", attestation_target.slot, self.attestation_target_slot)
 
             block_found = any(
-                b.slot == self.attestation_target_slot and r == target.root
-                for r, b in store.blocks.items()
+                block.slot == self.attestation_target_slot and block_root == attestation_target.root
+                for block_root, block in store.blocks.items()
             )
             if not block_found:
-                available = [
-                    f"0x{r.hex()}"
-                    for r, b in store.blocks.items()
-                    if b.slot == self.attestation_target_slot
+                block_roots_at_target_slot = [
+                    f"0x{block_root.hex()}"
+                    for block_root, block in store.blocks.items()
+                    if block.slot == self.attestation_target_slot
                 ]
                 raise AssertionError(
                     f"Step {step_index}: attestation_target.root = "
-                    f"0x{target.root.hex()} does not match any "
+                    f"0x{attestation_target.root.hex()} does not match any "
                     f"block at slot {self.attestation_target_slot}. "
-                    f"Available blocks: {available}"
+                    f"Available blocks: {block_roots_at_target_slot}"
                 )
 
         # Per-validator attestation content checks
         if "attestation_checks" in fields:
             assert self.attestation_checks is not None
-            for check in self.attestation_checks:
-                if check.location == "new":
+            for attestation_check in self.attestation_checks:
+                if attestation_check.location == "new":
                     payloads = store.latest_new_aggregated_payloads
                     label = "in latest_new"
                 else:
                     payloads = store.latest_known_aggregated_payloads
                     label = "in latest_known"
 
-                extracted = LstarSpec().extract_attestations_from_aggregated_payloads(
+                extracted_attestations = LstarSpec().extract_attestations_from_aggregated_payloads(
                     store, payloads
                 )
-                if check.validator not in extracted:
+                if attestation_check.validator not in extracted_attestations:
                     raise AssertionError(
-                        f"Step {step_index}: validator {check.validator} not found "
+                        f"Step {step_index}: validator {attestation_check.validator} not found "
                         f"{label}_aggregated_payloads"
                     )
-                check.validate_attestation(extracted[check.validator], label, step_index)
+                attestation_check.validate_attestation(
+                    extracted_attestations[attestation_check.validator], label, step_index
+                )
 
         if "attestation_signature_target_slots" in fields:
             assert self.attestation_signature_target_slots is not None
-            actual = sorted({data.target.slot for data in store.attestation_signatures})
-            expected = sorted(self.attestation_signature_target_slots)
-            _check("attestation_signatures.target_slots", actual, expected)
+            actual_target_slots = sorted(
+                {attestation_data.target.slot for attestation_data in store.attestation_signatures}
+            )
+            expected_target_slots = sorted(self.attestation_signature_target_slots)
+            _check(
+                "attestation_signatures.target_slots", actual_target_slots, expected_target_slots
+            )
 
         if "latest_new_aggregated_target_slots" in fields:
             assert self.latest_new_aggregated_target_slots is not None
-            actual = sorted({data.target.slot for data in store.latest_new_aggregated_payloads})
-            expected = sorted(self.latest_new_aggregated_target_slots)
-            _check("latest_new_aggregated_payloads.target_slots", actual, expected)
+            actual_target_slots = sorted(
+                {
+                    attestation_data.target.slot
+                    for attestation_data in store.latest_new_aggregated_payloads
+                }
+            )
+            expected_target_slots = sorted(self.latest_new_aggregated_target_slots)
+            _check(
+                "latest_new_aggregated_payloads.target_slots",
+                actual_target_slots,
+                expected_target_slots,
+            )
 
         if "latest_known_aggregated_target_slots" in fields:
             assert self.latest_known_aggregated_target_slots is not None
-            actual = sorted({data.target.slot for data in store.latest_known_aggregated_payloads})
-            expected = sorted(self.latest_known_aggregated_target_slots)
-            _check("latest_known_aggregated_payloads.target_slots", actual, expected)
+            actual_target_slots = sorted(
+                {
+                    attestation_data.target.slot
+                    for attestation_data in store.latest_known_aggregated_payloads
+                }
+            )
+            expected_target_slots = sorted(self.latest_known_aggregated_target_slots)
+            _check(
+                "latest_known_aggregated_payloads.target_slots",
+                actual_target_slots,
+                expected_target_slots,
+            )
 
         # Block body attestation count
         if "block_attestation_count" in fields:
@@ -497,44 +521,49 @@ class StoreChecks(CamelModel):
         """Validate detailed attestation structure in the block body."""
         actual_attestations = filled_block.body.attestations.data
         actual_participants_list = [
-            {int(v) for v in attestation.aggregation_bits.to_validator_indices()}
+            {
+                int(validator_index)
+                for validator_index in attestation.aggregation_bits.to_validator_indices()
+            }
             for attestation in actual_attestations
         ]
 
-        for check in expected_checks:
+        for attestation_check in expected_checks:
             matching_attestation = None
             matching_index = None
-            for index, attestation in enumerate(actual_attestations):
+            for attestation_index, attestation in enumerate(actual_attestations):
                 actual_participants = {
-                    int(v) for v in attestation.aggregation_bits.to_validator_indices()
+                    int(validator_index)
+                    for validator_index in attestation.aggregation_bits.to_validator_indices()
                 }
-                if actual_participants == check.participants:
+                if actual_participants == attestation_check.participants:
                     matching_attestation = attestation
-                    matching_index = index
+                    matching_index = attestation_index
                     break
 
             if matching_attestation is None:
                 raise AssertionError(
                     f"Step {step_index}: no aggregated attestation found with "
-                    f"participants={check.participants}\n"
+                    f"participants={attestation_check.participants}\n"
                     f"Available attestations: {actual_participants_list}"
                 )
 
-            if check.attestation_slot is not None:
-                if matching_attestation.data.slot != check.attestation_slot:
+            if attestation_check.attestation_slot is not None:
+                if matching_attestation.data.slot != attestation_check.attestation_slot:
                     raise AssertionError(
                         f"Step {step_index}: attestation[{matching_index}] with "
-                        f"participants={check.participants} has "
-                        f"slot={matching_attestation.data.slot}, expected {check.attestation_slot}"
+                        f"participants={attestation_check.participants} has "
+                        f"slot={matching_attestation.data.slot}, "
+                        f"expected {attestation_check.attestation_slot}"
                     )
 
-            if check.target_slot is not None:
-                if matching_attestation.data.target.slot != check.target_slot:
+            if attestation_check.target_slot is not None:
+                if matching_attestation.data.target.slot != attestation_check.target_slot:
                     raise AssertionError(
                         f"Step {step_index}: attestation[{matching_index}] with "
-                        f"participants={check.participants} has "
+                        f"participants={attestation_check.participants} has "
                         f"target_slot={matching_attestation.data.target.slot}, "
-                        f"expected {check.target_slot}"
+                        f"expected {attestation_check.target_slot}"
                     )
 
     @staticmethod
@@ -574,13 +603,13 @@ class StoreChecks(CamelModel):
                 if attestation_head_root == root:
                     weight += 1
                 elif attestation_head_root in store.blocks:
-                    current = attestation_head_root
-                    while current in store.blocks and store.blocks[current].slot > slot:
-                        parent = store.blocks[current].parent_root
+                    ancestor_root = attestation_head_root
+                    while ancestor_root in store.blocks and store.blocks[ancestor_root].slot > slot:
+                        parent = store.blocks[ancestor_root].parent_root
                         if parent == root:
                             weight += 1
                             break
-                        current = parent
+                        ancestor_root = parent
 
             fork_data[label] = (root, slot, weight)
 

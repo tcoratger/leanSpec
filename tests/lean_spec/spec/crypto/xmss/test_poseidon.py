@@ -36,21 +36,21 @@ def test_get_engine_rejects_unsupported_width(width: int) -> None:
 @pytest.mark.parametrize("width", [16, 24])
 def test_compress_returns_requested_output_length(width: int) -> None:
     """Compression returns exactly the requested number of output elements."""
-    result = POSEIDON.compress([Fp(value=i) for i in range(8)], width, 8)
-    assert len(result) == 8
+    compressed = POSEIDON.compress([Fp(value=i) for i in range(8)], width, 8)
+    assert len(compressed) == 8
 
 
 def test_compress_truncates_to_short_output() -> None:
     """A short output length yields a truncated digest."""
-    result = POSEIDON.compress([Fp(value=i) for i in range(8)], 16, 1)
-    assert len(result) == 1
+    compressed = POSEIDON.compress([Fp(value=i) for i in range(8)], 16, 1)
+    assert len(compressed) == 1
 
 
 def test_compress_is_deterministic() -> None:
     """The same input compresses to the same output."""
-    a = POSEIDON.compress([Fp(value=i) for i in range(8)], 16, 8)
-    b = POSEIDON.compress([Fp(value=i) for i in range(8)], 16, 8)
-    assert a == b
+    first_compression = POSEIDON.compress([Fp(value=i) for i in range(8)], 16, 8)
+    second_compression = POSEIDON.compress([Fp(value=i) for i in range(8)], 16, 8)
+    assert first_compression == second_compression
 
 
 def test_compress_rejects_output_longer_than_input() -> None:
@@ -90,34 +90,34 @@ def test_sponge_rejects_capacity_not_smaller_than_width() -> None:
 
 def test_tweak_hash_chain_uses_width_sixteen_compression() -> None:
     """A single digest input hashes through width-sixteen compression."""
-    result = POSEIDON.tweak_hash(
+    hashed_digest = POSEIDON.tweak_hash(
         TEST_CONFIG,
         _parameter(),
         ChainTweak(epoch=Uint64(0), chain_index=1, step=1),
         [random_domain(TEST_CONFIG)],
     )
-    assert isinstance(result, HashDigestVector)
-    assert len(result.data) == TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS
+    assert isinstance(hashed_digest, HashDigestVector)
+    assert len(hashed_digest.data) == TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS
 
 
 def test_tweak_hash_node_uses_width_twenty_four_compression() -> None:
     """Two digest inputs hash through width-twenty-four compression."""
-    result = POSEIDON.tweak_hash(
+    hashed_digest = POSEIDON.tweak_hash(
         TEST_CONFIG,
         _parameter(),
         TreeTweak(level=1, index=Uint64(0)),
         [random_domain(TEST_CONFIG), random_domain(TEST_CONFIG)],
     )
-    assert len(result.data) == TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS
+    assert len(hashed_digest.data) == TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS
 
 
 def test_tweak_hash_leaf_uses_sponge_mode() -> None:
     """More than two digest inputs hash through sponge mode."""
-    parts = [random_domain(TEST_CONFIG) for _ in range(TEST_CONFIG.DIMENSION)]
-    result = POSEIDON.tweak_hash(
-        TEST_CONFIG, _parameter(), TreeTweak(level=0, index=Uint64(0)), parts
+    leaf_digests = [random_domain(TEST_CONFIG) for _ in range(TEST_CONFIG.DIMENSION)]
+    hashed_digest = POSEIDON.tweak_hash(
+        TEST_CONFIG, _parameter(), TreeTweak(level=0, index=Uint64(0)), leaf_digests
     )
-    assert len(result.data) == TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS
+    assert len(hashed_digest.data) == TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS
 
 
 def test_tweak_hash_chain_and_tree_tweaks_are_domain_separated() -> None:
@@ -135,48 +135,48 @@ def test_tweak_hash_chain_and_tree_tweaks_are_domain_separated() -> None:
 
 def test_hash_chain_zero_steps_returns_start_digest() -> None:
     """Walking zero steps returns the starting digest unchanged."""
-    start = random_domain(TEST_CONFIG)
-    result = POSEIDON.hash_chain(
+    start_digest = random_domain(TEST_CONFIG)
+    walked_digest = POSEIDON.hash_chain(
         config=TEST_CONFIG,
         parameter=_parameter(),
         epoch=Uint64(0),
         chain_index=0,
         start_step=0,
         num_steps=0,
-        start_digest=start,
+        start_digest=start_digest,
     )
-    assert result == start
+    assert walked_digest == start_digest
 
 
 def test_hash_chain_is_composable() -> None:
     """Walking two steps equals walking one step then one more."""
     parameter = _parameter()
-    start = random_domain(TEST_CONFIG)
-    two = POSEIDON.hash_chain(
+    start_digest = random_domain(TEST_CONFIG)
+    walked_two_steps = POSEIDON.hash_chain(
         config=TEST_CONFIG,
         parameter=parameter,
         epoch=Uint64(0),
         chain_index=0,
         start_step=0,
         num_steps=2,
-        start_digest=start,
+        start_digest=start_digest,
     )
-    one = POSEIDON.hash_chain(
+    walked_one_step = POSEIDON.hash_chain(
         config=TEST_CONFIG,
         parameter=parameter,
         epoch=Uint64(0),
         chain_index=0,
         start_step=0,
         num_steps=1,
-        start_digest=start,
+        start_digest=start_digest,
     )
-    one_more = POSEIDON.hash_chain(
+    walked_one_more_step = POSEIDON.hash_chain(
         config=TEST_CONFIG,
         parameter=parameter,
         epoch=Uint64(0),
         chain_index=0,
         start_step=1,
         num_steps=1,
-        start_digest=one,
+        start_digest=walked_one_step,
     )
-    assert two == one_more
+    assert walked_two_steps == walked_one_more_step

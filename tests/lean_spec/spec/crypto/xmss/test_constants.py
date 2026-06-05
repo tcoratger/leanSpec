@@ -85,8 +85,8 @@ def test_signature_length_bytes_matches_layout() -> None:
     path = config.LOG_LIFETIME * config.HASH_LENGTH_FIELD_ELEMENTS * P_BYTES
     rho = config.RAND_LENGTH_FIELD_ELEMENTS * P_BYTES
     hashes = config.DIMENSION * config.HASH_LENGTH_FIELD_ELEMENTS * P_BYTES
-    expected = path + rho + hashes + 3 * BYTES_PER_LENGTH_OFFSET
-    assert config.SIGNATURE_LENGTH_BYTES == expected
+    expected_signature_length = path + rho + hashes + 3 * BYTES_PER_LENGTH_OFFSET
+    assert config.SIGNATURE_LENGTH_BYTES == expected_signature_length
 
 
 @pytest.mark.parametrize(

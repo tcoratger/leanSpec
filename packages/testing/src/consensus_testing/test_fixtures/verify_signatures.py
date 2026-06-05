@@ -121,12 +121,14 @@ class VerifySignaturesTest(BaseConsensusFixture):
         # Verify signatures
         try:
             LstarSpec().verify_signatures(signed_block, self.anchor_state.validators)
-        except AssertionError as e:
-            exception_raised = e
+        except AssertionError as exception:
+            exception_raised = exception
             # If we expect an exception, this is fine
             if self.expect_exception is None:
                 # Unexpected failure
-                raise AssertionError(f"Unexpected error verifying block signature(s): {e}") from e
+                raise AssertionError(
+                    f"Unexpected error verifying block signature(s): {exception}"
+                ) from exception
         finally:
             # Always store filled block for serialization, even if an exception occurred
             # This ensures the test fixture contains the signed block that consumer can test with
@@ -163,24 +165,28 @@ class VerifySignaturesTest(BaseConsensusFixture):
         operation = self.tamper.get("operation")
 
         if operation == "set_proposer_index":
-            value = self.tamper.get("value")
-            if value is None:
+            new_proposer_index = self.tamper.get("value")
+            if new_proposer_index is None:
                 raise ValueError("set_proposer_index requires a value")
             return signed_block.model_copy(
                 update={
                     "block": signed_block.block.model_copy(
-                        update={"proposer_index": ValidatorIndex(int(value))}
+                        update={"proposer_index": ValidatorIndex(int(new_proposer_index))}
                     )
                 }
             )
 
         if operation == "clear_first_attestation_bits":
-            original = signed_block.block.body.attestations.data
-            if not original:
+            attestations = signed_block.block.body.attestations.data
+            if not attestations:
                 raise ValueError("clear_first_attestation_bits requires at least one attestation")
-            first = original[0]
-            empty_bits = AggregationBits(data=[Boolean(False)] * len(first.aggregation_bits.data))
-            cleared = AggregatedAttestation(aggregation_bits=empty_bits, data=first.data)
+            first_attestation = attestations[0]
+            empty_bits = AggregationBits(
+                data=[Boolean(False)] * len(first_attestation.aggregation_bits.data)
+            )
+            cleared = AggregatedAttestation(
+                aggregation_bits=empty_bits, data=first_attestation.data
+            )
             return signed_block.model_copy(
                 update={
                     "block": signed_block.block.model_copy(
@@ -188,7 +194,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
                             "body": signed_block.block.body.model_copy(
                                 update={
                                     "attestations": AggregatedAttestations(
-                                        data=[cleared, *original[1:]]
+                                        data=[cleared, *attestations[1:]]
                                     )
                                 }
                             )
@@ -255,8 +261,8 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
         if operation == "swap_first_two_attestations":
             body = signed_block.block.body
-            original = body.attestations.data
-            if len(original) < 2:
+            attestations = body.attestations.data
+            if len(attestations) < 2:
                 raise ValueError("swap_first_two_attestations requires at least two attestations")
             assert self.anchor_state is not None
 
@@ -266,13 +272,13 @@ class VerifySignaturesTest(BaseConsensusFixture):
                     list(attestation.aggregation_bits.to_validator_indices()),
                     attestation.data,
                 )
-                for attestation in original
+                for attestation in attestations
             ]
 
             swapped_body = body.model_copy(
                 update={
                     "attestations": AggregatedAttestations(
-                        data=[original[1], original[0], *original[2:]]
+                        data=[attestations[1], attestations[0], *attestations[2:]]
                     )
                 }
             )

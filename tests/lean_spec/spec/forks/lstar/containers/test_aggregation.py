@@ -317,28 +317,30 @@ def test_multi_message_aggregate_split_by_message_rejected_under_test_prover(
         attestation_args_a[3],
     )
 
-    vids_a = [ValidatorIndex(0), ValidatorIndex(1)]
-    vids_b = [ValidatorIndex(2), ValidatorIndex(3)]
-    part_a = _sign_and_aggregate(key_manager, vids_a, attestation_args_a)
-    part_b = _sign_and_aggregate(key_manager, vids_b, attestation_args_b)
+    validator_indices_a = [ValidatorIndex(0), ValidatorIndex(1)]
+    validator_indices_b = [ValidatorIndex(2), ValidatorIndex(3)]
+    aggregate_a = _sign_and_aggregate(key_manager, validator_indices_a, attestation_args_a)
+    aggregate_b = _sign_and_aggregate(key_manager, validator_indices_b, attestation_args_b)
 
     public_keys_a = [
-        key_manager[validator_index].attestation_keypair.public_key for validator_index in vids_a
+        key_manager[validator_index].attestation_keypair.public_key
+        for validator_index in validator_indices_a
     ]
     public_keys_b = [
-        key_manager[validator_index].attestation_keypair.public_key for validator_index in vids_b
+        key_manager[validator_index].attestation_keypair.public_key
+        for validator_index in validator_indices_b
     ]
 
     merged = MultiMessageAggregate.aggregate(
-        parts=[part_a, part_b],
-        public_keys_per_part=[public_keys_a, public_keys_b],
+        single_message_aggregates=[aggregate_a, aggregate_b],
+        public_keys_per_aggregate=[public_keys_a, public_keys_b],
     )
 
     with pytest.raises(AggregationError, match="multi-message aggregate split failed"):
         merged.split_by_message(
             message=hash_tree_root(attestation_data_a),
             public_keys_per_message=[public_keys_a, public_keys_b],
-            participants=part_a.participants,
+            participants=aggregate_a.participants,
         )
 
 
@@ -441,7 +443,7 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
 def test_multi_message_aggregate_rejects_empty_parts() -> None:
     """multi-message aggregate aggregation requires at least one single-message aggregate input."""
     with pytest.raises(AggregationError, match="at least one single-message aggregate input"):
-        MultiMessageAggregate.aggregate(parts=[], public_keys_per_part=[])
+        MultiMessageAggregate.aggregate(single_message_aggregates=[], public_keys_per_aggregate=[])
 
 
 def test_multi_message_aggregate_rejects_mismatched_public_key_layout(
@@ -451,7 +453,7 @@ def test_multi_message_aggregate_rejects_mismatched_public_key_layout(
     source = Checkpoint(root=make_bytes32(200), slot=Slot(0))
     attestation_args = (Slot(7), 201, 202, source)
 
-    part = _sign_and_aggregate(
+    single_message_aggregate = _sign_and_aggregate(
         key_manager,
         [ValidatorIndex(0), ValidatorIndex(1)],
         attestation_args,
@@ -461,8 +463,8 @@ def test_multi_message_aggregate_rejects_mismatched_public_key_layout(
 
     with pytest.raises(AggregationError, match="expected 2 pubkeys, got 1"):
         MultiMessageAggregate.aggregate(
-            parts=[part],
-            public_keys_per_part=wrong_layout,
+            single_message_aggregates=[single_message_aggregate],
+            public_keys_per_aggregate=wrong_layout,
         )
 
 
@@ -472,22 +474,24 @@ def test_multi_message_aggregate_propagates_prover_error(key_manager: XmssKeyMan
     attestation_args = (Slot(8), 211, 212, source)
     validator_indices = [ValidatorIndex(0), ValidatorIndex(1)]
 
-    part = _sign_and_aggregate(key_manager, validator_indices, attestation_args)
+    single_message_aggregate = _sign_and_aggregate(key_manager, validator_indices, attestation_args)
     public_keys = [
         key_manager[validator_index].attestation_keypair.public_key
         for validator_index in validator_indices
     ]
 
-    corrupted_bytes = bytearray(part.proof.data)
+    corrupted_bytes = bytearray(single_message_aggregate.proof.data)
     corrupted_bytes[10] ^= 0xFF
     corrupted_bytes[20] ^= 0xFF
-    part = SingleMessageAggregate(
-        participants=part.participants,
+    corrupted_aggregate = SingleMessageAggregate(
+        participants=single_message_aggregate.participants,
         proof=ByteList512KiB(data=bytes(corrupted_bytes)),
     )
 
     with pytest.raises(AggregationError, match="merge_many_type_1 failed"):
-        MultiMessageAggregate.aggregate(parts=[part], public_keys_per_part=[public_keys])
+        MultiMessageAggregate.aggregate(
+            single_message_aggregates=[corrupted_aggregate], public_keys_per_aggregate=[public_keys]
+        )
 
 
 def test_multi_message_aggregate_verify_round_trip(key_manager: XmssKeyManager) -> None:
@@ -510,21 +514,23 @@ def test_multi_message_aggregate_verify_round_trip(key_manager: XmssKeyManager) 
         attestation_args_b[3],
     )
 
-    vids_a = [ValidatorIndex(0), ValidatorIndex(1)]
-    vids_b = [ValidatorIndex(2), ValidatorIndex(3)]
-    part_a = _sign_and_aggregate(key_manager, vids_a, attestation_args_a)
-    part_b = _sign_and_aggregate(key_manager, vids_b, attestation_args_b)
+    validator_indices_a = [ValidatorIndex(0), ValidatorIndex(1)]
+    validator_indices_b = [ValidatorIndex(2), ValidatorIndex(3)]
+    aggregate_a = _sign_and_aggregate(key_manager, validator_indices_a, attestation_args_a)
+    aggregate_b = _sign_and_aggregate(key_manager, validator_indices_b, attestation_args_b)
 
     public_keys_a = [
-        key_manager[validator_index].attestation_keypair.public_key for validator_index in vids_a
+        key_manager[validator_index].attestation_keypair.public_key
+        for validator_index in validator_indices_a
     ]
     public_keys_b = [
-        key_manager[validator_index].attestation_keypair.public_key for validator_index in vids_b
+        key_manager[validator_index].attestation_keypair.public_key
+        for validator_index in validator_indices_b
     ]
 
     merged = MultiMessageAggregate.aggregate(
-        parts=[part_a, part_b],
-        public_keys_per_part=[public_keys_a, public_keys_b],
+        single_message_aggregates=[aggregate_a, aggregate_b],
+        public_keys_per_aggregate=[public_keys_a, public_keys_b],
     )
 
     merged.verify(
@@ -560,24 +566,26 @@ def test_multi_message_aggregate_verify_rejects_message_swap(key_manager: XmssKe
         attestation_args_b[3],
     )
 
-    vids_a = [ValidatorIndex(0), ValidatorIndex(1)]
-    vids_b = [ValidatorIndex(2), ValidatorIndex(3)]
-    part_a = _sign_and_aggregate(key_manager, vids_a, attestation_args_a)
-    part_b = _sign_and_aggregate(key_manager, vids_b, attestation_args_b)
+    validator_indices_a = [ValidatorIndex(0), ValidatorIndex(1)]
+    validator_indices_b = [ValidatorIndex(2), ValidatorIndex(3)]
+    aggregate_a = _sign_and_aggregate(key_manager, validator_indices_a, attestation_args_a)
+    aggregate_b = _sign_and_aggregate(key_manager, validator_indices_b, attestation_args_b)
 
     public_keys_a = [
-        key_manager[validator_index].attestation_keypair.public_key for validator_index in vids_a
+        key_manager[validator_index].attestation_keypair.public_key
+        for validator_index in validator_indices_a
     ]
     public_keys_b = [
-        key_manager[validator_index].attestation_keypair.public_key for validator_index in vids_b
+        key_manager[validator_index].attestation_keypair.public_key
+        for validator_index in validator_indices_b
     ]
 
     merged = MultiMessageAggregate.aggregate(
-        parts=[part_a, part_b],
-        public_keys_per_part=[public_keys_a, public_keys_b],
+        single_message_aggregates=[aggregate_a, aggregate_b],
+        public_keys_per_aggregate=[public_keys_a, public_keys_b],
     )
 
-    # Swap the parallel messages: part_a's public_keys are now paired with part_b's
+    # Swap the parallel messages: aggregate_a's public_keys are now paired with aggregate_b's
     # message and vice versa.
     with pytest.raises(AggregationError, match="verification failed"):
         merged.verify(
@@ -597,15 +605,15 @@ def test_multi_message_aggregate_verify_rejects_mismatched_messages_length(
     attestation_args = (Slot(10), 501, 502, source)
 
     validator_indices = [ValidatorIndex(0), ValidatorIndex(1)]
-    part = _sign_and_aggregate(key_manager, validator_indices, attestation_args)
+    single_message_aggregate = _sign_and_aggregate(key_manager, validator_indices, attestation_args)
     public_keys = [
         key_manager[validator_index].attestation_keypair.public_key
         for validator_index in validator_indices
     ]
 
     merged = MultiMessageAggregate.aggregate(
-        parts=[part],
-        public_keys_per_part=[public_keys],
+        single_message_aggregates=[single_message_aggregate],
+        public_keys_per_aggregate=[public_keys],
     )
 
     with pytest.raises(AggregationError, match="expected 1 message bindings, got 0"):

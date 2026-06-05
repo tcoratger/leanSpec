@@ -183,7 +183,7 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
         # Phase 2: honest merge.
         merged = MultiMessageAggregate.aggregate(
             components,
-            public_keys_per_part=public_keys_per_message,
+            public_keys_per_aggregate=public_keys_per_message,
         )
 
         # Phase 3: optionally mutate exactly one binding of the bundle.
@@ -208,7 +208,7 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
                 )
                 merged = MultiMessageAggregate.aggregate(
                     components,
-                    public_keys_per_part=public_keys_per_message,
+                    public_keys_per_aggregate=public_keys_per_message,
                 )
 
             case IncrementComponentSlot(component_index=component_index):

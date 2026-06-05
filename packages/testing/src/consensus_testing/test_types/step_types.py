@@ -109,7 +109,7 @@ class BlockStep(BaseForkChoiceStep):
     """The filled Block, processed through the spec."""
 
     @field_serializer("block", when_used="json")
-    def serialize_block(self, value: BlockSpec) -> dict[str, Any]:
+    def serialize_block(self, block_spec: BlockSpec) -> dict[str, Any]:
         """
         Serialize the filled Block instead of the BlockSpec.
 
@@ -118,7 +118,7 @@ class BlockStep(BaseForkChoiceStep):
 
         Parameters:
         ----------
-        value : BlockSpec
+        block_spec : BlockSpec
             The BlockSpec field value (ignored, we use _filled_block instead).
 
         Returns:
@@ -136,10 +136,10 @@ class BlockStep(BaseForkChoiceStep):
                 "Block not filled yet - make_fixture() must be called before serialization. "
                 "This BlockStep should only be serialized after the fixture has been processed."
             )
-        result = self._filled_block.to_json()
-        if value.label:
-            result["blockRootLabel"] = value.label
-        return result
+        serialized_block = self._filled_block.to_json()
+        if block_spec.label:
+            serialized_block["blockRootLabel"] = block_spec.label
+        return serialized_block
 
 
 class AttestationStep(BaseForkChoiceStep):
@@ -177,7 +177,9 @@ class AttestationStep(BaseForkChoiceStep):
     """The filled SignedAttestation, processed through the spec."""
 
     @field_serializer("attestation", when_used="json")
-    def serialize_gossip_attestation(self, value: GossipAttestationSpec) -> dict[str, Any]:
+    def serialize_gossip_attestation(
+        self, attestation_spec: GossipAttestationSpec
+    ) -> dict[str, Any]:
         """
         Serialize the filled SignedAttestation instead of the spec.
 
@@ -186,7 +188,7 @@ class AttestationStep(BaseForkChoiceStep):
 
         Parameters:
         ----------
-        value : GossipAttestationSpec
+        attestation_spec : GossipAttestationSpec
             The spec field value (ignored, we use _filled_attestation instead).
 
         Returns:

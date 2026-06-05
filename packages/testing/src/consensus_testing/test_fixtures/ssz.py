@@ -56,20 +56,20 @@ class SSZTest(BaseConsensusFixture):
     """Hex hash_tree_root. Empty in decode-failure mode."""
 
     @field_serializer("value", when_used="json")
-    def serialize_value(self, value: SSZType) -> Any:
+    def serialize_value(self, ssz_value: SSZType) -> Any:
         """Convert an SSZ value to a JSON-safe representation."""
-        if isinstance(value, CamelModel):
-            return value.to_json()
+        if isinstance(ssz_value, CamelModel):
+            return ssz_value.to_json()
         # Boolean before int — Boolean subclasses int.
-        if isinstance(value, Boolean):
-            return bool(value)
-        if isinstance(value, bytes):
-            return "0x" + value.hex()
-        if isinstance(value, int):
-            return str(value)
-        if isinstance(value, Fp):
-            return str(value.value)
-        return str(value)
+        if isinstance(ssz_value, Boolean):
+            return bool(ssz_value)
+        if isinstance(ssz_value, bytes):
+            return "0x" + ssz_value.hex()
+        if isinstance(ssz_value, int):
+            return str(ssz_value)
+        if isinstance(ssz_value, Fp):
+            return str(ssz_value.value)
+        return str(ssz_value)
 
     def make_fixture(self) -> "SSZTest":
         """

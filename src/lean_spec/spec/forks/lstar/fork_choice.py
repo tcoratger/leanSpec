@@ -148,31 +148,43 @@ class ForkChoiceMixin(LstarSpecBase):
         Raises:
             AssertionError: If attestation fails validation.
         """
-        data = attestation_data
+        source_checkpoint = attestation_data.source
+        target_checkpoint = attestation_data.target
+        head_checkpoint = attestation_data.head
 
         # Availability Check
         #
         # We cannot count a vote if we haven't seen the blocks involved.
-        assert data.source.root in store.blocks, f"Unknown source block: {data.source.root.hex()}"
-        assert data.target.root in store.blocks, f"Unknown target block: {data.target.root.hex()}"
-        assert data.head.root in store.blocks, f"Unknown head block: {data.head.root.hex()}"
+        assert source_checkpoint.root in store.blocks, (
+            f"Unknown source block: {source_checkpoint.root.hex()}"
+        )
+        assert target_checkpoint.root in store.blocks, (
+            f"Unknown target block: {target_checkpoint.root.hex()}"
+        )
+        assert head_checkpoint.root in store.blocks, (
+            f"Unknown head block: {head_checkpoint.root.hex()}"
+        )
 
         # Topology Check
         #
         # History is linear and monotonic: source <= target <= head.
         # The second check implies head >= source by transitivity.
-        assert data.source.slot <= data.target.slot, "Source checkpoint slot must not exceed target"
-        assert data.head.slot >= data.target.slot, "Head checkpoint must not be older than target"
+        assert source_checkpoint.slot <= target_checkpoint.slot, (
+            "Source checkpoint slot must not exceed target"
+        )
+        assert head_checkpoint.slot >= target_checkpoint.slot, (
+            "Head checkpoint must not be older than target"
+        )
 
         # Consistency Check
         #
         # Validate checkpoint slots match block slots.
-        source_block = store.blocks[data.source.root]
-        target_block = store.blocks[data.target.root]
-        head_block = store.blocks[data.head.root]
-        assert source_block.slot == data.source.slot, "Source checkpoint slot mismatch"
-        assert target_block.slot == data.target.slot, "Target checkpoint slot mismatch"
-        assert head_block.slot == data.head.slot, "Head checkpoint slot mismatch"
+        source_block = store.blocks[source_checkpoint.root]
+        target_block = store.blocks[target_checkpoint.root]
+        head_block = store.blocks[head_checkpoint.root]
+        assert source_block.slot == source_checkpoint.slot, "Source checkpoint slot mismatch"
+        assert target_block.slot == target_checkpoint.slot, "Target checkpoint slot mismatch"
+        assert head_block.slot == head_checkpoint.slot, "Head checkpoint slot mismatch"
 
         # Time Check
         #
@@ -182,7 +194,7 @@ class ForkChoiceMixin(LstarSpecBase):
         # The bound is in intervals, not slots: a whole-slot margin would
         # let an adversary pre-publish next-slot aggregates ahead of any
         # honest validator.
-        attestation_start_interval = Interval.from_slot(data.slot)
+        attestation_start_interval = Interval.from_slot(attestation_data.slot)
         gossip_disparity = Interval(int(GOSSIP_DISPARITY_INTERVALS))
         assert attestation_start_interval <= store.time + gossip_disparity, (
             "Attestation too far in future"
@@ -270,26 +282,27 @@ class ForkChoiceMixin(LstarSpecBase):
             ValueError: If validator not found in state.
             AssertionError: If signature verification fails.
         """
-        data = signed_attestation.data
-        proof = signed_attestation.proof
+        attestation_data = signed_attestation.data
+        aggregated_proof = signed_attestation.proof
 
-        self.validate_attestation(store, data)
+        self.validate_attestation(store, attestation_data)
 
         # Get validator IDs who participated in this aggregation
-        validator_indices = proof.participants.to_validator_indices()
+        validator_indices = aggregated_proof.participants.to_validator_indices()
 
         # Retrieve the relevant state to look up public keys for verification.
-        key_state = store.states.get(data.target.root)
+        key_state = store.states.get(attestation_data.target.root)
         assert key_state is not None, (
             f"No state available to verify committee aggregation for target "
-            f"{data.target.root.hex()}"
+            f"{attestation_data.target.root.hex()}"
         )
 
         # Ensure all participants exist in the active set
         validators = key_state.validators
         for validator_index in validator_indices:
             assert validator_index.is_within_registry(Uint64(len(validators))), (
-                f"Validator {validator_index} not found in state {data.target.root.hex()}"
+                f"Validator {validator_index} not found in state "
+                f"{attestation_data.target.root.hex()}"
             )
 
         # Prepare public keys for verification
@@ -300,17 +313,19 @@ class ForkChoiceMixin(LstarSpecBase):
 
         # Verify the single-message aggregate single-message aggregated proof.
         try:
-            proof.verify(
+            aggregated_proof.verify(
                 public_keys=public_keys,
-                message=hash_tree_root(data),
-                slot=data.slot,
+                message=hash_tree_root(attestation_data),
+                slot=attestation_data.slot,
             )
         except AggregationError as exception:
             raise AssertionError(
                 f"Committee aggregation signature verification failed: {exception}"
             ) from exception
 
-        store.latest_new_aggregated_payloads.setdefault(data, set()).add(proof)
+        store.latest_new_aggregated_payloads.setdefault(attestation_data, set()).add(
+            aggregated_proof
+        )
 
         return store
 

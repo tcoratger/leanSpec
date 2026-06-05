@@ -11,10 +11,14 @@ class ForkRegistry:
     def __init__(self, forks_module: ModuleType) -> None:
         """Scan a forks module and build the name index."""
         discovered: set[type[BaseFork]] = set()
-        for name in dir(forks_module):
-            obj = getattr(forks_module, name)
-            if isinstance(obj, type) and issubclass(obj, BaseFork) and obj is not BaseFork:
-                discovered.add(obj)
+        for attribute_name in dir(forks_module):
+            module_attribute = getattr(forks_module, attribute_name)
+            if (
+                isinstance(module_attribute, type)
+                and issubclass(module_attribute, BaseFork)
+                and module_attribute is not BaseFork
+            ):
+                discovered.add(module_attribute)
 
         self._forks = frozenset(fork for fork in discovered if not fork.ignore())
         self._by_name: dict[str, type[BaseFork]] = {

@@ -219,21 +219,21 @@ class TestPoseidonEngine:
     def test_permute_determinism(self) -> None:
         """Same input produces same output."""
         engine = Poseidon(PARAMS_16)
-        state = [Fp(value=i) for i in range(16)]
+        input_state = [Fp(value=i) for i in range(16)]
 
-        output1 = engine.permute(state)
-        output2 = engine.permute(state)
+        output1 = engine.permute(input_state)
+        output2 = engine.permute(input_state)
 
         assert output1 == output2
 
     def test_permute_output_differs_from_input(self) -> None:
         """Permutation changes the state."""
         engine = Poseidon(PARAMS_16)
-        state = [Fp(value=i) for i in range(16)]
+        input_state = [Fp(value=i) for i in range(16)]
 
-        output = engine.permute(state)
+        permuted_output = engine.permute(input_state)
 
-        assert output != state
+        assert permuted_output != input_state
 
     @pytest.mark.parametrize(
         "params, input_state",
@@ -247,24 +247,24 @@ class TestPoseidonEngine:
         """Every output element lies strictly below the field modulus."""
         engine = Poseidon(params)
 
-        output = engine.permute(input_state)
+        permuted_output = engine.permute(input_state)
 
-        assert all(int(x) < P for x in output)
+        assert all(int(output_element) < P for output_element in permuted_output)
 
     def test_permute_all_zero_input(self) -> None:
         """All-zero input produces an in-field output of the expected width."""
         engine = Poseidon(PARAMS_16)
 
-        output = engine.permute([Fp(0)] * 16)
+        permuted_output = engine.permute([Fp(0)] * 16)
 
-        assert len(output) == 16
-        assert all(int(x) < P for x in output)
+        assert len(permuted_output) == 16
+        assert all(int(output_element) < P for output_element in permuted_output)
 
     def test_permute_field_boundary_input(self) -> None:
         """Maximum-value input stays in-field and exposes int64 regressions."""
         engine = Poseidon(PARAMS_16)
 
-        output = engine.permute([Fp(value=P - 1)] * 16)
+        permuted_output = engine.permute([Fp(value=P - 1)] * 16)
 
-        assert len(output) == 16
-        assert all(int(x) < P for x in output)
+        assert len(permuted_output) == 16
+        assert all(int(output_element) < P for output_element in permuted_output)

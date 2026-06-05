@@ -295,25 +295,25 @@ class BlockSpec(CamelModel):
                 slot=self.slot,
             )
 
-            public_keys_per_part: list[list] = [
+            public_keys_per_aggregate: list[list] = [
                 [
                     state.validators[validator_index].get_attestation_public_key()
-                    for validator_index in proof.participants.to_validator_indices()
+                    for validator_index in attestation_proof.participants.to_validator_indices()
                 ]
-                for proof in attestation_proofs
+                for attestation_proof in attestation_proofs
             ]
-            public_keys_per_part.append([proposer_public_key])
+            public_keys_per_aggregate.append([proposer_public_key])
 
-            proof = MultiMessageAggregate.aggregate(
+            block_proof = MultiMessageAggregate.aggregate(
                 [*attestation_proofs, proposer_single_message_aggregate],
-                public_keys_per_part=public_keys_per_part,
+                public_keys_per_aggregate=public_keys_per_aggregate,
             )
         else:
-            proof = MultiMessageAggregate(proof=ByteList512KiB(data=b""))
+            block_proof = MultiMessageAggregate(proof=ByteList512KiB(data=b""))
 
         return SignedBlock(
             block=final_block,
-            proof=proof,
+            proof=block_proof,
         )
 
     def build_signed_block(
@@ -391,9 +391,9 @@ class BlockSpec(CamelModel):
         aggregated_attestations = [
             AggregatedAttestation(
                 aggregation_bits=AggregationBits.from_indices(validator_indices),
-                data=data,
+                data=attestation_data,
             )
-            for data, validator_indices in data_to_validator_indices.items()
+            for attestation_data, validator_indices in data_to_validator_indices.items()
         ]
         attestation_signatures = key_manager.build_attestation_proofs(
             AggregatedAttestations(data=aggregated_attestations),
@@ -532,9 +532,12 @@ class BlockSpec(CamelModel):
 
         # Merge new known payloads (built locally) back into the caller's
         # store while leaving every other field untouched.
-        merged_known = {k: set(v) for k, v in caller_store.latest_known_aggregated_payloads.items()}
-        for data, proofs in merged_store.latest_known_aggregated_payloads.items():
-            merged_known.setdefault(data, set()).update(proofs)
+        merged_known = {
+            attestation_data: set(proofs)
+            for attestation_data, proofs in caller_store.latest_known_aggregated_payloads.items()
+        }
+        for attestation_data, proofs in merged_store.latest_known_aggregated_payloads.items():
+            merged_known.setdefault(attestation_data, set()).update(proofs)
         caller_store.latest_known_aggregated_payloads = merged_known
         store = caller_store
 

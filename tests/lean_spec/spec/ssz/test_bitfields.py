@@ -70,12 +70,12 @@ class TestBitvector:
 
     def test_instantiation_from_generator(self) -> None:
         """Fixed-length type materializes a generator into a tuple before validation."""
-        bits_gen = (Boolean(b) for b in [True, False, True, False])
-        instance = Bitvector4(data=bits_gen)  # type: ignore[arg-type]
+        bit_generator = (Boolean(bit) for bit in [True, False, True, False])
+        instance = Bitvector4(data=bit_generator)  # type: ignore[arg-type]
         assert len(instance) == 4
 
     @pytest.mark.parametrize(
-        "values, count",
+        "bits, expected_element_count",
         [
             ([Boolean(True), Boolean(False), Boolean(True)], 3),
             (
@@ -85,14 +85,16 @@ class TestBitvector:
         ],
     )
     def test_instantiation_with_wrong_length_raises_error(
-        self, values: list[Boolean], count: int
+        self, bits: list[Boolean], expected_element_count: int
     ) -> None:
         """Wrong-length input raises with the exact element count in the message."""
         with pytest.raises(
             ValueOrValidationError,
-            match=re.escape(f"Bitvector4 requires exactly 4 elements, got {count}"),
+            match=re.escape(
+                f"Bitvector4 requires exactly 4 elements, got {expected_element_count}"
+            ),
         ):
-            Bitvector4(data=values)
+            Bitvector4(data=bits)
 
     def test_pydantic_validation_accepts_valid_list(self) -> None:
         """Pydantic validation accepts a valid list of booleans."""
@@ -105,7 +107,7 @@ class TestBitvector:
         "invalid_value",
         [
             {"data": [Boolean(True), Boolean(False), Boolean(True)]},
-            {"data": [Boolean(b) for b in [True, False, True, False, True]]},
+            {"data": [Boolean(bit) for bit in [True, False, True, False, True]]},
         ],
     )
     def test_pydantic_validation_rejects_wrong_length(self, invalid_value: Any) -> None:
@@ -149,13 +151,15 @@ class TestBitlist:
         """Instantiation succeeds with any number of items up to LIMIT."""
         instance = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(1), Boolean(0)])
         assert len(instance) == 4
-        expected = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(True), Boolean(False)])
-        assert instance == expected
+        expected_bitlist = Bitlist8(
+            data=[Boolean(True), Boolean(False), Boolean(True), Boolean(False)]
+        )
+        assert instance == expected_bitlist
 
     def test_instantiation_from_generator(self) -> None:
         """Variable-length type materializes a generator into a list before validation."""
-        bits_gen = (Boolean(b) for b in [True, False, True])
-        instance = Bitlist8(data=bits_gen)  # type: ignore[arg-type]
+        bit_generator = (Boolean(bit) for bit in [True, False, True])
+        instance = Bitlist8(data=bit_generator)  # type: ignore[arg-type]
         assert len(instance) == 3
 
     @pytest.mark.parametrize(
@@ -196,7 +200,7 @@ class TestBitlist:
             ValueOrValidationError,
             match=re.escape("Bitlist4 exceeds limit of 4, got 5"),
         ):
-            Bitlist4(data=[Boolean(b) for b in [True, False, True, False, True]])
+            Bitlist4(data=[Boolean(bit) for bit in [True, False, True, False, True]])
 
     def test_pydantic_validation_accepts_valid_list(self) -> None:
         """Pydantic validation accepts a valid list of booleans."""
@@ -221,37 +225,37 @@ class TestBitlist:
     def test_get_item_slice(self) -> None:
         """Indexing by slice returns a list of Booleans."""
         bitlist = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(True), Boolean(False)])
-        result = bitlist[1:3]
-        assert result == [Boolean(False), Boolean(True)]
-        assert isinstance(result, list)
+        sliced_bits = bitlist[1:3]
+        assert sliced_bits == [Boolean(False), Boolean(True)]
+        assert isinstance(sliced_bits, list)
 
     def test_add_with_list(self) -> None:
         """Concatenating a Bitlist with a list returns a new instance."""
         bitlist = Bitlist8(data=[Boolean(True), Boolean(False), Boolean(True)])
-        result = bitlist + [Boolean(False), Boolean(True)]
-        assert len(result) == 5
-        assert list(result.data) == [
+        concatenated = bitlist + [Boolean(False), Boolean(True)]
+        assert len(concatenated) == 5
+        assert list(concatenated.data) == [
             Boolean(True),
             Boolean(False),
             Boolean(True),
             Boolean(False),
             Boolean(True),
         ]
-        assert isinstance(result, Bitlist8)
+        assert isinstance(concatenated, Bitlist8)
 
     def test_add_with_bitlist(self) -> None:
         """Concatenating two Bitlists of the same type returns a new instance."""
         bitlist1 = Bitlist8(data=[Boolean(True), Boolean(False)])
         bitlist2 = Bitlist8(data=[Boolean(True), Boolean(True)])
-        result = bitlist1 + bitlist2
-        assert len(result) == 4
-        assert list(result.data) == [
+        concatenated = bitlist1 + bitlist2
+        assert len(concatenated) == 4
+        assert list(concatenated.data) == [
             Boolean(True),
             Boolean(False),
             Boolean(True),
             Boolean(True),
         ]
-        assert isinstance(result, Bitlist8)
+        assert isinstance(concatenated, Bitlist8)
 
     def test_add_with_unsupported_type_raises(self) -> None:
         """Adding an unsupported type returns NotImplemented and Python raises TypeError."""
@@ -299,7 +303,7 @@ class TestBitfieldSSZ:
             Bitlist10.get_byte_length()
 
     @pytest.mark.parametrize(
-        "length, value, expected_hex",
+        "length, bits, expected_hex",
         [
             (8, (1, 1, 0, 1, 0, 1, 0, 0), "2b"),
             (4, (0, 1, 0, 1), "0a"),
@@ -311,15 +315,15 @@ class TestBitfieldSSZ:
         ],
     )
     def test_bitvector_round_trip(
-        self, length: int, value: tuple[int, ...], expected_hex: str
+        self, length: int, bits: tuple[int, ...], expected_hex: str
     ) -> None:
         """Bitvector round-trips through encode_bytes, decode_bytes, and stream serialization."""
 
         class TestBitvector(BaseBitvector):
             LENGTH = length
 
-        bool_value = tuple(Boolean(b) for b in value)
-        instance = TestBitvector(data=bool_value)
+        boolean_bits = tuple(Boolean(bit) for bit in bits)
+        instance = TestBitvector(data=boolean_bits)
 
         encoded = instance.encode_bytes()
         assert encoded.hex() == expected_hex
@@ -335,7 +339,7 @@ class TestBitfieldSSZ:
         assert decoded2 == instance
 
     @pytest.mark.parametrize(
-        "limit, value, expected_hex",
+        "limit, bits, expected_hex",
         [
             (8, (), "01"),
             (8, (1, 1, 0, 1, 0, 1, 0, 0), "2b01"),
@@ -347,16 +351,14 @@ class TestBitfieldSSZ:
             (513, tuple([1] * 513), ("ff" * 64) + "03"),
         ],
     )
-    def test_bitlist_round_trip(
-        self, limit: int, value: tuple[int, ...], expected_hex: str
-    ) -> None:
+    def test_bitlist_round_trip(self, limit: int, bits: tuple[int, ...], expected_hex: str) -> None:
         """Bitlist round-trips through encode_bytes, decode_bytes, and stream serialization."""
 
         class TestBitlist(BaseBitlist):
             LIMIT = limit
 
-        bool_value = tuple(Boolean(b) for b in value)
-        instance = TestBitlist(data=bool_value)
+        boolean_bits = tuple(Boolean(bit) for bit in bits)
+        instance = TestBitlist(data=boolean_bits)
 
         encoded = instance.encode_bytes()
         assert encoded.hex() == expected_hex

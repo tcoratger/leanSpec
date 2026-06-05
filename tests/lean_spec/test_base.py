@@ -38,9 +38,9 @@ class TestCamelModelToJson:
         """
         model = SampleCamelModel(first_name="Alice", current_slot=42)
 
-        result = model.to_json()
+        serialized = model.to_json()
 
-        assert result == {"firstName": "Alice", "currentSlot": 42}
+        assert serialized == {"firstName": "Alice", "currentSlot": 42}
 
     def test_to_json_rejects_mode_kwarg(self) -> None:
         """Overriding serialization mode raises an error instead of being silently accepted."""
@@ -65,10 +65,10 @@ class TestCamelModelToJson:
         model = SampleCamelModel(first_name="Dave", current_slot=0)
 
         # exclude_defaults=True should be forwarded to model_dump.
-        result = model.to_json(exclude_defaults=True)
+        serialized = model.to_json(exclude_defaults=True)
 
         # current_slot=0 is the default for int, so it gets excluded.
-        assert "firstName" in result
+        assert "firstName" in serialized
 
 
 class TestStrictBaseModel:
@@ -110,6 +110,6 @@ class TestStrictBaseModel:
         """
         model = SampleStrictModel(slot_number=42, block_root="0xdef")
 
-        result = model.to_json()
+        serialized = model.to_json()
 
-        assert result == {"slotNumber": 42, "blockRoot": "0xdef"}
+        assert serialized == {"slotNumber": 42, "blockRoot": "0xdef"}

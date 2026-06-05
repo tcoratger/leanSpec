@@ -87,19 +87,19 @@ class StateTransitionTest(BaseConsensusFixture):
     """Expected exception message for invalid tests."""
 
     @field_serializer("blocks", when_used="json")
-    def serialize_blocks(self, value: list[BlockSpec]) -> list[dict[str, Any]]:
+    def serialize_blocks(self, block_specs: list[BlockSpec]) -> list[dict[str, Any]]:
         """
         Serialize filled blocks instead of the input specs.
 
         Ensures fixture output contains complete blocks, not partial specs.
 
         Args:
-            value: The BlockSpec list (ignored; filled blocks are used instead).
+            block_specs: The BlockSpec list (ignored; filled blocks are used instead).
 
         Returns:
             The serialized blocks.
         """
-        del value
+        del block_specs
         return [block.to_json() for block in self._filled_blocks]
 
     def make_fixture(self) -> "StateTransitionTest":
@@ -147,12 +147,14 @@ class StateTransitionTest(BaseConsensusFixture):
                     state = spec.state_transition(state, block=block)
 
             actual_post_state = state
-        except (AssertionError, ValueError) as e:
-            exception_raised = e
+        except (AssertionError, ValueError) as exception:
+            exception_raised = exception
             # If we expect an exception, this is fine
             if self.expect_exception is None:
                 # Unexpected failure
-                raise AssertionError(f"Unexpected error processing blocks: {e}") from e
+                raise AssertionError(
+                    f"Unexpected error processing blocks: {exception}"
+                ) from exception
         finally:
             # Always store filled blocks for serialization, even if an exception occurred
             # This ensures the test fixture includes all blocks that were attempted
@@ -256,7 +258,9 @@ class StateTransitionTest(BaseConsensusFixture):
                     spec.attestations, state, block_registry
                 )
 
-            known_block_roots = frozenset(hash_tree_root(b) for b in block_registry.values())
+            known_block_roots = frozenset(
+                hash_tree_root(block) for block in block_registry.values()
+            )
 
             block, post_state, _, _ = LstarSpec().build_block(
                 state,

@@ -317,9 +317,14 @@ def parse_topic_string(topic_str: str) -> tuple[str, str, str, str]:
     Raises:
         ValueError: If the topic string is malformed.
     """
-    parts = topic_str.lstrip("/").split("/")
+    topic_components = topic_str.lstrip("/").split("/")
 
-    if len(parts) != 4:
-        raise ValueError(f"Invalid topic format: expected 4 parts, got {len(parts)}")
+    if len(topic_components) != 4:
+        raise ValueError(f"Invalid topic format: expected 4 parts, got {len(topic_components)}")
 
-    return (parts[0], parts[1], parts[2], parts[3])
+    return (
+        topic_components[0],
+        topic_components[1],
+        topic_components[2],
+        topic_components[3],
+    )

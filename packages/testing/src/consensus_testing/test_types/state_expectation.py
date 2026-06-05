@@ -166,29 +166,30 @@ class StateExpectation(CamelModel):
 
         for field_name in fields & self._ACCESSORS.keys():
             accessor = self._ACCESSORS[field_name]
-            expected = getattr(self, field_name)
-            actual = accessor(state)
-            if actual != expected:
+            expected_field_value = getattr(self, field_name)
+            actual_field_value = accessor(state)
+            if actual_field_value != expected_field_value:
                 raise AssertionError(
-                    f"State validation failed: {field_name} = {actual}, expected {expected}"
+                    f"State validation failed: {field_name} = {actual_field_value}, "
+                    f"expected {expected_field_value}"
                 )
 
         if "latest_justified_root_label" in fields:
             assert self.latest_justified_root_label is not None
-            expected = _resolve(self.latest_justified_root_label)
-            if state.latest_justified.root != expected:
+            expected_justified_root = _resolve(self.latest_justified_root_label)
+            if state.latest_justified.root != expected_justified_root:
                 raise AssertionError(
                     f"State validation failed: latest_justified.root = "
-                    f"{state.latest_justified.root}, expected {expected}"
+                    f"{state.latest_justified.root}, expected {expected_justified_root}"
                 )
 
         if "latest_finalized_root_label" in fields:
             assert self.latest_finalized_root_label is not None
-            expected = _resolve(self.latest_finalized_root_label)
-            if state.latest_finalized.root != expected:
+            expected_finalized_root = _resolve(self.latest_finalized_root_label)
+            if state.latest_finalized.root != expected_finalized_root:
                 raise AssertionError(
                     f"State validation failed: latest_finalized.root = "
-                    f"{state.latest_finalized.root}, expected {expected}"
+                    f"{state.latest_finalized.root}, expected {expected_finalized_root}"
                 )
 
         if "justifications_roots_labels" in fields:

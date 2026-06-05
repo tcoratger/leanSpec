@@ -161,10 +161,10 @@ def test_build_block_keeps_genesis_self_vote(
     # A vote here therefore has source and target both at slot zero.
     # That shape is a genesis self-vote.
     anchor = Checkpoint(root=parent_root, slot=Slot(0))
-    data = AttestationData(slot=Slot(1), head=anchor, target=anchor, source=anchor)
+    attestation_data = AttestationData(slot=Slot(1), head=anchor, target=anchor, source=anchor)
 
     # Validator zero signs the vote, giving a single-validator proof.
-    proof = make_aggregated_proof(key_manager, [ValidatorIndex(0)], data)
+    proof = make_aggregated_proof(key_manager, [ValidatorIndex(0)], attestation_data)
 
     # Build the slot-one block with this lone self-vote in the pool.
     block, post_state, attestations, proofs = spec.build_block(
@@ -173,13 +173,15 @@ def test_build_block_keeps_genesis_self_vote(
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
         known_block_roots={parent_root},
-        aggregated_payloads={data: {proof}},
+        aggregated_payloads={attestation_data: {proof}},
     )
 
     # The lone proof is kept verbatim, so the body is one attestation over it.
     # Slot zero is already justified, so this self-vote cannot advance justification.
     # It survives selection only through the genesis self-vote exemption.
-    expected_attestation = AggregatedAttestation(aggregation_bits=proof.participants, data=data)
+    expected_attestation = AggregatedAttestation(
+        aggregation_bits=proof.participants, data=attestation_data
+    )
     expected_block = Block(
         slot=Slot(1),
         proposer_index=ValidatorIndex(1),
@@ -199,8 +201,8 @@ def test_build_block_keeps_genesis_self_vote(
     # The kept proof still verifies against the signing validator's public key.
     proofs[0].verify(
         public_keys=[key_manager[ValidatorIndex(0)].attestation_keypair.public_key],
-        message=hash_tree_root(data),
-        slot=data.slot,
+        message=hash_tree_root(attestation_data),
+        slot=attestation_data.slot,
     )
 
 
@@ -209,7 +211,7 @@ def test_build_block_merges_split_proofs_into_one_attestation(
     spec: LstarSpec,
 ) -> None:
     """
-    Two proofs for the same data collapse into one attestation over their union.
+    Two proofs for the same vote collapse into one attestation over their union.
 
     - One subset arrives as a gossip-derived proof.
     - A second disjoint subset arrives as a separate proof.
@@ -227,12 +229,14 @@ def test_build_block_merges_split_proofs_into_one_attestation(
 
     # Every vote on a fresh chain anchors at genesis at slot zero.
     anchor = Checkpoint(root=parent_root, slot=Slot(0))
-    data = AttestationData(slot=Slot(1), head=anchor, target=anchor, source=anchor)
+    attestation_data = AttestationData(slot=Slot(1), head=anchor, target=anchor, source=anchor)
 
     # The same vote arrives as two proofs over disjoint validator sets.
     # One covers validator zero; the other covers validators one and two.
-    proof_one = make_aggregated_proof(key_manager, [ValidatorIndex(0)], data)
-    proof_two = make_aggregated_proof(key_manager, [ValidatorIndex(1), ValidatorIndex(2)], data)
+    proof_one = make_aggregated_proof(key_manager, [ValidatorIndex(0)], attestation_data)
+    proof_two = make_aggregated_proof(
+        key_manager, [ValidatorIndex(1), ValidatorIndex(2)], attestation_data
+    )
 
     # Build with both proofs for the one vote in the pool.
     block, post_state, attestations, _ = spec.build_block(
@@ -241,7 +245,7 @@ def test_build_block_merges_split_proofs_into_one_attestation(
         proposer_index=ValidatorIndex(1),
         parent_root=parent_root,
         known_block_roots={parent_root},
-        aggregated_payloads={data: {proof_one, proof_two}},
+        aggregated_payloads={attestation_data: {proof_one, proof_two}},
     )
 
     # Compaction folds the two proofs into one attestation.
@@ -381,13 +385,13 @@ def test_build_block_skips_vote_with_unjustified_source(
     block_two = Checkpoint(root=block_two_root, slot=Slot(2))
 
     # The vote builds from slot one, which no body has justified yet.
-    data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(3),
         head=block_two,
         target=block_two,
         source=Checkpoint(root=block_one_root, slot=Slot(1)),
     )
-    proof = make_aggregated_proof(key_manager, voters, data)
+    proof = make_aggregated_proof(key_manager, voters, attestation_data)
 
     # Offer the vote while building at slot three.
     block, post_state, attestations, proofs = spec.build_block(
@@ -396,7 +400,7 @@ def test_build_block_skips_vote_with_unjustified_source(
         proposer_index=ValidatorIndex(3),
         parent_root=block_two_root,
         known_block_roots={block_one_root, block_two_root},
-        aggregated_payloads={data: {proof}},
+        aggregated_payloads={attestation_data: {proof}},
     )
 
     # A vote may only build from an already-justified source.
@@ -442,13 +446,13 @@ def test_build_block_skips_vote_for_already_justified_target(
 
     # The vote targets slot one, which is already justified.
     block_one = Checkpoint(root=block_one_root, slot=Slot(1))
-    data = AttestationData(
+    attestation_data = AttestationData(
         slot=Slot(3),
         head=block_one,
         target=block_one,
         source=Checkpoint(root=genesis_root, slot=Slot(0)),
     )
-    proof = make_aggregated_proof(key_manager, voters, data)
+    proof = make_aggregated_proof(key_manager, voters, attestation_data)
 
     # Offer the redundant vote while building at slot three.
     block, post_state, attestations, proofs = spec.build_block(
@@ -457,7 +461,7 @@ def test_build_block_skips_vote_for_already_justified_target(
         proposer_index=ValidatorIndex(3),
         parent_root=block_two_root,
         known_block_roots={genesis_root, block_one_root, block_two_root},
-        aggregated_payloads={data: {proof}},
+        aggregated_payloads={attestation_data: {proof}},
     )
 
     # An already-justified target gains nothing from more votes, so it is excluded.

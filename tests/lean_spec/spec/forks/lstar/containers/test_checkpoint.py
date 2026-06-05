@@ -183,31 +183,31 @@ class TestCheckpointAdvanceTo:
         self, current_slot: int, candidate_slot: int, winner: str
     ) -> None:
         """The candidate replaces the receiver only when its slot is strictly greater."""
-        current = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(current_slot))
+        receiver_checkpoint = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(current_slot))
         candidate = Checkpoint(root=Bytes32(b"\xb0" * 32), slot=Slot(candidate_slot))
-        expected = candidate if winner == "candidate" else current
-        assert current.advance_to(candidate) == expected
+        expected_winner = candidate if winner == "candidate" else receiver_checkpoint
+        assert receiver_checkpoint.advance_to(candidate) == expected_winner
 
     def test_tie_is_symmetric_to_the_caller(self) -> None:
         """On a slot tie the receiver of the call wins, swapping callers swaps the result."""
-        cp_a = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(7))
-        cp_b = Checkpoint(root=Bytes32(b"\xb0" * 32), slot=Slot(7))
-        assert cp_a.advance_to(cp_b) == cp_a
-        assert cp_b.advance_to(cp_a) == cp_b
+        checkpoint_a = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(7))
+        checkpoint_b = Checkpoint(root=Bytes32(b"\xb0" * 32), slot=Slot(7))
+        assert checkpoint_a.advance_to(checkpoint_b) == checkpoint_a
+        assert checkpoint_b.advance_to(checkpoint_a) == checkpoint_b
 
     def test_self_advance_returns_receiver(self) -> None:
         """Advancing a checkpoint against itself returns the receiver unchanged."""
-        cp = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(2))
-        assert cp.advance_to(cp) == cp
+        checkpoint = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(2))
+        assert checkpoint.advance_to(checkpoint) == checkpoint
 
     def test_zero_slot_receiver_yields_to_any_higher_candidate(self) -> None:
         """A genesis-slot checkpoint is replaced by any candidate at a higher slot."""
-        current = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(0))
+        receiver_checkpoint = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(0))
         candidate = Checkpoint(root=Bytes32(b"\xb0" * 32), slot=Slot(1))
-        assert current.advance_to(candidate) == candidate
+        assert receiver_checkpoint.advance_to(candidate) == candidate
 
     def test_max_slot_receiver_never_yields(self) -> None:
         """A checkpoint pinned at the uint64 maximum can never be advanced further."""
-        current = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(2**64 - 1))
+        receiver_checkpoint = Checkpoint(root=Bytes32(b"\xa0" * 32), slot=Slot(2**64 - 1))
         candidate = Checkpoint(root=Bytes32(b"\xb0" * 32), slot=Slot(2**64 - 2))
-        assert current.advance_to(candidate) == current
+        assert receiver_checkpoint.advance_to(candidate) == receiver_checkpoint

@@ -71,44 +71,53 @@ def _serialize_rpcs(
 
     Fixture consumers use this to assert exact outbound behavior.
     """
-    result = []
-    for pid, rpc in sent:
-        name = peer_names.get(pid, str(pid))
-        entry: dict[str, Any] = {"toPeer": name}
+    serialized_rpcs = []
+    for recipient_peer_id, rpc in sent:
+        recipient_name = peer_names.get(recipient_peer_id, str(recipient_peer_id))
+        serialized_rpc: dict[str, Any] = {"toPeer": recipient_name}
 
         if rpc.subscriptions:
-            entry["subscriptions"] = [
-                {"subscribe": s.subscribe, "topicId": str(s.topic_id)} for s in rpc.subscriptions
+            serialized_rpc["subscriptions"] = [
+                {"subscribe": subscription.subscribe, "topicId": str(subscription.topic_id)}
+                for subscription in rpc.subscriptions
             ]
 
         if rpc.publish:
-            entry["publish"] = [
-                {"topic": str(m.topic), "data": "0x" + m.data.hex()} for m in rpc.publish
+            serialized_rpc["publish"] = [
+                {"topic": str(message.topic), "data": "0x" + message.data.hex()}
+                for message in rpc.publish
             ]
 
         # Only include control fields that carry sub-messages.
         if rpc.control and not rpc.control.is_empty():
-            ctrl: dict[str, Any] = {}
+            serialized_control: dict[str, Any] = {}
             if rpc.control.graft:
-                ctrl["graft"] = [{"topicId": str(g.topic_id)} for g in rpc.control.graft]
+                serialized_control["graft"] = [
+                    {"topicId": str(graft.topic_id)} for graft in rpc.control.graft
+                ]
             if rpc.control.prune:
-                ctrl["prune"] = [
-                    {"topicId": str(p.topic_id), "backoff": p.backoff} for p in rpc.control.prune
+                serialized_control["prune"] = [
+                    {"topicId": str(prune.topic_id), "backoff": prune.backoff}
+                    for prune in rpc.control.prune
                 ]
             if rpc.control.iwant:
-                ctrl["iwant"] = [
-                    {"messageIds": ["0x" + mid.hex() for mid in w.message_ids]}
-                    for w in rpc.control.iwant
+                serialized_control["iwant"] = [
+                    {"messageIds": ["0x" + message_id.hex() for message_id in iwant.message_ids]}
+                    for iwant in rpc.control.iwant
                 ]
             if rpc.control.idontwant:
-                ctrl["idontwant"] = [
-                    {"messageIds": ["0x" + mid.hex() for mid in d.message_ids]}
-                    for d in rpc.control.idontwant
+                serialized_control["idontwant"] = [
+                    {
+                        "messageIds": [
+                            "0x" + message_id.hex() for message_id in idontwant.message_ids
+                        ]
+                    }
+                    for idontwant in rpc.control.idontwant
                 ]
-            entry["control"] = ctrl
+            serialized_rpc["control"] = serialized_control
 
-        result.append(entry)
-    return result
+        serialized_rpcs.append(serialized_rpc)
+    return serialized_rpcs
 
 
 def _serialize_meshes(
@@ -121,7 +130,9 @@ def _serialize_meshes(
     Sorting ensures deterministic output for fixture comparison.
     """
     return {
-        str(topic): sorted(peer_names.get(p, str(p)) for p in behavior.mesh.get_mesh_peers(topic))
+        str(topic): sorted(
+            peer_names.get(peer_id, str(peer_id)) for peer_id in behavior.mesh.get_mesh_peers(topic)
+        )
         for topic in behavior.mesh.subscriptions
     }
 
@@ -194,51 +205,53 @@ class GossipsubHandlerTest(BaseConsensusFixture):
         #
         # Peer properties like backoff timers and IDONTWANT sets directly
         # influence handler decisions (e.g., reject GRAFTs, skip forwarding).
-        for name, info in self.initial_state.get("peers", {}).items():
-            pid = _peer_id(name)
-            peer_names[pid] = name
-            state = PeerState(
-                peer_id=pid,
-                subscriptions={TopicId(t) for t in info.get("subscriptions", [])},
-                outbound_stream=_FAKE_STREAM if info.get("withStream", True) else None,
+        for peer_name, peer_config in self.initial_state.get("peers", {}).items():
+            peer_id = _peer_id(peer_name)
+            peer_names[peer_id] = peer_name
+            peer_state = PeerState(
+                peer_id=peer_id,
+                subscriptions={
+                    TopicId(topic_str) for topic_str in peer_config.get("subscriptions", [])
+                },
+                outbound_stream=_FAKE_STREAM if peer_config.get("withStream", True) else None,
             )
 
             # Backoff prevents re-GRAFTing a recently-pruned peer.
-            for topic_str, expiry in info.get("backoff", {}).items():
-                state.backoff[TopicId(topic_str)] = expiry
+            for topic_str, expiry in peer_config.get("backoff", {}).items():
+                peer_state.backoff[TopicId(topic_str)] = expiry
 
             # IDONTWANT suppresses forwarding to peers that already have the message.
-            for mid_hex in info.get("dontWantIds", []):
-                state.dont_want_ids.add(MessageId(_unhex(mid_hex)))
-            behavior._peers[pid] = state
+            for message_id_hex in peer_config.get("dontWantIds", []):
+                peer_state.dont_want_ids.add(MessageId(_unhex(message_id_hex)))
+            behavior._peers[peer_id] = peer_state
 
         # Mesh topology determines who receives forwarded messages.
         #
         # Handlers check mesh membership for GRAFT acceptance, PRUNE removal,
         # and message forwarding decisions.
-        for topic_str, peer_list in self.initial_state.get("meshes", {}).items():
+        for topic_str, mesh_peer_names in self.initial_state.get("meshes", {}).items():
             topic = TopicId(topic_str)
-            for name in peer_list:
-                behavior.mesh.add_to_mesh(topic, _peer_id(name))
+            for peer_name in mesh_peer_names:
+                behavior.mesh.add_to_mesh(topic, _peer_id(peer_name))
 
         # Seen cache tracks previously-received message IDs.
         #
         # Duplicate messages are silently dropped; IHAVE for seen IDs
         # does not trigger an IWANT response.
-        for mid_hex in self.initial_state.get("seenMessageIds", []):
-            behavior.seen_cache.add(MessageId(_unhex(mid_hex)), Timestamp(self.now))
+        for message_id_hex in self.initial_state.get("seenMessageIds", []):
+            behavior.seen_cache.add(MessageId(_unhex(message_id_hex)), Timestamp(self.now))
 
         # Message cache holds full message payloads for IWANT responses.
         #
         # When a peer requests a message via IWANT, the handler looks it up
         # here and sends the payload back.
-        for entry in self.initial_state.get("cachedMessages", []):
+        for cached_message in self.initial_state.get("cachedMessages", []):
             message = GossipsubMessage(
-                topic=entry["topic"].encode("utf-8"),
-                raw_data=_unhex(entry["data"]),
+                topic=cached_message["topic"].encode("utf-8"),
+                raw_data=_unhex(cached_message["data"]),
             )
-            message._cached_id = MessageId(_unhex(entry["messageId"]))
-            behavior.message_cache.put(TopicId(entry["topic"]), message)
+            message._cached_id = MessageId(_unhex(cached_message["messageId"]))
+            behavior.message_cache.put(TopicId(cached_message["topic"]), message)
 
         # Build the incoming RPC from the event.
         from_peer = _peer_id(self.event["fromPeer"])
@@ -272,43 +285,53 @@ def _build_event_rpc(event: dict[str, Any]) -> RPC:
     - idontwant: list of dicts with hex messageIds
     - publish: list of dicts with topic and hex data
     """
-    control_parts: dict[str, list[Any]] = {}
+    control_components: dict[str, list[Any]] = {}
 
     if "graft" in event:
-        control_parts["graft"] = [
-            ControlGraft(topic_id=TopicId(g["topicId"])) for g in event["graft"]
+        control_components["graft"] = [
+            ControlGraft(topic_id=TopicId(graft["topicId"])) for graft in event["graft"]
         ]
     if "prune" in event:
-        control_parts["prune"] = [
-            ControlPrune(topic_id=TopicId(p["topicId"]), backoff=p.get("backoff", 0))
-            for p in event["prune"]
+        control_components["prune"] = [
+            ControlPrune(topic_id=TopicId(prune["topicId"]), backoff=prune.get("backoff", 0))
+            for prune in event["prune"]
         ]
     if "ihave" in event:
-        control_parts["ihave"] = [
+        control_components["ihave"] = [
             ControlIHave(
-                topic_id=TopicId(ih["topicId"]),
-                message_ids=[_unhex(m) for m in ih.get("messageIds", [])],
+                topic_id=TopicId(ihave["topicId"]),
+                message_ids=[
+                    _unhex(message_id_hex) for message_id_hex in ihave.get("messageIds", [])
+                ],
             )
-            for ih in event["ihave"]
+            for ihave in event["ihave"]
         ]
     if "iwant" in event:
-        control_parts["iwant"] = [
-            ControlIWant(message_ids=[_unhex(m) for m in iw.get("messageIds", [])])
-            for iw in event["iwant"]
+        control_components["iwant"] = [
+            ControlIWant(
+                message_ids=[
+                    _unhex(message_id_hex) for message_id_hex in iwant.get("messageIds", [])
+                ]
+            )
+            for iwant in event["iwant"]
         ]
     if "idontwant" in event:
-        control_parts["idontwant"] = [
-            ControlIDontWant(message_ids=[_unhex(m) for m in idw.get("messageIds", [])])
-            for idw in event["idontwant"]
+        control_components["idontwant"] = [
+            ControlIDontWant(
+                message_ids=[
+                    _unhex(message_id_hex) for message_id_hex in idontwant.get("messageIds", [])
+                ]
+            )
+            for idontwant in event["idontwant"]
         ]
 
     return RPC(
         publish=[
             Message(
-                topic=TopicId(m.get("topic", "")),
-                data=_unhex(m["data"]) if m.get("data") else b"",
+                topic=TopicId(message.get("topic", "")),
+                data=_unhex(message["data"]) if message.get("data") else b"",
             )
-            for m in event.get("publish", [])
+            for message in event.get("publish", [])
         ],
-        control=ControlMessage(**control_parts) if control_parts else None,
+        control=ControlMessage(**control_components) if control_components else None,
     )

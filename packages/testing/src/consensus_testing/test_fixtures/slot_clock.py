@@ -51,18 +51,18 @@ class SlotClockTest(BaseConsensusFixture):
         }
         match self.operation:
             case "from_unix_time":
-                result = self._make_from_unix_time()
+                computed_output = self._make_from_unix_time()
             case "from_slot":
-                result = self._make_from_slot()
+                computed_output = self._make_from_slot()
             case "current_slot":
-                result = self._make_current_slot()
+                computed_output = self._make_current_slot()
             case "current_interval":
-                result = self._make_current_interval()
+                computed_output = self._make_current_interval()
             case "total_intervals":
-                result = self._make_total_intervals()
+                computed_output = self._make_total_intervals()
             case _:
                 raise ValueError(f"Unknown operation: {self.operation}")
-        self.output = {"config": config, **result}
+        self.output = {"config": config, **computed_output}
         return self
 
     def _make_from_unix_time(self) -> dict[str, Any]:

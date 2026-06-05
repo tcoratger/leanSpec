@@ -140,9 +140,9 @@ class TestBlockCacheBasicOperations:
         """Getting a nonexistent block returns None."""
         cache = BlockCache()
 
-        result = cache.get(Bytes32.zero())
+        cached_block = cache.get(Bytes32.zero())
 
-        assert result is None
+        assert cached_block is None
 
     def test_remove_block(self, peer_id: PeerId) -> None:
         """Removing a block returns it and removes from cache."""
@@ -165,9 +165,9 @@ class TestBlockCacheBasicOperations:
         """Removing a nonexistent block returns None."""
         cache = BlockCache()
 
-        result = cache.remove(Bytes32.zero())
+        removed_block = cache.remove(Bytes32.zero())
 
-        assert result is None
+        assert removed_block is None
 
     def test_clear_cache(self, peer_id: PeerId) -> None:
         """Clear removes all blocks from the cache."""

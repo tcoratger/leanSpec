@@ -283,20 +283,20 @@ def frame_compress(data: bytes) -> bytes:
         # This ensures the framed output is never larger than necessary.
         if len(compressed) < len(chunk):
             chunk_type = CHUNK_TYPE_COMPRESSED
-            payload = compressed
+            chunk_body = compressed
         else:
             chunk_type = CHUNK_TYPE_UNCOMPRESSED
-            payload = chunk
+            chunk_body = chunk
 
         # Build chunk: [type: 1][length: 3 LE][crc: 4 LE][payload].
         #
         # The length field includes CRC (4 bytes) + payload.
         # It does NOT include the 4-byte header (type + length).
-        chunk_length = 4 + len(payload)
+        chunk_length = 4 + len(chunk_body)
         output.append(chunk_type)
         output.extend(chunk_length.to_bytes(3, "little"))
         output.extend(crc.to_bytes(4, "little"))
-        output.extend(payload)
+        output.extend(chunk_body)
 
     return bytes(output)
 

@@ -56,9 +56,9 @@ class TestBase58:
         """Test known Base58 encodings."""
         # "Hello World" in Base58
         # (not standard test vector, but useful for sanity check)
-        result = Base58.encode(b"Hello World")
-        assert len(result) > 0
-        assert all(c in Base58.ALPHABET for c in result)
+        encoded = Base58.encode(b"Hello World")
+        assert len(encoded) > 0
+        assert all(character in Base58.ALPHABET for character in encoded)
 
     def test_base58_roundtrip(self) -> None:
         """Encode then decode returns original."""
@@ -73,10 +73,10 @@ class TestBase58:
             bytes(range(256)),  # All bytes
         ]
 
-        for data in test_cases:
-            encoded = Base58.encode(data)
+        for original_bytes in test_cases:
+            encoded = Base58.encode(original_bytes)
             decoded = Base58.decode(encoded)
-            assert decoded == data, f"Roundtrip failed for {data.hex()}"
+            assert decoded == original_bytes, f"Roundtrip failed for {original_bytes.hex()}"
 
     def test_base58_decode_invalid_character(self) -> None:
         """Decoding invalid characters raises ValueError."""
@@ -98,31 +98,31 @@ class TestMultihash:
 
     def test_identity_multihash_format(self) -> None:
         """Small data uses identity multihash: [0x00][length][data]."""
-        data = b"test"
-        mh = Multihash.from_data(data)
-        result = mh.encode()
+        input_bytes = b"test"
+        multihash = Multihash.from_data(input_bytes)
+        encoded = multihash.encode()
 
-        assert result[0] == MultihashCode.IDENTITY  # 0x00
-        assert result[1] == len(data)  # 4
-        assert result[2:] == data
+        assert encoded[0] == MultihashCode.IDENTITY  # 0x00
+        assert encoded[1] == len(input_bytes)  # 4
+        assert encoded[2:] == input_bytes
 
     def test_sha256_multihash_format(self) -> None:
         """Large data uses SHA256 multihash: [0x12][0x20][32-byte hash]."""
         # 50 bytes > 42-byte identity threshold → SHA256 path
-        data = bytes(50)
-        mh = Multihash.from_data(data)
-        result = mh.encode()
+        input_bytes = bytes(50)
+        multihash = Multihash.from_data(input_bytes)
+        encoded = multihash.encode()
 
-        assert result[0] == MultihashCode.SHA256  # 0x12
-        assert result[1] == 32  # SHA256 output length
-        assert len(result) == 2 + 32
+        assert encoded[0] == MultihashCode.SHA256  # 0x12
+        assert encoded[1] == 32  # SHA256 output length
+        assert len(encoded) == 2 + 32
 
     def test_sha256_multihash_deterministic(self) -> None:
         """Same large input produces same multihash."""
-        data = bytes(50)
-        result1 = Multihash.from_data(data).encode()
-        result2 = Multihash.from_data(data).encode()
-        assert result1 == result2
+        input_bytes = bytes(50)
+        first_multihash = Multihash.from_data(input_bytes).encode()
+        second_multihash = Multihash.from_data(input_bytes).encode()
+        assert first_multihash == second_multihash
 
 
 class TestEncodePublicKey:
@@ -242,7 +242,7 @@ class TestDerivePeerId:
         # Result should be a valid Base58 string
         peer_id_str = str(peer_id)
         assert len(peer_id_str) > 0
-        assert all(c in Base58.ALPHABET for c in peer_id_str)
+        assert all(character in Base58.ALPHABET for character in peer_id_str)
         # secp256k1 PeerIds start with "16Uiu2"
         assert peer_id_str.startswith("16Uiu2")
 
@@ -480,8 +480,8 @@ class TestKnownVectors:
         peer_id = PeerId.from_public_key(protobuf)
 
         # Expected PeerId from spec test vector
-        expected = "16Uiu2HAmLhLvBoYaoZfaMUKuibM6ac163GwKY74c5kiSLg5KvLpY"
-        assert str(peer_id) == expected
+        expected_peer_id = "16Uiu2HAmLhLvBoYaoZfaMUKuibM6ac163GwKY74c5kiSLg5KvLpY"
+        assert str(peer_id) == expected_peer_id
 
         # Verify roundtrip
         decoded = Base58.decode(str(peer_id))

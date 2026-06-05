@@ -89,24 +89,24 @@ class QuicStreamAdapter:
         """
         if n is None:
             if self._buffer:
-                result = self._buffer
+                buffered_bytes = self._buffer
                 self._buffer = b""
-                return result
+                return buffered_bytes
             return await self._stream.read()
 
         if self._buffer:
-            result = self._buffer[:n]
+            buffered_bytes = self._buffer[:n]
             self._buffer = self._buffer[n:]
-            return result
+            return buffered_bytes
 
-        data = await self._stream.read()
-        if not data:
+        stream_bytes = await self._stream.read()
+        if not stream_bytes:
             return b""
 
-        if len(data) > n:
-            self._buffer = data[n:]
-            return data[:n]
-        return data
+        if len(stream_bytes) > n:
+            self._buffer = stream_bytes[n:]
+            return stream_bytes[:n]
+        return stream_bytes
 
     async def readexactly(self, n: int) -> bytes:
         """
@@ -121,9 +121,9 @@ class QuicStreamAdapter:
                 raise EOFError("Stream closed before enough data received")
             self._buffer += chunk
 
-        result = self._buffer[:n]
+        buffered_bytes = self._buffer[:n]
         self._buffer = self._buffer[n:]
-        return result
+        return buffered_bytes
 
     def write(self, data: bytes) -> None:
         """Buffer data for writing (synchronous for StreamWriter compatibility)."""
@@ -237,9 +237,9 @@ class QuicStreamAdapter:
 
         Format: [varint length][message + '\n']
         """
-        payload = message.encode("utf-8") + b"\n"
-        length_prefix = encode_varint(len(payload))
-        self.write(length_prefix + payload)
+        message_bytes = message.encode("utf-8") + b"\n"
+        length_prefix = encode_varint(len(message_bytes))
+        self.write(length_prefix + message_bytes)
         await self.drain()
 
     async def _read_negotiation_message(self) -> str:
@@ -278,9 +278,9 @@ class QuicStreamAdapter:
         if length == 0:
             raise NegotiationError("Empty message")
 
-        payload = await self.readexactly(length)
+        message_bytes = await self.readexactly(length)
 
-        if not payload.endswith(b"\n"):
+        if not message_bytes.endswith(b"\n"):
             raise NegotiationError("Message must end with newline")
 
-        return payload[:-1].decode("utf-8")
+        return message_bytes[:-1].decode("utf-8")

@@ -169,8 +169,8 @@ class MessageCache:
         Returns:
             The cached message, or None if not found/evicted.
         """
-        entry = self._by_id.get(message_id)
-        return entry.message if entry else None
+        cache_entry = self._by_id.get(message_id)
+        return cache_entry.message if cache_entry else None
 
     def has(self, message_id: MessageId) -> bool:
         """
@@ -197,17 +197,17 @@ class MessageCache:
         Returns:
             List of message IDs for IHAVE advertisement.
         """
-        result: list[MessageId] = []
+        gossip_message_ids: list[MessageId] = []
 
         windows_to_check = min(self.mcache_gossip, len(self._windows))
 
         for window in islice(self._windows, windows_to_check):
             for message_id in window:
-                entry = self._by_id.get(message_id)
-                if entry and entry.topic == topic:
-                    result.append(message_id)
+                cache_entry = self._by_id.get(message_id)
+                if cache_entry and cache_entry.topic == topic:
+                    gossip_message_ids.append(message_id)
 
-        return result
+        return gossip_message_ids
 
     def shift(self) -> int:
         """

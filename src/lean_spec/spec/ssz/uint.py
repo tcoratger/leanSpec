@@ -122,14 +122,14 @@ class BaseUint(int, SSZType):
                 f"{cls.__name__}: invalid scope, expected {byte_length} bytes, got {scope}"
             )
         # Read the required number of bytes from the stream.
-        data = stream.read(byte_length)
+        serialized_bytes = stream.read(byte_length)
         # Ensure the correct number of bytes was read.
-        if len(data) != byte_length:
+        if len(serialized_bytes) != byte_length:
             raise SSZSerializationError(
-                f"{cls.__name__}: expected {byte_length} bytes, got {len(data)}"
+                f"{cls.__name__}: expected {byte_length} bytes, got {len(serialized_bytes)}"
             )
         # Decode the bytes into a new instance.
-        return cls.decode_bytes(data)
+        return cls.decode_bytes(serialized_bytes)
 
     @classmethod
     def max_value(cls) -> Self:
@@ -217,8 +217,8 @@ class BaseUint(int, SSZType):
             self._raise_type_error(value, "**")
         if mod is not None and type(mod) is not type(self):
             self._raise_type_error(mod, "**")
-        result = pow(int(self), int(value), int(mod) if mod is not None else None)
-        return type(self)(result)
+        power = pow(int(self), int(value), int(mod) if mod is not None else None)
+        return type(self)(power)
 
     def __rpow__(self, base: int, modulo: int | None = None, /) -> Self:
         """Reverse exponentiation and three-argument pow."""
@@ -226,22 +226,22 @@ class BaseUint(int, SSZType):
             self._raise_type_error(base, "**")
         if modulo is not None and type(modulo) is not type(self):
             self._raise_type_error(modulo, "**")
-        result = pow(int(base), int(self), int(modulo) if modulo is not None else None)
-        return type(self)(result)
+        power = pow(int(base), int(self), int(modulo) if modulo is not None else None)
+        return type(self)(power)
 
     def __divmod__(self, other: Any) -> tuple[Self, Self]:
         """Forward divmod."""
         if type(other) is not type(self):
             self._raise_type_error(other, "divmod")
-        q, r = super().__divmod__(other)
-        return type(self)(q), type(self)(r)
+        quotient, remainder = super().__divmod__(other)
+        return type(self)(quotient), type(self)(remainder)
 
     def __rdivmod__(self, other: Any) -> tuple[Self, Self]:
         """Reverse divmod."""
         if type(other) is not type(self):
             self._raise_type_error(other, "divmod")
-        q, r = super().__rdivmod__(other)
-        return type(self)(q), type(self)(r)
+        quotient, remainder = super().__rdivmod__(other)
+        return type(self)(quotient), type(self)(remainder)
 
     def __and__(self, other: Any) -> Self:
         """Forward bitwise AND."""

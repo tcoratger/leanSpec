@@ -49,8 +49,8 @@ class TestStateVerification:
 
     async def test_valid_state_passes_verification(self, genesis_state: State) -> None:
         """Valid state with validators passes verification checks."""
-        result = verify_checkpoint_state(genesis_state)
-        assert result is True
+        is_valid_checkpoint = verify_checkpoint_state(genesis_state)
+        assert is_valid_checkpoint is True
 
     async def test_state_without_validators_fails_verification(self, genesis_state: State) -> None:
         """State with no validators fails verification."""
@@ -67,8 +67,8 @@ class TestStateVerification:
             justifications_validators=genesis_state.justifications_validators,
         )
 
-        result = verify_checkpoint_state(empty_state)
-        assert result is False
+        is_valid_checkpoint = verify_checkpoint_state(empty_state)
+        assert is_valid_checkpoint is False
 
     async def test_state_exceeding_validator_limit_fails(self) -> None:
         """State with more validators than VALIDATOR_REGISTRY_LIMIT fails."""
@@ -80,8 +80,8 @@ class TestStateVerification:
         mock_validators.__len__ = MagicMock(return_value=int(VALIDATOR_REGISTRY_LIMIT) + 1)
         mock_state.validators = mock_validators
 
-        result = verify_checkpoint_state(mock_state)
-        assert result is False
+        is_valid_checkpoint = verify_checkpoint_state(mock_state)
+        assert is_valid_checkpoint is False
 
     async def test_exception_during_hash_tree_root_returns_false(
         self, genesis_state: State
@@ -96,9 +96,9 @@ class TestStateVerification:
             "lean_spec.node.sync.checkpoint_sync.hash_tree_root",
             side_effect=RuntimeError("hash error"),
         ):
-            result = verify_checkpoint_state(genesis_state)
+            is_valid_checkpoint = verify_checkpoint_state(genesis_state)
 
-        assert result is False
+        assert is_valid_checkpoint is False
 
 
 class TestFetchFinalizedState:

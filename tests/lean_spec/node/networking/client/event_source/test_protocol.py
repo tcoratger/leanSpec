@@ -37,6 +37,6 @@ class TestSupportedProtocols:
 
     def test_exact_composition(self) -> None:
         """Equals the union of gossipsub and reqresp protocol IDs."""
-        expected = frozenset({GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12})
-        expected |= REQRESP_PROTOCOL_IDS
-        assert SUPPORTED_PROTOCOLS == expected
+        expected_protocols = frozenset({GOSSIPSUB_DEFAULT_PROTOCOL_ID, GOSSIPSUB_PROTOCOL_ID_V12})
+        expected_protocols |= REQRESP_PROTOCOL_IDS
+        assert SUPPORTED_PROTOCOLS == expected_protocols

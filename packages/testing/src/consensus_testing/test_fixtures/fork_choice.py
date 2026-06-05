@@ -200,15 +200,15 @@ class ForkChoiceTest(BaseConsensusFixture):
                     self.anchor_block,
                     validator_index=ValidatorIndex(0),
                 )
-            except AssertionError as e:
+            except AssertionError as exception:
                 if self.expected_anchor_error is not None and self.expected_anchor_error not in str(
-                    e
+                    exception
                 ):
                     raise AssertionError(
                         "Store.from_anchor failed with wrong error.\n"
                         f"  Expected error containing: {self.expected_anchor_error!r}\n"
-                        f"  Actual error: {e!r}"
-                    ) from e
+                        f"  Actual error: {exception!r}"
+                    ) from exception
                 return self
 
             raise AssertionError("Store.from_anchor was expected to fail but succeeded")
@@ -226,9 +226,11 @@ class ForkChoiceTest(BaseConsensusFixture):
         # We must replace them with the key manager's actual keys.
         # Otherwise signature verification will fail.
         updated_validators = []
-        for i, validator in enumerate(self.anchor_state.validators):
-            index = ValidatorIndex(i)
-            attestation_public_key, proposal_public_key = key_manager.get_public_keys(index)
+        for validator_position, validator in enumerate(self.anchor_state.validators):
+            validator_index = ValidatorIndex(validator_position)
+            attestation_public_key, proposal_public_key = key_manager.get_public_keys(
+                validator_index
+            )
             updated_validators.append(
                 validator.model_copy(
                     update={
@@ -266,7 +268,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # Process each step against the Store.
         # Store follows immutable pattern: each method returns a new Store.
-        for i, step in enumerate(self.steps):
+        for step_index, step in enumerate(self.steps):
             old_head = store.head
             try:
                 match step:
@@ -309,7 +311,7 @@ class ForkChoiceTest(BaseConsensusFixture):
                         if step.block.label is not None:
                             if step.block.label in self._block_registry:
                                 raise ValueError(
-                                    f"Step {i}: duplicate label '{step.block.label}' - "
+                                    f"Step {step_index}: duplicate label '{step.block.label}' - "
                                     f"labels must be unique within a test"
                                 )
                             self._block_registry[step.block.label] = block
@@ -355,34 +357,37 @@ class ForkChoiceTest(BaseConsensusFixture):
                         store = spec.on_gossip_aggregated_attestation(store, signed_aggregated)
 
                     case _:
-                        raise ValueError(f"Step {i}: unknown step type {type(step).__name__}")
+                        raise ValueError(
+                            f"Step {step_index}: unknown step type {type(step).__name__}"
+                        )
 
                 # Validate Store state if checks are provided.
                 if step.checks is not None:
                     filled_block = step._filled_block if isinstance(step, BlockStep) else None
                     step.checks.validate_against_store(
                         store,
-                        step_index=i,
+                        step_index=step_index,
                         block_registry=self._block_registry,
                         filled_block=filled_block,
                         old_head=old_head,
                     )
 
-            except Exception as e:
+            except Exception as exception:
                 # Handle expected failures.
                 # Steps marked valid=False should raise exceptions.
                 if step.valid:
                     raise AssertionError(
-                        f"Step {i} ({type(step).__name__}) failed unexpectedly: {e}"
-                    ) from e
+                        f"Step {step_index} ({type(step).__name__}) "
+                        f"failed unexpectedly: {exception}"
+                    ) from exception
 
                 # Verify the failure reason matches when specified.
-                if step.expected_error is not None and step.expected_error not in str(e):
+                if step.expected_error is not None and step.expected_error not in str(exception):
                     raise AssertionError(
-                        f"Step {i} ({type(step).__name__}) failed with wrong error.\n"
+                        f"Step {step_index} ({type(step).__name__}) failed with wrong error.\n"
                         f"  Expected error containing: {step.expected_error!r}\n"
-                        f"  Actual error: {e!r}"
-                    ) from e
+                        f"  Actual error: {exception!r}"
+                    ) from exception
 
                 continue
 
@@ -390,7 +395,7 @@ class ForkChoiceTest(BaseConsensusFixture):
             # If we expected failure but the step succeeded, that's a test bug.
             if not step.valid:
                 raise AssertionError(
-                    f"Step {i} ({type(step).__name__}) succeeded but expected failure"
+                    f"Step {step_index} ({type(step).__name__}) succeeded but expected failure"
                 )
 
         # Return self (fixture is already complete)

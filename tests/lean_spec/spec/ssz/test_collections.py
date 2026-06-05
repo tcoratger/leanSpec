@@ -240,7 +240,7 @@ class TestSSZVectorValidator:
 
     def test_generator_input_coerced(self) -> None:
         """A generator is materialized and each value is coerced to ELEMENT_TYPE."""
-        instance = Uint8Vector4(data=cast(Any, (value for value in range(1, 5))))
+        instance = Uint8Vector4(data=cast(Any, (number for number in range(1, 5))))
 
         assert tuple(instance) == (Uint8(1), Uint8(2), Uint8(3), Uint8(4))
 
@@ -463,7 +463,7 @@ class TestSSZListValidator:
 
     def test_generator_input_coerced(self) -> None:
         """A generator is materialized and each value is coerced to ELEMENT_TYPE."""
-        instance = Uint8List4(data=cast(Any, (value for value in range(3))))
+        instance = Uint8List4(data=cast(Any, (number for number in range(3))))
 
         assert list(instance) == [Uint8(0), Uint8(1), Uint8(2)]
 
@@ -599,42 +599,44 @@ class TestSSZListAccessors:
 
     def test_add_with_sszlist(self) -> None:
         """Concatenating two SSZLists yields a fresh list of the same type."""
-        result = Uint8List10(data=[Uint8(1), Uint8(2)]) + Uint8List10(data=[Uint8(3), Uint8(4)])
+        concatenated = Uint8List10(data=[Uint8(1), Uint8(2)]) + Uint8List10(
+            data=[Uint8(3), Uint8(4)]
+        )
 
-        assert result == Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4)])
-        assert isinstance(result, Uint8List10)
+        assert concatenated == Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4)])
+        assert isinstance(concatenated, Uint8List10)
 
     def test_add_with_plain_list(self) -> None:
         """Concatenating with a plain list coerces the right-hand values."""
-        result = Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3)]) + [4, 5]
+        concatenated = Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3)]) + [4, 5]
 
-        assert result == Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4), Uint8(5)])
+        assert concatenated == Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4), Uint8(5)])
 
     def test_add_with_tuple(self) -> None:
         """Concatenating with a tuple coerces the right-hand values."""
-        result = Uint8List10(data=[Uint8(1), Uint8(2)]) + (3, 4)
+        concatenated = Uint8List10(data=[Uint8(1), Uint8(2)]) + (3, 4)
 
-        assert result == Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4)])
+        assert concatenated == Uint8List10(data=[Uint8(1), Uint8(2), Uint8(3), Uint8(4)])
 
     def test_add_empty_to_empty(self) -> None:
         """Concatenating two empty lists yields an empty list of the same type."""
-        result = Uint8List10(data=[]) + Uint8List10(data=[])
+        concatenated = Uint8List10(data=[]) + Uint8List10(data=[])
 
-        assert result == Uint8List10(data=[])
+        assert concatenated == Uint8List10(data=[])
 
     def test_add_empty_to_non_empty(self) -> None:
         """Concatenating an empty list to a populated one preserves the populated list."""
         populated = Uint8List10(data=[Uint8(1), Uint8(2)])
-        result = Uint8List10(data=[]) + populated
+        concatenated = Uint8List10(data=[]) + populated
 
-        assert result == populated
+        assert concatenated == populated
 
     def test_add_non_empty_to_empty(self) -> None:
         """Concatenating a populated list to an empty one preserves the populated list."""
         populated = Uint8List10(data=[Uint8(1), Uint8(2)])
-        result = populated + Uint8List10(data=[])
+        concatenated = populated + Uint8List10(data=[])
 
-        assert result == populated
+        assert concatenated == populated
 
     def test_add_unsupported_type_returns_not_implemented(self) -> None:
         """Unsupported operands return NotImplemented from the add hook."""
@@ -656,7 +658,7 @@ class TestSSZVectorSerialization:
     """Tests SSZ serialization and deserialization for SSZVector."""
 
     @pytest.mark.parametrize(
-        "vector_type, value, expected_hex",
+        "vector_type, elements, expected_hex",
         [
             (Uint16Vector2, (0x4567, 0x0123), "67452301"),
             (Uint8Vector4, (1, 2, 3, 4), "01020304"),
@@ -694,11 +696,11 @@ class TestSSZVectorSerialization:
     def test_fixed_size_element_vector_roundtrip(
         self,
         vector_type: type[SSZVector],
-        value: tuple[Any, ...],
+        elements: tuple[Any, ...],
         expected_hex: str,
     ) -> None:
         """Fixed-size vectors encode to a known hex layout and round-trip back."""
-        instance = vector_type(data=value)
+        instance = vector_type(data=elements)
         encoded = instance.encode_bytes()
 
         assert encoded.hex() == expected_hex
@@ -754,14 +756,14 @@ class TestSSZVectorSerialization:
         #
         #     offsets[0] = 8   (table-end, valid first offset)
         #     offsets[1] = 6   (decreasing, triggers the monotonic check)
-        payload = b"\x08\x00\x00\x00\x06\x00\x00\x00"
+        encoded_bytes = b"\x08\x00\x00\x00\x06\x00\x00\x00"
         with pytest.raises(
             SSZSerializationError,
             match=re.escape(
                 "VariableContainerVector2: offsets not monotonically increasing: 8 -> 6"
             ),
         ):
-            VariableContainerVector2.decode_bytes(payload)
+            VariableContainerVector2.decode_bytes(encoded_bytes)
 
     def test_variable_size_vector_rejects_final_offset_overflow(self) -> None:
         """A final offset that exceeds the scope triggers the monotonic check first."""
@@ -772,21 +774,21 @@ class TestSSZVectorSerialization:
         #
         # Pairwise iteration appends scope as the final boundary, so the 100 -> 20
         # transition trips the monotonic check before the final-offset-exceeds-scope check.
-        payload = b"\x08\x00\x00\x00\x64\x00\x00\x00" + b"\x00" * 12
+        encoded_bytes = b"\x08\x00\x00\x00\x64\x00\x00\x00" + b"\x00" * 12
         with pytest.raises(
             SSZSerializationError,
             match=re.escape(
                 "VariableContainerVector2: offsets not monotonically increasing: 100 -> 20"
             ),
         ):
-            VariableContainerVector2.decode_bytes(payload)
+            VariableContainerVector2.decode_bytes(encoded_bytes)
 
 
 class TestSSZListSerialization:
     """Tests SSZ serialization and deserialization for SSZList."""
 
     @pytest.mark.parametrize(
-        "list_type, value, expected_hex",
+        "list_type, elements, expected_hex",
         [
             (Uint16List32, (0xAABB, 0xC0AD, 0xEEFF), "bbaaadc0ffee"),
             (Uint8List10, (), ""),
@@ -820,11 +822,11 @@ class TestSSZListSerialization:
     def test_fixed_size_element_list_roundtrip(
         self,
         list_type: type[SSZList],
-        value: tuple[Any, ...],
+        elements: tuple[Any, ...],
         expected_hex: str,
     ) -> None:
         """Fixed-size lists pack bodies back-to-back without separators."""
-        instance = list_type(data=value)
+        instance = list_type(data=elements)
         encoded = instance.encode_bytes()
 
         assert encoded.hex() == expected_hex
@@ -891,12 +893,12 @@ class TestSSZListSerialization:
         # Layout:
         #
         #     first_offset = 12   (count = 12 / 4 = 3, above LIMIT=2)
-        payload = b"\x0c\x00\x00\x00" + b"\x00" * 8
+        encoded_bytes = b"\x0c\x00\x00\x00" + b"\x00" * 8
         with pytest.raises(
             SSZValueError,
             match=re.escape("VariableContainerList2 exceeds limit of 2, got 3"),
         ):
-            VariableContainerList2.decode_bytes(payload)
+            VariableContainerList2.decode_bytes(encoded_bytes)
 
     def test_variable_size_list_rejects_non_monotonic_offsets(self) -> None:
         """A later offset smaller than an earlier one means a body would have negative width."""
@@ -904,30 +906,32 @@ class TestSSZListSerialization:
         #
         #     first_offset = 8     (count = 2, table-end)
         #     offsets[1]   = 6     (decreasing, triggers the monotonic check)
-        payload = b"\x08\x00\x00\x00\x06\x00\x00\x00" + b"\x00" * 12
+        encoded_bytes = b"\x08\x00\x00\x00\x06\x00\x00\x00" + b"\x00" * 12
         with pytest.raises(
             SSZSerializationError,
             match=re.escape("VariableContainerList2: offsets not monotonically increasing: 8 -> 6"),
         ):
-            VariableContainerList2.decode_bytes(payload)
+            VariableContainerList2.decode_bytes(encoded_bytes)
 
     def test_variable_size_list_rejects_final_offset_overflow(self) -> None:
         """An interior offset past the payload's end triggers the monotonic check."""
-        payload = b"\x08\x00\x00\x00\x64\x00\x00\x00" + b"\x00" * 12
+        encoded_bytes = b"\x08\x00\x00\x00\x64\x00\x00\x00" + b"\x00" * 12
         with pytest.raises(
             SSZSerializationError,
             match=re.escape(
                 "VariableContainerList2: offsets not monotonically increasing: 100 -> 20"
             ),
         ):
-            VariableContainerList2.decode_bytes(payload)
+            VariableContainerList2.decode_bytes(encoded_bytes)
 
     def test_variable_size_list_single_element_decodes(self) -> None:
         """A single-element list reads no further offsets after the first."""
-        value = VariableContainer(a=Uint8(1), b=Uint16List4(data=[Uint16(10)]))
-        encoded = VariableContainerList2(data=[value]).encode_bytes()
+        element = VariableContainer(a=Uint8(1), b=Uint16List4(data=[Uint16(10)]))
+        encoded = VariableContainerList2(data=[element]).encode_bytes()
 
-        assert VariableContainerList2.decode_bytes(encoded) == VariableContainerList2(data=[value])
+        assert VariableContainerList2.decode_bytes(encoded) == VariableContainerList2(
+            data=[element]
+        )
 
 
 class TestJsonSerialization:

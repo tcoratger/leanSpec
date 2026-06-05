@@ -29,21 +29,21 @@ def test_base_field_arithmetic() -> None:
     Test basic arithmetic, equality, and error handling
     in the base field Fp.
     """
-    a = Fp(value=5)
-    b = Fp(value=10)
+    left = Fp(value=5)
+    right = Fp(value=10)
 
     # Test operations
-    assert a + b == Fp(value=15)
-    assert b - a == Fp(value=5)
-    assert -a == Fp(value=P - 5)
-    assert a * b == Fp(value=50)
-    assert a / b == Fp(value=5) * Fp(value=10).inverse()
+    assert left + right == Fp(value=15)
+    assert right - left == Fp(value=5)
+    assert -left == Fp(value=P - 5)
+    assert left * right == Fp(value=50)
+    assert left / right == Fp(value=5) * Fp(value=10).inverse()
 
     # Test equality against the same and different types
-    assert a == Fp(value=5)
-    assert a != b
-    assert a != 5
-    assert a != "5"
+    assert left == Fp(value=5)
+    assert left != right
+    assert left != 5
+    assert left != "5"
 
     # Test error on inverting the zero element
     with pytest.raises(ZeroDivisionError, match=r"^Cannot invert the zero element\.$"):
@@ -73,16 +73,16 @@ def test_ssz_serialize() -> None:
 def test_ssz_deserialize() -> None:
     """Test SSZ deserialization using the deserialize method."""
     # Test successful deserialization
-    data = b"\x2a\x00\x00\x00"  # 42 in LE
-    stream = io.BytesIO(data)
+    encoded_bytes = b"\x2a\x00\x00\x00"  # 42 in LE
+    stream = io.BytesIO(encoded_bytes)
     fp = Fp.deserialize(stream, 4)
     assert fp == Fp(value=42)
 
 
 def test_ssz_deserialize_wrong_scope() -> None:
     """Test deserialize error when scope doesn't match P_BYTES."""
-    data = b"\x2a\x00\x00\x00"
-    stream = io.BytesIO(data)
+    encoded_bytes = b"\x2a\x00\x00\x00"
+    stream = io.BytesIO(encoded_bytes)
     with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 3$"):
         Fp.deserialize(stream, 3)
 
@@ -108,21 +108,21 @@ def test_ssz_encode_decode_bytes() -> None:
     """Test SSZ encode_bytes and decode_bytes methods."""
     # Test encode_bytes
     fp = Fp(value=100)
-    data = fp.encode_bytes()
-    assert len(data) == 4
-    assert data == b"\x64\x00\x00\x00"  # 100 in LE
+    encoded_bytes = fp.encode_bytes()
+    assert len(encoded_bytes) == 4
+    assert encoded_bytes == b"\x64\x00\x00\x00"  # 100 in LE
 
     # Test decode_bytes
-    fp2 = Fp.decode_bytes(data)
+    fp2 = Fp.decode_bytes(encoded_bytes)
     assert fp2 == fp
 
     # Test roundtrip for various values
     test_values = [0, 1, 42, 255, 256, 1000, 65535, 65536, 1000000, P - 1]
-    for value in test_values:
-        fp = Fp(value=value)
-        data = fp.encode_bytes()
-        recovered = Fp.decode_bytes(data)
-        assert recovered == fp, f"Failed for value={value}"
+    for field_value in test_values:
+        fp = Fp(value=field_value)
+        encoded = fp.encode_bytes()
+        recovered = Fp.decode_bytes(encoded)
+        assert recovered == fp, f"Failed for value={field_value}"
 
 
 def test_ssz_roundtrip() -> None:
@@ -131,12 +131,12 @@ def test_ssz_roundtrip() -> None:
 
     for _ in range(100):
         # Test with random values
-        value = random.randint(0, P - 1)
-        fp = Fp(value=value)
+        field_value = random.randint(0, P - 1)
+        fp = Fp(value=field_value)
 
         # Test deserialization works
-        data = fp.encode_bytes()
-        recovered = Fp.decode_bytes(data)
+        encoded = fp.encode_bytes()
+        recovered = Fp.decode_bytes(encoded)
         assert recovered == fp
 
 
@@ -169,7 +169,7 @@ def test_new_rejects_non_int_inputs(bad_value: Any, type_name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("raw", "expected"),
+    ("raw", "expected_residue"),
     [
         (P, 0),
         (P + 7, 7),
@@ -178,52 +178,52 @@ def test_new_rejects_non_int_inputs(bad_value: Any, type_name: str) -> None:
         (2 * P + 42, 42),
     ],
 )
-def test_new_normalizes_into_canonical_range(raw: int, expected: int) -> None:
+def test_new_normalizes_into_canonical_range(raw: int, expected_residue: int) -> None:
     """Constructor reduces the input modulo P into the canonical range."""
     fp = Fp(raw)
-    assert int(fp) == expected
-    assert fp == Fp(expected)
+    assert int(fp) == expected_residue
+    assert fp == Fp(expected_residue)
 
 
 @pytest.mark.parametrize("op", ["+", "-", "*", "/"])
 def test_reverse_arithmetic_rejects_int_left_operand(op: str) -> None:
     """Reverse operators reject a raw int on the left to block silent int fallback."""
-    a = Fp(2)
-    table = {
-        "+": lambda: 1 + a,
-        "-": lambda: 1 - a,
-        "*": lambda: 1 * a,
-        "/": lambda: 1 / a,
+    field_element = Fp(2)
+    operations = {
+        "+": lambda: 1 + field_element,
+        "-": lambda: 1 - field_element,
+        "*": lambda: 1 * field_element,
+        "/": lambda: 1 / field_element,
     }
     with pytest.raises(
         TypeError,
         match=rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$",
     ):
-        table[op]()
+        operations[op]()
 
 
 @pytest.mark.parametrize("op", ["+", "-", "*", "/"])
 def test_forward_arithmetic_rejects_raw_int_right_operand(op: str) -> None:
     """Forward operators reject a raw int on the right to enforce Fp-only arithmetic."""
-    a = Fp(2)
-    table = {
-        "+": lambda: a + 3,
-        "-": lambda: a - 3,
-        "*": lambda: a * 3,
-        "/": lambda: a / 3,
+    field_element = Fp(2)
+    operations = {
+        "+": lambda: field_element + 3,
+        "-": lambda: field_element - 3,
+        "*": lambda: field_element * 3,
+        "/": lambda: field_element / 3,
     }
     with pytest.raises(
         TypeError,
         match=rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$",
     ):
-        table[op]()
+        operations[op]()
 
 
 def test_forward_arithmetic_rejects_bool_right_operand() -> None:
     """Forward arithmetic against a bool right operand is rejected as a non-Fp type."""
-    a = Fp(2)
+    field_element = Fp(2)
     with pytest.raises(TypeError, match=r"^Unsupported operand type\(s\) for \+: 'Fp' and 'bool'$"):
-        a + True  # noqa: B015
+        field_element + True  # noqa: B015
 
 
 def test_negation_of_zero_stays_zero() -> None:
@@ -232,7 +232,7 @@ def test_negation_of_zero_stays_zero() -> None:
 
 
 @pytest.mark.parametrize(
-    ("base", "exponent", "expected"),
+    ("base", "exponent", "expected_power"),
     [
         (Fp(7), 0, Fp(1)),
         (Fp(0), 0, Fp(1)),
@@ -240,23 +240,25 @@ def test_negation_of_zero_stays_zero() -> None:
         (Fp(3), 1, Fp(3)),
     ],
 )
-def test_pow_covers_zero_and_modular_exponents(base: Fp, exponent: int, expected: Fp) -> None:
+def test_pow_covers_zero_and_modular_exponents(base: Fp, exponent: int, expected_power: Fp) -> None:
     """Exponentiation handles zero exponent, modular exponent, and identity exponent."""
-    assert base**exponent == expected
+    assert base**exponent == expected_power
 
 
-@pytest.mark.parametrize("a", [Fp(1), Fp(2), Fp(P - 1)])
-def test_inverse_multiplicative_property(a: Fp) -> None:
+@pytest.mark.parametrize("field_element", [Fp(1), Fp(2), Fp(P - 1)])
+def test_inverse_multiplicative_property(field_element: Fp) -> None:
     """The inverse satisfies a times a-inverse equals one and matches Fermat's little theorem."""
-    inv = a.inverse()
-    assert a * inv == Fp(1)
-    assert inv == a ** (P - 2)
+    inverse = field_element.inverse()
+    assert field_element * inverse == Fp(1)
+    assert inverse == field_element ** (P - 2)
 
 
-@pytest.mark.parametrize(("a", "b"), [(Fp(7), Fp(3)), (Fp(P - 1), Fp(2)), (Fp(1), Fp(P - 5))])
-def test_truediv_inverts_multiplication(a: Fp, b: Fp) -> None:
+@pytest.mark.parametrize(
+    ("dividend", "divisor"), [(Fp(7), Fp(3)), (Fp(P - 1), Fp(2)), (Fp(1), Fp(P - 5))]
+)
+def test_truediv_inverts_multiplication(dividend: Fp, divisor: Fp) -> None:
     """Division is the inverse of multiplication for any non-zero divisor."""
-    assert (a / b) * b == a
+    assert (dividend / divisor) * divisor == dividend
 
 
 def test_truediv_by_zero_raises_zero_division() -> None:
@@ -267,16 +269,16 @@ def test_truediv_by_zero_raises_zero_division() -> None:
 
 def test_equality_matrix_covers_same_other_and_foreign_types() -> None:
     """Equality returns True only between matching Fp residues, never raises on foreign types."""
-    a = Fp(5)
-    assert a == Fp(5)
-    assert (a == Fp(6)) is False
-    assert (a == 5) is False
-    assert (a == "5") is False
-    assert (a == None) is False  # noqa: E711
-    assert a != Fp(6)
-    assert a != 5
-    assert a != "5"
-    assert a != None  # noqa: E711
+    field_element = Fp(5)
+    assert field_element == Fp(5)
+    assert (field_element == Fp(6)) is False
+    assert (field_element == 5) is False
+    assert (field_element == "5") is False
+    assert (field_element == None) is False  # noqa: E711
+    assert field_element != Fp(6)
+    assert field_element != 5
+    assert field_element != "5"
+    assert field_element != None  # noqa: E711
 
 
 def test_hash_mixes_in_type_and_keeps_residue_distinct_from_int() -> None:
@@ -350,6 +352,6 @@ def test_pydantic_schema_rejects_out_of_range_ints(bad: int) -> None:
 def test_pydantic_json_serialization_drops_subtype_to_plain_int() -> None:
     """JSON serialization emits a plain integer, hiding the Fp subtype."""
     model = _PydanticModelWithFp(x=Fp(99))
-    payload = model.model_dump(mode="json")
-    assert payload == {"x": 99}
+    serialized = model.model_dump(mode="json")
+    assert serialized == {"x": 99}
     assert json.loads(model.model_dump_json()) == {"x": 99}

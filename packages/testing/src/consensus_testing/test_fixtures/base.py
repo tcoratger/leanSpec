@@ -39,11 +39,11 @@ class BaseConsensusFixture(BaseFixture):
             BaseConsensusFixture.formats[cls.format_name] = cls
 
     @field_serializer("expect_exception", when_used="json")
-    def serialize_exception(self, value: type[Exception] | None) -> str | None:
+    def serialize_exception(self, exception_type: type[Exception] | None) -> str | None:
         """Serialize exception type to its class name for JSON output."""
-        if value is None:
+        if exception_type is None:
             return None
-        return value.__name__
+        return exception_type.__name__
 
     def assert_expected_outcome(self, exception_raised: Exception | None) -> None:
         """

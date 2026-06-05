@@ -92,11 +92,11 @@ class TestFanoutEntry:
 
     def test_fanout_entry_staleness(self) -> None:
         """Test fanout entry staleness detection."""
-        entry = FanoutEntry()
-        entry.last_published = 1000.0
+        fanout_entry = FanoutEntry()
+        fanout_entry.last_published = 1000.0
 
-        assert not entry.is_stale(current_time=1050.0, ttl=60.0)
-        assert entry.is_stale(current_time=1070.0, ttl=60.0)
+        assert not fanout_entry.is_stale(current_time=1050.0, ttl=60.0)
+        assert fanout_entry.is_stale(current_time=1070.0, ttl=60.0)
 
 
 class TestFanoutOperations:
@@ -108,10 +108,10 @@ class TestFanoutOperations:
         topic = TopicId("fanout_topic")
 
         available = {peer("p1"), peer("p2"), peer("p3"), peer("p4")}
-        result = mesh.update_fanout(topic, available)
+        fanout_peers = mesh.update_fanout(topic, available)
 
-        assert len(result) <= 3  # Up to D peers
-        assert len(result) > 0
+        assert len(fanout_peers) <= 3  # Up to D peers
+        assert len(fanout_peers) > 0
 
     def test_update_fanout_returns_mesh_if_subscribed(self) -> None:
         """update_fanout returns mesh peers for subscribed topics."""
@@ -122,8 +122,8 @@ class TestFanoutOperations:
         p1 = peer("p1")
         mesh.add_to_mesh(topic, p1)
 
-        result = mesh.update_fanout(topic, {p1, peer("p2")})
-        assert result == {p1}
+        fanout_peers = mesh.update_fanout(topic, {p1, peer("p2")})
+        assert fanout_peers == {p1}
 
     def test_update_fanout_fills_to_d(self) -> None:
         """update_fanout fills fanout up to D peers."""
@@ -131,10 +131,10 @@ class TestFanoutOperations:
         topic = TopicId("fanout_topic")
 
         names = ["pA", "pB", "pC", "pD", "pE", "pF", "pG", "pH", "pJ", "pK"]
-        available = {peer(n) for n in names}
-        result = mesh.update_fanout(topic, available)
+        available = {peer(name) for name in names}
+        fanout_peers = mesh.update_fanout(topic, available)
 
-        assert len(result) == 4
+        assert len(fanout_peers) == 4
 
     def test_cleanup_fanouts_removes_stale(self) -> None:
         """cleanup_fanouts removes stale entries."""
@@ -187,8 +187,8 @@ class TestFanoutOperations:
         mesh.add_to_mesh(topic, p1)
         mesh.add_to_mesh(topic, p2)
 
-        result = mesh.unsubscribe(topic)
-        assert result == {p1, p2}
+        pruned_mesh_peers = mesh.unsubscribe(topic)
+        assert pruned_mesh_peers == {p1, p2}
 
     def test_select_peers_for_gossip_respects_d_lazy(self) -> None:
         """Gossip peer selection returns at most d_lazy peers."""
@@ -197,10 +197,10 @@ class TestFanoutOperations:
         mesh.subscribe(TopicId("topic"))
 
         names = ["gA", "gB", "gC", "gD", "gE", "gF", "gG", "gH", "gJ", "gK"]
-        all_peers = {peer(n) for n in names}
-        result = mesh.select_peers_for_gossip(TopicId("topic"), all_peers)
+        all_peers = {peer(name) for name in names}
+        gossip_peers = mesh.select_peers_for_gossip(TopicId("topic"), all_peers)
 
-        assert len(result) <= 2
+        assert len(gossip_peers) <= 2
 
     def test_select_peers_for_gossip_excludes_mesh(self) -> None:
         """Gossip peer selection excludes mesh peers."""
@@ -212,6 +212,6 @@ class TestFanoutOperations:
         mesh.add_to_mesh(TopicId("topic"), mesh_peer)
 
         all_peers = {mesh_peer, peer("p1"), peer("p2")}
-        result = mesh.select_peers_for_gossip(TopicId("topic"), all_peers)
+        gossip_peers = mesh.select_peers_for_gossip(TopicId("topic"), all_peers)
 
-        assert mesh_peer not in result
+        assert mesh_peer not in gossip_peers

@@ -601,7 +601,7 @@ class TestMaintainMesh:
 
         expected_peers = {make_peer(name) for name in names}
         graft_rpc = RPC(control=ControlMessage(graft=[ControlGraft(topic_id=topic)]))
-        assert {p for p, _ in capture.sent} == expected_peers
+        assert {peer_id for peer_id, _ in capture.sent} == expected_peers
         assert all(rpc == graft_rpc for _, rpc in capture.sent)
         assert behavior.mesh.get_mesh_peers(topic) == expected_peers
 
@@ -629,7 +629,7 @@ class TestMaintainMesh:
         prune_rpc = RPC(
             control=ControlMessage(prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)])
         )
-        pruned_peers = {p for p, _ in capture.sent}
+        pruned_peers = {peer_id for peer_id, _ in capture.sent}
         assert len(capture.sent) == 3
         assert all(rpc == prune_rpc for _, rpc in capture.sent)
         assert pruned_peers | mesh == all_peers
@@ -896,9 +896,9 @@ class TestHeartbeatIntegration:
         # Heartbeat emits gossip for fanout topics.
         # Filter to IHAVE RPCs for the fanout topic.
         fanout_ihaves = [
-            (p, r)
-            for p, r in capture.sent
-            if r.control and any(ih.topic_id == fan_topic for ih in r.control.ihave)
+            (peer_id, rpc)
+            for peer_id, rpc in capture.sent
+            if rpc.control and any(ihave.topic_id == fan_topic for ihave in rpc.control.ihave)
         ]
         assert fanout_ihaves == [
             (
@@ -930,7 +930,7 @@ class TestPublish:
         await behavior.publish(topic, b"hello")
 
         publish_rpc = RPC(publish=[Message(topic=topic, data=b"hello")])
-        assert {p for p, _ in capture.sent} == {p1, p2}
+        assert {peer_id for peer_id, _ in capture.sent} == {p1, p2}
         assert all(rpc == publish_rpc for _, rpc in capture.sent)
 
     @pytest.mark.asyncio
@@ -1090,8 +1090,10 @@ class TestBroadcastSubscription:
         prune_rpc = RPC(
             control=ControlMessage(prune=[ControlPrune(topic_id=topic, backoff=PRUNE_BACKOFF)])
         )
-        sub_sends = [(p, r) for p, r in capture.sent if r.subscriptions]
-        prune_sends = [(p, r) for p, r in capture.sent if r.control and r.control.prune]
+        sub_sends = [(peer_id, rpc) for peer_id, rpc in capture.sent if rpc.subscriptions]
+        prune_sends = [
+            (peer_id, rpc) for peer_id, rpc in capture.sent if rpc.control and rpc.control.prune
+        ]
         assert sub_sends == [(p1, sub_rpc), (p2, sub_rpc)]
-        assert {p for p, _ in prune_sends} == {p1, p2}
+        assert {peer_id for peer_id, _ in prune_sends} == {p1, p2}
         assert all(rpc == prune_rpc for _, rpc in prune_sends)

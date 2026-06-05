@@ -101,12 +101,12 @@ def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:
     Raises:
         ValueError: If the chunk count exceeds the limit.
     """
-    n = len(chunks)
-    if n == 0:
+    chunk_count = len(chunks)
+    if chunk_count == 0:
         return _zero_tree_root(_next_pow2(limit)) if limit is not None else ZERO_HASH
     if limit is None:
-        width = _next_pow2(n)
-    elif limit < n:
+        width = _next_pow2(chunk_count)
+    elif limit < chunk_count:
         raise ValueError("merkleize: input exceeds limit")
     else:
         width = _next_pow2(limit)
@@ -196,8 +196,8 @@ def _pack_bits(bits: Sequence[Boolean]) -> list[Bytes32]:
     The SSZ serialization delimiter and the length-mix are separate steps,
     handled by the caller when needed.
     """
-    value = sum(1 << i for i, bit in enumerate(bits) if bit)
-    return _pack_bytes(value.to_bytes(math.ceil(len(bits) / 8), "little"))
+    packed_bits = sum(1 << i for i, bit in enumerate(bits) if bit)
+    return _pack_bytes(packed_bits.to_bytes(math.ceil(len(bits) / 8), "little"))
 
 
 @singledispatch
@@ -248,9 +248,11 @@ def _htr_bytevector(value: BaseBytes) -> Bytes32:
 
 @hash_tree_root.register
 def _htr_bytelist(value: BaseByteList) -> Bytes32:
-    data = value.encode_bytes()
+    serialized_bytes = value.encode_bytes()
     limit_chunks = math.ceil(type(value).LIMIT / BYTES_PER_CHUNK)
-    return mix_in_length(merkleize(_pack_bytes(data), limit=limit_chunks), len(data))
+    return mix_in_length(
+        merkleize(_pack_bytes(serialized_bytes), limit=limit_chunks), len(serialized_bytes)
+    )
 
 
 @hash_tree_root.register

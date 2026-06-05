@@ -18,23 +18,23 @@ class TestEth2Data:
 
     def test_create_eth2_data(self) -> None:
         """Eth2Data can be created with valid parameters."""
-        data = Eth2Data(
+        eth2_data = Eth2Data(
             fork_digest=ForkDigest(b"\x12\x34\x56\x78"),
             next_fork_version=Version(b"\x02\x00\x00\x00"),
             next_fork_epoch=Uint64(194048),
         )
-        assert data.fork_digest == ForkDigest(b"\x12\x34\x56\x78")
-        assert data.next_fork_epoch == Uint64(194048)
+        assert eth2_data.fork_digest == ForkDigest(b"\x12\x34\x56\x78")
+        assert eth2_data.next_fork_epoch == Uint64(194048)
 
     def test_eth2_data_immutable(self) -> None:
         """Eth2Data is immutable (frozen)."""
-        data = Eth2Data(
+        eth2_data = Eth2Data(
             fork_digest=ForkDigest(b"\x12\x34\x56\x78"),
             next_fork_version=Version(b"\x02\x00\x00\x00"),
             next_fork_epoch=Uint64(0),
         )
         with pytest.raises(ValidationError):
-            data.fork_digest = ForkDigest(b"\x00\x00\x00\x00")
+            eth2_data.fork_digest = ForkDigest(b"\x00\x00\x00\x00")
 
     def test_far_future_epoch_value(self) -> None:
         """FAR_FUTURE_EPOCH is max uint64."""
@@ -70,9 +70,9 @@ class TestAttestationSubnets:
     def test_subscribed_subnets_list(self) -> None:
         """subscribed_subnets() returns correct list."""
         subnets = AttestationSubnets.from_subnet_ids([10, 20, 30])
-        result = subnets.subscribed_subnets()
+        subscribed_subnet_ids = subnets.subscribed_subnets()
 
-        assert result == [SubnetId(10), SubnetId(20), SubnetId(30)]
+        assert subscribed_subnet_ids == [SubnetId(10), SubnetId(20), SubnetId(30)]
 
     def test_invalid_subnet_id_in_from_subnet_ids(self) -> None:
         """from_subnet_ids() raises for invalid subnet IDs."""

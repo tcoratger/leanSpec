@@ -23,12 +23,17 @@ from lean_spec.spec.ssz.exceptions import SSZValueError
 
 def registry_state(registry: ValidatorRegistry) -> dict[ValidatorIndex, tuple[object, object]]:
     """Map each registry index to its (attestation_secret_key, proposal_secret_key) pair."""
-    result: dict[ValidatorIndex, tuple[object, object]] = {}
+    index_to_secret_keys: dict[ValidatorIndex, tuple[object, object]] = {}
     for index in registry.indices():
-        entry = registry.get(index)
-        assert entry is not None, f"Registry contains index {index} but get() returned None"
-        result[index] = (entry.attestation_secret_key, entry.proposal_secret_key)
-    return result
+        validator_entry = registry.get(index)
+        assert validator_entry is not None, (
+            f"Registry contains index {index} but get() returned None"
+        )
+        index_to_secret_keys[index] = (
+            validator_entry.attestation_secret_key,
+            validator_entry.proposal_secret_key,
+        )
+    return index_to_secret_keys
 
 
 @pytest.fixture
@@ -72,13 +77,13 @@ class TestValidatorEntry:
     def test_construction_stores_all_fields(self, km: XmssKeyManager) -> None:
         """All three fields are accessible after construction."""
         kp = km[ValidatorIndex(7)]
-        entry = ValidatorEntry(
+        validator_entry = ValidatorEntry(
             index=ValidatorIndex(7),
             attestation_secret_key=kp.attestation_keypair.secret_key,
             proposal_secret_key=kp.proposal_keypair.secret_key,
         )
 
-        assert entry == ValidatorEntry(
+        assert validator_entry == ValidatorEntry(
             index=ValidatorIndex(7),
             attestation_secret_key=kp.attestation_keypair.secret_key,
             proposal_secret_key=kp.proposal_keypair.secret_key,
@@ -90,7 +95,7 @@ class TestValidatorManifestEntry:
 
     def test_construction_stores_all_fields(self) -> None:
         """All fields are stored and accessible after construction."""
-        entry = ValidatorManifestEntry(
+        manifest_entry = ValidatorManifestEntry(
             index=ValidatorIndex(3),
             attestation_public_key_hex=Bytes52("0x" + "aa" * 52),
             proposal_public_key_hex=Bytes52("0x" + "bb" * 52),
@@ -98,7 +103,7 @@ class TestValidatorManifestEntry:
             proposal_private_key_file="prop.ssz",
         )
 
-        assert entry == ValidatorManifestEntry(
+        assert manifest_entry == ValidatorManifestEntry(
             index=ValidatorIndex(3),
             attestation_public_key_hex=Bytes52("0x" + "aa" * 52),
             proposal_public_key_hex=Bytes52("0x" + "bb" * 52),
@@ -152,10 +157,10 @@ class TestValidatorManifest:
 
     def test_from_yaml_file_parses_validators_list(self, tmp_path: Path) -> None:
         """Nested validators list is parsed into ValidatorManifestEntry objects."""
-        entries = [_manifest_entry_dict(0), _manifest_entry_dict(1)]
+        manifest_entry_dicts = [_manifest_entry_dict(0), _manifest_entry_dict(1)]
         manifest_file = tmp_path / "manifest.yaml"
         manifest_file.write_text(
-            yaml.dump(_minimal_manifest_dict(num_validators=2, validators=entries))
+            yaml.dump(_minimal_manifest_dict(num_validators=2, validators=manifest_entry_dicts))
         )
 
         manifest = ValidatorManifest.from_yaml_file(manifest_file)
@@ -223,10 +228,10 @@ class TestValidatorRegistry:
     def test_add_single_entry_and_retrieve(self, km: XmssKeyManager) -> None:
         """A single entry is stored and retrievable by index."""
         registry = ValidatorRegistry()
-        entry = self._entry(km, 0)
-        registry.add(entry)
+        validator_entry = self._entry(km, 0)
+        registry.add(validator_entry)
 
-        assert registry.get(ValidatorIndex(0)) == entry
+        assert registry.get(ValidatorIndex(0)) == validator_entry
 
     def test_get_miss_returns_none(self, km: XmssKeyManager) -> None:
         """get() returns None for an index that was never added."""
@@ -238,22 +243,22 @@ class TestValidatorRegistry:
     def test_add_multiple_entries(self, km: XmssKeyManager) -> None:
         """Multiple entries are stored with correct index-to-key mapping."""
         registry = ValidatorRegistry()
-        entries = {index: self._entry(km, index) for index in [3, 1, 4]}
-        for entry in entries.values():
-            registry.add(entry)
+        validator_entries = {index: self._entry(km, index) for index in [3, 1, 4]}
+        for validator_entry in validator_entries.values():
+            registry.add(validator_entry)
 
         assert registry_state(registry) == {
             ValidatorIndex(1): (
-                entries[1].attestation_secret_key,
-                entries[1].proposal_secret_key,
+                validator_entries[1].attestation_secret_key,
+                validator_entries[1].proposal_secret_key,
             ),
             ValidatorIndex(3): (
-                entries[3].attestation_secret_key,
-                entries[3].proposal_secret_key,
+                validator_entries[3].attestation_secret_key,
+                validator_entries[3].proposal_secret_key,
             ),
             ValidatorIndex(4): (
-                entries[4].attestation_secret_key,
-                entries[4].proposal_secret_key,
+                validator_entries[4].attestation_secret_key,
+                validator_entries[4].proposal_secret_key,
             ),
         }
 
@@ -286,9 +291,9 @@ class TestValidatorRegistry:
         for i in [2, 5, 7]:
             registry.add(self._entry(km, i))
 
-        result = registry.indices()
+        registered_indices = registry.indices()
 
-        assert set(result) == {ValidatorIndex(2), ValidatorIndex(5), ValidatorIndex(7)}
+        assert set(registered_indices) == {ValidatorIndex(2), ValidatorIndex(5), ValidatorIndex(7)}
 
     def test_primary_index_empty_registry(self) -> None:
         """Primary index is None for an empty registry."""
@@ -389,12 +394,12 @@ class TestValidatorRegistryFromYaml:
         # Loaded keys should match the originals from the key manager.
         for i in [0, 1]:
             validator_index = ValidatorIndex(i)
-            entry = registry.get(validator_index)
-            assert entry is not None
+            validator_entry = registry.get(validator_index)
+            assert validator_entry is not None
             expected_attestation = km[validator_index].attestation_keypair.secret_key.encode_bytes()
             expected_proposal = km[validator_index].proposal_keypair.secret_key.encode_bytes()
-            assert entry.attestation_secret_key.encode_bytes() == expected_attestation
-            assert entry.proposal_secret_key.encode_bytes() == expected_proposal
+            assert validator_entry.attestation_secret_key.encode_bytes() == expected_attestation
+            assert validator_entry.proposal_secret_key.encode_bytes() == expected_proposal
 
     def test_unknown_node_returns_empty_registry(self, tmp_path: Path) -> None:
         """An unrecognised node ID produces an empty registry without error."""

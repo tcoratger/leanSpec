@@ -53,13 +53,13 @@ class PoseidonPermutationTest(BaseConsensusFixture):
         else:
             raise ValueError(f"Unsupported Poseidon width: {self.width}")
 
-        state_ints = [int(x) for x in self.input["inputState"]]
+        state_ints = [int(raw_element) for raw_element in self.input["inputState"]]
         if len(state_ints) != self.width:
             raise ValueError(
                 f"Input state length {len(state_ints)} does not match width {self.width}"
             )
 
-        input_state = [Fp(v) for v in state_ints]
+        input_state = [Fp(state_int) for state_int in state_ints]
         output_state = engine.permute(input_state)
 
         self.output = {"outputState": [str(int(fp)) for fp in output_state]}

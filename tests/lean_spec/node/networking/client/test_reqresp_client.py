@@ -196,11 +196,11 @@ class TestReqRespClientStatusExchange:
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
         our_status = make_test_status()
-        result = await client.send_status(peer_id, our_status)
+        received_status = await client.send_status(peer_id, our_status)
 
-        assert result is not None
-        assert result.head.slot == Slot(150)
-        assert result.finalized.slot == Slot(50)
+        assert received_status is not None
+        assert received_status.head.slot == Slot(150)
+        assert received_status.finalized.slot == Slot(50)
 
     async def test_send_status_no_connection(self) -> None:
         """Request to unconnected peer returns None."""
@@ -209,9 +209,9 @@ class TestReqRespClientStatusExchange:
 
         # No connection registered
         our_status = make_test_status()
-        result = await client.send_status(peer_id, our_status)
+        received_status = await client.send_status(peer_id, our_status)
 
-        assert result is None
+        assert received_status is None
 
     async def test_send_status_server_error_response(self) -> None:
         """SERVER_ERROR response returns None."""
@@ -224,9 +224,9 @@ class TestReqRespClientStatusExchange:
 
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_send_status_stream_closed(self) -> None:
         """Empty response (closed stream) returns None."""
@@ -239,9 +239,9 @@ class TestReqRespClientStatusExchange:
 
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_send_status_writes_request(self) -> None:
         """Request is properly encoded and sent."""
@@ -324,7 +324,7 @@ class TestReqRespClientBlocksByRoot:
         blocks = await client.request_blocks_by_root(peer_id, roots)
 
         assert len(blocks) == 2
-        slots = {b.block.slot for b in blocks}
+        slots = {signed_block.block.slot for signed_block in blocks}
         assert Slot(10) in slots
         assert Slot(20) in slots
 
@@ -435,9 +435,9 @@ class TestReqRespClientTimeouts:
 
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_blocks_by_root_timeout_returns_empty(self) -> None:
         """BlocksByRoot timeout returns empty list."""
@@ -481,9 +481,9 @@ class TestReqRespClientErrorHandling:
 
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_read_failure_returns_gracefully(self) -> None:
         """Read failure during response handled gracefully."""
@@ -495,9 +495,9 @@ class TestReqRespClientErrorHandling:
 
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_open_stream_failure_returns_gracefully(self) -> None:
         """Failure to open stream handled gracefully."""
@@ -507,9 +507,9 @@ class TestReqRespClientErrorHandling:
         connection = MockConnection(_fail_on_open=True)
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_malformed_response_handled(self) -> None:
         """Malformed response data handled gracefully."""
@@ -523,9 +523,9 @@ class TestReqRespClientErrorHandling:
 
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        result = await client.send_status(peer_id, make_test_status())
+        received_status = await client.send_status(peer_id, make_test_status())
 
-        assert result is None
+        assert received_status is None
 
     async def test_blocks_codec_error_stops_reading(self) -> None:
         """CodecError during block response stops reading."""
@@ -581,19 +581,19 @@ class TestReqRespClientConcurrency:
         client.register_connection(peer2, conn2)  # type: ignore[arg-type]
 
         our_status = make_test_status()
-        results = list(
+        received_statuses = list(
             await asyncio.gather(
                 client.send_status(peer1, our_status),
                 client.send_status(peer2, our_status),
             )
         )
 
-        assert len(results) == 2
-        assert results[0] is not None
-        assert results[1] is not None
+        assert len(received_statuses) == 2
+        assert received_statuses[0] is not None
+        assert received_statuses[1] is not None
         # Verify we got different responses
-        assert results[0].head.slot == Slot(200)
-        assert results[1].head.slot == Slot(400)
+        assert received_statuses[0].head.slot == Slot(200)
+        assert received_statuses[1].head.slot == Slot(400)
 
     async def test_concurrent_mixed_requests(self) -> None:
         """Concurrent Status and BlocksByRoot work."""
@@ -886,7 +886,9 @@ class TestReqRespClientBlocksByRange:
         client = make_client()
         chain = build_chain(start_slot=10, count=4)
 
-        stream = MockRangeStream(response_chunks=[encode_success(b) for b in chain])
+        stream = MockRangeStream(
+            response_chunks=[encode_success(signed_block) for signed_block in chain]
+        )
         connection = MockRangeConnection(peer_id=peer_id, streams=[stream])
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
@@ -902,7 +904,9 @@ class TestReqRespClientBlocksByRange:
         client = make_client()
         chain = build_chain(start_slot=20, count=2)
 
-        stream = MockRangeStream(response_chunks=[encode_success(b) for b in chain])
+        stream = MockRangeStream(
+            response_chunks=[encode_success(signed_block) for signed_block in chain]
+        )
         connection = MockRangeConnection(peer_id=peer_id, streams=[stream])
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 

@@ -280,8 +280,8 @@ class TestRequestTracking:
     ) -> None:
         """Empty response completes the request, keeping the peer available."""
         manager = PeerManager()
-        info = PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED)
-        manager.add_peer(info)
+        peer_info = PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED)
+        manager.add_peer(peer_info)
         backfill = BackfillSync(
             peer_manager=manager,
             block_cache=BlockCache(),
@@ -294,7 +294,7 @@ class TestRequestTracking:
 
         peer = manager.peers.get(peer_id)
         assert peer == SyncPeer(
-            info=info,
+            info=peer_info,
             requests_in_flight=0,
             score=INITIAL_PEER_SCORE + SCORE_SUCCESS_BONUS,
         )

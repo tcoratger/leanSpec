@@ -289,7 +289,8 @@ class XmssKeyManager:
 
             # Each JSON file is named by its validator index (e.g. "0.json").
             self._available_indices = {
-                ValidatorIndex(int(f.stem)) for f in self._keys_directory.glob("*.json")
+                ValidatorIndex(int(key_file.stem))
+                for key_file in self._keys_directory.glob("*.json")
             }
 
             # An empty directory is as bad as a missing one.
@@ -320,8 +321,8 @@ class XmssKeyManager:
             # Resolve the per-validator JSON file path.
             key_file = self._keys_directory / f"{index}.json"
             try:
-                with key_file.open() as f:
-                    self._json_cache[index] = json.load(f)
+                with key_file.open() as key_file_handle:
+                    self._json_cache[index] = json.load(key_file_handle)
             except FileNotFoundError:
                 raise KeyError(f"Key file not found: {key_file}") from None
         return self._json_cache[index]
@@ -690,11 +691,14 @@ def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
     gen_start = time.monotonic()
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         worker_func = partial(_generate_single_keypair, scheme, num_slots)
-        for index, key_pair in enumerate(executor.map(worker_func, range(count))):
+        for validator_index, key_pair in enumerate(executor.map(worker_func, range(count))):
             elapsed = time.monotonic() - gen_start
-            print(f"[{index + 1}/{count}] saved key #{index} ({elapsed:.0f}s elapsed)")
+            print(
+                f"[{validator_index + 1}/{count}] saved key #{validator_index} "
+                f"({elapsed:.0f}s elapsed)"
+            )
 
-            key_file = keys_directory / f"{index}.json"
+            key_file = keys_directory / f"{validator_index}.json"
             key_file.write_text(key_pair.model_dump_json(indent=2))
 
     total = time.monotonic() - gen_start

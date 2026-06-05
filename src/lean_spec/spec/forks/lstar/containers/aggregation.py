@@ -148,11 +148,11 @@ class SingleMessageAggregate(Container):
         # The bitfield names one validator per set bit.
         # The caller must supply exactly that many keys, in the same order.
         # A miscount would otherwise fail deep in the verifier with an opaque error.
-        expected = len(self.participants.to_validator_indices())
-        if len(public_keys) != expected:
+        expected_public_key_count = len(self.participants.to_validator_indices())
+        if len(public_keys) != expected_public_key_count:
             raise AggregationError(
-                f"single-message aggregate verify expected {expected} pubkeys for participants, "
-                f"got {len(public_keys)}"
+                f"single-message aggregate verify expected {expected_public_key_count} pubkeys "
+                f"for participants, got {len(public_keys)}"
             )
 
         # Hand the resolved keys, message, and slot to the Rust verifier.
@@ -191,8 +191,8 @@ class MultiMessageAggregate(Container):
     @classmethod
     def aggregate(
         cls,
-        parts: list[SingleMessageAggregate],
-        public_keys_per_part: list[list[PublicKey]],
+        single_message_aggregates: list[SingleMessageAggregate],
+        public_keys_per_aggregate: list[list[PublicKey]],
     ) -> "MultiMessageAggregate":
         """
         Merge several single-message proofs over distinct messages into one.
@@ -204,8 +204,10 @@ class MultiMessageAggregate(Container):
         - They cannot be recovered from the proofs, so the caller supplies them.
 
         Args:
-            parts: The single-message proofs to merge, one per distinct message.
-            public_keys_per_part: Public keys for each component, in the same order as the proofs.
+            single_message_aggregates: The single-message proofs to merge,
+                one per distinct message.
+            public_keys_per_aggregate: Public keys for each component,
+                in the same order as the proofs.
 
         Returns:
             A merged proof binding every component to its own message.
@@ -214,7 +216,7 @@ class MultiMessageAggregate(Container):
             AggregationError: When no proofs are given, a public_key list disagrees
                 with its participant count, or the prover rejects the inputs.
         """
-        if not parts:
+        if not single_message_aggregates:
             raise AggregationError(
                 "multi-message aggregate requires at least one single-message aggregate input"
             )
@@ -223,15 +225,22 @@ class MultiMessageAggregate(Container):
         #
         # A miscount would otherwise fail deep in the prover with an opaque error.
         single_message_aggregate_entries: list[tuple[list[bytes], bytes]] = []
-        for index, (part, public_keys) in enumerate(zip(parts, public_keys_per_part, strict=True)):
-            expected = len(part.participants.to_validator_indices())
-            if len(public_keys) != expected:
+        for aggregate_index, (single_message_aggregate, public_keys) in enumerate(
+            zip(single_message_aggregates, public_keys_per_aggregate, strict=True)
+        ):
+            expected_public_key_count = len(
+                single_message_aggregate.participants.to_validator_indices()
+            )
+            if len(public_keys) != expected_public_key_count:
                 raise AggregationError(
-                    f"multi-message aggregate entry {index} "
-                    f"expected {expected} pubkeys, got {len(public_keys)}"
+                    f"multi-message aggregate entry {aggregate_index} "
+                    f"expected {expected_public_key_count} pubkeys, got {len(public_keys)}"
                 )
             single_message_aggregate_entries.append(
-                ([public_key.encode_bytes() for public_key in public_keys], bytes(part.proof.data))
+                (
+                    [public_key.encode_bytes() for public_key in public_keys],
+                    bytes(single_message_aggregate.proof.data),
+                )
             )
 
         # Hand the per-component keys and proof bytes to the Rust prover.

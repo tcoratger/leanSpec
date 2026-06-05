@@ -51,13 +51,13 @@ class TestBaseBytesConstruction:
         """Concrete subclasses inherit from BaseBytes and stay bytes-compatible."""
         assert issubclass(Bytes32, BaseBytes)
         assert Bytes32.LENGTH == 32
-        v = Bytes32(b"\x00" * 32)
-        assert isinstance(v, Bytes32)
-        assert isinstance(v, bytes)
-        assert len(v) == 32
+        byte_array = Bytes32(b"\x00" * 32)
+        assert isinstance(byte_array, Bytes32)
+        assert isinstance(byte_array, bytes)
+        assert len(byte_array) == 32
 
     @pytest.mark.parametrize(
-        "input_value, expected",
+        "input_value, expected_bytes",
         [
             (b"\x00\x01\x02\x03", b"\x00\x01\x02\x03"),
             (bytearray(b"\x00\x01\x02\x03"), b"\x00\x01\x02\x03"),
@@ -67,10 +67,10 @@ class TestBaseBytesConstruction:
             ("0x00010203", b"\x00\x01\x02\x03"),
         ],
     )
-    def test_coercion_from_supported_inputs(self, input_value: Any, expected: bytes) -> None:
+    def test_coercion_from_supported_inputs(self, input_value: Any, expected_bytes: bytes) -> None:
         """Bytes, bytearray, iterables, generators, and hex strings all coerce to bytes."""
-        v = Bytes4(input_value)
-        assert bytes(v) == expected
+        coerced = Bytes4(input_value)
+        assert bytes(coerced) == expected_bytes
 
     @pytest.mark.parametrize(
         "wrong_input, count",
@@ -102,9 +102,9 @@ class TestBaseBytesConstruction:
 
     def test_zero_factory(self) -> None:
         """The zero classmethod returns an instance of LENGTH zero bytes."""
-        v = Bytes4.zero()
-        assert isinstance(v, Bytes4)
-        assert bytes(v) == b"\x00\x00\x00\x00"
+        zero_array = Bytes4.zero()
+        assert isinstance(zero_array, Bytes4)
+        assert bytes(zero_array) == b"\x00\x00\x00\x00"
 
 
 class TestBaseBytesEquality:
@@ -145,8 +145,8 @@ class TestBaseBytesEquality:
 
     def test_hash_distinct_from_raw_bytes(self) -> None:
         """The hash binds the value to its concrete type, so equal raw bytes hash differently."""
-        v = Bytes4(b"\x00\x01\x02\x03")
-        assert hash(v) != hash(b"\x00\x01\x02\x03")
+        byte_array = Bytes4(b"\x00\x01\x02\x03")
+        assert hash(byte_array) != hash(b"\x00\x01\x02\x03")
 
     def test_hash_same_for_equal_instances(self) -> None:
         """Equal instances of the same type produce the same hash."""
@@ -169,37 +169,37 @@ class TestBaseBytesOperations:
 
     def test_length_iter_getitem(self) -> None:
         """The instance supports len, iteration, and integer indexing."""
-        v = Bytes4(b"\x00\x01\x02\x03")
-        assert len(v) == 4
-        assert list(iter(v)) == [0, 1, 2, 3]
-        assert v[2] == 2
+        byte_array = Bytes4(b"\x00\x01\x02\x03")
+        assert len(byte_array) == 4
+        assert list(iter(byte_array)) == [0, 1, 2, 3]
+        assert byte_array[2] == 2
 
     def test_concatenation_returns_plain_bytes(self) -> None:
         """Concatenation of two instances returns plain bytes."""
-        a = Bytes4(b"\x00\x00\x00\x01")
-        b = Bytes4(b"\x00\x00\x00\x02")
-        conc = a + b
-        assert type(conc) is bytes
-        assert conc == b"\x00\x00\x00\x01\x00\x00\x00\x02"
+        left_array = Bytes4(b"\x00\x00\x00\x01")
+        right_array = Bytes4(b"\x00\x00\x00\x02")
+        concatenated = left_array + right_array
+        assert type(concatenated) is bytes
+        assert concatenated == b"\x00\x00\x00\x01\x00\x00\x00\x02"
 
     def test_reverse_concatenation_returns_plain_bytes(self) -> None:
         """Concatenation with raw bytes on the left returns plain bytes."""
-        a = Bytes4(b"\x00\x00\x00\x01")
-        conc = b"\xff" + a
-        assert type(conc) is bytes
-        assert conc == b"\xff\x00\x00\x00\x01"
+        byte_array = Bytes4(b"\x00\x00\x00\x01")
+        concatenated = b"\xff" + byte_array
+        assert type(concatenated) is bytes
+        assert concatenated == b"\xff\x00\x00\x00\x01"
 
     def test_sort_lexicographic(self) -> None:
         """Instances sort lexicographically by byte content."""
-        a = Bytes32(b"\x00" * 31 + b"\x01")
-        b = Bytes32(b"\x00" * 31 + b"\x02")
-        c = Bytes32(b"\xff" * 32)
-        assert sorted([c, b, a]) == [a, b, c]
+        smallest = Bytes32(b"\x00" * 31 + b"\x01")
+        middle = Bytes32(b"\x00" * 31 + b"\x02")
+        largest = Bytes32(b"\xff" * 32)
+        assert sorted([largest, middle, smallest]) == [smallest, middle, largest]
 
     def test_hashlib_compatibility(self) -> None:
         """An instance is usable wherever a bytes-like value is expected."""
-        r = Bytes32(b"\x01" + b"\x00" * 31)
-        digest = hashlib.sha256(r).digest()
+        byte_array = Bytes32(b"\x01" + b"\x00" * 31)
+        digest = hashlib.sha256(byte_array).digest()
         assert len(digest) == 32
 
 
@@ -224,17 +224,17 @@ class TestBaseBytesSSZ:
     )
     def test_encode_decode_roundtrip(self, cls: type[BaseBytes], payload: bytes) -> None:
         """BaseBytes round-trips through encode_bytes, decode_bytes, and stream serialization."""
-        v = cls(payload)
-        assert v.encode_bytes() == payload
-        assert cls.decode_bytes(payload) == v
+        byte_array = cls(payload)
+        assert byte_array.encode_bytes() == payload
+        assert cls.decode_bytes(payload) == byte_array
 
         buffer = io.BytesIO()
-        n = v.serialize(buffer)
-        assert n == len(payload)
+        bytes_written = byte_array.serialize(buffer)
+        assert bytes_written == len(payload)
 
         buffer.seek(0)
-        v2 = cls.deserialize(buffer, len(payload))
-        assert v == v2
+        deserialized = cls.deserialize(buffer, len(payload))
+        assert byte_array == deserialized
 
     def test_deserialize_scope_mismatch_raises(self) -> None:
         """deserialize rejects a scope that doesn't match LENGTH."""
@@ -260,22 +260,22 @@ class TestBaseBytesPydantic:
 
     def test_accepts_typed_instances_and_supported_inputs(self) -> None:
         """Pydantic accepts existing instances built from hex strings or iterables."""
-        m = ModelVectors(
+        model = ModelVectors(
             root=Bytes32("0x" + "11" * 32),
             key=Bytes4([0, 1, 2, 3]),
         )
-        assert isinstance(m.root, Bytes32)
-        assert isinstance(m.key, Bytes4)
-        assert bytes(m.root) == b"\x11" * 32
-        assert bytes(m.key) == b"\x00\x01\x02\x03"
+        assert isinstance(model.root, Bytes32)
+        assert isinstance(model.key, Bytes4)
+        assert bytes(model.root) == b"\x11" * 32
+        assert bytes(model.key) == b"\x00\x01\x02\x03"
 
     def test_json_serialization_to_hex(self) -> None:
         """Serialization uses 0x-prefixed lowercase hex for JSON output."""
-        m = ModelVectors(
+        model = ModelVectors(
             root=Bytes32("0x" + "11" * 32),
             key=Bytes4([0, 1, 2, 3]),
         )
-        dumped = m.model_dump()
+        dumped = model.model_dump()
         assert dumped["root"] == "0x" + "11" * 32
         assert dumped["key"] == "0x00010203"
 
@@ -285,13 +285,13 @@ class TestBaseByteListConstruction:
 
     def test_inheritance(self) -> None:
         """Concrete subclasses carry the declared limit."""
-        v = ByteList16(data=b"\x01\x02")
-        assert isinstance(v, ByteList16)
+        byte_list = ByteList16(data=b"\x01\x02")
+        assert isinstance(byte_list, ByteList16)
         assert ByteList16.LIMIT == 16
-        assert len(v.data) == 2
+        assert len(byte_list.data) == 2
 
     @pytest.mark.parametrize(
-        "input_value, expected",
+        "input_value, expected_bytes",
         [
             (b"\x00\x01\x02\x03\x04", b"\x00\x01\x02\x03\x04"),
             (bytearray(b"\x00\x01\x02\x03\x04"), b"\x00\x01\x02\x03\x04"),
@@ -300,11 +300,11 @@ class TestBaseByteListConstruction:
             ("0x0001020304", b"\x00\x01\x02\x03\x04"),
         ],
     )
-    def test_coercion_from_supported_inputs(self, input_value: Any, expected: bytes) -> None:
+    def test_coercion_from_supported_inputs(self, input_value: Any, expected_bytes: bytes) -> None:
         """Bytes, bytearray, iterables, and hex strings all coerce to bytes."""
-        v = ByteList5(data=input_value)
-        assert v.data == expected
-        assert len(v.data) == len(expected)
+        byte_list = ByteList5(data=input_value)
+        assert byte_list.data == expected_bytes
+        assert len(byte_list.data) == len(expected_bytes)
 
     def test_construction_over_limit_raises(self) -> None:
         """Input exceeding LIMIT raises with the exact size in the message."""
@@ -385,17 +385,17 @@ class TestBaseByteListOperations:
 
     def test_concatenation_returns_plain_bytes(self) -> None:
         """Concatenation with a bytes-like value returns plain bytes."""
-        v = ByteList16(data=b"\x00\x01\x02")
-        conc = v + b"\x03\x04"
-        assert type(conc) is bytes
-        assert conc == b"\x00\x01\x02\x03\x04"
+        byte_list = ByteList16(data=b"\x00\x01\x02")
+        concatenated = byte_list + b"\x03\x04"
+        assert type(concatenated) is bytes
+        assert concatenated == b"\x00\x01\x02\x03\x04"
 
     def test_reverse_concatenation_returns_plain_bytes(self) -> None:
         """Concatenation with raw bytes on the left returns plain bytes."""
-        v = ByteList16(data=b"\x00\x01")
-        conc = b"\xff" + v
-        assert type(conc) is bytes
-        assert conc == b"\xff\x00\x01"
+        byte_list = ByteList16(data=b"\x00\x01")
+        concatenated = b"\xff" + byte_list
+        assert type(concatenated) is bytes
+        assert concatenated == b"\xff\x00\x01"
 
 
 class TestBaseByteListSSZ:
@@ -428,17 +428,17 @@ class TestBaseByteListSSZ:
         class TestByteList(BaseByteList):
             LIMIT = limit
 
-        x = TestByteList(data=data)
-        assert x.encode_bytes() == data
-        assert TestByteList.decode_bytes(data) == x
+        byte_list = TestByteList(data=data)
+        assert byte_list.encode_bytes() == data
+        assert TestByteList.decode_bytes(data) == byte_list
 
         buffer = io.BytesIO()
-        n = x.serialize(buffer)
-        assert n == len(data)
+        bytes_written = byte_list.serialize(buffer)
+        assert bytes_written == len(data)
 
         buffer.seek(0)
-        y = TestByteList.deserialize(buffer, len(data))
-        assert y == x
+        deserialized = TestByteList.deserialize(buffer, len(data))
+        assert deserialized == byte_list
 
     def test_deserialize_negative_scope_raises(self) -> None:
         """deserialize rejects a negative scope."""
@@ -473,10 +473,10 @@ class TestBaseByteListPydantic:
 
     def test_accepts_valid_input(self) -> None:
         """Pydantic accepts construction with bytes within LIMIT."""
-        data = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
-        m = ModelLists(payload=ByteList16(data=data))
-        assert isinstance(m.payload, ByteList16)
-        assert m.payload.encode_bytes() == data
+        raw_bytes = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
+        model = ModelLists(payload=ByteList16(data=raw_bytes))
+        assert isinstance(model.payload, ByteList16)
+        assert model.payload.encode_bytes() == raw_bytes
 
     def test_rejects_oversized_input(self) -> None:
         """Pydantic rejects data exceeding LIMIT via SSZValueError."""
@@ -485,9 +485,9 @@ class TestBaseByteListPydantic:
 
     def test_json_serialization_to_hex(self) -> None:
         """JSON-mode serialization renders the data field as a 0x-prefixed hex string."""
-        data = bytes.fromhex("0001020304")
-        m = ModelLists(payload=ByteList16(data=data))
-        dumped = m.model_dump(mode="json")
+        raw_bytes = bytes.fromhex("0001020304")
+        model = ModelLists(payload=ByteList16(data=raw_bytes))
+        dumped = model.model_dump(mode="json")
         assert dumped["payload"]["data"] == "0x0001020304"
 
 
@@ -499,9 +499,9 @@ def test_zero_hash_constant() -> None:
 
 def test_json_dumpable_via_hex() -> None:
     """Byte instances are JSON-dumpable when pre-encoded to hex strings."""
-    obj = {
+    hex_encoded_fields = {
         "root": Bytes32(b"\x11" * 32).hex(),
         "key": Bytes4(b"\x00\x01\x02\x03").hex(),
         "payload": ByteList5(data=b"\x00\x01\x02").hex(),
     }
-    assert json.loads(json.dumps(obj)) == obj
+    assert json.loads(json.dumps(hex_encoded_fields)) == hex_encoded_fields

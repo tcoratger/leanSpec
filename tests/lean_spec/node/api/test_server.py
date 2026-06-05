@@ -155,9 +155,9 @@ class TestForkChoiceEndpoint:
                 assert response.status_code == 200
                 assert response.headers["content-type"] == "application/json"
 
-                data = response.json()
+                response_body = response.json()
 
-                assert set(data.keys()) == {
+                assert set(response_body.keys()) == {
                     "nodes",
                     "head",
                     "justified",
@@ -168,19 +168,19 @@ class TestForkChoiceEndpoint:
 
                 head_root = "0x" + base_store.head.hex()
 
-                assert data["head"] == head_root
-                assert data["validator_count"] == 3
-                assert data["justified"] == {
+                assert response_body["head"] == head_root
+                assert response_body["validator_count"] == 3
+                assert response_body["justified"] == {
                     "slot": int(base_store.latest_justified.slot),
                     "root": "0x" + base_store.latest_justified.root.hex(),
                 }
-                assert data["finalized"] == {
+                assert response_body["finalized"] == {
                     "slot": int(base_store.latest_finalized.slot),
                     "root": "0x" + base_store.latest_finalized.root.hex(),
                 }
 
-                assert len(data["nodes"]) == 1
-                node = data["nodes"][0]
+                assert len(response_body["nodes"]) == 1
+                node = response_body["nodes"][0]
                 assert node["root"] == head_root
                 assert node["slot"] == 0
                 assert node["weight"] == 0

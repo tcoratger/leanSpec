@@ -379,7 +379,7 @@ def test_verify_path_accepts_boundary_position_without_raising() -> None:
     """The maximum valid position for the depth does not trip the bounds guard."""
     siblings = [random_domain(PROD_CONFIG) for _ in range(4)]
     opening = HashTreeOpening(siblings=HashDigestList(data=siblings))
-    result = verify_path(
+    verification_result = verify_path(
         poseidon=POSEIDON,
         config=PROD_CONFIG,
         parameter=random_parameter(PROD_CONFIG),
@@ -388,4 +388,4 @@ def test_verify_path_accepts_boundary_position_without_raising() -> None:
         leaf_parts=[random_domain(PROD_CONFIG)],
         opening=opening,
     )
-    assert isinstance(result, bool)
+    assert isinstance(verification_result, bool)

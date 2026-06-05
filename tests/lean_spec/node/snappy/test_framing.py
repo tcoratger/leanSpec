@@ -28,14 +28,14 @@ class TestStreamIdentifier:
 
     def test_stream_identifier_format(self) -> None:
         """Stream identifier matches spec: 0xff 0x06 0x00 0x00 sNaPpY."""
-        expected = b"\xff\x06\x00\x00sNaPpY"
-        assert STREAM_IDENTIFIER == expected
+        expected_stream_identifier = b"\xff\x06\x00\x00sNaPpY"
+        assert STREAM_IDENTIFIER == expected_stream_identifier
         assert len(STREAM_IDENTIFIER) == 10
 
     def test_compressed_starts_with_identifier(self) -> None:
         """All compressed output starts with stream identifier."""
-        data = b"test data"
-        compressed = frame_compress(data)
+        uncompressed = b"test data"
+        compressed = frame_compress(uncompressed)
         assert compressed.startswith(STREAM_IDENTIFIER)
 
     def test_empty_data_has_identifier(self) -> None:
@@ -45,14 +45,14 @@ class TestStreamIdentifier:
 
     def test_repeated_identifier_accepted(self) -> None:
         """Repeated stream identifiers in concatenated streams are accepted."""
-        data = b"test"
-        stream1 = frame_compress(data)
-        stream2 = frame_compress(data)
+        uncompressed = b"test"
+        stream1 = frame_compress(uncompressed)
+        stream2 = frame_compress(uncompressed)
         # Concatenate two valid streams
         combined = stream1 + stream2
         # Should decompress to concatenated data
-        result = frame_decompress(combined)
-        assert result == data + data
+        decompressed = frame_decompress(combined)
+        assert decompressed == uncompressed + uncompressed
 
     def test_invalid_identifier_rejected(self) -> None:
         """Invalid stream identifier content is rejected."""
@@ -77,8 +77,8 @@ class TestChunkFormat:
 
     def test_chunk_header_format(self) -> None:
         """Chunk header is [type: 1][length: 3 LE]."""
-        data = b"Hello"
-        compressed = frame_compress(data)
+        uncompressed = b"Hello"
+        compressed = frame_compress(uncompressed)
 
         # Skip stream identifier, read first chunk header
         pos = len(STREAM_IDENTIFIER)
@@ -93,8 +93,8 @@ class TestChunkFormat:
     def test_chunk_length_little_endian(self) -> None:
         """Chunk length is stored in little-endian format."""
         # Compress data that will create a known-size chunk
-        data = b"A" * 100
-        compressed = frame_compress(data)
+        uncompressed = b"A" * 100
+        compressed = frame_compress(uncompressed)
 
         pos = len(STREAM_IDENTIFIER)
         # Read 3-byte little-endian length
@@ -127,28 +127,28 @@ class TestCRC32C:
     def test_mask_formula(self) -> None:
         """Masking follows spec: ((x >> 15) | (x << 17)) + 0xa282ead8."""
         crc = 0x12345678
-        expected = (((crc >> 15) | (crc << 17)) + CRC32C_MASK_DELTA) & 0xFFFFFFFF
-        assert _mask_crc(crc) == expected
+        expected_masked_crc = (((crc >> 15) | (crc << 17)) + CRC32C_MASK_DELTA) & 0xFFFFFFFF
+        assert _mask_crc(crc) == expected_masked_crc
 
     def test_crc_stored_little_endian(self) -> None:
         """CRC is stored as 4 bytes little-endian in chunks."""
-        data = b"test"
-        compressed = frame_compress(data)
+        uncompressed = b"test"
+        compressed = frame_compress(uncompressed)
 
         # Find chunk after stream identifier
         pos = len(STREAM_IDENTIFIER) + 4  # Skip header
         stored_crc = int.from_bytes(compressed[pos : pos + 4], "little")
 
         # Compute expected CRC
-        expected_crc = _mask_crc(_crc32c(data))
+        expected_crc = _mask_crc(_crc32c(uncompressed))
         # Note: if compressed, CRC is of uncompressed data
         # For small data like "test", it may be uncompressed
         assert stored_crc == expected_crc or stored_crc != 0
 
     def test_crc_corruption_detected(self) -> None:
         """Corrupted CRC causes decompression to fail."""
-        data = b"test data for CRC validation"
-        compressed = bytearray(frame_compress(data))
+        uncompressed = b"test data for CRC validation"
+        compressed = bytearray(frame_compress(uncompressed))
 
         # Corrupt the CRC (byte 14-17 after stream identifier + chunk header)
         crc_pos = len(STREAM_IDENTIFIER) + 4
@@ -167,8 +167,8 @@ class TestCompressedChunk:
 
     def test_compressible_data_uses_compressed_chunk(self) -> None:
         """Highly compressible data uses compressed chunks."""
-        data = b"A" * 1000  # Very compressible
-        compressed = frame_compress(data)
+        uncompressed = b"A" * 1000  # Very compressible
+        compressed = frame_compress(uncompressed)
 
         # Check chunk type after stream identifier
         chunk_type = compressed[len(STREAM_IDENTIFIER)]
@@ -176,8 +176,8 @@ class TestCompressedChunk:
 
     def test_compressed_chunk_format(self) -> None:
         """Compressed chunk is [crc: 4][compressed_data]."""
-        data = b"A" * 1000
-        compressed = frame_compress(data)
+        uncompressed = b"A" * 1000
+        compressed = frame_compress(uncompressed)
 
         pos = len(STREAM_IDENTIFIER)
         chunk_type = compressed[pos]
@@ -198,8 +198,8 @@ class TestUncompressedChunk:
     def test_incompressible_data_uses_uncompressed_chunk(self) -> None:
         """Incompressible data uses uncompressed chunks."""
         # Random-looking data that doesn't compress
-        data = bytes([(i * 17 + 31) % 256 for i in range(100)])
-        compressed = frame_compress(data)
+        uncompressed = bytes([(i * 17 + 31) % 256 for i in range(100)])
+        compressed = frame_compress(uncompressed)
 
         # Check chunk type
         chunk_type = compressed[len(STREAM_IDENTIFIER)]
@@ -209,10 +209,10 @@ class TestUncompressedChunk:
     def test_uncompressed_roundtrip(self) -> None:
         """Data stored uncompressed roundtrips correctly."""
         # Small incompressible data
-        data = bytes(range(256))
-        compressed = frame_compress(data)
+        uncompressed = bytes(range(256))
+        compressed = frame_compress(uncompressed)
         decompressed = frame_decompress(compressed)
-        assert decompressed == data
+        assert decompressed == uncompressed
 
 
 class TestChunkSizeLimits:
@@ -224,8 +224,8 @@ class TestChunkSizeLimits:
 
     def test_large_data_split_into_chunks(self) -> None:
         """Data larger than 64KB is split into multiple chunks."""
-        data = b"X" * 100_000  # ~100KB
-        compressed = frame_compress(data)
+        uncompressed = b"X" * 100_000  # ~100KB
+        compressed = frame_compress(uncompressed)
 
         # Count chunks
         chunk_count = 0
@@ -240,10 +240,10 @@ class TestChunkSizeLimits:
 
     def test_exact_chunk_boundary(self) -> None:
         """Data exactly at chunk boundary handled correctly."""
-        data = b"Y" * MAX_UNCOMPRESSED_CHUNK_SIZE
-        compressed = frame_compress(data)
+        uncompressed = b"Y" * MAX_UNCOMPRESSED_CHUNK_SIZE
+        compressed = frame_compress(uncompressed)
         decompressed = frame_decompress(compressed)
-        assert decompressed == data
+        assert decompressed == uncompressed
 
     def test_oversized_uncompressed_chunk_rejected(self) -> None:
         """Chunks larger than 65536 bytes are rejected."""
@@ -277,8 +277,8 @@ class TestReservedChunks:
 
     def test_skippable_chunk_ignored(self) -> None:
         """Reserved skippable chunks (0x80-0xFD) are silently skipped."""
-        data = b"test"
-        compressed = bytearray(frame_compress(data))
+        uncompressed = b"test"
+        compressed = bytearray(frame_compress(uncompressed))
 
         # Insert a skippable chunk (type 0x80) with some padding
         padding_data = b"PADDING"
@@ -289,13 +289,13 @@ class TestReservedChunks:
         modified = compressed[:insert_pos] + skippable_chunk + compressed[insert_pos:]
 
         # Should still decompress correctly
-        result = frame_decompress(bytes(modified))
-        assert result == data
+        decompressed = frame_decompress(bytes(modified))
+        assert decompressed == uncompressed
 
     def test_padding_chunk_ignored(self) -> None:
         """Padding chunks (0xFE) are silently skipped."""
-        data = b"test"
-        compressed = bytearray(frame_compress(data))
+        uncompressed = b"test"
+        compressed = bytearray(frame_compress(uncompressed))
 
         # Insert padding chunk
         padding_chunk = b"\xfe\x10\x00\x00" + (b"\x00" * 16)
@@ -303,8 +303,8 @@ class TestReservedChunks:
         insert_pos = len(STREAM_IDENTIFIER)
         modified = compressed[:insert_pos] + padding_chunk + compressed[insert_pos:]
 
-        result = frame_decompress(bytes(modified))
-        assert result == data
+        decompressed = frame_decompress(bytes(modified))
+        assert decompressed == uncompressed
 
 
 class TestEdgeCases:
@@ -328,8 +328,8 @@ class TestEdgeCases:
 
     def test_truncated_chunk_data(self) -> None:
         """Truncated chunk data raises error."""
-        data = b"test"
-        compressed = frame_compress(data)
+        uncompressed = b"test"
+        compressed = frame_compress(uncompressed)
         # Truncate some bytes from the end
         truncated = compressed[:-5]
         with pytest.raises(SnappyDecompressionError, match="extends past end"):
@@ -338,10 +338,10 @@ class TestEdgeCases:
     def test_roundtrip_various_sizes(self) -> None:
         """Roundtrip works for various data sizes."""
         for size in [0, 1, 100, 1000, 65535, 65536, 65537, 100_000]:
-            data = bytes([i % 256 for i in range(size)])
-            compressed = frame_compress(data)
+            uncompressed = bytes([i % 256 for i in range(size)])
+            compressed = frame_compress(uncompressed)
             decompressed = frame_decompress(compressed)
-            assert decompressed == data, f"Roundtrip failed for size {size}"
+            assert decompressed == uncompressed, f"Roundtrip failed for size {size}"
 
 
 class TestInteroperability:
@@ -349,8 +349,8 @@ class TestInteroperability:
 
     def test_wire_format_structure(self) -> None:
         """Wire format matches expected structure for interop."""
-        data = b"Hello, Ethereum!"
-        compressed = frame_compress(data)
+        uncompressed = b"Hello, Ethereum!"
+        compressed = frame_compress(uncompressed)
 
         # Verify structure
         assert compressed[:10] == STREAM_IDENTIFIER
@@ -375,6 +375,6 @@ class TestInteroperability:
         stream3 = frame_compress(b"third")
 
         combined = stream1 + stream2 + stream3
-        result = frame_decompress(combined)
+        decompressed = frame_decompress(combined)
 
-        assert result == b"firstsecondthird"
+        assert decompressed == b"firstsecondthird"

@@ -28,8 +28,8 @@ def _test_correctness_roundtrip(
     # KEY GENERATION
     #
     # Generate a new key pair for the specified active range.
-    kp = scheme.key_gen(Slot(activation_slot), Uint64(num_active_slots))
-    public_key, secret_key = kp.public_key, kp.secret_key
+    key_pair = scheme.key_gen(Slot(activation_slot), Uint64(num_active_slots))
+    public_key, secret_key = key_pair.public_key, key_pair.secret_key
 
     # SIGN & VERIFY
     #
@@ -299,8 +299,8 @@ class TestVerifySecurityBounds:
         scheme = TEST_SIGNATURE_SCHEME
 
         # Generate valid keys.
-        kp = scheme.key_gen(Slot(0), Uint64(int(scheme.config.LIFETIME)))
-        public_key, secret_key = kp.public_key, kp.secret_key
+        key_pair = scheme.key_gen(Slot(0), Uint64(int(scheme.config.LIFETIME)))
+        public_key, secret_key = key_pair.public_key, key_pair.secret_key
 
         # Sign a valid message at a valid epoch.
         valid_epoch = Slot(4)
@@ -311,14 +311,14 @@ class TestVerifySecurityBounds:
         invalid_epoch = Slot(int(scheme.config.LIFETIME) + 1)
 
         # Must return False, not raise.
-        result = scheme.verify(public_key, invalid_epoch, message, signature)
-        assert result is False
+        verification_passed = scheme.verify(public_key, invalid_epoch, message, signature)
+        assert verification_passed is False
 
     def test_rejects_very_large_slot(self) -> None:
         """verify returns False for absurdly large slot values."""
         scheme = TEST_SIGNATURE_SCHEME
-        kp = scheme.key_gen(Slot(0), Uint64(int(scheme.config.LIFETIME)))
-        public_key, secret_key = kp.public_key, kp.secret_key
+        key_pair = scheme.key_gen(Slot(0), Uint64(int(scheme.config.LIFETIME)))
+        public_key, secret_key = key_pair.public_key, key_pair.secret_key
 
         valid_epoch = Slot(4)
         message = Bytes32(b"\x42" * 32)
@@ -328,5 +328,5 @@ class TestVerifySecurityBounds:
         huge_epoch = Slot(2**32)
 
         # Must return False, not raise.
-        result = scheme.verify(public_key, huge_epoch, message, signature)
-        assert result is False
+        is_valid = scheme.verify(public_key, huge_epoch, message, signature)
+        assert is_valid is False
