@@ -64,9 +64,17 @@ subspecifications that the Lean Ethereum protocol relies on.
   still vague is NOT acceptable. This applies to source, tests, and `packages/`.
   - BAN vague placeholder names that describe nothing: `selected`, `result`, `data`, `value`,
     `item`, `temp`, `obj`, `info`, `payload` (when unqualified), `current`, `entry`, `thing`,
-    `out`, `ret`, single-letter names (except a conventional math index `i`/`j` in a tight numeric
-    loop). Name the THING, not its role: `selected` → `selected_proofs`, `result` →
+    `out`, `ret`, `expected`, `actual`, `part`/`parts`, single-letter names (except a conventional
+    math index `i`/`j` in a tight numeric loop, or notation mirroring a cited formula). Name the
+    THING, not its role: `selected` → `selected_proofs`, `result` →
     `post_state` / `merged_signature`, `current` → `current_justified_checkpoint`.
+  - `expected` and `actual` must name WHAT is expected: `expected` →
+    `expected_public_key_count` / `expected_state_root` / `expected_encoding`; `actual` →
+    `actual_field_value`. This applies everywhere, including next to a test assert.
+  - `index` alone is banned when what it indexes is not obvious; say what it walks:
+    `validator_index`, `aggregate_index`, `byte_index`, `chunk_index`.
+  - Never shadow-alias a well-named value into a vague one (`data = attestation_data` is banned);
+    use the descriptive name directly, even if lines must wrap.
   - Encode the type or domain meaning when a bare word is ambiguous. A variable holding a
     `Checkpoint` is `justified_checkpoint`, not `justified`; a bitfield of justified slots is
     `justified_slots`, not `slots`; a boolean is a predicate phrase (`found_new_entries`,
