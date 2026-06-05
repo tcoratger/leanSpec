@@ -20,8 +20,6 @@ class Checkpoint(Container):
     Checkpoints are used for justification and finalization.
     """
 
-    model_config = Container.model_config | {"frozen": True}
-
     root: Bytes32
     """The root hash of the checkpoint's block."""
 
@@ -41,8 +39,6 @@ class Checkpoint(Container):
 
 class AttestationData(Container):
     """Attestation content describing the validator's observed chain view."""
-
-    model_config = Container.model_config | {"frozen": True}
 
     slot: Slot
     """The slot for which the attestation is made."""

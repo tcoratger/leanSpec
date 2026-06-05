@@ -19,14 +19,15 @@ from lean_spec.spec.ssz import Bytes32
 from tests.lean_spec.helpers import make_aggregated_proof, make_keyed_genesis_state
 
 
-def _seal_header(state: State) -> Bytes32:
-    """Write the post-state root into the header and return that header root."""
+def _seal_header(state: State) -> tuple[State, Bytes32]:
+    """Write the post-state root into the header and return the sealed state and its root."""
     # A child block references its parent by the parent header root.
     # That root is only final once the parent post-state root is filled in.
-    state.latest_block_header = state.latest_block_header.model_copy(
+    sealed_header = state.latest_block_header.model_copy(
         update={"state_root": hash_tree_root(state)}
     )
-    return hash_tree_root(state.latest_block_header)
+    sealed_state = state.model_copy(update={"latest_block_header": sealed_header})
+    return sealed_state, hash_tree_root(sealed_state.latest_block_header)
 
 
 def _genesis_with_parent(
@@ -35,7 +36,7 @@ def _genesis_with_parent(
 ) -> tuple[State, Bytes32]:
     """Build a keyed genesis state and seal its header for use as a parent."""
     state = make_keyed_genesis_state(num_validators, key_manager)
-    return state, _seal_header(state)
+    return _seal_header(state)
 
 
 def _chain_through_slot_two(
@@ -67,7 +68,7 @@ def _chain_through_slot_two(
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
     state = spec.process_block(spec.process_slots(state, Slot(1)), block_one)
-    block_one_root = _seal_header(state)
+    state, block_one_root = _seal_header(state)
 
     # The slot-two body stays empty unless a caller needs slot one justified.
     # A full vote for slot one inside the body crosses the supermajority.
@@ -93,7 +94,7 @@ def _chain_through_slot_two(
         body=BlockBody(attestations=slot_two_body),
     )
     state = spec.process_block(spec.process_slots(state, Slot(2)), block_two)
-    block_two_root = _seal_header(state)
+    state, block_two_root = _seal_header(state)
 
     return state, genesis_root, block_one_root, block_two_root
 

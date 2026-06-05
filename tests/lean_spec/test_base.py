@@ -76,8 +76,20 @@ class TestStrictBaseModel:
     Tests for StrictBaseModel constraints.
 
     StrictBaseModel is the foundation for all spec types. Its constraints
-    (extra-forbidden, strict) catch typos and silent type coercion.
+    (frozen, extra-forbidden, strict) prevent accidental mutations and
+    type coercion that could silently corrupt spec state.
     """
+
+    def test_frozen_rejects_assignment(self) -> None:
+        """Attribute assignment after construction raises an error.
+
+        Spec types must be immutable. A mutable state object would
+        break forkchoice assumptions.
+        """
+        model = SampleStrictModel(slot_number=5, block_root="0xabc")
+
+        with pytest.raises(ValidationError):
+            model.slot_number = 10
 
     def test_extra_fields_forbidden(self) -> None:
         """

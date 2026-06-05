@@ -189,13 +189,21 @@ class AggregationMixin(LstarSpecBase):
 
         # Replace the new-payload pool with this round's proofs, keyed by attestation data.
         # Future rounds reuse these as building blocks.
-        store.latest_new_aggregated_payloads = {
+        new_aggregated_payloads = {
             signed_attestation.data: {signed_attestation.proof}
             for signed_attestation in new_aggregates
         }
 
         # Those proofs absorbed their gossip signatures, so drop the raw copies.
-        for attestation_data in store.latest_new_aggregated_payloads:
-            store.attestation_signatures.pop(attestation_data, None)
+        remaining_attestation_signatures = {
+            attestation_data: signatures
+            for attestation_data, signatures in store.attestation_signatures.items()
+            if attestation_data not in new_aggregated_payloads
+        }
 
-        return store, new_aggregates
+        return store.model_copy(
+            update={
+                "latest_new_aggregated_payloads": new_aggregated_payloads,
+                "attestation_signatures": remaining_attestation_signatures,
+            }
+        ), new_aggregates

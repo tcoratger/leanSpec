@@ -398,10 +398,13 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
 
         # Phase 3: rotate the right tree into the left slot, advance the index.
-        secret_key.left_bottom_tree = secret_key.right_bottom_tree
-        secret_key.right_bottom_tree = new_right_bottom_tree
-        secret_key.left_bottom_tree_index = Uint64(left_index + 1)
-        return secret_key
+        return secret_key.model_copy(
+            update={
+                "left_bottom_tree": secret_key.right_bottom_tree,
+                "right_bottom_tree": new_right_bottom_tree,
+                "left_bottom_tree_index": Uint64(left_index + 1),
+            }
+        )
 
 
 PROD_SIGNATURE_SCHEME = GeneralizedXmssScheme(config=PROD_CONFIG, poseidon=POSEIDON)

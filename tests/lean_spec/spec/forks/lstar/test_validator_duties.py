@@ -120,8 +120,9 @@ class TestGetAttestationTarget:
             roots[slot] = hash_tree_root(block)
 
         finalized = Checkpoint(root=roots[Slot(4)], slot=Slot(4))
-        store.latest_justified = finalized
-        store.latest_finalized = finalized
+        store = store.model_copy(
+            update={"latest_justified": finalized, "latest_finalized": finalized}
+        )
         assert store.blocks[store.safe_target].slot == Slot(0)
 
         target = spec.get_attestation_target(store)
@@ -172,10 +173,14 @@ class TestGetAttestationTarget:
 
         # Fixture state: finalized at slot 1, safe target at slot 3, head at slot 4.
         # The safe target leads finalization, so it sets the lower bound at slot 3.
-        store.safe_target = roots[Slot(3)]
         finalized = Checkpoint(root=roots[Slot(1)], slot=Slot(1))
-        store.latest_justified = finalized
-        store.latest_finalized = finalized
+        store = store.model_copy(
+            update={
+                "safe_target": roots[Slot(3)],
+                "latest_justified": finalized,
+                "latest_finalized": finalized,
+            }
+        )
 
         target = spec.get_attestation_target(store)
 
@@ -292,8 +297,12 @@ class TestBlockProduction:
             AttestationSignatureEntry(ValidatorIndex(6), signed_6.signature)
         )
 
-        sample_store.latest_known_aggregated_payloads = known_payloads
-        sample_store.attestation_signatures = gossip_signatures
+        sample_store = sample_store.model_copy(
+            update={
+                "latest_known_aggregated_payloads": known_payloads,
+                "attestation_signatures": gossip_signatures,
+            }
+        )
 
         slot = Slot(2)
         validator_index = ValidatorIndex(2)  # Proposer for slot 2
@@ -375,7 +384,7 @@ class TestBlockProduction:
         validator_index = ValidatorIndex(3)
 
         # Ensure no attestations in store (clear aggregated payloads)
-        sample_store.latest_known_aggregated_payloads = {}
+        sample_store = sample_store.model_copy(update={"latest_known_aggregated_payloads": {}})
 
         store, block, _signatures = spec.produce_block_with_signatures(
             sample_store,
@@ -413,10 +422,16 @@ class TestBlockProduction:
 
         proof_7 = make_aggregated_proof(key_manager, [ValidatorIndex(7)], signed_7.data)
 
-        sample_store.latest_known_aggregated_payloads = {signed_7.data: {proof_7}}
-        sample_store.attestation_signatures = {
-            signed_7.data: {AttestationSignatureEntry(ValidatorIndex(7), signed_7.signature)},
-        }
+        sample_store = sample_store.model_copy(
+            update={
+                "latest_known_aggregated_payloads": {signed_7.data: {proof_7}},
+                "attestation_signatures": {
+                    signed_7.data: {
+                        AttestationSignatureEntry(ValidatorIndex(7), signed_7.signature)
+                    },
+                },
+            }
+        )
 
         store, block, signatures = spec.produce_block_with_signatures(
             sample_store,
@@ -643,8 +658,7 @@ class TestProposalHeadTiming:
         # Use immutable update to add block
         new_blocks = dict(sample_store.blocks)
         new_blocks[genesis_hash] = genesis_block
-        sample_store.blocks = new_blocks
-        sample_store.head = genesis_hash
+        sample_store = sample_store.model_copy(update={"blocks": new_blocks, "head": genesis_hash})
 
         # Get proposal head for slot 0
         store, head = spec.get_proposal_head(sample_store, Slot(0))

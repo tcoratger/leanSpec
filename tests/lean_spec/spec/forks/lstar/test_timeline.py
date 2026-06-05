@@ -88,7 +88,7 @@ class TestIntervalTicking:
         """Test different actions performed based on interval phase."""
         # Reset store to known state
         initial_time = Interval(0)
-        object.__setattr__(sample_store, "time", initial_time)
+        sample_store = sample_store.model_copy(update={"time": initial_time})
 
         # Tick through a complete slot cycle
         for interval in range(int(INTERVALS_PER_SLOT)):

@@ -1,6 +1,5 @@
 """Lstar fork — state transition: slots, header, body, finalization."""
 
-import copy
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -129,9 +128,6 @@ class StateTransitionMixin(LstarSpecBase):
         # The target must be strictly greater than the current slot.
         assert state.slot < target_slot, "Target slot must be in the future"
 
-        # Work on a copy so the caller's state is untouched.
-        state = copy.deepcopy(state)
-
         # Step through each missing slot.
         while state.slot < target_slot:
             # Cache the pre-block state root into the latest header, then bump the slot.
@@ -144,11 +140,14 @@ class StateTransitionMixin(LstarSpecBase):
                 hash_tree_root(state) if needs_state_root else state.latest_block_header.state_root
             )
 
-            if needs_state_root:
-                state.latest_block_header = state.latest_block_header.model_copy(
-                    update={"state_root": cached_state_root}
-                )
-            state.slot = Slot(state.slot + Slot(1))
+            state = state.model_copy(
+                update={
+                    "latest_block_header": state.latest_block_header.model_copy(
+                        update={"state_root": cached_state_root}
+                    ),
+                    "slot": Slot(state.slot + Slot(1)),
+                }
+            )
 
         # Reached the target slot. Return the advanced state.
         return state
@@ -223,8 +222,11 @@ class StateTransitionMixin(LstarSpecBase):
         #   updates rely entirely on validator attestations which are processed
         #   later in the block body.
         if is_genesis_parent:
-            state.latest_justified = Checkpoint(slot=Slot(0), root=parent_root)
-            state.latest_finalized = Checkpoint(slot=Slot(0), root=parent_root)
+            new_latest_justified = Checkpoint(slot=Slot(0), root=parent_root)
+            new_latest_finalized = Checkpoint(slot=Slot(0), root=parent_root)
+        else:
+            new_latest_justified = state.latest_justified
+            new_latest_finalized = state.latest_finalized
 
         # Historical Data Management
 
@@ -238,7 +240,7 @@ class StateTransitionMixin(LstarSpecBase):
         # Update the list of historical block roots.
         #
         # Structure: [Existing history] + [Parent root] + [Zero hash for gaps]
-        state.historical_block_hashes = (
+        new_historical_block_hashes = (
             state.historical_block_hashes + [parent_root] + [ZERO_HASH] * num_empty_slots
         )
 
@@ -254,8 +256,8 @@ class StateTransitionMixin(LstarSpecBase):
         # and addressable. The current block's slot is not materialized until
         # its header is fully processed, so we stop at slot (block.slot - 1).
         last_materialized_slot = block.slot - Slot(1)
-        state.justified_slots = state.justified_slots.extend_to_slot(
-            state.latest_finalized.slot,
+        new_justified_slots = state.justified_slots.extend_to_slot(
+            new_latest_finalized.slot,
             last_materialized_slot,
         )
 
@@ -265,7 +267,7 @@ class StateTransitionMixin(LstarSpecBase):
         #
         # Leave state root empty.
         # It is not computed until the block body is fully processed or the next slot begins.
-        state.latest_block_header = self.block_header_class(
+        new_latest_block_header = self.block_header_class(
             slot=block.slot,
             proposer_index=block.proposer_index,
             parent_root=block.parent_root,
@@ -273,7 +275,16 @@ class StateTransitionMixin(LstarSpecBase):
             state_root=Bytes32.zero(),
         )
 
-        return state
+        # Apply all calculated updates atomically in one new state.
+        return state.model_copy(
+            update={
+                "latest_justified": new_latest_justified,
+                "latest_finalized": new_latest_finalized,
+                "historical_block_hashes": new_historical_block_hashes,
+                "justified_slots": new_justified_slots,
+                "latest_block_header": new_latest_block_header,
+            }
+        )
 
     def process_block(self, state: State, block: Block) -> State:
         """
@@ -509,15 +520,18 @@ class StateTransitionMixin(LstarSpecBase):
         # Sorting ensures that every node produces identical state representation.
         sorted_roots = sorted(justifications.keys())
 
-        # Apply the updated state
-        state.justifications_roots = JustificationRoots(data=sorted_roots)
-        state.justifications_validators = JustificationValidators(
-            data=[vote for root in sorted_roots for vote in justifications[root]]
+        # Construct and return the updated state.
+        return state.model_copy(
+            update={
+                "justifications_roots": JustificationRoots(data=sorted_roots),
+                "justifications_validators": JustificationValidators(
+                    data=[vote for root in sorted_roots for vote in justifications[root]]
+                ),
+                "justified_slots": justified_slots,
+                "latest_justified": latest_justified,
+                "latest_finalized": latest_finalized,
+            }
         )
-        state.justified_slots = justified_slots
-        state.latest_justified = latest_justified
-        state.latest_finalized = latest_finalized
-        return state
 
     def state_transition(
         self,

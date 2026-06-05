@@ -656,7 +656,7 @@ class SyncService:
             aggregates.append(SignedAggregatedAttestation(data=attestation_data, proof=combined))
 
         if aggregates:
-            store.latest_new_aggregated_payloads = new_payloads
+            store = store.model_copy(update={"latest_new_aggregated_payloads": new_payloads})
 
         return store, aggregates
 

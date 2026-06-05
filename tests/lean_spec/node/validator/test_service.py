@@ -595,7 +595,9 @@ class TestProduceAttestationsAdvanced:
                     state_root=Bytes32.zero(),
                 )
                 root = hash_tree_root(sb.block)
-                sync_service.store.blocks = {**sync_service.store.blocks, root: sb.block}
+                sync_service.store = sync_service.store.model_copy(
+                    update={"blocks": {**sync_service.store.blocks, root: sb.block}}
+                )
 
         with patch("asyncio.sleep", new=mock_sleep):
             await service._produce_attestations(target_slot)
@@ -1088,8 +1090,9 @@ class TestValidatorServiceIntegration:
             slot=attestation_data.slot,
         )
 
-        store.latest_known_aggregated_payloads = {attestation_data: {proof}}
-        updated_store = store
+        updated_store = store.model_copy(
+            update={"latest_known_aggregated_payloads": {attestation_data: {proof}}}
+        )
         real_sync_service.store = updated_store
 
         blocks_produced: list[SignedBlock] = []
@@ -1294,8 +1297,7 @@ def _replace_head_at_slot(sync_service: SyncService, head_slot: Slot) -> None:
     )
     new_root = hash_tree_root(new_head_block)
     blocks[new_root] = new_head_block
-    sync_service.store.blocks = blocks
-    sync_service.store.head = new_root
+    sync_service.store = sync_service.store.model_copy(update={"blocks": blocks, "head": new_root})
 
 
 def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
@@ -1317,7 +1319,7 @@ def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
     )
     new_root = hash_tree_root(new_block)
     new_blocks = {**sync_service.store.blocks, new_root: new_block}
-    sync_service.store.blocks = new_blocks
+    sync_service.store = sync_service.store.model_copy(update={"blocks": new_blocks})
     return new_root
 
 

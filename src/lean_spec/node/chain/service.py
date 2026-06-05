@@ -110,7 +110,9 @@ class ChainService:
         # Acceptance for the jumped slots waits for the final slot's tick.
         # That is safe: acceptance is a monotone pool merge, and the head recomputes from scratch.
         if target_interval - store.time > Interval(INTERVALS_PER_SLOT):
-            store.time = target_interval - Interval(INTERVALS_PER_SLOT)
+            store = store.model_copy(
+                update={"time": target_interval - Interval(INTERVALS_PER_SLOT)}
+            )
 
         # Tick remaining intervals one at a time.
         while store.time < target_interval:

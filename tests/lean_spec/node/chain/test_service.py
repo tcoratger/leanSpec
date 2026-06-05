@@ -178,7 +178,9 @@ class TestCatchUp:
     async def test_rejects_a_target_before_the_current_time(self) -> None:
         """Catch-up refuses a target earlier than where the store already sits."""
         service = make_service(ProbeSpec())
-        service.sync_service.store.time = Interval(5)
+        service.sync_service.store = service.sync_service.store.model_copy(
+            update={"time": Interval(5)}
+        )
         with pytest.raises(AssertionError):
             await service._tick_to(Interval(3))
 
@@ -188,8 +190,10 @@ class TestCatchUp:
 
         # Stand in for a gossip handler that processes a block during the yield.
         # It installs a fresh store object, which the driver must continue from.
-        swapped = make_store(genesis_time=1000)
-        swapped.time = Interval(1)
+        #
+        # The swapped store carries a distinctive genesis time so the final store
+        # can be traced back to it rather than to the stale original object.
+        swapped = make_store(genesis_time=2000).model_copy(update={"time": Interval(1)})
         swap = {"done": False}
 
         async def swap_store_once(duration: float) -> None:
@@ -200,9 +204,11 @@ class TestCatchUp:
         with patch("asyncio.sleep", new=swap_store_once):
             await service._tick_to(Interval(3))
 
-        # Reaching the target on the swapped object proves the post-yield re-read.
-        assert service.sync_service.store is swapped
-        assert int(swapped.time) == 3
+        # The final store descends from the swapped object, proving the post-yield
+        # re-read: it carries the swapped genesis time and reaches the target time.
+        final_store = service.sync_service.store
+        assert final_store.config.genesis_time == Uint64(2000)
+        assert int(final_store.time) == 3
 
 
 class TestStartupTick:

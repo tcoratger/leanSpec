@@ -42,8 +42,6 @@ class PublicKey(HexSerializedContainer):
 class Signature(HexSerializedContainer):
     """A single XMSS signature for one slot and message under one public key."""
 
-    model_config = Container.model_config | {"frozen": True}
-
     path: HashTreeOpening
     """Authentication path from the one-time key up to the Merkle root."""
 
@@ -138,8 +136,6 @@ class SecretKey(HexSerializedContainer):
 class KeyPair(StrictBaseModel):
     """A single XMSS public/secret pair returned by key generation."""
 
-    model_config = StrictBaseModel.model_config | {"frozen": True}
-
     public_key: PublicKey
     """Public key."""
 
@@ -160,8 +156,6 @@ class ValidatorKeyPair(StrictBaseModel):
     So one key cannot cover both roles in the same slot.
     Two independent pairs let each role sign from its own Winternitz chains.
     """
-
-    model_config = StrictBaseModel.model_config | {"frozen": True}
 
     attestation_keypair: KeyPair
     """Key pair used to sign attestation data."""
