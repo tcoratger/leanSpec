@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from consensus_testing import generate_pre_state
-from consensus_testing.forks import registry
+from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.test_fixtures import (
     ApiEndpointTest,
     ForkChoiceTest,
@@ -184,15 +184,7 @@ def pytest_configure(config: pytest.Config) -> None:
     # Register fork validity markers
     config.addinivalue_line(
         "markers",
-        "valid_from(fork): specifies from which fork a test case is valid",
-    )
-    config.addinivalue_line(
-        "markers",
         "valid_until(fork): specifies until which fork a test case is valid",
-    )
-    config.addinivalue_line(
-        "markers",
-        "valid_at(fork): specifies at which fork a test case is valid",
     )
 
     # Get options
@@ -200,7 +192,7 @@ def pytest_configure(config: pytest.Config) -> None:
     fork_name = config.getoption("--fork")
     clean = config.getoption("--clean")
 
-    available_fork_names = sorted(fork.name() for fork in registry.forks)
+    available_fork_names = sorted(fork.name() for fork in FORKS_BY_NAME.values())
 
     # Validate fork
     if not fork_name:
@@ -211,7 +203,7 @@ def pytest_configure(config: pytest.Config) -> None:
         )
         pytest.exit("Missing required --fork option.", returncode=pytest.ExitCode.USAGE_ERROR)
 
-    fork_class = registry.get_fork_by_name(fork_name)
+    fork_class = FORKS_BY_NAME.get(fork_name.lower())
     if fork_class is None:
         print(
             f"Error: Unsupported fork: {fork_name}\n",
@@ -279,49 +271,21 @@ def _check_markers_valid_for_fork(
 
     Shared logic for both collection-time and parametrization-time fork filtering.
     """
-    has_valid_from = False
     has_valid_until = False
-    has_valid_at = False
-
-    valid_from_forks = []
     valid_until_forks = []
-    valid_at_forks = []
 
     for marker in markers:
-        if marker.name == "valid_from":
-            has_valid_from = True
-            for fork_name in marker.args:
-                target_fork = registry.get_fork_by_name(fork_name)
-                if target_fork:
-                    valid_from_forks.append(target_fork)
-        elif marker.name == "valid_until":
+        if marker.name == "valid_until":
             has_valid_until = True
             for fork_name in marker.args:
-                target_fork = registry.get_fork_by_name(fork_name)
+                target_fork = FORKS_BY_NAME.get(fork_name.lower())
                 if target_fork:
                     valid_until_forks.append(target_fork)
-        elif marker.name == "valid_at":
-            has_valid_at = True
-            for fork_name in marker.args:
-                target_fork = registry.get_fork_by_name(fork_name)
-                if target_fork:
-                    valid_at_forks.append(target_fork)
 
-    if not (has_valid_from or has_valid_until or has_valid_at):
+    if not has_valid_until:
         return True
 
-    if has_valid_at:
-        return fork_class in valid_at_forks
-
-    from_valid = True
-    if has_valid_from:
-        from_valid = any(fork_class >= from_fork for from_fork in valid_from_forks)
-
-    until_valid = True
-    if has_valid_until:
-        until_valid = any(fork_class <= until_fork for until_fork in valid_until_forks)
-
-    return from_valid and until_valid
+    return any(fork_class <= until_fork for until_fork in valid_until_forks)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
