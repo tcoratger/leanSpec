@@ -56,8 +56,8 @@ class _ServerThread(threading.Thread):
 
             self.loop.run_forever()
 
-        except Exception as e:
-            self.error = e
+        except Exception as exception:
+            self.error = exception
             self.ready.set()
         finally:
             if self.loop:

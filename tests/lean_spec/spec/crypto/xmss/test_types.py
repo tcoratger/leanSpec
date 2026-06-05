@@ -41,8 +41,8 @@ def test_hash_digest_vector_length_is_digest_length() -> None:
 
 def test_hash_digest_vector_accepts_exact_length() -> None:
     """A digest vector of the configured length validates."""
-    data = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)]
-    assert HashDigestVector(data=data).data == tuple(data)
+    digest_elements = [Fp(value=i) for i in range(TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)]
+    assert HashDigestVector(data=digest_elements).data == tuple(digest_elements)
 
 
 def test_hash_digest_vector_rejects_wrong_length() -> None:

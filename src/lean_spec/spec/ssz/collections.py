@@ -70,10 +70,11 @@ def _validate_offsets(offsets: list[int], scope: int, type_name: str) -> None:
         return
 
     # Pairwise comparison catches any decreasing step in the table.
-    for previous, current in pairwise(offsets):
-        if current < previous:
+    for previous_offset, current_offset in pairwise(offsets):
+        if current_offset < previous_offset:
             raise SSZSerializationError(
-                f"{type_name}: offsets not monotonically increasing: {previous} -> {current}"
+                f"{type_name}: offsets not monotonically increasing: "
+                f"{previous_offset} -> {current_offset}"
             )
 
     # The final boundary is the scope appended by the decoder.
@@ -84,7 +85,7 @@ def _validate_offsets(offsets: list[int], scope: int, type_name: str) -> None:
         )
 
 
-def _coerce_elements(element_type: type[SSZType], items: Sequence[Any]) -> tuple[SSZType, ...]:
+def _coerce_elements(element_type: type[SSZType], elements: Sequence[Any]) -> tuple[SSZType, ...]:
     """
     Coerce every element of an already-shaped sequence into the declared type.
 
@@ -94,15 +95,15 @@ def _coerce_elements(element_type: type[SSZType], items: Sequence[Any]) -> tuple
     - The chained cause preserves the underlying coercion detail.
     """
     coerced: list[SSZType] = []
-    for item in items:
-        if isinstance(item, element_type):
-            coerced.append(item)
+    for element in elements:
+        if isinstance(element, element_type):
+            coerced.append(element)
             continue
         try:
-            coerced.append(cast(Any, element_type)(item))
+            coerced.append(cast(Any, element_type)(element))
         except (SSZTypeError, SSZValueError, TypeError, ValueError) as exception:
             raise SSZTypeError(
-                f"Expected {element_type.__name__}, got {type(item).__name__}: {exception}"
+                f"Expected {element_type.__name__}, got {type(element).__name__}: {exception}"
             ) from exception
     return tuple(coerced)
 
@@ -186,24 +187,24 @@ class _SSZSequence[T: SSZType](SSZModel):
         """
         # Pydantic does not auto-flatten SSZ leaf types into JSON primitives.
         # Each element is inspected and rewritten according to the rules below.
-        result: list[Any] = []
-        for item in value:
+        serialized_elements: list[Any] = []
+        for element in value:
             # Byte-array leaves render as 0x-prefixed hex strings.
             # This matches how every other byte value appears in spec output.
-            if isinstance(item, BaseBytes):
-                result.append("0x" + item.hex())
+            if isinstance(element, BaseBytes):
+                serialized_elements.append("0x" + element.hex())
 
             # Integer leaves (uints, field elements) flatten to a plain int.
             # Bool also subclasses int.
             # It is excluded so True and False survive in JSON unchanged.
-            elif isinstance(item, int) and not isinstance(item, bool):
-                result.append(int(item))
+            elif isinstance(element, int) and not isinstance(element, bool):
+                serialized_elements.append(int(element))
 
             # Anything else passes through for Pydantic's downstream serializers.
             # Nested containers, booleans, strings, and primitive values land here.
             else:
-                result.append(item)
-        return result
+                serialized_elements.append(element)
+        return serialized_elements
 
     def _write_variable_payload(self, stream: IO[bytes], offset_count: int) -> int:
         """
@@ -325,24 +326,24 @@ class SSZVector[T: SSZType](_SSZSequence[T]):
         #   - other iterables  materialize into a list so the length check works.
         #   - str or bytes     rejected — iterating yields characters or ints.
         if isinstance(v, (list, tuple)):
-            items: Sequence[Any] = v
+            input_elements: Sequence[Any] = v
         elif isinstance(v, (str, bytes, bytearray)):
             raise SSZTypeError(
                 f"{cls.__name__}: Expected iterable of {cls.ELEMENT_TYPE.__name__}, "
                 f"got {type(v).__name__}"
             )
         elif hasattr(v, "__iter__"):
-            items = list(v)
+            input_elements = list(v)
         else:
             raise SSZTypeError(f"{cls.__name__}: Expected iterable, got {type(v).__name__}")
 
         # Fixed-length type: the input must contain exactly LENGTH elements.
-        if len(items) != cls.LENGTH:
+        if len(input_elements) != cls.LENGTH:
             raise SSZValueError(
-                f"{cls.__name__} requires exactly {cls.LENGTH} elements, got {len(items)}"
+                f"{cls.__name__} requires exactly {cls.LENGTH} elements, got {len(input_elements)}"
             )
 
-        return _coerce_elements(cls.ELEMENT_TYPE, items)
+        return _coerce_elements(cls.ELEMENT_TYPE, input_elements)
 
     @classmethod
     @override
@@ -489,22 +490,24 @@ class SSZList[T: SSZType](_SSZSequence[T]):
         #   - other iterables  materialize into a list so the length check works.
         #   - str or bytes     rejected — iterating yields characters or ints.
         if isinstance(v, (list, tuple)):
-            items: Sequence[Any] = v
+            input_elements: Sequence[Any] = v
         elif isinstance(v, (str, bytes, bytearray)):
             raise SSZTypeError(
                 f"{cls.__name__}: Expected iterable of {cls.ELEMENT_TYPE.__name__}, "
                 f"got {type(v).__name__}"
             )
         elif hasattr(v, "__iter__"):
-            items = list(v)
+            input_elements = list(v)
         else:
             raise SSZTypeError(f"{cls.__name__}: Expected iterable, got {type(v).__name__}")
 
         # Variable-length type: any count is fine, up to LIMIT.
-        if len(items) > cls.LIMIT:
-            raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(items)}")
+        if len(input_elements) > cls.LIMIT:
+            raise SSZValueError(
+                f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(input_elements)}"
+            )
 
-        return _coerce_elements(cls.ELEMENT_TYPE, items)
+        return _coerce_elements(cls.ELEMENT_TYPE, input_elements)
 
     def __add__(self, other: Any) -> Self:
         """

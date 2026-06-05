@@ -45,18 +45,18 @@ class TestMessageCacheShift:
 
         # Put 3 messages in the first window.
         messages = [GossipsubMessage(topic=b"t", raw_data=f"d{i}".encode()) for i in range(3)]
-        for m in messages:
-            cache.put(TopicId("t"), m)
+        for message in messages:
+            cache.put(TopicId("t"), message)
 
         # One shift: still within capacity (2 windows).
         evicted = cache.shift()
         assert evicted == 0
-        assert all(cache.has(m.id) for m in messages)
+        assert all(cache.has(message.id) for message in messages)
 
         # Second shift: oldest window (with 3 messages) is evicted.
         evicted = cache.shift()
         assert evicted == 3
-        assert not any(cache.has(m.id) for m in messages)
+        assert not any(cache.has(message.id) for message in messages)
 
 
 class TestMessageCacheGetGossipIds:

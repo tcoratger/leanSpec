@@ -42,8 +42,8 @@ def test_encode_message_reads_little_endian() -> None:
 def test_encode_epoch_matches_prefixed_decomposition(epoch: int) -> None:
     """An epoch encodes to its value shifted above the message prefix."""
     acc = (epoch << 8) | TWEAK_PREFIX_MESSAGE
-    expected = int_to_base_p(acc, TEST_CONFIG.TWEAK_LENGTH_FIELD_ELEMENTS)
-    assert encode_epoch(TEST_CONFIG, Uint64(epoch)) == expected
+    expected_encoding = int_to_base_p(acc, TEST_CONFIG.TWEAK_LENGTH_FIELD_ELEMENTS)
+    assert encode_epoch(TEST_CONFIG, Uint64(epoch)) == expected_encoding
 
 
 def test_encode_epoch_is_injective_over_a_range() -> None:
@@ -63,20 +63,22 @@ def test_aborting_decode_known_decomposition() -> None:
     for _ in range(config.Z):
         expected_per_field_element.append(remaining % config.BASE)
         remaining //= config.BASE
-    expected = (expected_per_field_element * config.MH_HASH_LENGTH_FIELD_ELEMENTS)[
+    expected_digits = (expected_per_field_element * config.MH_HASH_LENGTH_FIELD_ELEMENTS)[
         : config.DIMENSION
     ]
 
-    assert aborting_decode(config, field_element_list) == expected
+    assert aborting_decode(config, field_element_list) == expected_digits
 
 
 def test_aborting_decode_accepts_largest_valid_element() -> None:
     """The element just below the abort threshold decodes successfully."""
     config = TEST_CONFIG
-    result = aborting_decode(config, [Fp(value=P - 2)] * config.MH_HASH_LENGTH_FIELD_ELEMENTS)
-    assert result is not None
-    assert len(result) == config.DIMENSION
-    assert all(0 <= d < config.BASE for d in result)
+    decoded_digits = aborting_decode(
+        config, [Fp(value=P - 2)] * config.MH_HASH_LENGTH_FIELD_ELEMENTS
+    )
+    assert decoded_digits is not None
+    assert len(decoded_digits) == config.DIMENSION
+    assert all(0 <= digit < config.BASE for digit in decoded_digits)
 
 
 def test_aborting_decode_rejects_threshold_element() -> None:
@@ -90,13 +92,13 @@ def test_message_hash_yields_valid_codeword() -> None:
     parameter = Parameter(data=random_field_elements(config.PARAMETER_LENGTH))
     randomness = Randomness(data=random_field_elements(config.RAND_LENGTH_FIELD_ELEMENTS))
 
-    result = message_hash(
+    codeword = message_hash(
         POSEIDON, config, parameter, Uint64(313), randomness, Bytes32(b"\xaa" * 32)
     )
 
-    assert result is not None
-    assert len(result) == config.DIMENSION
-    assert all(0 <= digit < config.BASE for digit in result)
+    assert codeword is not None
+    assert len(codeword) == config.DIMENSION
+    assert all(0 <= digit < config.BASE for digit in codeword)
 
 
 def test_target_sum_encode_accepts_codeword_on_target_layer() -> None:

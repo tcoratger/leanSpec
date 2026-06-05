@@ -76,7 +76,7 @@ class TestIsQuicMultiaddr:
     """Tests for QUIC multiaddr detection per the multiaddr spec."""
 
     @pytest.mark.parametrize(
-        ("multiaddr", "expected"),
+        ("multiaddr", "expected_classification"),
         [
             # Valid QUIC multiaddrs (lowercase per spec)
             ("/ip4/127.0.0.1/udp/9000/quic-v1", True),
@@ -104,9 +104,9 @@ class TestIsQuicMultiaddr:
             "mixed-case-rejected",
         ],
     )
-    def test_detection(self, multiaddr: str, expected: bool) -> None:
+    def test_detection(self, multiaddr: str, expected_classification: bool) -> None:
         """Multiaddr is correctly classified as QUIC or non-QUIC."""
-        assert is_quic_multiaddr(multiaddr) == expected
+        assert is_quic_multiaddr(multiaddr) == expected_classification
 
 
 # Multiaddr parsing

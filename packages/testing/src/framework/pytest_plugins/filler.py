@@ -116,8 +116,8 @@ class FixtureCollector:
                 fixture_dict = fixture.json_dict_with_info()
                 all_tests[test_id] = fixture_dict
 
-            with open(output_file, "w") as f:
-                json.dump(all_tests, f, indent=4)
+            with open(output_file, "w") as output_handle:
+                json.dump(all_tests, output_handle, indent=4)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -173,11 +173,11 @@ def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool 
         return None
 
     # Check if it's a different layer directory or unit tests
-    parts = relative_path.parts
-    if parts:
+    path_components = relative_path.parts
+    if path_components:
         # Known layer directories
         known_layers = {"consensus", "execution"}
-        if parts[0] in known_layers:
+        if path_components[0] in known_layers:
             # It's a different layer, ignore it
             return True
         # It's probably unit tests (tests/lean_spec), ignore during fill
@@ -204,9 +204,9 @@ def pytest_configure(config: pytest.Config) -> None:
     try:
         layer_module = importlib.import_module(f"{layer}_testing")
         config.layer_module = layer_module  # type: ignore[attribute-defined]
-    except ImportError as e:
+    except ImportError as exception:
         pytest.exit(
-            f"Failed to import {layer}_testing module: {e}",
+            f"Failed to import {layer}_testing module: {exception}",
             returncode=pytest.ExitCode.USAGE_ERROR,
         )
 
@@ -260,13 +260,15 @@ def pytest_configure(config: pytest.Config) -> None:
     # Check output directory
     if output_directory.exists() and any(output_directory.iterdir()):
         if not clean:
-            contents = list(output_directory.iterdir())
-            summary = ", ".join(item.name for item in contents[:5])
-            if len(contents) > 5:
-                summary += ", ..."
+            leftover_fixture_paths = list(output_directory.iterdir())
+            leftover_names_preview = ", ".join(
+                leftover_path.name for leftover_path in leftover_fixture_paths[:5]
+            )
+            if len(leftover_fixture_paths) > 5:
+                leftover_names_preview += ", ..."
             pytest.exit(
                 f"Output directory '{output_directory}' is not empty. "
-                f"Contains: {summary}. Use --clean to remove all existing files "
+                f"Contains: {leftover_names_preview}. Use --clean to remove all existing files "
                 "or specify a different output directory.",
                 returncode=pytest.ExitCode.USAGE_ERROR,
             )
@@ -288,21 +290,21 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     layer_module = config.layer_module
     registry = layer_module.forks.registry
     verbose = config.getoption("verbose")
-    deselected = []
-    selected = []
+    deselected_items = []
+    selected_items = []
 
-    for item in items:
-        if not _is_test_item_valid_for_fork(item, fork_class, registry.get_fork_by_name):
+    for test_item in items:
+        if not _is_test_item_valid_for_fork(test_item, fork_class, registry.get_fork_by_name):
             if verbose < 2:
-                deselected.append(item)
+                deselected_items.append(test_item)
             else:
-                selected.append(item)
+                selected_items.append(test_item)
         else:
-            selected.append(item)
+            selected_items.append(test_item)
 
-    if deselected:
-        items[:] = selected
-        config.hook.pytest_deselected(items=deselected)
+    if deselected_items:
+        items[:] = selected_items
+        config.hook.pytest_deselected(items=deselected_items)
 
 
 def _check_markers_valid_for_fork(
@@ -568,8 +570,8 @@ def _register_layer_fixtures(config: pytest.Config, layer: str) -> None:
             fixture_func = base_spec_filler_parametrizer(fixture_class)
             # Add to module globals so pytest can discover them
             globals()[format_name] = fixture_func
-    except (ImportError, AttributeError) as e:
+    except (ImportError, AttributeError) as exception:
         pytest.exit(
-            f"Failed to load {layer} layer test fixtures: {e}",
+            f"Failed to load {layer} layer test fixtures: {exception}",
             returncode=pytest.ExitCode.USAGE_ERROR,
         )

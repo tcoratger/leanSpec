@@ -123,16 +123,16 @@ class SSZModel(StrictBaseModel, SSZType):
 
     def __len__(self) -> int:
         """Element count for collections, field count for containers."""
-        data = getattr(self, "data", None)
-        if data is not None:
-            return len(data)
+        data_field = getattr(self, "data", None)
+        if data_field is not None:
+            return len(data_field)
         return len(type(self).model_fields)
 
     def __repr__(self) -> str:
         """Show collection contents as data=[...] or container fields as name=value pairs."""
         cls_name = type(self).__name__
-        data = getattr(self, "data", None)
-        if data is not None:
-            return f"{cls_name}(data={list(data)!r})"
+        data_field = getattr(self, "data", None)
+        if data_field is not None:
+            return f"{cls_name}(data={list(data_field)!r})"
         field_strs = [f"{name}={getattr(self, name)!r}" for name in type(self).model_fields]
         return f"{cls_name}({' '.join(field_strs)})"

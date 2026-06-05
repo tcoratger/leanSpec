@@ -85,10 +85,12 @@ class BaseBytes(bytes, SSZType):
         if not hasattr(cls, "LENGTH"):
             raise SSZTypeError(f"{cls.__name__} must define LENGTH")
 
-        b = cls._coerce_to_bytes(value)
-        if len(b) != cls.LENGTH:
-            raise SSZValueError(f"{cls.__name__} requires exactly {cls.LENGTH} bytes, got {len(b)}")
-        return super().__new__(cls, b)
+        coerced_bytes = cls._coerce_to_bytes(value)
+        if len(coerced_bytes) != cls.LENGTH:
+            raise SSZValueError(
+                f"{cls.__name__} requires exactly {cls.LENGTH} bytes, got {len(coerced_bytes)}"
+            )
+        return super().__new__(cls, coerced_bytes)
 
     @classmethod
     def zero(cls) -> Self:
@@ -133,11 +135,13 @@ class BaseBytes(bytes, SSZType):
         """
         if scope != cls.LENGTH:
             raise SSZSerializationError(f"{cls.__name__}: expected {cls.LENGTH} bytes, got {scope}")
-        data = stream.read(scope)
-        if len(data) != scope:
-            raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
+        serialized_bytes = stream.read(scope)
+        if len(serialized_bytes) != scope:
+            raise SSZSerializationError(
+                f"{cls.__name__}: expected {scope} bytes, got {len(serialized_bytes)}"
+            )
         # Length already verified — bypass __new__'s coerce + revalidation.
-        return bytes.__new__(cls, data)
+        return bytes.__new__(cls, serialized_bytes)
 
     @override
     def encode_bytes(self) -> bytes:
@@ -365,10 +369,12 @@ class BaseByteList(SSZModel):
             raise SSZSerializationError(f"{cls.__name__}: negative scope")
         if scope > cls.LIMIT:
             raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {scope}")
-        data = stream.read(scope)
-        if len(data) != scope:
-            raise SSZSerializationError(f"{cls.__name__}: expected {scope} bytes, got {len(data)}")
-        return cls(data=data)
+        serialized_bytes = stream.read(scope)
+        if len(serialized_bytes) != scope:
+            raise SSZSerializationError(
+                f"{cls.__name__}: expected {scope} bytes, got {len(serialized_bytes)}"
+            )
+        return cls(data=serialized_bytes)
 
     @override
     def encode_bytes(self) -> bytes:

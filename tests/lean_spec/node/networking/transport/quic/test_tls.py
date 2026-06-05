@@ -71,7 +71,7 @@ class TestEncodeAsn1Length:
     """Tests for DER length encoding covering all three code paths."""
 
     @pytest.mark.parametrize(
-        ("length", "expected"),
+        ("length", "expected_encoding"),
         [
             (0, bytes([0])),
             (1, bytes([1])),
@@ -79,12 +79,12 @@ class TestEncodeAsn1Length:
         ],
         ids=["zero", "one", "max-short-form"],
     )
-    def test_short_form(self, length: int, expected: bytes) -> None:
+    def test_short_form(self, length: int, expected_encoding: bytes) -> None:
         """Lengths below 128 use a single byte (short form)."""
-        assert _encode_asn1_length(length) == expected
+        assert _encode_asn1_length(length) == expected_encoding
 
     @pytest.mark.parametrize(
-        ("length", "expected"),
+        ("length", "expected_encoding"),
         [
             (128, bytes([0x81, 128])),
             (200, bytes([0x81, 200])),
@@ -92,12 +92,12 @@ class TestEncodeAsn1Length:
         ],
         ids=["min-long-1", "mid-long-1", "max-long-1"],
     )
-    def test_one_byte_long_form(self, length: int, expected: bytes) -> None:
+    def test_one_byte_long_form(self, length: int, expected_encoding: bytes) -> None:
         """Lengths 128..255 use 0x81 prefix + 1 length byte."""
-        assert _encode_asn1_length(length) == expected
+        assert _encode_asn1_length(length) == expected_encoding
 
     @pytest.mark.parametrize(
-        ("length", "expected"),
+        ("length", "expected_encoding"),
         [
             (256, bytes([0x82, 0x01, 0x00])),
             (1000, bytes([0x82, 0x03, 0xE8])),
@@ -105,9 +105,9 @@ class TestEncodeAsn1Length:
         ],
         ids=["min-long-2", "mid-long-2", "max-u16"],
     )
-    def test_two_byte_long_form(self, length: int, expected: bytes) -> None:
+    def test_two_byte_long_form(self, length: int, expected_encoding: bytes) -> None:
         """Lengths >= 256 use 0x82 prefix + 2 big-endian length bytes."""
-        assert _encode_asn1_length(length) == expected
+        assert _encode_asn1_length(length) == expected_encoding
 
 
 # ASN.1 OCTET STRING encoding
@@ -118,21 +118,21 @@ class TestEncodeAsn1OctetString:
 
     def test_encodes_data_with_tag_and_length(self) -> None:
         """OCTET STRING has tag 0x04, correct length, and verbatim data."""
-        result = _encode_asn1_octet_string(b"\xaa\xbb\xcc")
-        assert result == bytes([0x04, 3, 0xAA, 0xBB, 0xCC])
+        encoded = _encode_asn1_octet_string(b"\xaa\xbb\xcc")
+        assert encoded == bytes([0x04, 3, 0xAA, 0xBB, 0xCC])
 
     def test_empty_data(self) -> None:
         """Empty OCTET STRING is valid: tag 0x04, length 0, no content."""
-        result = _encode_asn1_octet_string(b"")
-        assert result == bytes([0x04, 0])
+        encoded = _encode_asn1_octet_string(b"")
+        assert encoded == bytes([0x04, 0])
 
     def test_long_form_length(self) -> None:
         """Data >= 128 bytes triggers long-form length encoding."""
-        data = bytes(range(256)) * 2  # 512 bytes
-        result = _encode_asn1_octet_string(data)
-        assert result[0] == 0x04
-        assert result[1:4] == bytes([0x82, 0x02, 0x00])
-        assert result[4:] == data
+        octet_payload = bytes(range(256)) * 2  # 512 bytes
+        encoded = _encode_asn1_octet_string(octet_payload)
+        assert encoded[0] == 0x04
+        assert encoded[1:4] == bytes([0x82, 0x02, 0x00])
+        assert encoded[4:] == octet_payload
 
 
 # ASN.1 SEQUENCE encoding
@@ -144,13 +144,13 @@ class TestEncodeAsn1Sequence:
     def test_wraps_content_with_tag_and_length(self) -> None:
         """SEQUENCE has tag 0x30, correct length, and verbatim content."""
         content = bytes([0x04, 2, 0xAA, 0xBB])
-        result = _encode_asn1_sequence(content)
-        assert result == bytes([0x30, 4, 0x04, 2, 0xAA, 0xBB])
+        encoded = _encode_asn1_sequence(content)
+        assert encoded == bytes([0x30, 4, 0x04, 2, 0xAA, 0xBB])
 
     def test_empty_sequence(self) -> None:
         """Empty SEQUENCE is valid: tag 0x30, length 0."""
-        result = _encode_asn1_sequence(b"")
-        assert result == bytes([0x30, 0])
+        encoded = _encode_asn1_sequence(b"")
+        assert encoded == bytes([0x30, 0])
 
 
 # ASN.1 SignedKey — SEQUENCE { OCTET STRING, OCTET STRING }
@@ -163,20 +163,20 @@ class TestEncodeAsn1SignedKey:
         """Output is a SEQUENCE containing two OCTET STRINGs."""
         protobuf = b"\x08\x02\x12\x21" + bytes(33)
         signature = bytes(64)
-        result = _encode_asn1_signed_key(protobuf, signature)
+        encoded = _encode_asn1_signed_key(protobuf, signature)
 
-        assert result[0] == 0x30  # SEQUENCE tag
+        assert encoded[0] == 0x30  # SEQUENCE tag
 
         # Parse inner content
-        _, inner = _parse_der_tlv(result)
+        _, inner = _parse_der_tlv(encoded)
         # First OCTET STRING
-        tag1, val1, rest = _parse_der_tlv_with_rest(inner)
+        tag1, first_octet_string_value, rest = _parse_der_tlv_with_rest(inner)
         assert tag1 == 0x04
-        assert val1 == protobuf
+        assert first_octet_string_value == protobuf
         # Second OCTET STRING
-        tag2, val2, rest2 = _parse_der_tlv_with_rest(rest)
+        tag2, second_octet_string_value, rest2 = _parse_der_tlv_with_rest(rest)
         assert tag2 == 0x04
-        assert val2 == signature
+        assert second_octet_string_value == signature
         assert rest2 == b""
 
 
@@ -193,12 +193,12 @@ class TestCreateExtensionPayload:
             encoding=serialization.Encoding.DER,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-        payload = _create_extension_payload(identity_key, tls_public_bytes)
+        extension_payload = _create_extension_payload(identity_key, tls_public_bytes)
 
-        assert payload[0] == 0x30
-        _, inner = _parse_der_tlv(payload)
-        tag1, val1, rest = _parse_der_tlv_with_rest(inner)
-        tag2, val2, _ = _parse_der_tlv_with_rest(rest)
+        assert extension_payload[0] == 0x30
+        _, inner = _parse_der_tlv(extension_payload)
+        tag1, first_octet_string_value, rest = _parse_der_tlv_with_rest(inner)
+        tag2, second_octet_string_value, _ = _parse_der_tlv_with_rest(rest)
         assert tag1 == 0x04
         assert tag2 == 0x04
 
@@ -209,9 +209,9 @@ class TestCreateExtensionPayload:
             encoding=serialization.Encoding.DER,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-        payload = _create_extension_payload(identity_key, tls_public_bytes)
+        extension_payload = _create_extension_payload(identity_key, tls_public_bytes)
 
-        _, inner = _parse_der_tlv(payload)
+        _, inner = _parse_der_tlv(extension_payload)
         _, public_key_protobuf, _ = _parse_der_tlv_with_rest(inner)
 
         # Protobuf field 1 (Type): varint tag=0x08, value=2 (secp256k1)
@@ -231,9 +231,9 @@ class TestCreateExtensionPayload:
             encoding=serialization.Encoding.DER,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-        payload = _create_extension_payload(identity_key, tls_public_bytes)
+        extension_payload = _create_extension_payload(identity_key, tls_public_bytes)
 
-        _, inner = _parse_der_tlv(payload)
+        _, inner = _parse_der_tlv(extension_payload)
         _, _, rest = _parse_der_tlv_with_rest(inner)
         _, signature, _ = _parse_der_tlv_with_rest(rest)
 
@@ -318,10 +318,10 @@ class TestGenerateLibp2pCertificate:
 
         ext = certificate.extensions.get_extension_for_oid(LIBP2P_EXTENSION_OID)
         assert isinstance(ext.value, x509.UnrecognizedExtension)
-        payload = ext.value.value
+        extension_payload = ext.value.value
 
         # Parse ASN.1 SEQUENCE → two OCTET STRINGs
-        _, inner = _parse_der_tlv(payload)
+        _, inner = _parse_der_tlv(extension_payload)
         _, _, rest = _parse_der_tlv_with_rest(inner)
         _, signature, _ = _parse_der_tlv_with_rest(rest)
 
@@ -357,28 +357,28 @@ class TestGenerateLibp2pCertificate:
 # Minimal DER TLV parser for verifying hand-encoded ASN.1 output.
 
 
-def _parse_der_length(data: bytes, offset: int) -> tuple[int, int]:
+def _parse_der_length(der_bytes: bytes, offset: int) -> tuple[int, int]:
     """Parse a DER length field, return (length, bytes_consumed)."""
-    first = data[offset]
+    first = der_bytes[offset]
     if first < 128:
         return first, 1
     num_bytes = first & 0x7F
-    length = int.from_bytes(data[offset + 1 : offset + 1 + num_bytes], "big")
+    length = int.from_bytes(der_bytes[offset + 1 : offset + 1 + num_bytes], "big")
     return length, 1 + num_bytes
 
 
-def _parse_der_tlv(data: bytes) -> tuple[int, bytes]:
+def _parse_der_tlv(der_bytes: bytes) -> tuple[int, bytes]:
     """Parse a single DER TLV, return (tag, value)."""
-    tag = data[0]
-    length, length_size = _parse_der_length(data, 1)
+    tag = der_bytes[0]
+    length, length_size = _parse_der_length(der_bytes, 1)
     value_start = 1 + length_size
-    return tag, data[value_start : value_start + length]
+    return tag, der_bytes[value_start : value_start + length]
 
 
-def _parse_der_tlv_with_rest(data: bytes) -> tuple[int, bytes, bytes]:
+def _parse_der_tlv_with_rest(der_bytes: bytes) -> tuple[int, bytes, bytes]:
     """Parse a single DER TLV, return (tag, value, remaining_bytes)."""
-    tag = data[0]
-    length, length_size = _parse_der_length(data, 1)
+    tag = der_bytes[0]
+    length, length_size = _parse_der_length(der_bytes, 1)
     value_start = 1 + length_size
     value_end = value_start + length
-    return tag, data[value_start:value_end], data[value_end:]
+    return tag, der_bytes[value_start:value_end], der_bytes[value_end:]

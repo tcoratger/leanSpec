@@ -16,7 +16,7 @@ from lean_spec.spec.crypto.xmss.types import HashDigestVector, Parameter
 
 
 @pytest.mark.parametrize(
-    "value, num_limbs, expected_values",
+    "integer_value, num_limbs, expected_limbs",
     [
         pytest.param(0, 4, [0, 0, 0, 0], id="zero spreads to all-zero limbs"),
         pytest.param(123, 4, [123, 0, 0, 0], id="small value in the lowest limb"),
@@ -27,10 +27,10 @@ from lean_spec.spec.crypto.xmss.types import HashDigestVector, Parameter
     ],
 )
 def test_int_to_base_p_known_decomposition(
-    value: int, num_limbs: int, expected_values: list[int]
+    integer_value: int, num_limbs: int, expected_limbs: list[int]
 ) -> None:
     """Decomposition matches hand-computed base-P limbs."""
-    assert int_to_base_p(value, num_limbs) == [Fp(value=v) for v in expected_values]
+    assert int_to_base_p(integer_value, num_limbs) == [Fp(value=limb) for limb in expected_limbs]
 
 
 def test_int_to_base_p_zero_limbs_returns_empty() -> None:
@@ -47,7 +47,7 @@ def test_int_to_base_p_roundtrip_is_reversible() -> None:
     """Decomposing then recomposing recovers the original integer."""
     num_limbs = 5
     original_limbs = [secrets.randbelow(P) for _ in range(num_limbs)]
-    original_value = sum(value * (P**i) for i, value in enumerate(original_limbs))
+    original_value = sum(limb * (P**i) for i, limb in enumerate(original_limbs))
 
     decomposed = [int(fp) for fp in int_to_base_p(original_value, num_limbs)]
 

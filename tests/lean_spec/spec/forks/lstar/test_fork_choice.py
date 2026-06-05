@@ -582,54 +582,54 @@ class TestValidateAttestationTimeCheck:
         block_2_root = hash_tree_root(block_2)
         genesis_root = store.latest_justified.root
 
-        data = AttestationData(
+        attestation_data = AttestationData(
             slot=ATTESTATION_SLOT,
             head=Checkpoint(root=block_2_root, slot=ATTESTATION_SLOT),
             target=Checkpoint(root=block_2_root, slot=ATTESTATION_SLOT),
             source=Checkpoint(root=genesis_root, slot=Slot(0)),
         )
-        return store, data
+        return store, attestation_data
 
     def test_attestation_at_current_slot_passes(
         self, spec: LstarSpec, observer_store: Store
     ) -> None:
         """A vote at the current slot is always accepted, every interval."""
-        store, data = self._build_two_block_chain(spec, observer_store)
+        store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
         # Sweep every interval in the attestation's slot.
         for offset in range(int(INTERVALS_PER_SLOT)):
             store.time = ATTESTATION_START_INTERVAL + Interval(offset)
             local = store
-            spec.validate_attestation(local, data)
+            spec.validate_attestation(local, attestation_data)
 
     def test_attestation_in_past_passes(self, spec: LstarSpec, observer_store: Store) -> None:
         """A vote from a past slot is always accepted."""
-        store, data = self._build_two_block_chain(spec, observer_store)
+        store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
         # Place the local clock several slots ahead.
         far_future = ATTESTATION_START_INTERVAL + Interval(int(INTERVALS_PER_SLOT) * 10)
         store.time = far_future
-        spec.validate_attestation(store, data)
+        spec.validate_attestation(store, attestation_data)
 
     def test_attestation_at_disparity_boundary_passes(
         self, spec: LstarSpec, observer_store: Store
     ) -> None:
         """At the disparity boundary the attestation is still accepted."""
-        store, data = self._build_two_block_chain(spec, observer_store)
+        store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
         store.time = DISPARITY_BOUNDARY_INTERVAL
-        spec.validate_attestation(store, data)
+        spec.validate_attestation(store, attestation_data)
 
     def test_attestation_just_beyond_disparity_boundary_rejected(
         self, spec: LstarSpec, observer_store: Store
     ) -> None:
         """One interval past the disparity boundary the attestation is rejected."""
-        store, data = self._build_two_block_chain(spec, observer_store)
+        store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
         store.time = JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
-            spec.validate_attestation(store, data)
+            spec.validate_attestation(store, attestation_data)
 
     def test_attestation_one_full_slot_in_future_rejected(
         self, spec: LstarSpec, observer_store: Store
@@ -641,12 +641,12 @@ class TestValidateAttestationTimeCheck:
         That window let an adversary pre-publish next-slot aggregates
         before any honest validator could produce them.
         """
-        store, data = self._build_two_block_chain(spec, observer_store)
+        store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
         store.time = ONE_FULL_SLOT_BEHIND_INTERVAL
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
-            spec.validate_attestation(store, data)
+            spec.validate_attestation(store, attestation_data)
 
 
 def test_prunes_entries_with_head_at_finalized(spec: LstarSpec, pruning_store: Store) -> None:
@@ -1372,18 +1372,18 @@ class TestIntegrationScenarios:
         )
 
         head_state = store.states[store.head]
-        public_keys_per_part: list[list] = [
+        public_keys_per_aggregate: list[list] = [
             [
                 head_state.validators[validator_index].get_attestation_public_key()
                 for validator_index in proof.participants.to_validator_indices()
             ]
             for proof in signatures
         ]
-        public_keys_per_part.append([proposer_public_key])
+        public_keys_per_aggregate.append([proposer_public_key])
 
         merged = MultiMessageAggregate.aggregate(
             [*signatures, proposer_single_message_aggregate],
-            public_keys_per_part=public_keys_per_part,
+            public_keys_per_aggregate=public_keys_per_aggregate,
         )
         signed_block = SignedBlock(
             block=block,
@@ -1493,8 +1493,10 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
     )
 
     # Capture the original list lengths for keys that already exist
+    new_payloads_before = store_before_block_2.latest_new_aggregated_payloads
     original_signature_lengths = {
-        k: len(v) for k, v in store_before_block_2.latest_new_aggregated_payloads.items()
+        attestation_data: len(signatures)
+        for attestation_data, signatures in new_payloads_before.items()
     }
 
     # Process the second block
@@ -1549,9 +1551,9 @@ class TestOnGossipAttestationImportGating:
         updated_store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=True)
 
         signatures = updated_store.attestation_signatures.get(attestation_data, set())
-        assert attester_validator in {entry.validator_index for entry in signatures}, (
-            "Aggregator should store any attestation it receives"
-        )
+        assert attester_validator in {
+            stored_signature.validator_index for stored_signature in signatures
+        }, "Aggregator should store any attestation it receives"
 
     def test_aggregator_stores_multiple_attestations(
         self, key_manager: XmssKeyManager, spec: LstarSpec
@@ -1564,22 +1566,26 @@ class TestOnGossipAttestationImportGating:
             key_manager, num_validators=8, validator_index=current_validator
         )
 
-        def make_signed(v: ValidatorIndex) -> SignedAttestation:
+        def make_signed(attester: ValidatorIndex) -> SignedAttestation:
             return SignedAttestation(
-                validator_index=v,
+                validator_index=attester,
                 data=attestation_data,
-                signature=key_manager.sign_attestation_data(v, attestation_data),
+                signature=key_manager.sign_attestation_data(attester, attestation_data),
             )
 
-        updated = store
-        for v in attesters:
-            updated = spec.on_gossip_attestation(updated, make_signed(v), is_aggregator=True)
+        updated_store = store
+        for attester in attesters:
+            updated_store = spec.on_gossip_attestation(
+                updated_store, make_signed(attester), is_aggregator=True
+            )
 
-        stored_ids = {
-            entry.validator_index
-            for entry in updated.attestation_signatures.get(attestation_data, set())
+        stored_validator_indices = {
+            stored_signature.validator_index
+            for stored_signature in updated_store.attestation_signatures.get(
+                attestation_data, set()
+            )
         }
-        assert stored_ids == set(attesters), (
+        assert stored_validator_indices == set(attesters), (
             "Aggregator should store attestations from all received validators"
         )
 
@@ -1603,9 +1609,9 @@ class TestOnGossipAttestationImportGating:
         updated_store = spec.on_gossip_attestation(store, signed_attestation, is_aggregator=False)
 
         signatures = updated_store.attestation_signatures.get(attestation_data, set())
-        assert attester_validator not in {entry.validator_index for entry in signatures}, (
-            "Non-aggregator should never store gossip signatures"
-        )
+        assert attester_validator not in {
+            stored_signature.validator_index for stored_signature in signatures
+        }, "Non-aggregator should never store gossip signatures"
 
     def test_non_aggregator_does_not_create_signatures_entry(
         self, key_manager: XmssKeyManager, spec: LstarSpec

@@ -186,8 +186,8 @@ class TestPeerManagerPeerSelection:
         manager = PeerManager()
         manager.add_peer(connected_peer_info)
 
-        selected = manager.select_peer_for_request()
-        assert selected == SyncPeer(info=connected_peer_info)
+        selected_peer = manager.select_peer_for_request()
+        assert selected_peer == SyncPeer(info=connected_peer_info)
 
     def test_select_peer_for_request_none_when_empty(self) -> None:
         """select_peer_for_request returns None when no peers."""
@@ -224,8 +224,8 @@ class TestPeerManagerPeerSelection:
         )
 
         # Request slot 150 - only peer2 has it
-        selected = manager.select_peer_for_request(min_slot=Slot(150))
-        assert selected == sync_peer2
+        selected_peer = manager.select_peer_for_request(min_slot=Slot(150))
+        assert selected_peer == sync_peer2
 
 
 class TestPeerManagerNetworkConsensus:
@@ -238,8 +238,8 @@ class TestPeerManagerNetworkConsensus:
         manager = PeerManager()
 
         for pid, fin_slot in [(peer_id, 100), (peer_id_2, 100), (peer_id_3, 150)]:
-            info = PeerInfo(peer_id=pid, state=ConnectionState.CONNECTED)
-            sync_peer = manager.add_peer(info)
+            peer_info = PeerInfo(peer_id=pid, state=ConnectionState.CONNECTED)
+            sync_peer = manager.add_peer(peer_info)
             sync_peer.status = Status(
                 finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(fin_slot)),
                 head=Checkpoint(root=Bytes32.zero(), slot=Slot(fin_slot + 50)),
@@ -380,5 +380,5 @@ class TestPeerScoring:
         peer1.requests_in_flight = MAX_CONCURRENT_REQUESTS
 
         peer2 = manager.peers.get(peer_id_2)
-        selected = manager.select_peer_for_request()
-        assert selected == peer2
+        selected_peer = manager.select_peer_for_request()
+        assert selected_peer == peer2

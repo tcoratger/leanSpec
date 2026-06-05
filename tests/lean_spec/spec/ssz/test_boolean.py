@@ -80,9 +80,9 @@ def test_wrapping_existing_boolean_succeeds() -> None:
 
 def test_instantiation_and_type() -> None:
     """Tests that a Boolean is an instance of `int` and its own class."""
-    value = Boolean(True)
-    assert isinstance(value, int)
-    assert isinstance(value, Boolean)
+    boolean = Boolean(True)
+    assert isinstance(boolean, int)
+    assert isinstance(boolean, Boolean)
 
 
 @pytest.mark.parametrize(
@@ -253,15 +253,15 @@ class TestBooleanSSZ:
         assert Boolean.get_byte_length() == 1
 
     @pytest.mark.parametrize(
-        "value, expected_bytes",
+        "boolean_value, expected_bytes",
         [
             (True, b"\x01"),
             (False, b"\x00"),
         ],
     )
-    def test_encode_decode_roundtrip(self, value: bool, expected_bytes: bytes) -> None:
+    def test_encode_decode_roundtrip(self, boolean_value: bool, expected_bytes: bytes) -> None:
         """Tests the encode_bytes and decode_bytes round-trip."""
-        boolean_instance = Boolean(value)
+        boolean_instance = Boolean(boolean_value)
 
         # Test encoding
         encoded = boolean_instance.encode_bytes()

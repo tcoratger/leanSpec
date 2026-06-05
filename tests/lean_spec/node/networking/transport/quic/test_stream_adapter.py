@@ -67,9 +67,9 @@ class TestNegotiateServer:
             await _read_message(client)
 
         task = asyncio.create_task(client_task())
-        result = await server.negotiate_server({GOSSIPSUB_ID, STATUS_ID})
+        negotiated_protocol = await server.negotiate_server({GOSSIPSUB_ID, STATUS_ID})
         await task
-        assert result == GOSSIPSUB_ID
+        assert negotiated_protocol == GOSSIPSUB_ID
 
     async def test_server_rejects_unsupported_then_accepts(self) -> None:
         """Server rejects unsupported protocols."""
@@ -79,16 +79,16 @@ class TestNegotiateServer:
             await _write_message(client, MULTISTREAM_PROTOCOL_ID)
             await _read_message(client)
             await _write_message(client, GOSSIPSUB_V12_ID)
-            response1 = await _read_message(client)
-            assert response1 == NA
+            first_rejection_response = await _read_message(client)
+            assert first_rejection_response == NA
             await _write_message(client, GOSSIPSUB_ID)
-            response2 = await _read_message(client)
-            assert response2 == GOSSIPSUB_ID
+            accepted_protocol = await _read_message(client)
+            assert accepted_protocol == GOSSIPSUB_ID
 
         task = asyncio.create_task(client_task())
-        result = await server.negotiate_server({GOSSIPSUB_ID})
+        negotiated_protocol = await server.negotiate_server({GOSSIPSUB_ID})
         await task
-        assert result == GOSSIPSUB_ID
+        assert negotiated_protocol == GOSSIPSUB_ID
 
     async def test_server_empty_supported(self) -> None:
         """Server raises error when no supported protocols."""
@@ -115,8 +115,8 @@ class TestNegotiateServer:
 
             for i in range(MAX_NEGOTIATION_ATTEMPTS):
                 await _write_message(client, ProtocolId(f"/proto{i}"))
-                resp = await _read_message(client)
-                assert resp == NA
+                rejection_response = await _read_message(client)
+                assert rejection_response == NA
 
         task = asyncio.create_task(client_task())
 
@@ -155,9 +155,9 @@ class TestLazyClient:
             await _write_message(server, protocol)
 
         task = asyncio.create_task(server_task())
-        result = await client.negotiate_lazy_client(GOSSIPSUB_ID)
+        negotiated_protocol = await client.negotiate_lazy_client(GOSSIPSUB_ID)
         await task
-        assert result == GOSSIPSUB_ID
+        assert negotiated_protocol == GOSSIPSUB_ID
 
     async def test_lazy_client_rejected(self) -> None:
         """Lazy client raises error when protocol rejected."""
@@ -207,11 +207,11 @@ class TestMessageFormat:
         stream, peer = _create_stream_pair()
         await _write_message(peer, STATUS_ID)
 
-        raw = await stream.read(100)
+        raw_frame = await stream.read(100)
         expected_payload = STATUS_ID.encode("utf-8") + b"\n"
         expected_length = len(expected_payload)
-        assert raw[0] == expected_length
-        assert raw[1:] == expected_payload
+        assert raw_frame[0] == expected_length
+        assert raw_frame[1:] == expected_payload
 
     async def test_message_roundtrip(self) -> None:
         """Write then read returns original message."""
@@ -282,8 +282,8 @@ class TestMessageFormat:
         peer.write(b"CDE")
         peer.write(b"FG")
         await peer.drain()
-        result = await stream.readexactly(6)
-        assert result == b"ABCDEF"
+        received_bytes = await stream.readexactly(6)
+        assert received_bytes == b"ABCDEF"
         assert await stream.read() == b"G"
 
     async def test_readexactly_eof_error(self) -> None:
@@ -334,15 +334,15 @@ class TestMessageFormat:
         """Valid message is Varint length + payload + newline"""
         stream, peer = _create_stream_pair()
 
-        payload = b"/my/proto/1.0.0\n"
-        length_prefix = encode_varint(len(payload))
-        framed = length_prefix + payload
+        message_payload = b"/my/proto/1.0.0\n"
+        length_prefix = encode_varint(len(message_payload))
+        framed = length_prefix + message_payload
 
         peer.write(framed)
         await peer.drain()
 
-        result = await stream._read_negotiation_message()
-        assert result == "/my/proto/1.0.0"
+        negotiation_message = await stream._read_negotiation_message()
+        assert negotiation_message == "/my/proto/1.0.0"
 
     async def test_read_negotiation_message_connection_closed(self) -> None:
         """Connection closed"""
@@ -364,8 +364,8 @@ class TestMessageFormat:
         """Message too long"""
         stream, peer = _create_stream_pair()
         too_big_length = MAX_MESSAGE_SIZE + 1
-        payload = b"A" * too_big_length
-        length_prefix = encode_varint(len(payload))
+        message_payload = b"A" * too_big_length
+        length_prefix = encode_varint(len(message_payload))
         peer.write(length_prefix)
         await peer.drain()
 
@@ -383,9 +383,9 @@ class TestMessageFormat:
     async def test_read_negotiation_message_no_trailing_newline(self) -> None:
         """No trailing newline"""
         stream, peer = _create_stream_pair()
-        payload = b"/my/proto/1.0.0"
-        length_prefix = encode_varint(len(payload))
-        peer.write(length_prefix + payload)
+        message_payload = b"/my/proto/1.0.0"
+        length_prefix = encode_varint(len(message_payload))
+        peer.write(length_prefix + message_payload)
         await peer.drain()
 
         with pytest.raises(NegotiationError, match="Message must end with newline"):
@@ -410,11 +410,11 @@ class TestMessageFormat:
         """Write negotiation message with correct varint"""
         stream, peer = _create_stream_pair()
         await stream._write_negotiation_message("/my/proto/1.0.0")
-        raw = await peer.read()
+        raw_frame = await peer.read()
         expected_payload = b"/my/proto/1.0.0\n"
-        expected = encode_varint(len(expected_payload)) + expected_payload
+        expected_frame = encode_varint(len(expected_payload)) + expected_payload
 
-        assert raw == expected
+        assert raw_frame == expected_frame
 
 
 class TestBufferedIO:
@@ -424,31 +424,31 @@ class TestBufferedIO:
         """read(n=None) returns buffered data."""
         stream, _ = _create_stream_pair()
         stream._buffer = b"already buffered"
-        result = await stream.read()
-        assert result == b"already buffered"
+        read_bytes = await stream.read()
+        assert read_bytes == b"already buffered"
         assert stream._buffer == b""
 
     async def test_read_n_none_empty_buffer(self) -> None:
         """read(n=None) with empty buffer reads from stream."""
         stream, peer = _create_stream_pair()
         stream._stream._read_queue.put_nowait(b"from stream")  # type: ignore[attribute-defined]
-        result = await stream.read()
-        assert result == b"from stream"
+        read_bytes = await stream.read()
+        assert read_bytes == b"from stream"
 
     async def test_read_partial_buffer(self) -> None:
         """read(n) returns from buffer when buffer has less than n."""
         stream, _ = _create_stream_pair()
         stream._buffer = b"abc"
-        result = await stream.read(5)
-        assert result == b"abc"
+        read_bytes = await stream.read(5)
+        assert read_bytes == b"abc"
         assert stream._buffer == b""
 
     async def test_read_buffer_overflow(self) -> None:
         """read(n) keeps leftover when buffer exceeds n."""
         stream, _ = _create_stream_pair()
         stream._buffer = b"abcdef"
-        result = await stream.read(3)
-        assert result == b"abc"
+        read_bytes = await stream.read(3)
+        assert read_bytes == b"abc"
         assert stream._buffer == b"def"
 
     async def test_read_empty_stream(self) -> None:
@@ -456,16 +456,16 @@ class TestBufferedIO:
         stream, _ = _create_stream_pair()
         stream._buffer = b""
         stream._stream._read_queue.put_nowait(b"")  # type: ignore[attribute-defined]
-        result = await stream.read(10)
-        assert result == b""
+        read_bytes = await stream.read(10)
+        assert read_bytes == b""
 
     async def test_readexactly_accumulates_chunks(self) -> None:
         """readexactly accumulates chunks until n bytes."""
         stream, peer = _create_stream_pair()
         stream._stream._read_queue.put_nowait(b"ab")  # type: ignore[attribute-defined]
         stream._stream._read_queue.put_nowait(b"cd")  # type: ignore[attribute-defined]
-        result = await stream.readexactly(4)
-        assert result == b"abcd"
+        read_bytes = await stream.readexactly(4)
+        assert read_bytes == b"abcd"
         assert stream._buffer == b""
 
     async def test_readexactly_eof_error(self) -> None:
@@ -567,9 +567,9 @@ class TestReadNegotiationMessage:
     async def test_message_no_trailing_newline(self) -> None:
         """Raises error when message doesn't end with newline."""
         stream, peer = _create_stream_pair()
-        payload = b"no newline"
-        length_prefix = encode_varint(len(payload))
-        stream._buffer = length_prefix + payload
+        message_payload = b"no newline"
+        length_prefix = encode_varint(len(message_payload))
+        stream._buffer = length_prefix + message_payload
         with pytest.raises(NegotiationError, match="Message must end with newline"):
             await stream._read_negotiation_message()
 
@@ -613,9 +613,9 @@ class TestClose:
 
     async def test_close_delegates_to_underlying(self) -> None:
         """Close delegates to stream"""
-        mock = _MockStream(_read_queue=asyncio.Queue(), _write_queue=None)
-        await QuicStreamAdapter(cast(QuicStream, mock)).close()
-        assert mock.close_called is True
+        mock_stream = _MockStream(_read_queue=asyncio.Queue(), _write_queue=None)
+        await QuicStreamAdapter(cast(QuicStream, mock_stream)).close()
+        assert mock_stream.close_called is True
 
 
 def _create_stream_pair() -> tuple[QuicStreamAdapter, QuicStreamAdapter]:
@@ -635,9 +635,9 @@ def _create_stream_pair() -> tuple[QuicStreamAdapter, QuicStreamAdapter]:
 
 async def _write_message(stream: QuicStreamAdapter, message: str) -> None:
     """Write a multistream message to a stream."""
-    payload = message.encode("utf-8") + b"\n"
-    length_prefix = encode_varint(len(payload))
-    stream.write(length_prefix + payload)
+    message_payload = message.encode("utf-8") + b"\n"
+    length_prefix = encode_varint(len(message_payload))
+    stream.write(length_prefix + message_payload)
     await stream.drain()
 
 
@@ -653,9 +653,9 @@ async def _read_message(stream: QuicStreamAdapter) -> str:
             break
 
     length, _ = decode_varint(bytes(length_bytes))
-    payload = await stream.readexactly(length)
+    message_payload = await stream.readexactly(length)
 
-    if not payload.endswith(b"\n"):
+    if not message_payload.endswith(b"\n"):
         raise NegotiationError("Message must end with newline")
 
-    return payload[:-1].decode("utf-8")
+    return message_payload[:-1].decode("utf-8")

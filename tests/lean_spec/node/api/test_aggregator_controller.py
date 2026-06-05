@@ -84,7 +84,7 @@ class TestAggregatorControllerWrite:
         """Sequential toggles each see the prior state and converge to the last value."""
         controller, sync_service, network_service = _make_controller(peer_id, initial=False)
 
-        results = await asyncio.gather(
+        previous_states = await asyncio.gather(
             controller.set_enabled(True),
             controller.set_enabled(False),
             controller.set_enabled(True),
@@ -92,7 +92,7 @@ class TestAggregatorControllerWrite:
 
         # asyncio.gather on a single-threaded event loop preserves order.
         # Each toggle sees the previous state correctly.
-        assert results == [False, True, False]
+        assert previous_states == [False, True, False]
         assert controller.is_enabled() is True
         assert sync_service.is_aggregator is True
         assert network_service.is_aggregator is True

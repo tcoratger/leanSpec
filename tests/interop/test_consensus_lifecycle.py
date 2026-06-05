@@ -136,13 +136,14 @@ async def test_consensus_lifecycle(node_cluster: NodeCluster) -> None:
         store = node._store
         head_block = store.blocks[store.head]
         visited = 0
-        current = head_block
-        while current.parent_root in store.blocks:
-            parent = store.blocks[current.parent_root]
-            assert current.slot > parent.slot, (
-                f"Node {node.index}: block at slot {current.slot} has parent at slot {parent.slot}"
+        current_block = head_block
+        while current_block.parent_root in store.blocks:
+            parent = store.blocks[current_block.parent_root]
+            assert current_block.slot > parent.slot, (
+                f"Node {node.index}: block at slot {current_block.slot} "
+                f"has parent at slot {parent.slot}"
             )
-            current = parent
+            current_block = parent
             visited += 1
 
         logger.info(

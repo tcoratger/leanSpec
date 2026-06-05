@@ -185,27 +185,27 @@ class TestSkipField:
     def test_skip_varint(self) -> None:
         """Skip a varint field."""
         # Encode a varint value (300 = 0xAC 0x02)
-        data = b"\xac\x02"
-        new_pos = _skip_field(data, 0, WIRE_TYPE_VARINT)
+        encoded_field = b"\xac\x02"
+        new_pos = _skip_field(encoded_field, 0, WIRE_TYPE_VARINT)
         assert new_pos == 2
 
     def test_skip_length_delimited(self) -> None:
         """Skip a length-delimited field."""
         # Length 3, then 3 bytes of data
-        data = b"\x03abc"
-        new_pos = _skip_field(data, 0, WIRE_TYPE_LENGTH_DELIMITED)
+        encoded_field = b"\x03abc"
+        new_pos = _skip_field(encoded_field, 0, WIRE_TYPE_LENGTH_DELIMITED)
         assert new_pos == 4
 
     def test_skip_32bit(self) -> None:
         """Skip a 32-bit fixed field."""
-        data = b"\x00\x00\x00\x00"
-        new_pos = _skip_field(data, 0, WIRE_TYPE_32BIT)
+        encoded_field = b"\x00\x00\x00\x00"
+        new_pos = _skip_field(encoded_field, 0, WIRE_TYPE_32BIT)
         assert new_pos == 4
 
     def test_skip_64bit(self) -> None:
         """Skip a 64-bit fixed field."""
-        data = b"\x00" * 8
-        new_pos = _skip_field(data, 0, WIRE_TYPE_64BIT)
+        encoded_field = b"\x00" * 8
+        new_pos = _skip_field(encoded_field, 0, WIRE_TYPE_64BIT)
         assert new_pos == 8
 
     def test_skip_unknown_wire_type_raises(self) -> None:
@@ -247,23 +247,23 @@ class TestForwardCompatibility:
     def test_rpc_with_unknown_varint_field(self) -> None:
         """RPC ignores unknown varint fields."""
         rpc = RPC(subscriptions=[SubOpts(subscribe=True, topic_id=TopicId("topic"))])
-        data = bytearray(rpc.encode())
+        encoded_rpc = bytearray(rpc.encode())
 
         # Append unknown field 99, wire type varint, value 42.
-        data.extend(encode_tag(99, WIRE_TYPE_VARINT))
-        data.extend(b"\x2a")  # varint 42
+        encoded_rpc.extend(encode_tag(99, WIRE_TYPE_VARINT))
+        encoded_rpc.extend(b"\x2a")  # varint 42
 
-        assert RPC.decode(bytes(data)) == rpc
+        assert RPC.decode(bytes(encoded_rpc)) == rpc
 
     def test_message_with_unknown_field(self) -> None:
         """Message ignores unknown length-delimited fields."""
         message = Message(topic=TopicId("t"), data=b"d")
-        data = bytearray(message.encode())
+        encoded_message = bytearray(message.encode())
 
         # Append unknown field 99.
-        data.extend(encode_bytes(99, b"unknown_data"))
+        encoded_message.extend(encode_bytes(99, b"unknown_data"))
 
-        assert Message.decode(bytes(data)) == message
+        assert Message.decode(bytes(encoded_message)) == message
 
 
 class TestLengthValidation:
@@ -272,17 +272,17 @@ class TestLengthValidation:
     def test_truncated_length_delimited_field(self) -> None:
         """Truncated length-delimited data raises ProtobufDecodeError."""
         # Field 1, wire type 2 (length-delimited), length=100 but only 3 bytes.
-        data = encode_tag(1, WIRE_TYPE_LENGTH_DELIMITED) + b"\x64abc"
+        encoded_field = encode_tag(1, WIRE_TYPE_LENGTH_DELIMITED) + b"\x64abc"
 
         with pytest.raises(ProtobufDecodeError, match="exceeds data size"):
-            SubOpts.decode(data)
+            SubOpts.decode(encoded_field)
 
     def test_truncated_rpc_field(self) -> None:
         """RPC with truncated field raises ProtobufDecodeError."""
-        data = encode_tag(1, WIRE_TYPE_LENGTH_DELIMITED) + b"\xff\x01"
+        encoded_rpc = encode_tag(1, WIRE_TYPE_LENGTH_DELIMITED) + b"\xff\x01"
 
         with pytest.raises(ProtobufDecodeError, match="exceeds data size"):
-            RPC.decode(data)
+            RPC.decode(encoded_rpc)
 
 
 class TestMultiTopicControl:

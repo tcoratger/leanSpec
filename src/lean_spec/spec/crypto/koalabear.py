@@ -99,13 +99,15 @@ class Fp(int, SSZType):
         """Deserialize a field element from a binary stream."""
         if scope != P_BYTES:
             raise SSZSerializationError(f"Expected {P_BYTES} bytes for Fp, got {scope}")
-        data = stream.read(P_BYTES)
-        if len(data) != P_BYTES:
-            raise SSZSerializationError(f"Expected {P_BYTES} bytes for Fp, got {len(data)}")
-        value = int.from_bytes(data, byteorder="little")
-        if value >= P:
-            raise SSZValueError(f"Value {value} exceeds field modulus {P}")
-        return cls(value)
+        serialized_bytes = stream.read(P_BYTES)
+        if len(serialized_bytes) != P_BYTES:
+            raise SSZSerializationError(
+                f"Expected {P_BYTES} bytes for Fp, got {len(serialized_bytes)}"
+            )
+        decoded_integer = int.from_bytes(serialized_bytes, byteorder="little")
+        if decoded_integer >= P:
+            raise SSZValueError(f"Value {decoded_integer} exceeds field modulus {P}")
+        return cls(decoded_integer)
 
     def _reject(self, other: Any, op: str) -> NoReturn:
         """Raise a consistent TypeError for a non-Fp operand."""

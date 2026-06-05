@@ -141,8 +141,8 @@ class PoseidonXmss(StrictBaseModel):
 
         # Phase 2: absorb each chunk by overwriting the rate slots.
         for chunk in batched(padded_input, rate):
-            for j, value in enumerate(chunk):
-                state[cap_length + j] = value
+            for j, chunk_element in enumerate(chunk):
+                state[cap_length + j] = chunk_element
             state = engine.permute(state)
 
         # Phase 3: squeeze rate slots, permuting until enough output is available.
@@ -197,7 +197,7 @@ class PoseidonXmss(StrictBaseModel):
         if len(message_parts) == 1:
             # Hash chain step: width-16 compression of (digest || parameter || tweak).
             input_vec = message_parts[0].elements + parameter.elements + encoded_tweak
-            result = self.compress(input_vec, 16, config.HASH_LENGTH_FIELD_ELEMENTS)
+            digest = self.compress(input_vec, 16, config.HASH_LENGTH_FIELD_ELEMENTS)
 
         elif len(message_parts) == 2:
             # Merkle node: width-24 compression of (parameter || tweak || left || right).
@@ -207,11 +207,13 @@ class PoseidonXmss(StrictBaseModel):
                 + message_parts[0].elements
                 + message_parts[1].elements
             )
-            result = self.compress(input_vec, 24, config.HASH_LENGTH_FIELD_ELEMENTS)
+            digest = self.compress(input_vec, 24, config.HASH_LENGTH_FIELD_ELEMENTS)
 
         else:
             # Merkle leaf: sponge mode over many concatenated digests.
-            flattened_message = [element for part in message_parts for element in part.elements]
+            flattened_message = [
+                element for message_part in message_parts for element in message_part.elements
+            ]
             input_vec = parameter.elements + encoded_tweak + flattened_message
 
             # The domain separator binds the sponge to this hashing task shape.
@@ -222,9 +224,9 @@ class PoseidonXmss(StrictBaseModel):
                 config.HASH_LENGTH_FIELD_ELEMENTS,
             ]
             capacity_value = self.safe_domain_separator(lengths, config.CAPACITY)
-            result = self.sponge(input_vec, capacity_value, config.HASH_LENGTH_FIELD_ELEMENTS, 24)
+            digest = self.sponge(input_vec, capacity_value, config.HASH_LENGTH_FIELD_ELEMENTS, 24)
 
-        return HashDigestVector(data=result)
+        return HashDigestVector(data=digest)
 
     def hash_chain(
         self,

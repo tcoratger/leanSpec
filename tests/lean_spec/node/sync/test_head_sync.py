@@ -77,9 +77,9 @@ class TestGossipBlockProcessing:
         )
         block_root = hash_tree_root(block.block)
 
-        result, new_store = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, new_store = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=True,
         )
         assert block_root in processed_blocks
@@ -107,9 +107,9 @@ class TestGossipBlockProcessing:
         )
         block_root = hash_tree_root(block.block)
 
-        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert block_root in head_sync.block_cache
@@ -147,9 +147,9 @@ class TestGossipBlockProcessing:
             process_block=should_not_be_called,
         )
 
-        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert call_count == 0
@@ -206,9 +206,9 @@ class TestDescendantProcessing:
         )
 
         # Process parent - should trigger child processing
-        result, _ = await head_sync.on_gossip_block(parent, peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(parent, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=True,
         )
         assert processing_order == [parent_root, child_root]
@@ -259,9 +259,9 @@ class TestDescendantProcessing:
         )
 
         # Process first block - should cascade to all descendants
-        result, _ = await head_sync.on_gossip_block(blocks[0], peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(blocks[0], peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=True,
         )
         assert processing_order == [1, 2, 3, 4]
@@ -296,9 +296,9 @@ class TestErrorHandling:
             state_root=Bytes32.zero(),
         )
 
-        result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
             error="State transition failed",
         )
@@ -361,9 +361,9 @@ class TestStorePropagation:
             process_block=track_processing,
         )
 
-        result, new_store = await head_sync.on_gossip_block(parent, peer_id, store)
+        head_sync_result, new_store = await head_sync.on_gossip_block(parent, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=True,
         )
         assert {parent_root, child1_root, child2_root} <= set(new_store.blocks.keys())
@@ -406,9 +406,9 @@ class TestReentrantGuard:
         # Simulate reentrant call by pre-adding to _processing.
         head_sync._processing.add(block_root)
 
-        result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert returned_store is store
@@ -519,9 +519,9 @@ class TestRejectionBelowFinalized:
         block = _gossip_block(slot=10, parent_root=unknown_parent, state_seed=1)
         block_root = hash_tree_root(block.block)
 
-        result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert returned_store is store
@@ -539,9 +539,9 @@ class TestRejectionBelowFinalized:
         block = _gossip_block(slot=5, parent_root=unknown_parent, state_seed=1)
         block_root = hash_tree_root(block.block)
 
-        result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, returned_store = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert returned_store is store
@@ -563,9 +563,9 @@ class TestBackfillRoutingAboveHead:
         block = _gossip_block(slot=11, parent_root=unknown_parent, state_seed=1)
         block_root = hash_tree_root(block.block)
 
-        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert recorder.range_calls == []
@@ -582,9 +582,9 @@ class TestBackfillRoutingAboveHead:
         block = _gossip_block(slot=100, parent_root=unknown_parent, state_seed=1)
         block_root = hash_tree_root(block.block)
 
-        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         # gap_floor = head+1 = 21, gap_size = 100 - 21 = 79.
@@ -608,9 +608,9 @@ class TestAltForkRoutingAtOrBelowHead:
         block = _gossip_block(slot=15, parent_root=unknown_parent, state_seed=1)
         block_root = hash_tree_root(block.block)
 
-        result, _ = await head_sync.on_gossip_block(block, peer_id, store)
+        head_sync_result, _ = await head_sync.on_gossip_block(block, peer_id, store)
 
-        assert result == HeadSyncResult(
+        assert head_sync_result == HeadSyncResult(
             processed=False,
         )
         assert recorder.range_calls == []

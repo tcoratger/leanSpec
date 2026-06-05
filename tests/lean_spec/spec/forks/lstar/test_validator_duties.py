@@ -614,10 +614,10 @@ class TestValidatorErrorHandling:
         num_validators = len(state.validators)
 
         # Proposer comparison should work (though likely not match).
-        result = large_validator == ValidatorIndex.proposer_for_slot(
+        is_proposer = large_validator == ValidatorIndex.proposer_for_slot(
             large_slot, Uint64(num_validators)
         )
-        assert isinstance(result, bool)
+        assert isinstance(is_proposer, bool)
 
         # Attestation can be created for any validator
         attestation_data = spec.produce_attestation_data(sample_store, Slot(1))

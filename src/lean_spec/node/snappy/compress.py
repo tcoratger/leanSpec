@@ -322,15 +322,17 @@ def _hash_4_bytes(data: bytes, pos: int, table_bits: int) -> int:
     #   data[1] = 0x42 (B)
     #   data[2] = 0x43 (C)
     #   data[3] = 0x44 (D)
-    #   value = 0x44434241 (D C B A in memory order)
-    value = data[pos] | (data[pos + 1] << 8) | (data[pos + 2] << 16) | (data[pos + 3] << 24)
+    #   little_endian_word = 0x44434241 (D C B A in memory order)
+    little_endian_word = (
+        data[pos] | (data[pos + 1] << 8) | (data[pos + 2] << 16) | (data[pos + 3] << 24)
+    )
 
     # Multiply and mask to 32 bits.
     #
     # The magic constant (0x1e35a7bd) is chosen to spread input bits
     # across the output. This reduces collisions for similar inputs.
     # We mask to 32 bits because Python integers are arbitrary precision.
-    hash_value = (value * HASH_MULTIPLIER) & 0xFFFFFFFF
+    hash_value = (little_endian_word * HASH_MULTIPLIER) & 0xFFFFFFFF
 
     # Take top bits.
     #

@@ -361,8 +361,10 @@ class NodeCluster:
         if listener_task.done():
             try:
                 listener_task.result()
-            except OSError as e:
-                raise RuntimeError(f"Failed to start listener on {listen_address}: {e}") from e
+            except OSError as exception:
+                raise RuntimeError(
+                    f"Failed to start listener on {listen_address}: {exception}"
+                ) from exception
 
         test_node._listener_task = listener_task
 

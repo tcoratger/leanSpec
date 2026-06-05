@@ -155,9 +155,9 @@ class TestVariableContainer:
         )
         # Fixed-part width is 8 bytes for two Uint32 offsets.
         # First offset is 8, second offset is 12 because the first payload spans 4 bytes.
-        expected = bytes.fromhex("080000000c00000034127856bc9a")
-        assert original.encode_bytes() == expected
-        assert TwoVar.decode_bytes(expected) == original
+        expected_encoding = bytes.fromhex("080000000c00000034127856bc9a")
+        assert original.encode_bytes() == expected_encoding
+        assert TwoVar.decode_bytes(expected_encoding) == original
 
 
 class TestOneVariableField:
@@ -207,9 +207,9 @@ class TestMixedContainer:
             c=Uint32(0xEEFF),
             d=Uint16List4(data=[Uint16(3)]),
         )
-        expected = bytes.fromhex("ddccbbaa0000000014000000ffee000018000000010002000300")
-        assert original.encode_bytes() == expected
-        assert Mixed.decode_bytes(expected) == original
+        expected_encoding = bytes.fromhex("ddccbbaa0000000014000000ffee000018000000010002000300")
+        assert original.encode_bytes() == expected_encoding
+        assert Mixed.decode_bytes(expected_encoding) == original
 
 
 class TestNestedContainer:
@@ -245,9 +245,11 @@ class TestNestedContainer:
             head=Uint64(99),
             inner=InnerVar(a=Uint64(7), b=Uint16List4(data=[Uint16(1), Uint16(2)])),
         )
-        expected = bytes.fromhex("63000000000000000c00000007000000000000000c00000001000200")
-        assert original.encode_bytes() == expected
-        assert OuterVarNested.decode_bytes(expected) == original
+        expected_encoding = bytes.fromhex(
+            "63000000000000000c00000007000000000000000c00000001000200"
+        )
+        assert original.encode_bytes() == expected_encoding
+        assert OuterVarNested.decode_bytes(expected_encoding) == original
 
 
 class TestSubclassInheritance:
@@ -266,9 +268,9 @@ class TestSubclassInheritance:
         )
         # Fixed part is slot (8) plus data offset (4) plus signature (8) for 20 bytes.
         # Data offset value is therefore 20 and the payload is [1] as Uint16.
-        expected = bytes.fromhex("05000000000000001400000063000000000000000100")
-        assert original.encode_bytes() == expected
-        assert SignedAttestation.decode_bytes(expected) == original
+        expected_encoding = bytes.fromhex("05000000000000001400000063000000000000000100")
+        assert original.encode_bytes() == expected_encoding
+        assert SignedAttestation.decode_bytes(expected_encoding) == original
 
 
 class TestSerialize:
@@ -316,7 +318,7 @@ class TestErrors:
         """The first variable offset must equal the end of the fixed part."""
         # Fixed part of Mixed is 8 + 4 + 4 + 4 = 20 bytes.
         # The payload deviates by one byte in either direction from the canonical offset.
-        data = (
+        encoded_bytes = (
             (1).to_bytes(8, "little")
             + bad_offset.to_bytes(4, "little")
             + (2).to_bytes(4, "little")
@@ -325,16 +327,16 @@ class TestErrors:
             + bytes.fromhex("0300")
         )
         with pytest.raises(SSZSerializationError) as exc_info:
-            Mixed.decode_bytes(data)
+            Mixed.decode_bytes(encoded_bytes)
         assert exc_info.value.args[0] == expected_message
 
     def test_non_monotonic_offsets_raise(self) -> None:
         """A second offset below the first triggers a non-monotonic offsets error."""
         # Fixed part is 8 bytes for two Uint32 offsets.
         # First offset is 8 (valid), second offset is 5 (decreasing).
-        data = (8).to_bytes(4, "little") + (5).to_bytes(4, "little") + b"\x34\x12"
+        encoded_bytes = (8).to_bytes(4, "little") + (5).to_bytes(4, "little") + b"\x34\x12"
         with pytest.raises(SSZSerializationError) as exc_info:
-            TwoVar.decode_bytes(data)
+            TwoVar.decode_bytes(encoded_bytes)
         assert exc_info.value.args[0] == "TwoVar.a: non-monotonic offsets (8 > 5)"
 
     def test_short_input_on_fixed_field_raises(self) -> None:

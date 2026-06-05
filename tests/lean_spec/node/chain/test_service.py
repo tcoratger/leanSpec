@@ -209,7 +209,7 @@ class TestStartupTick:
     """Tests for the one-shot catch-up performed at startup."""
 
     @pytest.mark.parametrize(
-        ("intervals_elapsed", "expected_result", "expected_tick_times"),
+        ("intervals_elapsed", "expected_interval", "expected_tick_times"),
         [
             # Before genesis: nothing ticks, the caller waits.
             (-0.5, None, []),
@@ -224,15 +224,15 @@ class TestStartupTick:
     async def test_catches_store_up_to_wall_clock(
         self,
         intervals_elapsed: float,
-        expected_result: Interval | None,
+        expected_interval: Interval | None,
         expected_tick_times: list[int],
     ) -> None:
         """Startup ticks the store to the current interval, or reports waiting if pre-genesis."""
         spec = ProbeSpec()
         now = 1000 + intervals_elapsed * INTERVAL_SECONDS
         service = make_service(spec, time_fn=lambda: now)
-        result = await service._initial_tick()
-        assert result == expected_result
+        initial_tick_interval = await service._initial_tick()
+        assert initial_tick_interval == expected_interval
         assert [time for time, _, _ in spec.ticks] == expected_tick_times
 
     async def test_discards_aggregates_produced_during_catch_up(self) -> None:

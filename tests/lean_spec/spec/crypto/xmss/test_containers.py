@@ -50,9 +50,9 @@ def hex_dict(keypair_a: KeyPair, keypair_b: KeyPair) -> dict[str, dict[str, str]
 def test_construct_from_keypair_instances(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
     """Direct construction stores both pairs by value."""
     # Passing KeyPair instances skips the hex-decode branch.
-    vkp = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
-    assert vkp.attestation_keypair == keypair_a
-    assert vkp.proposal_keypair == keypair_b
+    validator_keypair = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
+    assert validator_keypair.attestation_keypair == keypair_a
+    assert validator_keypair.proposal_keypair == keypair_b
 
 
 def test_validate_from_nested_hex_dict(
@@ -83,22 +83,22 @@ def test_validator_accepts_0x_prefix(
 
 def test_validator_accepts_mixed_inputs(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
     """One role as a KeyPair instance, the other as a hex mapping, both decode."""
-    data = {
+    keypair_mapping = {
         "attestation_keypair": keypair_a,
         "proposal_keypair": {
             "public_key": keypair_b.public_key.encode_bytes().hex(),
             "secret_key": keypair_b.secret_key.encode_bytes().hex(),
         },
     }
-    vkp = ValidatorKeyPair.model_validate(data)
-    assert vkp.attestation_keypair == keypair_a
-    assert vkp.proposal_keypair == keypair_b
+    validator_keypair = ValidatorKeyPair.model_validate(keypair_mapping)
+    assert validator_keypair.attestation_keypair == keypair_a
+    assert validator_keypair.proposal_keypair == keypair_b
 
 
 def test_json_dump_emits_nested_hex_shape(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
     """JSON dump emits each key half as a 0x-prefixed hex string."""
-    vkp = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
-    assert json.loads(vkp.model_dump_json()) == {
+    validator_keypair = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
+    assert json.loads(validator_keypair.model_dump_json()) == {
         "attestation_keypair": {
             "public_key": "0x" + keypair_a.public_key.encode_bytes().hex(),
             "secret_key": "0x" + keypair_a.secret_key.encode_bytes().hex(),
@@ -113,15 +113,18 @@ def test_json_dump_emits_nested_hex_shape(keypair_a: KeyPair, keypair_b: KeyPair
 def test_json_roundtrip_preserves_equality(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
     """Dump-then-validate yields a model equal to the original."""
     # Invariant: encode then decode is identity on every ValidatorKeyPair.
-    vkp = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
-    assert ValidatorKeyPair.model_validate_json(vkp.model_dump_json()) == vkp
+    validator_keypair = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
+    assert (
+        ValidatorKeyPair.model_validate_json(validator_keypair.model_dump_json())
+        == validator_keypair
+    )
 
 
 def test_frozen_blocks_field_assignment(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
     """Reassigning a field after construction raises (frozen model)."""
-    vkp = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
+    validator_keypair = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
     with pytest.raises(ValidationError):
-        vkp.attestation_keypair = keypair_b
+        validator_keypair.attestation_keypair = keypair_b
 
 
 def test_extra_fields_rejected(
@@ -143,9 +146,12 @@ def test_rejects_non_keypair_non_mapping(
     bad_value: object,
 ) -> None:
     """Anything that is not a KeyPair or a Mapping fails validation."""
-    data = {"attestation_keypair": bad_value, "proposal_keypair": hex_dict["proposal_keypair"]}
+    keypair_mapping = {
+        "attestation_keypair": bad_value,
+        "proposal_keypair": hex_dict["proposal_keypair"],
+    }
     with pytest.raises(ValidationError):
-        ValidatorKeyPair.model_validate(data)
+        ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_missing_public_key(
@@ -153,12 +159,12 @@ def test_rejects_missing_public_key(
 ) -> None:
     """A role mapping without the public half fails to decode."""
     # KeyError on value["public_key"] surfaces as ValidationError.
-    data = {
+    keypair_mapping = {
         "attestation_keypair": {"secret_key": keypair_a.secret_key.encode_bytes().hex()},
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
     with pytest.raises(ValidationError):
-        ValidatorKeyPair.model_validate(data)
+        ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_missing_secret_key(
@@ -166,12 +172,12 @@ def test_rejects_missing_secret_key(
 ) -> None:
     """A role mapping without the secret half fails to decode."""
     # KeyError on value["secret_key"] surfaces as ValidationError.
-    data = {
+    keypair_mapping = {
         "attestation_keypair": {"public_key": keypair_a.public_key.encode_bytes().hex()},
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
     with pytest.raises(ValidationError):
-        ValidatorKeyPair.model_validate(data)
+        ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_non_string_hex_value(
@@ -179,7 +185,7 @@ def test_rejects_non_string_hex_value(
 ) -> None:
     """Hex fields must be strings; an integer is rejected before SSZ decoding."""
     # AttributeError on int.removeprefix surfaces as ValidationError.
-    data = {
+    keypair_mapping = {
         "attestation_keypair": {
             "public_key": 12345,
             "secret_key": keypair_a.secret_key.encode_bytes().hex(),
@@ -187,7 +193,7 @@ def test_rejects_non_string_hex_value(
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
     with pytest.raises(ValidationError):
-        ValidatorKeyPair.model_validate(data)
+        ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_invalid_hex_characters(
@@ -195,7 +201,7 @@ def test_rejects_invalid_hex_characters(
 ) -> None:
     """Non-hex characters surface as a validation error from the SSZ codec."""
     # ValueError from bytes.fromhex is wrapped natively by Pydantic.
-    data = {
+    keypair_mapping = {
         "attestation_keypair": {
             "public_key": "zz" * 26,
             "secret_key": keypair_a.secret_key.encode_bytes().hex(),
@@ -203,13 +209,13 @@ def test_rejects_invalid_hex_characters(
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
     with pytest.raises(ValidationError):
-        ValidatorKeyPair.model_validate(data)
+        ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_wrong_length_hex(keypair_a: KeyPair, hex_dict: dict[str, dict[str, str]]) -> None:
     """A hex string of the wrong byte length fails SSZ deserialization."""
     # SSZError from decode_bytes is rerouted to ValueError by the validator.
-    data = {
+    keypair_mapping = {
         "attestation_keypair": {
             "public_key": "deadbeef",
             "secret_key": keypair_a.secret_key.encode_bytes().hex(),
@@ -217,7 +223,7 @@ def test_rejects_wrong_length_hex(keypair_a: KeyPair, hex_dict: dict[str, dict[s
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
     with pytest.raises(ValidationError):
-        ValidatorKeyPair.model_validate(data)
+        ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_missing_role(hex_dict: dict[str, dict[str, str]]) -> None:
@@ -288,8 +294,10 @@ def test_public_key_ssz_roundtrip(signed_key_pair: KeyPair) -> None:
 def test_public_key_encoded_size_matches_layout(signed_key_pair: KeyPair) -> None:
     """The encoded public key is the digest plus parameter packed into field bytes."""
     encoded = signed_key_pair.public_key.encode_bytes()
-    expected = (TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS + TEST_CONFIG.PARAMETER_LENGTH) * P_BYTES
-    assert len(encoded) == expected
+    expected_encoded_length = (
+        TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS + TEST_CONFIG.PARAMETER_LENGTH
+    ) * P_BYTES
+    assert len(encoded) == expected_encoded_length
 
 
 def test_secret_key_ssz_roundtrip(signed_key_pair: KeyPair) -> None:

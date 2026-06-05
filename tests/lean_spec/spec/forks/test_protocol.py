@@ -54,8 +54,8 @@ class TestForkProtocolGeneric:
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
-                mod = node.module or ""
-                assert "devnet" not in mod, f"Forbidden import from {mod}"
+                module_name = node.module or ""
+                assert "devnet" not in module_name, f"Forbidden import from {module_name}"
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     assert "devnet" not in alias.name, f"Forbidden import of {alias.name}"
@@ -69,13 +69,19 @@ class TestForkProtocolGeneric:
             for node in ast.walk(tree):
                 # `from X import Y` — `X` is the module being imported from.
                 if isinstance(node, ast.ImportFrom):
-                    mod = node.module or ""
-                    if any(mod.startswith(p) for p in _FORBIDDEN_FORK_PREFIXES):
-                        offenders.append(f"{location}:{node.lineno}: from {mod} import ...")
+                    module_name = node.module or ""
+                    if any(
+                        module_name.startswith(forbidden_prefix)
+                        for forbidden_prefix in _FORBIDDEN_FORK_PREFIXES
+                    ):
+                        offenders.append(f"{location}:{node.lineno}: from {module_name} import ...")
                 # `import X` — each `alias.name` is a fully-qualified module path.
                 elif isinstance(node, ast.Import):
                     for alias in node.names:
-                        if any(alias.name.startswith(p) for p in _FORBIDDEN_FORK_PREFIXES):
+                        if any(
+                            alias.name.startswith(forbidden_prefix)
+                            for forbidden_prefix in _FORBIDDEN_FORK_PREFIXES
+                        ):
                             offenders.append(f"{location}:{node.lineno}: import {alias.name}")
 
         assert not offenders, "Subspecs must not import concrete forks:\n" + "\n".join(offenders)

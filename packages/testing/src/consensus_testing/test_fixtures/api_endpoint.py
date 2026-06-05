@@ -286,6 +286,6 @@ class ApiEndpointTest(BaseConsensusFixture):
             genesis_time=self.genesis_params.get("genesisTime", 0),
             anchor_slot=self.genesis_params.get("anchorSlot", 0),
         )
-        for k, v in handler(store, self).items():
-            setattr(self, k, v)
+        for field_name, field_value in handler(store, self).items():
+            setattr(self, field_name, field_value)
         return self

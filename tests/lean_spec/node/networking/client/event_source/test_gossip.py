@@ -145,9 +145,9 @@ class MockStream:
         """Return next chunk of data, or empty bytes if exhausted."""
         if self.offset >= len(self.data):
             return b""
-        end = min(self.offset + self.chunk_size, len(self.data))
-        chunk = self.data[self.offset : end]
-        self.offset = end
+        chunk_end = min(self.offset + self.chunk_size, len(self.data))
+        chunk = self.data[self.offset : chunk_end]
+        self.offset = chunk_end
         return chunk
 
     def write(self, data: bytes) -> None:
@@ -304,9 +304,9 @@ class TestGossipHandlerDecodeMessage:
         compressed = compress(ssz_bytes)
         topic_str = make_block_topic()
 
-        result = handler.decode_message(topic_str, compressed)
+        decoded_message = handler.decode_message(topic_str, compressed)
 
-        assert isinstance(result, SignedBlock)
+        assert isinstance(decoded_message, SignedBlock)
 
     def test_decode_valid_attestation_message(self) -> None:
         """Decodes valid attestation message correctly."""
@@ -316,9 +316,9 @@ class TestGossipHandlerDecodeMessage:
         compressed = compress(ssz_bytes)
         topic_str = make_attestation_topic()
 
-        result = handler.decode_message(topic_str, compressed)
+        decoded_message = handler.decode_message(topic_str, compressed)
 
-        assert isinstance(result, SignedAttestation)
+        assert isinstance(decoded_message, SignedAttestation)
 
     def test_decode_invalid_topic_format(self) -> None:
         """Raises GossipMessageError for invalid topic format."""
@@ -431,8 +431,8 @@ class TestReadGossipMessage:
         topic = make_block_topic()
         topic_bytes = topic.encode("utf-8")
         # Complete topic but incomplete data length varint
-        data = encode_varint(len(topic_bytes)) + topic_bytes + b"\x80"
-        stream = MockStream(data)
+        gossip_wire = encode_varint(len(topic_bytes)) + topic_bytes + b"\x80"
+        stream = MockStream(gossip_wire)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
             await read_gossip_message(stream)
@@ -443,8 +443,10 @@ class TestReadGossipMessage:
         topic_bytes = topic.encode("utf-8")
         compressed = compress(b"test data")
         # Claim data is 1000 bytes but only provide partial
-        data = encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(1000) + compressed[:5]
-        stream = MockStream(data)
+        gossip_wire = (
+            encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(1000) + compressed[:5]
+        )
+        stream = MockStream(gossip_wire)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
             await read_gossip_message(stream)
@@ -453,10 +455,10 @@ class TestReadGossipMessage:
         """Raises GossipMessageError for invalid UTF-8 in topic."""
         # Invalid UTF-8 sequence
         invalid_utf8 = b"\xff\xfe"
-        data = encode_varint(len(invalid_utf8)) + invalid_utf8
+        gossip_wire = encode_varint(len(invalid_utf8)) + invalid_utf8
         # Add data portion
-        data += encode_varint(4) + b"test"
-        stream = MockStream(data)
+        gossip_wire += encode_varint(4) + b"test"
+        stream = MockStream(gossip_wire)
 
         with pytest.raises(GossipMessageError, match="Invalid topic encoding"):
             await read_gossip_message(stream)
@@ -594,12 +596,12 @@ class TestGossipReceptionEdgeCases:
         topic = make_block_topic()
         topic_bytes = topic.encode("utf-8")
         # Zero-length data
-        data = encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(0)
-        stream = MockStream(data)
+        gossip_wire = encode_varint(len(topic_bytes)) + topic_bytes + encode_varint(0)
+        stream = MockStream(gossip_wire)
 
-        topic_result, compressed = await read_gossip_message(stream)
+        parsed_topic, compressed = await read_gossip_message(stream)
 
-        assert topic_result == topic
+        assert parsed_topic == topic
         assert compressed == b""
 
     def test_decode_corrupted_snappy_data(self) -> None:
@@ -622,10 +624,10 @@ class TestGossipReceptionEdgeCases:
         topic_bytes = topic.encode("utf-8")
         compressed = compress(b"test")
 
-        data = encode_varint(len(topic_bytes)) + topic_bytes
-        data += encode_varint(len(compressed)) + compressed
+        gossip_wire = encode_varint(len(topic_bytes)) + topic_bytes
+        gossip_wire += encode_varint(len(compressed)) + compressed
 
-        stream = MockStream(data)
+        stream = MockStream(gossip_wire)
         parsed_topic, _ = await read_gossip_message(stream)
 
         expected_topic = f"/{TOPIC_PREFIX}/{long_digest}/block/{ENCODING_POSTFIX}"
@@ -651,8 +653,8 @@ class TestGossipReceptionEdgeCases:
         topic = make_block_topic()
         topic_bytes = topic.encode("utf-8")
         # Only topic, no data length or data
-        data = encode_varint(len(topic_bytes)) + topic_bytes
-        stream = MockStream(data)
+        gossip_wire = encode_varint(len(topic_bytes)) + topic_bytes
+        stream = MockStream(gossip_wire)
 
         with pytest.raises(GossipMessageError, match="Truncated gossip message"):
             await read_gossip_message(stream)
@@ -685,10 +687,10 @@ class TestGossipHandlerForkMismatch:
 
     def test_fork_mismatch_error_attributes(self) -> None:
         """ForkMismatchError exposes expected and actual digests."""
-        err = ForkMismatchError(expected=FORK_DIGEST, actual=WRONG_FORK_DIGEST)
+        error = ForkMismatchError(expected=FORK_DIGEST, actual=WRONG_FORK_DIGEST)
 
-        assert err.expected == FORK_DIGEST
-        assert err.actual == WRONG_FORK_DIGEST
+        assert error.expected == FORK_DIGEST
+        assert error.actual == WRONG_FORK_DIGEST
 
     def test_fork_mismatch_is_value_error(self) -> None:
         """ForkMismatchError inherits from ValueError."""
@@ -799,8 +801,12 @@ class TestReadGossipMessageChunked:
         attestation = _make_attestation()
         wire = _build_gossip_wire(_attestation_topic(), attestation.encode_bytes())
 
-        third = len(wire) // 3
-        chunks = [wire[:third], wire[third : 2 * third], wire[2 * third :]]
+        third_length = len(wire) // 3
+        chunks = [
+            wire[:third_length],
+            wire[third_length : 2 * third_length],
+            wire[2 * third_length :],
+        ]
         stream = ChunkedMockStream(chunks)
         topic, _ = await read_gossip_message(stream)
 
@@ -822,13 +828,13 @@ class TestGossipHandlerDecodeRoundtrip:
         block = _make_block()
         original_bytes = block.encode_bytes()
 
-        result = handler.decode_message(
+        decoded_message = handler.decode_message(
             _block_topic(),
             compress(original_bytes),
         )
 
-        assert isinstance(result, SignedBlock)
-        assert result.encode_bytes() == original_bytes
+        assert isinstance(decoded_message, SignedBlock)
+        assert decoded_message.encode_bytes() == original_bytes
 
     def test_attestation_roundtrip_preserves_ssz(self) -> None:
         """Attestation SSZ bytes are identical after decode."""
@@ -836,13 +842,13 @@ class TestGossipHandlerDecodeRoundtrip:
         attestation = _make_attestation()
         original_bytes = attestation.encode_bytes()
 
-        result = handler.decode_message(
+        decoded_message = handler.decode_message(
             _attestation_topic(),
             compress(original_bytes),
         )
 
-        assert isinstance(result, SignedAttestation)
-        assert result.encode_bytes() == original_bytes
+        assert isinstance(decoded_message, SignedAttestation)
+        assert decoded_message.encode_bytes() == original_bytes
 
 
 class TestGossipHandlerForkValidation:

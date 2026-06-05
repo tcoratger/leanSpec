@@ -20,8 +20,8 @@ class TestSyncStateValues:
 
     def test_states_are_unique(self) -> None:
         """Each state has a unique value."""
-        values = [state.value for state in SyncState]
-        assert len(values) == len(set(values))
+        state_values = [state.value for state in SyncState]
+        assert len(state_values) == len(set(state_values))
 
 
 class TestSyncStateAcceptsGossip:

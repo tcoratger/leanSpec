@@ -39,49 +39,49 @@ class TestPeerInfo:
     def test_create_peer_info(self) -> None:
         """PeerInfo can be created with peer ID."""
         test_peer = peer("16Uiu2HAk")
-        info = PeerInfo(peer_id=test_peer)
-        assert info.peer_id == test_peer
-        assert info.state == ConnectionState.DISCONNECTED
-        assert info.direction == Direction.OUTBOUND
-        assert info.address is None
+        peer_info = PeerInfo(peer_id=test_peer)
+        assert peer_info.peer_id == test_peer
+        assert peer_info.state == ConnectionState.DISCONNECTED
+        assert peer_info.direction == Direction.OUTBOUND
+        assert peer_info.address is None
 
     def test_create_with_all_fields(self) -> None:
         """PeerInfo can be created with all fields."""
-        info = PeerInfo(
+        peer_info = PeerInfo(
             peer_id=peer("16Uiu2HAk"),
             state=ConnectionState.CONNECTED,
             direction=Direction.INBOUND,
             address=Multiaddr("/ip4/192.168.1.1/udp/9000/quic-v1"),
         )
-        assert info.state == ConnectionState.CONNECTED
-        assert info.direction == Direction.INBOUND
-        assert info.address == "/ip4/192.168.1.1/udp/9000/quic-v1"
+        assert peer_info.state == ConnectionState.CONNECTED
+        assert peer_info.direction == Direction.INBOUND
+        assert peer_info.address == "/ip4/192.168.1.1/udp/9000/quic-v1"
 
     def test_is_connected(self) -> None:
         """is_connected() returns True only when connected."""
-        info = PeerInfo(peer_id=peer("test"))
+        peer_info = PeerInfo(peer_id=peer("test"))
 
-        info.state = ConnectionState.DISCONNECTED
-        assert not info.is_connected()
+        peer_info.state = ConnectionState.DISCONNECTED
+        assert not peer_info.is_connected()
 
-        info.state = ConnectionState.CONNECTING
-        assert not info.is_connected()
+        peer_info.state = ConnectionState.CONNECTING
+        assert not peer_info.is_connected()
 
-        info.state = ConnectionState.CONNECTED
-        assert info.is_connected()
+        peer_info.state = ConnectionState.CONNECTED
+        assert peer_info.is_connected()
 
-        info.state = ConnectionState.DISCONNECTING
-        assert not info.is_connected()
+        peer_info.state = ConnectionState.DISCONNECTING
+        assert not peer_info.is_connected()
 
     def test_enr_and_status_fields(self) -> None:
         """Test that enr and status fields exist and default to None."""
-        info = PeerInfo(peer_id=peer("test"))
-        assert info.enr is None
-        assert info.status is None
+        peer_info = PeerInfo(peer_id=peer("test"))
+        assert peer_info.enr is None
+        assert peer_info.status is None
 
     def test_status_can_be_set(self) -> None:
         """Test that status can be set and read back."""
-        info = PeerInfo(peer_id=peer("test"))
+        peer_info = PeerInfo(peer_id=peer("test"))
 
         # Create a test status
         test_checkpoint = Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(100))
@@ -91,7 +91,7 @@ class TestPeerInfo:
         )
 
         # Set status
-        info.status = test_status
-        assert info.status is not None
-        assert info.status.finalized.slot == Slot(100)
-        assert info.status.head.slot == Slot(200)
+        peer_info.status = test_status
+        assert peer_info.status is not None
+        assert peer_info.status.finalized.slot == Slot(100)
+        assert peer_info.status.head.slot == Slot(200)

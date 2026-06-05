@@ -20,10 +20,10 @@ TESTDATA_DIRECTORY = Path(__file__).parent / "testdata"
 def load_test_file(filename: str, size_limit: int = 0) -> bytes:
     """Load a test data file, optionally truncated to size_limit."""
     path = TESTDATA_DIRECTORY / filename
-    data = path.read_bytes()
+    file_bytes = path.read_bytes()
     if size_limit > 0:
-        data = data[:size_limit]
-    return data
+        file_bytes = file_bytes[:size_limit]
+    return file_bytes
 
 
 # Test data files as defined in the C++ test suite
@@ -100,22 +100,22 @@ class TestSelfPatternExtension:
             for length in range(1, 65):
                 for extra_bytes in [0, 1, 15, 16, 128]:
                     size = pattern_size + length + extra_bytes
-                    data = bytearray(size)
+                    uncompressed = bytearray(size)
 
                     # Build pattern
                     for i in range(pattern_size):
-                        data[i] = ord("a") + i
+                        uncompressed[i] = ord("a") + i
 
                     # Repeat pattern
                     for i in range(length):
-                        data[pattern_size + i] = data[i % pattern_size]
+                        uncompressed[pattern_size + i] = uncompressed[i % pattern_size]
 
                     # Random suffix
                     for i in range(extra_bytes):
-                        data[pattern_size + length + i] = random.randint(0, 255)
+                        uncompressed[pattern_size + length + i] = random.randint(0, 255)
 
-                    compressed = compress(bytes(data))
-                    assert decompress(compressed) == bytes(data)
+                    compressed = compress(bytes(uncompressed))
+                    assert decompress(compressed) == bytes(uncompressed)
 
 
 class TestMaxBlowup:
@@ -126,18 +126,18 @@ class TestMaxBlowup:
         random.seed(42)
 
         # Build input with random bytes
-        data = bytearray(random.randint(0, 255) for _ in range(80000))
+        uncompressed = bytearray(random.randint(0, 255) for _ in range(80000))
 
         # Append four-byte sequences from the end
         for i in range(0, 80000, 4):
-            four_bytes = data[-(i + 4) : -i] if i > 0 else data[-4:]
-            data.extend(four_bytes)
+            four_bytes = uncompressed[-(i + 4) : -i] if i > 0 else uncompressed[-4:]
+            uncompressed.extend(four_bytes)
 
-        compressed = compress(bytes(data))
-        assert decompress(compressed) == bytes(data)
+        compressed = compress(bytes(uncompressed))
+        assert decompress(compressed) == bytes(uncompressed)
 
         # Verify max_compressed_length bound
-        assert len(compressed) <= max_compressed_length(len(data))
+        assert len(compressed) <= max_compressed_length(len(uncompressed))
 
 
 class TestRealDataFiles:
@@ -146,34 +146,34 @@ class TestRealDataFiles:
     @pytest.mark.parametrize("label,filename,size_limit", TEST_DATA_FILES)
     def test_roundtrip(self, label: str, filename: str, size_limit: int) -> None:
         """Test compression/decompression roundtrip for each test file."""
-        data = load_test_file(filename, size_limit)
-        compressed = compress(data)
+        uncompressed = load_test_file(filename, size_limit)
+        compressed = compress(uncompressed)
         decompressed = decompress(compressed)
-        assert decompressed == data, f"Roundtrip failed for {label}"
+        assert decompressed == uncompressed, f"Roundtrip failed for {label}"
 
     @pytest.mark.parametrize("label,filename,size_limit", TEST_DATA_FILES)
     def test_compression_bound(self, label: str, filename: str, size_limit: int) -> None:
         """Test that compressed size is within bounds."""
-        data = load_test_file(filename, size_limit)
-        compressed = compress(data)
-        assert len(compressed) <= max_compressed_length(len(data))
+        uncompressed = load_test_file(filename, size_limit)
+        compressed = compress(uncompressed)
+        assert len(compressed) <= max_compressed_length(len(uncompressed))
 
     def test_text_compression_ratio(self) -> None:
         """Text files should achieve good compression."""
         for label, filename, _ in TEST_DATA_FILES:
             if filename.endswith(".txt"):
-                data = load_test_file(filename)
-                compressed = compress(data)
-                ratio = len(compressed) / len(data)
+                uncompressed = load_test_file(filename)
+                compressed = compress(uncompressed)
+                ratio = len(compressed) / len(uncompressed)
                 # Text should compress to less than 70% of original
                 # (Snappy prioritizes speed over compression ratio)
                 assert ratio < 0.7, f"{label} compression ratio too high: {ratio:.2%}"
 
     def test_jpeg_low_compression(self) -> None:
         """JPEG files (already compressed) should have low compression ratio."""
-        data = load_test_file("fireworks.jpeg")
-        compressed = compress(data)
-        ratio = len(compressed) / len(data)
+        uncompressed = load_test_file("fireworks.jpeg")
+        compressed = compress(uncompressed)
+        ratio = len(compressed) / len(uncompressed)
         # JPEG shouldn't compress much (already compressed)
         # Allow up to 5% expansion or minimal compression
         assert ratio > 0.95, f"JPEG compressed too much: {ratio:.2%}"
@@ -186,9 +186,9 @@ class TestUtilities:
         """max_compressed_length returns a valid upper bound."""
         for size in [0, 100, 1000, 65536, 100000]:
             max_length = max_compressed_length(size)
-            data = bytes(range(256)) * (size // 256 + 1)
-            data = data[:size]
-            compressed = compress(data)
+            uncompressed = bytes(range(256)) * (size // 256 + 1)
+            uncompressed = uncompressed[:size]
+            compressed = compress(uncompressed)
             assert len(compressed) <= max_length
 
 
@@ -197,36 +197,36 @@ class TestSpecificPatterns:
 
     def test_overlapping_copy(self) -> None:
         """Overlapping copies (run-length encoding) work correctly."""
-        data = b"AAAAAAAAAAAA"
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = b"AAAAAAAAAAAA"
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
     def test_alternating_pattern(self) -> None:
         """Alternating patterns compress correctly."""
-        data = b"ABABABABABABABAB" * 100
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = b"ABABABABABABABAB" * 100
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
     def test_long_match(self) -> None:
         """Long matches (up to 64 bytes) are handled correctly."""
         pattern = bytes(range(64))
-        data = pattern * 100
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = pattern * 100
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
     def test_near_block_boundary(self) -> None:
         """Data near block boundaries compresses correctly."""
         for size in [65534, 65535, 65536, 65537, 65538]:
-            data = b"X" * size
-            compressed = compress(data)
-            assert decompress(compressed) == data
+            uncompressed = b"X" * size
+            compressed = compress(uncompressed)
+            assert decompress(compressed) == uncompressed
 
     def test_repeated_data_compresses(self) -> None:
         """Repeated data achieves significant compression."""
-        data = b"A" * 1000
-        compressed = compress(data)
-        assert len(compressed) < len(data) // 2
-        assert decompress(compressed) == data
+        uncompressed = b"A" * 1000
+        compressed = compress(uncompressed)
+        assert len(compressed) < len(uncompressed) // 2
+        assert decompress(compressed) == uncompressed
 
     def test_run_length_encoding(self) -> None:
         """Run-length patterns compress efficiently."""
@@ -237,15 +237,15 @@ class TestSpecificPatterns:
 
     def test_random_looking_data(self) -> None:
         """Data without patterns may not compress but still roundtrips."""
-        data = bytes([(i * 17 + 31) % 256 for i in range(500)])
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = bytes([(i * 17 + 31) % 256 for i in range(500)])
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
     def test_binary_data(self) -> None:
         """Binary data roundtrips correctly."""
-        data = bytes(range(256)) * 4
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = bytes(range(256)) * 4
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
 
 class TestMultiBlock:
@@ -253,21 +253,21 @@ class TestMultiBlock:
 
     def test_large_input(self) -> None:
         """Large inputs (multi-block) roundtrip correctly."""
-        data = b"Test pattern for large data compression. " * 5000
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = b"Test pattern for large data compression. " * 5000
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
     def test_exact_block_size(self) -> None:
         """Data exactly at block boundary."""
-        data = b"X" * 65536  # Exactly one block
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = b"X" * 65536  # Exactly one block
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
     def test_multiple_blocks(self) -> None:
         """Data spanning multiple blocks."""
-        data = b"Y" * (65536 * 3 + 1000)  # 3+ blocks
-        compressed = compress(data)
-        assert decompress(compressed) == data
+        uncompressed = b"Y" * (65536 * 3 + 1000)  # 3+ blocks
+        compressed = compress(uncompressed)
+        assert decompress(compressed) == uncompressed
 
 
 class TestExpandedData:
@@ -276,12 +276,12 @@ class TestExpandedData:
     @pytest.mark.parametrize("label,filename,size_limit", TEST_DATA_FILES)
     def test_expanded_roundtrip(self, label: str, filename: str, size_limit: int) -> None:
         """Test roundtrip with data expanded to span multiple blocks."""
-        data = load_test_file(filename, size_limit)
+        uncompressed = load_test_file(filename, size_limit)
 
         # Expand data to at least 3x block size (196KB)
-        expanded = data
+        expanded = uncompressed
         while len(expanded) < 3 * 65536:
-            expanded = expanded + data
+            expanded = expanded + uncompressed
 
         compressed = compress(expanded)
         assert decompress(compressed) == expanded

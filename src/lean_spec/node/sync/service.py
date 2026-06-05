@@ -183,9 +183,9 @@ class SyncService:
             def ancestors(start: Bytes32) -> set[Bytes32]:
                 seen: set[Bytes32] = set()
                 root = start
-                while (b := new_store.blocks.get(root)) is not None:
+                while (block := new_store.blocks.get(root)) is not None:
                     seen.add(root)
-                    root = b.parent_root
+                    root = block.parent_root
                 return seen
 
             # Reorg depth = blocks that lived on the old chain but not on the new one.
@@ -349,7 +349,7 @@ class SyncService:
             raise RuntimeError("HeadSync not initialized")
 
         # Head-sync either processes the block now or caches it pending backfill.
-        result, new_store = await self._head_sync.on_gossip_block(
+        gossip_block_outcome, new_store = await self._head_sync.on_gossip_block(
             block=block,
             peer_id=peer_id,
             store=self.store,
@@ -358,7 +358,7 @@ class SyncService:
         # Only update our store if the block was actually processed.
         #
         # A block may be cached instead of processed if its parent is unknown.
-        if result.processed:
+        if gossip_block_outcome.processed:
             block_root = hash_tree_root(block.block)
             logger.info(
                 "Block processed slot=%s root=%s from peer %s",
@@ -570,28 +570,29 @@ class SyncService:
         # AttestationData instances from different code paths may not share a
         # dict key, so match on the hash tree root instead.
         local_proofs_by_root: dict[Bytes32, list[SingleMessageAggregate]] = {}
-        for data, proofs in store.latest_new_aggregated_payloads.items():
-            local_proofs_by_root.setdefault(hash_tree_root(data), []).extend(proofs)
+        for attestation_data, proofs in store.latest_new_aggregated_payloads.items():
+            local_proofs_by_root.setdefault(hash_tree_root(attestation_data), []).extend(proofs)
 
         # Working copy of the pending pool.
         # The combined proof is retained locally so the block-sourced
         # aggregate survives without depending on gossip loopback. Shallow
         # copy the dict and its inner sets to preserve store immutability.
         new_payloads: dict[AttestationData, set[SingleMessageAggregate]] = {
-            k: set(v) for k, v in store.latest_new_aggregated_payloads.items()
+            pending_data: set(pending_proofs)
+            for pending_data, pending_proofs in store.latest_new_aggregated_payloads.items()
         }
         aggregates: list[SignedAggregatedAttestation] = []
 
         for attestation in block_attestations:
-            data = attestation.data
+            attestation_data = attestation.data
 
             # Only spend a split on attestations that can still move
             # justification forward. A target at or behind the store's
             # justified checkpoint cannot, so skip it.
-            if data.target.slot <= store.latest_justified.slot:
+            if attestation_data.target.slot <= store.latest_justified.slot:
                 continue
 
-            data_root = hash_tree_root(data)
+            data_root = hash_tree_root(attestation_data)
             block_participants = set(attestation.aggregation_bits.to_validator_indices())
 
             local_proofs = local_proofs_by_root.get(data_root, [])
@@ -627,7 +628,7 @@ class SyncService:
                         ],
                         raw_xmss=[],
                         message=data_root,
-                        slot=data.slot,
+                        slot=attestation_data.slot,
                     )
                 else:
                     # Data unseen locally: nothing to merge, use as-is.
@@ -651,8 +652,8 @@ class SyncService:
                     else:
                         del new_payloads[key]
 
-            new_payloads.setdefault(data, set()).add(combined)
-            aggregates.append(SignedAggregatedAttestation(data=data, proof=combined))
+            new_payloads.setdefault(attestation_data, set()).add(combined)
+            aggregates.append(SignedAggregatedAttestation(data=attestation_data, proof=combined))
 
         if aggregates:
             store.latest_new_aggregated_payloads = new_payloads

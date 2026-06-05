@@ -626,7 +626,7 @@ class TestIntegration:
                 blocks.append(SignedBlock.decode_bytes(ssz_bytes))
 
         assert len(blocks) == 2
-        slots = {b.block.slot for b in blocks}
+        slots = {signed_block.block.slot for signed_block in blocks}
         assert Slot(10) in slots
         assert Slot(20) in slots
 
@@ -680,11 +680,11 @@ class TestStreamResponseAdapterMultipleResponses:
         assert len(written) == 3
 
         # Each response should be independently decodable
-        for i, data in enumerate(written):
-            code, decoded = ResponseCode.decode(data)
+        for i, response_bytes in enumerate(written):
+            code, decoded = ResponseCode.decode(response_bytes)
             assert code == ResponseCode.SUCCESS
-            expected = bytes([i * 2 + 1, i * 2 + 2])
-            assert decoded == expected
+            expected_payload = bytes([i * 2 + 1, i * 2 + 2])
+            assert decoded == expected_payload
 
     async def test_send_success_then_error(self) -> None:
         """Success response followed by error response."""
@@ -803,7 +803,7 @@ class TestReqRespServerChunkedRead:
         request_bytes = encode_request(peer_status.encode_bytes())
 
         # Split into single-byte chunks
-        chunks = [bytes([b]) for b in request_bytes]
+        chunks = [bytes([byte_value]) for byte_value in request_bytes]
 
         stream = MockChunkedStream(chunks=chunks)
 
@@ -990,19 +990,21 @@ class TestConcurrentRequestHandling:
             streams.append(MockStream(request_data=request_bytes))
 
         # Handle all requests concurrently
-        await asyncio.gather(*[server.handle_stream(s, STATUS_PROTOCOL_V1) for s in streams])
+        await asyncio.gather(
+            *[server.handle_stream(stream, STATUS_PROTOCOL_V1) for stream in streams]
+        )
 
         # Decode all responses
-        results = []
+        decoded_statuses = []
         for stream in streams:
             assert stream.closed
             assert len(stream.written) >= 1
             code, ssz_data = ResponseCode.decode(stream.written[0])
             assert code == ResponseCode.SUCCESS
-            results.append(Status.decode_bytes(ssz_data))
+            decoded_statuses.append(Status.decode_bytes(ssz_data))
 
         # All responses should be our status
-        for status in results:
+        for status in decoded_statuses:
             assert status.head.slot == Slot(200)
             assert status.finalized.slot == Slot(100)
 
@@ -1404,7 +1406,10 @@ class TestRequestHandlerBlocksByRange:
         request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
         await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
 
-        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        decoded_slots = [
+            SignedBlock.decode_bytes(success_bytes).block.slot
+            for success_bytes in response.successes
+        ]
         assert response.errors == []
         assert decoded_slots == [Slot(4000 + i) for i in range(5)]
 
@@ -1418,7 +1423,10 @@ class TestRequestHandlerBlocksByRange:
         request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(10))
         await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
 
-        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        decoded_slots = [
+            SignedBlock.decode_bytes(success_bytes).block.slot
+            for success_bytes in response.successes
+        ]
         assert response.errors == []
         assert decoded_slots == [Slot(4000), Slot(4001), Slot(4002)]
 
@@ -1436,7 +1444,10 @@ class TestRequestHandlerBlocksByRange:
         request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(5))
         await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
 
-        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        decoded_slots = [
+            SignedBlock.decode_bytes(success_bytes).block.slot
+            for success_bytes in response.successes
+        ]
         assert response.errors == []
         assert decoded_slots == [Slot(4000), Slot(4002), Slot(4004)]
 
@@ -1466,7 +1477,10 @@ class TestRequestHandlerBlocksByRange:
         request = BlocksByRangeRequest(start_slot=Slot(0), count=Uint64(1))
         await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
 
-        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        decoded_slots = [
+            SignedBlock.decode_bytes(success_bytes).block.slot
+            for success_bytes in response.successes
+        ]
         assert response.errors == []
         assert decoded_slots == [Slot(0)]
 
@@ -1554,7 +1568,10 @@ class TestRequestHandlerBlocksByRange:
         request = BlocksByRangeRequest(start_slot=Slot(4000), count=Uint64(3))
         await handler.handle_blocks_by_range(request, response)  # type: ignore[arg-type]
 
-        decoded_slots = [SignedBlock.decode_bytes(s).block.slot for s in response.successes]
+        decoded_slots = [
+            SignedBlock.decode_bytes(success_bytes).block.slot
+            for success_bytes in response.successes
+        ]
         assert response.errors == []
         assert decoded_slots == [Slot(4001)]
 
@@ -1591,7 +1608,7 @@ class TestReqRespServerBlocksByRange:
             code, ssz_bytes = ResponseCode.decode(chunk)
             if code == ResponseCode.SUCCESS:
                 success_blocks.append(SignedBlock.decode_bytes(ssz_bytes))
-        assert [b.block.slot for b in success_blocks] == [Slot(4000)]
+        assert [signed_block.block.slot for signed_block in success_blocks] == [Slot(4000)]
 
     async def test_invalid_ssz_returns_invalid_request(self) -> None:
         """Invalid SSZ for BlocksByRange returns INVALID_REQUEST."""
@@ -1629,4 +1646,6 @@ class TestReqRespServerBlocksByRange:
             code, ssz_bytes = ResponseCode.decode(response_wire)
             if code == ResponseCode.SUCCESS:
                 success_blocks.append(SignedBlock.decode_bytes(ssz_bytes))
-        assert [b.block.slot for b in success_blocks] == [Slot(4000 + i) for i in range(3)]
+        assert [signed_block.block.slot for signed_block in success_blocks] == [
+            Slot(4000 + i) for i in range(3)
+        ]

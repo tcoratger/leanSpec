@@ -168,12 +168,14 @@ class NetworkingCodecTest(BaseConsensusFixture):
 
     def _make_varint(self) -> dict[str, Any]:
         """Encode a value as LEB128, decode it back, assert roundtrip."""
-        value = self.input["value"]
-        encoded = encode_varint(value)
+        varint_value = self.input["value"]
+        encoded = encode_varint(varint_value)
 
         # Decode must recover the original value and consume all bytes.
         decoded, byte_length = decode_varint(encoded)
-        assert decoded == value, f"Varint roundtrip: {value} -> {encoded.hex()} -> {decoded}"
+        assert decoded == varint_value, (
+            f"Varint roundtrip: {varint_value} -> {encoded.hex()} -> {decoded}"
+        )
         assert byte_length == len(encoded), f"Length: {byte_length} != {len(encoded)}"
 
         return {"encoded": _to_hex(encoded), "byteLength": byte_length}
@@ -281,9 +283,9 @@ class NetworkingCodecTest(BaseConsensusFixture):
         """
         raw_chunks = self.input["chunks"]
         buffer = bytearray()
-        for entry in raw_chunks:
-            code = ResponseCode(entry["responseCode"])
-            ssz_data = _from_hex(entry["sszData"])
+        for chunk in raw_chunks:
+            code = ResponseCode(chunk["responseCode"])
+            ssz_data = _from_hex(chunk["sszData"])
             buffer.extend(code.encode(ssz_data))
         return {
             "encoded": _to_hex(bytes(buffer)),
@@ -292,30 +294,30 @@ class NetworkingCodecTest(BaseConsensusFixture):
 
     def _make_snappy_block(self) -> dict[str, Any]:
         """Compress with raw Snappy block format, decompress, assert roundtrip."""
-        data = _from_hex(self.input["data"])
-        compressed = compress(data)
+        uncompressed_bytes = _from_hex(self.input["data"])
+        compressed = compress(uncompressed_bytes)
 
         decompressed = decompress(compressed)
-        assert decompressed == data, "Snappy block roundtrip produced different bytes"
+        assert decompressed == uncompressed_bytes, "Snappy block roundtrip produced different bytes"
 
         return {
             "compressed": _to_hex(compressed),
             "compressedLength": len(compressed),
-            "uncompressedLength": len(data),
+            "uncompressedLength": len(uncompressed_bytes),
         }
 
     def _make_snappy_frame(self) -> dict[str, Any]:
         """Compress with Snappy framing format (Ethereum wire format), decompress, roundtrip."""
-        data = _from_hex(self.input["data"])
-        framed = frame_compress(data)
+        uncompressed_bytes = _from_hex(self.input["data"])
+        framed = frame_compress(uncompressed_bytes)
 
         decompressed = frame_decompress(framed)
-        assert decompressed == data, "Snappy frame roundtrip produced different bytes"
+        assert decompressed == uncompressed_bytes, "Snappy frame roundtrip produced different bytes"
 
         return {
             "framed": _to_hex(framed),
             "framedLength": len(framed),
-            "uncompressedLength": len(data),
+            "uncompressedLength": len(uncompressed_bytes),
         }
 
     def _make_enr(self) -> dict[str, Any]:
@@ -356,7 +358,9 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 "nextForkEpoch": int(eth2.next_fork_epoch),
             }
         if (subnets := enr.attestation_subnets) is not None:
-            output["attestationSubnets"] = [int(s) for s in subnets.subscribed_subnets()]
+            output["attestationSubnets"] = [
+                int(subnet_id) for subnet_id in subnets.subscribed_subnets()
+            ]
         output["isAggregator"] = enr.is_aggregator
         output["signatureValid"] = enr.verify_signature()
         output["isValid"] = enr.is_valid()
@@ -389,63 +393,81 @@ class NetworkingCodecTest(BaseConsensusFixture):
         }
 
 
-def _build_rpc(d: dict[str, Any]) -> RPC:
+def _build_rpc(rpc_dict: dict[str, Any]) -> RPC:
     """Build an RPC from a JSON-friendly dict."""
-    subs = [_build_sub_opts(s) for s in d.get("subscriptions", [])]
-    messages = [_build_message(m) for m in d.get("publish", [])]
-    ctrl = _build_control(d["control"]) if d.get("control") else None
-    return RPC(subscriptions=subs, publish=messages, control=ctrl)
+    subscriptions = [
+        _build_sub_opts(subscription_dict)
+        for subscription_dict in rpc_dict.get("subscriptions", [])
+    ]
+    messages = [_build_message(message_dict) for message_dict in rpc_dict.get("publish", [])]
+    control = _build_control(rpc_dict["control"]) if rpc_dict.get("control") else None
+    return RPC(subscriptions=subscriptions, publish=messages, control=control)
 
 
-def _build_sub_opts(d: dict[str, Any]) -> SubOpts:
+def _build_sub_opts(sub_opts_dict: dict[str, Any]) -> SubOpts:
     """Build a SubOpts from a dict."""
-    return SubOpts(subscribe=d["subscribe"], topic_id=TopicId(d["topicId"]))
+    return SubOpts(subscribe=sub_opts_dict["subscribe"], topic_id=TopicId(sub_opts_dict["topicId"]))
 
 
-def _build_message(d: dict[str, Any]) -> Message:
+def _build_message(message_dict: dict[str, Any]) -> Message:
     """Build a Message from a dict. Bytes fields are hex-encoded."""
     return Message(
-        from_peer=_from_hex(d["fromPeer"]) if d.get("fromPeer") else b"",
-        data=_from_hex(d["data"]) if d.get("data") else b"",
-        seqno=_from_hex(d["seqno"]) if d.get("seqno") else b"",
-        topic=TopicId(d.get("topic", "")),
-        signature=_from_hex(d["signature"]) if d.get("signature") else b"",
-        key=_from_hex(d["key"]) if d.get("key") else b"",
+        from_peer=_from_hex(message_dict["fromPeer"]) if message_dict.get("fromPeer") else b"",
+        data=_from_hex(message_dict["data"]) if message_dict.get("data") else b"",
+        seqno=_from_hex(message_dict["seqno"]) if message_dict.get("seqno") else b"",
+        topic=TopicId(message_dict.get("topic", "")),
+        signature=_from_hex(message_dict["signature"]) if message_dict.get("signature") else b"",
+        key=_from_hex(message_dict["key"]) if message_dict.get("key") else b"",
     )
 
 
-def _build_control(d: dict[str, Any]) -> ControlMessage:
+def _build_control(control_dict: dict[str, Any]) -> ControlMessage:
     """Build a ControlMessage from a dict."""
     return ControlMessage(
-        ihave=[_build_ihave(x) for x in d.get("ihave", [])],
-        iwant=[_build_iwant(x) for x in d.get("iwant", [])],
-        graft=[ControlGraft(topic_id=TopicId(x["topicId"])) for x in d.get("graft", [])],
-        prune=[_build_prune(x) for x in d.get("prune", [])],
-        idontwant=[_build_idontwant(x) for x in d.get("idontwant", [])],
+        ihave=[_build_ihave(ihave_dict) for ihave_dict in control_dict.get("ihave", [])],
+        iwant=[_build_iwant(iwant_dict) for iwant_dict in control_dict.get("iwant", [])],
+        graft=[
+            ControlGraft(topic_id=TopicId(graft_dict["topicId"]))
+            for graft_dict in control_dict.get("graft", [])
+        ],
+        prune=[_build_prune(prune_dict) for prune_dict in control_dict.get("prune", [])],
+        idontwant=[
+            _build_idontwant(idontwant_dict) for idontwant_dict in control_dict.get("idontwant", [])
+        ],
     )
 
 
-def _build_ihave(d: dict[str, Any]) -> ControlIHave:
+def _build_ihave(ihave_dict: dict[str, Any]) -> ControlIHave:
     """Build a ControlIHave from a dict."""
     return ControlIHave(
-        topic_id=TopicId(d.get("topicId", "")),
-        message_ids=[_from_hex(mid) for mid in d.get("messageIds", [])],
+        topic_id=TopicId(ihave_dict.get("topicId", "")),
+        message_ids=[
+            _from_hex(message_id_hex) for message_id_hex in ihave_dict.get("messageIds", [])
+        ],
     )
 
 
-def _build_iwant(d: dict[str, Any]) -> ControlIWant:
+def _build_iwant(iwant_dict: dict[str, Any]) -> ControlIWant:
     """Build a ControlIWant from a dict."""
-    return ControlIWant(message_ids=[_from_hex(mid) for mid in d.get("messageIds", [])])
+    return ControlIWant(
+        message_ids=[
+            _from_hex(message_id_hex) for message_id_hex in iwant_dict.get("messageIds", [])
+        ]
+    )
 
 
-def _build_prune(d: dict[str, Any]) -> ControlPrune:
+def _build_prune(prune_dict: dict[str, Any]) -> ControlPrune:
     """Build a ControlPrune from a dict."""
     return ControlPrune(
-        topic_id=TopicId(d.get("topicId", "")),
-        backoff=d.get("backoff", 0),
+        topic_id=TopicId(prune_dict.get("topicId", "")),
+        backoff=prune_dict.get("backoff", 0),
     )
 
 
-def _build_idontwant(d: dict[str, Any]) -> ControlIDontWant:
+def _build_idontwant(idontwant_dict: dict[str, Any]) -> ControlIDontWant:
     """Build a ControlIDontWant from a dict."""
-    return ControlIDontWant(message_ids=[_from_hex(mid) for mid in d.get("messageIds", [])])
+    return ControlIDontWant(
+        message_ids=[
+            _from_hex(message_id_hex) for message_id_hex in idontwant_dict.get("messageIds", [])
+        ]
+    )

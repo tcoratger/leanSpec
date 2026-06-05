@@ -47,20 +47,20 @@ class TestSelectProofsForCoverage:
         wide = _proof([1, 2, 3], b"\xaa")
         narrow = _proof([4], b"\xbb")
 
-        selected, covered = select_proofs_for_coverage({wide, narrow})
+        selected_proofs, covered_validators = select_proofs_for_coverage({wide, narrow})
 
-        assert selected == [wide, narrow]
-        assert covered == {ValidatorIndex(i) for i in (1, 2, 3, 4)}
+        assert selected_proofs == [wide, narrow]
+        assert covered_validators == {ValidatorIndex(i) for i in (1, 2, 3, 4)}
 
     def test_stops_when_remaining_proof_adds_no_new_validator(self) -> None:
         """A proof whose validators are already covered is never selected."""
         full = _proof([1, 2, 3], b"\xaa")
         subset = _proof([1, 2], b"\xbb")
 
-        selected, covered = select_proofs_for_coverage({full, subset})
+        selected_proofs, covered_validators = select_proofs_for_coverage({full, subset})
 
-        assert selected == [full]
-        assert covered == {ValidatorIndex(i) for i in (1, 2, 3)}
+        assert selected_proofs == [full]
+        assert covered_validators == {ValidatorIndex(i) for i in (1, 2, 3)}
 
     def test_partial_overlap_picks_by_marginal_coverage(self) -> None:
         """Greedy scores by new coverage, then takes the next proof for its remainder."""
@@ -68,30 +68,32 @@ class TestSelectProofsForCoverage:
         first = _proof([1, 2, 3], b"\xaa")
         overlapping = _proof([3, 4], b"\xbb")
 
-        selected, covered = select_proofs_for_coverage({first, overlapping})
+        selected_proofs, covered_validators = select_proofs_for_coverage({first, overlapping})
 
-        assert selected == [first, overlapping]
-        assert covered == {ValidatorIndex(i) for i in (1, 2, 3, 4)}
+        assert selected_proofs == [first, overlapping]
+        assert covered_validators == {ValidatorIndex(i) for i in (1, 2, 3, 4)}
 
     def test_priority_pool_is_consumed_before_fallback(self) -> None:
         """A priority proof is chosen first even when a fallback proof covers more."""
         priority = _proof([1, 2], b"\xaa")
         fallback = _proof([1, 2, 3, 4, 5], b"\xbb")
 
-        selected, covered = select_proofs_for_coverage({priority}, {fallback})
+        selected_proofs, covered_validators = select_proofs_for_coverage({priority}, {fallback})
 
-        assert selected == [priority, fallback]
-        assert covered == {ValidatorIndex(i) for i in (1, 2, 3, 4, 5)}
+        assert selected_proofs == [priority, fallback]
+        assert covered_validators == {ValidatorIndex(i) for i in (1, 2, 3, 4, 5)}
 
     def test_fallback_proof_already_covered_by_priority_is_skipped(self) -> None:
         """A fallback proof adds nothing when priority already covers its validators."""
         priority = _proof([1, 2, 3], b"\xaa")
         redundant_fallback = _proof([1, 2], b"\xbb")
 
-        selected, covered = select_proofs_for_coverage({priority}, {redundant_fallback})
+        selected_proofs, covered_validators = select_proofs_for_coverage(
+            {priority}, {redundant_fallback}
+        )
 
-        assert selected == [priority]
-        assert covered == {ValidatorIndex(i) for i in (1, 2, 3)}
+        assert selected_proofs == [priority]
+        assert covered_validators == {ValidatorIndex(i) for i in (1, 2, 3)}
 
     def test_exhausting_priority_pool_early_still_processes_fallback(self) -> None:
         """Stopping one pool early still lets the next pool contribute."""
@@ -101,10 +103,10 @@ class TestSelectProofsForCoverage:
         subset = _proof([1, 2], b"\xbb")
         fallback = _proof([4], b"\xcc")
 
-        selected, covered = select_proofs_for_coverage({full, subset}, {fallback})
+        selected_proofs, covered_validators = select_proofs_for_coverage({full, subset}, {fallback})
 
-        assert selected == [full, fallback]
-        assert covered == {ValidatorIndex(i) for i in (1, 2, 3, 4)}
+        assert selected_proofs == [full, fallback]
+        assert covered_validators == {ValidatorIndex(i) for i in (1, 2, 3, 4)}
 
     def test_none_and_empty_pools_are_skipped(self) -> None:
         """None or empty pools contribute nothing and select nothing."""
@@ -123,10 +125,10 @@ class TestSelectProofsForCoverage:
         # If this ever flips, the assertion below is meaningless, so pin it.
         assert larger.encode_bytes() > smaller.encode_bytes()
 
-        selected, covered = select_proofs_for_coverage({smaller, larger})
+        selected_proofs, covered_validators = select_proofs_for_coverage({smaller, larger})
 
-        assert selected == [larger]
-        assert covered == {ValidatorIndex(1)}
+        assert selected_proofs == [larger]
+        assert covered_validators == {ValidatorIndex(1)}
 
 
 class TestAggregateCommitteeSignatures:
@@ -440,7 +442,7 @@ class TestEndToEndAggregationFlow:
 
         # Verify signatures were stored
         signatures = store.attestation_signatures.get(attestation_data, set())
-        stored_validators = {entry.validator_index for entry in signatures}
+        stored_validators = {stored_signature.validator_index for stored_signature in signatures}
         for validator_index in attesting_validators:
             assert validator_index in stored_validators, (
                 f"Signature for {validator_index} should be stored"
@@ -491,10 +493,10 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     }
 
     store.attestation_signatures = attestation_signatures
-    _, results = spec.aggregate(store)
+    _, aggregated_attestations = spec.aggregate(store)
 
-    assert len(results) == 1
-    assert set(results[0].proof.participants.to_validator_indices()) == {
+    assert len(aggregated_attestations) == 1
+    assert set(aggregated_attestations[0].proof.participants.to_validator_indices()) == {
         ValidatorIndex(0),
         ValidatorIndex(1),
     }
@@ -502,7 +504,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     public_keys = [
         head_state.validators[ValidatorIndex(i)].get_attestation_public_key() for i in range(2)
     ]
-    results[0].proof.verify(
+    aggregated_attestations[0].proof.verify(
         public_keys=public_keys,
         message=hash_tree_root(attestation_data),
         slot=attestation_data.slot,
@@ -515,9 +517,9 @@ def test_aggregate_with_empty_attestation_signatures(
 ) -> None:
     """Empty attestations list should return empty results."""
     store = make_store(num_validators=2, key_manager=container_key_manager)
-    _, results = spec.aggregate(store)
+    _, aggregated_attestations = spec.aggregate(store)
 
-    assert results == []
+    assert aggregated_attestations == []
 
 
 def test_aggregated_signatures_with_multiple_data_groups(
@@ -558,11 +560,11 @@ def test_aggregated_signatures_with_multiple_data_groups(
     }
 
     store.attestation_signatures = attestation_signatures
-    _, results = spec.aggregate(store)
+    _, aggregated_attestations = spec.aggregate(store)
 
-    assert len(results) == 2
+    assert len(aggregated_attestations) == 2
 
-    for signed_attestation in results:
+    for signed_attestation in aggregated_attestations:
         participants = signed_attestation.proof.participants.to_validator_indices()
         public_keys = [
             container_key_manager[validator_index].attestation_keypair.public_key
@@ -585,6 +587,6 @@ def test_aggregate_with_no_signatures(
     Returns empty results (no attestations can be aggregated without signatures).
     """
     store = make_store(num_validators=2, key_manager=container_key_manager)
-    _, results = spec.aggregate(store)
+    _, aggregated_attestations = spec.aggregate(store)
 
-    assert results == []
+    assert aggregated_attestations == []

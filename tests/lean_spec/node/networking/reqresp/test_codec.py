@@ -191,12 +191,12 @@ class TestBoundaryConditions:
         """A valid 10-byte varint is accepted."""
         # Construct a 10-byte varint representing 2^63
         # This is the smallest value that requires 10 bytes
-        value = 2**63
-        encoded = encode_varint(value)
+        integer_value = 2**63
+        encoded = encode_varint(integer_value)
         assert len(encoded) == 10
 
         decoded, consumed = decode_varint(encoded)
-        assert decoded == value
+        assert decoded == integer_value
         assert consumed == 10
 
     def test_varint_11_bytes_rejected(self) -> None:

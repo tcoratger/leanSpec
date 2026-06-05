@@ -83,11 +83,11 @@ class TestGenesisConfigYamlLoading:
         """PublicKeys are converted to Bytes52 instances."""
         config = _load(SAMPLE_YAML)
 
-        for entry in config.genesis_validators:
-            assert isinstance(entry.attestation_public_key, Bytes52)
-            assert len(entry.attestation_public_key) == 52
-            assert isinstance(entry.proposal_public_key, Bytes52)
-            assert len(entry.proposal_public_key) == 52
+        for genesis_validator in config.genesis_validators:
+            assert isinstance(genesis_validator.attestation_public_key, Bytes52)
+            assert len(genesis_validator.attestation_public_key) == 52
+            assert isinstance(genesis_validator.proposal_public_key, Bytes52)
+            assert len(genesis_validator.proposal_public_key) == 52
 
     def test_public_key_without_0x_prefix(self) -> None:
         """Handles public_keys without 0x prefix (zeam format)."""
@@ -251,5 +251,7 @@ class TestCrossClientFormat:
                 )
             ),
         ]
-        for entry, expected in zip(config.genesis_validators, expected_public_keys, strict=True):
-            assert entry.attestation_public_key == expected
+        for genesis_validator, expected_public_key in zip(
+            config.genesis_validators, expected_public_keys, strict=True
+        ):
+            assert genesis_validator.attestation_public_key == expected_public_key

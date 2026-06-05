@@ -143,9 +143,9 @@ class TestOfficialEIP778Vector:
         assert uncompressed[0] == 0x04  # Uncompressed point prefix
 
         # Compute keccak256 of 64-byte x||y (excluding 0x04 prefix)
-        k = keccak.new(digest_bits=256)
-        k.update(uncompressed[1:])
-        computed_node_id = k.hexdigest()
+        keccak_hash = keccak.new(digest_bits=256)
+        keccak_hash.update(uncompressed[1:])
+        computed_node_id = keccak_hash.hexdigest()
 
         assert computed_node_id == OFFICIAL_NODE_ID
 
@@ -317,13 +317,13 @@ class TestPropertyAccessors:
             (b"\xc0\xa8\x01\x01", "192.168.1.1"),
             (b"\x0a\x00\x00\x01", "10.0.0.1"),
         ]
-        for ip_bytes, expected in test_cases:
+        for ip_bytes, expected_ip in test_cases:
             enr = ENR(
                 signature=Bytes64(b"\x00" * 64),
                 seq=SeqNumber(1),
                 pairs={keys.ID: b"v4", keys.IP: ip_bytes},
             )
-            assert enr.ip4 == expected
+            assert enr.ip4 == expected_ip
 
     def test_ip4_returns_none_when_missing(self) -> None:
         """ip4 returns None when 'ip' key is absent."""
@@ -360,13 +360,13 @@ class TestPropertyAccessors:
             (b"\x23\x28", Port(9000)),
             (b"\x76\x5f", Port(30303)),
         ]
-        for port_bytes, expected in test_cases:
+        for port_bytes, expected_port in test_cases:
             enr = ENR(
                 signature=Bytes64(b"\x00" * 64),
                 seq=SeqNumber(1),
                 pairs={keys.ID: b"v4", keys.UDP: port_bytes},
             )
-            assert enr.udp_port == expected
+            assert enr.udp_port == expected_port
 
     def test_udp_port_returns_none_when_missing(self) -> None:
         """udp_port returns None when 'udp' key is absent."""
@@ -494,8 +494,8 @@ class TestStringRepresentation:
             seq=SeqNumber(42),
             pairs={keys.ID: b"v4"},
         )
-        result = str(enr)
-        assert "seq=42" in result
+        enr_string = str(enr)
+        assert "seq=42" in enr_string
 
     def test_str_includes_ip(self) -> None:
         """__str__() includes IP address when present."""
@@ -504,8 +504,8 @@ class TestStringRepresentation:
             seq=SeqNumber(1),
             pairs={keys.ID: b"v4", keys.IP: b"\xc0\xa8\x01\x01"},
         )
-        result = str(enr)
-        assert "192.168.1.1" in result
+        enr_string = str(enr)
+        assert "192.168.1.1" in enr_string
 
     def test_str_includes_udp_port(self) -> None:
         """__str__() includes UDP port when present."""
@@ -514,8 +514,8 @@ class TestStringRepresentation:
             seq=SeqNumber(1),
             pairs={keys.ID: b"v4", keys.UDP: (30303).to_bytes(2, "big")},
         )
-        result = str(enr)
-        assert "udp=30303" in result
+        enr_string = str(enr)
+        assert "udp=30303" in enr_string
 
     def test_str_minimal_enr(self) -> None:
         """__str__() works for minimal ENR."""
@@ -524,10 +524,10 @@ class TestStringRepresentation:
             seq=SeqNumber(1),
             pairs={},
         )
-        result = str(enr)
-        assert result.startswith("ENR(")
-        assert result.endswith(")")
-        assert "seq=1" in result
+        enr_string = str(enr)
+        assert enr_string.startswith("ENR(")
+        assert enr_string.endswith(")")
+        assert "seq=1" in enr_string
 
 
 class TestKeyAccessMethods:
@@ -922,11 +922,11 @@ class TestRoundTripSerialization:
             seq=SeqNumber(1),
             pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
         )
-        result = enr.to_string()
+        enr_text = enr.to_string()
 
-        assert result.startswith("enr:")
+        assert enr_text.startswith("enr:")
         # Should not have padding
-        assert "=" not in result
+        assert "=" not in enr_text
 
 
 class TestSignatureVerification:
@@ -958,16 +958,16 @@ class TestSignatureVerification:
         content_rlp = encode_rlp(content_items)
 
         # Hash content.
-        k = keccak.new(digest_bits=256)
-        k.update(content_rlp)
-        digest = k.digest()
+        keccak_hash = keccak.new(digest_bits=256)
+        keccak_hash.update(content_rlp)
+        digest = keccak_hash.digest()
 
         # Sign with ECDSA using Prehashed mode.
         signature_der = private_key.sign(digest, ec.ECDSA(Prehashed(hashes.SHA256())))
 
         # Convert DER signature to r || s format.
-        r, s = decode_dss_signature(signature_der)
-        signature_64 = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        signature_r, signature_s = decode_dss_signature(signature_der)
+        signature_64 = signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
 
         # Create ENR.
         enr = ENR(

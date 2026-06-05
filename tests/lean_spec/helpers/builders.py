@@ -227,7 +227,7 @@ def make_aggregated_attestation(
 
     Head checkpoint uses the target's root and slot.
     """
-    data = AttestationData(
+    attestation_data = AttestationData(
         slot=attestation_slot,
         head=Checkpoint(root=target.root, slot=target.slot),
         target=target,
@@ -236,7 +236,7 @@ def make_aggregated_attestation(
 
     return AggregatedAttestation(
         aggregation_bits=AggregationBits.from_indices(participant_ids),
-        data=data,
+        data=attestation_data,
     )
 
 
@@ -435,8 +435,8 @@ def make_signed_aggregated_attestation(
             target=Checkpoint(root=Bytes32.zero(), slot=Slot(1)),
             source=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
         )
-    proof = make_aggregated_proof(key_manager, participants, attestation_data)
-    return SignedAggregatedAttestation(data=attestation_data, proof=proof)
+    aggregated_proof = make_aggregated_proof(key_manager, participants, attestation_data)
+    return SignedAggregatedAttestation(data=attestation_data, proof=aggregated_proof)
 
 
 def make_signed_block_from_store(
@@ -459,15 +459,15 @@ def make_signed_block_from_store(
     block_root = hash_tree_root(block)
 
     head_state = new_store.states[new_store.head]
-    public_keys_per_part: list[list] = [
+    public_keys_per_aggregate: list[list] = [
         [
             head_state.validators[validator_index].get_attestation_public_key()
-            for validator_index in proof.participants.to_validator_indices()
+            for validator_index in attestation_proof.participants.to_validator_indices()
         ]
-        for proof in attestation_proofs
+        for attestation_proof in attestation_proofs
     ]
     proposer_public_key = head_state.validators[proposer_index].get_proposal_public_key()
-    public_keys_per_part.append([proposer_public_key])
+    public_keys_per_aggregate.append([proposer_public_key])
 
     proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
     proposer_single_message_aggregate = SingleMessageAggregate.aggregate(
@@ -477,14 +477,14 @@ def make_signed_block_from_store(
         slot=slot,
     )
 
-    merged = MultiMessageAggregate.aggregate(
+    merged_proof = MultiMessageAggregate.aggregate(
         [*attestation_proofs, proposer_single_message_aggregate],
-        public_keys_per_part=public_keys_per_part,
+        public_keys_per_aggregate=public_keys_per_aggregate,
     )
 
     signed_block = SignedBlock(
         block=block,
-        proof=merged,
+        proof=merged_proof,
     )
 
     target_interval = Interval.from_slot(block.slot)

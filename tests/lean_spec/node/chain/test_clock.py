@@ -159,8 +159,8 @@ class TestSecondsUntilNextInterval:
     )
     def test_time_until_boundary(self, genesis: int, now: float, expected_seconds: float) -> None:
         """Returns the seconds remaining until the next interval boundary."""
-        result = clock_at(genesis, now).seconds_until_next_interval()
-        assert result == pytest.approx(expected_seconds, abs=1e-3)
+        seconds_until_next_interval = clock_at(genesis, now).seconds_until_next_interval()
+        assert seconds_until_next_interval == pytest.approx(expected_seconds, abs=1e-3)
 
 
 class TestSleepUntilNextInterval:

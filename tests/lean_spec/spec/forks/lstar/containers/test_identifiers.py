@@ -40,7 +40,7 @@ class TestProposerForSlot:
     """Round-robin proposer selection by slot modulo the registry size."""
 
     @pytest.mark.parametrize(
-        ("slot", "num_validators", "expected"),
+        ("slot", "num_validators", "expected_proposer_index"),
         [
             # In-range slot, no wrap past the registry size.
             (0, 10, 0),
@@ -58,16 +58,18 @@ class TestProposerForSlot:
             (12_345, 1_000, 345),
         ],
     )
-    def test_round_robin_assignment(self, slot: int, num_validators: int, expected: int) -> None:
+    def test_round_robin_assignment(
+        self, slot: int, num_validators: int, expected_proposer_index: int
+    ) -> None:
         """The proposer for a given slot is the slot modulo the registry size."""
         assert ValidatorIndex.proposer_for_slot(
             Slot(slot), Uint64(num_validators)
-        ) == ValidatorIndex(expected)
+        ) == ValidatorIndex(expected_proposer_index)
 
     def test_return_type_is_validator_index(self) -> None:
         """The classmethod returns a strict ValidatorIndex, not a plain int."""
-        result = ValidatorIndex.proposer_for_slot(Slot(5), Uint64(7))
-        assert isinstance(result, ValidatorIndex)
+        proposer_index = ValidatorIndex.proposer_for_slot(Slot(5), Uint64(7))
+        assert isinstance(proposer_index, ValidatorIndex)
 
 
 class TestIsWithinRegistry:
@@ -100,7 +102,7 @@ class TestComputeSubnetId:
     """Subnet assignment by validator index modulo committee count."""
 
     @pytest.mark.parametrize(
-        ("validator_index", "num_committees", "expected"),
+        ("validator_index", "num_committees", "expected_subnet_id"),
         [
             # No wrap: validator index already inside the committee range.
             (0, 8, 0),
@@ -119,14 +121,14 @@ class TestComputeSubnetId:
         ],
     )
     def test_modulo_committee_count(
-        self, validator_index: int, num_committees: int, expected: int
+        self, validator_index: int, num_committees: int, expected_subnet_id: int
     ) -> None:
         """The subnet for a validator is its index modulo the committee count."""
         assert ValidatorIndex(validator_index).compute_subnet_id(
             Uint64(num_committees)
-        ) == SubnetId(expected)
+        ) == SubnetId(expected_subnet_id)
 
     def test_return_type_is_subnet_id(self) -> None:
         """The method returns a strict SubnetId, not a plain Uint64 or int."""
-        result = ValidatorIndex(5).compute_subnet_id(Uint64(64))
-        assert isinstance(result, SubnetId)
+        subnet_id = ValidatorIndex(5).compute_subnet_id(Uint64(64))
+        assert isinstance(subnet_id, SubnetId)

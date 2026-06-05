@@ -21,10 +21,10 @@ TESTDATA_DIRECTORY = Path(__file__).parent / "testdata"
 def load_test_file(filename: str, size_limit: int = 0) -> bytes:
     """Load a test data file, optionally truncated to size_limit."""
     path = TESTDATA_DIRECTORY / filename
-    data = path.read_bytes()
+    file_bytes = path.read_bytes()
     if size_limit > 0:
-        data = data[:size_limit]
-    return data
+        file_bytes = file_bytes[:size_limit]
+    return file_bytes
 
 
 class TestSnappyLengthPrefix:
@@ -46,18 +46,18 @@ class TestSnappyLengthPrefix:
 
     def test_encode_large_values(self) -> None:
         """Large values encode correctly."""
-        for value in [65536, 2**20, 2**24, 2**32 - 1]:
-            encoded = encode_varint(value, max_bytes=SNAPPY_VARINT_MAX_BYTES)
+        for varint_value in [65536, 2**20, 2**24, 2**32 - 1]:
+            encoded = encode_varint(varint_value, max_bytes=SNAPPY_VARINT_MAX_BYTES)
             decoded, _ = decode_varint(encoded, max_bytes=SNAPPY_VARINT_MAX_BYTES)
-            assert decoded == value
+            assert decoded == varint_value
 
     def test_decode_roundtrip(self) -> None:
         """Encoding then decoding returns the original value."""
         test_values = [0, 1, 127, 128, 255, 256, 16383, 16384, 65535, 65536, 2**20, 2**32 - 1]
-        for value in test_values:
-            encoded = encode_varint(value, max_bytes=SNAPPY_VARINT_MAX_BYTES)
+        for varint_value in test_values:
+            encoded = encode_varint(varint_value, max_bytes=SNAPPY_VARINT_MAX_BYTES)
             decoded, bytes_consumed = decode_varint(encoded, max_bytes=SNAPPY_VARINT_MAX_BYTES)
-            assert decoded == value
+            assert decoded == varint_value
             assert bytes_consumed == len(encoded)
 
     def test_encode_negative_raises(self) -> None:
@@ -82,10 +82,12 @@ class TestSnappyLengthPrefix:
 
     def test_decode_with_offset(self) -> None:
         """Decoding at an offset works correctly."""
-        data = b"prefix\xac\x02suffix"
-        value, consumed = decode_varint(data, offset=6, max_bytes=SNAPPY_VARINT_MAX_BYTES)
-        assert value == 300
-        assert consumed == 2
+        prefixed_bytes = b"prefix\xac\x02suffix"
+        decoded_value, bytes_consumed = decode_varint(
+            prefixed_bytes, offset=6, max_bytes=SNAPPY_VARINT_MAX_BYTES
+        )
+        assert decoded_value == 300
+        assert bytes_consumed == 2
 
     def test_decompress_wraps_oversize_prefix(self) -> None:
         """A length prefix that overruns the cap surfaces as a decompression error."""
@@ -142,18 +144,18 @@ class TestCorruptedData:
     @pytest.mark.parametrize("bad_file", ["baddata1.snappy", "baddata2.snappy", "baddata3.snappy"])
     def test_bad_data_files(self, bad_file: str) -> None:
         """Test that bad data files from C++ test suite are rejected."""
-        data = load_test_file(bad_file)
+        bad_snappy_bytes = load_test_file(bad_file)
 
         # Bad data must either decompress safely or raise.
         try:
-            decompress(data)
+            decompress(bad_snappy_bytes)
         except SnappyDecompressionError:
             pass
 
     def test_truncated_literal(self) -> None:
         """Test handling of truncated literal data."""
-        data = b"Hello, World!"
-        compressed = compress(data)
+        uncompressed = b"Hello, World!"
+        compressed = compress(uncompressed)
 
         # Truncate to remove some literal data
         truncated = compressed[:-3]

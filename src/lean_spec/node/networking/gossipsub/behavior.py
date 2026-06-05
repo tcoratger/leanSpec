@@ -898,18 +898,18 @@ class GossipsubBehavior:
         This is normal during connection setup -- the outbound
         stream arrives shortly after the inbound one.
         """
-        state = self._peers.get(peer_id)
-        if state is None or state.outbound_stream is None:
+        peer_state = self._peers.get(peer_id)
+        if peer_state is None or peer_state.outbound_stream is None:
             logger.debug("Cannot send RPC to %s: no outbound stream yet", peer_id)
             return
 
         try:
-            data = rpc.encode()
+            encoded_rpc = rpc.encode()
 
             # Libp2p frames each RPC with a varint length prefix.
             # The receiver uses this to know where one message ends
             # and the next begins on the multiplexed stream.
-            frame = encode_varint(len(data)) + data
+            frame = encode_varint(len(encoded_rpc)) + encoded_rpc
             logger.debug(
                 "Sending RPC to %s: %d bytes (subs=%d, msgs=%d)",
                 peer_id,
@@ -917,10 +917,10 @@ class GossipsubBehavior:
                 len(rpc.subscriptions),
                 len(rpc.publish),
             )
-            state.outbound_stream.write(frame)
-            await state.outbound_stream.drain()
+            peer_state.outbound_stream.write(frame)
+            await peer_state.outbound_stream.drain()
 
-            state.last_rpc_time = time.time()
+            peer_state.last_rpc_time = time.time()
         except Exception as exception:
             logger.warning("Failed to send RPC to %s: %s", peer_id, exception)
 

@@ -40,8 +40,8 @@ class TestAggregationBitsToValidatorIndices:
 
     def test_single_bit_set_at_last_valid_position(self) -> None:
         """Bitlist of length LIMIT with only the final bit set yields index LIMIT - 1."""
-        data = [Boolean(False)] * (int(VALIDATOR_REGISTRY_LIMIT) - 1) + [Boolean(True)]
-        bits = AggregationBits(data=data)
+        bit_flags = [Boolean(False)] * (int(VALIDATOR_REGISTRY_LIMIT) - 1) + [Boolean(True)]
+        bits = AggregationBits(data=bit_flags)
         assert bits.to_validator_indices() == ValidatorIndices(
             data=[ValidatorIndex(int(VALIDATOR_REGISTRY_LIMIT) - 1)]
         )
@@ -49,10 +49,10 @@ class TestAggregationBitsToValidatorIndices:
     def test_all_bits_set_at_full_limit(self) -> None:
         """All LIMIT bits set yields every validator index from 0 to LIMIT - 1 inclusive."""
         bits = AggregationBits(data=[Boolean(True)] * int(VALIDATOR_REGISTRY_LIMIT))
-        expected = ValidatorIndices(
+        expected_indices = ValidatorIndices(
             data=[ValidatorIndex(i) for i in range(int(VALIDATOR_REGISTRY_LIMIT))]
         )
-        assert bits.to_validator_indices() == expected
+        assert bits.to_validator_indices() == expected_indices
 
     def test_multiple_bits_set_ascending(self) -> None:
         """Multiple bits set yield indices in ascending order."""
@@ -65,29 +65,29 @@ class TestAggregationBitsToValidatorIndices:
 
     def test_two_bits_set_at_extremes(self) -> None:
         """Bits at positions 0 and LIMIT - 1 produce the two extreme indices in order."""
-        data = (
+        bit_values = (
             [Boolean(True)]
             + [Boolean(False)] * (int(VALIDATOR_REGISTRY_LIMIT) - 2)
             + [Boolean(True)]
         )
-        bits = AggregationBits(data=data)
+        bits = AggregationBits(data=bit_values)
         assert bits.to_validator_indices() == ValidatorIndices(
             data=[ValidatorIndex(0), ValidatorIndex(int(VALIDATOR_REGISTRY_LIMIT) - 1)]
         )
 
     def test_alternating_even_positions(self) -> None:
         """Bits true at every even position from 0 to 10 yield exactly those indices."""
-        data = [Boolean(i % 2 == 0) for i in range(11)]
-        bits = AggregationBits(data=data)
+        bit_values = [Boolean(i % 2 == 0) for i in range(11)]
+        bits = AggregationBits(data=bit_values)
         assert bits.to_validator_indices() == ValidatorIndices(
             data=[ValidatorIndex(i) for i in (0, 2, 4, 6, 8, 10)]
         )
 
     def test_trailing_false_bits_are_ignored(self) -> None:
         """Trailing false bits after the last set bit do not influence the index list."""
-        data = [Boolean(False)] * 10
-        data[2] = Boolean(True)
-        bits = AggregationBits(data=data)
+        bit_values = [Boolean(False)] * 10
+        bit_values[2] = Boolean(True)
+        bits = AggregationBits(data=bit_values)
         assert bits.to_validator_indices() == ValidatorIndices(data=[ValidatorIndex(2)])
 
 
