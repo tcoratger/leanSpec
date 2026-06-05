@@ -23,12 +23,7 @@ from lean_spec.spec.ssz import ByteList512KiB, Bytes32
 
 
 class AttestationSpec(CamelModel):
-    """
-    Shared core for attestation specifications.
-
-    Declares the checkpoint fields (target, head, source) common to all
-    attestation specs and resolves them into attestation data.
-    """
+    """Shared core for attestation specifications."""
 
     slot: Slot
     """The slot for which the attestation is made (required)."""
@@ -65,15 +60,7 @@ class AttestationSpec(CamelModel):
     """Optional override for the source checkpoint slot."""
 
     valid_signature: bool = True
-    """
-    Flag whether the generated attestation signatures should be valid.
-
-    Used for testing that verification properly rejects invalid attestation signatures.
-    When False, structurally valid but cryptographically invalid signatures
-    (all zeros) will be generated instead of proper XMSS signatures.
-
-    Defaults to True (valid signatures).
-    """
+    """Flag whether the generated attestation signatures should be valid."""
 
     def build_attestation_data(
         self,
@@ -153,14 +140,7 @@ class AttestationSpec(CamelModel):
 
 
 class AggregatedAttestationSpec(AttestationSpec):
-    """
-    Aggregated attestation specification for test definitions.
-
-    Specifies multiple validators attesting to the same data.
-    Used both for attestations embedded in blocks and for
-    aggregations received via gossip.
-    The source defaults to the latest justified checkpoint unless overridden.
-    """
+    """Aggregated attestation specification for test definitions."""
 
     validator_indices: list[ValidatorIndex]
     """The indices of validators making the attestation (required)."""
@@ -169,8 +149,8 @@ class AggregatedAttestationSpec(AttestationSpec):
     """
     Override which validators actually sign the attestation.
 
-    When None (default), signatures are generated using the validators in validator_indices.
-    When specified, signatures are generated using these validator indices instead.
+    - When None (default), signatures are generated using the validators in validator_indices.
+    - When specified, signatures are generated using these validator indices instead.
 
     This creates a mismatch between claimed participants and actual signers.
     Useful for testing that verification rejects attestations where valid signatures
