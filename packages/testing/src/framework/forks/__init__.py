@@ -1,10 +1,7 @@
-"""Base fork infrastructure for Ethereum testing."""
+"""Base fork infrastructure for spec test generation."""
 
-from framework.forks.base import BaseFork, BaseForkMeta
-from framework.forks.registry import ForkRegistry
+from framework.forks.base import BaseFork
 
 __all__ = [
     "BaseFork",
-    "BaseForkMeta",
-    "ForkRegistry",
 ]

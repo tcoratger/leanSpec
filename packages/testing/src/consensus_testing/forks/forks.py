@@ -17,8 +17,3 @@ class Lstar(BaseFork):
     def spec_class(cls) -> type[LstarSpec]:
         """Return the ForkProtocol implementation for this fork."""
         return LstarSpec
-
-    @classmethod
-    def state_class(cls) -> type:
-        """Return the State container class for this fork."""
-        return LstarSpec.state_class
