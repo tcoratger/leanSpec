@@ -26,6 +26,19 @@ from consensus_testing.test_fixtures import (
 )
 
 
+def _split_test_nodeid(test_nodeid: str) -> tuple[str, str]:
+    """
+    Split a pytest node ID into the test file path and bare function name.
+
+    Parametrization suffixes (the bracketed part) are stripped so every
+    parametrized case of one function shares one fixture file.
+    """
+    nodeid_parts = test_nodeid.split("::")
+    test_file_path = nodeid_parts[0]
+    function_name_with_params = nodeid_parts[1] if len(nodeid_parts) > 1 else ""
+    return test_file_path, function_name_with_params.split("[")[0]
+
+
 class FixtureCollector:
     """Collects generated fixtures and writes them to disk."""
 
@@ -39,11 +52,54 @@ class FixtureCollector:
         """
         self.output_directory = output_directory
         self.fork = fork
-        self.fixtures: list[tuple[str, str, Any, str]] = []
+        self.fixtures: list[tuple[str, Any, str]] = []
+
+    def fixture_output_file(self, test_nodeid: str, fixture_format: str) -> Path:
+        """
+        Compute the fixture file for one test function.
+
+        Layout: {output}/consensus/{format}/{test_path}/{function}.json
+        The format directory drops the redundant test suffix.
+
+        Args:
+            test_nodeid: Complete pytest node ID.
+            fixture_format: Format name (e.g., "state_transition_test").
+
+        Returns:
+            The path of the JSON file this test function's fixtures land in.
+
+        Raises:
+            ValueError: If the test file is not under the consensus spec
+                tests, where the output layout is defined.
+                Collection normally excludes such paths already;
+                this guards against misconfiguration.
+        """
+        test_file_path, base_function_name = _split_test_nodeid(test_nodeid)
+
+        # Extract test path relative to the consensus spec tests
+        # e.g., tests/consensus/lstar/... -> lstar/...
+        try:
+            relative_path = Path(test_file_path).relative_to("tests/consensus")
+        except ValueError as exception:
+            raise ValueError(
+                f"cannot derive a fixture output path for '{test_nodeid}': "
+                f"test file '{test_file_path}' is not under tests/consensus"
+            ) from exception
+
+        test_path = relative_path.with_suffix("")
+
+        # Build output path: fixtures/consensus/{format}/{test_path}
+        format_directory = fixture_format.removesuffix("_test")
+        return (
+            self.output_directory
+            / "consensus"
+            / format_directory
+            / test_path
+            / f"{base_function_name}.json"
+        )
 
     def add_fixture(
         self,
-        test_name: str,
         fixture_format: str,
         fixture: Any,
         test_nodeid: str,
@@ -53,78 +109,34 @@ class FixtureCollector:
         Add a fixture to the collection.
 
         Args:
-            test_name: Name of the test that generated this fixture.
             fixture_format: Format name (e.g., "state_transition_test").
             fixture: The fixture object.
             test_nodeid: Complete pytest node ID.
             config: Pytest config object to attach fixture path metadata.
         """
-        self.fixtures.append((test_name, fixture_format, fixture, test_nodeid))
+        self.fixtures.append((fixture_format, fixture, test_nodeid))
 
         if config is not None:
-            nodeid_parts = test_nodeid.split("::")
-            test_file_path = nodeid_parts[0]
-            func_name_with_params = nodeid_parts[1] if len(nodeid_parts) > 1 else ""
-            base_func_name = func_name_with_params.split("[")[0]
-
-            test_file = Path(test_file_path)
-            # Extract test path relative to the consensus spec tests
-            # e.g., tests/consensus/lstar/... -> lstar/...
-            try:
-                relative_path = test_file.relative_to("tests/consensus")
-            except ValueError:
-                # Fallback: try to extract from full path
-                relative_path = test_file
-
-            test_path = relative_path.with_suffix("")
-
-            # Build output path: fixtures/consensus/{format}/{test_path}
-            format_directory = fixture_format.replace("_test", "")
-            fixture_directory = self.output_directory / "consensus" / format_directory / test_path
-            fixture_path = fixture_directory / f"{base_func_name}.json"
-
+            fixture_path = self.fixture_output_file(test_nodeid, fixture_format)
             config.fixture_path_absolute = str(fixture_path.absolute())  # type: ignore[attribute-defined]
             config.fixture_path_relative = str(fixture_path.relative_to(self.output_directory))  # type: ignore[attribute-defined]
             config.fixture_format = fixture_format  # type: ignore[attribute-defined]
 
     def write_fixtures(self) -> None:
         """Write all collected fixtures to disk, grouped by test function."""
-        grouped: dict[tuple[str, str, str], list[tuple[str, Any, str]]] = defaultdict(list)
+        grouped: dict[Path, list[tuple[str, Any, str]]] = defaultdict(list)
 
-        for test_name, fixture_format, fixture, test_nodeid in self.fixtures:
-            nodeid_parts = test_nodeid.split("::")
-            test_file_path = nodeid_parts[0]
-            func_name_with_params = nodeid_parts[1] if len(nodeid_parts) > 1 else ""
-            base_func_name = func_name_with_params.split("[")[0]
+        for fixture_format, fixture, test_nodeid in self.fixtures:
+            output_file = self.fixture_output_file(test_nodeid, fixture_format)
+            grouped[output_file].append((fixture_format, fixture, test_nodeid))
 
-            group_key = (test_file_path, base_func_name, fixture_format)
-            grouped[group_key].append((test_name, fixture, test_nodeid))
-
-        for (test_file_path, base_func_name, fixture_format), fixtures_list in grouped.items():
-            test_file = Path(test_file_path)
-
-            # Extract test path relative to the consensus spec tests
-            # e.g., tests/consensus/lstar/... -> lstar/...
-            try:
-                relative_path = test_file.relative_to("tests/consensus")
-            except ValueError:
-                # Fallback: use full path
-                relative_path = test_file
-
-            test_path = relative_path.with_suffix("")
-
-            # Build output path: fixtures/consensus/{format}/{test_path}
-            format_directory = fixture_format.replace("_test", "")
-            fixture_directory = self.output_directory / "consensus" / format_directory / test_path
-            fixture_directory.mkdir(parents=True, exist_ok=True)
-
-            output_file = fixture_directory / f"{base_func_name}.json"
+        for output_file, fixtures_list in grouped.items():
+            output_file.parent.mkdir(parents=True, exist_ok=True)
 
             all_tests = {}
-            for _, fixture, test_nodeid in fixtures_list:
+            for fixture_format, fixture, test_nodeid in fixtures_list:
                 test_id = f"{test_nodeid}[fork_{self.fork}-{fixture_format}]"
-                fixture_dict = fixture.json_dict_with_info()
-                all_tests[test_id] = fixture_dict
+                all_tests[test_id] = fixture.json_dict_with_info()
 
             with open(output_file, "w") as output_handle:
                 json.dump(all_tests, output_handle, indent=4)
@@ -377,7 +389,6 @@ def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
 
                 if hasattr(request.config, "fixture_collector"):
                     request.config.fixture_collector.add_fixture(
-                        test_name=request.node.name,
                         fixture_format=filled_fixture.format_name,
                         fixture=filled_fixture,
                         test_nodeid=request.node.nodeid,
