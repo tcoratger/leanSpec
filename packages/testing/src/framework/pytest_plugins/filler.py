@@ -1,32 +1,45 @@
-"""Layer-agnostic pytest plugin for generating Ethereum test fixtures."""
+"""Pytest plugin for generating Lean Ethereum consensus test fixtures."""
 
-import importlib
 import json
 import shutil
 import sys
 from collections import defaultdict
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
+from consensus_testing import generate_pre_state
+from consensus_testing.forks import registry
+from consensus_testing.test_fixtures import (
+    ApiEndpointTest,
+    ForkChoiceTest,
+    GossipsubHandlerTest,
+    JustifiabilityTest,
+    NetworkingCodecTest,
+    PoseidonPermutationTest,
+    SlotClockTest,
+    SSZTest,
+    StateTransitionTest,
+    SyncTest,
+    VerifyMultiMessageProofsTest,
+    VerifySignaturesTest,
+    VerifySingleMessageProofsTest,
+)
 
 
 class FixtureCollector:
     """Collects generated fixtures and writes them to disk."""
 
-    def __init__(self, output_directory: Path, fork: str, layer: str):
+    def __init__(self, output_directory: Path, fork: str):
         """
         Initialize the fixture collector.
 
         Args:
             output_directory: Root directory for generated fixtures.
             fork: The fork name (e.g., "Lstar").
-            layer: The Ethereum layer (e.g., "consensus", "execution").
         """
         self.output_directory = output_directory
         self.fork = fork
-        self.layer = layer
         self.fixtures: list[tuple[str, str, Any, str]] = []
 
     def add_fixture(
@@ -56,21 +69,19 @@ class FixtureCollector:
             base_func_name = func_name_with_params.split("[")[0]
 
             test_file = Path(test_file_path)
-            # Extract test path relative to tests/{layer}
+            # Extract test path relative to the consensus spec tests
             # e.g., tests/consensus/lstar/... -> lstar/...
-            layer = config.test_layer if hasattr(config, "test_layer") else "consensus"
-
             try:
-                relative_path = test_file.relative_to(f"tests/{layer}")
+                relative_path = test_file.relative_to("tests/consensus")
             except ValueError:
                 # Fallback: try to extract from full path
                 relative_path = test_file
 
             test_path = relative_path.with_suffix("")
 
-            # Build output path: fixtures/{layer}/{format}/{test_path}
+            # Build output path: fixtures/consensus/{format}/{test_path}
             format_directory = fixture_format.replace("_test", "")
-            fixture_directory = self.output_directory / layer / format_directory / test_path
+            fixture_directory = self.output_directory / "consensus" / format_directory / test_path
             fixture_path = fixture_directory / f"{base_func_name}.json"
 
             config.fixture_path_absolute = str(fixture_path.absolute())  # type: ignore[attribute-defined]
@@ -93,19 +104,19 @@ class FixtureCollector:
         for (test_file_path, base_func_name, fixture_format), fixtures_list in grouped.items():
             test_file = Path(test_file_path)
 
-            # Extract test path relative to tests/{layer}
+            # Extract test path relative to the consensus spec tests
             # e.g., tests/consensus/lstar/... -> lstar/...
             try:
-                relative_path = test_file.relative_to(f"tests/{self.layer}")
+                relative_path = test_file.relative_to("tests/consensus")
             except ValueError:
                 # Fallback: use full path
                 relative_path = test_file
 
             test_path = relative_path.with_suffix("")
 
-            # Build output path: fixtures/{layer}/{format}/{test_path}
+            # Build output path: fixtures/consensus/{format}/{test_path}
             format_directory = fixture_format.replace("_test", "")
-            fixture_directory = self.output_directory / self.layer / format_directory / test_path
+            fixture_directory = self.output_directory / "consensus" / format_directory / test_path
             fixture_directory.mkdir(parents=True, exist_ok=True)
 
             output_file = fixture_directory / f"{base_func_name}.json"
@@ -136,12 +147,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Fork to generate fixtures for",
     )
     group.addoption(
-        "--layer",
-        action="store",
-        default="consensus",
-        help="Ethereum layer (consensus or execution, default: consensus)",
-    )
-    group.addoption(
         "--clean",
         action="store_true",
         default=False,
@@ -149,18 +154,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+def pytest_ignore_collect(collection_path: Path) -> bool | None:
     """
-    Ignore test collection for paths not in the current layer.
+    Ignore test collection for paths outside the consensus spec tests.
 
-    This prevents pytest from collecting tests from other layers,
+    This prevents pytest from collecting unit tests during fill,
     reducing overhead significantly when there are many tests.
     """
-    if not hasattr(config, "test_layer"):
-        return None
-
-    layer = config.test_layer
-
     # Check if path is under tests/ directory
     try:
         relative_path = collection_path.relative_to(Path.cwd() / "tests")
@@ -168,51 +168,19 @@ def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool 
         # Not under tests/, let pytest handle it normally
         return None
 
-    # If it's directly under tests/{layer}, don't ignore
-    if str(relative_path).startswith(layer):
+    # If it's directly under tests/consensus, don't ignore
+    if str(relative_path).startswith("consensus"):
         return None
 
-    # Check if it's a different layer directory or unit tests
-    path_components = relative_path.parts
-    if path_components:
-        # Known layer directories
-        known_layers = {"consensus", "execution"}
-        if path_components[0] in known_layers:
-            # It's a different layer, ignore it
-            return True
-        # It's probably unit tests (tests/lean_spec), ignore during fill
+    # Anything else under tests/ (unit, api, interop tests) is skipped during fill
+    if relative_path.parts:
         return True
 
     return None
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Setup fixture generation session with layer-specific modules."""
-    # Get layer and validate
-    layer = config.getoption("--layer", default="consensus").lower()
-    known_layers = {"consensus", "execution"}
-    if layer not in known_layers:
-        pytest.exit(
-            f"Invalid layer: {layer}. Must be one of: {', '.join(known_layers)}",
-            returncode=pytest.ExitCode.USAGE_ERROR,
-        )
-
-    # Store layer for later use (needed by pytest_ignore_collect hook)
-    config.test_layer = layer  # type: ignore[attribute-defined]
-
-    # Dynamically import layer-specific package
-    try:
-        layer_module = importlib.import_module(f"{layer}_testing")
-        config.layer_module = layer_module  # type: ignore[attribute-defined]
-    except ImportError as exception:
-        pytest.exit(
-            f"Failed to import {layer}_testing module: {exception}",
-            returncode=pytest.ExitCode.USAGE_ERROR,
-        )
-
-    # Register layer-specific test fixture formats
-    _register_layer_fixtures(config, layer)
-
+    """Setup the fixture generation session."""
     # Register fork validity markers
     config.addinivalue_line(
         "markers",
@@ -232,15 +200,13 @@ def pytest_configure(config: pytest.Config) -> None:
     fork_name = config.getoption("--fork")
     clean = config.getoption("--clean")
 
-    # Get available forks from layer-specific module
-    registry = layer_module.forks.registry
     available_fork_names = sorted(fork.name() for fork in registry.forks)
 
     # Validate fork
     if not fork_name:
         print("Error: --fork is required", file=sys.stderr)
         print(
-            f"Available {layer} forks: {', '.join(available_fork_names)}",
+            f"Available forks: {', '.join(available_fork_names)}",
             file=sys.stderr,
         )
         pytest.exit("Missing required --fork option.", returncode=pytest.ExitCode.USAGE_ERROR)
@@ -248,11 +214,11 @@ def pytest_configure(config: pytest.Config) -> None:
     fork_class = registry.get_fork_by_name(fork_name)
     if fork_class is None:
         print(
-            f"Error: Unsupported fork for {layer} layer: {fork_name}\n",
+            f"Error: Unsupported fork: {fork_name}\n",
             file=sys.stderr,
         )
         print(
-            f"Available {layer} forks: {', '.join(available_fork_names)}",
+            f"Available forks: {', '.join(available_fork_names)}",
             file=sys.stderr,
         )
         pytest.exit("Invalid fork specified.", returncode=pytest.ExitCode.USAGE_ERROR)
@@ -276,8 +242,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    # Create collector with layer info
-    config.fixture_collector = FixtureCollector(output_directory, fork_name, layer)  # type: ignore[attribute-defined]
+    config.fixture_collector = FixtureCollector(output_directory, fork_name)  # type: ignore[attribute-defined]
     config.test_fork_class = fork_class  # type: ignore[attribute-defined]
 
 
@@ -287,14 +252,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         return
 
     fork_class = config.test_fork_class
-    layer_module = config.layer_module
-    registry = layer_module.forks.registry
     verbose = config.getoption("verbose")
     deselected_items = []
     selected_items = []
 
     for test_item in items:
-        if not _is_test_item_valid_for_fork(test_item, fork_class, registry.get_fork_by_name):
+        if not _check_markers_valid_for_fork(list(test_item.iter_markers()), fork_class):
             if verbose < 2:
                 deselected_items.append(test_item)
             else:
@@ -310,7 +273,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 def _check_markers_valid_for_fork(
     markers: list[Any],
     fork_class: type,
-    get_fork_by_name: Callable[[str], type | None],
 ) -> bool:
     """
     Check if test markers indicate validity for the given fork.
@@ -329,19 +291,19 @@ def _check_markers_valid_for_fork(
         if marker.name == "valid_from":
             has_valid_from = True
             for fork_name in marker.args:
-                target_fork = get_fork_by_name(fork_name)
+                target_fork = registry.get_fork_by_name(fork_name)
                 if target_fork:
                     valid_from_forks.append(target_fork)
         elif marker.name == "valid_until":
             has_valid_until = True
             for fork_name in marker.args:
-                target_fork = get_fork_by_name(fork_name)
+                target_fork = registry.get_fork_by_name(fork_name)
                 if target_fork:
                     valid_until_forks.append(target_fork)
         elif marker.name == "valid_at":
             has_valid_at = True
             for fork_name in marker.args:
-                target_fork = get_fork_by_name(fork_name)
+                target_fork = registry.get_fork_by_name(fork_name)
                 if target_fork:
                     valid_at_forks.append(target_fork)
 
@@ -360,15 +322,6 @@ def _check_markers_valid_for_fork(
         until_valid = any(fork_class <= until_fork for until_fork in valid_until_forks)
 
     return from_valid and until_valid
-
-
-def _is_test_item_valid_for_fork(
-    item: pytest.Item,
-    fork_class: type,
-    get_fork_by_name: Callable[[str], type | None],
-) -> bool:
-    """Check if a test item is valid for the given fork based on validity markers."""
-    return _check_markers_valid_for_fork(list(item.iter_markers()), fork_class, get_fork_by_name)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -427,26 +380,17 @@ def test_case_description(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(scope="function")
 def pre(request: pytest.FixtureRequest, fork: Any) -> Any:
     """
-    Default pre-state (layer-specific).
+    Default consensus pre-state.
 
     Tests can request this fixture to customize the initial state,
     or omit it to use the default (auto-injected by framework).
     """
-    layer = request.config.test_layer  # type: ignore[attribute-defined]
-
-    if layer == "execution":
-        pytest.exit(
-            "Execution layer testing is not yet implemented. Use --layer=consensus (default).",
-            returncode=pytest.ExitCode.USAGE_ERROR,
-        )
-
-    layer_module = request.config.layer_module  # type: ignore[attribute-defined]
     spec = fork.spec_class()()
 
     if hasattr(request, "param"):
-        return layer_module.generate_pre_state(fork=spec, **request.param)
+        return generate_pre_state(fork=spec, **request.param)
 
-    return layer_module.generate_pre_state(fork=spec)
+    return generate_pre_state(fork=spec)
 
 
 def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
@@ -514,10 +458,8 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         return
 
     fork_class = metafunc.config.test_fork_class  # type: ignore[attribute-defined]
-    layer_module = metafunc.config.layer_module  # type: ignore[attribute-defined]
-    registry = layer_module.forks.registry
 
-    if not _is_test_valid_for_fork(metafunc, fork_class, registry.get_fork_by_name):
+    if not _check_markers_valid_for_fork(list(metafunc.definition.iter_markers()), fork_class):
         verbose = metafunc.config.getoption("verbose")
         if verbose >= 2:
             metafunc.parametrize(
@@ -541,37 +483,18 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     )
 
 
-def _is_test_valid_for_fork(
-    metafunc: pytest.Metafunc, fork_class: Any, get_fork_by_name: Any
-) -> bool:
-    """Check if a test is valid for the given fork based on validity markers."""
-    return _check_markers_valid_for_fork(
-        list(metafunc.definition.iter_markers()), fork_class, get_fork_by_name
-    )
-
-
-def _register_layer_fixtures(config: pytest.Config, layer: str) -> None:
-    """Register layer-specific test fixture formats during configuration."""
-    try:
-        # Import the test_fixtures module
-        fixtures_module = importlib.import_module(f"{layer}_testing.test_fixtures")
-
-        # Get the base fixture class based on layer
-        if layer == "consensus":
-            base_fixture_class = fixtures_module.BaseConsensusFixture
-        elif layer == "execution":
-            base_fixture_class = fixtures_module.BaseExecutionFixture
-        else:
-            return
-
-        # Register all fixture formats globally so pytest can discover them
-        # This must happen during pytest_configure, before fixture discovery
-        for format_name, fixture_class in base_fixture_class.formats.items():
-            fixture_func = base_spec_filler_parametrizer(fixture_class)
-            # Add to module globals so pytest can discover them
-            globals()[format_name] = fixture_func
-    except (ImportError, AttributeError) as exception:
-        pytest.exit(
-            f"Failed to load {layer} layer test fixtures: {exception}",
-            returncode=pytest.ExitCode.USAGE_ERROR,
-        )
+# Pytest fixtures for every consensus fixture format.
+# Each spec test requests one by its format name and calls it to build a test vector.
+api_endpoint = base_spec_filler_parametrizer(ApiEndpointTest)
+fork_choice_test = base_spec_filler_parametrizer(ForkChoiceTest)
+gossipsub_handler = base_spec_filler_parametrizer(GossipsubHandlerTest)
+justifiability = base_spec_filler_parametrizer(JustifiabilityTest)
+networking_codec = base_spec_filler_parametrizer(NetworkingCodecTest)
+poseidon_permutation = base_spec_filler_parametrizer(PoseidonPermutationTest)
+slot_clock = base_spec_filler_parametrizer(SlotClockTest)
+ssz = base_spec_filler_parametrizer(SSZTest)
+state_transition_test = base_spec_filler_parametrizer(StateTransitionTest)
+sync = base_spec_filler_parametrizer(SyncTest)
+verify_multi_message_proofs_test = base_spec_filler_parametrizer(VerifyMultiMessageProofsTest)
+verify_signatures_test = base_spec_filler_parametrizer(VerifySignaturesTest)
+verify_single_message_proofs_test = base_spec_filler_parametrizer(VerifySingleMessageProofsTest)
