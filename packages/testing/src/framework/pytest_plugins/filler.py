@@ -26,19 +26,6 @@ from consensus_testing.test_fixtures import (
 )
 
 
-def _split_test_nodeid(test_nodeid: str) -> tuple[str, str]:
-    """
-    Split a pytest node ID into the test file path and bare function name.
-
-    Parametrization suffixes (the bracketed part) are stripped so every
-    parametrized case of one function shares one fixture file.
-    """
-    nodeid_parts = test_nodeid.split("::")
-    test_file_path = nodeid_parts[0]
-    function_name_with_params = nodeid_parts[1] if len(nodeid_parts) > 1 else ""
-    return test_file_path, function_name_with_params.split("[")[0]
-
-
 class FixtureCollector:
     """Collects generated fixtures and writes them to disk."""
 
@@ -74,7 +61,13 @@ class FixtureCollector:
                 Collection normally excludes such paths already;
                 this guards against misconfiguration.
         """
-        test_file_path, base_function_name = _split_test_nodeid(test_nodeid)
+        # Split the node ID into the test file path and bare function name.
+        # Parametrization suffixes (the bracketed part) are stripped so every
+        # parametrized case of one function shares one fixture file.
+        nodeid_parts = test_nodeid.split("::")
+        test_file_path = nodeid_parts[0]
+        function_name_with_params = nodeid_parts[1] if len(nodeid_parts) > 1 else ""
+        base_function_name = function_name_with_params.split("[")[0]
 
         # Extract test path relative to the consensus spec tests
         # e.g., tests/consensus/lstar/... -> lstar/...
