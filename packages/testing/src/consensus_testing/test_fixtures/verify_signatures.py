@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 
 from pydantic import Field
 
+from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from consensus_testing.test_types import BlockSpec
@@ -39,11 +40,11 @@ class VerifySignaturesTest(BaseConsensusFixture):
     format_name: ClassVar[str] = "verify_signatures_test"
     description: ClassVar[str] = "Tests signature verification for signed blocks."
 
-    anchor_state: State | None = None
+    anchor_state: State = Field(default_factory=generate_pre_state)
     """
     The initial consensus state before processing.
 
-    If not provided, the framework will use the genesis fixture.
+    Defaults to the standard genesis state.
     """
 
     block: BlockSpec = Field(exclude=True)
@@ -101,9 +102,6 @@ class VerifySignaturesTest(BaseConsensusFixture):
         Raises:
             AssertionError: If signature verification fails unexpectedly.
         """
-        # Ensure anchor_state is set
-        assert self.anchor_state is not None, "anchor state must be set before making the fixture"
-
         # Use shared key manager
         key_manager = XmssKeyManager.shared()
 
@@ -264,7 +262,6 @@ class VerifySignaturesTest(BaseConsensusFixture):
             attestations = body.attestations.data
             if len(attestations) < 2:
                 raise ValueError("swap_first_two_attestations requires at least two attestations")
-            assert self.anchor_state is not None
 
             key_manager = XmssKeyManager.shared()
             original_attestation_proofs = [

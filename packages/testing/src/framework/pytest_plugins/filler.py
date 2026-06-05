@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from consensus_testing import generate_pre_state
 from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.test_fixtures import (
     ApiEndpointTest,
@@ -341,22 +340,6 @@ def test_case_description(request: pytest.FixtureRequest) -> str:
     return combined_docstring
 
 
-@pytest.fixture(scope="function")
-def pre(request: pytest.FixtureRequest, fork: Any) -> Any:
-    """
-    Default consensus pre-state.
-
-    Tests can request this fixture to customize the initial state,
-    or omit it to use the default (auto-injected by framework).
-    """
-    spec = fork.spec_class()()
-
-    if hasattr(request, "param"):
-        return generate_pre_state(fork=spec, **request.param)
-
-    return generate_pre_state(fork=spec)
-
-
 def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
     """
     Generate pytest.fixture for a given fixture class.
@@ -376,7 +359,6 @@ def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
         request: pytest.FixtureRequest,
         fork: Any,
         test_case_description: str,
-        pre: Any,  # Auto-inject pre fixture
     ) -> Any:
         """Fixture used to instantiate an auto-fillable fixture object."""
 
@@ -384,15 +366,6 @@ def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
             """Wrapper class that auto-fills and collects fixtures on instantiation."""
 
             def __init__(self, **kwargs: Any) -> None:
-                # Auto-inject pre-state if not provided by test
-                if "pre" not in kwargs and "anchor_state" not in kwargs:
-                    # Determine which field to inject based on fixture type
-                    if hasattr(fixture_class, "__annotations__"):
-                        if "pre" in fixture_class.__annotations__:
-                            kwargs["pre"] = pre
-                        elif "anchor_state" in fixture_class.__annotations__:
-                            kwargs["anchor_state"] = pre
-
                 super().__init__(**kwargs)
 
                 filled_fixture = self.make_fixture()

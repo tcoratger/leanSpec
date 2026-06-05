@@ -41,7 +41,6 @@ def test_supermajority_attestations_justify_block(
     4. latest_justified_slot advances to slot 1
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -256,7 +255,6 @@ def test_repeated_validators_do_not_double_count_across_blocks(
     4. latest_justified_slot stays at genesis
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -388,7 +386,6 @@ def test_pronic_boundary_acceptance(
     4. latest_justified_slot advances to slot 6
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -442,7 +439,6 @@ def test_non_justifiable_boundary_rejection(
     4. latest_justified_slot stays at genesis
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -497,7 +493,6 @@ def test_square_boundary_acceptance(
     4. latest_justified_slot advances to slot 9
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -724,7 +719,6 @@ def test_supermajority_with_mismatched_target_root_is_ignored(
     3. latest_justified_slot stays at genesis
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -776,7 +770,6 @@ def test_attestation_with_target_root_not_in_historical_hashes_is_skipped(
     4. latest_justified_slot stays at genesis
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -921,7 +914,6 @@ def test_target_at_or_before_source_is_ignored(
     4. latest_justified_slot remains at slot 4
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -1042,7 +1034,6 @@ def test_attestation_with_already_justified_target_is_silently_skipped(
     4. The block containing the duplicate attestation is accepted as valid
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             # Step 1 — Build chain and justify slot X
             BlockSpec(slot=Slot(1), label="block_1"),
@@ -1128,7 +1119,6 @@ def test_attestation_with_zero_hash_source_root_is_skipped(
     What matters for client teams: correct post-state, no crash.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -1206,7 +1196,6 @@ def test_attestation_with_zero_hash_target_root_is_skipped(
     The test proves correct post-state regardless of which fires.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -1288,7 +1277,6 @@ def test_attestation_with_unjustified_source_is_silently_skipped(
     The 4-entry pending votes (not 8) proves it was skipped.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             # Justify slot 1: 3/4 validators attest.
@@ -1410,7 +1398,6 @@ def test_same_block_multi_target_attestations_advance_to_highest_slot(
     since slot 9 is later in chain history.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),

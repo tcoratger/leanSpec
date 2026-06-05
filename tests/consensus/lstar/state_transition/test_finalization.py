@@ -45,7 +45,6 @@ def test_finalization_on_next_justifiable_step(
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -120,7 +119,6 @@ def test_pending_justification_survives_finalization_rebase(
     8. justifications_validators contains a single 1-of-4 pending tally
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -307,7 +305,6 @@ def test_mid_block_finalized_slot_visibility(
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -405,7 +402,6 @@ def test_finalization_prunes_stale_pending_votes_and_rebases_window(
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -513,7 +509,6 @@ def test_stale_finalized_source_justifies_without_rewinding_finalization(
     5. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -640,7 +635,6 @@ def test_source_at_finalized_boundary_justifies_without_refinalizing(
     5. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -767,7 +761,6 @@ def test_non_adjacent_justification_finalizes_across_non_justifiable_gap(
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -848,7 +841,6 @@ def test_no_finalization_when_rebased_boundary_exposes_intermediate_justifiable_
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -973,7 +965,6 @@ def test_mid_block_finalized_slot_rejects_target_that_loses_justifiability(
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -1079,7 +1070,6 @@ def test_merged_attestations_for_same_target_justify_and_finalize_cleanly(
     7. There are no pending justifications
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -1164,7 +1154,6 @@ def test_rebased_finalization_prunes_stale_votes_and_preserves_future_votes(
     8. justifications_validators contains a single 1-of-4 pending tally
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),

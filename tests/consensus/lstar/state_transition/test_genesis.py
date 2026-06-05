@@ -71,7 +71,6 @@ def test_genesis_default_configuration(
     - 4 validators with zero public_keys
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[],
         post=StateExpectation(
             slot=Slot(0),

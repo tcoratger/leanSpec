@@ -11,6 +11,7 @@ from typing import ClassVar, Self
 
 from pydantic import Field, model_validator
 
+from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from consensus_testing.test_types import (
@@ -56,12 +57,12 @@ class ForkChoiceTest(BaseConsensusFixture):
     description: ClassVar[str] = "Tests event-driven fork choice through Store operations"
     """Human-readable summary for fixture documentation."""
 
-    anchor_state: State | None = None
+    anchor_state: State = Field(default_factory=generate_pre_state)
     """
     Initial trusted consensus state.
 
-    Most tests start from genesis.
-    The pytest fixture provides this automatically.
+    Defaults to the standard genesis state.
+    Spell it out only when the test needs a non-default anchor.
     """
 
     anchor_block: Block | None = None
@@ -120,7 +121,7 @@ class ForkChoiceTest(BaseConsensusFixture):
         Most tests start from genesis.
         Deriving the anchor block from state reduces boilerplate.
         """
-        if self.anchor_block is None and self.anchor_state is not None:
+        if self.anchor_block is None:
             # Build a minimal genesis block from the state's header fields.
             #
             # The state already contains the block header.
@@ -177,7 +178,6 @@ class ForkChoiceTest(BaseConsensusFixture):
         #
         # Pydantic validators should have populated these fields.
         # These assertions guard against misuse.
-        assert self.anchor_state is not None, "anchor state must be set before making fixture"
         assert self.anchor_block is not None, "anchor block must be set before making fixture"
         assert self.max_slot is not None, "max slot must be set before making fixture"
 
