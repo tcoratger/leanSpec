@@ -1,4 +1,4 @@
-"""Unified CLI command for generating Ethereum test fixtures across all layers."""
+"""CLI command for generating Lean Ethereum consensus test fixtures."""
 
 import os
 import sys
@@ -25,13 +25,7 @@ import pytest
 @click.option(
     "--fork",
     required=True,
-    help="Fork to generate fixtures for (e.g., Lstar for consensus)",
-)
-@click.option(
-    "--layer",
-    type=click.Choice(["consensus", "execution"], case_sensitive=False),
-    default="consensus",
-    help="Ethereum layer to generate fixtures for (default: consensus)",
+    help="Fork to generate fixtures for (e.g., Lstar)",
 )
 @click.option(
     "--clean",
@@ -50,21 +44,14 @@ def fill(
     pytest_args: Sequence[str],
     output: str,
     fork: str,
-    layer: str,
     clean: bool,
     scheme: str,
 ) -> None:
     """
-    Generate Ethereum test fixtures from test specifications.
-
-    This unified command works across both consensus and execution layers.
-    The --layer flag determines which layer's forks and fixtures to use.
+    Generate consensus test fixtures from test specifications.
 
     Examples:
-        # Generate consensus layer fixtures
-        fill tests/consensus/devnet --fork=Lstar --layer=consensus --clean -v
-
-        # Default layer is consensus
+        # Generate consensus fixtures
         fill tests/consensus/devnet --fork=Lstar --clean -v
 
         # Use specific XMSS scheme (overrides LEAN_ENV env var)
@@ -75,17 +62,16 @@ def fill(
     # environment.
     os.environ["LEAN_ENV"] = scheme.lower()
 
-    # Check and download keys if needed (only for consensus layer)
-    if layer.lower() == "consensus":
-        # Import here to avoid loading leanSpec modules before LEAN_ENV is set
-        from consensus_testing.keys import download_keys, get_keys_directory
+    # Check and download keys if needed
+    # Import here to avoid loading leanSpec modules before LEAN_ENV is set
+    from consensus_testing.keys import download_keys, get_keys_directory
 
-        keys_directory = get_keys_directory(scheme.lower())
+    keys_directory = get_keys_directory(scheme.lower())
 
-        # Check if keys already exist, if not, download them
-        if not (keys_directory.exists() and any(keys_directory.glob("*.json"))):
-            click.echo(f"Test keys for '{scheme}' scheme not found. Downloading...")
-            download_keys(scheme.lower())
+    # Check if keys already exist, if not, download them
+    if not (keys_directory.exists() and any(keys_directory.glob("*.json"))):
+        click.echo(f"Test keys for '{scheme}' scheme not found. Downloading...")
+        download_keys(scheme.lower())
 
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-fill.ini"
     # Find project root by looking for pyproject.toml with [tool.uv.workspace]
@@ -105,7 +91,6 @@ def fill(
         f"--rootdir={project_root}",
         f"--output={output}",
         f"--fork={fork}",
-        f"--layer={layer}",
     ]
 
     if clean:
