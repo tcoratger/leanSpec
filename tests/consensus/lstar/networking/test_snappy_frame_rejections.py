@@ -11,7 +11,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_snappy_frame_decode_rejects_empty_input(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """Empty input is not a valid snappy frame and must be rejected.
+    """
+    Empty input is not a valid snappy frame and must be rejected.
 
     Every framed snappy stream begins with a ten-byte stream identifier.
     Zero bytes cannot satisfy that minimum so the decoder aborts early
@@ -27,7 +28,8 @@ def test_snappy_frame_decode_rejects_empty_input(
 def test_snappy_frame_decode_rejects_wrong_stream_identifier(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A stream whose opening bytes do not spell the snappy magic is rejected.
+    """
+    A stream whose opening bytes do not spell the snappy magic is rejected.
 
     A valid framed snappy stream starts with the ten-byte sequence
     `ff 06 00 00 73 4e 61 50 70 59` ("sNaPpY"). Ten zero bytes satisfy
@@ -44,7 +46,8 @@ def test_snappy_frame_decode_rejects_wrong_stream_identifier(
 def test_snappy_frame_decode_rejects_unknown_unskippable_chunk(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A chunk of an unassigned unskippable type is rejected.
+    """
+    A chunk of an unassigned unskippable type is rejected.
 
     The byte sequence begins with a valid stream identifier followed by a
     chunk whose type byte is `0x03` with a zero-length payload. Type

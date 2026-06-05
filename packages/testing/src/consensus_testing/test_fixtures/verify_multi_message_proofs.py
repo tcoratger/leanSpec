@@ -28,7 +28,8 @@ ALTERNATE_HEAD_ROOT: Bytes32 = Bytes32(b"\xee" * 32)
 
 
 class RebindComponentToAlternateHeadRoot(BaseModel):
-    """Rebind one component's proof to an alternate head root.
+    """
+    Rebind one component's proof to an alternate head root.
 
     The honest attestation data is still emitted for every component.
     Only the targeted component's proof bytes carry the alternate binding.
@@ -46,7 +47,8 @@ class IncrementComponentSlot(BaseModel):
 
 
 class SwapComponentParticipantPublicKey(BaseModel):
-    """Replace one participant's public key with another validator's attestation key.
+    """
+    Replace one participant's public key with another validator's attestation key.
 
     The honest proof is still emitted.
     Only the targeted component's public key layout carries the swap.
@@ -63,7 +65,8 @@ class SwapComponentParticipantPublicKey(BaseModel):
 
 
 class SwapComponentMessageBindings(BaseModel):
-    """Swap the emitted message-slot bindings of two components.
+    """
+    Swap the emitted message-slot bindings of two components.
 
     The merged proof and the per-component key layout stay honest.
     Each component's proof is then checked against the other component's binding.
@@ -78,7 +81,8 @@ class SwapComponentMessageBindings(BaseModel):
 
 
 class DropComponentMessageBinding(BaseModel):
-    """Drop one component's emitted message-slot binding while keeping its keys.
+    """
+    Drop one component's emitted message-slot binding while keeping its keys.
 
     The emitted binding list ends up shorter than the per-component key list.
     A conforming verifier rejects the length mismatch.
@@ -136,7 +140,8 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
     """Aggregated multi-message proof bytes for clients to verify."""
 
     def make_fixture(self) -> VerifyMultiMessageProofsTest:
-        """Generate the merged proof, optionally tamper one binding, self-verify, return self.
+        """
+        Generate the merged proof, optionally tamper one binding, self-verify, return self.
 
         Raises:
             AssertionError: If the verifier outcome disagrees with the configured expectation.

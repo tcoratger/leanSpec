@@ -95,7 +95,8 @@ logger = logging.getLogger(__name__)
 
 
 def _try_decompress(data: bytes) -> tuple[bytes, bytes]:
-    """Attempt Snappy decompression and return data with domain.
+    """
+    Attempt Snappy decompression and return data with domain.
 
     Decompress once upfront so that message ID computation and event delivery share the result.
 
@@ -259,7 +260,8 @@ class GossipsubBehavior:
         self._stop_event.set()
 
     def subscribe(self, topic: TopicId) -> None:
-        """Subscribe to a topic.
+        """
+        Subscribe to a topic.
 
         Joining a topic means:
 
@@ -282,7 +284,8 @@ class GossipsubBehavior:
             self._spawn_background_task(self._broadcast_subscription(topic, subscribe=True))
 
     def unsubscribe(self, topic: TopicId) -> None:
-        """Unsubscribe from a topic.
+        """
+        Unsubscribe from a topic.
 
         Leaving a topic means:
 
@@ -349,7 +352,8 @@ class GossipsubBehavior:
         *,
         inbound: bool = False,
     ) -> None:
-        """Add a connected peer and establish gossipsub session.
+        """
+        Add a connected peer and establish gossipsub session.
 
         Libp2p uses separate streams for each direction:
 
@@ -448,7 +452,8 @@ class GossipsubBehavior:
         logger.info("Removed gossipsub peer %s", peer_id)
 
     async def publish(self, topic: TopicId, data: bytes) -> None:
-        """Publish a message to a topic.
+        """
+        Publish a message to a topic.
 
         Sends the message to mesh peers, or fanout peers if not subscribed.
 
@@ -511,7 +516,8 @@ class GossipsubBehavior:
     async def get_next_event(
         self,
     ) -> GossipsubMessageEvent | GossipsubPeerEvent | None:
-        """Get the next event from the queue.
+        """
+        Get the next event from the queue.
 
         Returns None when stopped or no event available.
         """
@@ -741,7 +747,8 @@ class GossipsubBehavior:
             logger.debug("Sent %d messages in response to IWANT from %s", len(messages), peer_id)
 
     def _handle_idontwant(self, peer_id: PeerId, idontwant: ControlIDontWant) -> None:
-        """Handle an IDONTWANT message from a peer (v1.2).
+        """
+        Handle an IDONTWANT message from a peer (v1.2).
 
         Records message IDs the peer does not want so we skip
         forwarding those messages to them.
@@ -769,7 +776,8 @@ class GossipsubBehavior:
                 logger.warning("Heartbeat error: %s", exception)
 
     async def _heartbeat(self) -> None:
-        """Perform heartbeat maintenance.
+        """
+        Perform heartbeat maintenance.
 
         1. Maintain mesh sizes (GRAFT/PRUNE)
         2. Send IHAVE gossip to non-mesh peers
@@ -883,7 +891,8 @@ class GossipsubBehavior:
         )
 
     async def _send_rpc(self, peer_id: PeerId, rpc: RPC) -> None:
-        """Deliver an RPC to a peer using length-prefixed framing.
+        """
+        Deliver an RPC to a peer using length-prefixed framing.
 
         Silently skips if the peer has no outbound stream yet.
         This is normal during connection setup -- the outbound
@@ -916,7 +925,8 @@ class GossipsubBehavior:
             logger.warning("Failed to send RPC to %s: %s", peer_id, exception)
 
     async def _receive_loop(self, peer_id: PeerId, stream: QuicStreamAdapter) -> None:
-        """Process incoming RPCs from a peer for the lifetime of the connection.
+        """
+        Process incoming RPCs from a peer for the lifetime of the connection.
 
         Each RPC is length-prefixed with a varint, matching the libp2p
         framing convention: `[varint length][RPC payload] ...`
@@ -976,7 +986,8 @@ class GossipsubBehavior:
         subscribe: bool,
         prune_peers: set[PeerId] | None = None,
     ) -> None:
-        """Announce a subscription change and adjust the mesh accordingly.
+        """
+        Announce a subscription change and adjust the mesh accordingly.
 
         Every peer learns about the change so they can update their
         peer-subscription tables. Beyond that:

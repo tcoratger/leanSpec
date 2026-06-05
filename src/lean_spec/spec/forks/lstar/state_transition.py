@@ -31,7 +31,8 @@ def attestation_data_matches_chain(
     attestation_data: AttestationData,
     historical_block_hashes: Sequence[Bytes32],
 ) -> bool:
-    """Check that source and target checkpoints point to blocks on a chain.
+    """
+    Check that source and target checkpoints point to blocks on a chain.
 
     Args:
         attestation_data: The attestation being validated.

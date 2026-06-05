@@ -1,4 +1,5 @@
-"""Test network orchestrator for multi-node gossipsub integration tests.
+"""
+Test network orchestrator for multi-node gossipsub integration tests.
 
 Manages node lifecycle and provides common topologies (full mesh, star,
 chain, ring) so individual tests focus on protocol behavior, not setup.
@@ -50,7 +51,8 @@ PEER_NAMES = [
 
 
 class GossipsubTestNetwork:
-    """Manages a network of gossipsub test nodes.
+    """
+    Manages a network of gossipsub test nodes.
 
     Provides topology creation helpers (full mesh, star, chain, ring)
     and lifecycle management for all nodes.
@@ -83,7 +85,8 @@ class GossipsubTestNetwork:
             await node.stop()
 
     async def connect_full(self) -> None:
-        """Connect all nodes in a full mesh topology.
+        """
+        Connect all nodes in a full mesh topology.
 
         Every node can reach every other node directly.
         Useful for testing gossip with maximum connectivity.
@@ -93,7 +96,8 @@ class GossipsubTestNetwork:
                 await node_a.connect_to(node_b)
 
     async def connect_chain(self) -> None:
-        """Connect nodes in a linear chain: 0-1-2-...-N.
+        """
+        Connect nodes in a linear chain: 0-1-2-...-N.
 
         Messages must hop through intermediaries. Tests multi-hop
         gossip propagation and relay behavior.
@@ -102,7 +106,8 @@ class GossipsubTestNetwork:
             await self.nodes[i].connect_to(self.nodes[i + 1])
 
     async def connect_ring(self) -> None:
-        """Connect nodes in a ring: 0-1-2-...-N-0.
+        """
+        Connect nodes in a ring: 0-1-2-...-N-0.
 
         Like a chain but with redundant path between endpoints.
         Tests that duplicate suppression works across alternate routes.
@@ -125,7 +130,8 @@ class GossipsubTestNetwork:
         await asyncio.sleep(0.05)
 
     async def stabilize_mesh(self, topic: str, rounds: int = 3, settle_time: float = 0.05) -> None:
-        """Run multiple heartbeat rounds to let meshes converge.
+        """
+        Run multiple heartbeat rounds to let meshes converge.
 
         One heartbeat is rarely enough. Each round lets nodes exchange
         GRAFT/PRUNE control messages and react to peer changes. Three

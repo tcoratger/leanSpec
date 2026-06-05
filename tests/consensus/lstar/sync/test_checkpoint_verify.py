@@ -1,4 +1,5 @@
-"""Checkpoint-sync state verification: known-answer vectors.
+"""
+Checkpoint-sync state verification: known-answer vectors.
 
 Pins the structural-validity verdict each client must produce when
 fetching an anchor state from a checkpoint provider. The verdict is a
@@ -15,7 +16,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_checkpoint_verify_rejects_empty_validator_set(
     sync: SyncTestFiller,
 ) -> None:
-    """A checkpoint state with zero validators is rejected.
+    """
+    A checkpoint state with zero validators is rejected.
 
     A state without validators cannot produce blocks, so seeding a
     fork-choice store with it would be useless and mask configuration
@@ -30,7 +32,8 @@ def test_checkpoint_verify_rejects_empty_validator_set(
 def test_checkpoint_verify_accepts_small_validator_set(
     sync: SyncTestFiller,
 ) -> None:
-    """A checkpoint state with a small in-range validator set is accepted.
+    """
+    A checkpoint state with a small in-range validator set is accepted.
 
     Four validators is the baseline size used throughout the consensus
     test suite. Pins the happy path of the verifier so clients observe
@@ -45,7 +48,8 @@ def test_checkpoint_verify_accepts_small_validator_set(
 def test_checkpoint_verify_accepts_eight_validator_set(
     sync: SyncTestFiller,
 ) -> None:
-    """Eight-validator anchor state is accepted at the key-manager limit.
+    """
+    Eight-validator anchor state is accepted at the key-manager limit.
 
     Matches the maximum-validator setup used by the existing fork-choice
     and signature-verification suites. Pins the verdict at the upper

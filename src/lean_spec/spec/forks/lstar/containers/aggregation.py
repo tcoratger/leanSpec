@@ -1,7 +1,8 @@
-"""Post-quantum signature aggregation proofs wrapping the Rust prover.
+"""
+Post-quantum signature aggregation proofs wrapping the Rust prover.
 
-Single-message proofs aggregate many validators signing the same message.
-Multi-message proofs merge components over distinct messages into one blob.
+- Single-message proofs aggregate many validators signing the same message.
+- Multi-message proofs merge components over distinct messages into one blob.
 """
 
 from lean_multisig_py import (
@@ -20,7 +21,8 @@ from lean_spec.spec.forks.lstar.slot import Slot
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Container
 
 LOG_INV_RATE: int = 1 if LEAN_ENV == "test" else 2
-"""Inverse-rate exponent forwarded to the SNARK backend.
+"""
+Inverse-rate exponent forwarded to the SNARK backend.
 
 A smaller rate trades verifier cost for prover speed.
 Test mode favors prover speed.
@@ -32,7 +34,8 @@ class AggregationError(Exception):
 
 
 class SingleMessageAggregate(Container):
-    """Single-message proof aggregating signatures from many validators.
+    """
+    Single-message proof aggregating signatures from many validators.
 
     Every validator signs the same message for the same slot.
 
@@ -56,7 +59,8 @@ class SingleMessageAggregate(Container):
         message: Bytes32,
         slot: Slot,
     ) -> "SingleMessageAggregate":
-        """Fold fresh signatures and child proofs into one single-message proof.
+        """
+        Fold fresh signatures and child proofs into one single-message proof.
 
         # Overview
 
@@ -129,7 +133,8 @@ class SingleMessageAggregate(Container):
         message: Bytes32,
         slot: Slot,
     ) -> None:
-        """Verify this single-message single-message aggregate proof against a public_key set.
+        """
+        Verify this single-message single-message aggregate proof against a public_key set.
 
         Args:
             public_keys: PublicKeys for the validators named by participants.
@@ -171,7 +176,8 @@ class SingleMessageAggregate(Container):
 
 
 class MultiMessageAggregate(Container):
-    """Merged proof covering many distinct messages.
+    """
+    Merged proof covering many distinct messages.
 
     Each component is a single-message proof over its own message.
     Merging binds the components into one proof the block can carry whole.
@@ -188,7 +194,8 @@ class MultiMessageAggregate(Container):
         parts: list[SingleMessageAggregate],
         public_keys_per_part: list[list[PublicKey]],
     ) -> "MultiMessageAggregate":
-        """Merge several single-message proofs over distinct messages into one.
+        """
+        Merge several single-message proofs over distinct messages into one.
 
         # Why the public keys are passed in
 
@@ -247,7 +254,8 @@ class MultiMessageAggregate(Container):
         public_keys_per_message: list[list[PublicKey]],
         participants: AggregationBits,
     ) -> SingleMessageAggregate:
-        """Recover the single-message aggregate proof bound to one message.
+        """
+        Recover the single-message aggregate proof bound to one message.
 
         Splits this multi-message aggregate to extract the component
         bound to the given message.
@@ -301,7 +309,8 @@ class MultiMessageAggregate(Container):
         public_keys_per_message: list[list[PublicKey]],
         messages: list[tuple[Bytes32, Slot]],
     ) -> None:
-        """Verify this multi-message proof against its per-component bindings.
+        """
+        Verify this multi-message proof against its per-component bindings.
 
         # The message bindings
 

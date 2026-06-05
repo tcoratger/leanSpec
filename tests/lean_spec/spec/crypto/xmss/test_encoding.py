@@ -128,7 +128,8 @@ def test_target_sum_encode_rejects_codeword_off_target_layer() -> None:
 def test_target_sum_encode_propagates_aborting_decode_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An aborting message hash makes the encode return None before the sum check.
+    """
+    An aborting message hash makes the encode return None before the sum check.
 
     The aborting decode rejects only the prime-minus-one field element.
     That event has probability near one in two billion per element.

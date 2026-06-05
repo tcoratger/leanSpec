@@ -459,7 +459,8 @@ class QuicConnectionManager:
         multiaddr: str,
         on_connection: Callable[[QuicConnection], Awaitable[None]],
     ) -> None:
-        """Listen for incoming QUIC connections.
+        """
+        Listen for incoming QUIC connections.
 
         Creates a server using aioquic with libp2p-tls authentication.
         Runs until shutdown is requested.

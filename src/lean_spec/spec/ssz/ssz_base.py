@@ -19,7 +19,8 @@ class SSZType(ABC):
     @classmethod
     @abstractmethod
     def is_fixed_size(cls) -> bool:
-        """Whether every instance encodes to the same number of bytes.
+        """
+        Whether every instance encodes to the same number of bytes.
 
         Returns:
             True for fixed-size types, False for variable-size.
@@ -29,7 +30,8 @@ class SSZType(ABC):
     @classmethod
     @abstractmethod
     def get_byte_length(cls) -> int:
-        """Fixed encoded byte length of this type.
+        """
+        Fixed encoded byte length of this type.
 
         Returns:
             The constant byte width every instance encodes to.
@@ -41,7 +43,8 @@ class SSZType(ABC):
 
     @abstractmethod
     def serialize(self, stream: IO[bytes]) -> int:
-        """Write the SSZ encoding to a binary stream.
+        """
+        Write the SSZ encoding to a binary stream.
 
         Args:
             stream: Output binary stream.
@@ -54,7 +57,8 @@ class SSZType(ABC):
     @classmethod
     @abstractmethod
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
-        """Read one value from a binary stream within a bounded byte budget.
+        """
+        Read one value from a binary stream within a bounded byte budget.
 
         Args:
             stream: Source binary stream.
@@ -66,7 +70,8 @@ class SSZType(ABC):
         ...
 
     def encode_bytes(self) -> bytes:
-        """Encode this value to its SSZ byte representation.
+        """
+        Encode this value to its SSZ byte representation.
 
         Returns:
             Serialized bytes.
@@ -77,7 +82,8 @@ class SSZType(ABC):
 
     @classmethod
     def decode_bytes(cls, data: bytes) -> Self:
-        """Decode SSZ bytes into a new instance.
+        """
+        Decode SSZ bytes into a new instance.
 
         Rejects trailing bytes left over after the stream-based decoder finishes.
         A spec decoder must accept exactly one canonical encoding per value.
@@ -104,7 +110,8 @@ class SSZType(ABC):
 
 
 class SSZModel(StrictBaseModel, SSZType):
-    """Pydantic-backed SSZ base used by containers, lists, vectors, and bitfields.
+    """
+    Pydantic-backed SSZ base used by containers, lists, vectors, and bitfields.
 
     Two shapes share this base:
 

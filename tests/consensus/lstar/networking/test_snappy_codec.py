@@ -1,4 +1,5 @@
-"""Test vectors for standalone Snappy compression and decompression.
+"""
+Test vectors for standalone Snappy compression and decompression.
 
 Both raw block format and Ethereum framing format are tested.
 Client teams use these to verify their Snappy implementation

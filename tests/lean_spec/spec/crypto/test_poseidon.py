@@ -1,4 +1,5 @@
-"""Tests for the Poseidon permutation for widths 16 and 24.
+"""
+Tests for the Poseidon permutation for widths 16 and 24.
 
 Test vectors are taken from Plonky3 (koala-bear/src/poseidon1.rs).
 To verify independently, run `cargo test` in the Plonky3 koala-bear crate.

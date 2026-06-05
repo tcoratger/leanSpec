@@ -1,4 +1,5 @@
-r"""Buffered read/write adapter for QuicStream with multistream-select negotiation.
+r"""
+Buffered read/write adapter for QuicStream with multistream-select negotiation.
 
 QuicStream provides raw, unbuffered I/O — each read returns exactly one
 QUIC frame's worth of data. Higher-level protocols (multistream-select,
@@ -56,7 +57,8 @@ class NegotiationError(Exception):
 
 
 class QuicStreamAdapter:
-    """Adapts QuicStream for buffered, protocol-level I/O.
+    """
+    Adapts QuicStream for buffered, protocol-level I/O.
 
     Provides:
 
@@ -77,7 +79,8 @@ class QuicStreamAdapter:
         self._write_buffer = b""
 
     async def read(self, n: int | None = None) -> bytes:
-        """Read bytes from the stream.
+        """
+        Read bytes from the stream.
 
         - If *n* is provided, returns at most *n* bytes.
         - If *n* is None, returns all available data (no limit).
@@ -106,7 +109,8 @@ class QuicStreamAdapter:
         return data
 
     async def readexactly(self, n: int) -> bytes:
-        """Read exactly *n* bytes from the stream.
+        """
+        Read exactly *n* bytes from the stream.
 
         Raises:
             EOFError: If the stream closes before *n* bytes arrive.
@@ -136,7 +140,8 @@ class QuicStreamAdapter:
         await self._stream.close()
 
     async def finish_write(self) -> None:
-        """Half-close the stream (signal end of writing).
+        """
+        Half-close the stream (signal end of writing).
 
         Flushes any buffered data before sending FIN.
         """
@@ -150,7 +155,8 @@ class QuicStreamAdapter:
         supported: set[ProtocolId],
         timeout: float = DEFAULT_TIMEOUT,
     ) -> ProtocolId:
-        """Server-side protocol negotiation.
+        """
+        Server-side protocol negotiation.
 
         Waits for client to propose protocols, accepts first supported one.
 
@@ -193,7 +199,8 @@ class QuicStreamAdapter:
             raise NegotiationError(f"Negotiation timed out after {timeout}s") from None
 
     async def negotiate_lazy_client(self, protocol: ProtocolId) -> ProtocolId:
-        """Lazy client-side negotiation for single protocol.
+        """
+        Lazy client-side negotiation for single protocol.
 
         Sends both the multistream header and protocol proposal together,
         then waits for server to accept. Reduces round trips when we only
@@ -225,7 +232,8 @@ class QuicStreamAdapter:
             raise NegotiationError(f"Unexpected response: {response!r}")
 
     async def _write_negotiation_message(self, message: str) -> None:
-        r"""Write a multistream message.
+        r"""
+        Write a multistream message.
 
         Format: [varint length][message + '\n']
         """
@@ -235,7 +243,8 @@ class QuicStreamAdapter:
         await self.drain()
 
     async def _read_negotiation_message(self) -> str:
-        """Read a multistream message.
+        """
+        Read a multistream message.
 
         Returns:
             Message content (without newline).

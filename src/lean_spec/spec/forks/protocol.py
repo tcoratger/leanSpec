@@ -68,7 +68,8 @@ class SpecBlockType(SpecSSZType, Protocol):
 
 
 class SpecBlockBodyType(SpecSSZType, Protocol):
-    """Structural contract: any fork's BlockBody container class.
+    """
+    Structural contract: any fork's BlockBody container class.
 
     Carries the variable-size payload attached to a block — typically
     aggregated attestations and any future operation lists.
@@ -76,7 +77,8 @@ class SpecBlockBodyType(SpecSSZType, Protocol):
 
 
 class SpecBlockHeaderType(SpecSSZType, Protocol):
-    """Structural contract: any fork's BlockHeader container class.
+    """
+    Structural contract: any fork's BlockHeader container class.
 
     The fixed-shape summary of a block used in state-transition tracking
     and state-root caching. Carries slot, proposer, parent root, state
@@ -85,14 +87,16 @@ class SpecBlockHeaderType(SpecSSZType, Protocol):
 
 
 class SpecAggregatedAttestationsType(SpecSSZType, Protocol):
-    """Structural contract: any fork's AggregatedAttestations list class.
+    """
+    Structural contract: any fork's AggregatedAttestations list class.
 
     Bounded SSZ list of aggregated attestations included in a block body.
     """
 
 
 class SpecAttestationDataType(SpecSSZType, Protocol):
-    """Structural contract: any fork's AttestationData container class.
+    """
+    Structural contract: any fork's AttestationData container class.
 
     Encodes a validator's view of the chain (slot + source/target/head
     checkpoints) and is the payload that gets signed.
@@ -120,7 +124,8 @@ class SpecAttestationDataType(SpecSSZType, Protocol):
 
 
 class SpecAggregatedAttestationType(SpecSSZType, Protocol):
-    """Structural contract: any fork's AggregatedAttestation container class.
+    """
+    Structural contract: any fork's AggregatedAttestation container class.
 
     An attestation aggregated over multiple validators via a participation
     bitfield.
@@ -133,7 +138,8 @@ class SpecAggregatedAttestationType(SpecSSZType, Protocol):
 
 
 class SpecStoreType(Protocol):
-    """Structural contract: any fork's forkchoice Store.
+    """
+    Structural contract: any fork's forkchoice Store.
 
     Exposes anchor construction plus the read/write surface that sync,
     chain, and node services drive without depending on a concrete fork.

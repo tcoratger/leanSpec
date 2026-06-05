@@ -95,7 +95,8 @@ def _make_populated_db(
 
 
 def _make_mock_db_with_partial_data() -> MagicMock:
-    """Build a mock database pre-populated with valid data for negative-path tests.
+    """
+    Build a mock database pre-populated with valid data for negative-path tests.
 
     Returns a MagicMock so individual methods can be overridden to return None,
     simulating partial DB corruption.
@@ -387,7 +388,8 @@ class TestDatabaseGenesisTimeFallback:
     """Tests for genesis_time fallback to database."""
 
     def test_falls_back_to_database_genesis_time(self) -> None:
-        """When genesis_time is None, loads it from the database.
+        """
+        When genesis_time is None, loads it from the database.
 
         The store time should be computed using the database-provided
         genesis time, identical to passing it explicitly.
@@ -453,7 +455,8 @@ class TestDatabaseResumeFromGenesis:
 
 
 class TestValidatorPublishWrappers:
-    """Tests for the publish wrappers created when a validator registry is provided.
+    """
+    Tests for the publish wrappers created when a validator registry is provided.
 
     The wrappers fan out each locally-produced block/attestation to both the
     network layer (gossip) and the local sync service (so forkchoice sees the
@@ -485,7 +488,8 @@ class TestValidatorPublishWrappers:
     async def test_attestation_publish_wrapper_calls_both_services(
         self, node_with_validator: Node
     ) -> None:
-        """Attestation wrapper publishes to network with computed subnet_id.
+        """
+        Attestation wrapper publishes to network with computed subnet_id.
 
         The subnet_id is derived from the attestation's validator index via
         `compute_subnet_id(ATTESTATION_COMMITTEE_COUNT)`. This test
@@ -564,7 +568,8 @@ class TestSignalHandlers:
 
 
 class TestPeriodicLogging:
-    """Tests for the periodic logging task.
+    """
+    Tests for the periodic logging task.
 
     These tests call `_log_justified_finalized_periodically` directly
     rather than through `run()`, isolating the logging loop from the
@@ -585,7 +590,8 @@ class TestPeriodicLogging:
         await node._log_justified_finalized_periodically()
 
     async def test_logging_reports_metrics(self, node_config: NodeConfig) -> None:
-        """Periodic logging updates Prometheus gauges at least once.
+        """
+        Periodic logging updates Prometheus gauges at least once.
 
         Initializes the metric registry with a test collector, runs one
         full iteration of the loop, then asserts each gauge was set with
@@ -630,7 +636,8 @@ class TestPeriodicLogging:
     async def test_logging_reports_zero_validators_without_service(
         self, node_config: NodeConfig
     ) -> None:
-        """Validator count gauge is set to 0 when no validator service exists.
+        """
+        Validator count gauge is set to 0 when no validator service exists.
 
         This verifies the `len(self.validator_service.registry)` fallback
         path that returns 0 when `validator_service is None`.

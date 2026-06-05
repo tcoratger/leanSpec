@@ -177,7 +177,8 @@ class TestAlpnProtocol:
     """Verify the ALPN protocol value per the libp2p TLS spec."""
 
     def test_alpn_is_libp2p(self) -> None:
-        """The ALPN value is 'libp2p' as mandated by the libp2p TLS spec.
+        """
+        The ALPN value is 'libp2p' as mandated by the libp2p TLS spec.
 
         Spec reference (https://github.com/libp2p/specs/blob/master/tls/tls.md):
         the ALPN extension MUST include "libp2p" as the protocol string.
@@ -398,7 +399,8 @@ class TestQuicConnectionHandleEvent:
     def test_stream_reset_signals_error_not_eof(
         self, quic_connection: QuicConnection, mock_protocol: MagicMock
     ) -> None:
-        """Per RFC 9000 Section 3.2, RESET_STREAM is an error, not clean EOF.
+        """
+        Per RFC 9000 Section 3.2, RESET_STREAM is an error, not clean EOF.
 
         The stream must surface the error code to the application, and
         subsequent reads must raise rather than returning empty bytes.
@@ -422,7 +424,8 @@ class TestQuicConnectionHandleEvent:
     def test_connection_terminated_resets_all_streams(
         self, quic_connection: QuicConnection, mock_protocol: MagicMock
     ) -> None:
-        """Per RFC 9000 Section 10, connection termination implicitly resets all streams.
+        """
+        Per RFC 9000 Section 10, connection termination implicitly resets all streams.
 
         All open streams are assumed to have lost data. Reads must raise
         an error, not return empty bytes (which would imply clean EOF).
@@ -590,7 +593,8 @@ class TestLibP2PQuicProtocol:
     def test_events_buffered_between_handshake_and_connection(
         self, protocol: LibP2PQuicProtocol
     ) -> None:
-        """Events after handshake but before connection assignment are buffered.
+        """
+        Events after handshake but before connection assignment are buffered.
 
         This addresses a real race: the peer may open streams immediately after
         TLS completes, before the application creates the connection wrapper.
@@ -660,7 +664,8 @@ class TestLibP2PQuicProtocol:
     def test_handshake_exception_sets_peer_identity_none(
         self, protocol: LibP2PQuicProtocol
     ) -> None:
-        """Handshake completes even if certificate extraction raises.
+        """
+        Handshake completes even if certificate extraction raises.
 
         The except branch is defensive — if the try block inside the
         handshake handler raises, the handshake must still complete
@@ -694,7 +699,8 @@ class TestLibP2PQuicProtocol:
 
 
 class TestQuicStreamProtocolId:
-    """Tests for the protocol_id property on QuicStream.
+    """
+    Tests for the protocol_id property on QuicStream.
 
     Each QUIC stream carries a negotiated protocol identifier set during
     multistream-select. The default is empty until negotiation completes.
@@ -715,7 +721,8 @@ class TestQuicStreamProtocolId:
 
 
 class TestQuicStreamWriteFinDetection:
-    """Tests for write detecting aioquic's internal FIN state.
+    """
+    Tests for write detecting aioquic's internal FIN state.
 
     aioquic tracks per-stream state internally. If FIN was already sent
     (e.g., due to a race between close and write), the write method must
@@ -726,7 +733,8 @@ class TestQuicStreamWriteFinDetection:
     async def test_write_detects_aioquic_fin_sent(
         self, quic_stream: QuicStream, mock_protocol: MagicMock
     ) -> None:
-        """Write raises when aioquic has already sent FIN on this stream.
+        """
+        Write raises when aioquic has already sent FIN on this stream.
 
         This catches the race where close() sends FIN but write() is
         called before our _write_closed flag is set.
@@ -759,7 +767,8 @@ class TestQuicStreamWriteFinDetection:
     async def test_write_proceeds_when_stream_not_in_map(
         self, quic_stream: QuicStream, mock_protocol: MagicMock
     ) -> None:
-        """Write succeeds when aioquic has no entry for this stream ID.
+        """
+        Write succeeds when aioquic has no entry for this stream ID.
 
         This happens for newly created streams before any data is sent.
         """
@@ -770,7 +779,8 @@ class TestQuicStreamWriteFinDetection:
 
 
 class TestQuicStreamWriteException:
-    """Tests for write wrapping exceptions from aioquic.
+    """
+    Tests for write wrapping exceptions from aioquic.
 
     When aioquic raises during a write, the error is wrapped in
     QuicTransportError. If the error message indicates a terminal
@@ -781,7 +791,8 @@ class TestQuicStreamWriteException:
     async def test_write_wraps_fin_exception_and_marks_closed(
         self, quic_stream: QuicStream, mock_protocol: MagicMock
     ) -> None:
-        """An exception mentioning 'FIN' permanently closes the write side.
+        """
+        An exception mentioning 'FIN' permanently closes the write side.
 
         This heuristic detects terminal errors from aioquic's internals.
         """
@@ -811,7 +822,8 @@ class TestQuicStreamWriteException:
     async def test_write_wraps_unrelated_exception_without_marking_closed(
         self, quic_stream: QuicStream, mock_protocol: MagicMock
     ) -> None:
-        """Transient errors keep the write side open for retry.
+        """
+        Transient errors keep the write side open for retry.
 
         Only terminal conditions (FIN, closed) should permanently close.
         A buffer overflow or similar transient error should not.
@@ -828,7 +840,8 @@ class TestQuicStreamWriteException:
 
 
 class TestQuicConnectionProperties:
-    """Tests for QuicConnection read-only property accessors.
+    """
+    Tests for QuicConnection read-only property accessors.
 
     These properties expose the peer identity and address that were
     established during connection setup.
@@ -846,7 +859,8 @@ class TestQuicConnectionProperties:
 
 
 class TestQuicConnectionOpenStreamHappyPath:
-    """Tests for opening a stream with successful protocol negotiation.
+    """
+    Tests for opening a stream with successful protocol negotiation.
 
     Opening a stream involves three steps:
 
@@ -864,7 +878,8 @@ class TestQuicConnectionOpenStreamHappyPath:
         quic_connection: QuicConnection,
         mock_protocol: MagicMock,
     ) -> None:
-        """Full stream opening flow: allocate ID, negotiate, return stream.
+        """
+        Full stream opening flow: allocate ID, negotiate, return stream.
 
         The adapter wraps the raw QUIC stream for multistream-select.
         After negotiation, the protocol ID is stored on the stream.
@@ -891,7 +906,8 @@ class TestQuicConnectionOpenStreamHappyPath:
 
 
 class TestLibP2PQuicProtocolInit:
-    """Tests for LibP2PQuicProtocol construction.
+    """
+    Tests for LibP2PQuicProtocol construction.
 
     The parent class (aioquic's QuicConnectionProtocol) requires real
     QUIC internals. Patching the parent constructor lets us verify
@@ -899,7 +915,8 @@ class TestLibP2PQuicProtocolInit:
     """
 
     def test_init_with_mocked_quic_config(self) -> None:
-        """All custom attributes start in their expected initial state.
+        """
+        All custom attributes start in their expected initial state.
 
         Connection and peer identity are None until handshake completes.
         The handshake event is unset. No events are buffered yet.
@@ -916,7 +933,8 @@ class TestLibP2PQuicProtocolInit:
 
 
 class TestQuicConnectionManagerCreate:
-    """Tests for QuicConnectionManager.create factory method.
+    """
+    Tests for QuicConnectionManager.create factory method.
 
     Creation generates a libp2p-TLS certificate, writes it to temp files
     (aioquic requires file paths), and configures QUIC with the libp2p
@@ -928,7 +946,8 @@ class TestQuicConnectionManagerCreate:
     async def test_create_generates_certificate_and_configures_quic(
         self, mock_gen_certificate: MagicMock
     ) -> None:
-        """Full creation flow: generate certificate, write to disk, configure QUIC.
+        """
+        Full creation flow: generate certificate, write to disk, configure QUIC.
 
         The certificate is written to temp files because aioquic only
         accepts file paths for TLS configuration.
@@ -968,7 +987,8 @@ class TestQuicConnectionManagerCreate:
 
 
 class TestQuicConnectionManagerConnect:
-    """Tests for outbound QUIC connection establishment.
+    """
+    Tests for outbound QUIC connection establishment.
 
     Connecting parses the multiaddr, creates a QUIC session via aioquic,
     waits for the TLS handshake, and wraps the result in a QuicConnection.
@@ -999,7 +1019,8 @@ class TestQuicConnectionManagerConnect:
     async def test_connect_happy_path_with_peer_id(
         self, mock_quic_connect: MagicMock, manager: QuicConnectionManager
     ) -> None:
-        """When the multiaddr includes a p2p component, that peer ID is used.
+        """
+        When the multiaddr includes a p2p component, that peer ID is used.
 
         This is the normal case — the caller knows who they're connecting to.
         """
@@ -1036,7 +1057,8 @@ class TestQuicConnectionManagerConnect:
         mock_identity_cls: MagicMock,
         manager: QuicConnectionManager,
     ) -> None:
-        """Without a p2p component, a temporary peer ID is generated.
+        """
+        Without a p2p component, a temporary peer ID is generated.
 
         Full peer certificate verification is not yet implemented.
         This fallback allows connections to proceed during development.
@@ -1071,7 +1093,8 @@ class TestQuicConnectionManagerConnect:
     async def test_connect_wraps_exception(
         self, mock_quic_connect: MagicMock, manager: QuicConnectionManager
     ) -> None:
-        """Connection failures are wrapped in QuicTransportError.
+        """
+        Connection failures are wrapped in QuicTransportError.
 
         The original exception is preserved as the cause.
         """
@@ -1086,7 +1109,8 @@ class TestQuicConnectionManagerConnect:
 
 
 class TestQuicConnectionManagerListen:
-    """Tests for inbound QUIC connection acceptance.
+    """
+    Tests for inbound QUIC connection acceptance.
 
     The listener creates a server-side QUIC configuration, starts
     quic_serve, and installs a protocol factory. Each new connection
@@ -1095,7 +1119,8 @@ class TestQuicConnectionManagerListen:
 
     @pytest.fixture
     def manager_with_temp_directory(self, tmp_path: Path) -> QuicConnectionManager:
-        """A manager with a real temp dir containing certificate files.
+        """
+        A manager with a real temp dir containing certificate files.
 
         Uses tmp_path so certificate files exist on disk for load_cert_chain.
         """
@@ -1130,7 +1155,8 @@ class TestQuicConnectionManagerListen:
         mock_config_cls: MagicMock,
         manager_with_temp_directory: QuicConnectionManager,
     ) -> None:
-        """Server uses is_client=False, CERT_NONE, and the libp2p ALPN.
+        """
+        Server uses is_client=False, CERT_NONE, and the libp2p ALPN.
 
         CERT_NONE is correct because peer verification happens via
         the libp2p certificate extension, not a CA chain.
@@ -1175,7 +1201,8 @@ class TestQuicConnectionManagerListen:
         mock_config_cls: MagicMock,
         manager_with_temp_directory: QuicConnectionManager,
     ) -> None:
-        """The handshake callback creates and registers a QuicConnection.
+        """
+        The handshake callback creates and registers a QuicConnection.
 
         This test captures the protocol factory that listen() passes to
         quic_serve, then invokes the handshake callback to verify that
@@ -1246,7 +1273,8 @@ class TestQuicConnectionManagerListen:
         mock_quic_serve: MagicMock,
         mock_config_cls: MagicMock,
     ) -> None:
-        """Without a temp directory, certificate loading is skipped gracefully.
+        """
+        Without a temp directory, certificate loading is skipped gracefully.
 
         This guards against a crash if the manager was not constructed
         via the normal create() factory.

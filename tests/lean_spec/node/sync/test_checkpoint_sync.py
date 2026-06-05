@@ -20,7 +20,8 @@ from lean_spec.spec.forks.lstar.containers import Validators
 
 
 class _MockTransport(httpx.AsyncBaseTransport):
-    """Injects a canned HTTP response or error without a real network.
+    """
+    Injects a canned HTTP response or error without a real network.
 
     Used by fetch_finalized_state tests to exercise error-handling paths
     through real httpx machinery rather than patching context managers.
@@ -85,7 +86,8 @@ class TestStateVerification:
     async def test_exception_during_hash_tree_root_returns_false(
         self, genesis_state: State
     ) -> None:
-        """Verification never crashes the caller on unexpected hashing errors.
+        """
+        Verification never crashes the caller on unexpected hashing errors.
 
         Any exception from the state root computation is caught and treated
         as a verification failure so startup can abort cleanly.
@@ -100,7 +102,8 @@ class TestStateVerification:
 
 
 class TestFetchFinalizedState:
-    """Tests for error handling when fetching checkpoint state over HTTP.
+    """
+    Tests for error handling when fetching checkpoint state over HTTP.
 
     Each test injects failures via _MockTransport so the real httpx client
     runs unchanged. This exercises the actual error-wrapping logic without
@@ -108,7 +111,8 @@ class TestFetchFinalizedState:
     """
 
     async def test_network_error_raises_checkpoint_sync_error(self) -> None:
-        """TCP-level failure surfaces as CheckpointSyncError with the URL.
+        """
+        TCP-level failure surfaces as CheckpointSyncError with the URL.
 
         Operators need the URL in the error message to diagnose which endpoint
         is unreachable (DNS failure, firewall block, wrong host).
@@ -139,7 +143,8 @@ class TestFetchFinalizedState:
     async def test_http_error_response_raises_checkpoint_sync_error(
         self, status_code: int, status_text: str
     ) -> None:
-        """Non-success HTTP status surfaces as CheckpointSyncError with the code.
+        """
+        Non-success HTTP status surfaces as CheckpointSyncError with the code.
 
         Covers both misconfigured endpoints (404) and server-side failures (500).
         The status code in the message helps operators identify the failure tier.
@@ -156,7 +161,8 @@ class TestFetchFinalizedState:
             await fetch_finalized_state("http://example.com", State)
 
     async def test_corrupt_ssz_raises_checkpoint_sync_error(self) -> None:
-        """Corrupt response body surfaces as CheckpointSyncError.
+        """
+        Corrupt response body surfaces as CheckpointSyncError.
 
         A 200 response with malformed SSZ bytes fails at deserialization.
         This catches truncated downloads or servers that return JSON instead
@@ -174,7 +180,8 @@ class TestFetchFinalizedState:
             await fetch_finalized_state("http://example.com", State)
 
     async def test_trailing_slash_stripped_from_url(self) -> None:
-        """Trailing slash on base URL does not produce a double slash in the request.
+        """
+        Trailing slash on base URL does not produce a double slash in the request.
 
         Operators commonly configure base URLs with trailing slashes.
         The endpoint must be appended cleanly regardless of input format.

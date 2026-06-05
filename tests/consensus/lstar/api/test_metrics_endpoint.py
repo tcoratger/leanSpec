@@ -9,7 +9,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_metrics_endpoint_scrape_contract(
     api_endpoint: ApiEndpointTestFiller,
 ) -> None:
-    """GET /metrics returns the Prometheus-format scrape with the required metric names.
+    """
+    GET /metrics returns the Prometheus-format scrape with the required metric names.
 
     The endpoint body is dynamic (counters accumulate, timestamps shift),
     so the vector pins only the stable contract: status 200, the

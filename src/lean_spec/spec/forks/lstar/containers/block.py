@@ -64,7 +64,8 @@ class Block(Container):
 
 
 class SignedBlock(Container):
-    """Envelope carrying a block with a single aggregated proof for all signatures.
+    """
+    Envelope carrying a block with a single aggregated proof for all signatures.
 
     The proof is a multi-message aggregate multi-message proof.
     It binds every attestation in the body plus the proposer's signature

@@ -13,7 +13,8 @@ from lean_spec.spec.ssz.ssz_base import SSZType
 
 
 class SSZTest(BaseConsensusFixture):
-    """Fixture for SSZ conformance testing.
+    """
+    Fixture for SSZ conformance testing.
 
     Supports two modes:
 
@@ -71,7 +72,8 @@ class SSZTest(BaseConsensusFixture):
         return str(value)
 
     def make_fixture(self) -> "SSZTest":
-        """Verify SSZ roundtrip or decode-failure and produce the reference output.
+        """
+        Verify SSZ roundtrip or decode-failure and produce the reference output.
 
         Returns:
             A copy of this fixture with `serialized` and `root` populated.
@@ -102,7 +104,8 @@ class SSZTest(BaseConsensusFixture):
         return self
 
     def _make_decode_failure(self) -> "SSZTest":
-        """Run the decode-failure path: assert decoding `raw_bytes` raises.
+        """
+        Run the decode-failure path: assert decoding `raw_bytes` raises.
 
         The class of `value` is used as the decoder. `serialized` carries
         the malformed bytes verbatim so consumers can reproduce the input.

@@ -1,4 +1,5 @@
-"""Specification of the Poseidon permutation over the KoalaBear field.
+"""
+Specification of the Poseidon permutation over the KoalaBear field.
 
 Based on "Poseidon: A New Hash Function for Zero-Knowledge Proof Systems".
 See https://eprint.iacr.org/2019/458.
@@ -1340,7 +1341,8 @@ def _permute_jit(
 
 
 class PoseidonParams(StrictBaseModel):
-    """Parameters for a specific Poseidon instance.
+    """
+    Parameters for a specific Poseidon instance.
 
     - The paper requires at least 6 full rounds for statistical-attack security.
     - Some regimes raise this bound to 10 per Eq. 2 of the paper.

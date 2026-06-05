@@ -1,4 +1,5 @@
-"""Test vectors for slot clock timing computations.
+"""
+Test vectors for slot clock timing computations.
 
 Every consensus client must derive identical slot and interval numbers
 from wall-clock timestamps. These vectors verify the conversion logic

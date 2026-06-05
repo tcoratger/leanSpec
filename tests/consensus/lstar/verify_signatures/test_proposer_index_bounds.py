@@ -15,7 +15,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_proposer_index_out_of_range_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
-    """A signed block whose proposer_index exceeds the validator registry is rejected.
+    """
+    A signed block whose proposer_index exceeds the validator registry is rejected.
 
     Scenario
     --------

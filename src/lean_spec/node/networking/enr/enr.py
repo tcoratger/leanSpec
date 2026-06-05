@@ -134,7 +134,8 @@ class ENR(StrictBaseModel):
         return Port(int.from_bytes(raw, "big")) if raw else None
 
     def multiaddr(self) -> Multiaddr | None:
-        """Construct QUIC multiaddress from endpoint info.
+        """
+        Construct QUIC multiaddress from endpoint info.
 
         Use QUIC port if available, otherwise UDP port.
         """

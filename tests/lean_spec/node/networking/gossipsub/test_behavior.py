@@ -1,4 +1,5 @@
-"""Tests for the gossipsub behavior.
+"""
+Tests for the gossipsub behavior.
 
 Covers RPC handlers, mesh maintenance and gossip emission during the
 heartbeat cycle, and message publishing with subscription broadcast.

@@ -1,4 +1,5 @@
-"""In-memory bidirectional stream pair for integration testing.
+"""
+In-memory bidirectional stream pair for integration testing.
 
 Provides the same interface as QuicStreamAdapter (read, write, drain, close)
 so GossipsubBehavior can exchange RPCs without a real QUIC transport.
@@ -10,7 +11,8 @@ import asyncio
 
 
 class InMemoryStream:
-    """Async bidirectional stream backed by asyncio.Queue.
+    """
+    Async bidirectional stream backed by asyncio.Queue.
 
     Matches the QuicStreamAdapter interface used by GossipsubBehavior:
 
@@ -36,7 +38,8 @@ class InMemoryStream:
         self._read_buffer = b""
 
     async def read(self, n: int | None = None) -> bytes:
-        """Read bytes from the stream.
+        """
+        Read bytes from the stream.
 
         Returns data from the internal read queue. An empty bytes
         object signals EOF (peer closed their end).
@@ -94,7 +97,8 @@ class InMemoryStream:
             self._write_buffer = b""
 
     async def close(self) -> None:
-        """Signal EOF to the peer by sending an empty sentinel.
+        """
+        Signal EOF to the peer by sending an empty sentinel.
 
         An empty bytes object travels through the same queue as data.
         This guarantees the peer processes all prior writes before seeing EOF.
@@ -104,7 +108,8 @@ class InMemoryStream:
 
 
 def create_stream_pair() -> tuple[InMemoryStream, InMemoryStream]:
-    """Create a pair of connected in-memory streams.
+    """
+    Create a pair of connected in-memory streams.
 
     Returns (stream_a, stream_b) where:
     - Writing to stream_a is readable from stream_b

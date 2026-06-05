@@ -11,7 +11,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_gossipsub_rpc_decode_rejects_unknown_wire_type(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A protobuf tag with an unrecognised wire type must be rejected.
+    """
+    A protobuf tag with an unrecognised wire type must be rejected.
 
     The tag byte 0x0e encodes field number 1 with wire type 6. Wire types
     beyond the set 0, 1, 2, 5 are unassigned; any occurrence in RPC traffic
@@ -27,7 +28,8 @@ def test_gossipsub_rpc_decode_rejects_unknown_wire_type(
 def test_gossipsub_rpc_decode_rejects_length_exceeding_data(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A length-delimited field whose length runs past the payload is rejected.
+    """
+    A length-delimited field whose length runs past the payload is rejected.
 
     The payload starts with tag 0x0a (field 1, length-delimited wire type)
     followed by varint length 0x64 (100). The rest of the buffer carries

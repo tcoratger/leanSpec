@@ -1,4 +1,5 @@
-"""Req/resp multi-chunk response stream vectors.
+"""
+Req/resp multi-chunk response stream vectors.
 
 Pins the concatenated byte layout of a libp2p request/response stream
 carrying multiple chunks. Each chunk is its own [code][varint][snappy]
@@ -13,7 +14,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_stream_two_success_chunks(networking_codec: NetworkingCodecTestFiller) -> None:
-    """Stream with two SUCCESS chunks carrying distinct payload bytes.
+    """
+    Stream with two SUCCESS chunks carrying distinct payload bytes.
 
     Pins the concatenation of two independent response frames. Clients
     must read both records before signalling EOF, so a receiver that
@@ -33,7 +35,8 @@ def test_stream_two_success_chunks(networking_codec: NetworkingCodecTestFiller) 
 def test_stream_success_then_resource_unavailable(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A SUCCESS chunk followed by a RESOURCE_UNAVAILABLE terminator.
+    """
+    A SUCCESS chunk followed by a RESOURCE_UNAVAILABLE terminator.
 
     Real servers end a multi-chunk response early when the peer asked
     for more items than the server holds. The vector pins the exact
@@ -54,7 +57,8 @@ def test_stream_success_then_resource_unavailable(
 def test_stream_three_success_chunks_with_compressible_payloads(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """Three SUCCESS chunks whose payloads compress well.
+    """
+    Three SUCCESS chunks whose payloads compress well.
 
     Exercises the N>2 case and highlights that each chunk carries its
     own snappy stream-identifier preamble inside the concatenated bytes;

@@ -806,7 +806,8 @@ def empty_signed_block(slot: Slot, parent_root: Bytes32, state_seed: int) -> Sig
 
 
 def build_chain(start_slot: int, count: int, root_seed: int = 0xAA) -> list[SignedBlock]:
-    """Return a chain of strictly-increasing-slot blocks starting at start_slot.
+    """
+    Return a chain of strictly-increasing-slot blocks starting at start_slot.
 
     Each child links to its predecessor via the previous block's tree-hash root.
     The root of the first slot is derived from the seed parameter.
@@ -961,7 +962,8 @@ class TestReqRespClientBlocksByRange:
     async def test_parent_root_continuity_violation_across_skipped_slot(
         self, peer_id: PeerId
     ) -> None:
-        """A wrong parent root after a skipped empty slot is rejected as a protocol violation.
+        """
+        A wrong parent root after a skipped empty slot is rejected as a protocol violation.
 
         The responder serves canonical blocks only and skips empty slots.
         So a block following an empty slot must still chain off the previous

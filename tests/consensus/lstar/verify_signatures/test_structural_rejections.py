@@ -1,4 +1,5 @@
-"""Signature verification: structural rejection vectors for the merged proof.
+"""
+Signature verification: structural rejection vectors for the merged proof.
 
 These cover structural invariants a peer could break that the block
 builder upholds by construction:
@@ -26,7 +27,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_corrupt_proof_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
-    """A signed block whose merged proof does not decode is rejected.
+    """
+    A signed block whose merged proof does not decode is rejected.
 
     Scenario
     --------
@@ -56,7 +58,8 @@ def test_corrupt_proof_rejected(
 def test_proof_component_count_mismatch_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
-    """A block whose body claims more components than the proof is rejected.
+    """
+    A block whose body claims more components than the proof is rejected.
 
     Scenario
     --------
@@ -88,7 +91,8 @@ def test_proof_component_count_mismatch_rejected(
 def test_proof_reused_under_different_message_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
-    """An honest proof reused under a different block is rejected.
+    """
+    An honest proof reused under a different block is rejected.
 
     Scenario
     --------

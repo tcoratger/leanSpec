@@ -576,7 +576,8 @@ class TestReadNegotiationMessage:
 
 @dataclass
 class _MockStream:
-    """In-memory stream for testing.
+    """
+    In-memory stream for testing.
 
     Two instances cross-connected via asyncio queues simulate a
     bidirectional QUIC stream pair.
@@ -618,7 +619,8 @@ class TestClose:
 
 
 def _create_stream_pair() -> tuple[QuicStreamAdapter, QuicStreamAdapter]:
-    """Create a cross-connected pair of QuicStreamAdapters for testing.
+    """
+    Create a cross-connected pair of QuicStreamAdapters for testing.
 
     Data written to one adapter is readable from the other.
     """

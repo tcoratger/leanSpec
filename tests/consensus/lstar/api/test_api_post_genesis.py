@@ -1,4 +1,5 @@
-"""API endpoint conformance vectors after the chain has advanced past genesis.
+"""
+API endpoint conformance vectors after the chain has advanced past genesis.
 
 Existing API fixtures pin responses against a genesis-only store. This
 file pins the same endpoints after an empty-block chain has advanced,
@@ -16,7 +17,8 @@ GENESIS_4V_AT_SLOT_3 = {"numValidators": 4, "genesisTime": 0, "anchorSlot": 3}
 
 
 def test_fork_choice_tree_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
-    """Fork-choice response carries a multi-node tree once the chain advances.
+    """
+    Fork-choice response carries a multi-node tree once the chain advances.
 
     With the chain at slot 3 the store holds four blocks (genesis plus
     slots 1 through 3). The response's nodes list, head root, and
@@ -27,7 +29,8 @@ def test_fork_choice_tree_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None
 
 
 def test_finalized_state_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
-    """Finalized-state response returns the SSZ-encoded anchor state after chain advance.
+    """
+    Finalized-state response returns the SSZ-encoded anchor state after chain advance.
 
     Finalization has not yet moved past genesis (no attestations have
     been injected), but the served state now carries non-empty
@@ -38,7 +41,8 @@ def test_finalized_state_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
 
 
 def test_justified_checkpoint_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
-    """Justified-checkpoint response at a non-genesis slot pins the slot=0 root.
+    """
+    Justified-checkpoint response at a non-genesis slot pins the slot=0 root.
 
     Without attestations, justification remains at genesis even after
     the chain advances. This vector pins that the response still

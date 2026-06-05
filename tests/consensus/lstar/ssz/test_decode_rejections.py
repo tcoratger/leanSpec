@@ -1,4 +1,5 @@
-"""SSZ: decode-failure vectors for malformed inputs.
+"""
+SSZ: decode-failure vectors for malformed inputs.
 
 Exercises the SSZ decoder's user-triggerable rejection paths through the
 decode-failure fixture. Each vector captures the expected exception class
@@ -30,7 +31,8 @@ class DecodeBitvector16(BaseBitvector):
 
 
 def test_bitlist_decode_rejects_empty_input(ssz: SSZTestFiller) -> None:
-    """Bitlist decoding of zero bytes has no delimiter bit and must be rejected.
+    """
+    Bitlist decoding of zero bytes has no delimiter bit and must be rejected.
 
     Every SSZ bitlist encoding ends in a sentinel set bit that signals the
     bit-length. Empty input carries no such sentinel, so the decoder cannot
@@ -45,7 +47,8 @@ def test_bitlist_decode_rejects_empty_input(ssz: SSZTestFiller) -> None:
 
 
 def test_bitlist_decode_rejects_missing_delimiter(ssz: SSZTestFiller) -> None:
-    """Bitlist bytes with no set bits carry no sentinel and must be rejected.
+    """
+    Bitlist bytes with no set bits carry no sentinel and must be rejected.
 
     A single 0x00 byte encodes eight clear bits with nothing marking the
     end of the logical bitlist. The decoder needs the sentinel to know
@@ -60,7 +63,8 @@ def test_bitlist_decode_rejects_missing_delimiter(ssz: SSZTestFiller) -> None:
 
 
 def test_bitlist_decode_rejects_length_above_limit(ssz: SSZTestFiller) -> None:
-    """Bitlist whose sentinel implies a bit-length beyond the type limit must be rejected.
+    """
+    Bitlist whose sentinel implies a bit-length beyond the type limit must be rejected.
 
     The payload 0x0002 places the sentinel at bit index nine, implying a
     nine-bit bitlist. The type caps at eight bits, so the decoder must
@@ -75,7 +79,8 @@ def test_bitlist_decode_rejects_length_above_limit(ssz: SSZTestFiller) -> None:
 
 
 def test_bitvector_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
-    """Fixed-width bitvector decoding rejects inputs whose byte count does not match LENGTH.
+    """
+    Fixed-width bitvector decoding rejects inputs whose byte count does not match LENGTH.
 
     The fixed-width bitvector here occupies exactly two bytes. A single-byte
     input underfills the vector. The fixed-size decode path requires an
@@ -90,7 +95,8 @@ def test_bitvector_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
 
 
 def test_bytes4_decode_rejects_extra_trailing_bytes(ssz: SSZTestFiller) -> None:
-    """Fixed-size byte arrays reject inputs longer than their declared LENGTH.
+    """
+    Fixed-size byte arrays reject inputs longer than their declared LENGTH.
 
     A four-byte fixed array cannot consume five input bytes. The extra
     trailing byte has no slot in the type, so the decoder must raise
@@ -105,7 +111,8 @@ def test_bytes4_decode_rejects_extra_trailing_bytes(ssz: SSZTestFiller) -> None:
 
 
 def test_uint32_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
-    """Fixed-size uint types reject input whose byte length does not match the type.
+    """
+    Fixed-size uint types reject input whose byte length does not match the type.
 
     A uint32 is always four bytes. A three-byte input underfills the slot
     and cannot be safely widened. The decoder raises rather than guessing

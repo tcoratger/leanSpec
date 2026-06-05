@@ -445,7 +445,8 @@ def make_signed_block_from_store(
     slot: Slot,
     proposer_index: ValidatorIndex,
 ) -> tuple[Store, SignedBlock]:
-    """Produce a signed block and advance the consumer store to accept it.
+    """
+    Produce a signed block and advance the consumer store to accept it.
 
     Returns the updated store (with time advanced) and the signed block.
     The merged multi-message aggregate proof is built honestly because callers usually

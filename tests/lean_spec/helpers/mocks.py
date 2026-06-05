@@ -141,7 +141,8 @@ class _MockBlock:
 
 
 class MockForkchoiceStore:
-    """Mock forkchoice store for sync service testing.
+    """
+    Mock forkchoice store for sync service testing.
 
     Tracks blocks, attestations, and head state without running real
     forkchoice logic. Methods return self so the SyncService can assign

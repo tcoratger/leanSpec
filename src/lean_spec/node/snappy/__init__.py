@@ -1,4 +1,5 @@
-"""Pure Python Snappy compression library.
+"""
+Pure Python Snappy compression library.
 
 Snappy is a fast compression/decompression algorithm developed by Google.
 It prioritizes speed over compression ratio, making it ideal for real-time

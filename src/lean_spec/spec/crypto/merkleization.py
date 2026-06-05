@@ -54,7 +54,8 @@ Depth 64 covers any chunk count the protocol uses.
 
 
 def _zero_tree_root(width: int) -> Bytes32:
-    """Root of an all-zero perfect binary tree with the given leaf count.
+    """
+    Root of an all-zero perfect binary tree with the given leaf count.
 
     The width must be a power of two.
     """
@@ -75,7 +76,8 @@ def _zero_tree_root(width: int) -> Bytes32:
 
 
 def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:
-    r"""Compute the SSZ Merkle root over a chunk sequence.
+    r"""
+    Compute the SSZ Merkle root over a chunk sequence.
 
     Tree layout for three leaves with no limit:
 
@@ -138,7 +140,8 @@ def merkleize(chunks: Sequence[Bytes32], limit: int | None = None) -> Bytes32:
 
 
 def mix_in_length(root: Bytes32, length: int) -> Bytes32:
-    """Mix a length into a Merkle root via the SSZ uint256 little-endian encoding.
+    """
+    Mix a length into a Merkle root via the SSZ uint256 little-endian encoding.
 
     Variable-length types append their declared length to disambiguate roots.
     Two lists with identical elements but different lengths must produce different roots.
@@ -159,7 +162,8 @@ def mix_in_length(root: Bytes32, length: int) -> Bytes32:
 
 
 def _pack_bytes(data: bytes) -> list[Bytes32]:
-    """Right-pad serialized bytes to a chunk boundary and split into chunks.
+    """
+    Right-pad serialized bytes to a chunk boundary and split into chunks.
 
     Layout for a 5-byte payload:
 
@@ -176,7 +180,8 @@ def _pack_bytes(data: bytes) -> list[Bytes32]:
 
 
 def _pack_bits(bits: Sequence[Boolean]) -> list[Bytes32]:
-    """Pack a boolean sequence into bytes, then into chunks for merkleization.
+    """
+    Pack a boolean sequence into bytes, then into chunks for merkleization.
 
     The first input bit becomes the least significant bit of the first byte.
     Each next input bit moves up one position, wrapping to the next byte after eight.
@@ -197,7 +202,8 @@ def _pack_bits(bits: Sequence[Boolean]) -> list[Bytes32]:
 
 @singledispatch
 def hash_tree_root(value: object) -> Bytes32:
-    """Compute the SSZ Merkle root of a value.
+    """
+    Compute the SSZ Merkle root of a value.
 
     Raises:
         TypeError: If the value's type has no registered handler.

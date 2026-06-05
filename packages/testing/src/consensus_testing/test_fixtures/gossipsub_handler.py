@@ -127,7 +127,8 @@ def _serialize_meshes(
 
 
 class GossipsubHandlerTest(BaseConsensusFixture):
-    """Fixture for gossipsub handler behavior conformance.
+    """
+    Fixture for gossipsub handler behavior conformance.
 
     Tests protocol decisions: given initial state + incoming event,
     what RPCs are sent and how does the mesh change?

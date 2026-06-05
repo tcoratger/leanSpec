@@ -1,4 +1,5 @@
-"""Poseidon permutation test fixture.
+"""
+Poseidon permutation test fixture.
 
 Generates JSON test vectors for the Poseidon permutation over the
 KoalaBear field at widths 16 and 24. Clients must produce identical
@@ -13,7 +14,8 @@ from lean_spec.spec.crypto.poseidon import PARAMS_16, PARAMS_24, Poseidon
 
 
 class PoseidonPermutationTest(BaseConsensusFixture):
-    """Fixture for Poseidon permutation conformance.
+    """
+    Fixture for Poseidon permutation conformance.
 
     Each vector names the permutation width and supplies an input state
     as decimal strings. The fixture runs the spec's permutation engine
@@ -35,7 +37,8 @@ class PoseidonPermutationTest(BaseConsensusFixture):
     """Computed output state. Filled by make_fixture."""
 
     def make_fixture(self) -> "PoseidonPermutationTest":
-        """Run the Poseidon permutation and produce the output state.
+        """
+        Run the Poseidon permutation and produce the output state.
 
         Returns:
             A copy of this fixture with output populated.

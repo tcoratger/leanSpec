@@ -1,4 +1,5 @@
-"""Tests for the Ethereum Node Record (ENR) module (EIP-778).
+"""
+Tests for the Ethereum Node Record (ENR) module (EIP-778).
 
 This module tests ENR parsing, validation, and property accessors using the
 official EIP-778 test vector and additional edge cases.
@@ -113,7 +114,8 @@ class TestOfficialEIP778Vector:
         assert multiaddr == f"/ip4/{OFFICIAL_IPV4}/udp/{OFFICIAL_UDP_PORT}/quic-v1"
 
     def test_official_enr_node_id(self) -> None:
-        """Official ENR node ID matches keccak256(uncompressed_public_key).
+        """
+        Official ENR node ID matches keccak256(uncompressed_public_key).
 
         Per EIP-778 "v4" identity scheme:
             "To derive a node address, take the keccak256 hash of the

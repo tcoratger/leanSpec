@@ -71,7 +71,8 @@ class Signature(HexSerializedContainer):
 
 
 class SecretKey(HexSerializedContainer):
-    """Private state of an XMSS key pair.
+    """
+    Private state of an XMSS key pair.
 
     Must be kept confidential.
 
@@ -147,7 +148,8 @@ class KeyPair(StrictBaseModel):
 
 
 class ValidatorKeyPair(StrictBaseModel):
-    """Two independent XMSS key pairs for one validator's two signing roles.
+    """
+    Two independent XMSS key pairs for one validator's two signing roles.
 
     A validator signs two messages per slot:
 

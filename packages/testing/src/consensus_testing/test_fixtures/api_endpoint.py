@@ -33,7 +33,8 @@ def _make_genesis_block(state: State) -> Block:
 
 
 def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -> Store:
-    """Build a deterministic store rooted at genesis or at an advanced anchor.
+    """
+    Build a deterministic store rooted at genesis or at an advanced anchor.
 
     At anchor_slot 0 the store is genesis-only. At higher slots the store
     is seeded with a real (state, block) pair produced by advancing an
@@ -144,7 +145,8 @@ def _aggregator_status_response(_store: Store, fixture: "ApiEndpointTest") -> di
 
 
 def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
-    """Prometheus-format metrics scrape.
+    """
+    Prometheus-format metrics scrape.
 
     The body of /metrics is dynamic (counters accumulate, timestamps shift)
     so the fixture pins only the stable contract: status, content-type,
@@ -187,7 +189,8 @@ def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, A
 
 
 def _aggregator_toggle_response(_store: Store, fixture: "ApiEndpointTest") -> dict[str, Any]:
-    """Expected response after toggling the aggregator role.
+    """
+    Expected response after toggling the aggregator role.
 
     The fixture models a single POST against a node whose starting state is
     initial_is_aggregator. The response reflects the new value and the
@@ -223,7 +226,8 @@ _ENDPOINT_HANDLERS: dict[tuple[str, str], EndpointHandler] = {
 
 
 class ApiEndpointTest(BaseConsensusFixture):
-    """Fixture for API endpoint response conformance.
+    """
+    Fixture for API endpoint response conformance.
 
     JSON output: endpoint, genesisParams, expectedStatusCode,
     expectedContentType, expectedBody.

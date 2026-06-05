@@ -1,4 +1,5 @@
-"""Basic 2-3 peer connectivity tests.
+"""
+Basic 2-3 peer connectivity tests.
 
 Gossipsub is a mesh-based pub/sub protocol. Peers subscribe to topics,
 form a mesh overlay, and forward messages only through mesh links.

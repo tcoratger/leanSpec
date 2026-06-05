@@ -1,4 +1,5 @@
-"""Test vectors for 3SF-mini slot justifiability rules.
+"""
+Test vectors for 3SF-mini slot justifiability rules.
 
 A slot is justifiable after a finalized slot if the distance (delta) is:
 1. In the immediate window (delta <= 5)

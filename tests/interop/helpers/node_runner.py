@@ -83,7 +83,8 @@ class TestNode:
 
     @property
     def peer_count(self) -> int:
-        """Number of connected peers.
+        """
+        Number of connected peers.
 
         Reads the raw connection map rather than the peer manager,
         which is updated asynchronously and may lag behind.

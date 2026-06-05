@@ -21,7 +21,8 @@ class ValidatorDutiesMixin(LstarSpecBase):
     """Validator duties for the lstar fork."""
 
     def get_proposal_head(self, store: LstarStore, slot: Slot) -> tuple[LstarStore, Bytes32]:
-        """Get the head for block proposal at given slot.
+        """
+        Get the head for block proposal at given slot.
 
         Ensures store is up-to-date and processes any pending attestations
         before returning the canonical head. This guarantees the proposer
@@ -37,7 +38,8 @@ class ValidatorDutiesMixin(LstarSpecBase):
         return store, store.head
 
     def get_attestation_target(self, store: LstarStore) -> Checkpoint:
-        """Calculate target checkpoint for validator attestations.
+        """
+        Calculate target checkpoint for validator attestations.
 
         Determines the attestation target from the head, the safe target,
         and the finalization constraints.
@@ -86,7 +88,8 @@ class ValidatorDutiesMixin(LstarSpecBase):
         return Checkpoint(root=target_block_root, slot=target_block.slot)
 
     def produce_attestation_data(self, store: LstarStore, slot: Slot) -> AttestationData:
-        """Produce attestation data for the given slot.
+        """
+        Produce attestation data for the given slot.
 
         This method constructs an AttestationData object according to the lean protocol
         specification. The attestation data represents the chain state view including
@@ -115,7 +118,8 @@ class ValidatorDutiesMixin(LstarSpecBase):
         slot: Slot,
         validator_index: ValidatorIndex,
     ) -> tuple[LstarStore, Block, list[SingleMessageAggregate]]:
-        """Produce a block for the target slot.
+        """
+        Produce a block for the target slot.
 
         Returns the block alongside its per-attestation single-message
         aggregate proofs.

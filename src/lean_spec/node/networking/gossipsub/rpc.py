@@ -64,7 +64,8 @@ class ProtobufDecodeError(ValueError):
 
 
 def _decode_length_at(data: bytes, pos: int) -> tuple[int, int]:
-    """Decode a length varint and validate bounds.
+    """
+    Decode a length varint and validate bounds.
 
     Returns:
         (length, new_position) tuple.
@@ -576,7 +577,8 @@ class RPC:
 
 
 def _skip_field(data: bytes, pos: int, wire_type: int) -> int:
-    """Skip an unknown field based on wire type.
+    """
+    Skip an unknown field based on wire type.
 
     Raises:
         ProtobufDecodeError: If the wire type is unrecognized (e.g. deprecated

@@ -300,7 +300,8 @@ class TestBuildAnchor:
     async def test_checkpoint_url_calls_from_checkpoint(
         self, make_boot: Callable[..., NodeBootstrap]
     ) -> None:
-        """With a checkpoint URL the boot delegates to the asynchronous checkpoint builder.
+        """
+        With a checkpoint URL the boot delegates to the asynchronous checkpoint builder.
 
         The real checkpoint path needs a fetched state plus a constructed store.
         A dispatch-via-mock keeps the test focused on the dispatch contract.

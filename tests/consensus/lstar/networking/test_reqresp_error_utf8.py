@@ -9,7 +9,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_reqresp_error_at_max_error_message_size(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """Error response carrying a payload at the maximum error-message size roundtrips.
+    """
+    Error response carrying a payload at the maximum error-message size roundtrips.
 
     The handler truncates server-side error strings to 256 bytes before
     encoding. A payload at that boundary exercises the exact wire shape
@@ -29,7 +30,8 @@ def test_reqresp_error_at_max_error_message_size(
 def test_reqresp_error_with_multi_byte_utf8(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """Error response carrying multi-byte UTF-8 text roundtrips byte-for-byte.
+    """
+    Error response carrying multi-byte UTF-8 text roundtrips byte-for-byte.
 
     The codec treats the payload as opaque bytes. A multi-byte UTF-8
     payload verifies that compression, length framing, and decode
@@ -48,7 +50,8 @@ def test_reqresp_error_with_multi_byte_utf8(
 def test_reqresp_error_resource_unavailable_with_informational_text(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """Error code 3 response carrying a short descriptive message roundtrips.
+    """
+    Error code 3 response carrying a short descriptive message roundtrips.
 
     Pins the wire shape for the common peer-observed case of an
     informational error string alongside the RESOURCE_UNAVAILABLE code.

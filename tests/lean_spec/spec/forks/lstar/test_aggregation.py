@@ -25,7 +25,8 @@ from tests.lean_spec.helpers import (
 
 
 def _proof(validator_indices: list[int], distinguishing_bytes: bytes) -> SingleMessageAggregate:
-    """Build a proof covering the given validators.
+    """
+    Build a proof covering the given validators.
 
     Args:
         validator_indices: Validators this proof attests for.

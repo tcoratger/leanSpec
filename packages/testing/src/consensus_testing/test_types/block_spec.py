@@ -242,7 +242,8 @@ class BlockSpec(CamelModel):
         key_manager: XmssKeyManager,
         state: State,
     ) -> SignedBlock:
-        """Sign a block and assemble the final SignedBlock with the merged proof.
+        """
+        Sign a block and assemble the final SignedBlock with the merged proof.
 
         Builds a single-message aggregate wrapping the proposer's XMSS
         signature, then merges that with the per-attestation single-message

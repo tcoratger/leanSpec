@@ -1,4 +1,5 @@
-"""Tests for the API server implementation details.
+"""
+Tests for the API server implementation details.
 
 API contract tests (status codes, content types, response structure) are in
 tests/api/ and also run automatically with `uv run pytest`.
@@ -27,7 +28,8 @@ class _AggregatorStub:
 
 
 def _make_test_controller(initial: bool = False) -> AggregatorController:
-    """Build an AggregatorController backed by lightweight stubs.
+    """
+    Build an AggregatorController backed by lightweight stubs.
 
     Avoids pulling in the full SyncService / NetworkService dependency graph
     for endpoint-level tests that only exercise the flag-toggle contract.
@@ -336,7 +338,8 @@ class TestAggregatorAdminEndpoint:
             await server.aclose()
 
     async def test_sequential_posts_converge(self) -> None:
-        """Multiple sequential POSTs converge to the last-writer value.
+        """
+        Multiple sequential POSTs converge to the last-writer value.
 
         Posts must be issued one at a time (not via ``asyncio.gather``);
         with concurrent requests the server-side arrival order is racy and

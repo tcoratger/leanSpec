@@ -226,7 +226,8 @@ class SyncService:
         return new_store
 
     def _persist_block(self, store: Store, block: Block) -> None:
-        """Persist the block, its state, indices, and chain pointers atomically.
+        """
+        Persist the block, its state, indices, and chain pointers atomically.
 
         - A crash mid-batch would leave the database inconsistent.
         - The single batch guarantees all-or-nothing persistence per block import.
@@ -510,7 +511,8 @@ class SyncService:
         store: Store,
         block: SignedBlock,
     ) -> tuple[Store, list[SignedAggregatedAttestation]]:
-        """Recover per-attestation proofs from a processed block.
+        """
+        Recover per-attestation proofs from a processed block.
 
         On block import we already trust the block-attestation participant
         bitfields via spec on_block signature verification. The block carries
@@ -658,7 +660,8 @@ class SyncService:
         return store, aggregates
 
     async def _publish_pending_block_aggregates(self) -> None:
-        """Gossip the aggregates recovered from processed blocks.
+        """
+        Gossip the aggregates recovered from processed blocks.
 
         Every processed block is deconstructed in the block wrapper, which
         writes the recovered proofs into the store and queues the combined
@@ -697,7 +700,8 @@ class SyncService:
             await self._transition_to(SyncState.SYNCED)
 
     async def _transition_to(self, new_state: SyncState) -> None:
-        """Transition to a new sync state, rejecting invalid moves.
+        """
+        Transition to a new sync state, rejecting invalid moves.
 
         Two invariants are enforced:
 

@@ -76,7 +76,8 @@ from lean_spec.node.snappy.encoding import encode_copy_tag, encode_literal_tag
 
 
 def compress(data: bytes) -> bytes:
-    """Compress data using the Snappy algorithm.
+    """
+    Compress data using the Snappy algorithm.
 
     Args:
         data: Uncompressed input bytes.
@@ -124,7 +125,8 @@ def compress(data: bytes) -> bytes:
 
 
 def max_compressed_length(source_bytes: int) -> int:
-    """Calculate the maximum possible compressed length for a given input size.
+    """
+    Calculate the maximum possible compressed length for a given input size.
 
     Snappy guarantees that compressed output never exceeds this size.
     Useful for pre-allocating buffers.
@@ -147,7 +149,8 @@ def max_compressed_length(source_bytes: int) -> int:
 
 
 def _compress_block(block: bytes) -> bytes:
-    """Compress a single block (up to 64KB).
+    """
+    Compress a single block (up to 64KB).
 
     This is the heart of the compression algorithm.
 
@@ -254,7 +257,8 @@ def _compress_block(block: bytes) -> bytes:
 
 
 def _compute_table_bits(block_size: int) -> int:
-    """Compute hash table size (as power of 2) for a given block size.
+    """
+    Compute hash table size (as power of 2) for a given block size.
 
     Args:
         block_size: Size of the block being compressed.
@@ -277,7 +281,8 @@ def _compute_table_bits(block_size: int) -> int:
 
 
 def _hash_4_bytes(data: bytes, pos: int, table_bits: int) -> int:
-    """Hash 4 bytes into a table index.
+    """
+    Hash 4 bytes into a table index.
 
     Args:
         data: Input data.
@@ -337,7 +342,8 @@ def _hash_4_bytes(data: bytes, pos: int, table_bits: int) -> int:
 
 
 def _matches_at(data: bytes, pos1: int, pos2: int) -> bool:
-    """Check if 4 bytes at pos1 equal 4 bytes at pos2.
+    """
+    Check if 4 bytes at pos1 equal 4 bytes at pos2.
 
     Args:
         data: Input data.
@@ -371,7 +377,8 @@ def _matches_at(data: bytes, pos1: int, pos2: int) -> bool:
 
 
 def _extend_match(data: bytes, match_pos: int, current_pos: int) -> int:
-    """Extend a match as far as possible.
+    """
+    Extend a match as far as possible.
 
     Args:
         data: Input data.
@@ -423,7 +430,8 @@ def _extend_match(data: bytes, match_pos: int, current_pos: int) -> int:
 
 
 def _emit_literal(literal_data: bytes) -> bytes:
-    """Encode literal data (unmatched bytes).
+    """
+    Encode literal data (unmatched bytes).
 
     Args:
         literal_data: Raw bytes to emit.

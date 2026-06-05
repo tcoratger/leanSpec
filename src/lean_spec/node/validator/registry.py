@@ -1,4 +1,5 @@
-"""Validator registry for managing validator keys.
+"""
+Validator registry for managing validator keys.
 
 Loads validator keys from YAML configuration files compatible with ream and zeam.
 
@@ -217,7 +218,8 @@ class ValidatorRegistry:
 
     @classmethod
     def from_keys_directory(cls, node_id: str, base_directory: Path | str) -> ValidatorRegistry:
-        """Load a validator registry from the ream/zeam keystore layout.
+        """
+        Load a validator registry from the ream/zeam keystore layout.
 
         Two files relative to the base directory:
 

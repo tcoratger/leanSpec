@@ -1,4 +1,5 @@
-"""Poseidon permutation: width-16 known-answer vectors.
+"""
+Poseidon permutation: width-16 known-answer vectors.
 
 Pins the output state of the Poseidon permutation over the KoalaBear
 field at state width 16 for four structural input patterns. Clients
@@ -18,7 +19,8 @@ WIDTH: int = 16
 def test_permutation_width16_all_zero(
     poseidon_permutation: PoseidonPermutationTestFiller,
 ) -> None:
-    """Input state of all zeros pins the round-constant-only output.
+    """
+    Input state of all zeros pins the round-constant-only output.
 
     With a zero state, the only contribution to every S-box input is the
     round-constants stream. The output state therefore depends purely on
@@ -34,7 +36,8 @@ def test_permutation_width16_all_zero(
 def test_permutation_width16_all_one(
     poseidon_permutation: PoseidonPermutationTestFiller,
 ) -> None:
-    """Input state of all ones exercises uniform non-zero entries.
+    """
+    Input state of all ones exercises uniform non-zero entries.
 
     Every element begins at the smallest non-zero field value. The MDS
     multiplications see a state vector whose entries all carry the same
@@ -49,7 +52,8 @@ def test_permutation_width16_all_one(
 def test_permutation_width16_incremental_index(
     poseidon_permutation: PoseidonPermutationTestFiller,
 ) -> None:
-    """Input state filled with 0, 1, 2, ..., WIDTH - 1.
+    """
+    Input state filled with 0, 1, 2, ..., WIDTH - 1.
 
     Distinct entries per slot expose per-position behaviour: any
     off-by-one in MDS row indexing or round-constant slicing perturbs
@@ -64,7 +68,8 @@ def test_permutation_width16_incremental_index(
 def test_permutation_width16_p_minus_one_and_near_zero(
     poseidon_permutation: PoseidonPermutationTestFiller,
 ) -> None:
-    """Mix of field-boundary values P - 1 and small values across the state.
+    """
+    Mix of field-boundary values P - 1 and small values across the state.
 
     Half the slots sit at the maximum representable field element, the
     other half at small positives. This pattern stresses the reduction

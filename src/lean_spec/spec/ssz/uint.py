@@ -20,7 +20,8 @@ class BaseUint(int, SSZType):
     """The number of bits in the integer (overridden by subclasses)."""
 
     def __new__(cls, value: SupportsInt) -> Self:
-        """Create and range-check a new instance.
+        """
+        Create and range-check a new instance.
 
         Raises:
             SSZTypeError: If value is not an int. Bool, string, and float are rejected.
@@ -83,7 +84,8 @@ class BaseUint(int, SSZType):
     @classmethod
     @override
     def decode_bytes(cls, data: bytes) -> Self:
-        """Deserialize from little-endian bytes.
+        """
+        Deserialize from little-endian bytes.
 
         Raises:
             SSZSerializationError: If the byte string has the wrong length.
@@ -108,7 +110,8 @@ class BaseUint(int, SSZType):
     @classmethod
     @override
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
-        """Read little-endian bytes from a stream within a fixed scope.
+        """
+        Read little-endian bytes from a stream within a fixed scope.
 
         Raises:
             SSZSerializationError: If the scope mismatches, or the stream ends early.

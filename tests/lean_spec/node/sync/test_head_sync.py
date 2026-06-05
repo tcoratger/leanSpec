@@ -427,7 +427,8 @@ class TestReentrantGuard:
 
 @dataclass
 class _RecordingBackfill:
-    """Backfill stub recording range and root-recursion requests.
+    """
+    Backfill stub recording range and root-recursion requests.
 
     Used as the I/O boundary mock for head sync's backfill dependency.
     Each method appends its arguments verbatim and performs no real work.
@@ -459,7 +460,8 @@ def _store_with_head(
     finalized_slot: int,
     head_slot: int,
 ) -> tuple[Store, Bytes32]:
-    """Build a mock forkchoice store with a finalized slot and a head block.
+    """
+    Build a mock forkchoice store with a finalized slot and a head block.
 
     Returns the typed store and the head root. The head block carries the
     requested head slot so subsequent gap math sees the configured value.

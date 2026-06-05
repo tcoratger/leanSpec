@@ -166,7 +166,8 @@ class JustifiedSlots(BaseBitlist):
 
 
 class JustificationValidators(BaseBitlist):
-    """Per-root validator vote bitfields, concatenated into one flat bitlist.
+    """
+    Per-root validator vote bitfields, concatenated into one flat bitlist.
 
     Each tracked root contributes one bit per registered validator.
     The cap is the maximum tracked roots times the validator registry limit.

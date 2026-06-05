@@ -1,4 +1,5 @@
-"""Container types for the Lean consensus specification.
+"""
+Container types for the Lean consensus specification.
 
 This package is the public container surface for the lstar fork.
 The types are split across submodules by domain role:

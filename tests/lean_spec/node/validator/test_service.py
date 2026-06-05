@@ -1267,7 +1267,8 @@ class TestValidatorServiceIntegration:
 
 
 def _replace_head_at_slot(sync_service: SyncService, head_slot: Slot) -> None:
-    """Rewrite the head block at the given slot, preserving the map invariant.
+    """
+    Rewrite the head block at the given slot, preserving the map invariant.
 
     Preserves
     ---------
@@ -1296,7 +1297,8 @@ def _replace_head_at_slot(sync_service: SyncService, head_slot: Slot) -> None:
 
 
 def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
-    """Add a non-head block at the given slot, returning its root.
+    """
+    Add a non-head block at the given slot, returning its root.
 
     Why
     ---
@@ -1318,7 +1320,8 @@ def _add_block_at_slot(sync_service: SyncService, slot: Slot) -> Bytes32:
 
 
 def _build_gate_service(sync_service: SyncService) -> ValidatorService:
-    """Build a service for gate-only tests with an empty registry.
+    """
+    Build a service for gate-only tests with an empty registry.
 
     The gate logic never consults the registry, so emptying it keeps
     the focus on the predicate under test.
@@ -1331,7 +1334,8 @@ def _build_gate_service(sync_service: SyncService) -> ValidatorService:
 
 
 class TestSyncLagGate:
-    """Sync-lag duty gate.
+    """
+    Sync-lag duty gate.
 
     Decision matrix
     ---------------
@@ -1422,7 +1426,8 @@ class TestSyncLagGate:
         assert not service._is_synced_for_duties(Slot(10 + SYNC_LAG_THRESHOLD + 1), "block")
 
     def test_hysteresis_prevents_flap(self, sync_service: SyncService) -> None:
-        """Closed gate stays closed near the threshold.
+        """
+        Closed gate stays closed near the threshold.
 
         Lag sequence
         ------------
@@ -1492,7 +1497,8 @@ class TestSyncLagGate:
     async def test_run_loop_skips_attestation_when_gated(
         self, sync_service: SyncService, key_manager: XmssKeyManager
     ) -> None:
-        """Closed gate at interval 1 skips attestation and leaves the slot retryable.
+        """
+        Closed gate at interval 1 skips attestation and leaves the slot retryable.
 
         Why
         ---
@@ -1532,7 +1538,8 @@ class TestSyncLagGate:
     def test_gate_logs_only_on_transition(
         self, sync_service: SyncService, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """One INFO record per state change, not one per query.
+        """
+        One INFO record per state change, not one per query.
 
         Fields recorded
         ---------------

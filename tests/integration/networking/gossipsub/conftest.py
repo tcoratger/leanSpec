@@ -13,7 +13,8 @@ from tests.integration.networking.gossipsub.node import GossipsubTestNode
 
 
 def fast_params(**overrides: int | float | str) -> GossipsubParameters:
-    """Create parameters tuned for fast integration tests.
+    """
+    Create parameters tuned for fast integration tests.
 
     Uses small mesh degree (D=3) so tests need fewer nodes to fill
     meshes. Short heartbeat (0.05s) keeps test duration low.
@@ -37,7 +38,8 @@ def fast_params(**overrides: int | float | str) -> GossipsubParameters:
 
 @pytest.fixture
 async def network() -> AsyncGenerator[GossipsubTestNetwork]:
-    """Provide a test network with automatic teardown.
+    """
+    Provide a test network with automatic teardown.
 
     Teardown stops all nodes, cancelling background tasks and closing
     streams. This prevents leaked coroutines between tests.
