@@ -4,11 +4,11 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import ConfigDict, Field, PrivateAttr, field_serializer, model_validator
 
-from consensus_testing.test_types.block_spec import BlockSpec
-from consensus_testing.test_types.gossip_aggregated_attestation_spec import (
-    GossipAggregatedAttestationSpec,
+from consensus_testing.test_types.attestation_specs import (
+    AggregatedAttestationSpec,
+    GossipAttestationSpec,
 )
-from consensus_testing.test_types.gossip_attestation_spec import GossipAttestationSpec
+from consensus_testing.test_types.block_spec import BlockSpec
 from consensus_testing.test_types.store_checks import StoreChecks
 from lean_spec.base import CamelModel
 from lean_spec.spec.forks.lstar.containers import (
@@ -216,7 +216,7 @@ class GossipAggregatedAttestationStep(BaseForkChoiceStep):
     step_type: Literal["gossipAggregatedAttestation"] = "gossipAggregatedAttestation"
     """Discriminator field for serialization."""
 
-    attestation: GossipAggregatedAttestationSpec
+    attestation: AggregatedAttestationSpec
     """
     Specification for the aggregated gossip attestation.
     """
@@ -225,7 +225,7 @@ class GossipAggregatedAttestationStep(BaseForkChoiceStep):
 
     @field_serializer("attestation", when_used="json")
     def serialize_gossip_aggregated_attestation(
-        self, value: GossipAggregatedAttestationSpec
+        self, value: AggregatedAttestationSpec
     ) -> dict[str, Any]:
         """Return the filled aggregated attestation for serialization."""
         if self._filled_attestation is None:

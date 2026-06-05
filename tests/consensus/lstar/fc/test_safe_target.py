@@ -7,7 +7,6 @@ from consensus_testing import (
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
@@ -98,7 +97,7 @@ def test_safe_target_does_not_advance_below_supermajority(
             # Here we only care that they arrive in "new" so the safe-target
             # computation at interval 3 can read them.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(i) for i in range(num_attesters)],
                     slot=Slot(3),
                     target_slot=Slot(2),
@@ -184,7 +183,7 @@ def test_safe_target_advances_incrementally_along_the_chain(
             # Weight accumulates at block_1 only (ancestors of the voted head).
             TickStep(time=14),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -208,7 +207,7 @@ def test_safe_target_advances_incrementally_along_the_chain(
             # Weight now reaches block_2 through the new head.
             TickStep(time=18),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -232,7 +231,7 @@ def test_safe_target_advances_incrementally_along_the_chain(
             # Full chain now carries weight=3 at every block.
             TickStep(time=22),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -293,7 +292,7 @@ def test_safe_target_follows_heavier_fork_on_split(
             TickStep(time=18),
             # Supermajority (4/6) attests to block_b.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -307,7 +306,7 @@ def test_safe_target_follows_heavier_fork_on_split(
             ),
             # Minority (2/6) attests to block_a.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(4),
                         ValidatorIndex(5),
@@ -378,7 +377,7 @@ def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
             TickStep(time=18),
             # 6/8 vote for block_2. Weight: block_1 += 6, block_2 += 6.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -394,7 +393,7 @@ def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
             ),
             # 2/8 vote for block_3. Weight: block_1 += 2, block_2 += 2, block_3 += 2.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(6),
                         ValidatorIndex(7),
@@ -497,7 +496,7 @@ def test_safe_target_ignores_known_pool_at_interval_3(
             # Gossip 2 more attestations into the "new" pool.
             # Combined with "known": total weight = 4 = threshold.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(2),
                         ValidatorIndex(3),

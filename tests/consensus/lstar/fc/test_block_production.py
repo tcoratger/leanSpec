@@ -10,7 +10,6 @@ from consensus_testing import (
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
@@ -140,7 +139,7 @@ def test_block_builder_fixed_point_advances_justification(
             # Attestation A: source=1, target=2
             # 3/4 validators. Matches justified=1 on the first pass.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -157,7 +156,7 @@ def test_block_builder_fixed_point_advances_justification(
             # 3/4 validators. Source slot 2 is NOT justified yet.
             # Only unlocked after A justifies slot 2 on the first pass.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(1),
                         ValidatorIndex(2),
@@ -305,7 +304,7 @@ def test_produce_block_enforces_max_attestations_data_limit(
     # Source auto-resolves to the genesis justified checkpoint.
     attestation_steps: list[GossipAggregatedAttestationStep] = [
         GossipAggregatedAttestationStep(
-            attestation=GossipAggregatedAttestationSpec(
+            attestation=AggregatedAttestationSpec(
                 validator_indices=validators,
                 slot=Slot(num_target_blocks),
                 target_slot=Slot(n),
@@ -386,7 +385,7 @@ def test_produce_block_includes_pending_attestations(
             # Validators 1 & 2 gossip an aggregated attestation targeting block_2.
             # data.slot=2 matches the current slot.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1), ValidatorIndex(2)],
                     slot=Slot(2),
                     target_slot=Slot(2),
@@ -548,7 +547,7 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
             ],
             TickStep(time=aggregate_time),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -562,7 +561,7 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(1),
                         ValidatorIndex(2),

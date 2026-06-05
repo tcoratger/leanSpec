@@ -8,7 +8,6 @@ from consensus_testing import (
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     GossipAttestationSpec,
     StoreChecks,
@@ -300,7 +299,7 @@ def test_same_slot_equivocating_attesters_count_once(
             # Insertion-ordered dicts make this deterministic.
             # V0 and V1's first votes stick on fork_a.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -312,7 +311,7 @@ def test_same_slot_equivocating_attesters_count_once(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),

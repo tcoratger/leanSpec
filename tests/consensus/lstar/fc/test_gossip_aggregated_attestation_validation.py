@@ -2,10 +2,10 @@
 
 import pytest
 from consensus_testing import (
+    AggregatedAttestationSpec,
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
@@ -40,7 +40,7 @@ def test_valid_gossip_aggregated_attestation(
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(2),
                     target_slot=Slot(2),
@@ -67,7 +67,7 @@ def test_aggregated_attestation_unknown_source_rejected(
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(2),
                     target_slot=Slot(2),
@@ -97,7 +97,7 @@ def test_aggregated_attestation_target_slot_mismatch_rejected(
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(2),
                     target_slot=Slot(3),
@@ -125,7 +125,7 @@ def test_aggregated_attestation_head_slot_mismatch_rejected(
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(2),
                     target_slot=Slot(2),
@@ -159,7 +159,7 @@ def test_aggregated_attestation_source_after_target_rejected(
                 checks=StoreChecks(head_slot=Slot(3)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(3),
                     target_slot=Slot(2),
@@ -189,7 +189,7 @@ def test_aggregated_attestation_too_far_in_future_rejected(
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(4),
                     target_slot=Slot(2),
@@ -230,7 +230,7 @@ def test_aggregated_attestation_at_disparity_boundary_allowed(
             ),
             TickStep(interval=SLOT_3_BOUNDARY_INTERVAL),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(3),
                     target_slot=Slot(2),
@@ -269,7 +269,7 @@ def test_aggregated_attestation_just_beyond_disparity_boundary_rejected(
             ),
             TickStep(interval=SLOT_3_JUST_BEYOND_BOUNDARY_INTERVAL),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(3),
                     target_slot=Slot(2),
@@ -312,7 +312,7 @@ def test_aggregated_attestation_one_full_slot_in_future_rejected(
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
                     slot=Slot(3),
                     target_slot=Slot(2),
