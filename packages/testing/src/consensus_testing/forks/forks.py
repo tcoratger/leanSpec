@@ -2,8 +2,6 @@
 
 from framework.forks import BaseFork
 
-from lean_spec.spec.forks.lstar.spec import LstarSpec
-
 
 class Lstar(BaseFork):
     """Lstar fork — base fork for the lean Ethereum protocol."""
@@ -12,8 +10,3 @@ class Lstar(BaseFork):
     def name(cls) -> str:
         """Return the fork name."""
         return "Lstar"
-
-    @classmethod
-    def spec_class(cls) -> type[LstarSpec]:
-        """Return the ForkProtocol implementation for this fork."""
-        return LstarSpec

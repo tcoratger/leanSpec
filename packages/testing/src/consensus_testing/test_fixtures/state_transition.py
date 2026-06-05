@@ -2,8 +2,9 @@
 
 from typing import Any, ClassVar
 
-from pydantic import ConfigDict, PrivateAttr, field_serializer
+from pydantic import ConfigDict, Field, PrivateAttr, field_serializer
 
+from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
@@ -50,8 +51,13 @@ class StateTransitionTest(BaseConsensusFixture):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    pre: State
-    """The initial consensus state before processing."""
+    pre: State = Field(default_factory=generate_pre_state)
+    """
+    The initial consensus state before processing.
+
+    Defaults to the standard genesis state.
+    Spell it out only when the test needs a non-default pre-state.
+    """
 
     blocks: list[BlockSpec]
     """

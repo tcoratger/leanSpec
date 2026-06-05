@@ -8,7 +8,6 @@ from consensus_testing import (
     ForkChoiceStep,
     ForkChoiceTestFiller,
     StoreChecks,
-    generate_pre_state,
 )
 from consensus_testing.keys import XmssKeyManager
 
@@ -99,7 +98,6 @@ def test_block_with_maximum_attestations(
     )
 
     fork_choice_test(
-        anchor_state=generate_pre_state(),
         steps=chain,
     )
 
@@ -175,6 +173,5 @@ def test_block_exceeding_maximum_attestations_is_rejected(
     )
 
     fork_choice_test(
-        anchor_state=generate_pre_state(),
         steps=chain,
     )

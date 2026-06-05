@@ -37,7 +37,6 @@ def test_process_first_block_after_genesis(
     This is the foundation for all subsequent blocks.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1)),
         ],
@@ -70,7 +69,6 @@ def test_linear_chain_multiple_blocks(
     5. Final state at slot 5
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), parent_label="block_1", label="block_2"),
@@ -114,7 +112,6 @@ def test_blocks_with_gaps(
     This validates resilience to gaps.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(4), parent_label="block_1", label="block_4"),
@@ -150,7 +147,6 @@ def test_block_at_large_slot_number(
     4. State remains consistent
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(100)),
         ],
@@ -182,7 +178,6 @@ def test_block_at_very_large_slot_with_many_skipped(
     5. No integer overflow or memory issues
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(500)),
         ],
@@ -225,7 +220,6 @@ def test_block_with_invalid_proposer(
     # - expected proposer is Uint64(1),
     # - we'll try to use Uint64(5) instead
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(
                 slot=Slot(1),
@@ -263,7 +257,6 @@ def test_block_with_invalid_parent_root(
     Without this check, attackers could create invalid chain branches.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(
                 slot=Slot(1),
@@ -299,7 +292,6 @@ def test_block_with_invalid_state_root(
     This is a critical validation - without it, proposers could claim any arbitrary state.
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(
                 slot=Slot(1),
@@ -377,7 +369,6 @@ def test_block_extends_deep_chain(
     )
 
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=blocks,
         post=StateExpectation(slot=Slot(20)),
     )
@@ -419,7 +410,6 @@ def test_empty_blocks(
     ]
 
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=blocks,
         post=StateExpectation(
             slot=Slot(6), latest_block_header_slot=Slot(6), historical_block_hashes_count=6
@@ -451,7 +441,6 @@ def test_empty_blocks_with_missed_slots(
 
     """
     state_transition_test(
-        pre=generate_pre_state(),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(slot=Slot(2), body=None, parent_label="block_1", label="block_2"),

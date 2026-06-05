@@ -5,7 +5,6 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     VerifySignaturesTestFiller,
-    generate_pre_state,
 )
 
 from lean_spec.spec.forks import Slot, ValidatorIndex
@@ -42,7 +41,6 @@ def test_attestation_validator_index_out_of_range_rejected(
       so the failure reason is unambiguous across clients.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(),
         block=BlockSpec(
             slot=Slot(2),
             attestations=[
