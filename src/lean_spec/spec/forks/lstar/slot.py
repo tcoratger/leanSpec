@@ -1,4 +1,5 @@
-"""Slot primitive shared by the consensus and crypto layers.
+"""
+Slot primitive shared by the consensus and crypto layers.
 
 The crypto signing scheme binds each signature to a specific slot.
 Hosting the type here lets the crypto layer name the slot without

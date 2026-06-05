@@ -310,7 +310,8 @@ def _check_markers_valid_for_fork(
     fork_class: type,
     get_fork_by_name: Callable[[str], type | None],
 ) -> bool:
-    """Check if test markers indicate validity for the given fork.
+    """
+    Check if test markers indicate validity for the given fork.
 
     Shared logic for both collection-time and parametrization-time fork filtering.
     """

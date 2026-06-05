@@ -34,7 +34,8 @@ def test_safe_target_does_not_advance_below_supermajority(
     fork_choice_test: ForkChoiceTestFiller,
     num_attesters: int,
 ) -> None:
-    """Safe target stays at genesis when weight falls short of the 2/3 threshold.
+    """
+    Safe target stays at genesis when weight falls short of the 2/3 threshold.
 
     Fixture state:
 
@@ -144,7 +145,8 @@ def test_safe_target_does_not_advance_below_supermajority(
 def test_safe_target_advances_incrementally_along_the_chain(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Safe target advances one block at a time as votes shift forward.
+    """
+    Safe target advances one block at a time as votes shift forward.
 
     4 validators, threshold = ceil(8/3) = 3.
     Chain: genesis -> block_1 -> block_2 -> block_3.
@@ -257,7 +259,8 @@ def test_safe_target_advances_incrementally_along_the_chain(
 def test_safe_target_follows_heavier_fork_on_split(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Safe target follows the fork with supermajority support.
+    """
+    Safe target follows the fork with supermajority support.
 
     6 validators, threshold = 4.
 
@@ -330,7 +333,8 @@ def test_safe_target_follows_heavier_fork_on_split(
 def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Safe target can be strictly shallower than the LMD-GHOST head.
+    """
+    Safe target can be strictly shallower than the LMD-GHOST head.
 
     8 validators, threshold = ceil(16/3) = 6.
     Chain: genesis -> block_1 -> block_2 -> block_3.
@@ -419,7 +423,8 @@ def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
 def test_safe_target_ignores_known_pool_at_interval_3(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Safe target only uses the "new" pool at interval 3.
+    """
+    Safe target only uses the "new" pool at interval 3.
 
     6 validators, threshold = 4.
 

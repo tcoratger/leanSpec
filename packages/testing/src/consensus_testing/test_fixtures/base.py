@@ -46,7 +46,8 @@ class BaseConsensusFixture(BaseFixture):
         return value.__name__
 
     def assert_expected_outcome(self, exception_raised: Exception | None) -> None:
-        """Compare a self-verification outcome against the configured expectation.
+        """
+        Compare a self-verification outcome against the configured expectation.
 
         A fixture that self-verifies its own output catches the verifier exception.
         It then hands the caught exception here to decide pass or fail.

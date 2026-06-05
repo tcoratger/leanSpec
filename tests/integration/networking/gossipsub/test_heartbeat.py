@@ -1,4 +1,5 @@
-"""Heartbeat mechanics integration tests.
+"""
+Heartbeat mechanics integration tests.
 
 The heartbeat is the periodic maintenance cycle of gossipsub.
 Each tick, a node adjusts its mesh, ages its caches, and clears

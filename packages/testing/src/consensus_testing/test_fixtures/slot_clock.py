@@ -1,4 +1,5 @@
-"""Slot clock test fixture for timing conformance testing.
+"""
+Slot clock test fixture for timing conformance testing.
 
 Generates JSON test vectors that verify slot/interval computation from
 wall-clock timestamps. Every client must compute identical slot boundaries
@@ -19,7 +20,8 @@ from lean_spec.spec.ssz import Uint64
 
 
 class SlotClockTest(BaseConsensusFixture):
-    """Fixture for slot clock timing conformance.
+    """
+    Fixture for slot clock timing conformance.
 
     Tests time-to-slot and time-to-interval conversions that every
     consensus client must implement identically.

@@ -1,4 +1,5 @@
-"""Sync layer test fixture format.
+"""
+Sync layer test fixture format.
 
 Emits JSON vectors for the client-facing sync helpers. Each vector
 pins the expected verdict on a given input so clients can align their
@@ -16,7 +17,8 @@ from lean_spec.spec.ssz import Uint64
 
 
 class SyncTest(BaseConsensusFixture):
-    """Fixture for sync-layer conformance.
+    """
+    Fixture for sync-layer conformance.
 
     Currently supports one operation:
 
@@ -39,7 +41,8 @@ class SyncTest(BaseConsensusFixture):
     """Computed output. Filled by make_fixture."""
 
     def make_fixture(self) -> "SyncTest":
-        """Dispatch to the operation handler.
+        """
+        Dispatch to the operation handler.
 
         Returns:
             A copy of this fixture with output populated.
@@ -54,7 +57,8 @@ class SyncTest(BaseConsensusFixture):
         return self
 
     def _make_verify_checkpoint(self) -> dict[str, Any]:
-        """Build a state for the given validator count and anchor slot and report the verdict.
+        """
+        Build a state for the given validator count and anchor slot and report the verdict.
 
         Input keys:
 

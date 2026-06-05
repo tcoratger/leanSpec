@@ -580,7 +580,8 @@ class ValidatorService:
         slot: Slot,
         duty: Literal["block", "attestation"],
     ) -> bool:
-        """Decide whether duties may run for the given slot.
+        """
+        Decide whether duties may run for the given slot.
 
         Combines local lag and local-store stall evidence with
         hysteresis. Returns False only when the local view is stale

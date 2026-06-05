@@ -1,4 +1,5 @@
-"""End-to-end consensus lifecycle test.
+"""
+End-to-end consensus lifecycle test.
 
 Tests the networking, gossip, and block production stack in a 3-node cluster.
 Phases 1-4 verify connectivity, block propagation, attestation activity,

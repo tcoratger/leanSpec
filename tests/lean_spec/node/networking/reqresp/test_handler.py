@@ -1308,7 +1308,8 @@ class TestBlocksByRangeRequestBoundaryValues:
         assert decoded.count == Uint64(0)
 
     def test_count_above_max_encodes_and_decodes(self) -> None:
-        """count > MAX_REQUEST_BLOCKS encodes/decodes at SSZ layer.
+        """
+        count > MAX_REQUEST_BLOCKS encodes/decodes at SSZ layer.
 
         Enforcement of MAX_REQUEST_BLOCKS is the handler's job, not SSZ's.
         """
@@ -1440,7 +1441,8 @@ class TestRequestHandlerBlocksByRange:
         assert decoded_slots == [Slot(4000), Slot(4002), Slot(4004)]
 
     async def test_resource_unavailable_when_start_slot_predates_window(self) -> None:
-        """RESOURCE_UNAVAILABLE when start_slot is older than the sliding window.
+        """
+        RESOURCE_UNAVAILABLE when start_slot is older than the sliding window.
 
         With current_slot=5000 and MIN_SLOTS_FOR_BLOCK_REQUESTS=3600 the floor is
         slot 1400; start_slot=0 falls outside it.

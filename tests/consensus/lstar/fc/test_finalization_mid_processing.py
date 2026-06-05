@@ -1,4 +1,5 @@
-"""Fork Choice: Finalization advances mid-attestation processing.
+"""
+Fork Choice: Finalization advances mid-attestation processing.
 
 This test verifies that attestations see updated finalized_slot during processing,
 as required by the 3sf-mini specification.

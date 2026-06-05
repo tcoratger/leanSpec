@@ -1,4 +1,5 @@
-"""Casper-FFG checkpoints and the attestation vote they anchor.
+"""
+Casper-FFG checkpoints and the attestation vote they anchor.
 
 A checkpoint is the (block root, slot) pair that gets justified and finalized.
 An attestation's content is three checkpoints: source, target, and head.

@@ -1,4 +1,5 @@
-"""Poseidon permutation: width-24 known-answer vectors.
+"""
+Poseidon permutation: width-24 known-answer vectors.
 
 Pins the output state of the Poseidon permutation over the KoalaBear
 field at state width 24 for four structural input patterns. Mirrors
@@ -18,7 +19,8 @@ WIDTH: int = 24
 def test_permutation_width24_all_zero(
     poseidon_permutation: PoseidonPermutationTestFiller,
 ) -> None:
-    """Input state of all zeros pins the round-constant-only output at width 24.
+    """
+    Input state of all zeros pins the round-constant-only output at width 24.
 
     With a zero state the only contribution to every S-box input is the
     round-constants stream. The output state depends purely on the

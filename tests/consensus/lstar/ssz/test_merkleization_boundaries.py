@@ -51,7 +51,8 @@ class BoundaryBitvector257(BaseBitvector):
 
 
 class BoundaryBitlist256(BaseBitlist):
-    """Bitlist whose limit is exactly one Merkle chunk.
+    """
+    Bitlist whose limit is exactly one Merkle chunk.
 
     When filled to the limit, the sentinel bit lands in a fresh byte.
     """
@@ -115,7 +116,8 @@ def test_bitvector_length_257_all_set(ssz: SSZTestFiller) -> None:
 
 
 def test_bitlist_filled_to_chunk_boundary_limit(ssz: SSZTestFiller) -> None:
-    """Bitlist filled to a 256-bit limit places the sentinel at the start of a fresh byte.
+    """
+    Bitlist filled to a 256-bit limit places the sentinel at the start of a fresh byte.
 
     The trailing sentinel crosses into a new chunk, exercising the length-mixin
     ordering for bitlists whose limit sits on a Merkle-chunk edge.
@@ -127,7 +129,8 @@ def test_bitlist_filled_to_chunk_boundary_limit(ssz: SSZTestFiller) -> None:
 
 
 def test_uint64_list_with_misaligned_chunk_count(ssz: SSZTestFiller) -> None:
-    """Three uint64 entries occupy 24 bytes, one byte shy of a full Merkle chunk.
+    """
+    Three uint64 entries occupy 24 bytes, one byte shy of a full Merkle chunk.
 
     Pins the zero-pad / length-mixin behaviour for variable-length lists of
     fixed-size elements whose serialized length is not a multiple of 32.

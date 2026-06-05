@@ -1,4 +1,5 @@
-"""IDONTWANT protocol tests.
+"""
+IDONTWANT protocol tests.
 
 IDONTWANT is a gossipsub v1.2 optimization for large messages.
 When a node receives a large message, it tells its other mesh peers

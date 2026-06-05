@@ -300,7 +300,8 @@ def test_single_message_aggregate_verify_rejects_public_key_count_mismatch(
 def test_multi_message_aggregate_split_by_message_rejected_under_test_prover(
     key_manager: XmssKeyManager,
 ) -> None:
-    """Splitting a merged proof aborts under the reduced test-config prover.
+    """
+    Splitting a merged proof aborts under the reduced test-config prover.
 
     The split branch is functional only under the production prover.
     The test-config build aborts it with an in-circuit assertion.
@@ -536,7 +537,8 @@ def test_multi_message_aggregate_verify_round_trip(key_manager: XmssKeyManager) 
 
 
 def test_multi_message_aggregate_verify_rejects_message_swap(key_manager: XmssKeyManager) -> None:
-    """Swapping the parallel message bindings causes verification to fail.
+    """
+    Swapping the parallel message bindings causes verification to fail.
 
     Without per-component message binding a proposer could pair honest
     signatures with attacker-chosen attestation data.

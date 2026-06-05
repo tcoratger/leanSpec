@@ -17,7 +17,8 @@ from lean_spec.spec.ssz import Bytes32, Uint64
 def _expand_activation_time(
     log_lifetime: int, desired_activation_slot: int, desired_num_active_slots: int
 ) -> tuple[int, int]:
-    """Snap a requested slot window onto whole bottom trees.
+    """
+    Snap a requested slot window onto whole bottom trees.
 
     # Overview
 
@@ -76,7 +77,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
     """Cached Poseidon engine used by every primitive in the scheme."""
 
     def key_gen(self, activation_slot: Slot, num_active_slots: Uint64) -> KeyPair:
-        """Generate a fresh key pair active for an aligned slot range.
+        """
+        Generate a fresh key pair active for an aligned slot range.
 
         # Overview
 
@@ -172,7 +174,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         return KeyPair(public_key=public_key, secret_key=secret_key)
 
     def sign(self, secret_key: SecretKey, slot: Slot, message: Bytes32) -> Signature:
-        """Produce a signature for a message at a specific slot.
+        """
+        Produce a signature for a message at a specific slot.
 
         Phase 1: enforce that the slot is inside the activation and prepared windows.
         Phase 2: search for randomness rho whose encoding lands on the target-sum layer.
@@ -278,7 +281,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
     def verify(
         self, public_key: PublicKey, slot: Slot, message: Bytes32, signature: Signature
     ) -> bool:
-        """Verify a signature against a public key, message, and slot.
+        """
+        Verify a signature against a public key, message, and slot.
 
         Phase 1: bound-check the slot.
         Phase 1 rejects without raising on bad input.
@@ -340,7 +344,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         )
 
     def get_activation_interval(self, secret_key: SecretKey) -> range:
-        """Return the activation interval as a Python range.
+        """
+        Return the activation interval as a Python range.
 
         A signature is only valid for a slot inside this range.
         """
@@ -348,7 +353,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         return range(start, start + int(secret_key.num_active_slots))
 
     def get_prepared_interval(self, secret_key: SecretKey) -> range:
-        """Return the prepared interval as a Python range.
+        """
+        Return the prepared interval as a Python range.
 
         The prepared interval is the slot window covered by the two resident bottom trees.
         A signer can sign any slot in this range without paying the cost of
@@ -359,7 +365,8 @@ class GeneralizedXmssScheme(StrictBaseModel):
         return range(start, start + 2 * leaves_per_bottom_tree)
 
     def advance_preparation(self, secret_key: SecretKey) -> SecretKey:
-        """Slide the prepared window one bottom tree forward.
+        """
+        Slide the prepared window one bottom tree forward.
 
         Phase 1: bail out when the next window would exceed the activation interval.
         Phase 2: regenerate the new right bottom tree from the PRF key.

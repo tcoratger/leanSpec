@@ -81,7 +81,8 @@ from lean_spec.node.snappy import SnappyDecompressionError, frame_compress, fram
 
 
 class CodecError(Exception):
-    """Raised when encoding or decoding fails.
+    """
+    Raised when encoding or decoding fails.
 
     This covers all wire format errors:
       - Truncated or malformed varints

@@ -25,7 +25,8 @@ class PoseidonXmss(StrictBaseModel):
     _engines: dict[int, Poseidon] = PrivateAttr(default_factory=dict)
 
     def _get_engine(self, width: int) -> Poseidon:
-        """Return a cached Poseidon engine for the given width.
+        """
+        Return a cached Poseidon engine for the given width.
 
         Raises:
             ValueError: When the width is neither 16 nor 24.
@@ -42,7 +43,8 @@ class PoseidonXmss(StrictBaseModel):
         return self._engines[width]
 
     def compress(self, input_vec: list[Fp], width: int, output_length: int) -> list[Fp]:
-        """Poseidon in compression mode.
+        """
+        Poseidon in compression mode.
 
         Computes Truncate(Permute(padded_input) + padded_input).
         The padded input is the original vector zero-extended to the state width.
@@ -75,7 +77,8 @@ class PoseidonXmss(StrictBaseModel):
         return final_state[:output_length]
 
     def safe_domain_separator(self, lengths: list[int], capacity_length: int) -> list[Fp]:
-        """Build a capacity initialization vector for the sponge construction.
+        """
+        Build a capacity initialization vector for the sponge construction.
 
         Hashes the packed length parameters into a fixed-size capacity value.
         This prevents collisions between sponges that absorb data of different shapes.
@@ -104,7 +107,8 @@ class PoseidonXmss(StrictBaseModel):
         output_length: int,
         width: int,
     ) -> list[Fp]:
-        """Poseidon in sponge mode.
+        """
+        Poseidon in sponge mode.
 
         Phase 1: load capacity, zero-extend input to a multiple of the rate.
         Phase 2: absorb each rate-sized chunk by replacement, then permute.
@@ -156,7 +160,8 @@ class PoseidonXmss(StrictBaseModel):
         tweak: TreeTweak | ChainTweak,
         message_parts: list[HashDigestVector],
     ) -> HashDigestVector:
-        """Apply the tweakable hash to one or more digests.
+        """
+        Apply the tweakable hash to one or more digests.
 
         Mode selection:
 
@@ -231,7 +236,8 @@ class PoseidonXmss(StrictBaseModel):
         num_steps: int,
         start_digest: HashDigestVector,
     ) -> HashDigestVector:
-        """Iterate the tweakable hash along a Winternitz chain.
+        """
+        Iterate the tweakable hash along a Winternitz chain.
 
         Each iteration uses a distinct chain tweak so every step is domain-separated.
 

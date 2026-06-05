@@ -68,7 +68,8 @@ class XmssConfig(StrictBaseModel):
 
     @property
     def LIFETIME(self) -> Uint64:
-        """The maximum number of slots supported by this configuration.
+        """
+        The maximum number of slots supported by this configuration.
 
         An individual key pair can be active for a smaller sub-range.
         """
@@ -86,7 +87,8 @@ class XmssConfig(StrictBaseModel):
 
     @property
     def SIGNATURE_LENGTH_BYTES(self) -> int:
-        """The SSZ-encoded size of a signature in bytes.
+        """
+        The SSZ-encoded size of a signature in bytes.
 
         # Layout
 

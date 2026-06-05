@@ -1,4 +1,5 @@
-"""Test node wrapper for GossipsubBehavior integration tests.
+"""
+Test node wrapper for GossipsubBehavior integration tests.
 
 Wraps a GossipsubBehavior with connection helpers, event collection,
 and message waiting utilities.
@@ -22,7 +23,8 @@ from tests.integration.networking.gossipsub.stream import create_stream_pair
 
 @dataclass
 class GossipsubTestNode:
-    """Wraps a GossipsubBehavior for integration testing.
+    """
+    Wraps a GossipsubBehavior for integration testing.
 
     Collects received messages and peer events, and provides
     helpers for connecting to other nodes and waiting for messages.
@@ -46,7 +48,8 @@ class GossipsubTestNode:
         return cls(peer_id=peer_id, behavior=behavior)
 
     async def start(self) -> None:
-        """Start the behavior and event collector.
+        """
+        Start the behavior and event collector.
 
         The collector runs as a background task so events are captured
         continuously. Without it, the internal event queue would fill up
@@ -78,7 +81,8 @@ class GossipsubTestNode:
         await self.behavior.publish(topic, data)
 
     async def connect_to(self, other: GossipsubTestNode) -> None:
-        """Establish bidirectional gossipsub streams with another node.
+        """
+        Establish bidirectional gossipsub streams with another node.
 
         Creates two stream pairs (one per direction) and registers
         them with both behaviors. This mirrors real libp2p where
@@ -189,7 +193,8 @@ class GossipsubTestNode:
         self.received_messages.clear()
 
     async def _collect_events(self) -> None:
-        """Background task that collects events from the behavior.
+        """
+        Background task that collects events from the behavior.
 
         Runs for the lifetime of the node. Sorts events into typed lists
         so tests can query them without async boilerplate.

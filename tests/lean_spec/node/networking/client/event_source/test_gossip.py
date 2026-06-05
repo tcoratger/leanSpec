@@ -1,4 +1,5 @@
-"""Tests for the gossip message handler.
+"""
+Tests for the gossip message handler.
 
 This module tests the GossipHandler class, GossipMessageError exception,
 and read_gossip_message async function that handle incoming gossip messages

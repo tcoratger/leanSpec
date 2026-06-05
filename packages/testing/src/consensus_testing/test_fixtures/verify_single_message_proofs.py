@@ -97,7 +97,8 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
     """Aggregated proof bytes for clients to verify."""
 
     def make_fixture(self) -> VerifySingleMessageProofsTest:
-        """Generate the proof, optionally tamper, self-verify, and return the populated copy.
+        """
+        Generate the proof, optionally tamper, self-verify, and return the populated copy.
 
         Raises:
             AssertionError: If the verifier outcome disagrees with the configured expectation.
@@ -208,7 +209,8 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         validator_indices: list[ValidatorIndex],
         public_keys: list[PublicKey],
     ) -> ByteList512KiB:
-        """Build a two-level proof so the verifier is exercised on the recursive path.
+        """
+        Build a two-level proof so the verifier is exercised on the recursive path.
 
         Children are leaf-only sub-proofs, so the folded tree is exactly two levels deep.
 

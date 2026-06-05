@@ -1,4 +1,5 @@
-"""Message-to-codeword pipeline for the Generalized XMSS scheme.
+"""
+Message-to-codeword pipeline for the Generalized XMSS scheme.
 
 # Overview
 
@@ -56,7 +57,8 @@ from lean_spec.spec.ssz import Bytes32, Uint64
 
 
 def encode_message(config: XmssConfig, message: Bytes32) -> list[Fp]:
-    """Encode a 32-byte message into field elements via base-P decomposition.
+    """
+    Encode a 32-byte message into field elements via base-P decomposition.
 
     The bytes are read little-endian as a single integer.
     """
@@ -65,7 +67,8 @@ def encode_message(config: XmssConfig, message: Bytes32) -> list[Fp]:
 
 
 def encode_epoch(config: XmssConfig, epoch: Uint64) -> list[Fp]:
-    """Encode the epoch and the message-hash subdomain into field elements.
+    """
+    Encode the epoch and the message-hash subdomain into field elements.
 
     The 8-bit prefix separates the message-hash subdomain from the chain and tree subdomains.
     """
@@ -77,7 +80,8 @@ def encode_epoch(config: XmssConfig, epoch: Uint64) -> list[Fp]:
 
 
 def aborting_decode(config: XmssConfig, field_elements: list[Fp]) -> list[int] | None:
-    """Reject-sample each field element into base-BASE digits.
+    """
+    Reject-sample each field element into base-BASE digits.
 
     For each element A_i:
 
@@ -115,7 +119,8 @@ def message_hash(
     rho: Randomness,
     message: Bytes32,
 ) -> list[int] | None:
-    """Hash the inputs with Poseidon and decode into a candidate codeword.
+    """
+    Hash the inputs with Poseidon and decode into a candidate codeword.
 
     Args:
         poseidon: Cached Poseidon engine.
@@ -147,7 +152,8 @@ def target_sum_encode(
     rho: Randomness,
     epoch: Uint64,
 ) -> list[int] | None:
-    """Encode a message into a codeword if it meets the target sum.
+    """
+    Encode a message into a codeword if it meets the target sum.
 
     The signer retries with fresh randomness on rejection.
 

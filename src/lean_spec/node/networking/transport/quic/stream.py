@@ -15,7 +15,8 @@ class QuicTransportError(Exception):
 
 
 class QuicStreamResetError(QuicTransportError):
-    """Raised when a QUIC stream is abruptly reset by the peer (RESET_STREAM).
+    """
+    Raised when a QUIC stream is abruptly reset by the peer (RESET_STREAM).
 
     Per RFC 9000 Section 3.2, RESET_STREAM indicates the peer cannot guarantee
     delivery of stream data.  Outstanding data may be lost.
@@ -162,7 +163,8 @@ class QuicStream:
         self._read_buffer.put_nowait(b"")
 
     def _receive_reset(self, error_code: int) -> None:
-        """Internal: called when the peer sends RESET_STREAM (abrupt termination).
+        """
+        Internal: called when the peer sends RESET_STREAM (abrupt termination).
 
         Per RFC 9000 Section 3.2, RESET_STREAM indicates the sender cannot
         guarantee delivery.  Outstanding data may be lost.  This is fundamentally

@@ -20,7 +20,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 @pytest.fixture(autouse=True)
 def _reset_xmss_signing_state():
-    """Reset XMSS signing state around each test in this module.
+    """
+    Reset XMSS signing state around each test in this module.
 
     Tests here sign at high slots (50+). Without resetting, the advanced
     key state poisons the cache for any later test on the same

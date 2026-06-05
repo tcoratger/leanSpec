@@ -1,4 +1,5 @@
-"""Tests for the req/resp codec.
+"""
+Tests for the req/resp codec.
 
 Test Vector Sources
 -------------------
@@ -176,7 +177,8 @@ class TestInteroperability:
 
 
 class TestBoundaryConditions:
-    """Tests for boundary conditions in the codec.
+    """
+    Tests for boundary conditions in the codec.
 
     Source: Ethereum P2P Interface Spec (MAX_PAYLOAD_SIZE = 10 MiB)
         https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/p2p-interface.md
@@ -253,7 +255,8 @@ class TestBoundaryConditions:
 
 
 class TestMaliciousInputs:
-    """Security-focused tests for malicious input handling.
+    """
+    Security-focused tests for malicious input handling.
 
     These tests verify that the codec rejects malformed or malicious data
     without crashing, leaking information, or consuming excessive resources.
@@ -398,7 +401,8 @@ class TestMaliciousInputs:
 
 
 class TestSnappyFramingEdgeCases:
-    """Tests for snappy framing edge cases.
+    """
+    Tests for snappy framing edge cases.
 
     These tests verify correct handling of various snappy framing scenarios
     that may occur in real-world network traffic.

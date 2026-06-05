@@ -1,4 +1,5 @@
-"""Req/resp codec: wire-level rejection vectors.
+"""
+Req/resp codec: wire-level rejection vectors.
 
 Exercises the user-reachable CodecError paths in the req/resp decoder.
 Each vector pins the exact exception class a client must raise when a
@@ -16,7 +17,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_reqresp_decode_rejects_empty_request(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """Decoding an empty request is rejected with CodecError.
+    """
+    Decoding an empty request is rejected with CodecError.
 
     The req/resp framing demands a length-prefix varint followed by a
     compressed payload. Zero input carries neither, so the decoder must
@@ -32,7 +34,8 @@ def test_reqresp_decode_rejects_empty_request(
 def test_reqresp_decode_rejects_invalid_varint_prefix(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A request whose length prefix is a malformed varint is rejected with CodecError.
+    """
+    A request whose length prefix is a malformed varint is rejected with CodecError.
 
     Two continuation bytes with no terminator make the varint parse raise.
     The decoder wraps the underlying varint error in CodecError so clients
@@ -48,7 +51,8 @@ def test_reqresp_decode_rejects_invalid_varint_prefix(
 def test_reqresp_decode_rejects_declared_length_above_max(
     networking_codec: NetworkingCodecTestFiller,
 ) -> None:
-    """A request whose declared length exceeds the ten-mebibyte cap is rejected.
+    """
+    A request whose declared length exceeds the ten-mebibyte cap is rejected.
 
     The varint 0x81 0x80 0x80 0x05 declares 10,485,761 bytes, one over the
     ten-mebibyte protocol cap. Refusing before decompression prevents a

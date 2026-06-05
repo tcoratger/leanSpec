@@ -19,7 +19,8 @@ class TimelineMixin(LstarSpecBase):
         has_proposal: bool,
         is_aggregator: bool = False,
     ) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
-        """Advance store time by one interval and perform interval-specific actions.
+        """
+        Advance store time by one interval and perform interval-specific actions.
 
         Different actions are performed based on interval within slot:
         - Interval 0: Process attestations if proposal exists
@@ -51,7 +52,8 @@ class TimelineMixin(LstarSpecBase):
         has_proposal: bool,
         is_aggregator: bool = False,
     ) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
-        """Advance forkchoice store time to given interval count.
+        """
+        Advance forkchoice store time to given interval count.
 
         Ticks store forward interval by interval, performing appropriate
         actions for each interval type. This method handles time progression

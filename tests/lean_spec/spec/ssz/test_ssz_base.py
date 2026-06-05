@@ -35,7 +35,8 @@ class SmallBitlist(BaseBitlist):
 
 
 class TestSSZModelLength:
-    """Tests for SSZModel.__len__() on both collection and container models.
+    """
+    Tests for SSZModel.__len__() on both collection and container models.
 
     Uses BaseBitlist (not SSZList) for the data-path because SSZList overrides
     __len__ with its own implementation. BaseBitlist inherits SSZModel's version.
@@ -83,7 +84,8 @@ class TestSSZModelRepr:
 
 
 class TestSSZTypeEncodeDecode:
-    """Tests for encode_bytes/decode_bytes on SSZType.
+    """
+    Tests for encode_bytes/decode_bytes on SSZType.
 
     These methods wrap the stream-based serialize/deserialize interface
     so callers can work with plain byte strings instead.

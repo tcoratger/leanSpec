@@ -248,7 +248,8 @@ class HashSubTree(Container):
         parameter: Parameter,
         bottom_tree_roots: list[HashDigestVector],
     ) -> Self:
-        """Build the top tree from bottom-tree roots up to the global root.
+        """
+        Build the top tree from bottom-tree roots up to the global root.
 
         The top tree starts at layer depth/2 and treats bottom-tree roots as its leaves.
 
@@ -424,7 +425,8 @@ class HashSubTree(Container):
         )
 
     def root(self) -> HashDigestVector:
-        """Return the single node in the highest stored layer.
+        """
+        Return the single node in the highest stored layer.
 
         Raises:
             ValueError: When the subtree is empty or the highest layer has no nodes.

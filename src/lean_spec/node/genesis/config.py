@@ -1,4 +1,5 @@
-"""Genesis configuration loader.
+"""
+Genesis configuration loader.
 
 Loads genesis configuration from YAML files compatible with ream and zeam.
 

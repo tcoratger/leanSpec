@@ -126,7 +126,8 @@ class TestMultihash:
 
 
 class TestEncodePublicKey:
-    """Tests for public key encoding.
+    """
+    Tests for public key encoding.
 
     Protobuf wire format from libp2p-crypto:
         message PublicKey {
@@ -172,7 +173,8 @@ class TestEncodePublicKey:
         assert secp256k1[1] == KeyType.SECP256K1  # 2
 
     def test_ed25519_encoding_matches_spec(self) -> None:
-        """Test ED25519 encoding matches libp2p spec test vector.
+        """
+        Test ED25519 encoding matches libp2p spec test vector.
 
         From: https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#test-vectors
         """
@@ -190,7 +192,8 @@ class TestEncodePublicKey:
         assert encoded == full_encoded
 
     def test_secp256k1_encoding_matches_spec(self) -> None:
-        """Test secp256k1 encoding matches libp2p spec test vector.
+        """
+        Test secp256k1 encoding matches libp2p spec test vector.
 
         From: https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#test-vectors
         """
@@ -207,7 +210,8 @@ class TestEncodePublicKey:
         assert encoded == full_encoded
 
     def test_ecdsa_encoding_matches_spec(self) -> None:
-        """Test ECDSA encoding matches libp2p spec test vector.
+        """
+        Test ECDSA encoding matches libp2p spec test vector.
 
         From: https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#test-vectors
         """
@@ -295,7 +299,8 @@ class TestPeerIdFormat:
 
 
 class TestKnownVectors:
-    """Tests against known test vectors from the libp2p spec.
+    """
+    Tests against known test vectors from the libp2p spec.
 
     Test vectors from:
     https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#test-vectors
@@ -313,7 +318,8 @@ class TestKnownVectors:
     """
 
     def test_ed25519_from_spec_test_vector(self) -> None:
-        """Test ED25519 key from libp2p spec test vectors.
+        """
+        Test ED25519 key from libp2p spec test vectors.
 
         Spec test vector (encoded public key):
             080112201ed1e8fae2c4a144b8be8fd4b47bf3d3b34b871c3cacf6010f0e42d474fce27e
@@ -351,7 +357,8 @@ class TestKnownVectors:
         assert decoded == multihash
 
     def test_secp256k1_from_spec_test_vector(self) -> None:
-        """Test secp256k1 key from libp2p spec test vectors.
+        """
+        Test secp256k1 key from libp2p spec test vectors.
 
         Spec test vector (encoded public key):
             08021221037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99
@@ -389,7 +396,8 @@ class TestKnownVectors:
         assert decoded == multihash
 
     def test_ecdsa_from_spec_test_vector(self) -> None:
-        """Test ECDSA key from libp2p spec test vectors.
+        """
+        Test ECDSA key from libp2p spec test vectors.
 
         Spec test vector (encoded public key):
             0803125b3059301306072a8648ce3d020106082a8648ce3d030107034200
@@ -459,7 +467,8 @@ class TestKnownVectors:
         assert peer_id.startswith("16Uiu2")
 
     def test_known_secp256k1_peer_id(self) -> None:
-        """Test against a known secp256k1-derived PeerId.
+        """
+        Test against a known secp256k1-derived PeerId.
 
         This matches the libp2p spec test vector.
         """

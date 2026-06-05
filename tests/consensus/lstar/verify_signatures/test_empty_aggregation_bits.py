@@ -16,7 +16,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 def test_empty_aggregation_bits_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
-    """A signed block whose attestation references zero participants is rejected.
+    """
+    A signed block whose attestation references zero participants is rejected.
 
     Scenario
     --------

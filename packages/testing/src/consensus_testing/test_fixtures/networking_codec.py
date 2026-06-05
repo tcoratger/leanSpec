@@ -40,7 +40,8 @@ def _from_hex(hex_str: str) -> bytes:
 
 
 class NetworkingCodecTest(BaseConsensusFixture):
-    """Fixture for networking wire-format conformance.
+    """
+    Fixture for networking wire-format conformance.
 
     Verifies encode/decode roundtrips for networking codecs.
 
@@ -60,7 +61,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
     """Computed output. Filled by make_fixture."""
 
     def make_fixture(self) -> "NetworkingCodecTest":
-        """Dispatch to the codec handler and produce computed output.
+        """
+        Dispatch to the codec handler and produce computed output.
 
         Returns:
             A copy of this fixture with output populated.
@@ -99,7 +101,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
         return self
 
     def _make_decode_failure(self) -> dict[str, Any]:
-        """Assert that decoding `input.bytes` with `input.decoder` raises.
+        """
+        Assert that decoding `input.bytes` with `input.decoder` raises.
 
         Dispatches to one of the wire-format decoders and confirms that the
         expected exception (on :attribute:`expect_exception`) is raised. Used to
@@ -176,7 +179,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
         return {"encoded": _to_hex(encoded), "byteLength": byte_length}
 
     def _make_gossip_topic(self) -> dict[str, Any]:
-        """Build a topic string from components, parse it back, assert roundtrip.
+        """
+        Build a topic string from components, parse it back, assert roundtrip.
 
         When the input carries `expectedForkDigest`, also run validate_fork
         against the parsed topic and report whether the network name matched.
@@ -254,7 +258,8 @@ class NetworkingCodecTest(BaseConsensusFixture):
         return {"encoded": _to_hex(encoded)}
 
     def _make_reqresp_response_stream(self) -> dict[str, Any]:
-        """Encode a sequence of response chunks as a concatenated stream.
+        """
+        Encode a sequence of response chunks as a concatenated stream.
 
         Multi-chunk responses (for example BlocksByRoot returning N blocks)
         send their chunks back-to-back on a single libp2p stream: each

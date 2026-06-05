@@ -67,7 +67,8 @@ class HashDigestList(SSZList[HashDigestVector]):
 
 
 class Parameter(SSZVector[Fp]):
-    """The public parameter P.
+    """
+    The public parameter P.
 
     - Unique, randomly generated value associated with a single key pair.
     - Mixed into every hash to personalize the function and block cross-key attacks.

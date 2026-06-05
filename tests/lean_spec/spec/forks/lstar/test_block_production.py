@@ -45,7 +45,8 @@ def _chain_through_slot_two(
     *,
     justify_slot_one: bool = False,
 ) -> tuple[State, Bytes32, Bytes32, Bytes32]:
-    """Apply a three-block chain and return the slot-two state with its roots.
+    """
+    Apply a three-block chain and return the slot-two state with its roots.
 
     The chain runs genesis, then a slot-one block, then a slot-two block.
 
@@ -141,7 +142,8 @@ def test_build_block_keeps_genesis_self_vote(
     key_manager: XmssKeyManager,
     spec: LstarSpec,
 ) -> None:
-    """A vote anchored entirely at genesis is carried into the body unchanged.
+    """
+    A vote anchored entirely at genesis is carried into the body unchanged.
 
     - Source and target both sit at slot zero.
     - The state transition discards such a vote for justification.
@@ -206,7 +208,8 @@ def test_build_block_merges_split_proofs_into_one_attestation(
     key_manager: XmssKeyManager,
     spec: LstarSpec,
 ) -> None:
-    """Two proofs for the same data collapse into one attestation over their union.
+    """
+    Two proofs for the same data collapse into one attestation over their union.
 
     - One subset arrives as a gossip-derived proof.
     - A second disjoint subset arrives as a separate proof.
@@ -361,7 +364,8 @@ def test_build_block_skips_vote_with_unjustified_source(
     key_manager: XmssKeyManager,
     spec: LstarSpec,
 ) -> None:
-    """A vote whose source slot is not yet justified is excluded.
+    """
+    A vote whose source slot is not yet justified is excluded.
 
     Fixture state:
 
@@ -421,7 +425,8 @@ def test_build_block_skips_vote_for_already_justified_target(
     key_manager: XmssKeyManager,
     spec: LstarSpec,
 ) -> None:
-    """A vote whose target slot is already justified adds nothing and is excluded.
+    """
+    A vote whose target slot is already justified adds nothing and is excluded.
 
     Fixture state:
 
@@ -482,7 +487,8 @@ def test_build_block_fixed_point_unlocks_chained_source(
     key_manager: XmssKeyManager,
     spec: LstarSpec,
 ) -> None:
-    """Justifying one target unlocks a second vote whose source was that target.
+    """
+    Justifying one target unlocks a second vote whose source was that target.
 
     Fixture state:
 

@@ -1,4 +1,5 @@
-"""Tests for unsigned LEB128 varint encoding and decoding.
+"""
+Tests for unsigned LEB128 varint encoding and decoding.
 
 Test vectors sourced from:
 - Protocol Buffers Encoding Guide: https://protobuf.dev/programming-guides/encoding/
@@ -100,7 +101,8 @@ class TestVarintRoundtrip:
         ids=[f"2^{p}" for p in [7, 14, 21, 28, 35, 42, 49, 56, 63]],
     )
     def test_power_of_two_boundaries(self, power: int) -> None:
-        """Values at 7-bit group boundaries roundtrip correctly.
+        """
+        Values at 7-bit group boundaries roundtrip correctly.
 
         Each power of 7 is a byte-size boundary: values below 2^7
         fit in 1 byte, values below 2^14 fit in 2 bytes, etc.

@@ -250,7 +250,8 @@ def test_sign_rejects_slot_outside_activation() -> None:
 
 
 def test_sign_raises_when_no_encoding_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An encoding search that never succeeds raises after exhausting the attempts.
+    """
+    An encoding search that never succeeds raises after exhausting the attempts.
 
     The encoding is forced to always reject so the retry loop runs to its limit.
     """
@@ -264,7 +265,8 @@ def test_sign_raises_when_no_encoding_found(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_sign_raises_on_wrong_codeword_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An encoding returning the wrong number of digits raises.
+    """
+    An encoding returning the wrong number of digits raises.
 
     The encoding is forced to return one digit too few for the scheme dimension.
     """

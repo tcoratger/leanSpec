@@ -580,7 +580,8 @@ class LiveNetworkEventSource:
             return None
 
     async def _ensure_quic_manager(self) -> None:
-        """Initialize QUIC manager lazily on first use.
+        """
+        Initialize QUIC manager lazily on first use.
 
         Reuses the identity key from the connection manager for consistency.
         This ensures the same peer ID is used across all connections.
@@ -593,7 +594,8 @@ class LiveNetworkEventSource:
             self.quic_manager = await QuicConnectionManager.create(identity_key)
 
     async def _dial_quic(self, multiaddr: str) -> QuicConnection:
-        """Connect to a peer using QUIC transport.
+        """
+        Connect to a peer using QUIC transport.
 
         Ensures the QUIC manager is initialized before connecting.
 
@@ -611,7 +613,8 @@ class LiveNetworkEventSource:
         return await self.quic_manager.connect(multiaddr)
 
     async def listen(self, multiaddr: str) -> None:
-        """Start listening for incoming connections.
+        """
+        Start listening for incoming connections.
 
         Automatically detects transport type from multiaddr:
 
@@ -632,7 +635,8 @@ class LiveNetworkEventSource:
             )
 
     async def _listen_quic(self, multiaddr: str) -> None:
-        """Listen for incoming QUIC connections.
+        """
+        Listen for incoming QUIC connections.
 
         Ensures the QUIC manager is initialized.
         Registers the connection callback for accepted connections.

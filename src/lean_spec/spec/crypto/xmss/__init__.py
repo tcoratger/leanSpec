@@ -1,4 +1,5 @@
-"""Generalized XMSS hash-based signature scheme.
+"""
+Generalized XMSS hash-based signature scheme.
 
 References:
     - Hash-Based Multi-Signatures for Post-Quantum Ethereum.

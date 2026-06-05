@@ -42,7 +42,8 @@ class ForkChoiceMixin(LstarSpecBase):
         anchor_block: SpecBlockType,
         validator_index: ValidatorIndex | None,
     ) -> LstarStore:
-        """Initialize a forkchoice store from an anchor state and block.
+        """
+        Initialize a forkchoice store from an anchor state and block.
 
         The anchor block and state form the starting point for fork choice.
         Both are treated as justified and finalized.
@@ -99,7 +100,8 @@ class ForkChoiceMixin(LstarSpecBase):
         )
 
     def prune_stale_attestation_data(self, store: LstarStore) -> LstarStore:
-        """Remove attestation data that can no longer influence fork choice.
+        """
+        Remove attestation data that can no longer influence fork choice.
 
         An attestation becomes stale when its head checkpoint falls at or before
         the finalized slot. Such attestations cannot affect chain selection since
@@ -133,7 +135,8 @@ class ForkChoiceMixin(LstarSpecBase):
         return store
 
     def validate_attestation(self, store: LstarStore, attestation_data: AttestationData) -> None:
-        """Validate incoming attestation before processing.
+        """
+        Validate incoming attestation before processing.
 
         Ensures the vote respects the basic laws of time and topology:
             1. The blocks voted for must exist in our store.
@@ -191,7 +194,8 @@ class ForkChoiceMixin(LstarSpecBase):
         signed_attestation: SignedAttestation,
         is_aggregator: bool = False,
     ) -> LstarStore:
-        """Process a signed attestation received via gossip network.
+        """
+        Process a signed attestation received via gossip network.
 
         This method:
 
@@ -255,7 +259,8 @@ class ForkChoiceMixin(LstarSpecBase):
         store: LstarStore,
         signed_attestation: SignedAggregatedAttestation,
     ) -> LstarStore:
-        """Process a signed aggregated attestation received via aggregation topic.
+        """
+        Process a signed aggregated attestation received via aggregation topic.
 
         This method:
         1. Verifies the aggregated attestation
@@ -314,7 +319,8 @@ class ForkChoiceMixin(LstarSpecBase):
         store: LstarStore,
         signed_block: SignedBlock,
     ) -> LstarStore:
-        """Process a new block and update the forkchoice state.
+        """
+        Process a new block and update the forkchoice state.
 
         This method integrates a block into the forkchoice store by:
 
@@ -418,7 +424,8 @@ class ForkChoiceMixin(LstarSpecBase):
         store: LstarStore,
         aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]],
     ) -> dict[ValidatorIndex, AttestationData]:
-        """Extract attestations from aggregated payloads.
+        """
+        Extract attestations from aggregated payloads.
 
         Given a mapping of aggregated signature proofs, extract the attestation data
         for each validator that participated in the aggregation.
@@ -439,7 +446,8 @@ class ForkChoiceMixin(LstarSpecBase):
         attestations: dict[ValidatorIndex, AttestationData],
         start_slot: Slot,
     ) -> dict[Bytes32, int]:
-        """Accumulate one unit of voting weight per ancestor of each head vote.
+        """
+        Accumulate one unit of voting weight per ancestor of each head vote.
 
         For every vote, follow the chosen head upward through its ancestors.
         Each visited block above the start slot accumulates one unit of weight
@@ -460,7 +468,8 @@ class ForkChoiceMixin(LstarSpecBase):
         return weights
 
     def compute_block_weights(self, store: LstarStore) -> dict[Bytes32, int]:
-        """Compute attestation-based weight for each block above the finalized slot.
+        """
+        Compute attestation-based weight for each block above the finalized slot.
 
         Walks backward from each validator's latest head vote, incrementing weight
         for every ancestor above the finalized slot.
@@ -487,7 +496,8 @@ class ForkChoiceMixin(LstarSpecBase):
         attestations: dict[ValidatorIndex, AttestationData],
         min_score: int = 0,
     ) -> Bytes32:
-        """Walk the block tree according to the LMD GHOST rule.
+        """
+        Walk the block tree according to the LMD GHOST rule.
 
         The walk starts from a chosen root.
         At each fork, the child subtree with the highest weight is taken.
@@ -544,7 +554,8 @@ class ForkChoiceMixin(LstarSpecBase):
         return head
 
     def update_head(self, store: LstarStore) -> LstarStore:
-        """Compute updated store with new canonical head.
+        """
+        Compute updated store with new canonical head.
 
         Selects the canonical chain head using:
 
@@ -576,7 +587,8 @@ class ForkChoiceMixin(LstarSpecBase):
         return store
 
     def accept_new_attestations(self, store: LstarStore) -> LstarStore:
-        """Process pending aggregated payloads and update forkchoice head.
+        """
+        Process pending aggregated payloads and update forkchoice head.
 
         Moves aggregated payloads from latest_new_aggregated_payloads to
         latest_known_aggregated_payloads, making them eligible to contribute to
@@ -605,7 +617,8 @@ class ForkChoiceMixin(LstarSpecBase):
         return self.update_head(store)
 
     def update_safe_target(self, store: LstarStore) -> LstarStore:
-        """Compute the deepest block that has 2/3+ supermajority attestation weight.
+        """
+        Compute the deepest block that has 2/3+ supermajority attestation weight.
 
         The safe target is the furthest-from-genesis block where enough validators
         agree. Validators use it to decide which block is safe to attest to.

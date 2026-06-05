@@ -29,7 +29,8 @@ NUM_VALIDATORS = 4
 def test_store_init_from_non_genesis_anchor(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Store exposes the anchor as head, justified, and finalized on startup.
+    """
+    Store exposes the anchor as head, justified, and finalized on startup.
 
     Scenario
     --------
@@ -96,7 +97,8 @@ def test_store_init_from_non_genesis_anchor(
 def test_extend_chain_from_non_genesis_anchor(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Blocks at slots above the anchor extend the canonical chain.
+    """
+    Blocks at slots above the anchor extend the canonical chain.
 
     Scenario
     --------
@@ -186,7 +188,8 @@ def test_extend_chain_from_non_genesis_anchor(
 def test_fork_off_non_genesis_anchor(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Forks rooted at a checkpoint-synced anchor are tracked and resolvable.
+    """
+    Forks rooted at a checkpoint-synced anchor are tracked and resolvable.
 
     Scenario
     --------
@@ -282,7 +285,8 @@ def test_fork_off_non_genesis_anchor(
 def test_non_genesis_anchor_is_internally_consistent(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """The helper-built anchor satisfies Store.from_anchor's preconditions.
+    """
+    The helper-built anchor satisfies Store.from_anchor's preconditions.
 
     Documents the invariants any valid non-genesis anchor must meet before
     seeding the store:
@@ -327,7 +331,8 @@ def test_non_genesis_anchor_is_internally_consistent(
 def test_store_from_anchor_rejects_mismatched_state_root(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Store.from_anchor aborts when the anchor block's state_root disagrees
+    """
+    Store.from_anchor aborts when the anchor block's state_root disagrees
     with the hash of the anchor state.
 
     Scenario

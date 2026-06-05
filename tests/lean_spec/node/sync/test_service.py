@@ -769,7 +769,8 @@ def _setup(
     *,
     block_participants: list[ValidatorIndex],
 ):
-    """Build a two-block chain and a signed block carrying an attestation.
+    """
+    Build a two-block chain and a signed block carrying an attestation.
 
     The chain block sits at slot 1. The returned signed block sits at slot
     2 and carries one attestation whose target is the slot-1 block, ahead
@@ -814,7 +815,8 @@ def _service(peer_id: PeerId):
 def test_skips_when_target_not_ahead_of_justified(
     peer_id: PeerId, key_manager: XmssKeyManager
 ) -> None:
-    """Target at or behind the justified checkpoint -> no aggregates.
+    """
+    Target at or behind the justified checkpoint -> no aggregates.
 
     The block's attestation cannot move justification, so the expensive
     split is never attempted and the store is returned unchanged.
@@ -836,7 +838,8 @@ def test_skips_when_target_not_ahead_of_justified(
 def test_skips_when_block_adds_no_new_validators(
     peer_id: PeerId, key_manager: XmssKeyManager
 ) -> None:
-    """Block participants are a subset of the local union -> no aggregates.
+    """
+    Block participants are a subset of the local union -> no aggregates.
 
     The target is ahead of justified, so the only thing stopping the split
     is that the block adds no new participant. The store is unchanged.

@@ -147,7 +147,8 @@ class VerifySignaturesTest(BaseConsensusFixture):
         return self
 
     def _apply_tamper(self, signed_block: SignedBlock) -> SignedBlock:
-        """Apply the configured post-build mutation to a signed block.
+        """
+        Apply the configured post-build mutation to a signed block.
 
         Args:
             signed_block: The validly built signed block.

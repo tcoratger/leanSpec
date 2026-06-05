@@ -1,4 +1,5 @@
-"""Tests for libp2p TLS certificate generation and ASN.1 encoding.
+"""
+Tests for libp2p TLS certificate generation and ASN.1 encoding.
 
 Tests verify behavior against the libp2p TLS spec:
     https://github.com/libp2p/specs/blob/master/tls/tls.md

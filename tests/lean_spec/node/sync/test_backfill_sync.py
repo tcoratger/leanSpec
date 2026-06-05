@@ -26,7 +26,8 @@ from tests.lean_spec.helpers import MockNetworkRequester, make_signed_block
 
 @dataclass
 class FakeStoreView:
-    """In-memory StoreView used to drive backfill tests.
+    """
+    In-memory StoreView used to drive backfill tests.
 
     Concrete implementation. Avoids MagicMock so tests fail loudly when
     fields drift. Tests mutate `known_roots` and `head` directly.
@@ -107,7 +108,8 @@ class TestBackfillChainResolution:
         peer_id: PeerId,
         network: MockNetworkRequester,
     ) -> None:
-        """Backfill recursively fetches missing parents up the chain.
+        """
+        Backfill recursively fetches missing parents up the chain.
 
         No store view is supplied, so backfill resolves missing parents purely
         by root recursion (the gap-detection path requires a view).
@@ -392,7 +394,8 @@ class TestBackfillOptimizations:
         store_view: FakeStoreView,
         peer_id: PeerId,
     ) -> None:
-        """A large gap above head triggers a single range request to fill it.
+        """
+        A large gap above head triggers a single range request to fill it.
 
         Floor is the head slot, not the finalized slot: slots above finalized
         but at or below head are already canonical for us and are not refetched.

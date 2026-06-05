@@ -81,7 +81,8 @@ class SnappyDecompressionError(Exception):
 
 
 def decompress(data: bytes) -> bytes:
-    """Decompress Snappy-compressed data.
+    """
+    Decompress Snappy-compressed data.
 
     Args:
         data: Snappy-compressed bytes.
@@ -193,7 +194,8 @@ def decompress(data: bytes) -> bytes:
 
 
 def _execute_copy(output: bytearray, offset: int, length: int, max_length: int) -> None:
-    """Execute a copy operation, appending bytes to the output buffer.
+    """
+    Execute a copy operation, appending bytes to the output buffer.
 
     Args:
         output: The output buffer (modified in place).

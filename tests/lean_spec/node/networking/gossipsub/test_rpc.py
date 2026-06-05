@@ -39,7 +39,8 @@ class TestControlMessages:
 
 
 class TestRPCProtobufEncoding:
-    """Test suite for GossipSub RPC protobuf wire format encoding/decoding.
+    """
+    Test suite for GossipSub RPC protobuf wire format encoding/decoding.
 
     These tests verify interoperability with rust-libp2p and go-libp2p by
     ensuring our encoding matches the expected protobuf wire format.
@@ -163,7 +164,8 @@ class TestRPCProtobufEncoding:
         )
 
     def test_wire_format_compatibility(self) -> None:
-        """Test wire format matches expected protobuf encoding.
+        """
+        Test wire format matches expected protobuf encoding.
 
         Verifies that our encoding produces bytes that round-trip
         correctly through decode, matching the original structure.

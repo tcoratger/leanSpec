@@ -1,4 +1,5 @@
-"""Mesh formation with multiple peers.
+"""
+Mesh formation with multiple peers.
 
 Gossipsub controls mesh size with three parameters:
 

@@ -36,7 +36,8 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def _generate_max_registry_pre_state() -> State:
-    """Build genesis with the registry filled to capacity using placeholder public_keys.
+    """
+    Build genesis with the registry filled to capacity using placeholder public_keys.
 
     XMSS key generation is intentionally skipped: every validator carries a
     zero public_key. This is sound because the state-transition path used here

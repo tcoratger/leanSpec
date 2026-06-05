@@ -21,7 +21,8 @@ class SampleStrictModel(StrictBaseModel):
 
 
 class TestCamelModelToJson:
-    """Tests for CamelModel.to_json() camelCase serialization.
+    """
+    Tests for CamelModel.to_json() camelCase serialization.
 
     Test vectors use camelCase keys in their JSON output. This method
     is the single point where that conversion happens. A bug here
@@ -29,7 +30,8 @@ class TestCamelModelToJson:
     """
 
     def test_to_json_converts_snake_case_to_camel(self) -> None:
-        """Snake_case field names become camelCase in JSON output.
+        """
+        Snake_case field names become camelCase in JSON output.
 
         This is the core behavior that all test vector serialization
         depends on.
@@ -55,7 +57,8 @@ class TestCamelModelToJson:
             model.to_json(by_alias=False)
 
     def test_to_json_forwards_extra_kwargs(self) -> None:
-        """Other kwargs (e.g., exclude_defaults) pass through to model_dump.
+        """
+        Other kwargs (e.g., exclude_defaults) pass through to model_dump.
 
         Only mode and by_alias are stripped. Everything else is forwarded.
         """
@@ -69,14 +72,16 @@ class TestCamelModelToJson:
 
 
 class TestStrictBaseModel:
-    """Tests for StrictBaseModel constraints.
+    """
+    Tests for StrictBaseModel constraints.
 
     StrictBaseModel is the foundation for all spec types. Its constraints
     (extra-forbidden, strict) catch typos and silent type coercion.
     """
 
     def test_extra_fields_forbidden(self) -> None:
-        """Unknown fields are rejected at construction time.
+        """
+        Unknown fields are rejected at construction time.
 
         This catches typos and schema mismatches early.
         """
@@ -88,7 +93,8 @@ class TestStrictBaseModel:
             )
 
     def test_strict_rejects_type_coercion(self) -> None:
-        """Strict mode rejects values that would require type coercion.
+        """
+        Strict mode rejects values that would require type coercion.
 
         Without strict mode, Pydantic would silently convert "5" to 5.
         In spec code, this kind of silent coercion hides bugs.
@@ -97,7 +103,8 @@ class TestStrictBaseModel:
             SampleStrictModel(slot_number="5", block_root="0xabc")  # type: ignore[arg-type]
 
     def test_inherits_camel_serialization(self) -> None:
-        """StrictBaseModel inherits camelCase serialization from CamelModel.
+        """
+        StrictBaseModel inherits camelCase serialization from CamelModel.
 
         Verifies the inheritance chain works end-to-end.
         """

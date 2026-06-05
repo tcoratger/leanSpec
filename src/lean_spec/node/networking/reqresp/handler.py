@@ -90,7 +90,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class StreamResponseAdapter:
-    """Encodes responses using the wire format from codec.py and writes
+    """
+    Encodes responses using the wire format from codec.py and writes
     them to the underlying stream.
     """
 
@@ -98,7 +99,8 @@ class StreamResponseAdapter:
     """Underlying transport stream."""
 
     async def send_success(self, ssz_data: bytes) -> None:
-        """Send a SUCCESS response chunk.
+        """
+        Send a SUCCESS response chunk.
 
         Args:
             ssz_data: SSZ-encoded response payload.
@@ -108,7 +110,8 @@ class StreamResponseAdapter:
         await self._stream.drain()
 
     async def send_error(self, code: ResponseCode, message: str) -> None:
-        """Send an error response.
+        """
+        Send an error response.
 
         Args:
             code: Error code.

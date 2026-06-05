@@ -14,7 +14,8 @@ class ValidatorIndex(Uint64):
 
     @classmethod
     def proposer_for_slot(cls, slot: Slot, num_validators: Uint64) -> "ValidatorIndex":
-        """Return the validator index responsible for proposing at the given slot.
+        """
+        Return the validator index responsible for proposing at the given slot.
 
         Round-robin selection: the proposer is slot modulo registry size.
         """
@@ -25,7 +26,8 @@ class ValidatorIndex(Uint64):
         return int(self) < int(num_validators)
 
     def compute_subnet_id(self, num_committees: Uint64) -> SubnetId:
-        """Compute the attestation subnet id for this validator.
+        """
+        Compute the attestation subnet id for this validator.
 
         Args:
             num_committees: Positive number of committees.

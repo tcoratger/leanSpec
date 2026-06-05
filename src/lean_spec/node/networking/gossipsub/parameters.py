@@ -66,7 +66,8 @@ from lean_spec.spec.forks.lstar.config import JUSTIFICATION_LOOKBACK_SLOTS, SECO
 
 
 class GossipsubParameters(StrictBaseModel):
-    """Core gossipsub configuration.
+    """
+    Core gossipsub configuration.
 
     Defines the mesh topology and timing parameters.
 

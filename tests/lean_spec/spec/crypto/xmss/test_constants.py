@@ -112,7 +112,8 @@ def test_prod_config_matches_reference(param_name: str, value: int) -> None:
 
 
 def _calculate_layer_size(w: int, v: int, d: int) -> int:
-    """Count a hypercube layer's size using inclusion-exclusion.
+    """
+    Count a hypercube layer's size using inclusion-exclusion.
 
     Counts integer solutions to x_1 + ... + x_v = k with 0 <= x_i <= w-1,
     where k = v*(w-1) - d.
@@ -125,7 +126,8 @@ def _calculate_layer_size(w: int, v: int, d: int) -> int:
 
 
 def _compute_security_levels(config: XmssConfig) -> dict[str, float]:
-    """Compute classical and quantum security levels for a configuration.
+    """
+    Compute classical and quantum security levels for a configuration.
 
     Returns a dict with keys:
 

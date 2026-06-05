@@ -47,7 +47,8 @@ def generate_pre_state(
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
     num_validators: int = 4,
 ) -> State:
-    """Generate a default pre-state for consensus tests.
+    """
+    Generate a default pre-state for consensus tests.
 
     Args:
         fork: Fork dispatching genesis construction. Defaults to a fresh
@@ -69,7 +70,8 @@ def build_anchor(
     fork: LstarSpec | None = None,
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
 ) -> tuple[State, Block]:
-    """Build a consistent non-genesis anchor by advancing the genesis state.
+    """
+    Build a consistent non-genesis anchor by advancing the genesis state.
 
     Simulates the mid-chain view that a checkpoint-synced node would have:
     a real state reached via the normal state transition from genesis,

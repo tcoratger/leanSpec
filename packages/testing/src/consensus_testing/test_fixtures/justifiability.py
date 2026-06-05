@@ -1,4 +1,5 @@
-"""3SF-mini justifiability test fixture.
+"""
+3SF-mini justifiability test fixture.
 
 Generates JSON test vectors for the Slot.is_justifiable_after function
 that implements the core 3SF-mini justification rule. A slot is
@@ -18,7 +19,8 @@ from lean_spec.spec.forks import Slot
 
 
 class JustifiabilityTest(BaseConsensusFixture):
-    """Fixture for 3SF-mini justifiability conformance.
+    """
+    Fixture for 3SF-mini justifiability conformance.
 
     Tests Slot.is_justifiable_after(finalized_slot) which determines
     whether a slot can be a justification target.
