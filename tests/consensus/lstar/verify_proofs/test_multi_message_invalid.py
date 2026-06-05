@@ -2,11 +2,11 @@
 
 import pytest
 from consensus_testing import (
-    DropComponentMessageBinding,
-    IncrementComponentSlot,
-    RebindComponentToAlternateHeadRoot,
-    SwapComponentMessageBindings,
-    SwapComponentParticipantPublicKey,
+    DropMessageBinding,
+    IncrementEmittedSlot,
+    RebindToAlternateHeadRoot,
+    SwapMessageBindings,
+    SwapParticipantPublicKey,
     VerifyMultiMessageProofsTestFiller,
 )
 
@@ -41,7 +41,7 @@ def test_multi_message_wrong_message_in_one_component(
             ),
         ],
         expect_exception=AggregationError,
-        tamper=RebindComponentToAlternateHeadRoot(component_index=1),
+        tamper=RebindToAlternateHeadRoot(component_index=1),
     )
 
 
@@ -69,7 +69,7 @@ def test_multi_message_wrong_slot_in_one_component(
             ),
         ],
         expect_exception=AggregationError,
-        tamper=IncrementComponentSlot(component_index=1),
+        tamper=IncrementEmittedSlot(component_index=1),
     )
 
 
@@ -97,7 +97,7 @@ def test_multi_message_wrong_public_key_in_one_component(
             ),
         ],
         expect_exception=AggregationError,
-        tamper=SwapComponentParticipantPublicKey(
+        tamper=SwapParticipantPublicKey(
             component_index=1,
             participant_index=0,
             with_validator_index=ValidatorIndex(2),
@@ -129,7 +129,7 @@ def test_multi_message_components_with_swapped_bindings(
             ),
         ],
         expect_exception=AggregationError,
-        tamper=SwapComponentMessageBindings(
+        tamper=SwapMessageBindings(
             first_component_index=0,
             second_component_index=1,
         ),
@@ -160,5 +160,5 @@ def test_multi_message_missing_one_component_binding(
             ),
         ],
         expect_exception=AggregationError,
-        tamper=DropComponentMessageBinding(component_index=1),
+        tamper=DropMessageBinding(component_index=1),
     )

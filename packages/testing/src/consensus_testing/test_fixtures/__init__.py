@@ -11,36 +11,28 @@ from consensus_testing.test_fixtures.slot_clock import SlotClockTest
 from consensus_testing.test_fixtures.ssz import SSZTest
 from consensus_testing.test_fixtures.state_transition import StateTransitionTest
 from consensus_testing.test_fixtures.sync import SyncTest
-from consensus_testing.test_fixtures.verify_multi_message_proofs import (
-    DropComponentMessageBinding,
-    IncrementComponentSlot,
-    RebindComponentToAlternateHeadRoot,
-    SwapComponentMessageBindings,
-    SwapComponentParticipantPublicKey,
-    VerifyMultiMessageProofsTest,
-)
-from consensus_testing.test_fixtures.verify_signatures import VerifySignaturesTest
-from consensus_testing.test_fixtures.verify_single_message_proofs import (
+from consensus_testing.test_fixtures.verify_proofs import (
+    DropMessageBinding,
     IncrementEmittedSlot,
     RebindToAlternateHeadRoot,
+    SwapMessageBindings,
     SwapParticipantPublicKey,
+    VerifyMultiMessageProofsTest,
     VerifySingleMessageProofsTest,
 )
+from consensus_testing.test_fixtures.verify_signatures import VerifySignaturesTest
 
 __all__ = [
     "BaseConsensusFixture",
     "StateTransitionTest",
     "ForkChoiceTest",
     "VerifySingleMessageProofsTest",
+    "VerifyMultiMessageProofsTest",
     "RebindToAlternateHeadRoot",
     "IncrementEmittedSlot",
     "SwapParticipantPublicKey",
-    "VerifyMultiMessageProofsTest",
-    "RebindComponentToAlternateHeadRoot",
-    "IncrementComponentSlot",
-    "SwapComponentParticipantPublicKey",
-    "SwapComponentMessageBindings",
-    "DropComponentMessageBinding",
+    "SwapMessageBindings",
+    "DropMessageBinding",
     "VerifySignaturesTest",
     "SSZTest",
     "NetworkingCodecTest",

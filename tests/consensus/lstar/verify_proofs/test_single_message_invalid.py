@@ -62,5 +62,7 @@ def test_single_message_wrong_public_keys(
             source=Checkpoint(root=Bytes32(b"\x33" * 32), slot=Slot(0)),
         ),
         expect_exception=AggregationError,
-        tamper=SwapParticipantPublicKey(index=0, with_validator_index=ValidatorIndex(1)),
+        tamper=SwapParticipantPublicKey(
+            participant_index=0, with_validator_index=ValidatorIndex(1)
+        ),
     )

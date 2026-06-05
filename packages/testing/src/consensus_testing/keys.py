@@ -514,6 +514,7 @@ class XmssKeyManager:
         self,
         validator_indices: list[ValidatorIndex],
         attestation_data: AttestationData,
+        precomputed_signatures: Mapping[ValidatorIndex, Signature] | None = None,
     ) -> SingleMessageAggregate:
         """
         Sign attestation data with each validator and aggregate the result.
@@ -529,15 +530,19 @@ class XmssKeyManager:
         Args:
             validator_indices: Validators to sign with.
             attestation_data: The attestation data to sign.
+            precomputed_signatures: Optional pre-computed signatures keyed by
+                validator index. Missing entries are signed on the fly.
 
         Returns:
             Cryptographically valid single-message aggregate proof covering validator_indices.
         """
+        signatures = precomputed_signatures or {}
         raw_xmss = [
             (
                 validator_index,
                 self.get_public_keys(validator_index)[0],
-                self.sign_attestation_data(validator_index, attestation_data),
+                signatures.get(validator_index)
+                or self.sign_attestation_data(validator_index, attestation_data),
             )
             for validator_index in validator_indices
         ]
@@ -577,39 +582,17 @@ class XmssKeyManager:
         """
         lookup = signature_lookup or {}
 
-        proofs: list[SingleMessageAggregate] = []
-        for aggregate in aggregated_attestations:
-            # Decode which validators participated from the bitfield.
-            validator_indices = aggregate.aggregation_bits.to_validator_indices()
-
-            # Try the lookup first for pre-computed signatures.
-            # Fall back to signing on the fly for any missing entries.
-            signatures_for_data = lookup.get(aggregate.data, {})
-
-            # Collect the attestation public keys for each participant.
-            public_keys = [
-                self.get_public_keys(validator_index)[0] for validator_index in validator_indices
-            ]
-
-            # Gather individual signatures, computing any that are missing.
-            signatures = [
-                signatures_for_data.get(validator_index)
-                or self.sign_attestation_data(validator_index, aggregate.data)
-                for validator_index in validator_indices
-            ]
-
-            # Produce a single aggregated proof that the leanVM can verify
-            # in one pass over all participants.
-            proofs.append(
-                SingleMessageAggregate.aggregate(
-                    children=[],
-                    raw_xmss=list(zip(validator_indices, public_keys, signatures, strict=True)),
-                    message=hash_tree_root(aggregate.data),
-                    slot=aggregate.data.slot,
-                )
+        # Produce one aggregated proof per attestation that the leanVM can
+        # verify in one pass over all participants.
+        # Participants are decoded from each attestation's bitfield.
+        return [
+            self.sign_and_aggregate(
+                list(aggregate.aggregation_bits.to_validator_indices()),
+                aggregate.data,
+                precomputed_signatures=lookup.get(aggregate.data, {}),
             )
-
-        return proofs
+            for aggregate in aggregated_attestations
+        ]
 
 
 def _generate_single_keypair(
