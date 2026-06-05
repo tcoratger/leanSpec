@@ -2,11 +2,11 @@
 
 import pytest
 from consensus_testing import (
+    AggregatedAttestationSpec,
     AttestationCheck,
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
@@ -86,7 +86,7 @@ def test_tick_interval_progression_through_full_slot(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -247,7 +247,7 @@ def test_tick_interval_0_skips_acceptance_when_not_proposer(
             ),
             # Start with a pending aggregated attestation for slot 3.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -302,7 +302,7 @@ def test_tick_interval_0_skips_acceptance_when_not_proposer(
             # At store time 19, current slot is still 3, so a slot-4 attestation
             # is within the allowed +1 future-slot margin.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -355,7 +355,7 @@ def test_tick_interval_0_skips_acceptance_when_not_proposer(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(1),
                         ValidatorIndex(2),

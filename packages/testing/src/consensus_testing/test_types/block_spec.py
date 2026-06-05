@@ -6,7 +6,7 @@ import copy
 from collections import defaultdict
 
 from consensus_testing.keys import XmssKeyManager, create_dummy_signature
-from consensus_testing.test_types.aggregated_attestation_spec import AggregatedAttestationSpec
+from consensus_testing.test_types.attestation_specs import AggregatedAttestationSpec
 from lean_spec.base import CamelModel
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import Signature
@@ -204,7 +204,9 @@ class BlockSpec(CamelModel):
         for aggregated_spec in self.attestations:
             # Build attestation data once.
             # All validators in this aggregation vote for the same target.
-            attestation_data = aggregated_spec.build_attestation_data(block_registry, state)
+            attestation_data = aggregated_spec.build_attestation_data(
+                block_registry, state.latest_justified
+            )
 
             # Create one attestation per validator.
             # Each validator signs independently; signatures aggregate later.
@@ -546,7 +548,7 @@ class BlockSpec(CamelModel):
         if self.forced_attestations:
             for attestation_spec in self.forced_attestations:
                 attestation_data = attestation_spec.build_attestation_data(
-                    block_registry, parent_state
+                    block_registry, parent_state.latest_justified
                 )
                 proof = key_manager.sign_and_aggregate(
                     attestation_spec.validator_indices, attestation_data

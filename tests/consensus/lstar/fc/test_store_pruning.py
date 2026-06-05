@@ -8,7 +8,6 @@ from consensus_testing import (
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     GossipAttestationSpec,
     StoreChecks,
@@ -138,7 +137,7 @@ def test_finalization_prunes_stale_aggregated_payloads(
             #
             # Stale gossip: target=1 (at finalized slot), should be pruned later
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(0),
                         ValidatorIndex(1),
@@ -154,7 +153,7 @@ def test_finalization_prunes_stale_aggregated_payloads(
             # Fresh gossip: target=5 (above finalized), should survive pruning
             # V3 is unique to this attestation (not in stale)
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[
                         ValidatorIndex(1),
                         ValidatorIndex(2),
@@ -359,7 +358,7 @@ def test_finalization_prunes_stale_attestation_signatures(
             # correct justified checkpoint for targets that were justified at
             # their respective slots.
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(0), ValidatorIndex(1), ValidatorIndex(2)],
                     slot=Slot(5),
                     target_slot=Slot(1),
@@ -369,7 +368,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(0), ValidatorIndex(1), ValidatorIndex(2)],
                     slot=Slot(5),
                     target_slot=Slot(2),
@@ -379,7 +378,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(0), ValidatorIndex(1), ValidatorIndex(2)],
                     slot=Slot(5),
                     target_slot=Slot(3),
@@ -389,7 +388,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(0), ValidatorIndex(1), ValidatorIndex(2)],
                     slot=Slot(5),
                     target_slot=Slot(4),
@@ -399,7 +398,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(0), ValidatorIndex(1), ValidatorIndex(2)],
                     slot=Slot(5),
                     target_slot=Slot(5),
@@ -423,7 +422,7 @@ def test_finalization_prunes_stale_attestation_signatures(
             # Second batch (V3-V5): gossip aggregated attestations for all targets.
             # These land in latest_new_aggregated_payloads (first batch already migrated).
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(3), ValidatorIndex(4), ValidatorIndex(5)],
                     slot=Slot(5),
                     target_slot=Slot(1),
@@ -433,7 +432,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(3), ValidatorIndex(4), ValidatorIndex(5)],
                     slot=Slot(5),
                     target_slot=Slot(2),
@@ -443,7 +442,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(3), ValidatorIndex(4), ValidatorIndex(5)],
                     slot=Slot(5),
                     target_slot=Slot(3),
@@ -453,7 +452,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(3), ValidatorIndex(4), ValidatorIndex(5)],
                     slot=Slot(5),
                     target_slot=Slot(4),
@@ -463,7 +462,7 @@ def test_finalization_prunes_stale_attestation_signatures(
                 ),
             ),
             GossipAggregatedAttestationStep(
-                attestation=GossipAggregatedAttestationSpec(
+                attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(3), ValidatorIndex(4), ValidatorIndex(5)],
                     slot=Slot(5),
                     target_slot=Slot(5),

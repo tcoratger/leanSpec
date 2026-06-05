@@ -278,7 +278,7 @@ class StateTransitionTest(BaseConsensusFixture):
             forced = [
                 AggregatedAttestation(
                     aggregation_bits=AggregationBits.from_indices(fa.validator_indices),
-                    data=fa.build_attestation_data(block_registry, state),
+                    data=fa.build_attestation_data(block_registry, state.latest_justified),
                 )
                 for fa in spec.forced_attestations
             ]
@@ -334,7 +334,7 @@ class StateTransitionTest(BaseConsensusFixture):
             if spec.signer_ids is not None:
                 raise NotImplementedError("signer_ids not yet supported in StateTransitionTest")
 
-            attestation_data = spec.build_attestation_data(block_registry, state)
+            attestation_data = spec.build_attestation_data(block_registry, state.latest_justified)
             proof = key_manager.sign_and_aggregate(spec.validator_indices, attestation_data)
             payloads.setdefault(attestation_data, set()).add(proof)
 

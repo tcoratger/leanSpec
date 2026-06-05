@@ -37,7 +37,6 @@ from consensus_testing.test_types import (
     BlockSpec,
     BlockStep,
     ForkChoiceStep,
-    GossipAggregatedAttestationSpec,
     GossipAggregatedAttestationStep,
     GossipAttestationSpec,
     StateExpectation,
@@ -62,7 +61,6 @@ SyncTestFiller = Type[SyncTest]
 __all__ = [
     # Public API
     "AggregatedAttestationSpec",
-    "GossipAggregatedAttestationSpec",
     "GossipAttestationSpec",
     "BlockSpec",
     "forks",
