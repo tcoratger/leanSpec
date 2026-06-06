@@ -12,7 +12,11 @@ builder upholds by construction:
 import pytest
 from consensus_testing import (
     AggregatedAttestationSpec,
+    AppendPhantomAttestation,
     BlockSpec,
+    CorruptProof,
+    MutateStateRoot,
+    SwapFirstTwoAttestations,
     VerifySignaturesTestFiller,
     build_anchor,
     generate_pre_state,
@@ -50,7 +54,7 @@ def test_corrupt_proof_rejected(
     verify_signatures_test(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
-        tamper={"operation": "corrupt_proof"},
+        tamper=CorruptProof(),
         expect_exception=AssertionError,
     )
 
@@ -83,7 +87,7 @@ def test_proof_component_count_mismatch_rejected(
     verify_signatures_test(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
-        tamper={"operation": "append_phantom_attestation"},
+        tamper=AppendPhantomAttestation(),
         expect_exception=AssertionError,
     )
 
@@ -119,7 +123,7 @@ def test_proof_reused_under_different_message_rejected(
     verify_signatures_test(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
-        tamper={"operation": "mutate_state_root"},
+        tamper=MutateStateRoot(),
         expect_exception=AssertionError,
     )
 
@@ -155,6 +159,6 @@ def test_attestation_proof_order_mismatch_rejected(
                 ),
             ],
         ),
-        tamper={"operation": "swap_first_two_attestations"},
+        tamper=SwapFirstTwoAttestations(),
         expect_exception=AssertionError,
     )
