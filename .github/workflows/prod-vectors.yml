@@ -83,7 +83,7 @@ jobs:
 
       - name: Download keys
         if: steps.key-cache.outputs.cache-hit != 'true'
-        run: uv run python -m consensus_testing.keys --download --scheme prod
+        run: uv run python -m consensus_testing.keys_cli --download --scheme prod
 
       - name: Save key cache
         if: steps.key-cache.outputs.cache-hit != 'true'
