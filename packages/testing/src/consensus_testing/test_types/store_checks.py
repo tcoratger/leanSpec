@@ -580,8 +580,10 @@ class StoreChecks(CamelModel):
                 f"to test tiebreaker behavior, got {len(fork_labels)}: {fork_labels}"
             )
 
-        # Resolve all fork labels to roots and compute their weights
-        fork_data: dict[str, tuple[Bytes32, Slot, int]] = {}
+        # Resolve all fork labels to roots and compute their weights.
+        spec_block_weights = LstarSpec().compute_block_weights(store)
+
+        fork_data: dict[str, tuple[Bytes32, int]] = {}
         for label in fork_labels:
             if label not in block_registry:
                 raise ValueError(
@@ -589,34 +591,13 @@ class StoreChecks(CamelModel):
                     f"not found in block registry. Available: {list(block_registry.keys())}"
                 )
 
-            block = block_registry[label]
-            root = hash_tree_root(block)
-            slot = block.slot
-
-            spec = LstarSpec()
-            known_attestations = spec.extract_attestations_from_aggregated_payloads(
-                store, store.latest_known_aggregated_payloads
-            )
-            weight = 0
-            for attestation in known_attestations.values():
-                attestation_head_root = attestation.head.root
-                if attestation_head_root == root:
-                    weight += 1
-                elif attestation_head_root in store.blocks:
-                    ancestor_root = attestation_head_root
-                    while ancestor_root in store.blocks and store.blocks[ancestor_root].slot > slot:
-                        parent = store.blocks[ancestor_root].parent_root
-                        if parent == root:
-                            weight += 1
-                            break
-                        ancestor_root = parent
-
-            fork_data[label] = (root, slot, weight)
+            fork_root = hash_tree_root(block_registry[label])
+            fork_data[label] = (fork_root, spec_block_weights.get(fork_root, 0))
 
         # Verify all forks have equal weight
-        weights = [weight for _, _, weight in fork_data.values()]
+        weights = [weight for _, weight in fork_data.values()]
         if len(set(weights)) > 1:
-            weight_info = {label: weight for label, (_, _, weight) in fork_data.items()}
+            weight_info = {label: weight for label, (_, weight) in fork_data.items()}
             raise AssertionError(
                 f"Step {step_index}: lexicographic_head_among forks have "
                 f"unequal weights: {weight_info}. All forks must have equal "
@@ -625,7 +606,7 @@ class StoreChecks(CamelModel):
                 f"applies when competing forks have identical weight."
             )
 
-        fork_roots = {label: root for label, (root, _, _) in fork_data.items()}
+        fork_roots = {label: root for label, (root, _) in fork_data.items()}
         expected_head_root = max(fork_roots.values())
 
         actual_head_root = store.head
@@ -639,7 +620,7 @@ class StoreChecks(CamelModel):
             )
             fork_info = "\n".join(
                 f"  {label}: root=0x{root.hex()} weight={weight}"
-                for label, (root, _, weight) in sorted(fork_data.items())
+                for label, (root, weight) in sorted(fork_data.items())
             )
             raise AssertionError(
                 f"Step {step_index}: lexicographic tiebreaker failed.\n"
