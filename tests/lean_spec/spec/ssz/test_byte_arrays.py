@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 import pytest
+from hypothesis import given, strategies as st
 from pydantic import BaseModel
 
 from lean_spec.spec.ssz.byte_arrays import (
@@ -505,3 +506,17 @@ def test_json_dumpable_via_hex() -> None:
         "payload": ByteList5(data=b"\x00\x01\x02").hex(),
     }
     assert json.loads(json.dumps(hex_encoded_fields)) == hex_encoded_fields
+
+
+@given(raw_bytes=st.binary(min_size=32, max_size=32))
+def test_byte_vector_round_trip_random_bytes(raw_bytes: bytes) -> None:
+    """Any fixed-length byte pattern survives an encode and decode round trip."""
+    instance = Bytes32(raw_bytes)
+    assert Bytes32.decode_bytes(instance.encode_bytes()) == instance
+
+
+@given(raw_bytes=st.binary(max_size=16))
+def test_byte_list_round_trip_random_bytes(raw_bytes: bytes) -> None:
+    """Any byte pattern up to the limit, including empty, round-trips unchanged."""
+    instance = ByteList16(data=raw_bytes)
+    assert ByteList16.decode_bytes(instance.encode_bytes()) == instance

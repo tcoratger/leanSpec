@@ -5,6 +5,7 @@ import re
 from typing import Any, Callable
 
 import pytest
+from hypothesis import given, strategies as st
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.spec.ssz.boolean import Boolean
@@ -323,3 +324,10 @@ class TestBooleanSSZ:
         stream = io.BytesIO(b"")  # Empty stream
         with pytest.raises(SSZSerializationError, match=r"^Boolean: expected 1 byte, got 0$"):
             Boolean.deserialize(stream, scope=1)
+
+
+@given(boolean_value=st.booleans())
+def test_encode_decode_round_trip_random_values(boolean_value: bool) -> None:
+    """Either truth value survives an encode and decode round trip unchanged."""
+    instance = Boolean(boolean_value)
+    assert Boolean.decode_bytes(instance.encode_bytes()) == instance

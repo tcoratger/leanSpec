@@ -4,6 +4,7 @@ import re
 from typing import Any, cast
 
 import pytest
+from hypothesis import given, strategies as st
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.spec.crypto.koalabear import Fp
@@ -965,3 +966,17 @@ class TestJsonSerialization:
         )
 
         assert instance.model_dump(mode="json") == {"data": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]}
+
+
+@given(values=st.lists(st.integers(min_value=0, max_value=2**16 - 1), max_size=4))
+def test_list_round_trip_random_values(values: list[int]) -> None:
+    """Any element sequence up to the limit, including empty, round-trips unchanged."""
+    instance = Uint16List4(data=[Uint16(value) for value in values])
+    assert Uint16List4.decode_bytes(instance.encode_bytes()) == instance
+
+
+@given(values=st.lists(st.integers(min_value=0, max_value=255), min_size=4, max_size=4))
+def test_vector_round_trip_random_values(values: list[int]) -> None:
+    """Any fixed-length element sequence round-trips unchanged."""
+    instance = Uint8Vector4(data=[Uint8(value) for value in values])
+    assert Uint8Vector4.decode_bytes(instance.encode_bytes()) == instance
