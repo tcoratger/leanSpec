@@ -16,7 +16,7 @@ GENESIS_4V_AT_SLOT_3 = {"numValidators": 4, "genesisTime": 0, "anchorSlot": 3}
 """4-validator store advanced through three empty blocks past genesis."""
 
 
-def test_fork_choice_tree_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
+def test_fork_choice_tree_at_slot_3(api_endpoint_test: ApiEndpointTestFiller) -> None:
     """
     Fork-choice response carries a multi-node tree once the chain advances.
 
@@ -25,10 +25,10 @@ def test_fork_choice_tree_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None
     parent-root linkage are pinned so clients diverge only when their
     tree traversal or SSZ root computation differs.
     """
-    api_endpoint(endpoint="/lean/v0/fork_choice", genesis_params=GENESIS_4V_AT_SLOT_3)
+    api_endpoint_test(endpoint="/lean/v0/fork_choice", genesis_params=GENESIS_4V_AT_SLOT_3)
 
 
-def test_finalized_state_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
+def test_finalized_state_at_slot_3(api_endpoint_test: ApiEndpointTestFiller) -> None:
     """
     Finalized-state response returns the SSZ-encoded anchor state after chain advance.
 
@@ -37,10 +37,10 @@ def test_finalized_state_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
     historical_block_hashes because the chain has processed three empty
     blocks. Pins the exact SSZ bytes at that configuration.
     """
-    api_endpoint(endpoint="/lean/v0/states/finalized", genesis_params=GENESIS_4V_AT_SLOT_3)
+    api_endpoint_test(endpoint="/lean/v0/states/finalized", genesis_params=GENESIS_4V_AT_SLOT_3)
 
 
-def test_justified_checkpoint_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> None:
+def test_justified_checkpoint_at_slot_3(api_endpoint_test: ApiEndpointTestFiller) -> None:
     """
     Justified-checkpoint response at a non-genesis slot pins the slot=0 root.
 
@@ -48,7 +48,7 @@ def test_justified_checkpoint_at_slot_3(api_endpoint: ApiEndpointTestFiller) -> 
     the chain advances. This vector pins that the response still
     reports the genesis checkpoint, not a synthesised advance.
     """
-    api_endpoint(
+    api_endpoint_test(
         endpoint="/lean/v0/checkpoints/justified",
         genesis_params=GENESIS_4V_AT_SLOT_3,
     )

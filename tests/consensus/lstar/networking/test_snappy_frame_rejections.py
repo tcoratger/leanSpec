@@ -9,7 +9,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_snappy_frame_decode_rejects_empty_input(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Empty input is not a valid snappy frame and must be rejected.
@@ -18,7 +18,7 @@ def test_snappy_frame_decode_rejects_empty_input(
     Zero bytes cannot satisfy that minimum so the decoder aborts early
     with SnappyDecompressionError.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "snappy_frame", "bytes": "0x"},
         expect_exception=SnappyDecompressionError,
@@ -26,7 +26,7 @@ def test_snappy_frame_decode_rejects_empty_input(
 
 
 def test_snappy_frame_decode_rejects_wrong_stream_identifier(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A stream whose opening bytes do not spell the snappy magic is rejected.
@@ -36,7 +36,7 @@ def test_snappy_frame_decode_rejects_wrong_stream_identifier(
     the length check but carry the wrong magic, so the decoder rejects
     the stream at the identifier check.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "snappy_frame", "bytes": "0x" + "00" * 10},
         expect_exception=SnappyDecompressionError,
@@ -44,7 +44,7 @@ def test_snappy_frame_decode_rejects_wrong_stream_identifier(
 
 
 def test_snappy_frame_decode_rejects_unknown_unskippable_chunk(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A chunk of an unassigned unskippable type is rejected.
@@ -56,7 +56,7 @@ def test_snappy_frame_decode_rejects_unknown_unskippable_chunk(
     """
     stream_identifier = "ff060000734e61507059"
     unknown_chunk = "03000000"
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "snappy_frame", "bytes": "0x" + stream_identifier + unknown_chunk},
         expect_exception=SnappyDecompressionError,

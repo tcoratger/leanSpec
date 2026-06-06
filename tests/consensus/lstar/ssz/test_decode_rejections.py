@@ -30,7 +30,7 @@ class DecodeBitvector16(BaseBitvector):
     LENGTH: ClassVar[int] = 16
 
 
-def test_bitlist_decode_rejects_empty_input(ssz: SSZTestFiller) -> None:
+def test_bitlist_decode_rejects_empty_input(ssz_test: SSZTestFiller) -> None:
     """
     Bitlist decoding of zero bytes has no delimiter bit and must be rejected.
 
@@ -38,7 +38,7 @@ def test_bitlist_decode_rejects_empty_input(ssz: SSZTestFiller) -> None:
     bit-length. Empty input carries no such sentinel, so the decoder cannot
     determine how many bits the value was supposed to hold.
     """
-    ssz(
+    ssz_test(
         type_name="DecodeBitlist8",
         value=DecodeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x",
@@ -46,7 +46,7 @@ def test_bitlist_decode_rejects_empty_input(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_bitlist_decode_rejects_missing_delimiter(ssz: SSZTestFiller) -> None:
+def test_bitlist_decode_rejects_missing_delimiter(ssz_test: SSZTestFiller) -> None:
     """
     Bitlist bytes with no set bits carry no sentinel and must be rejected.
 
@@ -54,7 +54,7 @@ def test_bitlist_decode_rejects_missing_delimiter(ssz: SSZTestFiller) -> None:
     end of the logical bitlist. The decoder needs the sentinel to know
     where the payload stops.
     """
-    ssz(
+    ssz_test(
         type_name="DecodeBitlist8",
         value=DecodeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x00",
@@ -62,7 +62,7 @@ def test_bitlist_decode_rejects_missing_delimiter(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_bitlist_decode_rejects_length_above_limit(ssz: SSZTestFiller) -> None:
+def test_bitlist_decode_rejects_length_above_limit(ssz_test: SSZTestFiller) -> None:
     """
     Bitlist whose sentinel implies a bit-length beyond the type limit must be rejected.
 
@@ -70,7 +70,7 @@ def test_bitlist_decode_rejects_length_above_limit(ssz: SSZTestFiller) -> None:
     nine-bit bitlist. The type caps at eight bits, so the decoder must
     refuse to widen past its own limit.
     """
-    ssz(
+    ssz_test(
         type_name="DecodeBitlist8",
         value=DecodeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x0002",
@@ -78,7 +78,7 @@ def test_bitlist_decode_rejects_length_above_limit(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_bitvector_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
+def test_bitvector_decode_rejects_wrong_byte_length(ssz_test: SSZTestFiller) -> None:
     """
     Fixed-width bitvector decoding rejects inputs whose byte count does not match LENGTH.
 
@@ -86,7 +86,7 @@ def test_bitvector_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
     input underfills the vector. The fixed-size decode path requires an
     exact byte match, so the decoder must reject.
     """
-    ssz(
+    ssz_test(
         type_name="DecodeBitvector16",
         value=DecodeBitvector16(data=[Boolean(False)] * 16),
         raw_bytes="0x00",
@@ -94,7 +94,7 @@ def test_bitvector_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_bytes4_decode_rejects_extra_trailing_bytes(ssz: SSZTestFiller) -> None:
+def test_bytes4_decode_rejects_extra_trailing_bytes(ssz_test: SSZTestFiller) -> None:
     """
     Fixed-size byte arrays reject inputs longer than their declared LENGTH.
 
@@ -102,7 +102,7 @@ def test_bytes4_decode_rejects_extra_trailing_bytes(ssz: SSZTestFiller) -> None:
     trailing byte has no slot in the type, so the decoder must raise
     rather than silently ignore the overflow.
     """
-    ssz(
+    ssz_test(
         type_name="Bytes4",
         value=Bytes4(b"\x00\x00\x00\x00"),
         raw_bytes="0x0102030405",
@@ -110,7 +110,7 @@ def test_bytes4_decode_rejects_extra_trailing_bytes(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_uint32_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
+def test_uint32_decode_rejects_wrong_byte_length(ssz_test: SSZTestFiller) -> None:
     """
     Fixed-size uint types reject input whose byte length does not match the type.
 
@@ -118,7 +118,7 @@ def test_uint32_decode_rejects_wrong_byte_length(ssz: SSZTestFiller) -> None:
     and cannot be safely widened. The decoder raises rather than guessing
     a padding convention.
     """
-    ssz(
+    ssz_test(
         type_name="Uint32",
         value=Uint32(0),
         raw_bytes="0x010203",

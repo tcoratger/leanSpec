@@ -14,7 +14,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_checkpoint_verify_rejects_empty_validator_set(
-    sync: SyncTestFiller,
+    sync_test: SyncTestFiller,
 ) -> None:
     """
     A checkpoint state with zero validators is rejected.
@@ -23,14 +23,14 @@ def test_checkpoint_verify_rejects_empty_validator_set(
     fork-choice store with it would be useless and mask configuration
     errors. Clients must refuse the anchor before any store setup.
     """
-    sync(
+    sync_test(
         operation="verify_checkpoint",
         input={"numValidators": 0},
     )
 
 
 def test_checkpoint_verify_accepts_small_validator_set(
-    sync: SyncTestFiller,
+    sync_test: SyncTestFiller,
 ) -> None:
     """
     A checkpoint state with a small in-range validator set is accepted.
@@ -39,14 +39,14 @@ def test_checkpoint_verify_accepts_small_validator_set(
     test suite. Pins the happy path of the verifier so clients observe
     the accepted branch in addition to the rejection branch above.
     """
-    sync(
+    sync_test(
         operation="verify_checkpoint",
         input={"numValidators": 4},
     )
 
 
 def test_checkpoint_verify_accepts_eight_validator_set(
-    sync: SyncTestFiller,
+    sync_test: SyncTestFiller,
 ) -> None:
     """
     Eight-validator anchor state is accepted at the key-manager limit.
@@ -55,7 +55,7 @@ def test_checkpoint_verify_accepts_eight_validator_set(
     and signature-verification suites. Pins the verdict at the upper
     end of the practical test envelope.
     """
-    sync(
+    sync_test(
         operation="verify_checkpoint",
         input={"numValidators": 8},
     )

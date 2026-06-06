@@ -13,7 +13,7 @@ from consensus_testing import NetworkingCodecTestFiller
 pytestmark = pytest.mark.valid_until("Lstar")
 
 
-def test_stream_two_success_chunks(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_stream_two_success_chunks(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """
     Stream with two SUCCESS chunks carrying distinct payload bytes.
 
@@ -21,7 +21,7 @@ def test_stream_two_success_chunks(networking_codec: NetworkingCodecTestFiller) 
     must read both records before signalling EOF, so a receiver that
     stops after the first chunk drops half the response.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="reqresp_response_stream",
         input={
             "chunks": [
@@ -33,7 +33,7 @@ def test_stream_two_success_chunks(networking_codec: NetworkingCodecTestFiller) 
 
 
 def test_stream_success_then_resource_unavailable(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A SUCCESS chunk followed by a RESOURCE_UNAVAILABLE terminator.
@@ -43,7 +43,7 @@ def test_stream_success_then_resource_unavailable(
     concatenation so clients surface both the delivered payload and
     the error terminator.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="reqresp_response_stream",
         input={
             "chunks": [
@@ -55,7 +55,7 @@ def test_stream_success_then_resource_unavailable(
 
 
 def test_stream_three_success_chunks_with_compressible_payloads(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Three SUCCESS chunks whose payloads compress well.
@@ -65,7 +65,7 @@ def test_stream_three_success_chunks_with_compressible_payloads(
     stream-level parsers that reset snappy state between chunks must
     produce identical output to stateful parsers.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="reqresp_response_stream",
         input={
             "chunks": [

@@ -17,7 +17,7 @@ WIDTH: int = 16
 
 
 def test_permutation_width16_all_zero(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """
     Input state of all zeros pins the round-constant-only output.
@@ -27,14 +27,14 @@ def test_permutation_width16_all_zero(
     the round constants and the MDS matrix, making this vector a
     sensitive diff for tables-of-constants drift.
     """
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": ["0"] * WIDTH},
     )
 
 
 def test_permutation_width16_all_one(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """
     Input state of all ones exercises uniform non-zero entries.
@@ -43,14 +43,14 @@ def test_permutation_width16_all_one(
     multiplications see a state vector whose entries all carry the same
     contribution, pinning the first-row linearity of the permutation.
     """
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": ["1"] * WIDTH},
     )
 
 
 def test_permutation_width16_incremental_index(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """
     Input state filled with 0, 1, 2, ..., WIDTH - 1.
@@ -59,14 +59,14 @@ def test_permutation_width16_incremental_index(
     off-by-one in MDS row indexing or round-constant slicing perturbs
     the output noticeably.
     """
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": [str(i) for i in range(WIDTH)]},
     )
 
 
 def test_permutation_width16_p_minus_one_and_near_zero(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """
     Mix of field-boundary values P - 1 and small values across the state.
@@ -76,7 +76,7 @@ def test_permutation_width16_p_minus_one_and_near_zero(
     path for the widest intermediates generated inside the S-box.
     """
     state = [str(P - 1) if i % 2 == 0 else str(i) for i in range(WIDTH)]
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": state},
     )

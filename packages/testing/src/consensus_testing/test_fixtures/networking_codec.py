@@ -2,6 +2,8 @@
 
 from typing import Any, ClassVar
 
+from pydantic import Field
+
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.networking.enr.enr import ENR
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
@@ -48,7 +50,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
     JSON output: codecName, input, output.
     """
 
-    format_name: ClassVar[str] = "networking_codec"
+    format_name: ClassVar[str] = "networking_codec_test"
     description: ClassVar[str] = "Tests networking codec encode/decode roundtrip"
 
     codec_name: str
@@ -57,7 +59,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Codec-specific input parameters."""
 
-    output: dict[str, Any] = {}
+    output: dict[str, Any] = Field(default_factory=dict)
     """Computed output. Filled by make_fixture."""
 
     def make_fixture(self) -> "NetworkingCodecTest":
@@ -65,7 +67,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
         Dispatch to the codec handler and produce computed output.
 
         Returns:
-            A copy of this fixture with output populated.
+            This fixture with output populated.
 
         Raises:
             ValueError: If codec_name is unknown.

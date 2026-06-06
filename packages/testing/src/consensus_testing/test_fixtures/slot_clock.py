@@ -8,6 +8,8 @@ to coordinate block proposals and attestations.
 
 from typing import Any, ClassVar
 
+from pydantic import Field
+
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.forks import Interval, Slot
@@ -29,7 +31,7 @@ class SlotClockTest(BaseConsensusFixture):
     JSON output: operation, input, config, output.
     """
 
-    format_name: ClassVar[str] = "slot_clock"
+    format_name: ClassVar[str] = "slot_clock_test"
     description: ClassVar[str] = "Tests slot clock time-to-slot/interval conversion"
 
     operation: str
@@ -39,7 +41,7 @@ class SlotClockTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Operation-specific input parameters."""
 
-    output: dict[str, Any] = {}
+    output: dict[str, Any] = Field(default_factory=dict)
     """Computed output. Filled by make_fixture."""
 
     def make_fixture(self) -> "SlotClockTest":

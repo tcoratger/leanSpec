@@ -1,7 +1,5 @@
 """Test tools for generating and consuming leanSpec consensus test vectors."""
 
-from typing import Type
-
 from consensus_testing import forks
 from consensus_testing.genesis import build_anchor, generate_pre_state
 from consensus_testing.test_fixtures import (
@@ -47,19 +45,19 @@ from consensus_testing.test_types import (
     TickStep,
 )
 
-StateTransitionTestFiller = Type[StateTransitionTest]
-ForkChoiceTestFiller = Type[ForkChoiceTest]
-VerifySingleMessageProofsTestFiller = Type[VerifySingleMessageProofsTest]
-VerifyMultiMessageProofsTestFiller = Type[VerifyMultiMessageProofsTest]
-VerifySignaturesTestFiller = Type[VerifySignaturesTest]
-SSZTestFiller = Type[SSZTest]
-NetworkingCodecTestFiller = Type[NetworkingCodecTest]
-GossipsubHandlerTestFiller = Type[GossipsubHandlerTest]
-ApiEndpointTestFiller = Type[ApiEndpointTest]
-SlotClockTestFiller = Type[SlotClockTest]
-JustifiabilityTestFiller = Type[JustifiabilityTest]
-PoseidonPermutationTestFiller = Type[PoseidonPermutationTest]
-SyncTestFiller = Type[SyncTest]
+StateTransitionTestFiller = type[StateTransitionTest]
+ForkChoiceTestFiller = type[ForkChoiceTest]
+VerifySingleMessageProofsTestFiller = type[VerifySingleMessageProofsTest]
+VerifyMultiMessageProofsTestFiller = type[VerifyMultiMessageProofsTest]
+VerifySignaturesTestFiller = type[VerifySignaturesTest]
+SSZTestFiller = type[SSZTest]
+NetworkingCodecTestFiller = type[NetworkingCodecTest]
+GossipsubHandlerTestFiller = type[GossipsubHandlerTest]
+ApiEndpointTestFiller = type[ApiEndpointTest]
+SlotClockTestFiller = type[SlotClockTest]
+JustifiabilityTestFiller = type[JustifiabilityTest]
+PoseidonPermutationTestFiller = type[PoseidonPermutationTest]
+SyncTestFiller = type[SyncTest]
 
 __all__ = [
     # Public API

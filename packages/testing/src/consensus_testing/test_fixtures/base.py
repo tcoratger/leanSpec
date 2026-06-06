@@ -59,7 +59,11 @@ class BaseConsensusFixture(CamelModel):
     This is the field clients assert against.
     """
 
-    def assert_expected_outcome(self, exception_raised: Exception | None) -> None:
+    def assert_expected_outcome(
+        self,
+        exception_raised: Exception | None,
+        expected_message: str | None = None,
+    ) -> None:
         """
         Compare a self-verification outcome against the configured expectation.
 
@@ -68,6 +72,7 @@ class BaseConsensusFixture(CamelModel):
 
         Args:
             exception_raised: The exception the verifier raised, or None on success.
+            expected_message: Optional exact message the exception must carry.
 
         Raises:
             AssertionError: When the outcome disagrees with the expectation.
@@ -86,6 +91,11 @@ class BaseConsensusFixture(CamelModel):
             raise AssertionError(
                 f"Expected {self.expect_exception.__name__} but got "
                 f"{type(exception_raised).__name__}: {exception_raised}"
+            )
+        # A wrong message means the rejection fired for the wrong reason.
+        elif expected_message is not None and str(exception_raised) != expected_message:
+            raise AssertionError(
+                f"Expected exception message '{expected_message}' but got '{exception_raised}'"
             )
 
     @cached_property
@@ -116,20 +126,15 @@ class BaseConsensusFixture(CamelModel):
         h = hashlib.sha256(json_str.encode("utf-8")).hexdigest()
         return f"0x{h}"
 
-    def json_dict_with_info(self, hash_only: bool = False) -> dict[str, Any]:
+    def json_dict_with_info(self) -> dict[str, Any]:
         """
         Return JSON representation with the info field included.
-
-        Args:
-            hash_only: If True, only include the hash in _info.
 
         Returns:
             Dictionary ready for JSON serialization.
         """
         dict_with_info = self.json_dict.copy()
-        dict_with_info["_info"] = {"hash": self.hash}
-        if not hash_only:
-            dict_with_info["_info"].update(self.info)
+        dict_with_info["_info"] = {"hash": self.hash, **self.info}
         return dict_with_info
 
     def fill_info(

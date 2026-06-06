@@ -8,6 +8,8 @@ sync-layer decisions bit-for-bit.
 
 from typing import Any, ClassVar
 
+from pydantic import Field
+
 from consensus_testing.genesis import build_anchor, generate_pre_state
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.sync.checkpoint_sync import verify_checkpoint_state
@@ -28,7 +30,7 @@ class SyncTest(BaseConsensusFixture):
     JSON output: operation, input, output.
     """
 
-    format_name: ClassVar[str] = "sync"
+    format_name: ClassVar[str] = "sync_test"
     description: ClassVar[str] = "Tests sync-layer helpers clients must reproduce"
 
     operation: str
@@ -37,7 +39,7 @@ class SyncTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Operation-specific input. See per-handler docstrings."""
 
-    output: dict[str, Any] = {}
+    output: dict[str, Any] = Field(default_factory=dict)
     """Computed output. Filled by make_fixture."""
 
     def make_fixture(self) -> "SyncTest":
@@ -45,7 +47,7 @@ class SyncTest(BaseConsensusFixture):
         Dispatch to the operation handler.
 
         Returns:
-            A copy of this fixture with output populated.
+            This fixture with output populated.
 
         Raises:
             ValueError: If the operation name is unknown.

@@ -134,25 +134,19 @@ class BlockStep(BaseForkChoiceStep):
     @field_serializer("block", when_used="json")
     def serialize_block(self, block_spec: BlockSpec) -> dict[str, Any]:
         """
-        Serialize the filled Block instead of the BlockSpec.
+        Serialize the filled block instead of the input spec.
 
-        This ensures the fixture output contains the complete Block that was
-        filled from the spec, not the input BlockSpec.
+        This ensures the fixture output contains the complete block that was
+        filled from the spec, not the input specification.
 
-        Parameters:
-        ----------
-        block_spec : BlockSpec
-            The BlockSpec field value (ignored, we use _filled_block instead).
+        Args:
+            block_spec: The spec field value, ignored in favor of the filled block.
 
         Returns:
-        -------
-        dict[str, Any]
-            The serialized Block.
+            The serialized block.
 
         Raises:
-        ------
-        ValueError
-            If _filled_block is None (make_fixture not called yet).
+            ValueError: If the block has not been filled yet.
         """
         if self._filled_block is None:
             raise ValueError(
@@ -204,25 +198,19 @@ class AttestationStep(BaseForkChoiceStep):
         self, attestation_spec: GossipAttestationSpec
     ) -> dict[str, Any]:
         """
-        Serialize the filled SignedAttestation instead of the spec.
+        Serialize the filled attestation instead of the input spec.
 
         This ensures the fixture output contains the complete attestation that was
         filled from the spec, not the input specification.
 
-        Parameters:
-        ----------
-        attestation_spec : GossipAttestationSpec
-            The spec field value (ignored, we use _filled_attestation instead).
+        Args:
+            attestation_spec: The spec field value, ignored in favor of the filled attestation.
 
         Returns:
-        -------
-        dict[str, Any]
-            The serialized SignedAttestation.
+            The serialized attestation.
 
         Raises:
-        ------
-        ValueError
-            If _filled_attestation is None (make_fixture not called yet).
+            ValueError: If the attestation has not been filled yet.
         """
         if self._filled_attestation is None:
             raise ValueError(

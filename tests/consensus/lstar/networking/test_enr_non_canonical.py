@@ -40,7 +40,7 @@ UNSORTED_ENR_HEX: str = "0x" + _build_unsorted_enr_rlp().hex()
 
 
 def test_enr_decode_rejects_non_canonical_key_order(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     An ENR with keys outside lexicographic order must be rejected.
@@ -49,7 +49,7 @@ def test_enr_decode_rejects_non_canonical_key_order(
     such a record would verify a signature over bytes the signer never
     produced.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "enr", "bytes": UNSORTED_ENR_HEX},
         expect_exception=ValueError,

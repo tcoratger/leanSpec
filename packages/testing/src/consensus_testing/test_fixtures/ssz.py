@@ -27,7 +27,7 @@ class SSZTest(BaseConsensusFixture):
       shape; `serialized` holds the malformed bytes and `root` is empty.
     """
 
-    format_name: ClassVar[str] = "ssz"
+    format_name: ClassVar[str] = "ssz_test"
     description: ClassVar[str] = "Tests SSZ serialization roundtrip and hash_tree_root"
 
     type_name: str
@@ -77,7 +77,7 @@ class SSZTest(BaseConsensusFixture):
         Verify SSZ roundtrip or decode-failure and produce the reference output.
 
         Returns:
-            A copy of this fixture with `serialized` and `root` populated.
+            This fixture with serialized bytes and root populated.
 
         Raises:
             AssertionError:

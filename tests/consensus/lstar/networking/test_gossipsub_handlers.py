@@ -17,9 +17,9 @@ MESSAGE_ID_2 = "0xb51451075fcc3e8f0baa9041d8256c647ceaeaac"
 # --- GRAFT handler ---
 
 
-def test_graft_accept(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_graft_accept(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """Accept GRAFT when subscribed and mesh has capacity."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
         initial_state={
@@ -34,9 +34,9 @@ def test_graft_accept(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
     )
 
 
-def test_graft_reject_capacity(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_graft_reject_capacity(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """Reject GRAFT with PRUNE when mesh is at d_high."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="graft",
         params={"d": 4, "dLow": 3, "dHigh": 3, "dLazy": 3},
         initial_state={
@@ -53,9 +53,9 @@ def test_graft_reject_capacity(gossipsub_handler: GossipsubHandlerTestFiller) ->
     )
 
 
-def test_graft_reject_backoff(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_graft_reject_backoff(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """Reject GRAFT with PRUNE when peer is in backoff period."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
         initial_state={
@@ -71,9 +71,9 @@ def test_graft_reject_backoff(gossipsub_handler: GossipsubHandlerTestFiller) -> 
     )
 
 
-def test_graft_ignore_unsubscribed(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_graft_ignore_unsubscribed(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """Silently ignore GRAFT for a topic we are not subscribed to."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
         initial_state={
@@ -87,9 +87,9 @@ def test_graft_ignore_unsubscribed(gossipsub_handler: GossipsubHandlerTestFiller
     )
 
 
-def test_graft_idempotent(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_graft_idempotent(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """GRAFT for a peer already in mesh is harmless."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
         initial_state={
@@ -106,9 +106,9 @@ def test_graft_idempotent(gossipsub_handler: GossipsubHandlerTestFiller) -> None
 # --- PRUNE handler ---
 
 
-def test_prune_with_backoff(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_prune_with_backoff(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """PRUNE removes peer from mesh and sets backoff timer."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="prune",
         params=PARAMS,
         initial_state={
@@ -123,9 +123,9 @@ def test_prune_with_backoff(gossipsub_handler: GossipsubHandlerTestFiller) -> No
     )
 
 
-def test_prune_zero_backoff(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_prune_zero_backoff(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """PRUNE with backoff=0 removes from mesh but does not set backoff timer."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="prune",
         params=PARAMS,
         initial_state={
@@ -142,9 +142,9 @@ def test_prune_zero_backoff(gossipsub_handler: GossipsubHandlerTestFiller) -> No
 # --- IHAVE handler ---
 
 
-def test_ihave_unseen_triggers_iwant(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_ihave_unseen_triggers_iwant(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """IHAVE for an unseen message triggers an IWANT response."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="ihave",
         params=PARAMS,
         initial_state={
@@ -161,9 +161,9 @@ def test_ihave_unseen_triggers_iwant(gossipsub_handler: GossipsubHandlerTestFill
     )
 
 
-def test_ihave_seen_no_iwant(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_ihave_seen_no_iwant(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """IHAVE for an already-seen message produces no IWANT."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="ihave",
         params=PARAMS,
         initial_state={
@@ -180,9 +180,9 @@ def test_ihave_seen_no_iwant(gossipsub_handler: GossipsubHandlerTestFiller) -> N
     )
 
 
-def test_ihave_mixed(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_ihave_mixed(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """IHAVE with seen and unseen IDs. IWANT only for the unseen one."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="ihave",
         params=PARAMS,
         initial_state={
@@ -202,9 +202,9 @@ def test_ihave_mixed(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
 # --- IWANT handler ---
 
 
-def test_iwant_cached_responds(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_iwant_cached_responds(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """IWANT for a cached message responds with the full message."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="iwant",
         params=PARAMS,
         initial_state={
@@ -226,9 +226,9 @@ def test_iwant_cached_responds(gossipsub_handler: GossipsubHandlerTestFiller) ->
 # --- Message handler ---
 
 
-def test_message_forward_to_mesh(gossipsub_handler: GossipsubHandlerTestFiller) -> None:
+def test_message_forward_to_mesh(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None:
     """New message forwarded to mesh peers except the sender."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="message",
         params=PARAMS,
         initial_state={
@@ -248,10 +248,10 @@ def test_message_forward_to_mesh(gossipsub_handler: GossipsubHandlerTestFiller) 
 
 
 def test_message_duplicate_not_forwarded(
-    gossipsub_handler: GossipsubHandlerTestFiller,
+    gossipsub_handler_test: GossipsubHandlerTestFiller,
 ) -> None:
     """Duplicate message (already in seen cache) is not forwarded."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="message",
         params=PARAMS,
         initial_state={
@@ -271,10 +271,10 @@ def test_message_duplicate_not_forwarded(
 
 
 def test_message_idontwant_skips_peer(
-    gossipsub_handler: GossipsubHandlerTestFiller,
+    gossipsub_handler_test: GossipsubHandlerTestFiller,
 ) -> None:
     """Peer that sent IDONTWANT for this message ID is skipped during forwarding."""
-    gossipsub_handler(
+    gossipsub_handler_test(
         handler_name="message",
         params=PARAMS,
         initial_state={

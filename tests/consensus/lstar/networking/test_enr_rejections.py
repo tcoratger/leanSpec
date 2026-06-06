@@ -7,7 +7,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_enr_decode_rejects_oversize_payload(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     An ENR RLP payload above the 300-byte cap is rejected.
@@ -17,7 +17,7 @@ def test_enr_decode_rejects_oversize_payload(
     rejected before any RLP parsing runs.
     """
     oversize = "0x" + "ff" * 301
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "enr", "bytes": oversize},
         expect_exception=ValueError,
@@ -25,7 +25,7 @@ def test_enr_decode_rejects_oversize_payload(
 
 
 def test_enr_decode_rejects_malformed_rlp(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     An input that cannot be parsed as an RLP list is rejected.
@@ -34,7 +34,7 @@ def test_enr_decode_rejects_malformed_rlp(
     list structure. The ENR decoder requires a list header, so the parse
     fails and the error surfaces as a ValueError on the ENR API.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "enr", "bytes": "0x00"},
         expect_exception=ValueError,

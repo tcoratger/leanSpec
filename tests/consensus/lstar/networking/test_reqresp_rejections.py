@@ -15,7 +15,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_reqresp_decode_rejects_empty_request(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Decoding an empty request is rejected with CodecError.
@@ -24,7 +24,7 @@ def test_reqresp_decode_rejects_empty_request(
     compressed payload. Zero input carries neither, so the decoder must
     refuse before any downstream parsing.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "reqresp_request", "bytes": "0x"},
         expect_exception=CodecError,
@@ -32,7 +32,7 @@ def test_reqresp_decode_rejects_empty_request(
 
 
 def test_reqresp_decode_rejects_invalid_varint_prefix(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A request whose length prefix is a malformed varint is rejected with CodecError.
@@ -41,7 +41,7 @@ def test_reqresp_decode_rejects_invalid_varint_prefix(
     The decoder wraps the underlying varint error in CodecError so clients
     can uniformly treat wire-level framing errors as a single class.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "reqresp_request", "bytes": "0x8080"},
         expect_exception=CodecError,
@@ -49,7 +49,7 @@ def test_reqresp_decode_rejects_invalid_varint_prefix(
 
 
 def test_reqresp_decode_rejects_declared_length_above_max(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A request whose declared length exceeds the ten-mebibyte cap is rejected.
@@ -58,7 +58,7 @@ def test_reqresp_decode_rejects_declared_length_above_max(
     ten-mebibyte protocol cap. Refusing before decompression prevents a
     sender from forcing resource allocation proportional to a claimed size.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "reqresp_request", "bytes": "0x81808005"},
         expect_exception=CodecError,

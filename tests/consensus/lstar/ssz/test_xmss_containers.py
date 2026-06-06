@@ -40,9 +40,9 @@ def _zero_parameter() -> Parameter:
 # --- PublicKey ---
 
 
-def test_public_key_zero(ssz: SSZTestFiller) -> None:
+def test_public_key_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for PublicKey with zero values."""
-    ssz(
+    ssz_test(
         type_name="PublicKey",
         value=PublicKey(root=_zero_hash_digest_vector(), parameter=_zero_parameter()),
     )
@@ -51,18 +51,18 @@ def test_public_key_zero(ssz: SSZTestFiller) -> None:
 # --- Signature ---
 
 
-def test_signature_zero(ssz: SSZTestFiller) -> None:
+def test_signature_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Signature with zero values."""
-    ssz(type_name="Signature", value=create_dummy_signature())
+    ssz_test(type_name="Signature", value=create_dummy_signature())
 
 
-def test_signature_actual(ssz: SSZTestFiller) -> None:
+def test_signature_actual(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for a real Signature produced by the XMSS signing algorithm."""
     key_manager = XmssKeyManager.shared()
     scheme = key_manager.scheme
     secret_key = key_manager[ValidatorIndex(0)].attestation_keypair.secret_key
     signature = scheme.sign(secret_key, Slot(0), Bytes32(b"\x42" * 32))
-    ssz(type_name="Signature", value=signature)
+    ssz_test(type_name="Signature", value=signature)
 
 
 # --- SingleMessageAggregate / MultiMessageAggregate ---
@@ -73,9 +73,9 @@ def _bits(participants: list[bool]) -> AggregationBits:
     return AggregationBits(data=[Boolean(b) for b in participants])
 
 
-def test_single_message_aggregate_empty(ssz: SSZTestFiller) -> None:
+def test_single_message_aggregate_empty(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for a single-message aggregate proof with empty proof bytes."""
-    ssz(
+    ssz_test(
         type_name="SingleMessageAggregate",
         value=SingleMessageAggregate(
             participants=_bits([True]),
@@ -84,10 +84,10 @@ def test_single_message_aggregate_empty(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_single_message_aggregate_with_proof(ssz: SSZTestFiller) -> None:
+def test_single_message_aggregate_with_proof(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for a single-message aggregate proof with non-empty proof bytes."""
     wire = b"\xde\xad\xbe\xef"
-    ssz(
+    ssz_test(
         type_name="SingleMessageAggregate",
         value=SingleMessageAggregate(
             participants=_bits([True, False, True]),
@@ -96,10 +96,10 @@ def test_single_message_aggregate_with_proof(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_multi_message_aggregate_roundtrip(ssz: SSZTestFiller) -> None:
+def test_multi_message_aggregate_roundtrip(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for a multi-message aggregate proof envelope."""
     wire = b"\x01\x02\x03"
-    ssz(
+    ssz_test(
         type_name="MultiMessageAggregate",
         value=MultiMessageAggregate(proof=ByteList512KiB(data=wire)),
     )
@@ -108,9 +108,9 @@ def test_multi_message_aggregate_roundtrip(ssz: SSZTestFiller) -> None:
 # --- PublicKey ---
 
 
-def test_public_key_typical(ssz: SSZTestFiller) -> None:
+def test_public_key_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for PublicKey with ascending non-zero field elements."""
-    ssz(
+    ssz_test(
         type_name="PublicKey",
         value=PublicKey(
             root=HashDigestVector(
@@ -124,17 +124,17 @@ def test_public_key_typical(ssz: SSZTestFiller) -> None:
 # --- HashTreeOpening ---
 
 
-def test_hash_tree_opening_empty(ssz: SSZTestFiller) -> None:
+def test_hash_tree_opening_empty(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for HashTreeOpening with no sibling digests."""
-    ssz(
+    ssz_test(
         type_name="HashTreeOpening",
         value=HashTreeOpening(siblings=HashDigestList(data=[])),
     )
 
 
-def test_hash_tree_opening_typical(ssz: SSZTestFiller) -> None:
+def test_hash_tree_opening_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for HashTreeOpening with three sibling digest vectors."""
-    ssz(
+    ssz_test(
         type_name="HashTreeOpening",
         value=HashTreeOpening(
             siblings=HashDigestList(
@@ -154,9 +154,9 @@ def test_hash_tree_opening_typical(ssz: SSZTestFiller) -> None:
 # --- HashTreeLayer ---
 
 
-def test_hash_tree_layer_zero(ssz: SSZTestFiller) -> None:
+def test_hash_tree_layer_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for HashTreeLayer at index zero with no nodes."""
-    ssz(
+    ssz_test(
         type_name="HashTreeLayer",
         value=HashTreeLayer(
             start_index=Uint64(0),
@@ -165,9 +165,9 @@ def test_hash_tree_layer_zero(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_hash_tree_layer_typical(ssz: SSZTestFiller) -> None:
+def test_hash_tree_layer_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for HashTreeLayer at index 42 with two node digest vectors."""
-    ssz(
+    ssz_test(
         type_name="HashTreeLayer",
         value=HashTreeLayer(
             start_index=Uint64(42),

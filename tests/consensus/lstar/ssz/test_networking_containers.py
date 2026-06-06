@@ -17,9 +17,9 @@ pytestmark = pytest.mark.valid_until("Lstar")
 # --- Status ---
 
 
-def test_status_zero(ssz: SSZTestFiller) -> None:
+def test_status_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Status with zero values."""
-    ssz(
+    ssz_test(
         type_name="Status",
         value=Status(
             finalized=Checkpoint(root=Bytes32.zero(), slot=Slot(0)),
@@ -28,9 +28,9 @@ def test_status_zero(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_status_typical(ssz: SSZTestFiller) -> None:
+def test_status_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Status with typical values."""
-    ssz(
+    ssz_test(
         type_name="Status",
         value=Status(
             finalized=Checkpoint(root=Bytes32(b"\x01" * 32), slot=Slot(100)),
@@ -42,25 +42,25 @@ def test_status_typical(ssz: SSZTestFiller) -> None:
 # --- BlocksByRootRequest ---
 
 
-def test_blocks_by_root_request_empty(ssz: SSZTestFiller) -> None:
+def test_blocks_by_root_request_empty(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlocksByRootRequest with no roots."""
-    ssz(
+    ssz_test(
         type_name="BlocksByRootRequest",
         value=BlocksByRootRequest(roots=RequestedBlockRoots(data=[])),
     )
 
 
-def test_blocks_by_root_request_single(ssz: SSZTestFiller) -> None:
+def test_blocks_by_root_request_single(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlocksByRootRequest with single root."""
-    ssz(
+    ssz_test(
         type_name="BlocksByRootRequest",
         value=BlocksByRootRequest(roots=RequestedBlockRoots(data=[Bytes32(b"\xab" * 32)])),
     )
 
 
-def test_blocks_by_root_request_multiple(ssz: SSZTestFiller) -> None:
+def test_blocks_by_root_request_multiple(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlocksByRootRequest with multiple roots."""
-    ssz(
+    ssz_test(
         type_name="BlocksByRootRequest",
         value=BlocksByRootRequest(
             roots=RequestedBlockRoots(
@@ -70,9 +70,9 @@ def test_blocks_by_root_request_multiple(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_blocks_by_root_request_max_roots(ssz: SSZTestFiller) -> None:
+def test_blocks_by_root_request_max_roots(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlocksByRootRequest with ten distinct roots."""
-    ssz(
+    ssz_test(
         type_name="BlocksByRootRequest",
         value=BlocksByRootRequest(
             roots=RequestedBlockRoots(data=[Bytes32(bytes([i]) * 32) for i in range(1, 11)])

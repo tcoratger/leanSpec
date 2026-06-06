@@ -14,6 +14,8 @@ Every client must implement this identically for consensus.
 
 from typing import Any, ClassVar
 
+from pydantic import Field
+
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.spec.forks import Slot
 
@@ -28,7 +30,7 @@ class JustifiabilityTest(BaseConsensusFixture):
     JSON output: slot, finalizedSlot, output.
     """
 
-    format_name: ClassVar[str] = "justifiability"
+    format_name: ClassVar[str] = "justifiability_test"
     description: ClassVar[str] = "Tests 3SF-mini slot justifiability rules"
 
     slot: int
@@ -37,7 +39,7 @@ class JustifiabilityTest(BaseConsensusFixture):
     finalized_slot: int
     """Last finalized slot."""
 
-    output: dict[str, Any] = {}
+    output: dict[str, Any] = Field(default_factory=dict)
     """Computed output. Filled by make_fixture."""
 
     def make_fixture(self) -> "JustifiabilityTest":
