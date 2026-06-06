@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from consensus_testing.keys import XmssKeyManager
 from hypothesis import given, settings, strategies as st
+from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Interval, Slot, ValidatorIndex
@@ -35,6 +36,7 @@ from tests.lean_spec.helpers import (
     make_bytes32,
     make_checkpoint,
     make_empty_block_body,
+    make_genesis_data,
     make_mock_signature,
     make_signed_block,
     make_signed_block_from_store,
@@ -2106,3 +2108,89 @@ class TestAttestationProcessingTiming:
         # Should be no-op
         assert len(sample_store.latest_new_aggregated_payloads) == 0
         assert len(sample_store.latest_known_aggregated_payloads) == initial_known_payloads
+
+
+class StoreHeadMachine(RuleBasedStateMachine):
+    """
+    Drive the store with random block trees and head votes.
+
+    Rules grow a block tree and inject votes without cryptography.
+    Invariants re-derive the head through the spec after every step.
+    """
+
+    def __init__(self) -> None:
+        """Start from a keyed genesis store with four validators."""
+        super().__init__()
+        self.spec = LstarSpec()
+        genesis = make_genesis_data(num_validators=4, key_manager=XmssKeyManager.shared())
+        self.store = genesis.store
+        self.block_roots = [hash_tree_root(genesis.block)]
+        self.next_slot = 1
+        self.next_state_seed = 1
+
+    @rule(data=st.data())
+    def add_block(self, data: st.DataObject) -> None:
+        """Attach a new block to a randomly chosen parent."""
+        parent_root = data.draw(st.sampled_from(self.block_roots))
+        self.store, block_root = _add_known_block(
+            self.store,
+            Slot(self.next_slot),
+            ValidatorIndex(self.next_slot % 4),
+            parent_root,
+            self.next_state_seed,
+        )
+        self.block_roots.append(block_root)
+        self.next_slot += 1
+        self.next_state_seed += 1
+
+    @rule(data=st.data())
+    def cast_head_vote(self, data: st.DataObject) -> None:
+        """Record one validator's head vote for a randomly chosen block."""
+        validator_index = ValidatorIndex(data.draw(st.integers(min_value=0, max_value=3)))
+        voted_root = data.draw(st.sampled_from(self.block_roots))
+        voted_block = self.store.blocks[voted_root]
+
+        attestation_data = AttestationData(
+            slot=voted_block.slot,
+            head=Checkpoint(root=voted_root, slot=voted_block.slot),
+            target=Checkpoint(root=voted_root, slot=voted_block.slot),
+            source=self.store.latest_justified,
+        )
+        # Head weights only read the participant bits, never the proof bytes.
+        vote = SingleMessageAggregate(
+            participants=AggregationBits.from_indices([validator_index]),
+            proof=ByteList512KiB(data=b""),
+        )
+        merged_payloads = {
+            **self.store.latest_known_aggregated_payloads,
+            attestation_data: {
+                *self.store.latest_known_aggregated_payloads.get(attestation_data, set()),
+                vote,
+            },
+        }
+        self.store = self.store.model_copy(
+            update={"latest_known_aggregated_payloads": merged_payloads}
+        )
+
+    @invariant()
+    def head_is_a_known_descendant_of_justified(self) -> None:
+        """The head exists, descends from justified, and recomputes identically."""
+        head_root = self.spec.update_head(self.store).head
+        assert head_root in self.store.blocks
+
+        # Walk parents from head; the justified root must be reachable.
+        justified_root = self.store.latest_justified.root
+        ancestor_root = head_root
+        while ancestor_root != justified_root and ancestor_root in self.store.blocks:
+            ancestor_root = self.store.blocks[ancestor_root].parent_root
+        assert ancestor_root == justified_root
+
+        # Determinism: recomputing from the same store yields the same head.
+        assert self.spec.update_head(self.store).head == head_root
+
+
+StoreHeadMachine.TestCase.settings = settings(
+    max_examples=25, stateful_step_count=15, deadline=None
+)
+
+TestStoreHeadProperties = StoreHeadMachine.TestCase

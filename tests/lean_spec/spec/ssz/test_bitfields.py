@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 import pytest
+from hypothesis import given, strategies as st
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.spec.ssz.bitfields import BaseBitlist, BaseBitvector
@@ -455,3 +456,17 @@ class TestBitfieldSSZ:
             match=re.escape("Bitlist16: expected 2 bytes, got 1"),
         ):
             Bitlist16.deserialize(stream, scope=2)
+
+
+@given(bits=st.lists(st.booleans(), max_size=8))
+def test_bitlist_round_trip_random_bits(bits: list[bool]) -> None:
+    """Any bit pattern up to the limit, including empty, round-trips unchanged."""
+    instance = Bitlist8(data=tuple(Boolean(bit) for bit in bits))
+    assert Bitlist8.decode_bytes(instance.encode_bytes()) == instance
+
+
+@given(bits=st.lists(st.booleans(), min_size=4, max_size=4))
+def test_bitvector_round_trip_random_bits(bits: list[bool]) -> None:
+    """Any fixed-length bit pattern round-trips unchanged."""
+    instance = Bitvector4(data=tuple(Boolean(bit) for bit in bits))
+    assert Bitvector4.decode_bytes(instance.encode_bytes()) == instance
