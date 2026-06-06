@@ -606,8 +606,8 @@ def _add_known_block(
     proposer_index: ValidatorIndex,
     parent_root: Bytes32,
     state_seed: int,
-) -> Bytes32:
-    """Insert a block at the given slot into the store, reusing the justified state."""
+) -> tuple[Store, Bytes32]:
+    """Return a store copy holding a block at the given slot, reusing the justified state."""
     block = make_signed_block(
         slot=slot,
         proposer_index=proposer_index,
@@ -615,9 +615,13 @@ def _add_known_block(
         state_root=make_bytes32(state_seed),
     ).block
     block_root = hash_tree_root(block)
-    store.blocks = {**store.blocks, block_root: block}
-    store.states = {**store.states, block_root: store.states[store.latest_justified.root]}
-    return block_root
+    updated_store = store.model_copy(
+        update={
+            "blocks": {**store.blocks, block_root: block},
+            "states": {**store.states, block_root: store.states[store.latest_justified.root]},
+        }
+    )
+    return updated_store, block_root
 
 
 class TestValidateAttestationAncestryChecks:
@@ -631,9 +635,9 @@ class TestValidateAttestationAncestryChecks:
         """A vote whose checkpoints form one chain across three slots validates."""
         store = observer_store
         genesis_root = store.latest_justified.root
-        target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        head_root = _add_known_block(store, Slot(2), ValidatorIndex(2), target_root, 2)
-        store.time = Interval.from_slot(Slot(2))
+        store, target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
+        store, head_root = _add_known_block(store, Slot(2), ValidatorIndex(2), target_root, 2)
+        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
 
         attestation_data = AttestationData(
             slot=Slot(2),
@@ -652,9 +656,11 @@ class TestValidateAttestationAncestryChecks:
         """A head on a sibling fork must not validate against this target."""
         store = observer_store
         genesis_root = store.latest_justified.root
-        target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        sibling_head_root = _add_known_block(store, Slot(2), ValidatorIndex(2), genesis_root, 2)
-        store.time = Interval.from_slot(Slot(2))
+        store, target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
+        store, sibling_head_root = _add_known_block(
+            store, Slot(2), ValidatorIndex(2), genesis_root, 2
+        )
+        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
 
         attestation_data = AttestationData(
             slot=Slot(2),
@@ -674,10 +680,14 @@ class TestValidateAttestationAncestryChecks:
         """A source on a sibling fork must not validate against this target."""
         store = observer_store
         genesis_root = store.latest_justified.root
-        source_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        target_parent_root = _add_known_block(store, Slot(1), ValidatorIndex(2), genesis_root, 2)
-        target_root = _add_known_block(store, Slot(2), ValidatorIndex(2), target_parent_root, 3)
-        store.time = Interval.from_slot(Slot(2))
+        store, source_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
+        store, target_parent_root = _add_known_block(
+            store, Slot(1), ValidatorIndex(2), genesis_root, 2
+        )
+        store, target_root = _add_known_block(
+            store, Slot(2), ValidatorIndex(2), target_parent_root, 3
+        )
+        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
 
         attestation_data = AttestationData(
             slot=Slot(2),
@@ -697,9 +707,11 @@ class TestValidateAttestationAncestryChecks:
         """A head whose parent chain leaves the store cannot prove ancestry."""
         store = observer_store
         genesis_root = store.latest_justified.root
-        target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        orphan_head_root = _add_known_block(store, Slot(2), ValidatorIndex(2), make_bytes32(99), 2)
-        store.time = Interval.from_slot(Slot(2))
+        store, target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
+        store, orphan_head_root = _add_known_block(
+            store, Slot(2), ValidatorIndex(2), make_bytes32(99), 2
+        )
+        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
 
         attestation_data = AttestationData(
             slot=Slot(2),
