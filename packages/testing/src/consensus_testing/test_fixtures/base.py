@@ -7,8 +7,8 @@ from typing import Any, ClassVar
 
 from pydantic import Field
 
+from consensus_testing.forks.base import BaseFork
 from consensus_testing.keys import XmssKeyManager
-from framework.forks import BaseFork
 from lean_spec.base import CamelModel
 from lean_spec.config import LEAN_ENV
 from lean_spec.spec.forks import RejectionReason

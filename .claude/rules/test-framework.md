@@ -13,7 +13,7 @@ paths:
 
 **Test Filling Framework:**
 
-- Pytest plugin in `packages/testing/src/framework/pytest_plugins/filler.py`
+- Pytest plugin in `packages/testing/src/consensus_testing/pytest_plugins/filler.py`
 - Consensus fixture package: `consensus_testing`
 - Write consensus spec tests using `state_transition_test` or `fork_choice_test` fixtures
 - These fixtures are type aliases that create test vectors when called
@@ -42,8 +42,8 @@ def test_block(state_transition_test: StateTransitionTestFiller) -> None:
 
 **Package architecture:**
 
-- `framework/` - Pytest plugin, CLI entry points, fork registry infrastructure
-- `consensus_testing/` - Consensus fixtures, forks, builders
+- Single package `consensus_testing/`: fixtures, forks, builders, the pytest
+  plugin (`pytest_plugins/`), and CLI entry points (`cli/`)
 - Regular pytest runs (`uv run pytest`) ignore spec tests - they only run via `fill` command
 
 **Serialization requirements:**

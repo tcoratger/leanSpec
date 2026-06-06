@@ -3,6 +3,7 @@
 from consensus_testing import forks
 from consensus_testing.genesis import build_anchor, generate_pre_state
 from consensus_testing.test_fixtures import (
+    FIXTURE_FORMATS,
     ApiEndpointTest,
     AppendPhantomAttestation,
     BaseConsensusFixture,
@@ -42,6 +43,7 @@ from consensus_testing.test_types import (
     GossipAttestationSpec,
     StateExpectation,
     StoreChecks,
+    StoreSnapshot,
     TickStep,
 )
 
@@ -69,6 +71,7 @@ __all__ = [
     "generate_pre_state",
     # Base types
     # Fixture classes
+    "FIXTURE_FORMATS",
     "BaseConsensusFixture",
     "StateTransitionTest",
     "ForkChoiceTest",
@@ -103,6 +106,7 @@ __all__ = [
     "ForkChoiceStep",
     "StateExpectation",
     "StoreChecks",
+    "StoreSnapshot",
     "AttestationCheck",
     "AggregatedAttestationCheck",
     # Type aliases for test function signatures
