@@ -1,6 +1,7 @@
 """Signature verification: empty aggregation_bits rejection vector."""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
@@ -8,7 +9,6 @@ from consensus_testing import (
     VerifySignaturesTestFiller,
     generate_pre_state,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

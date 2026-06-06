@@ -1,12 +1,12 @@
 """State Transition: Block Slot Monotonicity Rejections."""
 
 import pytest
+
 from consensus_testing import (
     BlockSpec,
     StateTransitionTestFiller,
     generate_pre_state,
 )
-
 from lean_spec.spec.forks import Slot
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 

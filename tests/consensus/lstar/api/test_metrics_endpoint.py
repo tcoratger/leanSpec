@@ -1,6 +1,7 @@
 """API endpoint: /metrics scrape contract vector."""
 
 import pytest
+
 from consensus_testing import ApiEndpointTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

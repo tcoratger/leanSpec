@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-from consensus_testing.keys import XmssKeyManager
 from pydantic import ValidationError
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.node.validator import ValidatorRegistry
 from lean_spec.node.validator.registry import (
     ValidatorEntry,

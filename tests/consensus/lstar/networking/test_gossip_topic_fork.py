@@ -8,6 +8,7 @@ wrong-fork messages into their subscriptions.
 """
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

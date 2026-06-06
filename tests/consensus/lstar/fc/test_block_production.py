@@ -3,6 +3,7 @@
 import math
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationCheck,
     AggregatedAttestationSpec,
@@ -14,7 +15,6 @@ from consensus_testing import (
     StoreChecks,
     TickStep,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import (
     INTERVALS_PER_SLOT,

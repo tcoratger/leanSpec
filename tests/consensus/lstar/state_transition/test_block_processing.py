@@ -1,13 +1,13 @@
 """State Transition: Block Processing"""
 
 import pytest
+
 from consensus_testing import (
     BlockSpec,
     StateExpectation,
     StateTransitionTestFiller,
     generate_pre_state,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import JustifiedSlots
 from lean_spec.spec.forks.lstar.spec import LstarSpec

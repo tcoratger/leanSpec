@@ -1,6 +1,7 @@
 """Test vectors for LEB128 varint encoding."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

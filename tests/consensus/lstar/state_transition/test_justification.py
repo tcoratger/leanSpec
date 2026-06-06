@@ -1,6 +1,7 @@
 """State Transition: Justification"""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
@@ -8,7 +9,6 @@ from consensus_testing import (
     StateTransitionTestFiller,
     generate_pre_state,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     JustificationRoots,

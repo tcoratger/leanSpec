@@ -8,6 +8,7 @@ Tests for genesis state generation and initialization.
 """
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
@@ -15,7 +16,6 @@ from consensus_testing import (
     StateTransitionTestFiller,
     generate_pre_state,
 )
-
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import VALIDATOR_REGISTRY_LIMIT, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (

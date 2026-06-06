@@ -1,6 +1,7 @@
 """Attestation Target Selection and Safe Target Computation"""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
@@ -8,7 +9,6 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import JUSTIFICATION_LOOKBACK_SLOTS
 

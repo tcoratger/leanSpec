@@ -1,6 +1,7 @@
 """Multi-message aggregate proof verification vectors — rejection cases."""
 
 import pytest
+
 from consensus_testing import (
     DropMessageBinding,
     IncrementEmittedSlot,
@@ -9,7 +10,6 @@ from consensus_testing import (
     SwapParticipantPublicKey,
     VerifyMultiMessageProofsTestFiller,
 )
-
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AggregationError, AttestationData
 from lean_spec.spec.ssz import Bytes32

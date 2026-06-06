@@ -1,6 +1,7 @@
 """Test vectors for gossipsub message ID computation."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

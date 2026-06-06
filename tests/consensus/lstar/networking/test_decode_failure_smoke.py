@@ -6,6 +6,7 @@ independently of later negative-path content PRs.
 """
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

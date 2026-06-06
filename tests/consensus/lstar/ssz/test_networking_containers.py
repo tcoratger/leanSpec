@@ -1,8 +1,8 @@
 """SSZ conformance tests for networking containers."""
 
 import pytest
-from consensus_testing import SSZTestFiller
 
+from consensus_testing import SSZTestFiller
 from lean_spec.node.networking.reqresp.message import (
     BlocksByRootRequest,
     RequestedBlockRoots,

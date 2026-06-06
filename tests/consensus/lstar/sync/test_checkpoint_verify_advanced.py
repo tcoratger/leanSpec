@@ -8,6 +8,7 @@ historical_block_hashes path that real checkpoint-sync downloads hit.
 """
 
 import pytest
+
 from consensus_testing import SyncTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

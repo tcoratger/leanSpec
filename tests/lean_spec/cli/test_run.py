@@ -7,8 +7,8 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.cli import NodeBootstrap
 from lean_spec.cli.run import _build_event_source
 from lean_spec.node.genesis import GenesisConfig

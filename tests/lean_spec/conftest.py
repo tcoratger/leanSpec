@@ -10,8 +10,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import State, Store
 from lean_spec.spec.forks.lstar.containers import Block

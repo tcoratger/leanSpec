@@ -6,8 +6,8 @@ from types import MappingProxyType
 from typing import cast
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.reqresp.message import Status
 from lean_spec.node.storage.database import Database

@@ -10,6 +10,7 @@ builder upholds by construction:
 """
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     AppendPhantomAttestation,
@@ -21,7 +22,6 @@ from consensus_testing import (
     build_anchor,
     generate_pre_state,
 )
-
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
 

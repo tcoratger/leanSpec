@@ -1,6 +1,7 @@
 """Test vectors for ENR encoding and PeerId derivation."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

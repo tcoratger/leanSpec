@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
 from consensus_testing.test_fixtures import (
@@ -26,7 +27,6 @@ from consensus_testing.test_fixtures import (
     VerifySignaturesTest,
     VerifySingleMessageProofsTest,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32
 

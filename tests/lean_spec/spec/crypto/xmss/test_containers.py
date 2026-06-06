@@ -3,9 +3,9 @@
 import json
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 from pydantic import ValidationError
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.koalabear import P_BYTES
 from lean_spec.spec.crypto.xmss.constants import TEST_CONFIG
 from lean_spec.spec.crypto.xmss.containers import (

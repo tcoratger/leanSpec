@@ -1,8 +1,8 @@
 """Varint decoder: invalid-input rejection vectors."""
 
 import pytest
-from consensus_testing import NetworkingCodecTestFiller
 
+from consensus_testing import NetworkingCodecTestFiller
 from lean_spec.node.networking.varint import VarintError
 
 pytestmark = pytest.mark.valid_until("Lstar")

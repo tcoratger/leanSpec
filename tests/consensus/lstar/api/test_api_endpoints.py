@@ -6,6 +6,7 @@ API server returns the exact same response given the same genesis parameters.
 """
 
 import pytest
+
 from consensus_testing import ApiEndpointTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

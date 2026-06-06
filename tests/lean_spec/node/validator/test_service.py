@@ -5,8 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.node.sync.block_cache import BlockCache
 from lean_spec.node.sync.peer_manager import PeerManager

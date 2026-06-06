@@ -8,6 +8,7 @@ store.
 """
 
 import pytest
+
 from consensus_testing import SyncTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

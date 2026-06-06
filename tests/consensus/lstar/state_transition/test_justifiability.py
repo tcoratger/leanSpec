@@ -11,6 +11,7 @@ independently of the full state transition machinery.
 """
 
 import pytest
+
 from consensus_testing import JustifiabilityTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")
