@@ -1,6 +1,6 @@
 """Consensus fork definitions for test fixture generation."""
 
-from framework.forks import BaseFork
+from consensus_testing.forks.base import BaseFork
 
 
 class Lstar(BaseFork):

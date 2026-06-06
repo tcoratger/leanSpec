@@ -1,12 +1,15 @@
 """CLI command for generating Lean Ethereum consensus test fixtures."""
 
 import os
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import click
-import pytest
+
+from consensus_testing.keys import compute_key_set_digest, get_keys_directory
+from consensus_testing.keys_cli import PINNED_KEY_SET_DIGESTS, download_keys
 
 
 @click.command(
@@ -57,16 +60,12 @@ def fill(
         # Use specific XMSS scheme (overrides LEAN_ENV env var)
         fill --fork=Lstar --scheme=prod --clean -v
     """
-    # Note: It's important to never import any leanSpec modules in this file, so the
-    # `LEAN_ENV` variable can be set before the config loads its value from the
-    # environment.
+    # Why: the spec config reads this flag once, at import time.
+    # The current process froze the old value when the package imported.
+    # Only the pytest subprocess below starts fresh and sees this export.
     os.environ["LEAN_ENV"] = scheme.lower()
 
     # Check and download keys if needed
-    # Import here to avoid loading leanSpec modules before LEAN_ENV is set
-    from consensus_testing.keys import compute_key_set_digest, get_keys_directory
-    from consensus_testing.keys_cli import PINNED_KEY_SET_DIGESTS, download_keys
-
     keys_directory = get_keys_directory(scheme.lower())
 
     # Check if keys already exist, if not, download them
@@ -107,8 +106,9 @@ def fill(
     # Add extra click context args
     args.extend(ctx.args)
 
-    # Run pytest
-    exit_code = pytest.main(args)
+    # Why a subprocess: a fresh interpreter imports the spec config anew.
+    # Only then does the scheme exported above take effect.
+    exit_code = subprocess.run([sys.executable, "-m", "pytest", *args]).returncode
     sys.exit(exit_code)
 
 

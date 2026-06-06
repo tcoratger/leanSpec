@@ -12,21 +12,7 @@ import pytest
 
 from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
-from consensus_testing.test_fixtures import (
-    ApiEndpointTest,
-    ForkChoiceTest,
-    GossipsubHandlerTest,
-    JustifiabilityTest,
-    NetworkingCodecTest,
-    PoseidonPermutationTest,
-    SlotClockTest,
-    SSZTest,
-    StateTransitionTest,
-    SyncTest,
-    VerifyMultiMessageProofsTest,
-    VerifySignaturesTest,
-    VerifySingleMessageProofsTest,
-)
+from consensus_testing.test_fixtures import FIXTURE_FORMATS
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32
 
@@ -479,16 +465,9 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
 # Pytest fixtures for every consensus fixture format.
 # Each spec test requests one by its format name and calls it to build a test vector.
-api_endpoint = base_spec_filler_parametrizer(ApiEndpointTest)
-fork_choice_test = base_spec_filler_parametrizer(ForkChoiceTest)
-gossipsub_handler = base_spec_filler_parametrizer(GossipsubHandlerTest)
-justifiability = base_spec_filler_parametrizer(JustifiabilityTest)
-networking_codec = base_spec_filler_parametrizer(NetworkingCodecTest)
-poseidon_permutation = base_spec_filler_parametrizer(PoseidonPermutationTest)
-slot_clock = base_spec_filler_parametrizer(SlotClockTest)
-ssz = base_spec_filler_parametrizer(SSZTest)
-state_transition_test = base_spec_filler_parametrizer(StateTransitionTest)
-sync = base_spec_filler_parametrizer(SyncTest)
-verify_multi_message_proofs_test = base_spec_filler_parametrizer(VerifyMultiMessageProofsTest)
-verify_signatures_test = base_spec_filler_parametrizer(VerifySignaturesTest)
-verify_single_message_proofs_test = base_spec_filler_parametrizer(VerifySingleMessageProofsTest)
+# Registration iterates the canonical registry.
+# A new format needs no edit here.
+for fixture_format_class in FIXTURE_FORMATS:
+    globals()[fixture_format_class.format_name] = base_spec_filler_parametrizer(
+        fixture_format_class
+    )
