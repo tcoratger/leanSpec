@@ -43,8 +43,6 @@ class SingleMessageAggregate(Container):
     The verifier rederives them from the block body it already trusts.
     """
 
-    model_config = Container.model_config | {"frozen": True}
-
     participants: AggregationBits
     """Bitfield indicating which validators contributed signatures."""
 
@@ -182,8 +180,6 @@ class MultiMessageAggregate(Container):
     Each component is a single-message proof over its own message.
     Merging binds the components into one proof the block can carry whole.
     """
-
-    model_config = Container.model_config | {"frozen": True}
 
     proof: ByteList512KiB
     """Compact public-key-free serialized multi-message aggregate proof bytes."""

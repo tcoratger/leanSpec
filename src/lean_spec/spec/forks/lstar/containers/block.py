@@ -10,8 +10,6 @@ from lean_spec.spec.ssz import Bytes32, Container
 class BlockBody(Container):
     """Payload of a block containing attestations."""
 
-    model_config = Container.model_config | {"frozen": True}
-
     attestations: AggregatedAttestations
     """Attestations in the block. Signatures are folded into the block-level proof."""
 
@@ -23,8 +21,6 @@ class BlockHeader(Container):
     Contains parent reference, state root, and body hash.
     Smaller than full blocks.
     """
-
-    model_config = Container.model_config | {"frozen": True}
 
     slot: Slot
     """The slot in which the block was proposed."""
@@ -44,8 +40,6 @@ class BlockHeader(Container):
 
 class Block(Container):
     """A complete block including header and body."""
-
-    model_config = Container.model_config | {"frozen": True}
 
     slot: Slot
     """The slot in which the block was proposed."""
@@ -71,8 +65,6 @@ class SignedBlock(Container):
     It binds every attestation in the body plus the proposer's signature
     over the block root.
     """
-
-    model_config = Container.model_config | {"frozen": True}
 
     block: Block
     """The block being signed."""

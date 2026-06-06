@@ -205,10 +205,14 @@ class ValidatorDutiesMixin(LstarSpecBase):
 
         # Persist block and state.
         previous_finalized_slot = store.latest_finalized.slot
-        store.blocks = store.blocks | {block_hash: final_block}
-        store.states = store.states | {block_hash: final_post_state}
-        store.latest_justified = latest_justified
-        store.latest_finalized = latest_finalized
+        store = store.model_copy(
+            update={
+                "blocks": store.blocks | {block_hash: final_block},
+                "states": store.states | {block_hash: final_post_state},
+                "latest_justified": latest_justified,
+                "latest_finalized": latest_finalized,
+            }
+        )
 
         # Prune stale attestation data when finalization advances
         if store.latest_finalized.slot > previous_finalized_slot:

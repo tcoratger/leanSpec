@@ -25,8 +25,7 @@ def pruning_store() -> Store:
 def sample_store(store_factory):
     """Store with 8 validators, genesis_time=1000, time=100."""
     store = store_factory(num_validators=8, genesis_time=1000)
-    store.time = Interval(100)
-    return store
+    return store.model_copy(update={"time": Interval(100)})
 
 
 @pytest.fixture

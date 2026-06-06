@@ -338,7 +338,7 @@ def make_store_with_attestation_data(
         validator_index=validator_index,
         key_manager=key_manager,
     )
-    store.time = Interval.from_slot(attestation_slot)
+    store = store.model_copy(update={"time": Interval.from_slot(attestation_slot)})
     attestation_data = LstarSpec().produce_attestation_data(store, attestation_slot)
     return store, attestation_data
 
@@ -357,15 +357,19 @@ def make_store_with_attestation_signatures(
         validator_index,
         attestation_slot,
     )
-    store.attestation_signatures = {
-        attestation_data: {
-            AttestationSignatureEntry(
-                validator_index,
-                key_manager.sign_attestation_data(validator_index, attestation_data),
-            )
-            for validator_index in attesting_validators
-        },
-    }
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {
+                attestation_data: {
+                    AttestationSignatureEntry(
+                        validator_index,
+                        key_manager.sign_attestation_data(validator_index, attestation_data),
+                    )
+                    for validator_index in attesting_validators
+                },
+            }
+        }
+    )
     return store, attestation_data
 
 

@@ -117,22 +117,25 @@ class ForkChoiceMixin(LstarSpecBase):
         #
         # Each mapping is keyed by attestation data, so we check the attested
         # head slot against the finalized slot.
-        store.attestation_signatures = {
-            attestation_data: signatures
-            for attestation_data, signatures in store.attestation_signatures.items()
-            if attestation_data.head.slot > store.latest_finalized.slot
-        }
-        store.latest_new_aggregated_payloads = {
-            attestation_data: proofs
-            for attestation_data, proofs in store.latest_new_aggregated_payloads.items()
-            if attestation_data.head.slot > store.latest_finalized.slot
-        }
-        store.latest_known_aggregated_payloads = {
-            attestation_data: proofs
-            for attestation_data, proofs in store.latest_known_aggregated_payloads.items()
-            if attestation_data.head.slot > store.latest_finalized.slot
-        }
-        return store
+        return store.model_copy(
+            update={
+                "attestation_signatures": {
+                    attestation_data: signatures
+                    for attestation_data, signatures in store.attestation_signatures.items()
+                    if attestation_data.head.slot > store.latest_finalized.slot
+                },
+                "latest_new_aggregated_payloads": {
+                    attestation_data: proofs
+                    for attestation_data, proofs in store.latest_new_aggregated_payloads.items()
+                    if attestation_data.head.slot > store.latest_finalized.slot
+                },
+                "latest_known_aggregated_payloads": {
+                    attestation_data: proofs
+                    for attestation_data, proofs in store.latest_known_aggregated_payloads.items()
+                    if attestation_data.head.slot > store.latest_finalized.slot
+                },
+            }
+        )
 
     def validate_attestation(self, store: LstarStore, attestation_data: AttestationData) -> None:
         """
@@ -255,16 +258,22 @@ class ForkChoiceMixin(LstarSpecBase):
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
             ), "Signature verification failed"
 
+            # Non-aggregator nodes validate and drop — they never store gossip signatures.
+            if not is_aggregator:
+                return store
+
             # Aggregators store all received gossip signatures.
             # The p2p layer only delivers attestations from subscribed subnets,
             # so subnet filtering happens at subscription time, not here.
-            # Non-aggregator nodes validate and drop — they never store gossip signatures.
-            if is_aggregator:
-                store.attestation_signatures.setdefault(attestation_data, set()).add(
-                    AttestationSignatureEntry(validator_index, signature)
-                )
+            # Copy the inner sets so the caller's store is left untouched.
+            new_attestation_signatures = {
+                data: set(signatures) for data, signatures in store.attestation_signatures.items()
+            }
+            new_attestation_signatures.setdefault(attestation_data, set()).add(
+                AttestationSignatureEntry(validator_index, signature)
+            )
 
-            return store
+            return store.model_copy(update={"attestation_signatures": new_attestation_signatures})
 
     def on_gossip_aggregated_attestation(
         self,
@@ -323,11 +332,14 @@ class ForkChoiceMixin(LstarSpecBase):
                 f"Committee aggregation signature verification failed: {exception}"
             ) from exception
 
-        store.latest_new_aggregated_payloads.setdefault(attestation_data, set()).add(
-            aggregated_proof
-        )
+        # Copy the inner sets so the caller's store is left untouched.
+        new_aggregated_payloads = {
+            pooled_data: set(pooled_proofs)
+            for pooled_data, pooled_proofs in store.latest_new_aggregated_payloads.items()
+        }
+        new_aggregated_payloads.setdefault(attestation_data, set()).add(aggregated_proof)
 
-        return store
+        return store.model_copy(update={"latest_new_aggregated_payloads": new_aggregated_payloads})
 
     def on_block(
         self,
@@ -401,11 +413,6 @@ class ForkChoiceMixin(LstarSpecBase):
             latest_justified = store.latest_justified.advance_to(post_state.latest_justified)
             latest_finalized = store.latest_finalized.advance_to(post_state.latest_finalized)
 
-            store.blocks = store.blocks | {block_root: block}
-            store.states = store.states | {block_root: post_state}
-            store.latest_justified = latest_justified
-            store.latest_finalized = latest_finalized
-
             # Register each block attestation's data in the known pool.
             #
             # Only the data key is recorded here, with an empty proof set.
@@ -420,10 +427,23 @@ class ForkChoiceMixin(LstarSpecBase):
             # the known pool at the next acceptance tick.
             # Head weight from block-imported votes is therefore deferred
             # by up to one slot.
+            # Copy the inner sets so the caller's store is left untouched.
+            new_known_aggregated_payloads = {
+                attestation_data: set(proofs)
+                for attestation_data, proofs in store.latest_known_aggregated_payloads.items()
+            }
             for aggregated_attestation in aggregated_attestations:
-                store.latest_known_aggregated_payloads.setdefault(
-                    aggregated_attestation.data, set()
-                )
+                new_known_aggregated_payloads.setdefault(aggregated_attestation.data, set())
+
+            store = store.model_copy(
+                update={
+                    "blocks": store.blocks | {block_root: block},
+                    "states": store.states | {block_root: post_state},
+                    "latest_justified": latest_justified,
+                    "latest_finalized": latest_finalized,
+                    "latest_known_aggregated_payloads": new_known_aggregated_payloads,
+                }
+            )
 
             # Update forkchoice head based on new block and attestations.
             store = self.update_head(store)
@@ -594,12 +614,12 @@ class ForkChoiceMixin(LstarSpecBase):
         # Starts from the justified root and greedily descends to the heaviest
         # leaf. The result is always a descendant of the justified root by
         # construction: the walk only follows child edges within the subtree.
-        store.head = self._compute_lmd_ghost_head(
+        new_head = self._compute_lmd_ghost_head(
             store,
             start_root=store.latest_justified.root,
             attestations=attestations,
         )
-        return store
+        return store.model_copy(update={"head": new_head})
 
     def accept_new_attestations(self, store: LstarStore) -> LstarStore:
         """
@@ -621,12 +641,21 @@ class ForkChoiceMixin(LstarSpecBase):
         This staged progression ensures proper timing and prevents premature
         influence on fork choice decisions.
         """
-        # Merge new aggregated payloads into known aggregated payloads
+        # Merge new aggregated payloads into known aggregated payloads.
+        # Copy the inner sets so the caller's store is left untouched.
+        merged_aggregated_payloads = {
+            attestation_data: set(proofs)
+            for attestation_data, proofs in store.latest_known_aggregated_payloads.items()
+        }
         for attestation_data, proofs in store.latest_new_aggregated_payloads.items():
-            store.latest_known_aggregated_payloads.setdefault(attestation_data, set()).update(
-                proofs
-            )
-        store.latest_new_aggregated_payloads = {}
+            merged_aggregated_payloads.setdefault(attestation_data, set()).update(proofs)
+
+        store = store.model_copy(
+            update={
+                "latest_known_aggregated_payloads": merged_aggregated_payloads,
+                "latest_new_aggregated_payloads": {},
+            }
+        )
 
         # Update head with newly accepted aggregated payloads
         return self.update_head(store)
@@ -701,5 +730,4 @@ class ForkChoiceMixin(LstarSpecBase):
         # Return a new Store with only the safe target updated.
         #
         # The head and attestation pools remain unchanged.
-        store.safe_target = safe_target
-        return store
+        return store.model_copy(update={"safe_target": safe_target})

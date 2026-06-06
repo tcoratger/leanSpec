@@ -30,7 +30,7 @@ class TimelineMixin(LstarSpecBase):
         - Interval 4: Process accumulated attestations
         """
         # Advance time by one interval
-        store.time = store.time + Interval(1)
+        store = store.model_copy(update={"time": store.time + Interval(1)})
         current_interval = Interval(int(store.time) % int(INTERVALS_PER_SLOT))
         new_aggregates: list[SignedAggregatedAttestation] = []
 

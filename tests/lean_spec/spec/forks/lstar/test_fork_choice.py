@@ -52,7 +52,7 @@ def _make_empty_proof(participants: list[ValidatorIndex]) -> SingleMessageAggreg
     )
 
 
-def _add_two_block_chain(base_store: Store) -> tuple[Bytes32, Bytes32, Bytes32]:
+def _add_two_block_chain(base_store: Store) -> tuple[Store, Bytes32, Bytes32, Bytes32]:
     genesis_root = base_store.head
 
     block1 = make_signed_block(
@@ -71,23 +71,27 @@ def _add_two_block_chain(base_store: Store) -> tuple[Bytes32, Bytes32, Bytes32]:
     )
     block2_root = hash_tree_root(block2.block)
 
-    base_store.blocks = {
-        **base_store.blocks,
-        block1_root: block1.block,
-        block2_root: block2.block,
-    }
     genesis_state = base_store.states[genesis_root]
-    base_store.states = {
-        **base_store.states,
-        block1_root: genesis_state,
-        block2_root: genesis_state,
-    }
-    base_store.head = block2_root
+    base_store = base_store.model_copy(
+        update={
+            "blocks": {
+                **base_store.blocks,
+                block1_root: block1.block,
+                block2_root: block2.block,
+            },
+            "states": {
+                **base_store.states,
+                block1_root: genesis_state,
+                block2_root: genesis_state,
+            },
+            "head": block2_root,
+        }
+    )
 
-    return genesis_root, block1_root, block2_root
+    return base_store, genesis_root, block1_root, block2_root
 
 
-def _add_finalized_fork(base_store: Store) -> tuple[Bytes32, Bytes32, Bytes32, Bytes32]:
+def _add_finalized_fork(base_store: Store) -> tuple[Store, Bytes32, Bytes32, Bytes32, Bytes32]:
     genesis_root = base_store.head
 
     block1 = make_signed_block(
@@ -117,22 +121,26 @@ def _add_finalized_fork(base_store: Store) -> tuple[Bytes32, Bytes32, Bytes32, B
     voted_root, tie_break_root = sorted([child_a_root, child_b_root])
 
     genesis_state = base_store.states[genesis_root]
-    base_store.blocks = {
-        **base_store.blocks,
-        block1_root: block1.block,
-        child_a_root: child_a.block,
-        child_b_root: child_b.block,
-    }
-    base_store.states = {
-        **base_store.states,
-        block1_root: genesis_state,
-        child_a_root: genesis_state,
-        child_b_root: genesis_state,
-    }
-    base_store.head = tie_break_root
+    base_store = base_store.model_copy(
+        update={
+            "blocks": {
+                **base_store.blocks,
+                block1_root: block1.block,
+                child_a_root: child_a.block,
+                child_b_root: child_b.block,
+            },
+            "states": {
+                **base_store.states,
+                block1_root: genesis_state,
+                child_a_root: genesis_state,
+                child_b_root: genesis_state,
+            },
+            "head": tie_break_root,
+        }
+    )
     assert tie_break_root > voted_root
 
-    return genesis_root, block1_root, voted_root, tie_break_root
+    return base_store, genesis_root, block1_root, voted_root, tie_break_root
 
 
 def test_genesis_only_store_returns_empty_weights(spec: LstarSpec, base_store: Store) -> None:
@@ -180,11 +188,14 @@ def test_linear_chain_weight_accumulates_upward(spec: LstarSpec, base_store: Sto
         attestation_data: {proof},
     }
 
-    base_store.blocks = new_blocks
-    base_store.states = new_states
-    base_store.head = block2_root
-    base_store.latest_known_aggregated_payloads = aggregated_payloads
-    store = base_store
+    store = base_store.model_copy(
+        update={
+            "blocks": new_blocks,
+            "states": new_states,
+            "head": block2_root,
+            "latest_known_aggregated_payloads": aggregated_payloads,
+        }
+    )
 
     weights = spec.compute_block_weights(store)
 
@@ -216,19 +227,23 @@ def test_stale_latest_message_does_not_mask_fresh_weight(
     )
     block2_root = hash_tree_root(block2.block)
 
-    base_store.blocks = {
-        **base_store.blocks,
-        block1_root: block1.block,
-        block2_root: block2.block,
-    }
     genesis_state = base_store.states[genesis_root]
-    base_store.states = {
-        **base_store.states,
-        block1_root: genesis_state,
-        block2_root: genesis_state,
-    }
-    base_store.head = block2_root
-    base_store.latest_finalized = Checkpoint(root=block1_root, slot=Slot(1))
+    base_store = base_store.model_copy(
+        update={
+            "blocks": {
+                **base_store.blocks,
+                block1_root: block1.block,
+                block2_root: block2.block,
+            },
+            "states": {
+                **base_store.states,
+                block1_root: genesis_state,
+                block2_root: genesis_state,
+            },
+            "head": block2_root,
+            "latest_finalized": Checkpoint(root=block1_root, slot=Slot(1)),
+        }
+    )
 
     fresh_vote = AttestationData(
         slot=Slot(2),
@@ -243,10 +258,14 @@ def test_stale_latest_message_does_not_mask_fresh_weight(
         source=Checkpoint(root=genesis_root, slot=Slot(0)),
     )
 
-    base_store.latest_known_aggregated_payloads = {
-        fresh_vote: {_make_empty_proof([ValidatorIndex(0)])},
-        stale_vote: {_make_empty_proof([ValidatorIndex(0)])},
-    }
+    base_store = base_store.model_copy(
+        update={
+            "latest_known_aggregated_payloads": {
+                fresh_vote: {_make_empty_proof([ValidatorIndex(0)])},
+                stale_vote: {_make_empty_proof([ValidatorIndex(0)])},
+            }
+        }
+    )
 
     weights = spec.compute_block_weights(base_store)
 
@@ -255,8 +274,7 @@ def test_stale_latest_message_does_not_mask_fresh_weight(
 
 def test_fresh_head_with_finalized_target_still_counts(spec: LstarSpec, base_store: Store) -> None:
     """A vote with head above finalization still counts when its target is finalized."""
-    genesis_root, block1_root, block2_root = _add_two_block_chain(base_store)
-    base_store.latest_finalized = Checkpoint(root=block1_root, slot=Slot(1))
+    base_store, genesis_root, block1_root, block2_root = _add_two_block_chain(base_store)
 
     fresh_vote_with_finalized_target = AttestationData(
         slot=Slot(2),
@@ -264,9 +282,14 @@ def test_fresh_head_with_finalized_target_still_counts(spec: LstarSpec, base_sto
         target=Checkpoint(root=block1_root, slot=Slot(1)),
         source=Checkpoint(root=genesis_root, slot=Slot(0)),
     )
-    base_store.latest_known_aggregated_payloads = {
-        fresh_vote_with_finalized_target: {_make_empty_proof([ValidatorIndex(0)])},
-    }
+    base_store = base_store.model_copy(
+        update={
+            "latest_finalized": Checkpoint(root=block1_root, slot=Slot(1)),
+            "latest_known_aggregated_payloads": {
+                fresh_vote_with_finalized_target: {_make_empty_proof([ValidatorIndex(0)])},
+            },
+        }
+    )
 
     weights = spec.compute_block_weights(base_store)
 
@@ -275,10 +298,10 @@ def test_fresh_head_with_finalized_target_still_counts(spec: LstarSpec, base_sto
 
 def test_finalized_target_vote_can_drive_head_selection(spec: LstarSpec, base_store: Store) -> None:
     """A weighted head above finalization wins over the zero-weight tie break branch."""
-    genesis_root, block1_root, voted_root, tie_break_root = _add_finalized_fork(base_store)
+    base_store, genesis_root, block1_root, voted_root, tie_break_root = _add_finalized_fork(
+        base_store
+    )
     finalized = Checkpoint(root=block1_root, slot=Slot(1))
-    base_store.latest_justified = finalized
-    base_store.latest_finalized = finalized
 
     vote = AttestationData(
         slot=Slot(2),
@@ -286,9 +309,15 @@ def test_finalized_target_vote_can_drive_head_selection(spec: LstarSpec, base_st
         target=finalized,
         source=Checkpoint(root=genesis_root, slot=Slot(0)),
     )
-    base_store.latest_known_aggregated_payloads = {
-        vote: {_make_empty_proof([ValidatorIndex(0)])},
-    }
+    base_store = base_store.model_copy(
+        update={
+            "latest_justified": finalized,
+            "latest_finalized": finalized,
+            "latest_known_aggregated_payloads": {
+                vote: {_make_empty_proof([ValidatorIndex(0)])},
+            },
+        }
+    )
 
     store = spec.update_head(base_store)
 
@@ -298,11 +327,8 @@ def test_finalized_target_vote_can_drive_head_selection(spec: LstarSpec, base_st
 
 def test_finalized_target_vote_can_advance_safe_target(spec: LstarSpec, base_store: Store) -> None:
     """Safe target counts new-pool votes whose head is above finalization."""
-    genesis_root, block1_root, block2_root = _add_two_block_chain(base_store)
+    base_store, genesis_root, block1_root, block2_root = _add_two_block_chain(base_store)
     finalized = Checkpoint(root=block1_root, slot=Slot(1))
-    base_store.latest_justified = finalized
-    base_store.latest_finalized = finalized
-    base_store.safe_target = block1_root
 
     vote = AttestationData(
         slot=Slot(2),
@@ -310,9 +336,16 @@ def test_finalized_target_vote_can_advance_safe_target(spec: LstarSpec, base_sto
         target=finalized,
         source=Checkpoint(root=genesis_root, slot=Slot(0)),
     )
-    base_store.latest_new_aggregated_payloads = {
-        vote: {_make_empty_proof([ValidatorIndex(0), ValidatorIndex(1)])},
-    }
+    base_store = base_store.model_copy(
+        update={
+            "latest_justified": finalized,
+            "latest_finalized": finalized,
+            "safe_target": block1_root,
+            "latest_new_aggregated_payloads": {
+                vote: {_make_empty_proof([ValidatorIndex(0), ValidatorIndex(1)])},
+            },
+        }
+    )
 
     store = spec.update_safe_target(base_store)
 
@@ -349,11 +382,14 @@ def test_multiple_attestations_accumulate(spec: LstarSpec, base_store: Store) ->
         attestation_data: {proof},
     }
 
-    base_store.blocks = new_blocks
-    base_store.states = new_states
-    base_store.head = block1_root
-    base_store.latest_known_aggregated_payloads = aggregated_payloads
-    store = base_store
+    store = base_store.model_copy(
+        update={
+            "blocks": new_blocks,
+            "states": new_states,
+            "head": block1_root,
+            "latest_known_aggregated_payloads": aggregated_payloads,
+        }
+    )
 
     weights = spec.compute_block_weights(store)
 
@@ -598,8 +634,7 @@ class TestValidateAttestationTimeCheck:
 
         # Sweep every interval in the attestation's slot.
         for offset in range(int(INTERVALS_PER_SLOT)):
-            store.time = ATTESTATION_START_INTERVAL + Interval(offset)
-            local = store
+            local = store.model_copy(update={"time": ATTESTATION_START_INTERVAL + Interval(offset)})
             spec.validate_attestation(local, attestation_data)
 
     def test_attestation_in_past_passes(self, spec: LstarSpec, observer_store: Store) -> None:
@@ -608,7 +643,7 @@ class TestValidateAttestationTimeCheck:
 
         # Place the local clock several slots ahead.
         far_future = ATTESTATION_START_INTERVAL + Interval(int(INTERVALS_PER_SLOT) * 10)
-        store.time = far_future
+        store = store.model_copy(update={"time": far_future})
         spec.validate_attestation(store, attestation_data)
 
     def test_attestation_at_disparity_boundary_passes(
@@ -617,7 +652,7 @@ class TestValidateAttestationTimeCheck:
         """At the disparity boundary the attestation is still accepted."""
         store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
-        store.time = DISPARITY_BOUNDARY_INTERVAL
+        store = store.model_copy(update={"time": DISPARITY_BOUNDARY_INTERVAL})
         spec.validate_attestation(store, attestation_data)
 
     def test_attestation_just_beyond_disparity_boundary_rejected(
@@ -626,7 +661,7 @@ class TestValidateAttestationTimeCheck:
         """One interval past the disparity boundary the attestation is rejected."""
         store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
-        store.time = JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL
+        store = store.model_copy(update={"time": JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL})
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
             spec.validate_attestation(store, attestation_data)
@@ -643,7 +678,7 @@ class TestValidateAttestationTimeCheck:
         """
         store, attestation_data = self._build_two_block_chain(spec, observer_store)
 
-        store.time = ONE_FULL_SLOT_BEHIND_INTERVAL
+        store = store.model_copy(update={"time": ONE_FULL_SLOT_BEHIND_INTERVAL})
 
         with pytest.raises(AssertionError, match="Attestation too far in future"):
             spec.validate_attestation(store, attestation_data)
@@ -663,10 +698,16 @@ def test_prunes_entries_with_head_at_finalized(spec: LstarSpec, pruning_store: S
     )
 
     # Set up store with attestation data and finalized slot at 5
-    store.attestation_signatures = {
-        attestation_data: {AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())},
-    }
-    store.latest_finalized = make_checkpoint(root_seed=255, slot=5)
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {
+                attestation_data: {
+                    AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())
+                },
+            },
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
+        }
+    )
 
     # Verify data exists before pruning
     assert attestation_data in store.attestation_signatures
@@ -691,10 +732,16 @@ def test_prunes_entries_with_head_before_finalized(spec: LstarSpec, pruning_stor
     )
 
     # Set up store with finalized slot at 5 (greater than head.slot)
-    store.attestation_signatures = {
-        attestation_data: {AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())},
-    }
-    store.latest_finalized = make_checkpoint(root_seed=255, slot=5)
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {
+                attestation_data: {
+                    AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())
+                },
+            },
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
+        }
+    )
 
     # Verify data exists before pruning
     assert attestation_data in store.attestation_signatures
@@ -719,10 +766,16 @@ def test_keeps_entries_with_head_after_finalized(spec: LstarSpec, pruning_store:
     )
 
     # Set up store with finalized slot at 5 (less than head.slot)
-    store.attestation_signatures = {
-        attestation_data: {AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())},
-    }
-    store.latest_finalized = make_checkpoint(root_seed=255, slot=5)
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {
+                attestation_data: {
+                    AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())
+                },
+            },
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
+        }
+    )
 
     # Verify data exists before pruning
     assert attestation_data in store.attestation_signatures
@@ -754,10 +807,14 @@ def test_keeps_finalized_target_when_head_after_finalized(
     )
     signature = AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())
 
-    store.attestation_signatures = {attestation_data: {signature}}
-    store.latest_new_aggregated_payloads = {attestation_data: {mock_proof}}
-    store.latest_known_aggregated_payloads = {attestation_data: {mock_proof}}
-    store.latest_finalized = finalized
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {attestation_data: {signature}},
+            "latest_new_aggregated_payloads": {attestation_data: {mock_proof}},
+            "latest_known_aggregated_payloads": {attestation_data: {mock_proof}},
+            "latest_finalized": finalized,
+        }
+    )
 
     pruned_store = spec.prune_stale_attestation_data(store)
 
@@ -796,19 +853,27 @@ def test_prunes_related_structures_together(spec: LstarSpec, pruning_store: Stor
     )
 
     # Set up store with both stale and fresh entries in all structures
-    store.attestation_signatures = {
-        stale_attestation: {AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())},
-        fresh_attestation: {AttestationSignatureEntry(ValidatorIndex(2), make_mock_signature())},
-    }
-    store.latest_new_aggregated_payloads = {
-        stale_attestation: {mock_proof},
-        fresh_attestation: {mock_proof},
-    }
-    store.latest_known_aggregated_payloads = {
-        stale_attestation: {mock_proof},
-        fresh_attestation: {mock_proof},
-    }
-    store.latest_finalized = make_checkpoint(root_seed=255, slot=5)
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {
+                stale_attestation: {
+                    AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature())
+                },
+                fresh_attestation: {
+                    AttestationSignatureEntry(ValidatorIndex(2), make_mock_signature())
+                },
+            },
+            "latest_new_aggregated_payloads": {
+                stale_attestation: {mock_proof},
+                fresh_attestation: {mock_proof},
+            },
+            "latest_known_aggregated_payloads": {
+                stale_attestation: {mock_proof},
+                fresh_attestation: {mock_proof},
+            },
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
+        }
+    )
 
     # Verify all data exists before pruning
     assert stale_attestation in store.attestation_signatures
@@ -860,13 +925,17 @@ def test_prunes_multiple_validators_same_attestation_data(
     )
 
     # Multiple validators signed the same attestation data
-    store.attestation_signatures = {
-        stale_attestation: {
-            AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature()),
-            AttestationSignatureEntry(ValidatorIndex(2), make_mock_signature()),
-        },
-    }
-    store.latest_finalized = make_checkpoint(root_seed=255, slot=5)
+    store = store.model_copy(
+        update={
+            "attestation_signatures": {
+                stale_attestation: {
+                    AttestationSignatureEntry(ValidatorIndex(1), make_mock_signature()),
+                    AttestationSignatureEntry(ValidatorIndex(2), make_mock_signature()),
+                },
+            },
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
+        }
+    )
 
     # Verify data exists before pruning
     assert stale_attestation in store.attestation_signatures
@@ -900,8 +969,12 @@ def test_mixed_stale_and_fresh_entries(spec: LstarSpec, pruning_store: Store) ->
     }
 
     # Finalized at slot 5 means slots 1-5 are stale, 6-10 are fresh
-    store.attestation_signatures = gossip_signatures
-    store.latest_finalized = make_checkpoint(root_seed=255, slot=5)
+    store = store.model_copy(
+        update={
+            "attestation_signatures": gossip_signatures,
+            "latest_finalized": make_checkpoint(root_seed=255, slot=5),
+        }
+    )
 
     # Verify all data exists before pruning
     for attestation in attestations:
@@ -1420,8 +1493,9 @@ def test_on_block_processes_multi_validator_aggregations(
 
     aggregated_payloads = {attestation_data: {proof}}
 
-    base_store.latest_known_aggregated_payloads = aggregated_payloads
-    producer_store = base_store
+    producer_store = base_store.model_copy(
+        update={"latest_known_aggregated_payloads": aggregated_payloads}
+    )
 
     proposer_index = ValidatorIndex(1)
     consumer_store, signed_block = make_signed_block_from_store(
@@ -1463,8 +1537,7 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
         },
     }
 
-    base_store.attestation_signatures = gossip_signatures_1
-    producer_store_1 = base_store
+    producer_store_1 = base_store.model_copy(update={"attestation_signatures": gossip_signatures_1})
 
     consumer_store_1, signed_block_1 = make_signed_block_from_store(
         producer_store_1, key_manager, attestation_slot_1, ValidatorIndex(1)
@@ -1485,8 +1558,9 @@ def test_on_block_preserves_immutability_of_aggregated_payloads(
         },
     }
 
-    store_after_block_1.attestation_signatures = gossip_signatures_2
-    producer_store_2 = store_after_block_1
+    producer_store_2 = store_after_block_1.model_copy(
+        update={"attestation_signatures": gossip_signatures_2}
+    )
 
     store_before_block_2, signed_block_2 = make_signed_block_from_store(
         producer_store_2, key_manager, attestation_slot_2, ValidatorIndex(2)

@@ -48,15 +48,17 @@ class CamelModel(BaseModel):
 
 class StrictBaseModel(CamelModel):
     """
-    Strict base model for all spec types.
+    Immutable, strict base model for all spec types.
 
-    Adds two constraints on top of CamelModel:
+    Adds three constraints on top of CamelModel:
 
+    - Frozen: attribute assignment after construction raises
     - Extra forbidden: unknown fields rejected at construction
     - Strict: no implicit type coercion
     """
 
     model_config = CamelModel.model_config | {
         "extra": "forbid",
+        "frozen": True,
         "strict": True,
     }

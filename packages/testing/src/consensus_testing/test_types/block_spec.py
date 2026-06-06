@@ -540,8 +540,7 @@ class BlockSpec(CamelModel):
         }
         for attestation_data, proofs in merged_store.latest_known_aggregated_payloads.items():
             merged_known.setdefault(attestation_data, set()).update(proofs)
-        caller_store.latest_known_aggregated_payloads = merged_known
-        store = caller_store
+        store = caller_store.model_copy(update={"latest_known_aggregated_payloads": merged_known})
 
         # Append forced attestations that bypass the builder's MAX cap.
         # Each entry is signed and aggregated so the block carries valid proofs.
