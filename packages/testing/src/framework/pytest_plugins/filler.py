@@ -4,11 +4,13 @@ import json
 import shutil
 import sys
 from collections import defaultdict
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 from consensus_testing.forks import FORKS_BY_NAME
+from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
 from consensus_testing.test_fixtures import (
     ApiEndpointTest,
     ForkChoiceTest,
@@ -24,6 +26,9 @@ from consensus_testing.test_fixtures import (
     VerifySignaturesTest,
     VerifySingleMessageProofsTest,
 )
+
+from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.ssz import Bytes32
 
 
 class FixtureCollector:
@@ -292,6 +297,39 @@ def _check_markers_valid_for_fork(
     return any(fork_class <= until_fork for until_fork in valid_until_forks)
 
 
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """
+    Fail the session fast if re-signing the same message is not byte-identical.
+
+    A signature must depend only on the key, the slot, and the message.
+    Prior signing activity must never influence the bytes.
+
+    Why: a scheme change breaking this invariant must abort the fill.
+    Emitting order-dependent vectors would be worse than failing.
+
+    Under sharded runs every worker process probes its own key state.
+    """
+    probe_message = Bytes32(b"\x07" * 32)
+    fresh_signature = XmssKeyManager.shared().sign_block_root(
+        ValidatorIndex(0), Slot(1), probe_message
+    )
+
+    # Advance the key state to the manager's slot limit, reset, and sign again.
+    XmssKeyManager.shared().sign_block_root(ValidatorIndex(0), DEFAULT_MAX_SLOT, probe_message)
+    XmssKeyManager.reset_signing_state()
+    resigned_signature = XmssKeyManager.shared().sign_block_root(
+        ValidatorIndex(0), Slot(1), probe_message
+    )
+
+    assert fresh_signature.encode_bytes() == resigned_signature.encode_bytes(), (
+        "XMSS re-signing produced different bytes for the same validator, slot, and "
+        "message; emitted vectors would depend on test execution order"
+    )
+
+    # Restore the manager to a disk-fresh state.
+    XmssKeyManager.reset_signing_state()
+
+
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Write all collected fixtures at the end of the session."""
     if hasattr(session.config, "fixture_collector"):
@@ -343,6 +381,21 @@ def test_case_description(request: pytest.FixtureRequest) -> str:
 
     combined_docstring = f"{test_class_doc}\n\n{test_function_doc}".strip()
     return combined_docstring
+
+
+@pytest.fixture(autouse=True)
+def reset_xmss_signing_state() -> Iterator[None]:
+    """
+    Reset shared XMSS signing state before every test.
+
+    XMSS signing is stateful.
+    Each signature consumes a one-time leaf and advances the shared key state.
+
+    Every test must start from the same fresh key state.
+    Otherwise emitted vectors could depend on test order or worker sharding.
+    """
+    XmssKeyManager.reset_signing_state()
+    yield
 
 
 def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
