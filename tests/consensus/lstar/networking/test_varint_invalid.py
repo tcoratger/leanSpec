@@ -9,7 +9,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_varint_truncated_mid_stream_rejected(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A varint whose final byte still has the continuation bit set is rejected.
@@ -18,7 +18,7 @@ def test_varint_truncated_mid_stream_rejected(
     further bytes to complete the value. The decoder must raise
     `VarintError("Truncated varint")`.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "varint", "bytes": "0x8080"},
         expect_exception=VarintError,
@@ -26,7 +26,7 @@ def test_varint_truncated_mid_stream_rejected(
 
 
 def test_varint_longer_than_ten_bytes_rejected(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A varint running eleven continuation bytes exceeds the 64-bit cap and is rejected.
@@ -35,7 +35,7 @@ def test_varint_longer_than_ten_bytes_rejected(
     continuation bytes means the decoder cannot represent the value and must
     raise `VarintError("Varint too long")`.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "varint", "bytes": "0x" + "80" * 11},
         expect_exception=VarintError,

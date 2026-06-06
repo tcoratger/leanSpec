@@ -9,7 +9,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_gossipsub_rpc_decode_rejects_unknown_wire_type(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A protobuf tag with an unrecognised wire type must be rejected.
@@ -18,7 +18,7 @@ def test_gossipsub_rpc_decode_rejects_unknown_wire_type(
     beyond the set 0, 1, 2, 5 are unassigned; any occurrence in RPC traffic
     must be rejected rather than silently skipped.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "gossipsub_rpc", "bytes": "0x0e"},
         expect_exception=ProtobufDecodeError,
@@ -26,7 +26,7 @@ def test_gossipsub_rpc_decode_rejects_unknown_wire_type(
 
 
 def test_gossipsub_rpc_decode_rejects_length_exceeding_data(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     A length-delimited field whose length runs past the payload is rejected.
@@ -36,7 +36,7 @@ def test_gossipsub_rpc_decode_rejects_length_exceeding_data(
     zero bytes, so the declared length cannot possibly be covered. The
     decoder must raise before reading past the buffer end.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "gossipsub_rpc", "bytes": "0x0a64"},
         expect_exception=ProtobufDecodeError,

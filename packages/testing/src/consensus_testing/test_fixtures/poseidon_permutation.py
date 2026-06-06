@@ -8,6 +8,8 @@ output states bit-for-bit for every input state.
 
 from typing import Any, ClassVar
 
+from pydantic import Field
+
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.poseidon import PARAMS_16, PARAMS_24, Poseidon
@@ -24,7 +26,7 @@ class PoseidonPermutationTest(BaseConsensusFixture):
     JSON output: width, input, output.
     """
 
-    format_name: ClassVar[str] = "poseidon_permutation"
+    format_name: ClassVar[str] = "poseidon_permutation_test"
     description: ClassVar[str] = "Tests Poseidon permutation at widths 16 and 24"
 
     width: int
@@ -33,7 +35,7 @@ class PoseidonPermutationTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Input state. Key inputState holds a list of decimal element strings."""
 
-    output: dict[str, Any] = {}
+    output: dict[str, Any] = Field(default_factory=dict)
     """Computed output state. Filled by make_fixture."""
 
     def make_fixture(self) -> "PoseidonPermutationTest":
@@ -41,7 +43,7 @@ class PoseidonPermutationTest(BaseConsensusFixture):
         Run the Poseidon permutation and produce the output state.
 
         Returns:
-            A copy of this fixture with output populated.
+            This fixture with output populated.
 
         Raises:
             ValueError: If the width is unsupported.

@@ -7,7 +7,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_metrics_endpoint_scrape_contract(
-    api_endpoint: ApiEndpointTestFiller,
+    api_endpoint_test: ApiEndpointTestFiller,
 ) -> None:
     """
     GET /metrics returns the Prometheus-format scrape with the required metric names.
@@ -18,7 +18,7 @@ def test_metrics_endpoint_scrape_contract(
     metric names a compliant node must expose. Clients replay the
     fixture and confirm every listed metric appears in their scrape.
     """
-    api_endpoint(
+    api_endpoint_test(
         endpoint="/metrics",
         method="GET",
         genesis_params={"numValidators": 4, "genesisTime": 0},

@@ -67,75 +67,75 @@ class BoundaryUint64List32(SSZList[Uint64]):
     ELEMENT_TYPE = Uint64
 
 
-def test_bitvector_length_one_all_set(ssz: SSZTestFiller) -> None:
+def test_bitvector_length_one_all_set(ssz_test: SSZTestFiller) -> None:
     """Single-bit vector with the bit set pins the minimal Merkle chunk layout."""
-    ssz(
+    ssz_test(
         type_name="BoundaryBitvector1",
         value=BoundaryBitvector1(data=[Boolean(True)]),
     )
 
 
-def test_bitvector_length_seven_all_set(ssz: SSZTestFiller) -> None:
+def test_bitvector_length_seven_all_set(ssz_test: SSZTestFiller) -> None:
     """Seven-bit vector exercises the pre-byte-boundary pad bit."""
-    ssz(
+    ssz_test(
         type_name="BoundaryBitvector7",
         value=BoundaryBitvector7(data=[Boolean(True)] * 7),
     )
 
 
-def test_bitvector_length_nine_all_set(ssz: SSZTestFiller) -> None:
+def test_bitvector_length_nine_all_set(ssz_test: SSZTestFiller) -> None:
     """Nine-bit vector straddles the single-byte boundary."""
-    ssz(
+    ssz_test(
         type_name="BoundaryBitvector9",
         value=BoundaryBitvector9(data=[Boolean(True)] * 9),
     )
 
 
-def test_bitvector_length_255_all_set(ssz: SSZTestFiller) -> None:
+def test_bitvector_length_255_all_set(ssz_test: SSZTestFiller) -> None:
     """255-bit vector is one bit shy of a full 32-byte Merkle chunk."""
-    ssz(
+    ssz_test(
         type_name="BoundaryBitvector255",
         value=BoundaryBitvector255(data=[Boolean(True)] * 255),
     )
 
 
-def test_bitvector_length_256_all_set(ssz: SSZTestFiller) -> None:
+def test_bitvector_length_256_all_set(ssz_test: SSZTestFiller) -> None:
     """256-bit vector fills exactly one Merkle chunk with no padding."""
-    ssz(
+    ssz_test(
         type_name="BoundaryBitvector256",
         value=BoundaryBitvector256(data=[Boolean(True)] * 256),
     )
 
 
-def test_bitvector_length_257_all_set(ssz: SSZTestFiller) -> None:
+def test_bitvector_length_257_all_set(ssz_test: SSZTestFiller) -> None:
     """257-bit vector forces a second Merkle chunk holding a single bit."""
-    ssz(
+    ssz_test(
         type_name="BoundaryBitvector257",
         value=BoundaryBitvector257(data=[Boolean(True)] * 257),
     )
 
 
-def test_bitlist_filled_to_chunk_boundary_limit(ssz: SSZTestFiller) -> None:
+def test_bitlist_filled_to_chunk_boundary_limit(ssz_test: SSZTestFiller) -> None:
     """
     Bitlist filled to a 256-bit limit places the sentinel at the start of a fresh byte.
 
     The trailing sentinel crosses into a new chunk, exercising the length-mixin
     ordering for bitlists whose limit sits on a Merkle-chunk edge.
     """
-    ssz(
+    ssz_test(
         type_name="BoundaryBitlist256",
         value=BoundaryBitlist256(data=[Boolean(True)] * 256),
     )
 
 
-def test_uint64_list_with_misaligned_chunk_count(ssz: SSZTestFiller) -> None:
+def test_uint64_list_with_misaligned_chunk_count(ssz_test: SSZTestFiller) -> None:
     """
     Three uint64 entries occupy 24 bytes, one byte shy of a full Merkle chunk.
 
     Pins the zero-pad / length-mixin behaviour for variable-length lists of
     fixed-size elements whose serialized length is not a multiple of 32.
     """
-    ssz(
+    ssz_test(
         type_name="BoundaryUint64List32",
         value=BoundaryUint64List32(data=[Uint64(1), Uint64(2), Uint64(3)]),
     )

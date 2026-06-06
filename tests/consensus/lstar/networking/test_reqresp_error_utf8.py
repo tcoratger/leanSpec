@@ -7,7 +7,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_reqresp_error_at_max_error_message_size(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Error response carrying a payload at the maximum error-message size roundtrips.
@@ -18,7 +18,7 @@ def test_reqresp_error_at_max_error_message_size(
     bytes without loss.
     """
     payload = b"e" * 256
-    networking_codec(
+    networking_codec_test(
         codec_name="reqresp_response",
         input={
             "responseCode": 1,
@@ -28,7 +28,7 @@ def test_reqresp_error_at_max_error_message_size(
 
 
 def test_reqresp_error_with_multi_byte_utf8(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Error response carrying multi-byte UTF-8 text roundtrips byte-for-byte.
@@ -38,7 +38,7 @@ def test_reqresp_error_with_multi_byte_utf8(
     preserve the original bytes even when they are not ASCII-only.
     """
     payload = "errür😀fail".encode()
-    networking_codec(
+    networking_codec_test(
         codec_name="reqresp_response",
         input={
             "responseCode": 2,
@@ -48,7 +48,7 @@ def test_reqresp_error_with_multi_byte_utf8(
 
 
 def test_reqresp_error_resource_unavailable_with_informational_text(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Error code 3 response carrying a short descriptive message roundtrips.
@@ -57,7 +57,7 @@ def test_reqresp_error_resource_unavailable_with_informational_text(
     informational error string alongside the RESOURCE_UNAVAILABLE code.
     """
     payload = b"block not found"
-    networking_codec(
+    networking_codec_test(
         codec_name="reqresp_response",
         input={
             "responseCode": 3,

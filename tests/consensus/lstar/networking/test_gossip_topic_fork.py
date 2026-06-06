@@ -14,7 +14,7 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 
 def test_gossip_topic_network_name_matches(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Block topic whose network name matches the expected value validates cleanly.
@@ -22,7 +22,7 @@ def test_gossip_topic_network_name_matches(
     Pins the accept branch of validate_fork: a topic built with a network
     name equal to the expected one must pass the check.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_topic",
         input={
             "kind": "block",
@@ -33,7 +33,7 @@ def test_gossip_topic_network_name_matches(
 
 
 def test_gossip_topic_network_name_mismatch(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Block topic with a network name different from the expected one is rejected.
@@ -43,7 +43,7 @@ def test_gossip_topic_network_name_mismatch(
     output reports forkValid=false so clients align on the rejection
     verdict.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_topic",
         input={
             "kind": "block",
@@ -54,7 +54,7 @@ def test_gossip_topic_network_name_mismatch(
 
 
 def test_gossip_topic_network_name_match_on_attestation_subnet(
-    networking_codec: NetworkingCodecTestFiller,
+    networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
     Attestation-subnet topic carries the subnet id and still validates its network name.
@@ -63,7 +63,7 @@ def test_gossip_topic_network_name_match_on_attestation_subnet(
     to confirm the validator reads network_name independent of other
     topic components.
     """
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_topic",
         input={
             "kind": "attestation",

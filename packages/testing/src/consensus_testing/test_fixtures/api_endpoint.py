@@ -233,7 +233,7 @@ class ApiEndpointTest(BaseConsensusFixture):
     expectedContentType, expectedBody.
     """
 
-    format_name: ClassVar[str] = "api_endpoint"
+    format_name: ClassVar[str] = "api_endpoint_test"
     description: ClassVar[str] = "Tests API endpoint responses against known state"
 
     endpoint: str

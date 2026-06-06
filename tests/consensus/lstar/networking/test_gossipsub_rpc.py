@@ -16,9 +16,9 @@ PEER_ID = "0x" + "dd" * 32
 # --- SubOpts ---
 
 
-def test_sub_opts_subscribe(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_sub_opts_subscribe(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """SubOpts encoding for a topic subscription."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [{"subscribe": True, "topicId": TOPIC_A}],
@@ -27,9 +27,9 @@ def test_sub_opts_subscribe(networking_codec: NetworkingCodecTestFiller) -> None
     )
 
 
-def test_sub_opts_unsubscribe(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_sub_opts_unsubscribe(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """SubOpts encoding for a topic unsubscription."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [{"subscribe": False, "topicId": TOPIC_A}],
@@ -38,9 +38,9 @@ def test_sub_opts_unsubscribe(networking_codec: NetworkingCodecTestFiller) -> No
     )
 
 
-def test_sub_opts_empty_topic(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_sub_opts_empty_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """SubOpts with an empty topic string."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [{"subscribe": True, "topicId": ""}],
@@ -52,9 +52,9 @@ def test_sub_opts_empty_topic(networking_codec: NetworkingCodecTestFiller) -> No
 # --- Message ---
 
 
-def test_message_topic_only(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_topic_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Published message with only the topic field set."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -63,9 +63,9 @@ def test_message_topic_only(networking_codec: NetworkingCodecTestFiller) -> None
     )
 
 
-def test_message_all_fields(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_all_fields(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Published message with every optional field populated."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -83,9 +83,9 @@ def test_message_all_fields(networking_codec: NetworkingCodecTestFiller) -> None
     )
 
 
-def test_message_empty(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Published message with no fields set. Encodes as zero bytes."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -97,9 +97,9 @@ def test_message_empty(networking_codec: NetworkingCodecTestFiller) -> None:
 # --- ControlGraft ---
 
 
-def test_graft_single_topic(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_graft_single_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """GRAFT requesting mesh membership for one topic."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -109,9 +109,9 @@ def test_graft_single_topic(networking_codec: NetworkingCodecTestFiller) -> None
     )
 
 
-def test_graft_empty_topic(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_graft_empty_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """GRAFT with an empty topic string."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -124,9 +124,9 @@ def test_graft_empty_topic(networking_codec: NetworkingCodecTestFiller) -> None:
 # --- ControlIHave ---
 
 
-def test_ihave_single_id(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_ihave_single_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IHAVE advertising one cached message ID."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -138,9 +138,9 @@ def test_ihave_single_id(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_ihave_multiple_ids(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_ihave_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IHAVE advertising three cached message IDs."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -154,9 +154,9 @@ def test_ihave_multiple_ids(networking_codec: NetworkingCodecTestFiller) -> None
     )
 
 
-def test_ihave_empty_ids(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_ihave_empty_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IHAVE with a topic but no message IDs."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -171,9 +171,9 @@ def test_ihave_empty_ids(networking_codec: NetworkingCodecTestFiller) -> None:
 # --- ControlIWant ---
 
 
-def test_iwant_single_id(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_iwant_single_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IWANT requesting one message by ID."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -185,9 +185,9 @@ def test_iwant_single_id(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_iwant_multiple_ids(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_iwant_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IWANT requesting two messages by ID."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -202,9 +202,9 @@ def test_iwant_multiple_ids(networking_codec: NetworkingCodecTestFiller) -> None
 # --- ControlPrune ---
 
 
-def test_prune_topic_only(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_prune_topic_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """PRUNE with topic but no peer exchange or backoff."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -216,9 +216,9 @@ def test_prune_topic_only(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_prune_with_backoff(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_prune_with_backoff(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """PRUNE with a 60-second backoff duration."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -230,9 +230,9 @@ def test_prune_with_backoff(networking_codec: NetworkingCodecTestFiller) -> None
     )
 
 
-def test_prune_with_peer_exchange(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_prune_with_peer_exchange(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """PRUNE with peer exchange information and backoff."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -255,9 +255,9 @@ def test_prune_with_peer_exchange(networking_codec: NetworkingCodecTestFiller) -
 # --- ControlIDontWant ---
 
 
-def test_idontwant_single_id(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_idontwant_single_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IDONTWANT declining one message. Gossipsub v1.2 extension."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -269,9 +269,9 @@ def test_idontwant_single_id(networking_codec: NetworkingCodecTestFiller) -> Non
     )
 
 
-def test_idontwant_multiple_ids(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_idontwant_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """IDONTWANT declining two messages."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -286,9 +286,9 @@ def test_idontwant_multiple_ids(networking_codec: NetworkingCodecTestFiller) -> 
 # --- ControlMessage ---
 
 
-def test_control_single_graft(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_control_single_graft(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Control message containing only a single GRAFT."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -298,9 +298,9 @@ def test_control_single_graft(networking_codec: NetworkingCodecTestFiller) -> No
     )
 
 
-def test_control_all_types(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_control_all_types(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Control message with one of each control type."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -316,9 +316,9 @@ def test_control_all_types(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_control_empty(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_control_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Empty control message. All repeated fields empty, encodes to zero bytes."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -331,9 +331,9 @@ def test_control_empty(networking_codec: NetworkingCodecTestFiller) -> None:
 # --- Full RPC ---
 
 
-def test_rpc_subscriptions_only(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_rpc_subscriptions_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """RPC with only subscription changes."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [
@@ -345,9 +345,9 @@ def test_rpc_subscriptions_only(networking_codec: NetworkingCodecTestFiller) -> 
     )
 
 
-def test_rpc_publish_only(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_rpc_publish_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """RPC with only published messages."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -359,9 +359,9 @@ def test_rpc_publish_only(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_rpc_control_only(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_rpc_control_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """RPC with only control messages."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],
@@ -374,9 +374,9 @@ def test_rpc_control_only(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_rpc_full(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_rpc_full(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """RPC with subscriptions, published messages, and control all present."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [{"subscribe": True, "topicId": TOPIC_A}],
@@ -389,9 +389,9 @@ def test_rpc_full(networking_codec: NetworkingCodecTestFiller) -> None:
     )
 
 
-def test_rpc_empty(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_rpc_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Empty RPC. No subscriptions, messages, or control."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossipsub_rpc",
         input={
             "subscriptions": [],

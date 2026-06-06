@@ -172,34 +172,14 @@ class StateTransitionTest(BaseConsensusFixture):
             actual_post_state = state
         except (AssertionError, ValueError) as exception:
             exception_raised = exception
-            # If we expect an exception, this is fine
-            if self.expect_exception is None:
-                # Unexpected failure
-                raise AssertionError(
-                    f"Unexpected error processing blocks: {exception}"
-                ) from exception
         finally:
             # Always store filled blocks for serialization, even if an exception occurred
             # This ensures the test fixture includes all blocks that were attempted
             self._filled_blocks = filled_blocks
 
         # Validate exception expectations
-        if self.expect_exception is not None:
-            if exception_raised is None:
-                raise AssertionError(
-                    f"Expected exception {self.expect_exception.__name__} but processing succeeded"
-                )
-            if not isinstance(exception_raised, self.expect_exception):
-                raise AssertionError(
-                    f"Expected {self.expect_exception.__name__} "
-                    f"but got {type(exception_raised).__name__}: {exception_raised}"
-                )
-            if self.expect_exception_message is not None:
-                if str(exception_raised) != self.expect_exception_message:
-                    raise AssertionError(
-                        f"Expected exception message '{self.expect_exception_message}' "
-                        f"but got '{exception_raised}'"
-                    )
+        self.assert_expected_outcome(exception_raised, self.expect_exception_message)
+        if exception_raised is not None:
             # Emit the language-neutral reason clients assert against.
             self.rejection_reason = classify_rejection(exception_raised)
 

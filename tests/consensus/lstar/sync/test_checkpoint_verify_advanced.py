@@ -13,7 +13,7 @@ from consensus_testing import SyncTestFiller
 pytestmark = pytest.mark.valid_until("Lstar")
 
 
-def test_checkpoint_verify_advanced_slot_three(sync: SyncTestFiller) -> None:
+def test_checkpoint_verify_advanced_slot_three(sync_test: SyncTestFiller) -> None:
     """
     Advanced anchor state at slot 3 with four validators is accepted.
 
@@ -21,13 +21,13 @@ def test_checkpoint_verify_advanced_slot_three(sync: SyncTestFiller) -> None:
     carries non-empty historical_block_hashes and a non-zero latest
     block header. Pins the accepted verdict plus the exact SSZ bytes.
     """
-    sync(
+    sync_test(
         operation="verify_checkpoint",
         input={"numValidators": 4, "anchorSlot": 3},
     )
 
 
-def test_checkpoint_verify_advanced_slot_ten(sync: SyncTestFiller) -> None:
+def test_checkpoint_verify_advanced_slot_ten(sync_test: SyncTestFiller) -> None:
     """
     Advanced anchor state at slot 10 with four validators is accepted.
 
@@ -35,20 +35,20 @@ def test_checkpoint_verify_advanced_slot_ten(sync: SyncTestFiller) -> None:
     with longer lists. Pins the verdict and state bytes at a larger
     history than the slot-three case.
     """
-    sync(
+    sync_test(
         operation="verify_checkpoint",
         input={"numValidators": 4, "anchorSlot": 10},
     )
 
 
-def test_checkpoint_verify_advanced_eight_validators(sync: SyncTestFiller) -> None:
+def test_checkpoint_verify_advanced_eight_validators(sync_test: SyncTestFiller) -> None:
     """
     Advanced anchor state at slot 5 with eight validators is accepted.
 
     Exercises the combination of larger validator set with a non-zero
     anchor slot so clients diff both axes in a single vector.
     """
-    sync(
+    sync_test(
         operation="verify_checkpoint",
         input={"numValidators": 8, "anchorSlot": 5},
     )

@@ -18,9 +18,9 @@ BLOCK_TOPIC = "0x" + b"/leanconsensus/12345678/block/ssz_snappy".hex()
 # --- Valid snappy domain ---
 
 
-def test_message_id_valid_snappy(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_valid_snappy(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Message ID with valid-snappy domain and typical block data."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": BLOCK_TOPIC,
@@ -30,9 +30,11 @@ def test_message_id_valid_snappy(networking_codec: NetworkingCodecTestFiller) ->
     )
 
 
-def test_message_id_valid_snappy_large_payload(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_valid_snappy_large_payload(
+    networking_codec_test: NetworkingCodecTestFiller,
+) -> None:
     """Message ID with valid-snappy domain and a larger payload."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": BLOCK_TOPIC,
@@ -45,9 +47,9 @@ def test_message_id_valid_snappy_large_payload(networking_codec: NetworkingCodec
 # --- Invalid snappy domain ---
 
 
-def test_message_id_invalid_snappy(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_invalid_snappy(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Message ID with invalid-snappy domain and same data as the valid test."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": BLOCK_TOPIC,
@@ -60,9 +62,9 @@ def test_message_id_invalid_snappy(networking_codec: NetworkingCodecTestFiller) 
 # --- Empty inputs ---
 
 
-def test_message_id_empty_data(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_empty_data(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Message ID with empty payload."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": BLOCK_TOPIC,
@@ -72,9 +74,9 @@ def test_message_id_empty_data(networking_codec: NetworkingCodecTestFiller) -> N
     )
 
 
-def test_message_id_empty_topic(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_empty_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Message ID with empty topic string."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": "0x",
@@ -84,9 +86,9 @@ def test_message_id_empty_topic(networking_codec: NetworkingCodecTestFiller) -> 
     )
 
 
-def test_message_id_both_empty(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_both_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Message ID with both topic and data empty."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": "0x",
@@ -99,9 +101,9 @@ def test_message_id_both_empty(networking_codec: NetworkingCodecTestFiller) -> N
 # --- Domain differentiation ---
 
 
-def test_message_id_domain_changes_id(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_domain_changes_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Same topic and data with invalid-snappy domain produces a different ID."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": "0x" + b"test-topic".hex(),
@@ -111,9 +113,11 @@ def test_message_id_domain_changes_id(networking_codec: NetworkingCodecTestFille
     )
 
 
-def test_message_id_domain_valid_same_data(networking_codec: NetworkingCodecTestFiller) -> None:
+def test_message_id_domain_valid_same_data(
+    networking_codec_test: NetworkingCodecTestFiller,
+) -> None:
     """Same topic and data with valid-snappy domain for cross-reference."""
-    networking_codec(
+    networking_codec_test(
         codec_name="gossip_message_id",
         input={
             "topic": "0x" + b"test-topic".hex(),

@@ -21,7 +21,7 @@ class SmokeBitlist8(BaseBitlist):
     LIMIT: ClassVar[int] = 8
 
 
-def test_ssz_decode_failure_bitlist_exceeds_limit(ssz: SSZTestFiller) -> None:
+def test_ssz_decode_failure_bitlist_exceeds_limit(ssz_test: SSZTestFiller) -> None:
     """
     Decoding a bitlist whose contents imply a length above its LIMIT raises.
 
@@ -29,7 +29,7 @@ def test_ssz_decode_failure_bitlist_exceeds_limit(ssz: SSZTestFiller) -> None:
     on the decoder type is 8, so SSZ decode must reject. This pins the new
     `raw_bytes` + `expect_exception` path on the ssz fixture.
     """
-    ssz(
+    ssz_test(
         type_name="SmokeBitlist8",
         value=SmokeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x0010",

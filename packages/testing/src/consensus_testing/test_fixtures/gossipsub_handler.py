@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from unittest.mock import patch
 
+from pydantic import Field
+
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.gossipsub.behavior import GossipsubBehavior, PeerState
@@ -147,7 +149,7 @@ class GossipsubHandlerTest(BaseConsensusFixture):
     JSON output: params, initialState, event, now, expected.
     """
 
-    format_name: ClassVar[str] = "gossipsub_handler"
+    format_name: ClassVar[str] = "gossipsub_handler_test"
     description: ClassVar[str] = "Tests gossipsub handler protocol decisions"
 
     handler_name: str
@@ -165,7 +167,7 @@ class GossipsubHandlerTest(BaseConsensusFixture):
     now: float = 1000.0
     """Current timestamp for backoff checks."""
 
-    expected: dict[str, Any] = {}
+    expected: dict[str, Any] = Field(default_factory=dict)
     """Expected output. Filled by make_fixture."""
 
     def make_fixture(self) -> "GossipsubHandlerTest":

@@ -57,14 +57,14 @@ def _typical_attestation_data() -> AttestationData:
 # --- Checkpoint ---
 
 
-def test_checkpoint_zero(ssz: SSZTestFiller) -> None:
+def test_checkpoint_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Checkpoint with zero values."""
-    ssz(type_name="Checkpoint", value=_zero_checkpoint())
+    ssz_test(type_name="Checkpoint", value=_zero_checkpoint())
 
 
-def test_checkpoint_typical(ssz: SSZTestFiller) -> None:
+def test_checkpoint_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Checkpoint with typical values."""
-    ssz(
+    ssz_test(
         type_name="Checkpoint",
         value=Checkpoint(root=Bytes32(b"\xab" * 32), slot=Slot(12345)),
     )
@@ -73,30 +73,30 @@ def test_checkpoint_typical(ssz: SSZTestFiller) -> None:
 # --- AttestationData ---
 
 
-def test_attestation_data_zero(ssz: SSZTestFiller) -> None:
+def test_attestation_data_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for AttestationData with zero values."""
-    ssz(type_name="AttestationData", value=_zero_attestation_data())
+    ssz_test(type_name="AttestationData", value=_zero_attestation_data())
 
 
-def test_attestation_data_typical(ssz: SSZTestFiller) -> None:
+def test_attestation_data_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for AttestationData with typical values."""
-    ssz(type_name="AttestationData", value=_typical_attestation_data())
+    ssz_test(type_name="AttestationData", value=_typical_attestation_data())
 
 
 # --- Attestation ---
 
 
-def test_attestation_zero(ssz: SSZTestFiller) -> None:
+def test_attestation_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Attestation with zero values."""
-    ssz(
+    ssz_test(
         type_name="Attestation",
         value=Attestation(validator_index=ValidatorIndex(0), data=_zero_attestation_data()),
     )
 
 
-def test_attestation_typical(ssz: SSZTestFiller) -> None:
+def test_attestation_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Attestation with typical values."""
-    ssz(
+    ssz_test(
         type_name="Attestation",
         value=Attestation(validator_index=ValidatorIndex(42), data=_typical_attestation_data()),
     )
@@ -105,9 +105,9 @@ def test_attestation_typical(ssz: SSZTestFiller) -> None:
 # --- SignedAttestation ---
 
 
-def test_signed_attestation_minimal(ssz: SSZTestFiller) -> None:
+def test_signed_attestation_minimal(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for SignedAttestation with minimal values."""
-    ssz(
+    ssz_test(
         type_name="SignedAttestation",
         value=SignedAttestation(
             validator_index=ValidatorIndex(0),
@@ -120,9 +120,9 @@ def test_signed_attestation_minimal(ssz: SSZTestFiller) -> None:
 # --- AggregatedAttestation ---
 
 
-def test_aggregated_attestation_single(ssz: SSZTestFiller) -> None:
+def test_aggregated_attestation_single(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for AggregatedAttestation with single validator."""
-    ssz(
+    ssz_test(
         type_name="AggregatedAttestation",
         value=AggregatedAttestation(
             aggregation_bits=AggregationBits(data=[Boolean(True)]),
@@ -131,9 +131,9 @@ def test_aggregated_attestation_single(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_aggregated_attestation_multiple(ssz: SSZTestFiller) -> None:
+def test_aggregated_attestation_multiple(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for AggregatedAttestation with multiple validators."""
-    ssz(
+    ssz_test(
         type_name="AggregatedAttestation",
         value=AggregatedAttestation(
             aggregation_bits=AggregationBits(
@@ -147,17 +147,17 @@ def test_aggregated_attestation_multiple(ssz: SSZTestFiller) -> None:
 # --- BlockBody ---
 
 
-def test_block_body_empty(ssz: SSZTestFiller) -> None:
+def test_block_body_empty(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlockBody with no attestations."""
-    ssz(
+    ssz_test(
         type_name="BlockBody",
         value=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
 
 
-def test_block_body_with_attestation(ssz: SSZTestFiller) -> None:
+def test_block_body_with_attestation(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlockBody with attestations."""
-    ssz(
+    ssz_test(
         type_name="BlockBody",
         value=BlockBody(
             attestations=AggregatedAttestations(
@@ -175,9 +175,9 @@ def test_block_body_with_attestation(ssz: SSZTestFiller) -> None:
 # --- BlockHeader ---
 
 
-def test_block_header_zero(ssz: SSZTestFiller) -> None:
+def test_block_header_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlockHeader with zero values."""
-    ssz(
+    ssz_test(
         type_name="BlockHeader",
         value=BlockHeader(
             slot=Slot(0),
@@ -189,9 +189,9 @@ def test_block_header_zero(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_block_header_typical(ssz: SSZTestFiller) -> None:
+def test_block_header_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlockHeader with typical values."""
-    ssz(
+    ssz_test(
         type_name="BlockHeader",
         value=BlockHeader(
             slot=Slot(100),
@@ -206,9 +206,9 @@ def test_block_header_typical(ssz: SSZTestFiller) -> None:
 # --- Block ---
 
 
-def test_block_empty_body(ssz: SSZTestFiller) -> None:
+def test_block_empty_body(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Block with empty body."""
-    ssz(
+    ssz_test(
         type_name="Block",
         value=Block(
             slot=Slot(0),
@@ -220,9 +220,9 @@ def test_block_empty_body(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_block_typical(ssz: SSZTestFiller) -> None:
+def test_block_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Block with attestations."""
-    ssz(
+    ssz_test(
         type_name="Block",
         value=Block(
             slot=Slot(100),
@@ -246,7 +246,7 @@ def test_block_typical(ssz: SSZTestFiller) -> None:
 # --- SignedBlock ---
 
 
-def test_signed_block_minimal(ssz: SSZTestFiller) -> None:
+def test_signed_block_minimal(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for SignedBlock with empty proof bytes."""
     block = Block(
         slot=Slot(1),
@@ -255,7 +255,7 @@ def test_signed_block_minimal(ssz: SSZTestFiller) -> None:
         state_root=Bytes32.zero(),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
-    ssz(
+    ssz_test(
         type_name="SignedBlock",
         value=SignedBlock(
             block=block,
@@ -264,7 +264,7 @@ def test_signed_block_minimal(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_signed_block_with_proof_bytes(ssz: SSZTestFiller) -> None:
+def test_signed_block_with_proof_bytes(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for SignedBlock with non-empty proof bytes."""
     block = Block(
         slot=Slot(2),
@@ -273,7 +273,7 @@ def test_signed_block_with_proof_bytes(ssz: SSZTestFiller) -> None:
         state_root=Bytes32(b"\x02" * 32),
         body=BlockBody(attestations=AggregatedAttestations(data=[])),
     )
-    ssz(
+    ssz_test(
         type_name="SignedBlock",
         value=SignedBlock(
             block=block,
@@ -285,22 +285,22 @@ def test_signed_block_with_proof_bytes(ssz: SSZTestFiller) -> None:
 # --- Config ---
 
 
-def test_config_zero(ssz: SSZTestFiller) -> None:
+def test_config_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Config with zero genesis time."""
-    ssz(type_name="Config", value=GenesisConfig(genesis_time=Uint64(0)))
+    ssz_test(type_name="Config", value=GenesisConfig(genesis_time=Uint64(0)))
 
 
-def test_config_typical(ssz: SSZTestFiller) -> None:
+def test_config_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Config with typical genesis time."""
-    ssz(type_name="Config", value=GenesisConfig(genesis_time=Uint64(1609459200)))
+    ssz_test(type_name="Config", value=GenesisConfig(genesis_time=Uint64(1609459200)))
 
 
 # --- Validator ---
 
 
-def test_validator_zero(ssz: SSZTestFiller) -> None:
+def test_validator_zero(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Validator with zero values."""
-    ssz(
+    ssz_test(
         type_name="Validator",
         value=Validator(
             attestation_public_key=Bytes52.zero(),
@@ -310,9 +310,9 @@ def test_validator_zero(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_validator_typical(ssz: SSZTestFiller) -> None:
+def test_validator_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Validator with typical values."""
-    ssz(
+    ssz_test(
         type_name="Validator",
         value=Validator(
             attestation_public_key=Bytes52(b"\xab" * 52),
@@ -325,7 +325,7 @@ def test_validator_typical(ssz: SSZTestFiller) -> None:
 # --- State ---
 
 
-def test_state_minimal(ssz: SSZTestFiller) -> None:
+def test_state_minimal(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for State with minimal values."""
     zero_cp = _zero_checkpoint()
     zero_header = BlockHeader(
@@ -335,7 +335,7 @@ def test_state_minimal(ssz: SSZTestFiller) -> None:
         state_root=Bytes32.zero(),
         body_root=Bytes32.zero(),
     )
-    ssz(
+    ssz_test(
         type_name="State",
         value=State(
             config=GenesisConfig(genesis_time=Uint64(0)),
@@ -360,9 +360,9 @@ def test_state_minimal(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_state_with_validators(ssz: SSZTestFiller) -> None:
+def test_state_with_validators(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for State with multiple validators and history."""
-    ssz(
+    ssz_test(
         type_name="State",
         value=State(
             config=GenesisConfig(genesis_time=Uint64(1609459200)),
@@ -415,10 +415,10 @@ def test_state_with_validators(ssz: SSZTestFiller) -> None:
 # --- SignedAggregatedAttestation ---
 
 
-def test_signed_aggregated_attestation_minimal(ssz: SSZTestFiller) -> None:
+def test_signed_aggregated_attestation_minimal(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for SignedAggregatedAttestation with one participant and empty proof."""
     data = _zero_attestation_data()
-    ssz(
+    ssz_test(
         type_name="SignedAggregatedAttestation",
         value=SignedAggregatedAttestation(
             data=data,
@@ -430,11 +430,11 @@ def test_signed_aggregated_attestation_minimal(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_signed_aggregated_attestation_typical(ssz: SSZTestFiller) -> None:
+def test_signed_aggregated_attestation_typical(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for SignedAggregatedAttestation with mixed participation bits."""
     data = _typical_attestation_data()
     wire = b"\xca\xfe\xba\xbe\xde\xad"
-    ssz(
+    ssz_test(
         type_name="SignedAggregatedAttestation",
         value=SignedAggregatedAttestation(
             data=data,
@@ -451,17 +451,17 @@ def test_signed_aggregated_attestation_typical(ssz: SSZTestFiller) -> None:
 # --- Boundary-value tests ---
 
 
-def test_checkpoint_max_slot(ssz: SSZTestFiller) -> None:
+def test_checkpoint_max_slot(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Checkpoint at the maximum 64-bit slot and all-0xff root."""
-    ssz(
+    ssz_test(
         type_name="Checkpoint",
         value=Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(2**64 - 1)),
     )
 
 
-def test_block_body_max_attestations(ssz: SSZTestFiller) -> None:
+def test_block_body_max_attestations(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for BlockBody with four attestations of varying aggregation sizes."""
-    ssz(
+    ssz_test(
         type_name="BlockBody",
         value=BlockBody(
             attestations=AggregatedAttestations(
@@ -497,9 +497,9 @@ def test_block_body_max_attestations(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_validator_max_index(ssz: SSZTestFiller) -> None:
+def test_validator_max_index(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for Validator at the maximum 64-bit index with all-0xff public keys."""
-    ssz(
+    ssz_test(
         type_name="Validator",
         value=Validator(
             attestation_public_key=Bytes52(b"\xff" * 52),
@@ -509,9 +509,9 @@ def test_validator_max_index(ssz: SSZTestFiller) -> None:
     )
 
 
-def test_state_with_full_history(ssz: SSZTestFiller) -> None:
+def test_state_with_full_history(ssz_test: SSZTestFiller) -> None:
     """SSZ roundtrip for State with five block hashes, eight justification bits, and three roots."""
-    ssz(
+    ssz_test(
         type_name="State",
         value=State(
             config=GenesisConfig(genesis_time=Uint64(1700000000)),

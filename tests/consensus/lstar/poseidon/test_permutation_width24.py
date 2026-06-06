@@ -17,7 +17,7 @@ WIDTH: int = 24
 
 
 def test_permutation_width24_all_zero(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """
     Input state of all zeros pins the round-constant-only output at width 24.
@@ -27,38 +27,38 @@ def test_permutation_width24_all_zero(
     round constants and MDS matrix, making this vector sensitive to
     tables-of-constants drift at the larger width.
     """
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": ["0"] * WIDTH},
     )
 
 
 def test_permutation_width24_all_one(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """Input state of all ones exercises uniform non-zero entries at width 24."""
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": ["1"] * WIDTH},
     )
 
 
 def test_permutation_width24_incremental_index(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """Input state filled with 0, 1, 2, ..., 23 pins per-slot MDS behaviour."""
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": [str(i) for i in range(WIDTH)]},
     )
 
 
 def test_permutation_width24_p_minus_one_and_near_zero(
-    poseidon_permutation: PoseidonPermutationTestFiller,
+    poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """Alternating P - 1 and small positives stress reduction at width 24."""
     state = [str(P - 1) if i % 2 == 0 else str(i) for i in range(WIDTH)]
-    poseidon_permutation(
+    poseidon_permutation_test(
         width=WIDTH,
         input={"inputState": state},
     )
