@@ -6,6 +6,7 @@ from pydantic import ConfigDict, Field, PrivateAttr, field_serializer
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
+from consensus_testing.rejection import classify_rejection
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
 from lean_spec.spec.crypto.merkleization import hash_tree_root
@@ -100,8 +101,13 @@ class StateTransitionTest(BaseConsensusFixture):
     Stays None for invalid tests, which produce no post-state.
     """
 
-    expect_exception_message: str | None = None
-    """Expected exception message for invalid tests."""
+    expect_exception_message: str | None = Field(default=None, exclude=True)
+    """
+    Expected exception message for invalid tests.
+
+    Excluded from JSON output: an English message means nothing to
+    other-language clients. It remains a fill-time self-check only.
+    """
 
     @field_serializer("blocks", when_used="json")
     def serialize_blocks(self, block_specs: list[BlockSpec]) -> list[dict[str, Any]]:
@@ -194,6 +200,8 @@ class StateTransitionTest(BaseConsensusFixture):
                         f"Expected exception message '{self.expect_exception_message}' "
                         f"but got '{exception_raised}'"
                     )
+            # Emit the language-neutral reason clients assert against.
+            self.rejection_reason = classify_rejection(exception_raised)
 
         # Pin the full post-state for clients.
         # Selective expectations below only cover authored fields.

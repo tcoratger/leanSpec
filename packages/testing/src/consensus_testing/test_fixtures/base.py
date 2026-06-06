@@ -6,10 +6,11 @@ from functools import cached_property
 from typing import Any, ClassVar
 
 from framework.forks import BaseFork
-from pydantic import Field, field_serializer
+from pydantic import Field
 
 from lean_spec.base import CamelModel
 from lean_spec.config import LEAN_ENV
+from lean_spec.spec.forks import RejectionReason
 
 
 class BaseConsensusFixture(CamelModel):
@@ -39,20 +40,24 @@ class BaseConsensusFixture(CamelModel):
     info: dict[str, Any] = Field(default_factory=dict, alias="_info")
     """Metadata about the test (description, fork, etc.)."""
 
-    expect_exception: type[Exception] | None = None
+    expect_exception: type[Exception] | None = Field(default=None, exclude=True)
     """
     Expected exception type for invalid tests.
 
     If set, the fixture expects this exception during processing.
     The test passes only if the exception is raised.
+
+    Excluded from JSON output: a Python class name means nothing to
+    other-language clients. It remains a fill-time self-check only.
     """
 
-    @field_serializer("expect_exception", when_used="json")
-    def serialize_exception(self, exception_type: type[Exception] | None) -> str | None:
-        """Serialize exception type to its class name for JSON output."""
-        if exception_type is None:
-            return None
-        return exception_type.__name__
+    rejection_reason: RejectionReason | None = None
+    """
+    Language-neutral reason the vector's input must be rejected.
+
+    Filled during generation for negative vectors.
+    This is the field clients assert against.
+    """
 
     def assert_expected_outcome(self, exception_raised: Exception | None) -> None:
         """

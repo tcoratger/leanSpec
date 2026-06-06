@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
+from consensus_testing.rejection import classify_rejection
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from consensus_testing.test_types import BlockSpec
 from lean_spec.spec.crypto.merkleization import hash_tree_root
@@ -187,6 +188,8 @@ class VerifySignaturesTest(BaseConsensusFixture):
                     f"Expected {self.expect_exception.__name__} "
                     f"but got {type(exception_raised).__name__}: {exception_raised}"
                 )
+            # Emit the language-neutral reason clients assert against.
+            self.rejection_reason = classify_rejection(exception_raised)
 
         return self
 

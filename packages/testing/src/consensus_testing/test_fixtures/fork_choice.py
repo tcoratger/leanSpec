@@ -13,6 +13,7 @@ from pydantic import Field, model_validator
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
+from consensus_testing.rejection import classify_rejection
 from consensus_testing.test_fixtures.base import BaseConsensusFixture
 from consensus_testing.test_types import (
     AttestationStep,
@@ -210,6 +211,8 @@ class ForkChoiceTest(BaseConsensusFixture):
                         f"  Expected error containing: {self.expected_anchor_error!r}\n"
                         f"  Actual error: {exception!r}"
                     ) from exception
+                # Emit the language-neutral reason clients assert against.
+                self.rejection_reason = classify_rejection(exception)
                 return self
 
             raise AssertionError("Store.from_anchor was expected to fail but succeeded")
@@ -394,6 +397,9 @@ class ForkChoiceTest(BaseConsensusFixture):
                         f"  Expected error containing: {step.expected_error!r}\n"
                         f"  Actual error: {exception!r}"
                     ) from exception
+
+                # Emit the language-neutral reason clients assert against.
+                step.rejection_reason = classify_rejection(exception)
 
                 continue
 

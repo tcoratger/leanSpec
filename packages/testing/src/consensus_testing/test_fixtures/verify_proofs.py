@@ -13,6 +13,7 @@ from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import (
     AggregationBits,
     Checkpoint,
+    RejectionReason,
     Slot,
     ValidatorIndex,
 )
@@ -250,6 +251,9 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         except Exception as exception:
             exception_raised = exception
         self.assert_expected_outcome(exception_raised)
+        # Every tamper breaks the proof's cryptographic binding.
+        if self.expect_exception is not None:
+            self.rejection_reason = RejectionReason.INVALID_SIGNATURE
 
         # Phase 4: publish the client-visible outputs and return self.
         self.message = message
@@ -494,6 +498,9 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
         except Exception as exception:
             exception_raised = exception
         self.assert_expected_outcome(exception_raised)
+        # Every tamper breaks the proof's cryptographic binding.
+        if self.expect_exception is not None:
+            self.rejection_reason = RejectionReason.INVALID_SIGNATURE
 
         # Phase 5: publish the client-visible outputs and return self.
         self.messages = messages

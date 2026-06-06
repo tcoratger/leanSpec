@@ -12,6 +12,7 @@ from consensus_testing.test_types.block_spec import BlockSpec
 from consensus_testing.test_types.store_checks import StoreChecks
 from consensus_testing.test_types.store_snapshot import StoreSnapshot
 from lean_spec.base import CamelModel
+from lean_spec.spec.forks import RejectionReason
 from lean_spec.spec.forks.lstar.containers import (
     Block,
     SignedAggregatedAttestation,
@@ -33,13 +34,24 @@ class BaseForkChoiceStep(CamelModel):
     valid: bool = True
     """Whether this step is expected to succeed."""
 
-    expected_error: str | None = None
+    expected_error: str | None = Field(default=None, exclude=True)
     """
     Expected error message substring when valid=False.
 
     When set, the exception message must contain this string.
     When None and valid=False, any exception is accepted.
     Ignored when valid=True.
+
+    Excluded from JSON output: an English substring means nothing to
+    other-language clients. It remains a fill-time self-check only.
+    """
+
+    rejection_reason: RejectionReason | None = None
+    """
+    Language-neutral reason this step's input must be rejected.
+
+    Filled during generation for invalid steps.
+    This is the field clients assert against.
     """
 
     checks: StoreChecks | None = None
