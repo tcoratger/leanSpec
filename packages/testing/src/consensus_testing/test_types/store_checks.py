@@ -581,8 +581,6 @@ class StoreChecks(CamelModel):
             )
 
         # Resolve all fork labels to roots and compute their weights.
-        # The spec's own weight computation is the source of truth.
-        # Why: a hand-rolled re-derivation could drift from the fork choice rule.
         spec_block_weights = LstarSpec().compute_block_weights(store)
 
         fork_data: dict[str, tuple[Bytes32, int]] = {}
