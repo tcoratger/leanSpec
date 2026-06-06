@@ -89,6 +89,17 @@ class StateTransitionTest(BaseConsensusFixture):
     If None, no post-state validation is performed (e.g., for invalid tests).
     """
 
+    post_state_root: Bytes32 | None = None
+    """
+    Hash tree root of the full post-state.
+
+    Populated by the framework whenever processing succeeds.
+    Tests must not set this.
+    Clients must reproduce this root exactly, so two clients cannot
+    pass the same vector while holding divergent state.
+    Stays None for invalid tests, which produce no post-state.
+    """
+
     expect_exception_message: str | None = None
     """Expected exception message for invalid tests."""
 
@@ -183,6 +194,12 @@ class StateTransitionTest(BaseConsensusFixture):
                         f"Expected exception message '{self.expect_exception_message}' "
                         f"but got '{exception_raised}'"
                     )
+
+        # Pin the full post-state for clients.
+        # Selective expectations below only cover authored fields.
+        # The root covers every field, closing the divergence gap.
+        if actual_post_state is not None:
+            self.post_state_root = hash_tree_root(actual_post_state)
 
         # Validate post-state expectations if provided
         if self.post is not None and actual_post_state is not None:

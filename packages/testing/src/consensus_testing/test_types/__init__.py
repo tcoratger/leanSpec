@@ -19,12 +19,14 @@ from consensus_testing.test_types.store_checks import (
     AttestationCheck,
     StoreChecks,
 )
+from consensus_testing.test_types.store_snapshot import StoreSnapshot
 
 __all__ = [
     "AggregatedAttestationSpec",
     "GossipAttestationSpec",
     "StateExpectation",
     "StoreChecks",
+    "StoreSnapshot",
     "AttestationCheck",
     "AggregatedAttestationCheck",
     "BaseForkChoiceStep",
