@@ -9,26 +9,11 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-from consensus_testing.keys import XmssKeyManager
 
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import MAX_ATTESTATIONS_DATA
 
 pytestmark = pytest.mark.valid_until("Lstar")
-
-
-@pytest.fixture(autouse=True)
-def _reset_xmss_signing_state():
-    """
-    Reset XMSS signing state around each test in this module.
-
-    Tests here sign at high slots (50+). Without resetting, the advanced
-    key state poisons the cache for any later test on the same
-    worker that need low-slot signatures.
-    """
-    XmssKeyManager.reset_signing_state()
-    yield
-    XmssKeyManager.reset_signing_state()
 
 
 def _justifiable_slots(n: int) -> list[Slot]:
