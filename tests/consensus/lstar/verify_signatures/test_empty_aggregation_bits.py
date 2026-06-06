@@ -4,6 +4,7 @@ import pytest
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
+    ClearFirstAttestationBits,
     VerifySignaturesTestFiller,
     generate_pre_state,
 )
@@ -53,6 +54,6 @@ def test_empty_aggregation_bits_rejected(
                 ),
             ],
         ),
-        tamper={"operation": "clear_first_attestation_bits"},
+        tamper=ClearFirstAttestationBits(),
         expect_exception=AssertionError,
     )

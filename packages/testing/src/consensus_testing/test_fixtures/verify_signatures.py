@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
@@ -22,6 +22,71 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
+
+
+class SetProposerIndex(BaseModel):
+    """
+    Rewrite the block's proposer index.
+
+    Exercises the validator-bounds check that the builder skips
+    because its round-robin selection stays within range by
+    construction.
+    """
+
+    proposer_index: ValidatorIndex
+    """Replacement proposer index written into the block."""
+
+
+class ClearFirstAttestationBits(BaseModel):
+    """
+    Replace the first body attestation with one whose participation bits carry no set bit.
+
+    Exercises the empty-participants check inside signature verification.
+    """
+
+
+class CorruptProof(BaseModel):
+    """
+    Replace the merged proof with a short non-decodable blob.
+
+    Exercises the multi-message aggregate decode check.
+    """
+
+
+class AppendPhantomAttestation(BaseModel):
+    """
+    Add a body attestation with no matching proof component.
+
+    Exercises the component count check between the body and the merged proof.
+    """
+
+
+class MutateStateRoot(BaseModel):
+    """
+    Change a block field after signing so the block root differs.
+
+    Exercises the per-component message binding that prevents
+    reusing an honest proof under a different message.
+    """
+
+
+class SwapFirstTwoAttestations(BaseModel):
+    """
+    Swap the first two body attestations and re-sign only the proposer.
+
+    Exercises body/proof ordering without relying on a block-root mismatch.
+    """
+
+
+SignedBlockTamper = (
+    SetProposerIndex
+    | ClearFirstAttestationBits
+    | CorruptProof
+    | AppendPhantomAttestation
+    | MutateStateRoot
+    | SwapFirstTwoAttestations
+)
+"""Union of post-build mutations that each produce a rejection vector."""
 
 
 class VerifySignaturesTest(BaseConsensusFixture):
@@ -55,32 +120,11 @@ class VerifySignaturesTest(BaseConsensusFixture):
     build a complete signed block with all necessary signatures.
     """
 
-    tamper: dict[str, Any] | None = Field(default=None, exclude=True)
+    tamper: SignedBlockTamper | None = Field(default=None, exclude=True)
     """
     Optional post-build mutation applied before verification.
 
-    Supported operations:
-
-    - `{"operation": "set_proposer_index", "value": int}`: Rewrite
-      the block's proposer_index field. Use this to exercise the
-      validator-bounds check that the builder skips because its round-
-      robin selection stays within range by construction.
-    - `{"operation": "clear_first_attestation_bits"}`: Replace the
-      first body attestation with one whose aggregation_bits carry no
-      set bit. Exercises the empty-participants check inside
-      signature verification.
-    - `{"operation": "corrupt_proof"}`: Replace the merged proof with
-      a short non-decodable blob. Exercises the multi-message aggregate decode check.
-    - `{"operation": "append_phantom_attestation"}`: Add a body
-      attestation with no matching proof component. Exercises the
-      component count check between the body and the merged proof.
-    - `{"operation": "mutate_state_root"}`: Change a block field after
-      signing so the block root differs. Exercises the per-component
-      message binding that prevents reusing an honest proof under a
-      different message.
-    - `{"operation": "swap_first_two_attestations"}`: Swap the first
-      two body attestations and re-sign only the proposer. Exercises
-      body/proof ordering without relying on a block-root mismatch.
+    Each tamper type documents the rejection path it exercises.
 
     Tampered blocks bypass the builder's structural invariants. The
     resulting fixture pins the exact rejection a client must raise when
@@ -112,7 +156,7 @@ class VerifySignaturesTest(BaseConsensusFixture):
         # This is the only way to exercise rejection paths the builder would
         # otherwise prevent by construction.
         if self.tamper is not None:
-            signed_block = self._apply_tamper(signed_block)
+            signed_block = self._apply_tamper(signed_block, self.tamper)
 
         exception_raised: Exception | None = None
 
@@ -146,155 +190,156 @@ class VerifySignaturesTest(BaseConsensusFixture):
 
         return self
 
-    def _apply_tamper(self, signed_block: SignedBlock) -> SignedBlock:
+    def _apply_tamper(self, signed_block: SignedBlock, tamper: SignedBlockTamper) -> SignedBlock:
         """
         Apply the configured post-build mutation to a signed block.
 
         Args:
             signed_block: The validly built signed block.
+            tamper: The mutation to apply.
 
         Returns:
             A new signed block with the requested mutation applied.
 
         Raises:
-            ValueError: If the operation is unknown or cannot be applied.
+            ValueError: If the mutation cannot be applied to this block.
         """
-        assert self.tamper is not None
-        operation = self.tamper.get("operation")
-
-        if operation == "set_proposer_index":
-            new_proposer_index = self.tamper.get("value")
-            if new_proposer_index is None:
-                raise ValueError("set_proposer_index requires a value")
-            return signed_block.model_copy(
-                update={
-                    "block": signed_block.block.model_copy(
-                        update={"proposer_index": ValidatorIndex(int(new_proposer_index))}
-                    )
-                }
-            )
-
-        if operation == "clear_first_attestation_bits":
-            attestations = signed_block.block.body.attestations.data
-            if not attestations:
-                raise ValueError("clear_first_attestation_bits requires at least one attestation")
-            first_attestation = attestations[0]
-            empty_bits = AggregationBits(
-                data=[Boolean(False)] * len(first_attestation.aggregation_bits.data)
-            )
-            cleared = AggregatedAttestation(
-                aggregation_bits=empty_bits, data=first_attestation.data
-            )
-            return signed_block.model_copy(
-                update={
-                    "block": signed_block.block.model_copy(
-                        update={
-                            "body": signed_block.block.body.model_copy(
-                                update={
-                                    "attestations": AggregatedAttestations(
-                                        data=[cleared, *attestations[1:]]
-                                    )
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-
-        if operation == "corrupt_proof":
-            # Replace the merged proof with a short bogus payload.
-            # The verifier rejects the malformed proof bytes.
-            return signed_block.model_copy(
-                update={
-                    "proof": MultiMessageAggregate(
-                        proof=ByteList512KiB(data=b"\x00\x01\x02\x03"),
-                    )
-                }
-            )
-
-        if operation == "append_phantom_attestation":
-            # Add a body attestation with no matching proof component.
-            # The proof binds one component per original attestation plus
-            # the proposer, so the body now claims more components than the
-            # proof carries.
-            phantom_data = AttestationData(
-                slot=Slot(0),
-                head=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
-                target=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
-                source=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
-            )
-            phantom = AggregatedAttestation(
-                aggregation_bits=AggregationBits(data=[Boolean(True)]),
-                data=phantom_data,
-            )
-            return signed_block.model_copy(
-                update={
-                    "block": signed_block.block.model_copy(
-                        update={
-                            "body": signed_block.block.body.model_copy(
-                                update={
-                                    "attestations": AggregatedAttestations(
-                                        data=[*signed_block.block.body.attestations.data, phantom]
-                                    )
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-
-        if operation == "mutate_state_root":
-            # Change a block field after signing so the block root differs.
-            # The proposer component's bound message no longer matches the
-            # recomputed block root, even though the signature is honest.
-            # This is the repackaging vector: an honest proof reused under
-            # a different message.
-            return signed_block.model_copy(
-                update={
-                    "block": signed_block.block.model_copy(
-                        update={"state_root": Bytes32(b"\xff" * 32)}
-                    )
-                }
-            )
-
-        if operation == "swap_first_two_attestations":
-            body = signed_block.block.body
-            attestations = body.attestations.data
-            if len(attestations) < 2:
-                raise ValueError("swap_first_two_attestations requires at least two attestations")
-
-            key_manager = XmssKeyManager.shared()
-            original_attestation_proofs = [
-                key_manager.sign_and_aggregate(
-                    list(attestation.aggregation_bits.to_validator_indices()),
-                    attestation.data,
+        match tamper:
+            case SetProposerIndex(proposer_index=new_proposer_index):
+                return signed_block.model_copy(
+                    update={
+                        "block": signed_block.block.model_copy(
+                            update={"proposer_index": new_proposer_index}
+                        )
+                    }
                 )
-                for attestation in attestations
-            ]
 
-            swapped_body = body.model_copy(
-                update={
-                    "attestations": AggregatedAttestations(
-                        data=[attestations[1], attestations[0], *attestations[2:]]
+            case ClearFirstAttestationBits():
+                attestations = signed_block.block.body.attestations.data
+                if not attestations:
+                    raise ValueError(
+                        "clearing the first attestation's bits requires at least one attestation"
                     )
-                }
-            )
-            swapped_block = signed_block.block.model_copy(update={"body": swapped_body})
+                first_attestation = attestations[0]
+                empty_bits = AggregationBits(
+                    data=[Boolean(False)] * len(first_attestation.aggregation_bits.data)
+                )
+                cleared = AggregatedAttestation(
+                    aggregation_bits=empty_bits, data=first_attestation.data
+                )
+                return signed_block.model_copy(
+                    update={
+                        "block": signed_block.block.model_copy(
+                            update={
+                                "body": signed_block.block.body.model_copy(
+                                    update={
+                                        "attestations": AggregatedAttestations(
+                                            data=[cleared, *attestations[1:]]
+                                        )
+                                    }
+                                )
+                            }
+                        )
+                    }
+                )
 
-            # Keep the block root honestly signed; only the attestation
-            # proof order remains mismatched with the body order.
-            post_state = LstarSpec().process_slots(self.anchor_state, swapped_block.slot)
-            post_state = LstarSpec().process_block(post_state, swapped_block)
-            swapped_block = swapped_block.model_copy(
-                update={"state_root": hash_tree_root(post_state)}
-            )
+            case CorruptProof():
+                # Replace the merged proof with a short bogus payload.
+                # The verifier rejects the malformed proof bytes.
+                return signed_block.model_copy(
+                    update={
+                        "proof": MultiMessageAggregate(
+                            proof=ByteList512KiB(data=b"\x00\x01\x02\x03"),
+                        )
+                    }
+                )
 
-            return self.block._sign_block(
-                swapped_block,
-                original_attestation_proofs,
-                swapped_block.proposer_index,
-                key_manager,
-                self.anchor_state,
-            )
+            case AppendPhantomAttestation():
+                # Add a body attestation with no matching proof component.
+                # The proof binds one component per original attestation plus
+                # the proposer, so the body now claims more components than the
+                # proof carries.
+                phantom_data = AttestationData(
+                    slot=Slot(0),
+                    head=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
+                    target=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
+                    source=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
+                )
+                phantom = AggregatedAttestation(
+                    aggregation_bits=AggregationBits(data=[Boolean(True)]),
+                    data=phantom_data,
+                )
+                return signed_block.model_copy(
+                    update={
+                        "block": signed_block.block.model_copy(
+                            update={
+                                "body": signed_block.block.body.model_copy(
+                                    update={
+                                        "attestations": AggregatedAttestations(
+                                            data=[
+                                                *signed_block.block.body.attestations.data,
+                                                phantom,
+                                            ]
+                                        )
+                                    }
+                                )
+                            }
+                        )
+                    }
+                )
 
-        raise ValueError(f"Unknown tamper operation: {operation!r}")
+            case MutateStateRoot():
+                # Change a block field after signing so the block root differs.
+                # The proposer component's bound message no longer matches the
+                # recomputed block root, even though the signature is honest.
+                # This is the repackaging vector: an honest proof reused under
+                # a different message.
+                return signed_block.model_copy(
+                    update={
+                        "block": signed_block.block.model_copy(
+                            update={"state_root": Bytes32(b"\xff" * 32)}
+                        )
+                    }
+                )
+
+            case SwapFirstTwoAttestations():
+                body = signed_block.block.body
+                attestations = body.attestations.data
+                if len(attestations) < 2:
+                    raise ValueError(
+                        "swapping the first two attestations requires at least two attestations"
+                    )
+
+                key_manager = XmssKeyManager.shared()
+                original_attestation_proofs = [
+                    key_manager.sign_and_aggregate(
+                        list(attestation.aggregation_bits.to_validator_indices()),
+                        attestation.data,
+                    )
+                    for attestation in attestations
+                ]
+
+                swapped_body = body.model_copy(
+                    update={
+                        "attestations": AggregatedAttestations(
+                            data=[attestations[1], attestations[0], *attestations[2:]]
+                        )
+                    }
+                )
+                swapped_block = signed_block.block.model_copy(update={"body": swapped_body})
+
+                # Keep the block root honestly signed; only the attestation
+                # proof order remains mismatched with the body order.
+                post_state = LstarSpec().process_slots(self.anchor_state, swapped_block.slot)
+                post_state = LstarSpec().process_block(post_state, swapped_block)
+                swapped_block = swapped_block.model_copy(
+                    update={"state_root": hash_tree_root(post_state)}
+                )
+
+                return self.block._sign_block(
+                    swapped_block,
+                    original_attestation_proofs,
+                    swapped_block.proposer_index,
+                    key_manager,
+                    self.anchor_state,
+                )

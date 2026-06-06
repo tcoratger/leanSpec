@@ -20,7 +20,15 @@ from consensus_testing.test_fixtures.verify_proofs import (
     VerifyMultiMessageProofsTest,
     VerifySingleMessageProofsTest,
 )
-from consensus_testing.test_fixtures.verify_signatures import VerifySignaturesTest
+from consensus_testing.test_fixtures.verify_signatures import (
+    AppendPhantomAttestation,
+    ClearFirstAttestationBits,
+    CorruptProof,
+    MutateStateRoot,
+    SetProposerIndex,
+    SwapFirstTwoAttestations,
+    VerifySignaturesTest,
+)
 
 __all__ = [
     "BaseConsensusFixture",
@@ -34,6 +42,12 @@ __all__ = [
     "SwapMessageBindings",
     "DropMessageBinding",
     "VerifySignaturesTest",
+    "SetProposerIndex",
+    "ClearFirstAttestationBits",
+    "CorruptProof",
+    "AppendPhantomAttestation",
+    "MutateStateRoot",
+    "SwapFirstTwoAttestations",
     "SSZTest",
     "NetworkingCodecTest",
     "GossipsubHandlerTest",
