@@ -8,8 +8,8 @@ peer sends malformed framing.
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
-from lean_spec.node.networking.reqresp.codec import CodecError
+from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -27,7 +27,7 @@ def test_reqresp_decode_rejects_empty_request(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "reqresp_request", "bytes": "0x"},
-        expect_exception=CodecError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -44,7 +44,7 @@ def test_reqresp_decode_rejects_invalid_varint_prefix(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "reqresp_request", "bytes": "0x8080"},
-        expect_exception=CodecError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -61,5 +61,5 @@ def test_reqresp_decode_rejects_declared_length_above_max(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "reqresp_request", "bytes": "0x81808005"},
-        expect_exception=CodecError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

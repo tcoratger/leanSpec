@@ -1,16 +1,8 @@
-"""
-Slot clock test fixture for timing conformance testing.
-
-Generates JSON test vectors that verify slot/interval computation from
-wall-clock timestamps. Every client must compute identical slot boundaries
-to coordinate block proposals and attestations.
-"""
+"""Slot clock test fixture for timing conformance testing."""
 
 from typing import Any, ClassVar
 
-from pydantic import Field
-
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.forks import Interval, Slot
 from lean_spec.spec.forks.lstar.config import (
@@ -21,14 +13,29 @@ from lean_spec.spec.forks.lstar.config import (
 from lean_spec.spec.ssz import Uint64
 
 
-class SlotClockTest(BaseConsensusFixture):
+class SlotClockFixture(BaseConsensusFixture):
     """
-    Fixture for slot clock timing conformance.
+    Emitted vector for slot clock timing conformance.
+
+    JSON output: operation, input, output.
+    """
+
+    operation: str
+    """Operation under test."""
+
+    input: dict[str, Any]
+    """Operation-specific input parameters."""
+
+    output: dict[str, Any]
+    """Computed output including the timing config."""
+
+
+class SlotClockTest(BaseTestSpec):
+    """
+    Spec for slot clock timing conformance.
 
     Tests time-to-slot and time-to-interval conversions that every
     consensus client must implement identically.
-
-    JSON output: operation, input, config, output.
     """
 
     format_name: ClassVar[str] = "slot_clock_test"
@@ -41,10 +48,7 @@ class SlotClockTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Operation-specific input parameters."""
 
-    output: dict[str, Any] = Field(default_factory=dict)
-    """Computed output. Filled by make_fixture."""
-
-    def make_fixture(self) -> "SlotClockTest":
+    def generate(self) -> SlotClockFixture:
         """Dispatch to the operation handler and produce computed output."""
         config = {
             "secondsPerSlot": int(SECONDS_PER_SLOT),
@@ -64,8 +68,11 @@ class SlotClockTest(BaseConsensusFixture):
                 computed_output = self._make_total_intervals()
             case _:
                 raise ValueError(f"Unknown operation: {self.operation}")
-        self.output = {"config": config, **computed_output}
-        return self
+        return SlotClockFixture(
+            operation=self.operation,
+            input=self.input,
+            output={"config": config, **computed_output},
+        )
 
     def _make_from_unix_time(self) -> dict[str, Any]:
         """Convert unix timestamp to interval count since genesis."""

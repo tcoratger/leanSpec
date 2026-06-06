@@ -4,11 +4,12 @@ import pytest
 
 from consensus_testing import (
     BlockSpec,
+    ExpectedRejection,
     SetProposerIndex,
     VerifySignaturesTestFiller,
     generate_pre_state,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -47,5 +48,5 @@ def test_proposer_index_out_of_range_rejected(
             attestations=[],
         ),
         tamper=SetProposerIndex(proposer_index=ValidatorIndex(99)),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.PROPOSER_INDEX_OUT_OF_RANGE),
     )

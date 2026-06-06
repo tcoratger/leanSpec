@@ -1,9 +1,10 @@
-"""Step types for fork choice tests."""
+"""Step types for fork choice tests: author-facing inputs and emitted results."""
 
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import ConfigDict, Field, PrivateAttr, field_serializer, model_validator
+from pydantic import Field, field_serializer, model_validator
 
+from consensus_testing.test_fixtures.base import ExpectedRejection
 from consensus_testing.test_types.attestation_specs import (
     AggregatedAttestationSpec,
     GossipAttestationSpec,
@@ -29,29 +30,20 @@ class BaseForkChoiceStep(CamelModel):
     - optional Store state checks to validate after processing
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = CamelModel.model_config | {"frozen": True}
 
     valid: bool = True
     """Whether this step is expected to succeed."""
 
-    expected_error: str | None = Field(default=None, exclude=True)
+    expected_rejection: ExpectedRejection | None = None
     """
-    Expected error message substring when valid=False.
+    Expected rejection when valid=False.
 
-    When set, the exception message must contain this string.
-    When None and valid=False, any exception is accepted.
+    When set, the classified reason must match and the exception message
+    must contain the optional substring.
+    When None and valid=False, any spec rejection is accepted.
     Ignored when valid=True.
-
-    Excluded from JSON output: an English substring means nothing to
-    other-language clients. It remains a fill-time self-check only.
-    """
-
-    rejection_reason: RejectionReason | None = None
-    """
-    Language-neutral reason this step's input must be rejected.
-
-    Filled during generation for invalid steps.
-    This is the field clients assert against.
+    Never serialized: the emitted contract is the filled step's reason field.
     """
 
     checks: StoreChecks | None = None
@@ -61,16 +53,6 @@ class BaseForkChoiceStep(CamelModel):
     If provided, the fixture will validate the Store state matches
     these checks after executing the step.
     Only fields that are explicitly set will be validated.
-    """
-
-    store_snapshot: StoreSnapshot | None = None
-    """
-    Canonical store observables after this step.
-
-    Populated by the framework for every successful step.
-    Tests must not set this.
-    Stays None for steps expected to fail, where the resulting
-    store state is implementation-defined.
     """
 
 
@@ -122,41 +104,8 @@ class BlockStep(BaseForkChoiceStep):
     Block specification for this step.
 
     Tests provide a BlockSpec with required slot and optional field overrides.
-    The framework fills a complete Block during make_fixture() and stores it
-    in the private _filled_block attribute for serialization.
+    Generation fills a complete Block and emits it in the filled step.
     """
-
-    # TODO: We should figure out a configuration to raise if a private attribute is
-    #  attempted to be set during model initialization.
-    _filled_block: Block | None = PrivateAttr(default=None)
-    """The filled Block, processed through the spec."""
-
-    @field_serializer("block", when_used="json")
-    def serialize_block(self, block_spec: BlockSpec) -> dict[str, Any]:
-        """
-        Serialize the filled block instead of the input spec.
-
-        This ensures the fixture output contains the complete block that was
-        filled from the spec, not the input specification.
-
-        Args:
-            block_spec: The spec field value, ignored in favor of the filled block.
-
-        Returns:
-            The serialized block.
-
-        Raises:
-            ValueError: If the block has not been filled yet.
-        """
-        if self._filled_block is None:
-            raise ValueError(
-                "Block not filled yet - make_fixture() must be called before serialization. "
-                "This BlockStep should only be serialized after the fixture has been processed."
-            )
-        serialized_block = self._filled_block.to_json()
-        if block_spec.label:
-            serialized_block["blockRootLabel"] = block_spec.label
-        return serialized_block
 
 
 class AttestationStep(BaseForkChoiceStep):
@@ -178,7 +127,7 @@ class AttestationStep(BaseForkChoiceStep):
     Gossip attestation specification for this step.
 
     Tests provide a GossipAttestationSpec with required fields.
-    The framework fills in the attestation data and signature during make_fixture().
+    Generation fills in the attestation data and signature.
     """
 
     is_aggregator: bool = False
@@ -189,36 +138,6 @@ class AttestationStep(BaseForkChoiceStep):
     Defaults to False so existing fillers preserve the behavior where gossip
     attestations are validated but not stored.
     """
-
-    _filled_attestation: SignedAttestation | None = PrivateAttr(default=None)
-    """The filled SignedAttestation, processed through the spec."""
-
-    @field_serializer("attestation", when_used="json")
-    def serialize_gossip_attestation(
-        self, attestation_spec: GossipAttestationSpec
-    ) -> dict[str, Any]:
-        """
-        Serialize the filled attestation instead of the input spec.
-
-        This ensures the fixture output contains the complete attestation that was
-        filled from the spec, not the input specification.
-
-        Args:
-            attestation_spec: The spec field value, ignored in favor of the filled attestation.
-
-        Returns:
-            The serialized attestation.
-
-        Raises:
-            ValueError: If the attestation has not been filled yet.
-        """
-        if self._filled_attestation is None:
-            raise ValueError(
-                "Attestation not filled yet - make_fixture() must be called "
-                "before serialization. This AttestationStep should only be "
-                "serialized after the fixture has been processed."
-            )
-        return self._filled_attestation.to_json()
 
 
 class GossipAggregatedAttestationStep(BaseForkChoiceStep):
@@ -232,22 +151,119 @@ class GossipAggregatedAttestationStep(BaseForkChoiceStep):
     Specification for the aggregated gossip attestation.
     """
 
-    _filled_attestation: SignedAggregatedAttestation | None = PrivateAttr(default=None)
-
-    @field_serializer("attestation", when_used="json")
-    def serialize_gossip_aggregated_attestation(
-        self, value: AggregatedAttestationSpec
-    ) -> dict[str, Any]:
-        """Return the filled aggregated attestation for serialization."""
-        if self._filled_attestation is None:
-            raise ValueError(
-                "Aggregated attestation not filled yet - make_fixture() must process the step."
-            )
-        return self._filled_attestation.to_json()
-
 
 # Discriminated union type for all fork choice steps
 ForkChoiceStep = Annotated[
     Union[TickStep, BlockStep, AttestationStep, GossipAggregatedAttestationStep],
+    Field(discriminator="step_type"),
+]
+
+
+class BaseFilledStep(CamelModel):
+    """
+    Base class for emitted fork choice steps.
+
+    Carries the authored flags plus the generation outputs every step shares.
+    """
+
+    model_config = CamelModel.model_config | {"frozen": True}
+
+    valid: bool
+    """Whether this step succeeded."""
+
+    rejection_reason: RejectionReason | None = None
+    """
+    Language-neutral reason this step's input must be rejected.
+
+    Filled during generation for invalid steps.
+    This is the field clients assert against.
+    """
+
+    checks: StoreChecks | None = None
+    """Store state checks the step was validated against."""
+
+    store_snapshot: StoreSnapshot | None = None
+    """
+    Canonical store observables after this step.
+
+    Populated for every successful step.
+    Stays None for steps expected to fail, where the resulting
+    store state is implementation-defined.
+    """
+
+
+class FilledTickStep(BaseFilledStep):
+    """Emitted time advancement step."""
+
+    step_type: Literal["tick"] = "tick"
+    """Discriminator field for serialization."""
+
+    time: int | None = None
+    """Optional unix timestamp advanced to."""
+
+    interval: int | None = None
+    """Optional exact interval count advanced to."""
+
+    has_proposal: bool
+    """Whether interval 0 of the target slot saw a proposal."""
+
+
+class FilledBlockStep(BaseFilledStep):
+    """Emitted block processing step carrying the complete built block."""
+
+    step_type: Literal["block"] = "block"
+    """Discriminator field for serialization."""
+
+    block: Block
+    """The filled Block, processed through the spec."""
+
+    block_root_label: str | None = Field(default=None, exclude=True)
+    """Authored label for this block, merged into the block payload."""
+
+    @field_serializer("block", when_used="json")
+    def serialize_block(self, filled_block: Block) -> dict[str, Any]:
+        """
+        Serialize the block, merging the authored label into its payload.
+
+        The label rides inside the block object so consumers can resolve
+        fork references without a side table.
+        """
+        serialized_block = filled_block.to_json()
+        if self.block_root_label:
+            serialized_block["blockRootLabel"] = self.block_root_label
+        return serialized_block
+
+
+class FilledAttestationStep(BaseFilledStep):
+    """Emitted gossip attestation step carrying the signed attestation."""
+
+    step_type: Literal["attestation"] = "attestation"
+    """Discriminator field for serialization."""
+
+    attestation: SignedAttestation
+    """The filled SignedAttestation, processed through the spec."""
+
+    is_aggregator: bool
+    """Whether the node held the aggregator role for this attestation."""
+
+
+class FilledGossipAggregatedAttestationStep(BaseFilledStep):
+    """Emitted aggregated attestation step carrying the signed aggregate."""
+
+    step_type: Literal["gossipAggregatedAttestation"] = "gossipAggregatedAttestation"
+    """Discriminator field for serialization."""
+
+    attestation: SignedAggregatedAttestation
+    """The filled SignedAggregatedAttestation, processed through the spec."""
+
+
+# Discriminated union type for all emitted fork choice steps
+FilledForkChoiceStep = Annotated[
+    Union[
+        FilledTickStep,
+        FilledBlockStep,
+        FilledAttestationStep,
+        FilledGossipAggregatedAttestationStep,
+    ],
     Field(discriminator="step_type"),
 ]

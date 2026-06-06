@@ -5,10 +5,11 @@ import pytest
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
+    ExpectedRejection,
     VerifySignaturesTestFiller,
     generate_pre_state,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -43,7 +44,7 @@ def test_invalid_proposer_signature(
             attestations=[],
             valid_signature=False,
         ),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
     )
 
 
@@ -95,5 +96,5 @@ def test_invalid_aggregated_attestation_signature(
                 ),
             ],
         ),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
     )

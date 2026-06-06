@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 from consensus_testing.genesis import build_anchor, generate_pre_state
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
@@ -225,13 +225,42 @@ _ENDPOINT_HANDLERS: dict[tuple[str, str], EndpointHandler] = {
 """Maps (method, path) tuples to response builders."""
 
 
-class ApiEndpointTest(BaseConsensusFixture):
+class ApiEndpointFixture(BaseConsensusFixture):
     """
-    Fixture for API endpoint response conformance.
+    Emitted vector for API endpoint response conformance.
 
-    JSON output: endpoint, genesisParams, expectedStatusCode,
-    expectedContentType, expectedBody.
+    JSON output: endpoint, method, genesisParams, requestBody,
+    initialIsAggregator, expectedStatusCode, expectedContentType,
+    expectedBody.
     """
+
+    endpoint: str
+    """API path under test."""
+
+    method: str
+    """HTTP method under test."""
+
+    genesis_params: dict[str, int]
+    """Genesis store inputs."""
+
+    request_body: Any = None
+    """Request body for non-GET methods."""
+
+    initial_is_aggregator: bool
+    """Aggregator role seeded before the request is sent."""
+
+    expected_status_code: int
+    """HTTP status code."""
+
+    expected_content_type: str
+    """Response MIME type."""
+
+    expected_body: Any = None
+    """Response payload. JSON dict or hex SSZ string."""
+
+
+class ApiEndpointTest(BaseTestSpec):
+    """Spec for API endpoint response conformance."""
 
     format_name: ClassVar[str] = "api_endpoint_test"
     description: ClassVar[str] = "Tests API endpoint responses against known state"
@@ -266,17 +295,8 @@ class ApiEndpointTest(BaseConsensusFixture):
     fixture. Ignored by other endpoints.
     """
 
-    expected_status_code: int = 0
-    """HTTP status code. Filled by make_fixture."""
-
-    expected_content_type: str = ""
-    """Response MIME type. Filled by make_fixture."""
-
-    expected_body: Any = None
-    """Response payload. JSON dict or hex SSZ string. Filled by make_fixture."""
-
-    def make_fixture(self) -> "ApiEndpointTest":
-        """Build genesis store, compute expected response, populate output fields."""
+    def generate(self) -> ApiEndpointFixture:
+        """Build genesis store, compute expected response, emit the vector."""
         handler = _ENDPOINT_HANDLERS.get((self.method, self.endpoint))
         if handler is None:
             raise ValueError(f"Unknown endpoint: {self.method} {self.endpoint}")
@@ -286,6 +306,14 @@ class ApiEndpointTest(BaseConsensusFixture):
             genesis_time=self.genesis_params.get("genesisTime", 0),
             anchor_slot=self.genesis_params.get("anchorSlot", 0),
         )
-        for field_name, field_value in handler(store, self).items():
-            setattr(self, field_name, field_value)
-        return self
+        response_contract = handler(store, self)
+        return ApiEndpointFixture(
+            endpoint=self.endpoint,
+            method=self.method,
+            genesis_params=self.genesis_params,
+            request_body=self.request_body,
+            initial_is_aggregator=self.initial_is_aggregator,
+            expected_status_code=response_contract["expected_status_code"],
+            expected_content_type=response_contract["expected_content_type"],
+            expected_body=response_contract["expected_body"],
+        )

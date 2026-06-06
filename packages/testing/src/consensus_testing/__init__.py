@@ -1,33 +1,51 @@
 """Test tools for generating and consuming leanSpec consensus test vectors."""
 
+from collections.abc import Callable
+
 from consensus_testing import forks
 from consensus_testing.genesis import build_anchor, generate_pre_state
 from consensus_testing.test_fixtures import (
     FIXTURE_FORMATS,
+    ApiEndpointFixture,
     ApiEndpointTest,
     AppendPhantomAttestation,
     BaseConsensusFixture,
+    BaseTestSpec,
     ClearFirstAttestationBits,
     CorruptProof,
     DropMessageBinding,
+    ExpectedRejection,
+    FixtureInfo,
+    ForkChoiceFixture,
     ForkChoiceTest,
+    GossipsubHandlerFixture,
     GossipsubHandlerTest,
     IncrementEmittedSlot,
+    JustifiabilityFixture,
     JustifiabilityTest,
     MutateStateRoot,
+    NetworkingCodecFixture,
     NetworkingCodecTest,
+    PoseidonPermutationFixture,
     PoseidonPermutationTest,
     RebindToAlternateHeadRoot,
     SetProposerIndex,
+    SlotClockFixture,
     SlotClockTest,
+    SSZFixture,
     SSZTest,
+    StateTransitionFixture,
     StateTransitionTest,
     SwapFirstTwoAttestations,
     SwapMessageBindings,
     SwapParticipantPublicKey,
+    SyncFixture,
     SyncTest,
+    VerifyMultiMessageProofsFixture,
     VerifyMultiMessageProofsTest,
+    VerifySignaturesFixture,
     VerifySignaturesTest,
+    VerifySingleMessageProofsFixture,
     VerifySingleMessageProofsTest,
 )
 from consensus_testing.test_types import (
@@ -47,19 +65,19 @@ from consensus_testing.test_types import (
     TickStep,
 )
 
-StateTransitionTestFiller = type[StateTransitionTest]
-ForkChoiceTestFiller = type[ForkChoiceTest]
-VerifySingleMessageProofsTestFiller = type[VerifySingleMessageProofsTest]
-VerifyMultiMessageProofsTestFiller = type[VerifyMultiMessageProofsTest]
-VerifySignaturesTestFiller = type[VerifySignaturesTest]
-SSZTestFiller = type[SSZTest]
-NetworkingCodecTestFiller = type[NetworkingCodecTest]
-GossipsubHandlerTestFiller = type[GossipsubHandlerTest]
-ApiEndpointTestFiller = type[ApiEndpointTest]
-SlotClockTestFiller = type[SlotClockTest]
-JustifiabilityTestFiller = type[JustifiabilityTest]
-PoseidonPermutationTestFiller = type[PoseidonPermutationTest]
-SyncTestFiller = type[SyncTest]
+StateTransitionTestFiller = Callable[..., StateTransitionFixture]
+ForkChoiceTestFiller = Callable[..., ForkChoiceFixture]
+VerifySingleMessageProofsTestFiller = Callable[..., VerifySingleMessageProofsFixture]
+VerifyMultiMessageProofsTestFiller = Callable[..., VerifyMultiMessageProofsFixture]
+VerifySignaturesTestFiller = Callable[..., VerifySignaturesFixture]
+SSZTestFiller = Callable[..., SSZFixture]
+NetworkingCodecTestFiller = Callable[..., NetworkingCodecFixture]
+GossipsubHandlerTestFiller = Callable[..., GossipsubHandlerFixture]
+ApiEndpointTestFiller = Callable[..., ApiEndpointFixture]
+SlotClockTestFiller = Callable[..., SlotClockFixture]
+JustifiabilityTestFiller = Callable[..., JustifiabilityFixture]
+PoseidonPermutationTestFiller = Callable[..., PoseidonPermutationFixture]
+SyncTestFiller = Callable[..., SyncFixture]
 
 __all__ = [
     # Public API
@@ -70,18 +88,26 @@ __all__ = [
     "build_anchor",
     "generate_pre_state",
     # Base types
-    # Fixture classes
     "FIXTURE_FORMATS",
     "BaseConsensusFixture",
+    "BaseTestSpec",
+    "ExpectedRejection",
+    "FixtureInfo",
+    # Spec and fixture classes
+    "StateTransitionFixture",
     "StateTransitionTest",
+    "ForkChoiceFixture",
     "ForkChoiceTest",
+    "VerifySingleMessageProofsFixture",
     "VerifySingleMessageProofsTest",
+    "VerifyMultiMessageProofsFixture",
     "VerifyMultiMessageProofsTest",
     "RebindToAlternateHeadRoot",
     "IncrementEmittedSlot",
     "SwapParticipantPublicKey",
     "SwapMessageBindings",
     "DropMessageBinding",
+    "VerifySignaturesFixture",
     "VerifySignaturesTest",
     "SetProposerIndex",
     "ClearFirstAttestationBits",
@@ -89,13 +115,21 @@ __all__ = [
     "AppendPhantomAttestation",
     "MutateStateRoot",
     "SwapFirstTwoAttestations",
+    "SSZFixture",
     "SSZTest",
+    "NetworkingCodecFixture",
     "NetworkingCodecTest",
+    "GossipsubHandlerFixture",
     "GossipsubHandlerTest",
+    "ApiEndpointFixture",
     "ApiEndpointTest",
+    "SlotClockFixture",
     "SlotClockTest",
+    "JustifiabilityFixture",
     "JustifiabilityTest",
+    "PoseidonPermutationFixture",
     "PoseidonPermutationTest",
+    "SyncFixture",
     "SyncTest",
     # Test types
     "BaseForkChoiceStep",

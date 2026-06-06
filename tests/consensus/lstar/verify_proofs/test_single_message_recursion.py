@@ -3,12 +3,13 @@
 import pytest
 
 from consensus_testing import (
+    ExpectedRejection,
     IncrementEmittedSlot,
     RebindToAlternateHeadRoot,
     VerifySingleMessageProofsTestFiller,
 )
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
-from lean_spec.spec.forks.lstar.containers import AggregationError, AttestationData
+from lean_spec.spec.forks import Checkpoint, RejectionReason, Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -99,7 +100,7 @@ def test_single_message_recursion_wrong_message(
             [ValidatorIndex(0), ValidatorIndex(1)],
             [ValidatorIndex(2), ValidatorIndex(3)],
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=RebindToAlternateHeadRoot(),
     )
 
@@ -125,6 +126,6 @@ def test_single_message_recursion_wrong_slot(
             [ValidatorIndex(0), ValidatorIndex(1)],
             [ValidatorIndex(2)],
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=IncrementEmittedSlot(),
     )

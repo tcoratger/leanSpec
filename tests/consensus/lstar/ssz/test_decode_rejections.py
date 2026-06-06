@@ -11,9 +11,9 @@ from typing import ClassVar
 
 import pytest
 
-from consensus_testing import SSZTestFiller
+from consensus_testing import ExpectedRejection, SSZTestFiller
+from lean_spec.spec.forks import RejectionReason
 from lean_spec.spec.ssz import BaseBitlist, BaseBitvector, Boolean, Bytes4, Uint32
-from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZValueError
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -42,7 +42,7 @@ def test_bitlist_decode_rejects_empty_input(ssz_test: SSZTestFiller) -> None:
         type_name="DecodeBitlist8",
         value=DecodeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x",
-        expect_exception=SSZSerializationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -58,7 +58,7 @@ def test_bitlist_decode_rejects_missing_delimiter(ssz_test: SSZTestFiller) -> No
         type_name="DecodeBitlist8",
         value=DecodeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x00",
-        expect_exception=SSZSerializationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -74,7 +74,7 @@ def test_bitlist_decode_rejects_length_above_limit(ssz_test: SSZTestFiller) -> N
         type_name="DecodeBitlist8",
         value=DecodeBitlist8(data=[Boolean(False)]),
         raw_bytes="0x0002",
-        expect_exception=SSZValueError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -90,7 +90,7 @@ def test_bitvector_decode_rejects_wrong_byte_length(ssz_test: SSZTestFiller) -> 
         type_name="DecodeBitvector16",
         value=DecodeBitvector16(data=[Boolean(False)] * 16),
         raw_bytes="0x00",
-        expect_exception=SSZValueError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -106,7 +106,7 @@ def test_bytes4_decode_rejects_extra_trailing_bytes(ssz_test: SSZTestFiller) -> 
         type_name="Bytes4",
         value=Bytes4(b"\x00\x00\x00\x00"),
         raw_bytes="0x0102030405",
-        expect_exception=SSZValueError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -122,5 +122,5 @@ def test_uint32_decode_rejects_wrong_byte_length(ssz_test: SSZTestFiller) -> Non
         type_name="Uint32",
         value=Uint32(0),
         raw_bytes="0x010203",
-        expect_exception=SSZSerializationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

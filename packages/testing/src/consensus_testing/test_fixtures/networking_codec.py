@@ -2,9 +2,7 @@
 
 from typing import Any, ClassVar
 
-from pydantic import Field
-
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.node.networking.enr.enr import ENR
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
 from lean_spec.node.networking.gossipsub.rpc import (
@@ -28,7 +26,7 @@ from lean_spec.node.networking.reqresp.codec import (
 from lean_spec.node.networking.transport.peer_id import KeyType, PeerId, PublicKeyProtobuf
 from lean_spec.node.networking.varint import decode_varint, encode_varint
 from lean_spec.node.snappy import compress, decompress, frame_compress, frame_decompress
-from lean_spec.spec.forks import RejectionReason, SubnetId
+from lean_spec.spec.forks import SubnetId
 
 
 def _to_hex(data: bytes) -> str:
@@ -41,13 +39,28 @@ def _from_hex(hex_str: str) -> bytes:
     return bytes.fromhex(hex_str.removeprefix("0x"))
 
 
-class NetworkingCodecTest(BaseConsensusFixture):
+class NetworkingCodecFixture(BaseConsensusFixture):
     """
-    Fixture for networking wire-format conformance.
-
-    Verifies encode/decode roundtrips for networking codecs.
+    Emitted vector for networking wire-format conformance.
 
     JSON output: codecName, input, output.
+    """
+
+    codec_name: str
+    """Codec under test."""
+
+    input: dict[str, Any]
+    """Codec-specific input parameters."""
+
+    output: dict[str, Any]
+    """Computed output."""
+
+
+class NetworkingCodecTest(BaseTestSpec):
+    """
+    Spec for networking wire-format conformance.
+
+    Verifies encode/decode roundtrips for networking codecs.
     """
 
     format_name: ClassVar[str] = "networking_codec_test"
@@ -59,15 +72,12 @@ class NetworkingCodecTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Codec-specific input parameters."""
 
-    output: dict[str, Any] = Field(default_factory=dict)
-    """Computed output. Filled by make_fixture."""
-
-    def make_fixture(self) -> "NetworkingCodecTest":
+    def generate(self) -> NetworkingCodecFixture:
         """
         Dispatch to the codec handler and produce computed output.
 
         Returns:
-            This fixture with output populated.
+            The emitted vector with output populated.
 
         Raises:
             ValueError: If codec_name is unknown.
@@ -96,19 +106,22 @@ class NetworkingCodecTest(BaseConsensusFixture):
             case "snappy_frame":
                 output = self._make_snappy_frame()
             case "decode_failure":
-                output = self._make_decode_failure()
+                return self._generate_decode_failure()
             case _:
                 raise ValueError(f"Unknown codec: {self.codec_name}")
-        self.output = output
-        return self
+        return NetworkingCodecFixture(
+            codec_name=self.codec_name,
+            input=self.input,
+            output=output,
+        )
 
-    def _make_decode_failure(self) -> dict[str, Any]:
+    def _generate_decode_failure(self) -> NetworkingCodecFixture:
         """
         Assert that decoding `input.bytes` with `input.decoder` raises.
 
-        Dispatches to one of the wire-format decoders and confirms that the
-        expected exception (on :attribute:`expect_exception`) is raised. Used to
-        generate negative-path test vectors for client decoders.
+        Dispatches to one of the wire-format decoders and confirms the decoder
+        rejects the input. Used to generate negative-path test vectors for
+        client decoders.
 
         The input record carries two fields:
 
@@ -117,16 +130,16 @@ class NetworkingCodecTest(BaseConsensusFixture):
         - `bytes`: hex-encoded malformed input.
 
         Returns:
-            A dict echoing the decoder name.
+            The emitted vector echoing the decoder name.
 
         Raises:
-            AssertionError: If the decoder succeeds or raises a mismatched
-                exception type.
-            ValueError: If `expect_exception` is unset or the decoder is
+            AssertionError: If the decoder succeeds or the rejection
+                contradicts the authored expectation.
+            ValueError: If `expected_rejection` is unset or the decoder is
                 unknown.
         """
-        if self.expect_exception is None:
-            raise ValueError("decode_failure codec requires expect_exception to be set")
+        if self.expected_rejection is None:
+            raise ValueError("decode_failure codec requires expected_rejection to be set")
 
         decoder_name = self.input["decoder"]
         raw = _from_hex(self.input["bytes"])
@@ -152,18 +165,17 @@ class NetworkingCodecTest(BaseConsensusFixture):
 
         if exception_raised is None:
             raise AssertionError(
-                f"Expected {self.expect_exception.__name__} from "
-                f"{decoder_name!r} decode, but decode succeeded"
+                f"Expected {decoder_name!r} decode to reject the input, but decode succeeded"
             )
-        if not isinstance(exception_raised, self.expect_exception):
-            raise AssertionError(
-                f"Expected {self.expect_exception.__name__} but got "
-                f"{type(exception_raised).__name__}: {exception_raised}"
-            )
+        self.assert_expected_outcome(exception_raised)
 
         # Emit the language-neutral reason clients assert against.
-        self.rejection_reason = RejectionReason.DECODE_ERROR
-        return {"decoder": decoder_name}
+        return NetworkingCodecFixture(
+            codec_name=self.codec_name,
+            input=self.input,
+            output={"decoder": decoder_name},
+            rejection_reason=self.expected_rejection.reason,
+        )
 
     def _make_varint(self) -> dict[str, Any]:
         """Encode a value as LEB128, decode it back, assert roundtrip."""

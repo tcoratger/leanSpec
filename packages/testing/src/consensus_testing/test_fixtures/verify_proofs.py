@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from consensus_testing.keys import XmssKeyManager
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import (
     AggregationBits,
     Checkpoint,
-    RejectionReason,
     Slot,
     ValidatorIndex,
 )
@@ -155,7 +154,37 @@ def _swap_participant_public_key(
     public_keys[participant_index] = replacement
 
 
-class VerifySingleMessageProofsTest(BaseConsensusFixture):
+class VerifySingleMessageProofsFixture(BaseConsensusFixture):
+    """
+    Emitted vector for single-message aggregate proof verification.
+
+    JSON output: attestationData, publicKeys, aggregationBits, message,
+    slot, proof.
+    """
+
+    attestation_data: AttestationData
+    """The signed object."""
+
+    public_keys: list[PublicKey]
+    """Attestation public keys for the participating validators.
+
+    Ordered consistently with the participation bitfield.
+    """
+
+    aggregation_bits: AggregationBits
+    """Participation bitfield naming the contributing validators."""
+
+    message: Bytes32
+    """Hash tree root of the signed object, bound into the proof."""
+
+    slot: Slot
+    """Slot bound into the proof."""
+
+    proof: ByteList512KiB
+    """Aggregated proof bytes for clients to verify."""
+
+
+class VerifySingleMessageProofsTest(BaseTestSpec):
     """Verify a single-message aggregate proof against precomputed bytes."""
 
     format_name: ClassVar[str] = "verify_single_message_proofs_test"
@@ -164,43 +193,21 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         "Tests single-message aggregate proof verification against precomputed proof bytes."
     )
 
-    validator_indices: list[ValidatorIndex] = Field(exclude=True)
+    validator_indices: list[ValidatorIndex]
     """Validators contributing raw signatures to the aggregate."""
 
     attestation_data: AttestationData
     """The signed object."""
 
-    tamper: SingleMessageTamper | None = Field(default=None, exclude=True)
+    tamper: SingleMessageTamper | None = None
     """Optional post-generation mutation that produces a rejection vector."""
 
-    child_groups: list[list[ValidatorIndex]] = Field(default_factory=list, exclude=True)
+    child_groups: list[list[ValidatorIndex]] = []
     """Optional partition of the participating validators into pre-aggregated child subsets."""
 
-    # Fields below are populated during generation.
-    #
-    # Together they form the client-visible portion of the JSON vector.
-
-    public_keys: list[PublicKey] | None = None
-    """Attestation public keys for the participating validators.
-
-    Ordered consistently with the participation bitfield.
-    """
-
-    aggregation_bits: AggregationBits | None = None
-    """Participation bitfield naming the contributing validators."""
-
-    message: Bytes32 | None = None
-    """Hash tree root of the signed object, bound into the proof."""
-
-    slot: Slot | None = None
-    """Slot bound into the proof."""
-
-    proof: ByteList512KiB | None = None
-    """Aggregated proof bytes for clients to verify."""
-
-    def make_fixture(self) -> VerifySingleMessageProofsTest:
+    def generate(self) -> VerifySingleMessageProofsFixture:
         """
-        Generate the proof, optionally tamper, self-verify, and return the populated copy.
+        Generate the proof, optionally tamper, self-verify, and emit the vector.
 
         Raises:
             AssertionError: If the verifier outcome disagrees with the configured expectation.
@@ -251,17 +258,20 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         except Exception as exception:
             exception_raised = exception
         self.assert_expected_outcome(exception_raised)
-        # Every tamper breaks the proof's cryptographic binding.
-        if self.expect_exception is not None:
-            self.rejection_reason = RejectionReason.INVALID_SIGNATURE
 
-        # Phase 4: publish the client-visible outputs and return self.
-        self.message = message
-        self.slot = slot
-        self.public_keys = public_keys
-        self.aggregation_bits = aggregation_bits
-        self.proof = proof
-        return self
+        # Phase 4: publish the client-visible outputs.
+        # Every tamper breaks the proof's cryptographic binding.
+        return VerifySingleMessageProofsFixture(
+            attestation_data=self.attestation_data,
+            public_keys=public_keys,
+            aggregation_bits=aggregation_bits,
+            message=message,
+            slot=slot,
+            proof=proof,
+            rejection_reason=(
+                self.expected_rejection.reason if self.expected_rejection is not None else None
+            ),
+        )
 
     def _aggregate_proof(
         self,
@@ -332,7 +342,34 @@ class VerifySingleMessageProofsTest(BaseConsensusFixture):
         return aggregate.proof
 
 
-class VerifyMultiMessageProofsTest(BaseConsensusFixture):
+class VerifyMultiMessageProofsFixture(BaseConsensusFixture):
+    """
+    Emitted vector for multi-message aggregate proof verification.
+
+    JSON output: attestationDataPerMessage, publicKeysPerMessage,
+    aggregationBitsPerMessage, messages, slots, proof.
+    """
+
+    attestation_data_per_message: list[AttestationData]
+    """Signed object for each component."""
+
+    public_keys_per_message: list[list[PublicKey]]
+    """Attestation public keys per component, parallel to the participation bits."""
+
+    aggregation_bits_per_message: list[AggregationBits]
+    """Per-component participation bitfields naming each component's contributors."""
+
+    messages: list[Bytes32]
+    """Hash tree root per component, bound into the proof."""
+
+    slots: list[Slot]
+    """Slot per component, bound into the proof."""
+
+    proof: ByteList512KiB
+    """Aggregated multi-message proof bytes for clients to verify."""
+
+
+class VerifyMultiMessageProofsTest(BaseTestSpec):
     """Verify a multi-message aggregate proof against precomputed bytes."""
 
     format_name: ClassVar[str] = "verify_multi_message_proofs_test"
@@ -341,37 +378,18 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
         "Tests multi-message aggregate proof verification against precomputed proof bytes."
     )
 
-    validator_indices_per_message: list[list[ValidatorIndex]] = Field(exclude=True)
+    validator_indices_per_message: list[list[ValidatorIndex]]
     """Per-component validator lists contributing raw signatures."""
 
     attestation_data_per_message: list[AttestationData]
     """Signed object for each component."""
 
-    tamper: MultiMessageTamper | None = Field(default=None, exclude=True)
+    tamper: MultiMessageTamper | None = None
     """Optional post-generation mutation that produces a rejection vector."""
 
-    # Fields below are populated during generation.
-    #
-    # Together they form the client-visible portion of the JSON vector.
-
-    public_keys_per_message: list[list[PublicKey]] | None = None
-    """Attestation public keys per component, parallel to the participation bits."""
-
-    aggregation_bits_per_message: list[AggregationBits] | None = None
-    """Per-component participation bitfields naming each component's contributors."""
-
-    messages: list[Bytes32] | None = None
-    """Hash tree root per component, bound into the proof."""
-
-    slots: list[Slot] | None = None
-    """Slot per component, bound into the proof."""
-
-    proof: ByteList512KiB | None = None
-    """Aggregated multi-message proof bytes for clients to verify."""
-
-    def make_fixture(self) -> VerifyMultiMessageProofsTest:
+    def generate(self) -> VerifyMultiMessageProofsFixture:
         """
-        Generate the merged proof, optionally tamper one binding, self-verify, return self.
+        Generate the merged proof, optionally tamper one binding, self-verify, emit the vector.
 
         Raises:
             AssertionError: If the verifier outcome disagrees with the configured expectation.
@@ -498,14 +516,17 @@ class VerifyMultiMessageProofsTest(BaseConsensusFixture):
         except Exception as exception:
             exception_raised = exception
         self.assert_expected_outcome(exception_raised)
-        # Every tamper breaks the proof's cryptographic binding.
-        if self.expect_exception is not None:
-            self.rejection_reason = RejectionReason.INVALID_SIGNATURE
 
-        # Phase 5: publish the client-visible outputs and return self.
-        self.messages = messages
-        self.slots = slots
-        self.public_keys_per_message = public_keys_per_message
-        self.aggregation_bits_per_message = aggregation_bits_per_message
-        self.proof = merged.proof
-        return self
+        # Phase 5: publish the client-visible outputs.
+        # Every tamper breaks the proof's cryptographic binding.
+        return VerifyMultiMessageProofsFixture(
+            attestation_data_per_message=self.attestation_data_per_message,
+            public_keys_per_message=public_keys_per_message,
+            aggregation_bits_per_message=aggregation_bits_per_message,
+            messages=messages,
+            slots=slots,
+            proof=merged.proof,
+            rejection_reason=(
+                self.expected_rejection.reason if self.expected_rejection is not None else None
+            ),
+        )

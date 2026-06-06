@@ -2,8 +2,8 @@
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
-from lean_spec.node.networking.gossipsub.rpc import ProtobufDecodeError
+from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -21,7 +21,7 @@ def test_gossipsub_rpc_decode_rejects_unknown_wire_type(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "gossipsub_rpc", "bytes": "0x0e"},
-        expect_exception=ProtobufDecodeError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -39,5 +39,5 @@ def test_gossipsub_rpc_decode_rejects_length_exceeding_data(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "gossipsub_rpc", "bytes": "0x0a64"},
-        expect_exception=ProtobufDecodeError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

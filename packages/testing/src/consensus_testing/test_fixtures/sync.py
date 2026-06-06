@@ -1,33 +1,40 @@
-"""
-Sync layer test fixture format.
-
-Emits JSON vectors for the client-facing sync helpers. Each vector
-pins the expected verdict on a given input so clients can align their
-sync-layer decisions bit-for-bit.
-"""
+"""Sync layer test fixture format."""
 
 from typing import Any, ClassVar
 
-from pydantic import Field
-
 from consensus_testing.genesis import build_anchor, generate_pre_state
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.node.sync.checkpoint_sync import verify_checkpoint_state
 from lean_spec.spec.forks import Slot
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Uint64
 
 
-class SyncTest(BaseConsensusFixture):
+class SyncFixture(BaseConsensusFixture):
     """
-    Fixture for sync-layer conformance.
+    Emitted vector for sync-layer conformance.
+
+    JSON output: operation, input, output.
+    """
+
+    operation: str
+    """Sync operation under test."""
+
+    input: dict[str, Any]
+    """Operation-specific input."""
+
+    output: dict[str, Any]
+    """Computed verdict and reference bytes."""
+
+
+class SyncTest(BaseTestSpec):
+    """
+    Spec for sync-layer conformance.
 
     Currently supports one operation:
 
     - `verify_checkpoint`: emits the SSZ-encoded anchor state plus the
       verification verdict a client must produce.
-
-    JSON output: operation, input, output.
     """
 
     format_name: ClassVar[str] = "sync_test"
@@ -39,24 +46,21 @@ class SyncTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Operation-specific input. See per-handler docstrings."""
 
-    output: dict[str, Any] = Field(default_factory=dict)
-    """Computed output. Filled by make_fixture."""
-
-    def make_fixture(self) -> "SyncTest":
+    def generate(self) -> SyncFixture:
         """
         Dispatch to the operation handler.
 
         Returns:
-            This fixture with output populated.
+            The emitted vector with output populated.
 
         Raises:
             ValueError: If the operation name is unknown.
         """
         if self.operation == "verify_checkpoint":
-            self.output = self._make_verify_checkpoint()
+            output = self._make_verify_checkpoint()
         else:
             raise ValueError(f"Unknown sync operation: {self.operation!r}")
-        return self
+        return SyncFixture(operation=self.operation, input=self.input, output=output)
 
     def _make_verify_checkpoint(self) -> dict[str, Any]:
         """

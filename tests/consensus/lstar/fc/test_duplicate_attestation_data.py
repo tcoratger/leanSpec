@@ -6,10 +6,11 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     BlockStep,
+    ExpectedRejection,
     ForkChoiceTestFiller,
     StoreChecks,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -71,7 +72,10 @@ def test_block_with_duplicate_aggregated_attestation_data_rejected(
                     forced_attestations=[duplicated_spec, duplicated_spec],
                 ),
                 valid=False,
-                expected_error="Block contains duplicate AttestationData",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.DUPLICATE_ATTESTATION_DATA,
+                    message_substring="Block contains duplicate AttestationData",
+                ),
             ),
         ],
     )

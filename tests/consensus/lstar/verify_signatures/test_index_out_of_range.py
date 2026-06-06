@@ -5,9 +5,10 @@ import pytest
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
+    ExpectedRejection,
     VerifySignaturesTestFiller,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -53,5 +54,5 @@ def test_attestation_validator_index_out_of_range_rejected(
                 ),
             ],
         ),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.VALIDATOR_INDEX_OUT_OF_RANGE),
     )

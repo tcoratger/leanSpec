@@ -4,11 +4,12 @@ import pytest
 
 from consensus_testing import (
     BlockSpec,
+    ExpectedRejection,
     StateExpectation,
     StateTransitionTestFiller,
     generate_pre_state,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import JustifiedSlots
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, Bytes32
@@ -227,7 +228,7 @@ def test_block_with_invalid_proposer(
             ),
         ],
         post=None,  # Expect failure
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.WRONG_PROPOSER),
     )
 
 
@@ -264,7 +265,7 @@ def test_block_with_invalid_parent_root(
             ),
         ],
         post=None,
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.PARENT_ROOT_MISMATCH),
     )
 
 
@@ -299,7 +300,7 @@ def test_block_with_invalid_state_root(
             ),
         ],
         post=None,
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.STATE_ROOT_MISMATCH),
     )
 
 
@@ -336,8 +337,10 @@ def test_block_with_wrong_slot(state_transition_test: StateTransitionTestFiller)
             ),
         ],
         post=None,
-        expect_exception=AssertionError,
-        expect_exception_message="Block slot mismatch",
+        expected_rejection=ExpectedRejection(
+            reason=RejectionReason.BLOCK_SLOT_MISMATCH,
+            message_substring="Block slot mismatch",
+        ),
     )
 
 

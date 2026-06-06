@@ -8,8 +8,7 @@ from pydantic import BaseModel, Field
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
-from consensus_testing.rejection import classify_rejection
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import BlockSpec
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
@@ -90,9 +89,23 @@ SignedBlockTamper = (
 """Union of post-build mutations that each produce a rejection vector."""
 
 
-class VerifySignaturesTest(BaseConsensusFixture):
+class VerifySignaturesFixture(BaseConsensusFixture):
     """
-    Test fixture for verifying signatures on a signed block.
+    Emitted vector for signature verification on a signed block.
+
+    JSON output: anchorState, signedBlock.
+    """
+
+    anchor_state: State
+    """The consensus state whose validators verify the block."""
+
+    signed_block: SignedBlock
+    """The generated signed block."""
+
+
+class VerifySignaturesTest(BaseTestSpec):
+    """
+    Spec for verifying signatures on a signed block.
 
     Generates a complete signed block from the block specification,
     then verifies that signatures pass or fail as expected.
@@ -113,15 +126,15 @@ class VerifySignaturesTest(BaseConsensusFixture):
     Defaults to the standard genesis state.
     """
 
-    block: BlockSpec = Field(exclude=True)
+    block: BlockSpec
     """
     Block specifications to generate signatures for.
 
-    This defines the block parameters including attestations. The framework will
-    build a complete signed block with all necessary signatures.
+    This defines the block parameters including attestations. Generation
+    builds a complete signed block with all necessary signatures.
     """
 
-    tamper: SignedBlockTamper | None = Field(default=None, exclude=True)
+    tamper: SignedBlockTamper | None = None
     """
     Optional post-build mutation applied before verification.
 
@@ -132,17 +145,12 @@ class VerifySignaturesTest(BaseConsensusFixture):
     receiving such a block from a peer.
     """
 
-    signed_block: SignedBlock | None = None
-    """
-    The generated signed block.
-    """
-
-    def make_fixture(self) -> VerifySignaturesTest:
+    def generate(self) -> VerifySignaturesFixture:
         """
         Generate the fixture by creating and verifying a signed block.
 
         Returns:
-            The validated fixture.
+            The emitted vector carrying the signed block.
 
         Raises:
             AssertionError: If signature verification fails unexpectedly.
@@ -166,18 +174,19 @@ class VerifySignaturesTest(BaseConsensusFixture):
             LstarSpec().verify_signatures(signed_block, self.anchor_state.validators)
         except AssertionError as exception:
             exception_raised = exception
-        finally:
-            # Always store filled block for serialization, even if an exception occurred
-            # This ensures the test fixture contains the signed block that consumer can test with
-            self.signed_block = signed_block
 
         # Validate exception expectations
         self.assert_expected_outcome(exception_raised)
+        rejection_reason = None
         if exception_raised is not None:
             # Emit the language-neutral reason clients assert against.
-            self.rejection_reason = classify_rejection(exception_raised)
+            rejection_reason = self.resolve_rejection_reason(exception_raised)
 
-        return self
+        return VerifySignaturesFixture(
+            anchor_state=self.anchor_state,
+            signed_block=signed_block,
+            rejection_reason=rejection_reason,
+        )
 
     def _apply_tamper(self, signed_block: SignedBlock, tamper: SignedBlockTamper) -> SignedBlock:
         """
