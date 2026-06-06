@@ -219,11 +219,15 @@ class TestProcessAttestationsHeadChecks:
         canonical_head_root = make_bytes32(3)
         sibling_head_root = make_bytes32(4)
 
-        state.slot = Slot(3)
-        state.historical_block_hashes = HistoricalBlockHashes(
-            data=[source_root, target_root, canonical_head_root]
+        state = state.model_copy(
+            update={
+                "slot": Slot(3),
+                "historical_block_hashes": HistoricalBlockHashes(
+                    data=[source_root, target_root, canonical_head_root]
+                ),
+                "justified_slots": JustifiedSlots(data=[Boolean(False), Boolean(False)]),
+            }
         )
-        state.justified_slots = JustifiedSlots(data=[Boolean(False), Boolean(False)])
 
         attestation_data = AttestationData(
             slot=Slot(2),
@@ -256,11 +260,15 @@ class TestProcessAttestationsHeadChecks:
         target_root = make_bytes32(2)
         canonical_head_root = make_bytes32(3)
 
-        state.slot = Slot(3)
-        state.historical_block_hashes = HistoricalBlockHashes(
-            data=[source_root, target_root, canonical_head_root]
+        state = state.model_copy(
+            update={
+                "slot": Slot(3),
+                "historical_block_hashes": HistoricalBlockHashes(
+                    data=[source_root, target_root, canonical_head_root]
+                ),
+                "justified_slots": JustifiedSlots(data=[Boolean(False), Boolean(False)]),
+            }
         )
-        state.justified_slots = JustifiedSlots(data=[Boolean(False), Boolean(False)])
 
         attestation_data = AttestationData(
             slot=Slot(2),
@@ -294,11 +302,15 @@ class TestProcessAttestationsHeadChecks:
         source_root = make_bytes32(1)
         target_root = make_bytes32(2)
 
-        state.slot = Slot(3)
-        state.historical_block_hashes = HistoricalBlockHashes(
-            data=[source_root, target_root, make_bytes32(3)]
+        state = state.model_copy(
+            update={
+                "slot": Slot(3),
+                "historical_block_hashes": HistoricalBlockHashes(
+                    data=[source_root, target_root, make_bytes32(3)]
+                ),
+                "justified_slots": JustifiedSlots(data=[Boolean(False)] * 10),
+            }
         )
-        state.justified_slots = JustifiedSlots(data=[Boolean(False)] * 10)
 
         attestation_data = AttestationData(
             slot=Slot(2),
