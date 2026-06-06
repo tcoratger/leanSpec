@@ -10,6 +10,7 @@ from consensus_testing.test_types.attestation_specs import (
 )
 from consensus_testing.test_types.block_spec import BlockSpec
 from consensus_testing.test_types.store_checks import StoreChecks
+from consensus_testing.test_types.store_snapshot import StoreSnapshot
 from lean_spec.base import CamelModel
 from lean_spec.spec.forks.lstar.containers import (
     Block,
@@ -48,6 +49,16 @@ class BaseForkChoiceStep(CamelModel):
     If provided, the fixture will validate the Store state matches
     these checks after executing the step.
     Only fields that are explicitly set will be validated.
+    """
+
+    store_snapshot: StoreSnapshot | None = None
+    """
+    Canonical store observables after this step.
+
+    Populated by the framework for every successful step.
+    Tests must not set this.
+    Stays None for steps expected to fail, where the resulting
+    store state is implementation-defined.
     """
 
 

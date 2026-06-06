@@ -19,6 +19,7 @@ from consensus_testing.test_types import (
     BlockStep,
     ForkChoiceStep,
     GossipAggregatedAttestationStep,
+    StoreSnapshot,
     TickStep,
 )
 from lean_spec.node.chain.clock import SlotClock
@@ -360,6 +361,11 @@ class ForkChoiceTest(BaseConsensusFixture):
                         raise ValueError(
                             f"Step {step_index}: unknown step type {type(step).__name__}"
                         )
+
+                # Record the canonical store observables for this step.
+                # Clients replay the step and must reproduce every field.
+                # Authored checks below remain a human-readable overlay.
+                step.store_snapshot = StoreSnapshot.from_store(store)
 
                 # Validate Store state if checks are provided.
                 if step.checks is not None:
