@@ -64,14 +64,18 @@ def fill(
 
     # Check and download keys if needed
     # Import here to avoid loading leanSpec modules before LEAN_ENV is set
-    from consensus_testing.keys import get_keys_directory
-    from consensus_testing.keys_cli import download_keys
+    from consensus_testing.keys import compute_key_set_digest, get_keys_directory
+    from consensus_testing.keys_cli import PINNED_KEY_SET_DIGESTS, download_keys
 
     keys_directory = get_keys_directory(scheme.lower())
 
     # Check if keys already exist, if not, download them
     if not (keys_directory.exists() and any(keys_directory.glob("*.json"))):
         click.echo(f"Test keys for '{scheme}' scheme not found. Downloading...")
+        download_keys(scheme.lower())
+    # Why: stale or modified local keys would silently change every vector.
+    elif compute_key_set_digest(keys_directory) != PINNED_KEY_SET_DIGESTS[scheme.lower()]:
+        click.echo(f"Local '{scheme}' keys do not match the pinned key set. Re-downloading...")
         download_keys(scheme.lower())
 
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-fill.ini"

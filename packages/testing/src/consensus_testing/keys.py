@@ -18,6 +18,7 @@ File format:
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -121,6 +122,29 @@ def get_keys_directory(scheme_name: str) -> Path:
     return Path(__file__).parent / "test_keys" / f"{scheme_name}_scheme"
 
 
+def compute_key_set_digest(keys_directory: Path) -> str:
+    """
+    Compute the SHA-256 digest identifying a directory's key set.
+
+    Hashes every validator's public keys in ascending index order.
+    Two fills agree on vectors only if they agree on this digest.
+
+    Args:
+        keys_directory: Directory holding per-validator key files.
+
+    Returns:
+        Hex digest prefixed with 0x.
+    """
+    digest = hashlib.sha256()
+    key_files = sorted(keys_directory.glob("*.json"), key=lambda key_file: int(key_file.stem))
+    for key_file in key_files:
+        key_data = json.loads(key_file.read_text())
+        digest.update(key_file.stem.encode())
+        digest.update(bytes.fromhex(key_data["attestation_keypair"]["public_key"]))
+        digest.update(bytes.fromhex(key_data["proposal_keypair"]["public_key"]))
+    return f"0x{digest.hexdigest()}"
+
+
 class XmssKeyManager:
     """
     Stateful manager for XMSS signing in tests.
@@ -146,6 +170,7 @@ class XmssKeyManager:
         "_public_cache",
         "_available_indices",
         "_secret_state",
+        "_key_set_digest",
     )
 
     _cache: ClassVar[dict[str, XmssKeyManager]] = {}
@@ -223,6 +248,9 @@ class XmssKeyManager:
 
         # Advanced secret-key state held as live Python objects.
         self._secret_state: dict[tuple[ValidatorIndex, KeyRole], SecretKey] = {}
+
+        # Computed lazily on first request.
+        self._key_set_digest: str | None = None
 
     def _scan_indices(self) -> set[ValidatorIndex]:
         """
@@ -327,6 +355,16 @@ class XmssKeyManager:
     def __iter__(self) -> Iterator[ValidatorIndex]:
         """Iterate over validator indices in ascending order."""
         return iter(sorted(self._scan_indices()))
+
+    def key_set_digest(self) -> str:
+        """
+        Return the digest identifying this manager's on-disk key set.
+
+        Computed once and cached for the manager's lifetime.
+        """
+        if self._key_set_digest is None:
+            self._key_set_digest = compute_key_set_digest(self._keys_directory)
+        return self._key_set_digest
 
     def get_public_keys(self, index: ValidatorIndex) -> tuple[PublicKey, PublicKey]:
         """
