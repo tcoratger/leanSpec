@@ -3,6 +3,7 @@
 import io
 
 import pytest
+from hypothesis import given, strategies as st
 from pydantic import ValidationError
 
 from lean_spec.spec.ssz.collections import SSZList
@@ -430,3 +431,22 @@ class TestHexStringValidator:
             }
         )
         assert outer == OuterFixedNested(z=Uint64(7), inner=InnerFixed(x=Uint64(1), y=Uint64(2)))
+
+
+@given(
+    a=st.integers(min_value=0, max_value=2**64 - 1),
+    b=st.lists(st.integers(min_value=0, max_value=2**16 - 1), max_size=4),
+    c=st.integers(min_value=0, max_value=2**32 - 1),
+    d=st.lists(st.integers(min_value=0, max_value=2**16 - 1), max_size=4),
+)
+def test_mixed_container_round_trip_random_values(
+    a: int, b: list[int], c: int, d: list[int]
+) -> None:
+    """Any mix of fixed and variable field values round-trips unchanged."""
+    instance = Mixed(
+        a=Uint64(a),
+        b=Uint16List4(data=[Uint16(value) for value in b]),
+        c=Uint32(c),
+        d=Uint16List4(data=[Uint16(value) for value in d]),
+    )
+    assert Mixed.decode_bytes(instance.encode_bytes()) == instance
