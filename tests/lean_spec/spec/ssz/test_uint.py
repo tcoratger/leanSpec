@@ -7,6 +7,7 @@ from itertools import permutations
 from typing import Any, Type
 
 import pytest
+from hypothesis import given, strategies as st
 from pydantic import BaseModel, ValidationError
 
 from lean_spec.spec.ssz import Uint8, Uint16, Uint32, Uint64
@@ -792,3 +793,12 @@ class TestCrossWidthEqualityIsStrict:
     ) -> None:
         """Equal-by-value instances of different widths hash differently."""
         assert hash(type_a(5)) != hash(type_b(5))
+
+
+@pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
+@given(data=st.data())
+def test_encode_decode_round_trip_random_values(uint_class: Type[BaseUint], data) -> None:
+    """Any in-range value survives an encode and decode round trip unchanged."""
+    raw_value = data.draw(st.integers(min_value=0, max_value=2**uint_class.BITS - 1))
+    instance = uint_class(raw_value)
+    assert uint_class.decode_bytes(instance.encode_bytes()) == instance
