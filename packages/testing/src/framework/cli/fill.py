@@ -64,7 +64,8 @@ def fill(
 
     # Check and download keys if needed
     # Import here to avoid loading leanSpec modules before LEAN_ENV is set
-    from consensus_testing.keys import download_keys, get_keys_directory
+    from consensus_testing.keys import get_keys_directory
+    from consensus_testing.keys_cli import download_keys
 
     keys_directory = get_keys_directory(scheme.lower())
 
