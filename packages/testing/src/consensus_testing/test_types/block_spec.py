@@ -369,12 +369,13 @@ class BlockSpec(CamelModel):
         ]
 
         # Build a valid-only copy for normal attestation construction.
-        self.attestations = [
+        # A copy keeps this spec unchanged, so building twice gives the same result.
+        valid_specs = [
             attestation_spec
             for attestation_spec in (self.attestations or [])
             if attestation_spec not in invalid_specs
         ]
-        valid_only = self
+        valid_only = self.model_copy(update={"attestations": valid_specs})
 
         # Build valid attestations and their signatures.
         valid_attestations, signature_lookup, _ = valid_only.build_attestations(
