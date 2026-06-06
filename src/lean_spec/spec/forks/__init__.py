@@ -26,6 +26,7 @@ from lean_spec.spec.forks.lstar.containers import (
     ValidatorIndices,
     Validators,
 )
+from lean_spec.spec.forks.lstar.rejection_reason import RejectionReason
 from lean_spec.spec.forks.lstar.spec import LstarSpec, LstarStore
 from lean_spec.spec.forks.protocol import ForkProtocol, SpecStateType, SpecStoreType
 from lean_spec.spec.forks.registry import ForkRegistry
@@ -59,6 +60,7 @@ __all__ = [
     "Interval",
     "LstarSpec",
     "LstarStore",
+    "RejectionReason",
     "SignedAggregatedAttestation",
     "SignedAttestation",
     "SignedBlock",

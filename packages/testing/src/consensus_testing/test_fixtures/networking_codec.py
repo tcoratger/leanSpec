@@ -26,7 +26,7 @@ from lean_spec.node.networking.reqresp.codec import (
 from lean_spec.node.networking.transport.peer_id import KeyType, PeerId, PublicKeyProtobuf
 from lean_spec.node.networking.varint import decode_varint, encode_varint
 from lean_spec.node.snappy import compress, decompress, frame_compress, frame_decompress
-from lean_spec.spec.forks import SubnetId
+from lean_spec.spec.forks import RejectionReason, SubnetId
 
 
 def _to_hex(data: bytes) -> str:
@@ -115,8 +115,7 @@ class NetworkingCodecTest(BaseConsensusFixture):
         - `bytes`: hex-encoded malformed input.
 
         Returns:
-            A dict echoing the decoder name along with the error type and
-            message for reproducibility.
+            A dict echoing the decoder name.
 
         Raises:
             AssertionError: If the decoder succeeds or raises a mismatched
@@ -160,11 +159,9 @@ class NetworkingCodecTest(BaseConsensusFixture):
                 f"{type(exception_raised).__name__}: {exception_raised}"
             )
 
-        return {
-            "decoder": decoder_name,
-            "errorType": type(exception_raised).__name__,
-            "errorMessage": str(exception_raised),
-        }
+        # Emit the language-neutral reason clients assert against.
+        self.rejection_reason = RejectionReason.DECODE_ERROR
+        return {"decoder": decoder_name}
 
     def _make_varint(self) -> dict[str, Any]:
         """Encode a value as LEB128, decode it back, assert roundtrip."""
