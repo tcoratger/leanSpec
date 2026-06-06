@@ -16,6 +16,7 @@ Regenerating Keys:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import sys
@@ -27,7 +28,11 @@ from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
 
-from consensus_testing.keys import LEAN_ENV_TO_SCHEMES, get_keys_directory
+from consensus_testing.keys import (
+    LEAN_ENV_TO_SCHEMES,
+    compute_key_set_digest,
+    get_keys_directory,
+)
 from lean_spec.spec.crypto.xmss.containers import ValidatorKeyPair
 from lean_spec.spec.crypto.xmss.interface import GeneralizedXmssScheme
 from lean_spec.spec.forks import Slot
@@ -42,6 +47,31 @@ GitHub release URLs for pre-generated key archives.
 
 Keyed by scheme name ("test" or "prod").
 Each URL points to a tar.gz containing per-validator JSON files.
+"""
+
+PINNED_KEY_ARCHIVE_SHA256 = {
+    "test": "2d616857f4936cde4e2720fa95a76f2644015390f4b8c188acbaa756f521dac8",
+    "prod": "a40aa60fc0c0d1b4c761f19fb1678039400ae318da85f782dd57bc8cc0eb617d",
+}
+"""
+SHA-256 of each scheme's key archive.
+
+The release tag is mutable, so these checksums are the real pin.
+A re-cut release fails the download instead of silently changing vectors.
+Update together with the key-set digests when adopting a new release.
+"""
+
+PINNED_KEY_SET_DIGESTS = {
+    "test": "0x49306dfdb6dddd72afe265ec3b20a1901834dde9b3dfe4fee6b4f7ca58c7aa43",
+    "prod": "0xc2b5fc4c1f1fbc181ddf07db3df985f79e1dcedcfb7df732ef20863d7cbcf491",
+}
+"""
+Expected key-set digest per scheme.
+
+Guards the on-disk keys, which the archive checksum cannot see.
+
+- test: the key set committed to this repository.
+- prod: the key set served by the current release.
 """
 
 NUM_VALIDATORS: int = 8
@@ -176,16 +206,46 @@ def download_keys(scheme: str) -> None:
         with urllib.request.urlopen(url) as response, tmp_path.open("wb") as out:
             shutil.copyfileobj(response, out)
 
-        # Remove any existing keys for this scheme before extracting.
-        target_directory = base_directory / f"{scheme}_scheme"
-        if target_directory.exists():
-            shutil.rmtree(target_directory)
-        base_directory.mkdir(parents=True, exist_ok=True)
+        # Verify the archive against the pinned checksum before extracting.
+        # The release tag is mutable, so the checksum is the real pin.
+        with tmp_path.open("rb") as archive_handle:
+            archive_sha256 = hashlib.file_digest(archive_handle, "sha256").hexdigest()
+        if archive_sha256 != PINNED_KEY_ARCHIVE_SHA256[scheme]:
+            raise RuntimeError(
+                f"downloaded {scheme} key archive does not match the pinned checksum\n"
+                f"  expected: {PINNED_KEY_ARCHIVE_SHA256[scheme]}\n"
+                f"  actual:   {archive_sha256}\n"
+                "The release was re-cut upstream. Adopting the new key set requires "
+                "updating the pinned checksum and key-set digest on purpose."
+            )
 
-        # Extract the archive into the base directory.
+        # Extract into a scratch directory and verify there first.
+        # A rejected archive must never destroy working keys.
         # The archive root is the scheme directory itself.
-        with tarfile.open(tmp_path, "r:gz") as tar:
-            tar.extractall(path=base_directory, filter="data")
+        with tempfile.TemporaryDirectory() as scratch_name:
+            scratch_directory = Path(scratch_name)
+            with tarfile.open(tmp_path, "r:gz") as tar:
+                tar.extractall(path=scratch_directory, filter="data")
+
+            # Verify the extracted key set against the pinned digest.
+            # Catches content drift the checksum pin alone would miss.
+            extracted_directory = scratch_directory / f"{scheme}_scheme"
+            extracted_digest = compute_key_set_digest(extracted_directory)
+            if extracted_digest != PINNED_KEY_SET_DIGESTS[scheme]:
+                raise RuntimeError(
+                    f"extracted {scheme} key set does not match the pinned digest\n"
+                    f"  expected: {PINNED_KEY_SET_DIGESTS[scheme]}\n"
+                    f"  actual:   {extracted_digest}\n"
+                    "The archive carries a different key set than the canonical one. "
+                    "For the test scheme, restore the committed keys from version control."
+                )
+
+            # Replace the live key set only after both verifications pass.
+            target_directory = base_directory / f"{scheme}_scheme"
+            if target_directory.exists():
+                shutil.rmtree(target_directory)
+            base_directory.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(extracted_directory), str(target_directory))
 
         print(f"Extracted {scheme} keys to {target_directory}/")
     finally:

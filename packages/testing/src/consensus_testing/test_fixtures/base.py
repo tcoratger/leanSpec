@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 from framework.forks import BaseFork
 from pydantic import Field, field_serializer
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.base import CamelModel
 from lean_spec.config import LEAN_ENV
 
@@ -146,5 +147,9 @@ class BaseConsensusFixture(CamelModel):
         self.info["testId"] = test_id
         self.info["description"] = description
         self.info["fixtureFormat"] = self.format_name
+
+        # Why: consumers can detect vectors generated from a different key set.
+        self.info["keySetDigest"] = XmssKeyManager.shared().key_set_digest()
+
         # Set network field on the fixture itself
         self.network = fork.name()
