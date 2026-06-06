@@ -1,8 +1,8 @@
 """Single-message aggregate proof verification vectors — valid cases."""
 
 import pytest
-from consensus_testing import VerifySingleMessageProofsTestFiller
 
+from consensus_testing import VerifySingleMessageProofsTestFiller
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32

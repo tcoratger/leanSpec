@@ -1,6 +1,7 @@
 """Fork Choice: Attestation Source Under Justified Divergence"""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationCheck,
     AggregatedAttestationSpec,
@@ -9,7 +10,6 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

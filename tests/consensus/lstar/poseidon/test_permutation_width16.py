@@ -7,8 +7,8 @@ must produce identical output states bit-for-bit.
 """
 
 import pytest
-from consensus_testing import PoseidonPermutationTestFiller
 
+from consensus_testing import PoseidonPermutationTestFiller
 from lean_spec.spec.crypto.koalabear import P
 
 pytestmark = pytest.mark.valid_until("Lstar")

@@ -3,19 +3,18 @@ CLI for generating or downloading the pre-generated XMSS test keys.
 
 Downloading Pre-generated Keys:
 
-    python -m consensus_testing.keys_cli --download --scheme test    # test scheme
-    python -m consensus_testing.keys_cli --download --scheme prod    # prod scheme
+    uv run keys --download --scheme test    # test scheme
+    uv run keys --download --scheme prod    # prod scheme
 
 Regenerating Keys:
 
-    python -m consensus_testing.keys_cli                   # defaults
-    python -m consensus_testing.keys_cli --count 20        # more validators
-    python -m consensus_testing.keys_cli --max-slot 200    # longer lifetime
+    uv run keys                   # defaults
+    uv run keys --count 20        # more validators
+    uv run keys --max-slot 200    # longer lifetime
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import os
 import shutil
@@ -27,6 +26,8 @@ import urllib.request
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
+
+import click
 
 from consensus_testing.keys import (
     LEAN_ENV_TO_SCHEMES,
@@ -255,45 +256,43 @@ def download_keys(scheme: str) -> None:
     print("Download complete!")
 
 
-def main() -> None:
-    """CLI entry point for generating or downloading test keys."""
-    parser = argparse.ArgumentParser(
-        description="Generate XMSS key pairs for consensus testing",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "--download",
-        action="store_true",
-        help="Download pre-generated keys from a GitHub release",
-    )
-    parser.add_argument(
-        "--scheme",
-        choices=LEAN_ENV_TO_SCHEMES.keys(),
-        default="test",
-        help="XMSS scheme to use",
-    )
-    parser.add_argument(
-        "--count",
-        type=int,
-        default=NUM_VALIDATORS,
-        help="Number of validator key pairs",
-    )
-    parser.add_argument(
-        "--max-slot",
-        type=int,
-        default=int(CLI_DEFAULT_MAX_SLOT),
-        help="Maximum slot (key lifetime = max_slot + 1)",
-    )
-    args = parser.parse_args()
-
+@click.command()
+@click.option(
+    "--download",
+    is_flag=True,
+    help="Download pre-generated keys from a GitHub release",
+)
+@click.option(
+    "--scheme",
+    type=click.Choice(list(LEAN_ENV_TO_SCHEMES)),
+    default="test",
+    show_default=True,
+    help="XMSS scheme to use",
+)
+@click.option(
+    "--count",
+    type=int,
+    default=NUM_VALIDATORS,
+    show_default=True,
+    help="Number of validator key pairs",
+)
+@click.option(
+    "--max-slot",
+    type=int,
+    default=int(CLI_DEFAULT_MAX_SLOT),
+    show_default=True,
+    help="Maximum slot (key lifetime = max_slot + 1)",
+)
+def keys(download: bool, scheme: str, count: int, max_slot: int) -> None:
+    """Generate XMSS key pairs for consensus testing."""
     # Download pre-generated keys instead of generating locally.
-    if args.download:
-        download_keys(scheme=args.scheme)
+    if download:
+        download_keys(scheme=scheme)
         return
 
     # Generate fresh keys with the specified parameters.
-    _generate_keys(lean_env=args.scheme, count=args.count, max_slot=args.max_slot)
+    _generate_keys(lean_env=scheme, count=count, max_slot=max_slot)
 
 
 if __name__ == "__main__":
-    main()
+    keys()

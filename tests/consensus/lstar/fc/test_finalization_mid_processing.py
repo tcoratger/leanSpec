@@ -8,6 +8,7 @@ Reference: https://github.com/leanEthereum/leanSpec/pull/443
 """
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
@@ -15,7 +16,6 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

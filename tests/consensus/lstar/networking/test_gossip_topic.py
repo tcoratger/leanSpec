@@ -1,6 +1,7 @@
 """Test vectors for gossipsub topic string encoding and parsing."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

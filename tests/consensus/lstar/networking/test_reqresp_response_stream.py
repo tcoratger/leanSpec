@@ -8,6 +8,7 @@ and produce the same ordered list of (code, sszData) records.
 """
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

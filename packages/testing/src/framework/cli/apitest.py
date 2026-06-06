@@ -1,8 +1,8 @@
 """CLI command for running API conformance tests against an external server."""
 
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import click
 import pytest

@@ -1,8 +1,8 @@
 """Gossipsub RPC decoder: malformed-protobuf rejection vectors."""
 
 import pytest
-from consensus_testing import NetworkingCodecTestFiller
 
+from consensus_testing import NetworkingCodecTestFiller
 from lean_spec.node.networking.gossipsub.rpc import ProtobufDecodeError
 
 pytestmark = pytest.mark.valid_until("Lstar")

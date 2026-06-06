@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import NamedTuple, cast
 
 from consensus_testing.keys import XmssKeyManager
-
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.peer import PeerInfo

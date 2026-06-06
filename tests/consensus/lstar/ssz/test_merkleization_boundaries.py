@@ -3,8 +3,8 @@
 from typing import ClassVar
 
 import pytest
-from consensus_testing import SSZTestFiller
 
+from consensus_testing import SSZTestFiller
 from lean_spec.spec.ssz import BaseBitlist, BaseBitvector, Boolean, SSZList, Uint64
 
 pytestmark = pytest.mark.valid_until("Lstar")

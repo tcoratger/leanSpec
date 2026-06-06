@@ -1,6 +1,7 @@
 """Test vectors for gossipsub handler protocol decisions."""
 
 import pytest
+
 from consensus_testing import GossipsubHandlerTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

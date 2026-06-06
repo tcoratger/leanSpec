@@ -1,6 +1,7 @@
 """Test vectors for req/resp wire format encoding."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

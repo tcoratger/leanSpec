@@ -7,6 +7,7 @@ so clients' response shapes at non-zero slots are also captured.
 """
 
 import pytest
+
 from consensus_testing import ApiEndpointTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

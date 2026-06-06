@@ -8,8 +8,8 @@ change is covered independently of later negative-path content PRs.
 from typing import ClassVar
 
 import pytest
-from consensus_testing import SSZTestFiller
 
+from consensus_testing import SSZTestFiller
 from lean_spec.spec.ssz import BaseBitlist, Boolean
 
 pytestmark = pytest.mark.valid_until("Lstar")

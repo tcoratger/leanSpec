@@ -1,6 +1,7 @@
 """Req/resp error-response payload roundtrip at size and UTF-8 boundaries."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

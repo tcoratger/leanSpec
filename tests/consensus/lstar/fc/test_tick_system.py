@@ -1,6 +1,7 @@
 """Fork choice tick interval progression tests."""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     AttestationCheck,
@@ -11,7 +12,6 @@ from consensus_testing import (
     StoreChecks,
     TickStep,
 )
-
 from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

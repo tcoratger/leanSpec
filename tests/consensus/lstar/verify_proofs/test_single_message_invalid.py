@@ -1,13 +1,13 @@
 """Single-message aggregate proof verification vectors — rejection cases."""
 
 import pytest
+
 from consensus_testing import (
     IncrementEmittedSlot,
     RebindToAlternateHeadRoot,
     SwapParticipantPublicKey,
     VerifySingleMessageProofsTestFiller,
 )
-
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AggregationError, AttestationData
 from lean_spec.spec.ssz import Bytes32

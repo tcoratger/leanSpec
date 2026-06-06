@@ -269,7 +269,7 @@ class XmssKeyManager:
             if not self._keys_directory.exists():
                 raise FileNotFoundError(
                     f"Keys directory not found: {self._keys_directory} - "
-                    f"Run: python -m consensus_testing.keys_cli --scheme {self.scheme_name}"
+                    f"Run: uv run keys --scheme {self.scheme_name}"
                 )
 
             # Each JSON file is named by its validator index (e.g. "0.json").
@@ -282,7 +282,7 @@ class XmssKeyManager:
             if not self._available_indices:
                 raise FileNotFoundError(
                     f"No key files found in: {self._keys_directory} - "
-                    f"Run: python -m consensus_testing.keys_cli --scheme {self.scheme_name}"
+                    f"Run: uv run keys --scheme {self.scheme_name}"
                 )
         return self._available_indices
 

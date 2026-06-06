@@ -5,10 +5,10 @@ import json
 from functools import cached_property
 from typing import Any, ClassVar
 
-from framework.forks import BaseFork
 from pydantic import Field
 
 from consensus_testing.keys import XmssKeyManager
+from framework.forks import BaseFork
 from lean_spec.base import CamelModel
 from lean_spec.config import LEAN_ENV
 from lean_spec.spec.forks import RejectionReason

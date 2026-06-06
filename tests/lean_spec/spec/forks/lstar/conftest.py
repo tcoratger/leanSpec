@@ -8,8 +8,8 @@ timeline, aggregation, and container tests.
 from __future__ import annotations
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.forks import Interval, Slot
 from lean_spec.spec.forks.lstar import Store
 from tests.lean_spec.helpers import TEST_VALIDATOR_INDEX, make_store

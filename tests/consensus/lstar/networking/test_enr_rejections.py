@@ -1,6 +1,7 @@
 """ENR RLP decoder: malformed-input rejection vectors."""
 
 import pytest
+
 from consensus_testing import NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")

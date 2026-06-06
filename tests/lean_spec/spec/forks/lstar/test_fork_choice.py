@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 from hypothesis import given, settings, strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, Store

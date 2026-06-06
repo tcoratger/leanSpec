@@ -1,12 +1,12 @@
 """Signature Verification: Out-of-Range Attestation Validator Index."""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     VerifySignaturesTestFiller,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

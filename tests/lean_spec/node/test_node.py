@@ -8,8 +8,8 @@ import signal
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.node.api import ApiServerConfig
 from lean_spec.node.node import Node, NodeConfig
 from lean_spec.node.storage.sqlite import SQLiteDatabase

@@ -1,6 +1,7 @@
 """Gossip aggregated attestation validation vectors."""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
@@ -10,7 +11,6 @@ from consensus_testing import (
     StoreChecks,
     TickStep,
 )
-
 from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import GOSSIP_DISPARITY_INTERVALS
 from lean_spec.spec.ssz import Bytes32

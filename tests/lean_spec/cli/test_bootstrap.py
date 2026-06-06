@@ -8,12 +8,12 @@ from typing import Callable
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from consensus_testing.keys import XmssKeyManager
 from Crypto.Hash import keccak
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import Prehashed, decode_dss_signature
 
+from consensus_testing.keys import XmssKeyManager
 from lean_spec.cli import CliValidationError, NodeBootstrap, parse_args
 from lean_spec.node.api import ApiServerConfig
 from lean_spec.node.networking.enr.rlp import RLPItem, encode_rlp

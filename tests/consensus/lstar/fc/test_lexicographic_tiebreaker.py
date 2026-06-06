@@ -6,13 +6,13 @@ competing forks have equal attestation weight.
 """
 
 import pytest
+
 from consensus_testing import (
     BlockSpec,
     BlockStep,
     ForkChoiceTestFiller,
     StoreChecks,
 )
-
 from lean_spec.spec.forks import Slot
 
 pytestmark = pytest.mark.valid_until("Lstar")

@@ -1,6 +1,7 @@
 """Equivocating Proposer Tests."""
 
 import pytest
+
 from consensus_testing import (
     AggregatedAttestationSpec,
     AttestationCheck,
@@ -14,7 +15,6 @@ from consensus_testing import (
     TickStep,
     generate_pre_state,
 )
-
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from consensus_testing.keys import XmssKeyManager
-
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
