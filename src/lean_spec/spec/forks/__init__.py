@@ -28,7 +28,7 @@ from lean_spec.spec.forks.lstar.containers import (
 )
 from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
 from lean_spec.spec.forks.lstar.spec import LstarSpec, LstarStore
-from lean_spec.spec.forks.protocol import ForkProtocol, SpecStateType, SpecStoreType
+from lean_spec.spec.forks.protocol import ForkProtocol
 from lean_spec.spec.forks.registry import ForkRegistry
 
 Store = LstarStore
@@ -66,8 +66,6 @@ __all__ = [
     "SignedAttestation",
     "SignedBlock",
     "Slot",
-    "SpecStateType",
-    "SpecStoreType",
     "State",
     "Store",
     "SubnetId",
