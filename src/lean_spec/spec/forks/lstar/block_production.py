@@ -19,7 +19,7 @@ from lean_spec.spec.forks.lstar.containers import (
     ValidatorIndex,
 )
 from lean_spec.spec.forks.lstar.state_transition import attestation_data_matches_chain
-from lean_spec.spec.ssz import ZERO_HASH, Bytes32, Uint8
+from lean_spec.spec.ssz import ZERO_HASH, Bytes32
 
 
 class BlockProductionMixin(LstarSpecBase):
@@ -39,23 +39,29 @@ class BlockProductionMixin(LstarSpecBase):
 
         # Overview
 
-        A proposer packs attestations into a block and records the post-state root.
-        A vote is eligible only if the point it builds from is already justified.
-        Including a vote can justify a new checkpoint.
-        That, in turn, makes further votes eligible.
+        A proposer fills a block with attestation votes, then records the post-state root.
+
+        Selection is circular:
+
+        - A vote may only build from an already-justified source.
+        - Yet including votes is the act that justifies those sources.
+
+        So the eligible set grows as votes are added, and the proposer selects in rounds.
 
         # Algorithm
 
-        Selection runs as a fixed point:
+        Each round repeats these steps:
 
-        1. Anchor on the checkpoint this chain currently treats as justified.
-        2. Greedily pick proofs covering the most new validators.
-        3. Apply the state transition to a trial block.
-        4. If justification or finalization advanced, repeat from the new checkpoint.
-        5. Stop when a full pass adds nothing.
+        1. Pick the eligible proofs covering the most uncounted validators.
+        2. Apply the state transition.
+        3. Re-anchor on any newly justified checkpoint.
 
-        The loop is bounded: justification and finalization only move forward,
-        and the set of chosen entries only grows.
+        The rounds stop once a pass adds nothing.
+
+        # Why it terminates
+
+        Justification and finalization only move forward, and the chosen set only grows.
+        Both are bounded, so the rounds must end.
 
         Args:
             state: Pre-state the block builds on.
@@ -72,12 +78,14 @@ class BlockProductionMixin(LstarSpecBase):
         aggregated_attestations: list[AggregatedAttestation] = []
         aggregated_signatures: list[SingleMessageAggregate] = []
 
+        # Advance the pre-state to this block's slot once.
+        advanced_state = self.process_slots(state, slot)
+
         if aggregated_payloads:
             # Anchor on the checkpoint this chain treats as justified.
             #
-            # Building directly on genesis is special.
-            # Header processing justifies the parent at slot 0.
-            # Anchor on that same checkpoint so eligible sources match.
+            # On genesis the parent is justified at slot 0 by header processing.
+            # Anchor there so eligible sources match.
             current_justified_checkpoint = (
                 Checkpoint(slot=Slot(0), root=parent_root)
                 if state.latest_block_header.slot == Slot(0)
@@ -98,13 +106,19 @@ class BlockProductionMixin(LstarSpecBase):
             # 1. History up to the parent.
             # 2. The parent root at its own slot.
             # 3. A zero hash for each slot skipped before this block.
-            # 4. Source and target roots are validated against this view.
+            #
+            # Source and target roots are validated against this view.
             num_empty_slots = int(slot - state.latest_block_header.slot - Slot(1))
             extended_historical_block_hashes: list[Bytes32] = (
                 list(state.historical_block_hashes) + [parent_root] + [ZERO_HASH] * num_empty_slots
             )
 
             processed_attestation_data: set[AttestationData] = set()
+
+            # Order candidates by target slot, once.
+            candidates_in_target_slot_order = sorted(
+                aggregated_payloads.items(), key=lambda item: item[0].target.slot
+            )
 
             # Fixed-point selection.
             #
@@ -114,17 +128,13 @@ class BlockProductionMixin(LstarSpecBase):
             while True:
                 found_new_entries = False
 
-                # Visit candidates in target-slot order.
-                # Earlier targets justify first and unlock later ones.
-                for attestation_data, proofs in sorted(
-                    aggregated_payloads.items(), key=lambda item: item[0].target.slot
-                ):
+                for attestation_data, proofs in candidates_in_target_slot_order:
                     if attestation_data in processed_attestation_data:
                         continue
 
                     # Stop once the block holds the maximum distinct data entries.
                     # This cap is a proposer-side budget, not a consensus rule.
-                    if Uint8(len(processed_attestation_data)) >= MAX_ATTESTATIONS_DATA:
+                    if len(processed_attestation_data) >= int(MAX_ATTESTATIONS_DATA):
                         break
 
                     # Skip votes whose head block the proposer has not seen.
@@ -153,14 +163,14 @@ class BlockProductionMixin(LstarSpecBase):
                     # - Including them propagates them to peers.
                     # - Slot 0 counts as justified, so the next check would drop them.
                     # - This flag lets them through.
-                    is_genesis_self_vote = attestation_data.source.slot == Slot(0) and (
-                        attestation_data.target.slot == Slot(0)
-                    )
+                    source_at_genesis = attestation_data.source.slot == Slot(0)
+                    target_at_genesis = attestation_data.target.slot == Slot(0)
+                    is_genesis_self_vote = source_at_genesis and target_at_genesis
 
                     # Skip votes whose target slot is already justified.
                     #
-                    # A justified target gains nothing from more votes.
-                    # Genesis self-votes are exempt, kept for their head weight.
+                    # - A justified target gains nothing from more votes.
+                    # - Genesis self-votes are exempt, kept for their head weight.
                     if not is_genesis_self_vote and current_justified_slots.is_slot_justified(
                         current_finalized_slot, attestation_data.target.slot
                     ):
@@ -193,11 +203,11 @@ class BlockProductionMixin(LstarSpecBase):
                     state_root=Bytes32.zero(),
                     body=self.block_body_class(
                         attestations=self.aggregated_attestations_class(
-                            data=list(aggregated_attestations)
+                            data=aggregated_attestations
                         )
                     ),
                 )
-                post_state = self.process_block(self.process_slots(state, slot), candidate_block)
+                post_state = self.process_block(advanced_state, candidate_block)
 
                 # Repeat only if justification or finalization moved.
                 #
@@ -211,9 +221,10 @@ class BlockProductionMixin(LstarSpecBase):
                     current_justified_checkpoint = post_state.latest_justified
                     current_justified_slots = post_state.justified_slots
                     current_finalized_slot = post_state.latest_finalized.slot
-                    # The chain view never changes between passes.
-                    # Earlier block hashes are fixed once written.
-                    # Attestation processing does not rewrite them.
+
+                    # Re-anchoring needs no other rebuilds.
+                    # The justified window still covers every slot the loop queries.
+                    # The chain view is fixed once written, never recomputed.
                     continue
 
                 break
@@ -281,7 +292,7 @@ class BlockProductionMixin(LstarSpecBase):
         #
         # Merging proofs keeps the same voters, so the post-state is unchanged.
         # Only the body's shape differs, so just the root is needed.
-        post_state = self.process_block(self.process_slots(state, slot), final_block)
+        post_state = self.process_block(advanced_state, final_block)
         final_block = final_block.model_copy(update={"state_root": hash_tree_root(post_state)})
 
         return final_block, post_state, aggregated_attestations, aggregated_signatures
