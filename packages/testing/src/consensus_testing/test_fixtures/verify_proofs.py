@@ -17,6 +17,7 @@ from lean_spec.spec.forks import (
     ValidatorIndex,
 )
 from lean_spec.spec.forks.lstar.containers import (
+    AggregationError,
     AttestationData,
     MultiMessageAggregate,
     SingleMessageAggregate,
@@ -251,11 +252,11 @@ class VerifySingleMessageProofsTest(BaseTestSpec):
         # Phase 3: self-verify and assert the outcome against the configured expectation.
         candidate = SingleMessageAggregate(participants=aggregation_bits, proof=proof)
         exception_raised: Exception | None = None
-        # Catch any exception so a verifier raising the wrong type still produces
-        # a comparable "expected X got Y" message instead of crashing the filler.
+        # Why this catch: the aggregation layer raises exactly one error type.
+        # Anything else is a harness bug and propagates unswallowed.
         try:
             candidate.verify(public_keys, message, slot)
-        except Exception as exception:
+        except AggregationError as exception:
             exception_raised = exception
         self.assert_expected_outcome(exception_raised)
 
@@ -506,14 +507,14 @@ class VerifyMultiMessageProofsTest(BaseTestSpec):
 
         # Phase 4: self-verify and assert the outcome against the configured expectation.
         exception_raised: Exception | None = None
-        # Catch any exception so a verifier raising the wrong type still produces
-        # a comparable "expected X got Y" message instead of crashing the filler.
+        # Why this catch: the aggregation layer raises exactly one error type.
+        # Anything else is a harness bug and propagates unswallowed.
         try:
             merged.verify(
                 public_keys_per_message=public_keys_per_message,
                 messages=list(zip(messages, slots, strict=True)),
             )
-        except Exception as exception:
+        except AggregationError as exception:
             exception_raised = exception
         self.assert_expected_outcome(exception_raised)
 

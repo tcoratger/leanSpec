@@ -39,10 +39,8 @@ class BaseForkChoiceStep(CamelModel):
     """
     Expected rejection when valid=False.
 
-    When set, the classified reason must match and the exception message
-    must contain the optional substring.
-    When None and valid=False, any spec rejection is accepted.
-    Ignored when valid=True.
+    The classified reason must match.
+    The exception message must contain the optional substring.
     Never serialized: the emitted contract is the filled step's reason field.
     """
 
@@ -54,6 +52,18 @@ class BaseForkChoiceStep(CamelModel):
     these checks after executing the step.
     Only fields that are explicitly set will be validated.
     """
+
+    @model_validator(mode="after")
+    def validate_rejection_is_declared(self) -> "BaseForkChoiceStep":
+        """
+        Require a declared rejection on every step expected to fail.
+
+        Why: a vector saying only "reject this" lets a client reject
+        for the wrong reason and still pass.
+        """
+        if not self.valid and self.expected_rejection is None:
+            raise ValueError("steps with valid=False must declare their expected_rejection")
+        return self
 
 
 class TickStep(BaseForkChoiceStep):
@@ -105,6 +115,15 @@ class BlockStep(BaseForkChoiceStep):
 
     Tests provide a BlockSpec with required slot and optional field overrides.
     Generation fills a complete Block and emits it in the filled step.
+    """
+
+    tick_to_slot: bool = True
+    """
+    Whether to advance the store clock to the block's slot before import.
+
+    Default True matches a node whose clock reached the slot already.
+    Set False to deliver the block while the store clock lags behind,
+    pinning how clients treat a block ahead of their local time.
     """
 
 
@@ -213,6 +232,9 @@ class FilledBlockStep(BaseFilledStep):
 
     step_type: Literal["block"] = "block"
     """Discriminator field for serialization."""
+
+    tick_to_slot: bool
+    """Whether the store clock advanced to the block's slot before import."""
 
     block: Block
     """The filled Block, processed through the spec."""

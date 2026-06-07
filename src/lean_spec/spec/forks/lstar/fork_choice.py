@@ -25,6 +25,7 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
     ValidatorIndex,
 )
+from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
 from lean_spec.spec.forks.protocol import SpecBlockType, SpecStateType
 from lean_spec.spec.observability import (
     observe_on_attestation,
@@ -90,9 +91,11 @@ class ForkChoiceMixin(LstarSpecBase):
         # Check that the block actually points to this state.
         #
         # If this fails, the caller has supplied inconsistent inputs.
-        assert anchor_block.state_root == computed_state_root, (
-            "Anchor block state root must match anchor state hash"
-        )
+        if anchor_block.state_root != computed_state_root:
+            raise SpecRejectionError(
+                RejectionReason.ANCHOR_STATE_ROOT_MISMATCH,
+                "Anchor block state root must match anchor state hash",
+            )
 
         # Compute the SSZ root of the anchor block itself.
         #
@@ -185,26 +188,36 @@ class ForkChoiceMixin(LstarSpecBase):
         # Availability Check
         #
         # We cannot count a vote if we haven't seen the blocks involved.
-        assert source_checkpoint.root in store.blocks, (
-            f"Unknown source block: {source_checkpoint.root.hex()}"
-        )
-        assert target_checkpoint.root in store.blocks, (
-            f"Unknown target block: {target_checkpoint.root.hex()}"
-        )
-        assert head_checkpoint.root in store.blocks, (
-            f"Unknown head block: {head_checkpoint.root.hex()}"
-        )
+        if source_checkpoint.root not in store.blocks:
+            raise SpecRejectionError(
+                RejectionReason.UNKNOWN_SOURCE_BLOCK,
+                f"Unknown source block: {source_checkpoint.root.hex()}",
+            )
+        if target_checkpoint.root not in store.blocks:
+            raise SpecRejectionError(
+                RejectionReason.UNKNOWN_TARGET_BLOCK,
+                f"Unknown target block: {target_checkpoint.root.hex()}",
+            )
+        if head_checkpoint.root not in store.blocks:
+            raise SpecRejectionError(
+                RejectionReason.UNKNOWN_HEAD_BLOCK,
+                f"Unknown head block: {head_checkpoint.root.hex()}",
+            )
 
         # Topology Check
         #
         # History is linear and monotonic: source <= target <= head.
         # The second check implies head >= source by transitivity.
-        assert source_checkpoint.slot <= target_checkpoint.slot, (
-            "Source checkpoint slot must not exceed target"
-        )
-        assert head_checkpoint.slot >= target_checkpoint.slot, (
-            "Head checkpoint must not be older than target"
-        )
+        if source_checkpoint.slot > target_checkpoint.slot:
+            raise SpecRejectionError(
+                RejectionReason.SOURCE_AFTER_TARGET,
+                "Source checkpoint slot must not exceed target",
+            )
+        if head_checkpoint.slot < target_checkpoint.slot:
+            raise SpecRejectionError(
+                RejectionReason.HEAD_OLDER_THAN_TARGET,
+                "Head checkpoint must not be older than target",
+            )
 
         # Consistency Check
         #
@@ -212,20 +225,33 @@ class ForkChoiceMixin(LstarSpecBase):
         source_block = store.blocks[source_checkpoint.root]
         target_block = store.blocks[target_checkpoint.root]
         head_block = store.blocks[head_checkpoint.root]
-        assert source_block.slot == source_checkpoint.slot, "Source checkpoint slot mismatch"
-        assert target_block.slot == target_checkpoint.slot, "Target checkpoint slot mismatch"
-        assert head_block.slot == head_checkpoint.slot, "Head checkpoint slot mismatch"
+        if source_block.slot != source_checkpoint.slot:
+            raise SpecRejectionError(
+                RejectionReason.SOURCE_SLOT_MISMATCH, "Source checkpoint slot mismatch"
+            )
+        if target_block.slot != target_checkpoint.slot:
+            raise SpecRejectionError(
+                RejectionReason.TARGET_SLOT_MISMATCH, "Target checkpoint slot mismatch"
+            )
+        if head_block.slot != head_checkpoint.slot:
+            raise SpecRejectionError(
+                RejectionReason.HEAD_SLOT_MISMATCH, "Head checkpoint slot mismatch"
+            )
 
         # Ancestry Check
         #
         # Why: fork-choice weight accrues to every ancestor of the attested head.
         # A sibling head would steer that weight onto a non-canonical branch.
-        assert self._checkpoint_is_ancestor(store, source_checkpoint, target_checkpoint), (
-            "Source checkpoint must be ancestor of target"
-        )
-        assert self._checkpoint_is_ancestor(store, target_checkpoint, head_checkpoint), (
-            "Target checkpoint must be ancestor of head"
-        )
+        if not self._checkpoint_is_ancestor(store, source_checkpoint, target_checkpoint):
+            raise SpecRejectionError(
+                RejectionReason.SOURCE_NOT_ANCESTOR_OF_TARGET,
+                "Source checkpoint must be ancestor of target",
+            )
+        if not self._checkpoint_is_ancestor(store, target_checkpoint, head_checkpoint):
+            raise SpecRejectionError(
+                RejectionReason.TARGET_NOT_ANCESTOR_OF_HEAD,
+                "Target checkpoint must be ancestor of head",
+            )
 
         # Time Check
         #
@@ -237,9 +263,10 @@ class ForkChoiceMixin(LstarSpecBase):
         # honest validator.
         attestation_start_interval = Interval.from_slot(attestation_data.slot)
         gossip_disparity = Interval(int(GOSSIP_DISPARITY_INTERVALS))
-        assert attestation_start_interval <= store.time + gossip_disparity, (
-            "Attestation too far in future"
-        )
+        if attestation_start_interval > store.time + gossip_disparity:
+            raise SpecRejectionError(
+                RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE, "Attestation too far in future"
+            )
 
     def on_gossip_attestation(
         self,
@@ -286,15 +313,20 @@ class ForkChoiceMixin(LstarSpecBase):
                 f"No state available to verify attestation signature for target block "
                 f"{attestation_data.target.root.hex()}"
             )
-            assert validator_index.is_within_registry(Uint64(len(key_state.validators))), (
-                f"Validator {validator_index} not found in state "
-                f"{attestation_data.target.root.hex()}"
-            )
+            if not validator_index.is_within_registry(Uint64(len(key_state.validators))):
+                raise SpecRejectionError(
+                    RejectionReason.VALIDATOR_NOT_IN_STATE,
+                    f"Validator {validator_index} not found in state "
+                    f"{attestation_data.target.root.hex()}",
+                )
             public_key = key_state.validators[validator_index].get_attestation_public_key()
 
-            assert TARGET_SIGNATURE_SCHEME.verify(
+            if not TARGET_SIGNATURE_SCHEME.verify(
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
-            ), "Signature verification failed"
+            ):
+                raise SpecRejectionError(
+                    RejectionReason.INVALID_SIGNATURE, "Signature verification failed"
+                )
 
             # Non-aggregator nodes validate and drop — they never store gossip signatures.
             if not is_aggregator:
@@ -347,10 +379,12 @@ class ForkChoiceMixin(LstarSpecBase):
         # Ensure all participants exist in the active set
         validators = key_state.validators
         for validator_index in validator_indices:
-            assert validator_index.is_within_registry(Uint64(len(validators))), (
-                f"Validator {validator_index} not found in state "
-                f"{attestation_data.target.root.hex()}"
-            )
+            if not validator_index.is_within_registry(Uint64(len(validators))):
+                raise SpecRejectionError(
+                    RejectionReason.VALIDATOR_NOT_IN_STATE,
+                    f"Validator {validator_index} not found in state "
+                    f"{attestation_data.target.root.hex()}",
+                )
 
         # Prepare public keys for verification
         public_keys = [
@@ -414,23 +448,29 @@ class ForkChoiceMixin(LstarSpecBase):
             # The parent state must exist before processing this block.
             # If missing, the node must sync the parent chain first.
             parent_state = store.states.get(block.parent_root)
-            assert parent_state is not None, (
-                f"Parent state not found (root={block.parent_root.hex()}). "
-                f"Sync parent chain before processing block at slot {block.slot}."
-            )
+            if parent_state is None:
+                raise SpecRejectionError(
+                    RejectionReason.UNKNOWN_PARENT_BLOCK,
+                    f"Parent state not found (root={block.parent_root.hex()}). "
+                    f"Sync parent chain before processing block at slot {block.slot}.",
+                )
 
             # The block body constrains how many distinct AttestationData
             # entries it may carry.
             aggregated_attestations = block.body.attestations
             attestation_data_set = {attestation.data for attestation in aggregated_attestations}
-            assert len(attestation_data_set) == len(aggregated_attestations), (
-                "Block contains duplicate AttestationData entries; "
-                "each AttestationData must appear at most once"
-            )
-            assert len(attestation_data_set) <= int(MAX_ATTESTATIONS_DATA), (
-                f"Block contains {len(attestation_data_set)} distinct AttestationData entries; "
-                f"maximum is {MAX_ATTESTATIONS_DATA}"
-            )
+            if len(attestation_data_set) != len(aggregated_attestations):
+                raise SpecRejectionError(
+                    RejectionReason.DUPLICATE_ATTESTATION_DATA,
+                    "Block contains duplicate AttestationData entries; "
+                    "each AttestationData must appear at most once",
+                )
+            if len(attestation_data_set) > int(MAX_ATTESTATIONS_DATA):
+                raise SpecRejectionError(
+                    RejectionReason.TOO_MANY_ATTESTATION_DATA,
+                    f"Block contains {len(attestation_data_set)} distinct AttestationData "
+                    f"entries; maximum is {MAX_ATTESTATIONS_DATA}",
+                )
 
             # Validate cryptographic signatures.
             #

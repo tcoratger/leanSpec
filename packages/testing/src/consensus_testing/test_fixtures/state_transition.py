@@ -2,14 +2,14 @@
 
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import AggregationBits
+from lean_spec.spec.forks import AggregationBits, SpecRejectionError
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -62,6 +62,10 @@ class StateTransitionTest(BaseTestSpec):
     - Invalid blocks
 
     Tests everything through the main state_transition() public API.
+
+    The state transition assumes signatures were verified upstream.
+    Invalid-signature scenarios belong to the fork choice and signature
+    verification formats, never to this one.
     """
 
     format_name: ClassVar[str] = "state_transition_test"
@@ -93,6 +97,19 @@ class StateTransitionTest(BaseTestSpec):
     Only fields explicitly set in the StateExpectation will be validated.
     If None, no post-state validation is performed (e.g., for invalid tests).
     """
+
+    @model_validator(mode="after")
+    def validate_signatures_are_out_of_scope(self) -> "StateTransitionTest":
+        """Reject signature-flavored attestation fields at construction."""
+        for block_spec in self.blocks:
+            for attestation_spec in block_spec.attestations or []:
+                if not attestation_spec.valid_signature or attestation_spec.signer_ids is not None:
+                    raise ValueError(
+                        "state transition assumes signatures were verified upstream; "
+                        "author invalid-signature scenarios through the fork choice "
+                        "or signature verification formats"
+                    )
+        return self
 
     def generate(self) -> StateTransitionFixture:
         """
@@ -140,7 +157,7 @@ class StateTransitionTest(BaseTestSpec):
                     state = spec.state_transition(state, block=block)
 
             actual_post_state = state
-        except (AssertionError, ValueError) as exception:
+        except SpecRejectionError as exception:
             exception_raised = exception
 
         # Validate exception expectations
@@ -316,13 +333,6 @@ class StateTransitionTest(BaseTestSpec):
         payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
 
         for spec in attestation_specs:
-            if not spec.valid_signature:
-                raise NotImplementedError(
-                    "valid_signature=False not yet supported in StateTransitionTest"
-                )
-            if spec.signer_ids is not None:
-                raise NotImplementedError("signer_ids not yet supported in StateTransitionTest")
-
             attestation_data = spec.build_attestation_data(block_registry, state.latest_justified)
             proof = key_manager.sign_and_aggregate(spec.validator_indices, attestation_data)
             payloads.setdefault(attestation_data, set()).add(proof)

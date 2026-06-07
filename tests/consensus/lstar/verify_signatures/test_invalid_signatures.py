@@ -44,7 +44,7 @@ def test_invalid_proposer_signature(
             attestations=[],
             valid_signature=False,
         ),
-        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
     )
 
 
@@ -96,5 +96,5 @@ def test_invalid_aggregated_attestation_signature(
                 ),
             ],
         ),
-        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
     )

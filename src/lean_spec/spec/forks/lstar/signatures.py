@@ -9,6 +9,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Slot,
     Validators,
 )
+from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
 from lean_spec.spec.ssz import Bytes32, Uint64
 
 
@@ -58,9 +59,11 @@ class SignatureMixin(LstarSpecBase):
         for aggregated_attestation in aggregated_attestations:
             validator_indices = aggregated_attestation.aggregation_bits.to_validator_indices()
             for validator_index in validator_indices:
-                assert validator_index.is_within_registry(num_validators), (
-                    "Validator index out of range"
-                )
+                if not validator_index.is_within_registry(num_validators):
+                    raise SpecRejectionError(
+                        RejectionReason.VALIDATOR_INDEX_OUT_OF_RANGE,
+                        "Validator index out of range",
+                    )
 
             public_keys_per_message.append(
                 [
@@ -81,7 +84,10 @@ class SignatureMixin(LstarSpecBase):
         # This proves the proposer endorsed this specific block.
         # It is a single-participant entry, distinct from the vote entries.
         proposer_index = block.proposer_index
-        assert proposer_index.is_within_registry(num_validators), "Proposer index out of range"
+        if not proposer_index.is_within_registry(num_validators):
+            raise SpecRejectionError(
+                RejectionReason.PROPOSER_INDEX_OUT_OF_RANGE, "Proposer index out of range"
+            )
 
         public_keys_per_message.append([validators[proposer_index].get_proposal_public_key()])
         message_bindings.append((hash_tree_root(block), block.slot))
@@ -92,6 +98,9 @@ class SignatureMixin(LstarSpecBase):
                 messages=message_bindings,
             )
         except AggregationError as exception:
-            raise AssertionError(f"Block proof verification failed: {exception}") from exception
+            raise SpecRejectionError(
+                RejectionReason.INVALID_BLOCK_PROOF,
+                f"Block proof verification failed: {exception}",
+            ) from exception
 
         return True

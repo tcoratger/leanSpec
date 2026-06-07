@@ -140,7 +140,6 @@ class SSZTest(BaseTestSpec):
             AssertionError: If the decoder succeeds.
             ValueError: If `raw_bytes` is missing.
         """
-        assert self.expected_rejection is not None
         if self.raw_bytes is None:
             raise ValueError("raw_bytes is required when expected_rejection is set")
 
@@ -152,18 +151,13 @@ class SSZTest(BaseTestSpec):
         except Exception as exception:
             exception_raised = exception
 
-        if exception_raised is None:
-            raise AssertionError(
-                f"Expected {decoder.__name__}.decode_bytes to reject the input, "
-                "but decode succeeded"
-            )
-        self.assert_expected_outcome(exception_raised)
-
         return SSZFixture(
             type_name=self.type_name,
             value=self.value,
             raw_bytes=self.raw_bytes,
             serialized="0x" + raw.hex(),
             root="",
-            rejection_reason=self.expected_rejection.reason,
+            rejection_reason=self.assert_decode_rejection(
+                exception_raised, f"{decoder.__name__}.decode_bytes"
+            ),
         )
