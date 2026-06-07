@@ -11,7 +11,7 @@ from lean_spec.spec.ssz import Bytes32, Container
 
 class Checkpoint(Container):
     """
-    Represents a checkpoint in the chain's history.
+    A checkpoint in the chain's history.
 
     A checkpoint marks a specific moment in the chain.
 

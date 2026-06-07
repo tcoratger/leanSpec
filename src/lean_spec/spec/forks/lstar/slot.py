@@ -16,7 +16,7 @@ IMMEDIATE_JUSTIFICATION_WINDOW: Final = 5
 
 
 class Slot(Uint64):
-    """Represents a slot number as a 64-bit unsigned integer."""
+    """A slot number, as a 64-bit unsigned integer."""
 
     def justified_index_after(self, finalized_slot: "Slot") -> int | None:
         """
@@ -36,7 +36,7 @@ class Slot(Uint64):
         Checks if this slot is a valid candidate for justification after a given finalized slot.
 
         According to the 3SF-mini specification, a slot is justifiable if its
-        distance (`delta`) from the last finalized slot is:
+        distance (delta) from the last finalized slot is:
           1. Less than or equal to 5.
           2. A perfect square (e.g., 9, 16, 25...).
           3. A pronic number (of the form x^2 + x, e.g., 6, 12, 20...).

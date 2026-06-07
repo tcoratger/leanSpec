@@ -6,7 +6,7 @@ from lean_spec.spec.ssz import Bytes52, Container, SSZList
 
 
 class Validator(Container):
-    """Represents a validator's static metadata and operational interface."""
+    """A validator's static metadata and operational interface."""
 
     attestation_public_key: Bytes52
     """XMSS public key for signing attestations."""

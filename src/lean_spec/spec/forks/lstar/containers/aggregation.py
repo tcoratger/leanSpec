@@ -132,7 +132,7 @@ class SingleMessageAggregate(Container):
         slot: Slot,
     ) -> None:
         """
-        Verify this single-message single-message aggregate proof against a public_key set.
+        Verify this single-message aggregate proof against a set of public keys.
 
         Args:
             public_keys: PublicKeys for the validators named by participants.

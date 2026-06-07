@@ -10,7 +10,7 @@ class SubnetId(Uint64):
 
 
 class ValidatorIndex(Uint64):
-    """Represents a validator's unique index as a 64-bit unsigned integer."""
+    """A validator's index in the registry, as a 64-bit unsigned integer."""
 
     @classmethod
     def proposer_for_slot(cls, slot: Slot, num_validators: Uint64) -> "ValidatorIndex":
