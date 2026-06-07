@@ -125,7 +125,7 @@ def build_anchor(
     # justification tracking) that a real mid-chain state would have.
     for next_slot in range(1, int(anchor_slot) + 1):
         slot = Slot(next_slot)
-        proposer_index = ValidatorIndex(int(slot) % int(num_validators_u64))
+        proposer_index = ValidatorIndex.proposer_for_slot(slot, num_validators_u64)
         current_block, state, _, _ = fork.build_block(
             state,
             slot=slot,
