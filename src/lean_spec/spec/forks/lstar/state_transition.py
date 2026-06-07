@@ -61,11 +61,8 @@ def attestation_data_matches_chain(
     source_slot = int(attestation_data.source.slot)
     target_slot = int(attestation_data.target.slot)
     head_slot = int(attestation_data.head.slot)
-    if source_slot >= len(historical_block_hashes):
-        return False
-    if target_slot >= len(historical_block_hashes):
-        return False
-    if head_slot >= len(historical_block_hashes):
+    chain_length = len(historical_block_hashes)
+    if source_slot >= chain_length or target_slot >= chain_length or head_slot >= chain_length:
         return False
 
     # All checkpoint roots must match the chain at their slot.
@@ -450,11 +447,10 @@ class StateTransitionMixin(LstarSpecBase):
 
             # Mark that each validator in this aggregation has voted for the target.
             #
-            # A vote is represented as a boolean flag.
-            # If it was previously absent, flip it to True.
+            # A vote is a boolean flag set to True.
+            # Re-marking an existing voter is idempotent, so no guard is needed.
             for validator_index in attestation.aggregation_bits.to_validator_indices():
-                if not justifications[target.root][validator_index]:
-                    justifications[target.root][validator_index] = Boolean(True)
+                justifications[target.root][validator_index] = Boolean(True)
 
             # Check whether the vote count crosses the supermajority threshold.
             #
