@@ -23,8 +23,8 @@ class AggregationBits(BaseBitlist):
             Aggregation bits with exactly the given indices set to True.
 
         Raises:
-            AssertionError: If no indices are provided.
-            AssertionError: If any index is outside the supported LIMIT.
+            SpecRejectionError: EMPTY_AGGREGATION_BITS if no indices are provided.
+            SpecRejectionError: VALIDATOR_INDEX_OUT_OF_RANGE if an index exceeds the limit.
         """
         # Convert to native ints once for bounds checking and membership tests.
         #
@@ -55,10 +55,10 @@ class AggregationBits(BaseBitlist):
         Extract all validator indices encoded in these aggregation bits.
 
         Returns:
-            `ValidatorIndices` containing the indices, sorted in ascending order.
+            ValidatorIndices containing the indices, sorted in ascending order.
 
         Raises:
-            `AssertionError`: If no bits are set.
+            SpecRejectionError: EMPTY_AGGREGATION_BITS if no bits are set.
         """
         # Extract indices where bit is set; fail if none found.
         indices = [ValidatorIndex(i) for i, bit in enumerate(self.data) if bit]

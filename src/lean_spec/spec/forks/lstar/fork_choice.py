@@ -77,9 +77,8 @@ class ForkChoiceMixin(LstarSpecBase):
         Both are treated as justified and finalized.
 
         Raises:
-            AssertionError:
-                If the anchor block's state root does not match the hash
-                of the state.
+            SpecRejectionError: ANCHOR_STATE_ROOT_MISMATCH if the anchor block's
+                state root does not match the hash of the state.
         """
         assert isinstance(state, State)
         assert isinstance(anchor_block, Block)
@@ -180,7 +179,7 @@ class ForkChoiceMixin(LstarSpecBase):
             6. The vote's slot must have started locally (a small disparity margin is allowed).
 
         Raises:
-            AssertionError: If attestation fails validation.
+            SpecRejectionError: If the attestation fails any of the validation checks above.
         """
         source_checkpoint = attestation_data.source
         target_checkpoint = attestation_data.target
@@ -297,8 +296,8 @@ class ForkChoiceMixin(LstarSpecBase):
             aggregator mode, otherwise the input store unchanged.
 
         Raises:
-            ValueError: If validator not found in state.
-            AssertionError: If signature verification fails.
+            SpecRejectionError: VALIDATOR_NOT_IN_STATE if the validator is not in the state.
+            SpecRejectionError: INVALID_SIGNATURE if signature verification fails.
         """
         with observe_on_attestation():
             validator_index = signed_attestation.validator_index
@@ -361,8 +360,8 @@ class ForkChoiceMixin(LstarSpecBase):
         2. Stores the aggregation in aggregation_payloads map
 
         Raises:
-            ValueError: If validator not found in state.
-            AssertionError: If signature verification fails.
+            SpecRejectionError: VALIDATOR_NOT_IN_STATE if a participant is not in the state.
+            AssertionError: If aggregate signature verification fails.
         """
         attestation_data = signed_attestation.data
         aggregated_proof = signed_attestation.proof
@@ -432,7 +431,9 @@ class ForkChoiceMixin(LstarSpecBase):
         4. Updating the forkchoice head
 
         Raises:
-            AssertionError: If parent block/state not found in store.
+            SpecRejectionError: UNKNOWN_PARENT_BLOCK if the parent state is not in the store.
+            SpecRejectionError: DUPLICATE_ATTESTATION_DATA if the block repeats an AttestationData.
+            SpecRejectionError: TOO_MANY_ATTESTATION_DATA if the block exceeds the data cap.
         """
         with observe_on_block():
             block = signed_block.block
