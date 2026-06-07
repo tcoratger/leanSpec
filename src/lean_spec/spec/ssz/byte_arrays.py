@@ -67,7 +67,7 @@ class BaseBytes(bytes, SSZType):
             case str():
                 return bytes.fromhex(value.removeprefix("0x"))
             case Iterable():
-                return bytes(bytearray(value))
+                return bytes(value)
             case _:
                 raise TypeError(f"Cannot coerce {type(value).__name__} to bytes")
 
