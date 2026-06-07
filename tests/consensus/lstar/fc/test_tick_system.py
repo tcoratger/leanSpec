@@ -87,11 +87,7 @@ def test_tick_interval_progression_through_full_slot(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -248,11 +244,7 @@ def test_tick_interval_0_skips_acceptance_when_not_proposer(
             # Start with a pending aggregated attestation for slot 3.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -303,11 +295,7 @@ def test_tick_interval_0_skips_acceptance_when_not_proposer(
             # is within the allowed +1 future-slot margin.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(4),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -356,11 +344,7 @@ def test_tick_interval_0_skips_acceptance_when_not_proposer(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                        ValidatorIndex(3),
-                    ],
+                    validator_indices=[1, 2, 3],
                     slot=Slot(5),
                     target_slot=Slot(2),
                     target_root_label="block_2",

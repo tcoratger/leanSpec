@@ -143,7 +143,7 @@ def test_block_exceeding_maximum_attestations_is_rejected(
                 ],
                 forced_attestations=[
                     AggregatedAttestationSpec(
-                        validator_indices=[ValidatorIndex(0)],
+                        validator_indices=[0],
                         slot=proposal_slot,
                         target_slot=forced_target,
                         target_root_label=f"b_{forced_target}",

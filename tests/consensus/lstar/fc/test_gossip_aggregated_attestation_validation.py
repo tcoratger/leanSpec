@@ -12,7 +12,7 @@ from consensus_testing import (
     StoreChecks,
     TickStep,
 )
-from lean_spec.spec.forks import Interval, RejectionReason, Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, RejectionReason, Slot
 from lean_spec.spec.forks.lstar.config import GOSSIP_DISPARITY_INTERVALS
 from lean_spec.spec.ssz import Bytes32
 
@@ -42,7 +42,7 @@ def test_valid_gossip_aggregated_attestation(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(2),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -69,7 +69,7 @@ def test_aggregated_attestation_unknown_source_rejected(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(2),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -102,7 +102,7 @@ def test_aggregated_attestation_target_slot_mismatch_rejected(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(2),
                     target_slot=Slot(3),
                     target_root_label="block_2",
@@ -133,7 +133,7 @@ def test_aggregated_attestation_head_slot_mismatch_rejected(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(2),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -170,7 +170,7 @@ def test_aggregated_attestation_source_after_target_rejected(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -203,7 +203,7 @@ def test_aggregated_attestation_too_far_in_future_rejected(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(4),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -247,7 +247,7 @@ def test_aggregated_attestation_at_disparity_boundary_allowed(
             TickStep(interval=SLOT_3_BOUNDARY_INTERVAL),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -286,7 +286,7 @@ def test_aggregated_attestation_just_beyond_disparity_boundary_rejected(
             TickStep(interval=SLOT_3_JUST_BEYOND_BOUNDARY_INTERVAL),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -332,7 +332,7 @@ def test_aggregated_attestation_one_full_slot_in_future_rejected(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1)],
+                    validator_indices=[1],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="block_2",

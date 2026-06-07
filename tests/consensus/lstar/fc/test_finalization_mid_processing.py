@@ -16,7 +16,7 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Slot
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -72,11 +72,7 @@ def test_finalization_advances_mid_attestation_processing(
                     label="block_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(3),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -117,11 +113,7 @@ def test_finalization_advances_mid_attestation_processing(
                         # Finalization: range(1+1, 2) = empty -> finalizes slot 1
                         # Need 3/4 validators for supermajority
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(8),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -134,11 +126,7 @@ def test_finalization_advances_mid_attestation_processing(
                         # If skipped, latest_justified stays at 2
                         # This is how we detect the bug!
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(8),
                             target_slot=Slot(7),
                             target_root_label="block_7",

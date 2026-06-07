@@ -10,7 +10,7 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Slot
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -74,7 +74,7 @@ def test_justified_divergence_self_heals_in_next_block(
                     label="block_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0)],
+                            validator_indices=[0],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -105,11 +105,7 @@ def test_justified_divergence_self_heals_in_next_block(
                     label="fork_4",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                                ValidatorIndex(3),
-                            ],
+                            validator_indices=[1, 2, 3],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="common",

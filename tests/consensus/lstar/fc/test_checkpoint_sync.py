@@ -13,7 +13,7 @@ from consensus_testing import (
     build_anchor,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Interval, RejectionReason, Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, RejectionReason, Slot
 from lean_spec.spec.forks.lstar.config import INTERVALS_PER_SLOT, SECONDS_PER_SLOT
 from lean_spec.spec.ssz import Bytes32
 
@@ -261,11 +261,7 @@ def test_fork_off_non_genesis_anchor(
                     label="fork_b_12",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(11),
                             source_root_label="genesis",
                             target_slot=Slot(11),

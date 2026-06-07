@@ -10,7 +10,7 @@ from consensus_testing import (
     StoreChecks,
     generate_pre_state,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Slot
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -90,7 +90,7 @@ def test_simple_one_block_reorg(
                     label="fork_b_4",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2)],
+                            validator_indices=[2],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="fork_b_3",
@@ -174,7 +174,7 @@ def test_two_block_reorg_progressive_building(
                     label="fork_a_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0)],
+                            validator_indices=[0],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="fork_a_2",
@@ -210,7 +210,7 @@ def test_two_block_reorg_progressive_building(
                     label="fork_b_6",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(1), ValidatorIndex(3)],
+                            validator_indices=[1, 3],
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_5",
@@ -291,7 +291,7 @@ def test_three_block_deep_reorg(
                     label="fork_a_4",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2), ValidatorIndex(3)],
+                            validator_indices=[2, 3],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="fork_a_3",
@@ -321,11 +321,7 @@ def test_three_block_deep_reorg(
                     label="fork_b_6",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(2),
-                                ValidatorIndex(5),
-                            ],
+                            validator_indices=[0, 2, 5],
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_5",
@@ -430,7 +426,7 @@ def test_reorg_with_slot_gaps(
                     label="fork_a_7",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(3)],
+                            validator_indices=[3],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="fork_a_3",
@@ -453,12 +449,7 @@ def test_reorg_with_slot_gaps(
                     label="fork_b_8",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(2),
-                                ValidatorIndex(5),
-                                ValidatorIndex(6),
-                            ],
+                            validator_indices=[0, 2, 5, 6],
                             slot=Slot(4),
                             target_slot=Slot(4),
                             target_root_label="fork_b_4",
@@ -578,7 +569,7 @@ def test_three_way_fork_competition(
                     label="fork_c_5",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0)],
+                            validator_indices=[0],
                             slot=Slot(4),
                             target_slot=Slot(4),
                             target_root_label="fork_c_4",
@@ -606,7 +597,7 @@ def test_three_way_fork_competition(
                     label="fork_b_7",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(1), ValidatorIndex(2)],
+                            validator_indices=[1, 2],
                             slot=Slot(6),
                             target_slot=Slot(6),
                             target_root_label="fork_b_6",
@@ -691,7 +682,7 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
                     label="fork_a_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2)],
+                            validator_indices=[2],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="fork_a_2",
@@ -710,7 +701,7 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
                     label="fork_a_4",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(3)],
+                            validator_indices=[3],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="fork_a_3",
@@ -729,7 +720,7 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
                     label="fork_a_5",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(4)],
+                            validator_indices=[4],
                             slot=Slot(4),
                             target_slot=Slot(4),
                             target_root_label="fork_a_4",
@@ -748,7 +739,7 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
                     label="fork_a_6",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(5)],
+                            validator_indices=[5],
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_a_5",
@@ -867,7 +858,7 @@ def test_back_and_forth_reorg_oscillation(
                     label="fork_b_4",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0)],
+                            validator_indices=[0],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="fork_b_3",
@@ -895,7 +886,7 @@ def test_back_and_forth_reorg_oscillation(
                     label="fork_a_6",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(7), ValidatorIndex(6)],
+                            validator_indices=[7, 6],
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_a_5",
@@ -923,7 +914,7 @@ def test_back_and_forth_reorg_oscillation(
                     label="fork_b_8",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(1), ValidatorIndex(7)],
+                            validator_indices=[1, 7],
                             slot=Slot(7),
                             target_slot=Slot(7),
                             target_root_label="fork_b_7",
@@ -1006,7 +997,7 @@ def test_reorg_depth_across_deep_chain_split(
                     label="a_11",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(7)],
+                            validator_indices=[7],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="common",
@@ -1040,14 +1031,7 @@ def test_reorg_depth_across_deep_chain_split(
                     label="b_12",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                                ValidatorIndex(3),
-                                ValidatorIndex(4),
-                                ValidatorIndex(5),
-                            ],
+                            validator_indices=[0, 1, 2, 3, 4, 5],
                             slot=Slot(11),
                             target_slot=Slot(11),
                             target_root_label="b_11",
@@ -1145,7 +1129,7 @@ def test_reorg_on_newly_justified_slot(
                     label="fork_a_2",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2)],
+                            validator_indices=[2],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="fork_a_1",
@@ -1193,14 +1177,7 @@ def test_reorg_on_newly_justified_slot(
                     label="fork_b_2",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(3),
-                                ValidatorIndex(5),
-                                ValidatorIndex(6),
-                                ValidatorIndex(7),
-                            ],
+                            validator_indices=[0, 1, 3, 5, 6, 7],
                             slot=Slot(5),
                             target_slot=Slot(5),
                             target_root_label="fork_b_1",

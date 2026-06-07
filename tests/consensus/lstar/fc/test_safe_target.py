@@ -184,11 +184,7 @@ def test_safe_target_advances_incrementally_along_the_chain(
             TickStep(time=14),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(3),
                     target_slot=Slot(1),
                     target_root_label="block_1",
@@ -208,11 +204,7 @@ def test_safe_target_advances_incrementally_along_the_chain(
             TickStep(time=18),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(4),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -232,11 +224,7 @@ def test_safe_target_advances_incrementally_along_the_chain(
             TickStep(time=22),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(5),
                     target_slot=Slot(3),
                     target_root_label="block_3",
@@ -293,12 +281,7 @@ def test_safe_target_follows_heavier_fork_on_split(
             # Supermajority (4/6) attests to block_b.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                        ValidatorIndex(3),
-                    ],
+                    validator_indices=[0, 1, 2, 3],
                     slot=Slot(4),
                     target_slot=Slot(3),
                     target_root_label="block_b",
@@ -307,10 +290,7 @@ def test_safe_target_follows_heavier_fork_on_split(
             # Minority (2/6) attests to block_a.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(4),
-                        ValidatorIndex(5),
-                    ],
+                    validator_indices=[4, 5],
                     slot=Slot(4),
                     target_slot=Slot(2),
                     target_root_label="block_a",
@@ -378,14 +358,7 @@ def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
             # 6/8 vote for block_2. Weight: block_1 += 6, block_2 += 6.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                        ValidatorIndex(3),
-                        ValidatorIndex(4),
-                        ValidatorIndex(5),
-                    ],
+                    validator_indices=[0, 1, 2, 3, 4, 5],
                     slot=Slot(4),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -394,10 +367,7 @@ def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
             # 2/8 vote for block_3. Weight: block_1 += 2, block_2 += 2, block_3 += 2.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(6),
-                        ValidatorIndex(7),
-                    ],
+                    validator_indices=[6, 7],
                     slot=Slot(4),
                     target_slot=Slot(3),
                     target_root_label="block_3",
@@ -463,10 +433,7 @@ def test_safe_target_ignores_known_pool_at_interval_3(
                     label="block_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                            ],
+                            validator_indices=[0, 1],
                             slot=Slot(3),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -497,10 +464,7 @@ def test_safe_target_ignores_known_pool_at_interval_3(
             # Combined with "known": total weight = 4 = threshold.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(2),
-                        ValidatorIndex(3),
-                    ],
+                    validator_indices=[2, 3],
                     slot=Slot(4),
                     target_slot=Slot(2),
                     target_root_label="block_2",

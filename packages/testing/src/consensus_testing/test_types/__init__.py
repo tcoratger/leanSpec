@@ -5,6 +5,7 @@ from consensus_testing.test_types.attestation_specs import (
     GossipAttestationSpec,
 )
 from consensus_testing.test_types.block_spec import BlockSpec
+from consensus_testing.test_types.scenario import ForkChoiceScenario
 from consensus_testing.test_types.state_expectation import StateExpectation
 from consensus_testing.test_types.step_types import (
     AttestationStep,
@@ -38,6 +39,7 @@ __all__ = [
     "BlockSpec",
     "TickStep",
     "BlockStep",
+    "ForkChoiceScenario",
     "AttestationStep",
     "ForkChoiceStep",
     "GossipAggregatedAttestationStep",

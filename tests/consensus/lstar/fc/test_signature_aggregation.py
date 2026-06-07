@@ -10,7 +10,7 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     StoreChecks,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Slot
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -46,13 +46,13 @@ def test_multiple_specs_same_target_merge_into_one(
                     slot=Slot(2),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0), ValidatorIndex(1)],
+                            validator_indices=[0, 1],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
                         ),
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2), ValidatorIndex(3)],
+                            validator_indices=[2, 3],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -107,13 +107,13 @@ def test_different_targets_create_separate_aggregations(
                     slot=Slot(3),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0), ValidatorIndex(1)],
+                            validator_indices=[0, 1],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
                         ),
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2), ValidatorIndex(3)],
+                            validator_indices=[2, 3],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
@@ -179,14 +179,14 @@ def test_mixed_attestations_multiple_targets_and_validators(
                     attestations=[
                         # Attestations for older block
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0), ValidatorIndex(1)],
+                            validator_indices=[0, 1],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
                         ),
                         # Attestations for newer block
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(2), ValidatorIndex(3)],
+                            validator_indices=[2, 3],
                             slot=Slot(3),
                             target_slot=Slot(3),
                             target_root_label="block_3",
@@ -244,12 +244,7 @@ def test_all_validators_attest_in_single_aggregation(
                     slot=Slot(2),
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                                ValidatorIndex(3),
-                            ],
+                            validator_indices=[0, 1, 2, 3],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",

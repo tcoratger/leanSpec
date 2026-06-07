@@ -10,6 +10,7 @@ from consensus_testing import (
     AttestationCheck,
     BlockSpec,
     BlockStep,
+    ForkChoiceScenario,
     ForkChoiceTestFiller,
     GossipAggregatedAttestationStep,
     StoreChecks,
@@ -83,11 +84,7 @@ def test_block_builder_fixed_point_advances_justification(
                     label="block_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(3),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -140,11 +137,7 @@ def test_block_builder_fixed_point_advances_justification(
             # 3/4 validators. Matches justified=1 on the first pass.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(5),
                     target_slot=Slot(2),
                     target_root_label="block_2",
@@ -157,11 +150,7 @@ def test_block_builder_fixed_point_advances_justification(
             # Only unlocked after A justifies slot 2 on the first pass.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                        ValidatorIndex(3),
-                    ],
+                    validator_indices=[1, 2, 3],
                     slot=Slot(5),
                     target_slot=Slot(4),
                     target_root_label="block_4",
@@ -370,48 +359,39 @@ def test_produce_block_includes_pending_attestations(
     - Covers validators {1, 2}
     - Target slot 2
     """
+    # The same scenario, authored through the fluent builder.
+    # Each block carries its head check; the gossiped aggregate is delivered
+    # between ticks; the final block reads the pending pool with no explicit
+    # attestation spec.
     fork_choice_test(
-        steps=[
-            BlockStep(
-                block=BlockSpec(slot=Slot(1), label="block_1"),
-                checks=StoreChecks(head_slot=Slot(1)),
-            ),
-            BlockStep(
-                block=BlockSpec(slot=Slot(2), label="block_2"),
-                checks=StoreChecks(head_slot=Slot(2)),
-            ),
+        steps=(
+            ForkChoiceScenario()
+            .block(1, label="block_1")
+            .expect(head_slot=Slot(1))
+            .block(2, label="block_2")
+            .expect(head_slot=Slot(2))
             # Advance past the aggregate interval while the pool is empty.
-            TickStep(time=10),
+            .tick_to_unix_time(10)
             # Validators 1 & 2 gossip an aggregated attestation targeting block_2.
-            # data.slot=2 matches the current slot.
-            GossipAggregatedAttestationStep(
-                attestation=AggregatedAttestationSpec(
-                    validator_indices=[ValidatorIndex(1), ValidatorIndex(2)],
-                    slot=Slot(2),
-                    target_slot=Slot(2),
-                    target_root_label="block_2",
-                ),
-            ),
+            .attest(by=[1, 2], slot=2, target_label="block_2", target_slot=2)
             # Advance time to slot 3 so the block proposal is valid.
-            TickStep(time=12),
-            # Produce block without explicit attestations.
-            # The block builder merges pending gossip payloads before calling
-            # the state transition, so the gossip attestation above is included.
-            BlockStep(
-                block=BlockSpec(slot=Slot(3), label="block_3"),
-                checks=StoreChecks(
-                    head_slot=Slot(3),
-                    block_attestation_count=1,
-                    block_attestations=[
-                        AggregatedAttestationCheck(
-                            participants={1, 2},
-                            attestation_slot=Slot(2),
-                            target_slot=Slot(2),
-                        ),
-                    ],
-                ),
-            ),
-        ],
+            .tick_to_unix_time(12)
+            # Produce a block with no explicit attestations: the builder merges
+            # pending gossip payloads, so the attestation above is included.
+            .block(3, label="block_3")
+            .expect(
+                head_slot=Slot(3),
+                block_attestation_count=1,
+                block_attestations=[
+                    AggregatedAttestationCheck(
+                        participants={1, 2},
+                        attestation_slot=Slot(2),
+                        target_slot=Slot(2),
+                    ),
+                ],
+            )
+            .steps()
+        ),
     )
 
 
@@ -465,11 +445,7 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
                     label="block_3",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(3),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -505,21 +481,13 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
                     label="block_8",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(8),
                             target_slot=Slot(2),
                             target_root_label="block_2",
                         ),
                         AggregatedAttestationSpec(
-                            validator_indices=[
-                                ValidatorIndex(0),
-                                ValidatorIndex(1),
-                                ValidatorIndex(2),
-                            ],
+                            validator_indices=[0, 1, 2],
                             slot=Slot(8),
                             target_slot=Slot(7),
                             target_root_label="block_7",
@@ -548,11 +516,7 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
             TickStep(time=aggregate_time),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(11),
                     target_slot=Slot(10),
                     target_root_label="block_10",
@@ -562,11 +526,7 @@ def test_block_builder_recovers_finality_after_non_zero_boundary_stall(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                        ValidatorIndex(3),
-                    ],
+                    validator_indices=[1, 2, 3],
                     slot=Slot(11),
                     target_slot=Slot(11),
                     target_root_label="block_11",

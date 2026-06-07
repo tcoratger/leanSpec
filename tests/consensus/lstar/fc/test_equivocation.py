@@ -62,7 +62,7 @@ def test_equivocating_proposer_two_blocks_at_same_slot(
                     label="equivocation_a",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0)],
+                            validator_indices=[0],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -83,7 +83,7 @@ def test_equivocating_proposer_two_blocks_at_same_slot(
                     label="equivocation_b",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(1)],
+                            validator_indices=[1],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -153,7 +153,7 @@ def test_equivocating_proposer_with_split_attestations(
                     label="fork_a",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(0)],
+                            validator_indices=[0],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -175,7 +175,7 @@ def test_equivocating_proposer_with_split_attestations(
                     label="fork_b",
                     attestations=[
                         AggregatedAttestationSpec(
-                            validator_indices=[ValidatorIndex(1)],
+                            validator_indices=[1],
                             slot=Slot(1),
                             target_slot=Slot(1),
                             target_root_label="block_1",
@@ -300,11 +300,7 @@ def test_same_slot_equivocating_attesters_count_once(
             # V0 and V1's first votes stick on fork_a.
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(2),
-                    ],
+                    validator_indices=[0, 1, 2],
                     slot=Slot(3),
                     target_slot=Slot(2),
                     target_root_label="fork_a",
@@ -312,12 +308,7 @@ def test_same_slot_equivocating_attesters_count_once(
             ),
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
-                    validator_indices=[
-                        ValidatorIndex(0),
-                        ValidatorIndex(1),
-                        ValidatorIndex(3),
-                        ValidatorIndex(4),
-                    ],
+                    validator_indices=[0, 1, 3, 4],
                     slot=Slot(3),
                     target_slot=Slot(3),
                     target_root_label="fork_b",
