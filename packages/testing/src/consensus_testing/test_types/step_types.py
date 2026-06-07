@@ -201,13 +201,13 @@ class BaseFilledStep(CamelModel):
     checks: StoreChecks | None = None
     """Store state checks the step was validated against."""
 
-    store_snapshot: StoreSnapshot | None = None
+    store_snapshot: StoreSnapshot
     """
     Canonical store observables after this step.
 
-    Populated for every successful step.
-    Stays None for steps expected to fail, where the resulting
-    store state is implementation-defined.
+    Populated for every step, including rejected ones.
+    A rejected input leaves the store unchanged, and the snapshot
+    pins that no-op so a client cannot corrupt state on rejection.
     """
 
 
