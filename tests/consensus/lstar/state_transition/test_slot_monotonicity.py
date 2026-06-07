@@ -4,10 +4,11 @@ import pytest
 
 from consensus_testing import (
     BlockSpec,
+    ExpectedRejection,
     StateTransitionTestFiller,
     generate_pre_state,
 )
-from lean_spec.spec.forks import Slot
+from lean_spec.spec.forks import RejectionReason, Slot
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -46,8 +47,10 @@ def test_process_slots_target_equal_to_state_slot_rejected(
             BlockSpec(slot=Slot(1)),
         ],
         post=None,
-        expect_exception=AssertionError,
-        expect_exception_message="Target slot must be in the future",
+        expected_rejection=ExpectedRejection(
+            reason=RejectionReason.BLOCK_SLOT_NOT_IN_FUTURE,
+            message_substring="Target slot must be in the future",
+        ),
     )
 
 
@@ -88,6 +91,8 @@ def test_block_at_parent_slot_rejected_when_slot_processing_skipped(
             BlockSpec(slot=Slot(1), skip_slot_processing=True),
         ],
         post=None,
-        expect_exception=AssertionError,
-        expect_exception_message="Block is older than latest header",
+        expected_rejection=ExpectedRejection(
+            reason=RejectionReason.BLOCK_OLDER_THAN_LATEST_HEADER,
+            message_substring="Block is older than latest header",
+        ),
     )

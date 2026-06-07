@@ -1,21 +1,11 @@
-"""
-Gossipsub handler test fixture for protocol behavior conformance.
-
-Generates JSON test vectors that assert gossipsub protocol decisions.
-Each vector captures an initial peer/mesh/cache state, an incoming RPC event,
-and the expected outbound RPCs plus resulting mesh topology.
-
-The fixture tests protocol logic only, not wire encoding or I/O.
-"""
+"""Gossipsub handler test fixture for protocol behavior conformance."""
 
 import asyncio
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from unittest.mock import patch
 
-from pydantic import Field
-
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.gossipsub.behavior import GossipsubBehavior, PeerState
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
@@ -139,14 +129,38 @@ def _serialize_meshes(
     }
 
 
-class GossipsubHandlerTest(BaseConsensusFixture):
+class GossipsubHandlerFixture(BaseConsensusFixture):
     """
-    Fixture for gossipsub handler behavior conformance.
+    Emitted vector for gossipsub handler behavior conformance.
+
+    JSON output: handlerName, params, initialState, event, now, expected.
+    """
+
+    handler_name: str
+    """Handler under test."""
+
+    params: dict[str, int]
+    """Gossipsub parameters: d, dLow, dHigh, dLazy."""
+
+    initial_state: dict[str, Any]
+    """Initial behavior state: subscriptions, meshes, peers, caches."""
+
+    event: dict[str, Any]
+    """Incoming event: fromPeer + RPC content."""
+
+    now: float
+    """Current timestamp for backoff checks."""
+
+    expected: dict[str, Any]
+    """Expected outbound RPCs and final mesh state."""
+
+
+class GossipsubHandlerTest(BaseTestSpec):
+    """
+    Spec for gossipsub handler behavior conformance.
 
     Tests protocol decisions: given initial state + incoming event,
     what RPCs are sent and how does the mesh change?
-
-    JSON output: params, initialState, event, now, expected.
     """
 
     format_name: ClassVar[str] = "gossipsub_handler_test"
@@ -167,13 +181,16 @@ class GossipsubHandlerTest(BaseConsensusFixture):
     now: float = 1000.0
     """Current timestamp for backoff checks."""
 
-    expected: dict[str, Any] = Field(default_factory=dict)
-    """Expected output. Filled by make_fixture."""
-
-    def make_fixture(self) -> "GossipsubHandlerTest":
-        """Produce the completed fixture with expected outputs filled in."""
-        self.expected = asyncio.run(self._execute())
-        return self
+    def generate(self) -> GossipsubHandlerFixture:
+        """Produce the emitted vector with expected outputs filled in."""
+        return GossipsubHandlerFixture(
+            handler_name=self.handler_name,
+            params=self.params,
+            initial_state=self.initial_state,
+            event=self.event,
+            now=self.now,
+            expected=asyncio.run(self._execute()),
+        )
 
     async def _execute(self) -> dict[str, Any]:
         """

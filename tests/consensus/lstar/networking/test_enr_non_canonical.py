@@ -9,8 +9,9 @@ wire, breaking the signature covenant.
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
+from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
 from lean_spec.node.networking.enr.rlp import encode_rlp
+from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -52,5 +53,5 @@ def test_enr_decode_rejects_non_canonical_key_order(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "enr", "bytes": UNSORTED_ENR_HEX},
-        expect_exception=ValueError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

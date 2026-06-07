@@ -12,7 +12,7 @@ import pytest
 
 from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
-from consensus_testing.test_fixtures import FIXTURE_FORMATS
+from consensus_testing.test_fixtures import FIXTURE_FORMATS, FixtureInfo
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32
 
@@ -384,50 +384,50 @@ def reset_xmss_signing_state() -> Iterator[None]:
     yield
 
 
-def base_spec_filler_parametrizer(fixture_class: Any) -> Any:
+def base_spec_filler_parametrizer(spec_class: Any) -> Any:
     """
-    Generate pytest.fixture for a given fixture class.
+    Generate pytest.fixture for a given test spec class.
 
     Args:
-        fixture_class: The fixture class to create a parametrizer for.
+        spec_class: The input spec class to create a filler for.
 
     Returns:
-        A pytest fixture function that creates wrapper instances.
+        A pytest fixture function whose value fills and collects a fixture.
     """
 
     @pytest.fixture(
         scope="function",
-        name=fixture_class.format_name,
+        name=spec_class.format_name,
     )
     def base_spec_filler_parametrizer_func(
         request: pytest.FixtureRequest,
         fork: Any,
         test_case_description: str,
     ) -> Any:
-        """Fixture used to instantiate an auto-fillable fixture object."""
+        """Fixture whose value builds the spec, generates, and collects the result."""
 
-        class FixtureWrapper(fixture_class):
-            """Wrapper class that auto-fills and collects fixtures on instantiation."""
-
-            def __init__(self, **kwargs: Any) -> None:
-                super().__init__(**kwargs)
-
-                filled_fixture = self.make_fixture()
-                filled_fixture.fill_info(
+        def fill_and_collect(**spec_fields: Any) -> Any:
+            test_spec = spec_class(**spec_fields)
+            filled_fixture = test_spec.generate().with_info(
+                info=FixtureInfo(
                     test_id=request.node.nodeid,
                     description=test_case_description,
-                    fork=fork,
+                    fixture_format=spec_class.format_name,
+                    key_set_digest=XmssKeyManager.shared().key_set_digest(),
+                ),
+                network=fork.name(),
+            )
+
+            if hasattr(request.config, "fixture_collector"):
+                request.config.fixture_collector.add_fixture(
+                    fixture_format=spec_class.format_name,
+                    fixture=filled_fixture,
+                    test_nodeid=request.node.nodeid,
+                    config=request.config,
                 )
+            return filled_fixture
 
-                if hasattr(request.config, "fixture_collector"):
-                    request.config.fixture_collector.add_fixture(
-                        fixture_format=filled_fixture.format_name,
-                        fixture=filled_fixture,
-                        test_nodeid=request.node.nodeid,
-                        config=request.config,
-                    )
-
-        return FixtureWrapper
+        return fill_and_collect
 
     return base_spec_filler_parametrizer_func
 

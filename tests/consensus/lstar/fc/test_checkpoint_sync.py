@@ -6,13 +6,14 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     BlockStep,
+    ExpectedRejection,
     ForkChoiceTestFiller,
     StoreChecks,
     TickStep,
     build_anchor,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, RejectionReason, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import INTERVALS_PER_SLOT, SECONDS_PER_SLOT
 from lean_spec.spec.ssz import Bytes32
 
@@ -372,6 +373,9 @@ def test_store_from_anchor_rejects_mismatched_state_root(
         anchor_state=anchor_state,
         anchor_block=bad_anchor_block,
         anchor_valid=False,
-        expected_anchor_error="Anchor block state root must match anchor state hash",
+        expected_rejection=ExpectedRejection(
+            reason=RejectionReason.ANCHOR_STATE_ROOT_MISMATCH,
+            message_substring="Anchor block state root must match anchor state hash",
+        ),
         steps=[],
     )

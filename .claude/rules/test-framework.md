@@ -33,10 +33,10 @@ def test_block(state_transition_test: StateTransitionTestFiller) -> None:
 
 **How it works:**
 
-1. Test function receives a fixture class (not instance) as parameter
-2. Calling it creates a `FixtureWrapper` that runs `make_fixture()`
-3. `make_fixture()` executes the spec code (state transitions, fork choice steps)
-4. Validates output against expectations (`StateExpectation`, `StoreChecks`)
+1. Test function receives a filler callable as parameter
+2. Calling it builds a frozen input spec (a `BaseTestSpec` subclass) from the kwargs
+3. `generate()` executes the spec code and returns a separate frozen fixture object
+4. Validates output against expectations (`StateExpectation`, `StoreChecks`, `ExpectedRejection`)
 5. Serializes to JSON via Pydantic's `model_dump(mode="json")`
 6. Writes fixtures at session end to `fixtures/consensus/{format}/{test_path}/...`
 
@@ -51,9 +51,9 @@ def test_block(state_transition_test: StateTransitionTestFiller) -> None:
 - All spec types (State, Block, Uint64, etc.) must be Pydantic models
 - Custom types need `@field_serializer` or `model_serializer` for JSON output
 - SSZ types typically serialize to hex strings (e.g., `"0x1234..."`)
-- Fixture models inherit from `BaseConsensusFixture` (in
-  `consensus_testing/test_fixtures/base.py`), which uses `CamelModel` for
-  camelCase JSON output
+- Emitted fixtures inherit from `BaseConsensusFixture`, input specs from
+  `BaseTestSpec` (both in `consensus_testing/test_fixtures/base.py`); both are
+  frozen `CamelModel`s producing camelCase JSON output
 - Test the serialization: `fixture.model_dump(mode="json")` must produce valid JSON
 
 **Key fixture types:**
@@ -61,3 +61,4 @@ def test_block(state_transition_test: StateTransitionTestFiller) -> None:
 - `StateTransitionTest` - Tests state transitions with blocks
 - `ForkChoiceTest` - Tests fork choice with steps (tick/block/attestation)
 - Selective validation via `StateExpectation` and `StoreChecks` (only validates fields you specify)
+- Negative paths via `ExpectedRejection` (reason + optional message substring)

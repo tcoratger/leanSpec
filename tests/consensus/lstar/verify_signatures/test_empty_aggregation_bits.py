@@ -6,10 +6,11 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     ClearFirstAttestationBits,
+    ExpectedRejection,
     VerifySignaturesTestFiller,
     generate_pre_state,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -55,5 +56,5 @@ def test_empty_aggregation_bits_rejected(
             ],
         ),
         tamper=ClearFirstAttestationBits(),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.EMPTY_AGGREGATION_BITS),
     )

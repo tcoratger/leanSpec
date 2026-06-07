@@ -1,29 +1,36 @@
-"""
-Poseidon permutation test fixture.
-
-Generates JSON test vectors for the Poseidon permutation over the
-KoalaBear field at widths 16 and 24. Clients must produce identical
-output states bit-for-bit for every input state.
-"""
+"""Poseidon permutation test fixture."""
 
 from typing import Any, ClassVar
 
-from pydantic import Field
-
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.poseidon import PARAMS_16, PARAMS_24, Poseidon
 
 
-class PoseidonPermutationTest(BaseConsensusFixture):
+class PoseidonPermutationFixture(BaseConsensusFixture):
     """
-    Fixture for Poseidon permutation conformance.
-
-    Each vector names the permutation width and supplies an input state
-    as decimal strings. The fixture runs the spec's permutation engine
-    and emits the output state as decimal strings.
+    Emitted vector for Poseidon permutation conformance.
 
     JSON output: width, input, output.
+    """
+
+    width: int
+    """State width of the permutation."""
+
+    input: dict[str, Any]
+    """Input state as decimal element strings."""
+
+    output: dict[str, Any]
+    """Computed output state as decimal element strings."""
+
+
+class PoseidonPermutationTest(BaseTestSpec):
+    """
+    Spec for Poseidon permutation conformance.
+
+    Each vector names the permutation width and supplies an input state
+    as decimal strings. Generation runs the spec's permutation engine
+    and emits the output state as decimal strings.
     """
 
     format_name: ClassVar[str] = "poseidon_permutation_test"
@@ -35,15 +42,12 @@ class PoseidonPermutationTest(BaseConsensusFixture):
     input: dict[str, Any]
     """Input state. Key inputState holds a list of decimal element strings."""
 
-    output: dict[str, Any] = Field(default_factory=dict)
-    """Computed output state. Filled by make_fixture."""
-
-    def make_fixture(self) -> "PoseidonPermutationTest":
+    def generate(self) -> PoseidonPermutationFixture:
         """
         Run the Poseidon permutation and produce the output state.
 
         Returns:
-            This fixture with output populated.
+            The emitted vector with output populated.
 
         Raises:
             ValueError: If the width is unsupported.
@@ -64,5 +68,8 @@ class PoseidonPermutationTest(BaseConsensusFixture):
         input_state = [Fp(state_int) for state_int in state_ints]
         output_state = engine.permute(input_state)
 
-        self.output = {"outputState": [str(int(fp)) for fp in output_state]}
-        return self
+        return PoseidonPermutationFixture(
+            width=self.width,
+            input=self.input,
+            output={"outputState": [str(int(fp)) for fp in output_state]},
+        )

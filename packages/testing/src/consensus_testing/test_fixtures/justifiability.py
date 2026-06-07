@@ -1,33 +1,34 @@
-"""
-3SF-mini justifiability test fixture.
-
-Generates JSON test vectors for the Slot.is_justifiable_after function
-that implements the core 3SF-mini justification rule. A slot is
-justifiable after a finalized slot if the distance (delta) satisfies:
-
-1. delta <= 5 (immediate window)
-2. delta is a perfect square (4, 9, 16, 25, ...)
-3. delta is a pronic number n*(n+1) (6, 12, 20, 30, ...)
-
-Every client must implement this identically for consensus.
-"""
+"""3SF-mini justifiability test fixture."""
 
 from typing import Any, ClassVar
 
-from pydantic import Field
-
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.spec.forks import Slot
 
 
-class JustifiabilityTest(BaseConsensusFixture):
+class JustifiabilityFixture(BaseConsensusFixture):
     """
-    Fixture for 3SF-mini justifiability conformance.
+    Emitted vector for 3SF-mini justifiability conformance.
+
+    JSON output: slot, finalizedSlot, output.
+    """
+
+    slot: int
+    """Candidate slot under test."""
+
+    finalized_slot: int
+    """Last finalized slot."""
+
+    output: dict[str, Any]
+    """Computed delta and justifiability verdict."""
+
+
+class JustifiabilityTest(BaseTestSpec):
+    """
+    Spec for 3SF-mini justifiability conformance.
 
     Tests Slot.is_justifiable_after(finalized_slot) which determines
     whether a slot can be a justification target.
-
-    JSON output: slot, finalizedSlot, output.
     """
 
     format_name: ClassVar[str] = "justifiability_test"
@@ -39,18 +40,18 @@ class JustifiabilityTest(BaseConsensusFixture):
     finalized_slot: int
     """Last finalized slot."""
 
-    output: dict[str, Any] = Field(default_factory=dict)
-    """Computed output. Filled by make_fixture."""
-
-    def make_fixture(self) -> "JustifiabilityTest":
+    def generate(self) -> JustifiabilityFixture:
         """Compute justifiability and delta classification."""
-        s = Slot(self.slot)
-        f = Slot(self.finalized_slot)
+        candidate_slot = Slot(self.slot)
+        finalized_slot = Slot(self.finalized_slot)
         delta = self.slot - self.finalized_slot
-        justifiable = s.is_justifiable_after(f)
+        justifiable = candidate_slot.is_justifiable_after(finalized_slot)
 
-        self.output = {
-            "delta": delta,
-            "isJustifiable": justifiable,
-        }
-        return self
+        return JustifiabilityFixture(
+            slot=self.slot,
+            finalized_slot=self.finalized_slot,
+            output={
+                "delta": delta,
+                "isJustifiable": justifiable,
+            },
+        )

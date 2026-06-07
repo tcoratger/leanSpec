@@ -6,11 +6,12 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     BlockStep,
+    ExpectedRejection,
     ForkChoiceStep,
     ForkChoiceTestFiller,
     StoreChecks,
 )
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import MAX_ATTESTATIONS_DATA
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -150,9 +151,12 @@ def test_block_exceeding_maximum_attestations_is_rejected(
                 ],
             ),
             valid=False,
-            expected_error=(
-                f"Block contains {n + 1} distinct AttestationData entries; "
-                f"maximum is {MAX_ATTESTATIONS_DATA}"
+            expected_rejection=ExpectedRejection(
+                reason=RejectionReason.TOO_MANY_ATTESTATION_DATA,
+                message_substring=(
+                    f"Block contains {n + 1} distinct AttestationData entries; "
+                    f"maximum is {MAX_ATTESTATIONS_DATA}"
+                ),
             ),
         )
     )

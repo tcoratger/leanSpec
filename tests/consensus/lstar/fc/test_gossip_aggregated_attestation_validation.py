@@ -6,12 +6,13 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     BlockStep,
+    ExpectedRejection,
     ForkChoiceTestFiller,
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
 )
-from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, RejectionReason, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import GOSSIP_DISPARITY_INTERVALS
 from lean_spec.spec.ssz import Bytes32
 
@@ -76,7 +77,10 @@ def test_aggregated_attestation_unknown_source_rejected(
                     source_slot=Slot(999),
                 ),
                 valid=False,
-                expected_error="Unknown source block",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.UNKNOWN_SOURCE_BLOCK,
+                    message_substring="Unknown source block",
+                ),
             ),
         ]
     )
@@ -104,7 +108,10 @@ def test_aggregated_attestation_target_slot_mismatch_rejected(
                     target_root_label="block_2",
                 ),
                 valid=False,
-                expected_error="Target checkpoint slot mismatch",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.TARGET_SLOT_MISMATCH,
+                    message_substring="Target checkpoint slot mismatch",
+                ),
             ),
         ]
     )
@@ -134,7 +141,10 @@ def test_aggregated_attestation_head_slot_mismatch_rejected(
                     head_slot=Slot(5),
                 ),
                 valid=False,
-                expected_error="Head checkpoint slot mismatch",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.HEAD_SLOT_MISMATCH,
+                    message_substring="Head checkpoint slot mismatch",
+                ),
             ),
         ]
     )
@@ -168,7 +178,10 @@ def test_aggregated_attestation_source_after_target_rejected(
                     source_slot=Slot(3),
                 ),
                 valid=False,
-                expected_error="Source checkpoint slot must not exceed target",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.SOURCE_AFTER_TARGET,
+                    message_substring="Source checkpoint slot must not exceed target",
+                ),
             ),
         ]
     )
@@ -196,7 +209,10 @@ def test_aggregated_attestation_too_far_in_future_rejected(
                     target_root_label="block_2",
                 ),
                 valid=False,
-                expected_error="Attestation too far in future",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
+                    message_substring="Attestation too far in future",
+                ),
             ),
         ]
     )
@@ -276,7 +292,10 @@ def test_aggregated_attestation_just_beyond_disparity_boundary_rejected(
                     target_root_label="block_2",
                 ),
                 valid=False,
-                expected_error="Attestation too far in future",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
+                    message_substring="Attestation too far in future",
+                ),
             ),
         ]
     )
@@ -319,7 +338,10 @@ def test_aggregated_attestation_one_full_slot_in_future_rejected(
                     target_root_label="block_2",
                 ),
                 valid=False,
-                expected_error="Attestation too far in future",
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
+                    message_substring="Attestation too far in future",
+                ),
             ),
         ]
     )

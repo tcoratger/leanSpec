@@ -4,14 +4,15 @@ import pytest
 
 from consensus_testing import (
     DropMessageBinding,
+    ExpectedRejection,
     IncrementEmittedSlot,
     RebindToAlternateHeadRoot,
     SwapMessageBindings,
     SwapParticipantPublicKey,
     VerifyMultiMessageProofsTestFiller,
 )
-from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
-from lean_spec.spec.forks.lstar.containers import AggregationError, AttestationData
+from lean_spec.spec.forks import Checkpoint, RejectionReason, Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -40,7 +41,7 @@ def test_multi_message_wrong_message_in_one_component(
                 source=Checkpoint(root=Bytes32(b"\x33" * 32), slot=Slot(0)),
             ),
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=RebindToAlternateHeadRoot(component_index=1),
     )
 
@@ -68,7 +69,7 @@ def test_multi_message_wrong_slot_in_one_component(
                 source=Checkpoint(root=Bytes32(b"\x33" * 32), slot=Slot(0)),
             ),
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=IncrementEmittedSlot(component_index=1),
     )
 
@@ -96,7 +97,7 @@ def test_multi_message_wrong_public_key_in_one_component(
                 source=Checkpoint(root=Bytes32(b"\x33" * 32), slot=Slot(0)),
             ),
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=SwapParticipantPublicKey(
             component_index=1,
             participant_index=0,
@@ -128,7 +129,7 @@ def test_multi_message_components_with_swapped_bindings(
                 source=Checkpoint(root=Bytes32(b"\x33" * 32), slot=Slot(0)),
             ),
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=SwapMessageBindings(
             first_component_index=0,
             second_component_index=1,
@@ -159,6 +160,6 @@ def test_multi_message_missing_one_component_binding(
                 source=Checkpoint(root=Bytes32(b"\x33" * 32), slot=Slot(0)),
             ),
         ],
-        expect_exception=AggregationError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
         tamper=DropMessageBinding(component_index=1),
     )

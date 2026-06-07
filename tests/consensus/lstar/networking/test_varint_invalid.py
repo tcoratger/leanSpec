@@ -2,8 +2,8 @@
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
-from lean_spec.node.networking.varint import VarintError
+from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -21,7 +21,7 @@ def test_varint_truncated_mid_stream_rejected(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "varint", "bytes": "0x8080"},
-        expect_exception=VarintError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
 
@@ -38,5 +38,5 @@ def test_varint_longer_than_ten_bytes_rejected(
     networking_codec_test(
         codec_name="decode_failure",
         input={"decoder": "varint", "bytes": "0x" + "80" * 11},
-        expect_exception=VarintError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

@@ -16,6 +16,7 @@ from consensus_testing import (
     AppendPhantomAttestation,
     BlockSpec,
     CorruptProof,
+    ExpectedRejection,
     MutateStateRoot,
     SwapFirstTwoAttestations,
     VerifySignaturesTestFiller,
@@ -23,7 +24,7 @@ from consensus_testing import (
     generate_pre_state,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -55,7 +56,7 @@ def test_corrupt_proof_rejected(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=CorruptProof(),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
     )
 
 
@@ -88,7 +89,7 @@ def test_proof_component_count_mismatch_rejected(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=AppendPhantomAttestation(),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
     )
 
 
@@ -124,7 +125,7 @@ def test_proof_reused_under_different_message_rejected(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=MutateStateRoot(),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
     )
 
 
@@ -160,5 +161,5 @@ def test_attestation_proof_order_mismatch_rejected(
             ],
         ),
         tamper=SwapFirstTwoAttestations(),
-        expect_exception=AssertionError,
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
     )

@@ -1,13 +1,12 @@
 """State transition test fixture format."""
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from pydantic import ConfigDict, Field, PrivateAttr, field_serializer
+from pydantic import Field
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
-from consensus_testing.rejection import classify_rejection
-from consensus_testing.test_fixtures.base import BaseConsensusFixture
+from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits
@@ -24,9 +23,36 @@ from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32
 
 
-class StateTransitionTest(BaseConsensusFixture):
+class StateTransitionFixture(BaseConsensusFixture):
     """
-    Test fixture for block processing through state_transition().
+    Emitted vector for block processing through state_transition().
+
+    JSON output: pre, blocks, post, postStateRoot.
+    """
+
+    pre: State
+    """The initial consensus state before processing."""
+
+    blocks: list[Block]
+    """The filled Blocks, processed through the spec."""
+
+    post: StateExpectation | None = None
+    """Authored post-state expectations, echoed for readability."""
+
+    post_state_root: Bytes32 | None = None
+    """
+    Hash tree root of the full post-state.
+
+    Populated whenever processing succeeds.
+    Clients must reproduce this root exactly, so two clients cannot
+    pass the same vector while holding divergent state.
+    Stays None for invalid tests, which produce no post-state.
+    """
+
+
+class StateTransitionTest(BaseTestSpec):
+    """
+    Spec for block processing through state_transition().
 
     This is the primary test type that covers:
     - Operations (attestations via blocks)
@@ -36,12 +62,6 @@ class StateTransitionTest(BaseConsensusFixture):
     - Invalid blocks
 
     Tests everything through the main state_transition() public API.
-
-    Structure:
-        pre: Initial consensus state
-        blocks: Sequence of signed blocks to process
-        post: Expected state after processing (None if invalid, filled by spec)
-        expect_exception: Expected exception for invalid tests
     """
 
     format_name: ClassVar[str] = "state_transition_test"
@@ -49,8 +69,6 @@ class StateTransitionTest(BaseConsensusFixture):
         "Tests block processing through state_transition() - covers operations, "
         "epochs, and finality"
     )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     pre: State = Field(default_factory=generate_pre_state)
     """
@@ -65,21 +83,7 @@ class StateTransitionTest(BaseConsensusFixture):
     Block specifications to process through the spec.
 
     Tests provide a list of BlockSpec objects with required slots and optional
-    field overrides. The framework fills complete Block objects during
-    make_fixture() and stores them in the private _filled_blocks attribute.
-    """
-
-    # TODO: We should figure out a configuration to raise if a private attribute is
-    #  attempted to be set during model initialization.
-    _filled_blocks: list[Block] = PrivateAttr(default_factory=list)
-    """
-    The filled Blocks, processed through the specs.
-
-    This is a private attribute not part of the model schema.
-
-    Tests cannot set this.
-
-    The framework populates it during make_fixture().
+    field overrides. Generation fills complete Block objects and emits them.
     """
 
     post: StateExpectation | None = None
@@ -90,47 +94,12 @@ class StateTransitionTest(BaseConsensusFixture):
     If None, no post-state validation is performed (e.g., for invalid tests).
     """
 
-    post_state_root: Bytes32 | None = None
-    """
-    Hash tree root of the full post-state.
-
-    Populated by the framework whenever processing succeeds.
-    Tests must not set this.
-    Clients must reproduce this root exactly, so two clients cannot
-    pass the same vector while holding divergent state.
-    Stays None for invalid tests, which produce no post-state.
-    """
-
-    expect_exception_message: str | None = Field(default=None, exclude=True)
-    """
-    Expected exception message for invalid tests.
-
-    Excluded from JSON output: an English message means nothing to
-    other-language clients. It remains a fill-time self-check only.
-    """
-
-    @field_serializer("blocks", when_used="json")
-    def serialize_blocks(self, block_specs: list[BlockSpec]) -> list[dict[str, Any]]:
-        """
-        Serialize filled blocks instead of the input specs.
-
-        Ensures fixture output contains complete blocks, not partial specs.
-
-        Args:
-            block_specs: The BlockSpec list (ignored; filled blocks are used instead).
-
-        Returns:
-            The serialized blocks.
-        """
-        del block_specs
-        return [block.to_json() for block in self._filled_blocks]
-
-    def make_fixture(self) -> "StateTransitionTest":
+    def generate(self) -> StateTransitionFixture:
         """
         Generate the fixture by running the spec.
 
         Returns:
-            A validated fixture.
+            The emitted vector with filled blocks and post-state root.
 
         Raises:
             AssertionError: If processing fails unexpectedly or validation fails.
@@ -139,7 +108,8 @@ class StateTransitionTest(BaseConsensusFixture):
         exception_raised: Exception | None = None
         spec = LstarSpec()
 
-        # Initialize filled_blocks list that will be populated as we process blocks
+        # Filled blocks accumulate as we process, even if a later block fails.
+        # This ensures the test fixture includes all blocks that were attempted.
         filled_blocks: list[Block] = []
         block_registry: dict[str, Block] = {}
         try:
@@ -164,7 +134,7 @@ class StateTransitionTest(BaseConsensusFixture):
                 # Use cached state if available, otherwise run state transition
                 if cached_state is not None:
                     state = cached_state
-                elif getattr(block_spec, "skip_slot_processing", False):
+                elif block_spec.skip_slot_processing:
                     state = spec.process_block(state, block)
                 else:
                     state = spec.state_transition(state, block=block)
@@ -172,33 +142,36 @@ class StateTransitionTest(BaseConsensusFixture):
             actual_post_state = state
         except (AssertionError, ValueError) as exception:
             exception_raised = exception
-        finally:
-            # Always store filled blocks for serialization, even if an exception occurred
-            # This ensures the test fixture includes all blocks that were attempted
-            self._filled_blocks = filled_blocks
 
         # Validate exception expectations
-        self.assert_expected_outcome(exception_raised, self.expect_exception_message)
+        self.assert_expected_outcome(exception_raised)
+        rejection_reason = None
         if exception_raised is not None:
             # Emit the language-neutral reason clients assert against.
-            self.rejection_reason = classify_rejection(exception_raised)
+            rejection_reason = self.resolve_rejection_reason(exception_raised)
 
         # Pin the full post-state for clients.
         # Selective expectations below only cover authored fields.
         # The root covers every field, closing the divergence gap.
+        post_state_root = None
         if actual_post_state is not None:
-            self.post_state_root = hash_tree_root(actual_post_state)
+            post_state_root = hash_tree_root(actual_post_state)
 
         # Validate post-state expectations if provided
         if self.post is not None and actual_post_state is not None:
             self.post.validate_against_state(actual_post_state, block_registry=block_registry)
 
-        # Return self (fixture is already complete)
-        return self
+        return StateTransitionFixture(
+            pre=self.pre,
+            blocks=filled_blocks,
+            post=self.post,
+            post_state_root=post_state_root,
+            rejection_reason=rejection_reason,
+        )
 
     def _build_block_from_spec(
         self,
-        spec: BlockSpec,
+        block_spec: BlockSpec,
         state: State,
         block_registry: dict[str, Block],
     ) -> tuple[Block, State | None]:
@@ -216,45 +189,46 @@ class StateTransitionTest(BaseConsensusFixture):
         process_attestations directly (e.g., unjustified source tests).
 
         Args:
-            spec: Block specification with optional field overrides.
+            block_spec: Block specification with optional field overrides.
             state: Current state to build against.
             block_registry: Labeled blocks for parent and target resolution.
 
         Returns:
             Block and cached post-state (None if not computed).
         """
-        proposer_index = spec.resolve_proposer_index(len(state.validators))
+        fork = LstarSpec()
+        proposer_index = block_spec.resolve_proposer_index(len(state.validators))
 
         # Advance slots unless the spec intentionally skips slot processing.
         slot_advanced_state: State | None = None
-        if not spec.skip_slot_processing:
-            slot_advanced_state = LstarSpec().process_slots(state, spec.slot)
+        if not block_spec.skip_slot_processing:
+            slot_advanced_state = fork.process_slots(state, block_spec.slot)
 
         # Resolve the parent root.
         # Default: latest block header from the slot-advanced state.
         source_state = slot_advanced_state or state
-        parent_root = spec.resolve_parent_root(
+        parent_root = block_spec.resolve_parent_root(
             block_registry,
             default_root=hash_tree_root(source_state.latest_block_header),
         )
 
-        body = spec.body or BlockBody(attestations=AggregatedAttestations(data=[]))
+        body = block_spec.body or BlockBody(attestations=AggregatedAttestations(data=[]))
         post_state: State | None = None
 
         # Path 1: explicit state root override -- no state transition needed.
-        if spec.state_root is not None:
+        if block_spec.state_root is not None:
             block = Block(
-                slot=spec.slot,
+                slot=block_spec.slot,
                 proposer_index=proposer_index,
                 parent_root=parent_root,
-                state_root=spec.state_root,
+                state_root=block_spec.state_root,
                 body=body,
             )
 
         # Path 2: invalid test or skip-slot -- placeholder root, no transition.
-        elif self.expect_exception is not None or spec.skip_slot_processing:
+        elif self.expected_rejection is not None or block_spec.skip_slot_processing:
             block = Block(
-                slot=spec.slot,
+                slot=block_spec.slot,
                 proposer_index=proposer_index,
                 parent_root=parent_root,
                 state_root=Bytes32.zero(),
@@ -264,18 +238,18 @@ class StateTransitionTest(BaseConsensusFixture):
         # Path 3: normal block construction via the spec's builder.
         else:
             aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
-            if spec.attestations:
+            if block_spec.attestations:
                 aggregated_payloads = StateTransitionTest._build_aggregated_payloads_from_spec(
-                    spec.attestations, state, block_registry
+                    block_spec.attestations, state, block_registry
                 )
 
             known_block_roots = frozenset(
                 hash_tree_root(block) for block in block_registry.values()
             )
 
-            block, post_state, _, _ = LstarSpec().build_block(
+            block, post_state, _, _ = fork.build_block(
                 state,
-                slot=spec.slot,
+                slot=block_spec.slot,
                 proposer_index=proposer_index,
                 parent_root=parent_root,
                 known_block_roots=known_block_roots,
@@ -285,13 +259,17 @@ class StateTransitionTest(BaseConsensusFixture):
         # Append forced attestations if any.
         # These bypass the builder's filtering so they reach the state
         # transition even when the builder would exclude them.
-        if spec.forced_attestations:
+        if block_spec.forced_attestations:
             forced = [
                 AggregatedAttestation(
-                    aggregation_bits=AggregationBits.from_indices(fa.validator_indices),
-                    data=fa.build_attestation_data(block_registry, state.latest_justified),
+                    aggregation_bits=AggregationBits.from_indices(
+                        forced_attestation.validator_indices
+                    ),
+                    data=forced_attestation.build_attestation_data(
+                        block_registry, state.latest_justified
+                    ),
                 )
-                for fa in spec.forced_attestations
+                for forced_attestation in block_spec.forced_attestations
             ]
             block = block.model_copy(
                 update={
@@ -308,8 +286,8 @@ class StateTransitionTest(BaseConsensusFixture):
             # The body changed, so re-run the transition to get the correct
             # post-state and state root.
             if post_state is not None:
-                post_state = LstarSpec().process_slots(state, spec.slot)
-                post_state = LstarSpec().process_block(post_state, block)
+                post_state = fork.process_slots(state, block_spec.slot)
+                post_state = fork.process_block(post_state, block)
                 block = block.model_copy(update={"state_root": hash_tree_root(post_state)})
 
         return block, post_state
