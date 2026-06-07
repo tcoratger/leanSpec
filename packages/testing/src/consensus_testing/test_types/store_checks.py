@@ -1,7 +1,9 @@
 """Store checks model for selective validation in fork choice tests."""
 
-from typing import Literal
+from collections.abc import Callable
+from typing import Any, ClassVar, Literal
 
+from consensus_testing.test_types.selective_check import SelectiveCheck
 from consensus_testing.test_types.utils import resolve_block_root
 from lean_spec.base import CamelModel
 from lean_spec.spec.crypto.merkleization import hash_tree_root
@@ -9,6 +11,14 @@ from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AttestationData, Block, Store
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import ZERO_HASH, Bytes32
+
+_ATTESTATION_SLOT_ACCESSORS: dict[str, Callable[[AttestationData], Slot]] = {
+    "attestation_slot": lambda attestation: attestation.slot,
+    "head_slot": lambda attestation: attestation.head.slot,
+    "source_slot": lambda attestation: attestation.source.slot,
+    "target_slot": lambda attestation: attestation.target.slot,
+}
+"""Per-validator attestation check field to the slot it reads."""
 
 
 def _ancestor_set(blocks: dict[Bytes32, Block], head: Bytes32) -> set[Bytes32]:
@@ -76,51 +86,53 @@ class AttestationCheck(CamelModel):
         self, attestation: "AttestationData", location: str, step_index: int
     ) -> None:
         """Validate attestation properties."""
-        fields_to_check = self.model_fields_set - {"validator", "location"}
-
-        for field_name in fields_to_check:
+        for field_name in self.model_fields_set & _ATTESTATION_SLOT_ACCESSORS.keys():
             expected_slot = getattr(self, field_name)
-
-            if field_name == "attestation_slot":
-                actual_slot = attestation.slot
-                if actual_slot != expected_slot:
-                    raise AssertionError(
-                        f"Step {step_index}: validator {self.validator} {location} "
-                        f"attestation slot = {actual_slot}, expected {expected_slot}"
-                    )
-
-            elif field_name == "head_slot":
-                actual_slot = attestation.head.slot
-                if actual_slot != expected_slot:
-                    raise AssertionError(
-                        f"Step {step_index}: validator {self.validator} {location} "
-                        f"head slot = {actual_slot}, expected {expected_slot}"
-                    )
-
-            elif field_name == "source_slot":
-                actual_slot = attestation.source.slot
-                if actual_slot != expected_slot:
-                    raise AssertionError(
-                        f"Step {step_index}: validator {self.validator} {location} "
-                        f"source slot = {actual_slot}, expected {expected_slot}"
-                    )
-
-            elif field_name == "target_slot":
-                actual_slot = attestation.target.slot
-                if actual_slot != expected_slot:
-                    raise AssertionError(
-                        f"Step {step_index}: validator {self.validator} {location} "
-                        f"target slot = {actual_slot}, expected {expected_slot}"
-                    )
+            actual_slot = _ATTESTATION_SLOT_ACCESSORS[field_name](attestation)
+            if actual_slot != expected_slot:
+                raise AssertionError(
+                    f"Step {step_index}: validator {self.validator} {location} "
+                    f"{field_name} = {actual_slot}, expected {expected_slot}"
+                )
 
 
-class StoreChecks(CamelModel):
+class StoreChecks(SelectiveCheck):
     """
     Store state checks for fork choice tests.
 
     All fields are optional. Only specified fields are validated.
     This allows tests to focus on the properties they care about.
     """
+
+    _SCALAR_ACCESSORS: ClassVar[dict[str, Callable[[Store], Any]]] = {
+        "time": lambda store: store.time,
+        "head_slot": lambda store: store.blocks[store.head].slot,
+        "head_root": lambda store: store.head,
+        "latest_justified_slot": lambda store: store.latest_justified.slot,
+        "latest_justified_root": lambda store: store.latest_justified.root,
+        "latest_finalized_slot": lambda store: store.latest_finalized.slot,
+        "latest_finalized_root": lambda store: store.latest_finalized.root,
+        "safe_target": lambda store: store.safe_target,
+        "safe_target_slot": lambda store: store.blocks[store.safe_target].slot,
+    }
+    """Scalar field to the store value it must equal."""
+
+    _LABEL_ROOT_ACCESSORS: ClassVar[dict[str, Callable[[Store], Bytes32]]] = {
+        "head_root_label": lambda store: store.head,
+        "latest_justified_root_label": lambda store: store.latest_justified.root,
+        "latest_finalized_root_label": lambda store: store.latest_finalized.root,
+        "safe_target_root_label": lambda store: store.safe_target,
+    }
+    """Label-reference field to the store root it must resolve to."""
+
+    _POOL_TARGET_SLOT_ACCESSORS: ClassVar[dict[str, Callable[[Store], Any]]] = {
+        "attestation_signature_target_slots": lambda store: store.attestation_signatures,
+        "latest_new_aggregated_target_slots": lambda store: store.latest_new_aggregated_payloads,
+        "latest_known_aggregated_target_slots": (
+            lambda store: store.latest_known_aggregated_payloads
+        ),
+    }
+    """Pool target-slot field to the pool whose keyed target slots it compares."""
 
     time: Interval | None = None
     """Expected store time (in intervals since genesis)."""
@@ -316,30 +328,13 @@ class StoreChecks(CamelModel):
             return resolve_block_root(label, block_registry)
 
         # Scalar store fields
-        if "time" in fields:
-            _check("time", store.time, self.time)
-        if "head_slot" in fields:
-            _check("head.slot", store.blocks[store.head].slot, self.head_slot)
-        if "head_root" in fields:
-            _check("head.root", store.head, self.head_root)
-        if "latest_justified_slot" in fields:
-            _check("latest_justified.slot", store.latest_justified.slot, self.latest_justified_slot)
-        if "latest_justified_root" in fields:
-            _check("latest_justified.root", store.latest_justified.root, self.latest_justified_root)
-        if "latest_finalized_slot" in fields:
-            _check("latest_finalized.slot", store.latest_finalized.slot, self.latest_finalized_slot)
-        if "latest_finalized_root" in fields:
-            _check("latest_finalized.root", store.latest_finalized.root, self.latest_finalized_root)
-        if "safe_target" in fields:
-            _check("safe_target", store.safe_target, self.safe_target)
-        if "safe_target_slot" in fields:
-            _check("safe_target.slot", store.blocks[store.safe_target].slot, self.safe_target_slot)
+        self.validate_scalar_fields(store, f"Step {step_index}")
 
         # Label-based root checks (resolve label -> root, then compare)
-        if "head_root_label" in fields:
-            assert self.head_root_label is not None
-            expected_head_root = _resolve(self.head_root_label)
-            _check("head.root", store.head, expected_head_root)
+        for field_name in fields & self._LABEL_ROOT_ACCESSORS.keys():
+            expected_root = _resolve(getattr(self, field_name))
+            _check(field_name, self._LABEL_ROOT_ACCESSORS[field_name](store), expected_root)
+
         if "filled_block_root_label" in fields:
             if filled_block is None:
                 raise ValueError(
@@ -349,18 +344,6 @@ class StoreChecks(CamelModel):
             assert self.filled_block_root_label is not None
             expected_filled_block_root = _resolve(self.filled_block_root_label)
             _check("filled_block.root", hash_tree_root(filled_block), expected_filled_block_root)
-        if "latest_justified_root_label" in fields:
-            assert self.latest_justified_root_label is not None
-            expected_justified_root = _resolve(self.latest_justified_root_label)
-            _check("latest_justified.root", store.latest_justified.root, expected_justified_root)
-        if "latest_finalized_root_label" in fields:
-            assert self.latest_finalized_root_label is not None
-            expected_finalized_root = _resolve(self.latest_finalized_root_label)
-            _check("latest_finalized.root", store.latest_finalized.root, expected_finalized_root)
-        if "safe_target_root_label" in fields:
-            assert self.safe_target_root_label is not None
-            expected_safe_target_root = _resolve(self.safe_target_root_label)
-            _check("safe_target", store.safe_target, expected_safe_target_root)
 
         # Attestation target checkpoint (slot + root consistency)
         if "attestation_target_slot" in fields:
@@ -407,45 +390,14 @@ class StoreChecks(CamelModel):
                     extracted_attestations[attestation_check.validator], label, step_index
                 )
 
-        if "attestation_signature_target_slots" in fields:
-            assert self.attestation_signature_target_slots is not None
+        # Target slots keyed in each attestation pool
+        for field_name in fields & self._POOL_TARGET_SLOT_ACCESSORS.keys():
+            pool = self._POOL_TARGET_SLOT_ACCESSORS[field_name](store)
             actual_target_slots = sorted(
-                {attestation_data.target.slot for attestation_data in store.attestation_signatures}
+                {attestation_data.target.slot for attestation_data in pool}
             )
-            expected_target_slots = sorted(self.attestation_signature_target_slots)
-            _check(
-                "attestation_signatures.target_slots", actual_target_slots, expected_target_slots
-            )
-
-        if "latest_new_aggregated_target_slots" in fields:
-            assert self.latest_new_aggregated_target_slots is not None
-            actual_target_slots = sorted(
-                {
-                    attestation_data.target.slot
-                    for attestation_data in store.latest_new_aggregated_payloads
-                }
-            )
-            expected_target_slots = sorted(self.latest_new_aggregated_target_slots)
-            _check(
-                "latest_new_aggregated_payloads.target_slots",
-                actual_target_slots,
-                expected_target_slots,
-            )
-
-        if "latest_known_aggregated_target_slots" in fields:
-            assert self.latest_known_aggregated_target_slots is not None
-            actual_target_slots = sorted(
-                {
-                    attestation_data.target.slot
-                    for attestation_data in store.latest_known_aggregated_payloads
-                }
-            )
-            expected_target_slots = sorted(self.latest_known_aggregated_target_slots)
-            _check(
-                "latest_known_aggregated_payloads.target_slots",
-                actual_target_slots,
-                expected_target_slots,
-            )
+            expected_target_slots = sorted(getattr(self, field_name))
+            _check(field_name, actual_target_slots, expected_target_slots)
 
         # Block body attestation count
         if "block_attestation_count" in fields:
