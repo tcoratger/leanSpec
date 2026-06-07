@@ -74,6 +74,35 @@ If removing the comment would not confuse a future reader, do not write it.
 Never remove or rewrite a comment or docstring unless the documented behavior actually changed.
 Removing valid docs creates diff noise and destroys context.
 
+### 6. One-line docstrings by default
+
+A class, function, or constant of ordinary complexity gets exactly one summary line.
+Add a body only when a non-obvious design choice or invariant must be explained.
+A body that restates what the summary already implies is noise.
+
+### 7. Docstring summaries are noun phrases, not questions
+
+Never open a docstring with "Why ..." or any question-style phrasing.
+Name the thing plainly, the way a human would label it.
+
+### 8. Never enumerate the container's contents in its docstring
+
+Do not list members, variants, or fields in a class or enum docstring.
+The list rots the moment the class changes.
+Stay generic; each member documents itself.
+
+Bad:
+```python
+class RejectionReason(StrEnum):
+    """Why the spec rejects an invalid block, attestation, or wire message."""
+```
+
+Good:
+```python
+class RejectionReason(StrEnum):
+    """Language-neutral reason the spec rejects an invalid input."""
+```
+
 ## Style requirements
 
 ### Sentences

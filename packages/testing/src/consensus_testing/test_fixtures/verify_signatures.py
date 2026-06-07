@@ -11,7 +11,13 @@ from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import BlockSpec
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
+from lean_spec.spec.forks import (
+    AggregationBits,
+    Checkpoint,
+    Slot,
+    SpecRejectionError,
+    ValidatorIndex,
+)
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -172,7 +178,7 @@ class VerifySignaturesTest(BaseTestSpec):
         # Verify signatures
         try:
             LstarSpec().verify_signatures(signed_block, self.anchor_state.validators)
-        except AssertionError as exception:
+        except SpecRejectionError as exception:
             exception_raised = exception
 
         # Validate exception expectations

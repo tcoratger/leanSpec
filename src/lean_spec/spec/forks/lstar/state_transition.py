@@ -19,6 +19,7 @@ from lean_spec.spec.forks.lstar.containers import (
     ValidatorIndex,
     Validators,
 )
+from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
 from lean_spec.spec.forks.protocol import SpecStateType
 from lean_spec.spec.observability import (
     observe_state_transition,
@@ -134,7 +135,10 @@ class StateTransitionMixin(LstarSpecBase):
             AssertionError: If target_slot is not in the future.
         """
         # The target must be strictly greater than the current slot.
-        assert state.slot < target_slot, "Target slot must be in the future"
+        if state.slot >= target_slot:
+            raise SpecRejectionError(
+                RejectionReason.BLOCK_SLOT_NOT_IN_FUTURE, "Target slot must be in the future"
+            )
 
         # Step through each missing slot.
         while state.slot < target_slot:
@@ -192,23 +196,31 @@ class StateTransitionMixin(LstarSpecBase):
         # Verify the block corresponds to the current state slot.
         #
         # To move to this slot, we have processed any intermediate slots before.
-        assert block.slot == state.slot, "Block slot mismatch"
+        if block.slot != state.slot:
+            raise SpecRejectionError(RejectionReason.BLOCK_SLOT_MISMATCH, "Block slot mismatch")
 
         # The block must be newer than the current latest header.
-        assert block.slot > parent_header.slot, "Block is older than latest header"
+        if block.slot <= parent_header.slot:
+            raise SpecRejectionError(
+                RejectionReason.BLOCK_OLDER_THAN_LATEST_HEADER, "Block is older than latest header"
+            )
 
         # Verify the block proposer.
         #
         # Ensures the block was proposed by the assigned validator for this round.
-        assert block.proposer_index == ValidatorIndex.proposer_for_slot(
+        if block.proposer_index != ValidatorIndex.proposer_for_slot(
             slot=state.slot,
             num_validators=Uint64(len(state.validators)),
-        ), "Incorrect block proposer"
+        ):
+            raise SpecRejectionError(RejectionReason.WRONG_PROPOSER, "Incorrect block proposer")
 
         # Verify the chain link.
         #
         # The block must cryptographically point to the known parent.
-        assert block.parent_root == parent_root, "Block parent root mismatch"
+        if block.parent_root != parent_root:
+            raise SpecRejectionError(
+                RejectionReason.PARENT_ROOT_MISMATCH, "Block parent root mismatch"
+            )
 
         # Checkpoint Updates
 
@@ -569,6 +581,8 @@ class StateTransitionMixin(LstarSpecBase):
             # Validate that the block's state root matches the computed state
             computed_state_root = hash_tree_root(new_state)
             if block.state_root != computed_state_root:
-                raise AssertionError("Invalid block state root")
+                raise SpecRejectionError(
+                    RejectionReason.STATE_ROOT_MISMATCH, "Invalid block state root"
+                )
 
         return new_state

@@ -26,9 +26,16 @@ from consensus_testing.test_types import (
 from lean_spec.config import LEAN_ENV
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Interval, RejectionReason, Slot, ValidatorIndex
+from lean_spec.spec.forks import (
+    Interval,
+    RejectionReason,
+    Slot,
+    SpecRejectionError,
+    ValidatorIndex,
+)
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
+    AggregationError,
     Block,
     BlockBody,
     SignedAggregatedAttestation,
@@ -302,14 +309,15 @@ class ForkChoiceTest(BaseTestSpec):
                                 )
                             block_registry[step.block.label] = filled_block
 
-                        # Advance time to the block's slot.
-                        # Store rejects blocks from the future.
+                        # Advance time to the block's slot unless the test
+                        # delivers the block ahead of the store clock.
                         # This tick includes a block (has proposal).
                         # Always act as aggregator to ensure gossip signatures are aggregated
-                        target_interval = Interval.from_slot(filled_block.slot)
-                        store, _ = spec.on_tick(
-                            store, target_interval, has_proposal=True, is_aggregator=True
-                        )
+                        if step.tick_to_slot:
+                            target_interval = Interval.from_slot(filled_block.slot)
+                            store, _ = spec.on_tick(
+                                store, target_interval, has_proposal=True, is_aggregator=True
+                            )
 
                         # Process the block through Store.
                         # This validates, applies state transition, and updates the store's head.
@@ -360,9 +368,10 @@ class ForkChoiceTest(BaseTestSpec):
                         old_head=old_head,
                     )
 
-            except Exception as exception:
+            except (SpecRejectionError, AggregationError) as exception:
                 # Handle expected failures.
-                # Steps marked valid=False should raise exceptions.
+                # Steps marked valid=False should raise spec rejections.
+                # Harness bugs raise other types and propagate unswallowed.
                 if step.valid:
                     raise AssertionError(
                         f"Step {step_index} ({type(step).__name__}) "
@@ -404,6 +413,7 @@ class ForkChoiceTest(BaseTestSpec):
                             rejection_reason=rejection_reason,
                             checks=step.checks,
                             store_snapshot=store_snapshot,
+                            tick_to_slot=step.tick_to_slot,
                             block=filled_block,
                             block_root_label=step.block.label,
                         )
@@ -462,18 +472,19 @@ class ForkChoiceTest(BaseTestSpec):
             "steps must be empty when anchor_valid is False: "
             "Store.from_anchor is expected to fail before any step can run"
         )
+        # Why: a vector saying only "reject this anchor" lets a client
+        # reject for the wrong reason and still pass.
+        assert self.expected_rejection is not None, (
+            "anchor_valid=False requires expected_rejection to be set"
+        )
         try:
             spec.create_store(
                 self.anchor_state,
                 anchor_block,
                 validator_index=ValidatorIndex(0),
             )
-        except AssertionError as exception:
-            expected_substring = (
-                self.expected_rejection.message_substring
-                if self.expected_rejection is not None
-                else None
-            )
+        except SpecRejectionError as exception:
+            expected_substring = self.expected_rejection.message_substring
             if expected_substring is not None and expected_substring not in str(exception):
                 raise AssertionError(
                     "Store.from_anchor failed with wrong error.\n"

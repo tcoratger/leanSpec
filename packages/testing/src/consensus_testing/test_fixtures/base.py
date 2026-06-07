@@ -234,3 +234,34 @@ class BaseTestSpec(CamelModel):
                 f"but the test expects {self.expected_rejection.reason}"
             )
         return classified_reason
+
+    def assert_decode_rejection(
+        self,
+        exception_raised: Exception | None,
+        decoder_name: str,
+    ) -> RejectionReason:
+        """
+        Check a decode-failure outcome and resolve the emitted reason.
+
+        Decode failures never reach the rejection classifier.
+        The authored expectation is the only source of the emitted reason.
+
+        Args:
+            exception_raised: The exception the decoder raised, or None on success.
+            decoder_name: Decoder label for failure messages.
+
+        Returns:
+            The reason emitted into the test vector.
+
+        Raises:
+            ValueError: When the authored expectation is missing.
+            AssertionError: When decoding succeeds or contradicts the expectation.
+        """
+        if self.expected_rejection is None:
+            raise ValueError("decode-failure vectors require expected_rejection to be set")
+        if exception_raised is None:
+            raise AssertionError(
+                f"Expected {decoder_name} to reject the input, but decoding succeeded"
+            )
+        self.assert_expected_outcome(exception_raised)
+        return self.expected_rejection.reason

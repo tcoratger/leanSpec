@@ -14,6 +14,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Slot,
     ValidatorIndex,
 )
+from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
 from lean_spec.spec.ssz import Bytes32, Uint64
 
 
@@ -155,9 +156,11 @@ class ValidatorDutiesMixin(LstarSpecBase):
         # Only one validator may propose per slot.
         # Unauthorized proposals would be rejected by other nodes.
         num_validators = Uint64(len(head_state.validators))
-        assert validator_index == ValidatorIndex.proposer_for_slot(slot, num_validators), (
-            f"Validator {validator_index} is not the proposer for slot {slot}"
-        )
+        if validator_index != ValidatorIndex.proposer_for_slot(slot, num_validators):
+            raise SpecRejectionError(
+                RejectionReason.WRONG_PROPOSER,
+                f"Validator {validator_index} is not the proposer for slot {slot}",
+            )
 
         # Build the block.
         #

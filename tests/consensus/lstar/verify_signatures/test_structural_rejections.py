@@ -56,7 +56,7 @@ def test_corrupt_proof_rejected(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=CorruptProof(),
-        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
     )
 
 
@@ -89,7 +89,7 @@ def test_proof_component_count_mismatch_rejected(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=AppendPhantomAttestation(),
-        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
     )
 
 
@@ -125,7 +125,7 @@ def test_proof_reused_under_different_message_rejected(
         anchor_state=generate_pre_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=MutateStateRoot(),
-        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
     )
 
 
@@ -161,5 +161,5 @@ def test_attestation_proof_order_mismatch_rejected(
             ],
         ),
         tamper=SwapFirstTwoAttestations(),
-        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_SIGNATURE),
+        expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
     )

@@ -774,32 +774,12 @@ class NetworkingCodecTest(BaseTestSpec):
     def generate(self) -> NetworkingCodecFixture:
         """Run the codec case and emit the vector."""
         if isinstance(self.codec, DecodeFailure):
-            return self._generate_decode_failure(self.codec)
-        return NetworkingCodecFixture(codec=self.codec, output=self.codec.run())
-
-    def _generate_decode_failure(self, decode_failure: DecodeFailure) -> NetworkingCodecFixture:
-        """
-        Assert the decoder rejects the malformed input and emit the rejection vector.
-
-        Raises:
-            AssertionError: If the decoder succeeds or the rejection
-                contradicts the authored expectation.
-            ValueError: If the expected rejection is unset.
-        """
-        if self.expected_rejection is None:
-            raise ValueError("decode_failure codec requires expected_rejection to be set")
-
-        exception_raised = decode_failure.attempt_decode()
-        if exception_raised is None:
-            raise AssertionError(
-                f"Expected {decode_failure.decoder!r} decode to reject the input, "
-                "but decode succeeded"
+            # Emit the language-neutral reason clients assert against.
+            return NetworkingCodecFixture(
+                codec=self.codec,
+                output=DecodeFailureOutput(decoder=self.codec.decoder),
+                rejection_reason=self.assert_decode_rejection(
+                    self.codec.attempt_decode(), self.codec.decoder
+                ),
             )
-        self.assert_expected_outcome(exception_raised)
-
-        # Emit the language-neutral reason clients assert against.
-        return NetworkingCodecFixture(
-            codec=decode_failure,
-            output=DecodeFailureOutput(decoder=decode_failure.decoder),
-            rejection_reason=self.expected_rejection.reason,
-        )
+        return NetworkingCodecFixture(codec=self.codec, output=self.codec.run())

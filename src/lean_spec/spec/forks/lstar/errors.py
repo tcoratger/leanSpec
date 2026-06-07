@@ -1,15 +1,10 @@
-"""Language-neutral rejection reasons for invalid consensus inputs."""
+"""Rejection reasons and the typed error that carries them."""
 
 from enum import StrEnum
 
 
 class RejectionReason(StrEnum):
-    """
-    Why the spec rejects an invalid block, attestation, or wire message.
-
-    Test vectors emit these instead of Python exception details.
-    Clients in any language assert the reason, not an English message.
-    """
+    """Language-neutral reason the spec rejects an invalid input."""
 
     # Block validation
     BLOCK_SLOT_NOT_IN_FUTURE = "BLOCK_SLOT_NOT_IN_FUTURE"
@@ -87,7 +82,10 @@ class RejectionReason(StrEnum):
 
     # Cryptographic verification
     INVALID_SIGNATURE = "INVALID_SIGNATURE"
-    """A signature or aggregate proof fails cryptographic verification."""
+    """An attestation signature or aggregate proof fails cryptographic verification."""
+
+    INVALID_BLOCK_PROOF = "INVALID_BLOCK_PROOF"
+    """The block's multi-message aggregate proof fails verification."""
 
     # Anchor initialization
     ANCHOR_STATE_ROOT_MISMATCH = "ANCHOR_STATE_ROOT_MISMATCH"
@@ -96,3 +94,22 @@ class RejectionReason(StrEnum):
     # Wire decoding
     DECODE_ERROR = "DECODE_ERROR"
     """The input bytes cannot be decoded into the expected structure."""
+
+
+class SpecRejectionError(AssertionError):
+    """
+    A rejection carrying its language-neutral reason.
+
+    Subclassing the assertion error keeps existing rejection handlers working.
+    """
+
+    def __init__(self, reason: RejectionReason, message: str) -> None:
+        """
+        Bind the rejection to its reason.
+
+        Args:
+            reason: Language-neutral reason clients assert against.
+            message: Human-readable explanation for logs and debugging.
+        """
+        super().__init__(message)
+        self.reason = reason
