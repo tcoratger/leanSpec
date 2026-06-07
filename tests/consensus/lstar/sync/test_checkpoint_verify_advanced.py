@@ -9,7 +9,7 @@ historical_block_hashes path that real checkpoint-sync downloads hit.
 
 import pytest
 
-from consensus_testing import SyncTestFiller
+from consensus_testing import SyncTestFiller, VerifyCheckpoint
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -23,8 +23,7 @@ def test_checkpoint_verify_advanced_slot_three(sync_test: SyncTestFiller) -> Non
     block header. Pins the accepted verdict plus the exact SSZ bytes.
     """
     sync_test(
-        operation="verify_checkpoint",
-        input={"numValidators": 4, "anchorSlot": 3},
+        operation=VerifyCheckpoint(num_validators=4, anchor_slot=3),
     )
 
 
@@ -37,8 +36,7 @@ def test_checkpoint_verify_advanced_slot_ten(sync_test: SyncTestFiller) -> None:
     history than the slot-three case.
     """
     sync_test(
-        operation="verify_checkpoint",
-        input={"numValidators": 4, "anchorSlot": 10},
+        operation=VerifyCheckpoint(num_validators=4, anchor_slot=10),
     )
 
 
@@ -50,6 +48,5 @@ def test_checkpoint_verify_advanced_eight_validators(sync_test: SyncTestFiller) 
     anchor slot so clients diff both axes in a single vector.
     """
     sync_test(
-        operation="verify_checkpoint",
-        input={"numValidators": 8, "anchorSlot": 5},
+        operation=VerifyCheckpoint(num_validators=8, anchor_slot=5),
     )

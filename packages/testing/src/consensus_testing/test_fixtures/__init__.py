@@ -9,28 +9,68 @@ from consensus_testing.test_fixtures.base import (
 )
 from consensus_testing.test_fixtures.fork_choice import ForkChoiceFixture, ForkChoiceTest
 from consensus_testing.test_fixtures.gossipsub_handler import (
+    CachedMessage,
+    GossipsubEvent,
     GossipsubHandlerFixture,
     GossipsubHandlerTest,
+    GossipsubInitialState,
+    GossipsubMeshParameters,
+    IncomingGraft,
+    IncomingIDontWant,
+    IncomingIHave,
+    IncomingIWant,
+    IncomingPrune,
+    IncomingPublish,
+    PeerConfiguration,
 )
 from consensus_testing.test_fixtures.justifiability import (
     JustifiabilityFixture,
     JustifiabilityTest,
 )
 from consensus_testing.test_fixtures.networking_codec import (
+    DecodeFailure,
+    EnrRoundtrip,
+    GossipMessageIdentifier,
+    GossipsubRpcRoundtrip,
+    GossipTopicRoundtrip,
     NetworkingCodecFixture,
     NetworkingCodecTest,
+    PeerIdentifierDerivation,
+    ReqRespRequestRoundtrip,
+    ReqRespResponseRoundtrip,
+    ReqRespResponseStream,
+    ResponseChunkSpec,
+    RpcControlSpec,
+    RpcGraftSpec,
+    RpcIDontWantSpec,
+    RpcIHaveSpec,
+    RpcIWantSpec,
+    RpcMessageSpec,
+    RpcPruneSpec,
+    RpcSubscriptionSpec,
+    SnappyBlockRoundtrip,
+    SnappyFrameRoundtrip,
+    VarintRoundtrip,
 )
 from consensus_testing.test_fixtures.poseidon_permutation import (
     PoseidonPermutationFixture,
     PoseidonPermutationTest,
 )
-from consensus_testing.test_fixtures.slot_clock import SlotClockFixture, SlotClockTest
+from consensus_testing.test_fixtures.slot_clock import (
+    CurrentInterval,
+    CurrentSlot,
+    FromSlot,
+    FromUnixTime,
+    SlotClockFixture,
+    SlotClockTest,
+    TotalIntervals,
+)
 from consensus_testing.test_fixtures.ssz import SSZFixture, SSZTest
 from consensus_testing.test_fixtures.state_transition import (
     StateTransitionFixture,
     StateTransitionTest,
 )
-from consensus_testing.test_fixtures.sync import SyncFixture, SyncTest
+from consensus_testing.test_fixtures.sync import SyncFixture, SyncTest, VerifyCheckpoint
 from consensus_testing.test_fixtures.verify_proofs import (
     DropMessageBinding,
     IncrementEmittedSlot,
@@ -76,6 +116,44 @@ A new format becomes fillable by adding its class here.
 """
 
 __all__ = [
+    "CachedMessage",
+    "GossipsubEvent",
+    "GossipsubInitialState",
+    "GossipsubMeshParameters",
+    "IncomingGraft",
+    "IncomingIDontWant",
+    "IncomingIHave",
+    "IncomingIWant",
+    "IncomingPrune",
+    "IncomingPublish",
+    "PeerConfiguration",
+    "DecodeFailure",
+    "EnrRoundtrip",
+    "GossipMessageIdentifier",
+    "GossipsubRpcRoundtrip",
+    "GossipTopicRoundtrip",
+    "PeerIdentifierDerivation",
+    "ReqRespRequestRoundtrip",
+    "ReqRespResponseRoundtrip",
+    "ReqRespResponseStream",
+    "ResponseChunkSpec",
+    "RpcControlSpec",
+    "RpcGraftSpec",
+    "RpcIDontWantSpec",
+    "RpcIHaveSpec",
+    "RpcIWantSpec",
+    "RpcMessageSpec",
+    "RpcPruneSpec",
+    "RpcSubscriptionSpec",
+    "SnappyBlockRoundtrip",
+    "SnappyFrameRoundtrip",
+    "VarintRoundtrip",
+    "CurrentInterval",
+    "CurrentSlot",
+    "FromSlot",
+    "FromUnixTime",
+    "TotalIntervals",
+    "VerifyCheckpoint",
     "FIXTURE_FORMATS",
     "BaseConsensusFixture",
     "BaseTestSpec",

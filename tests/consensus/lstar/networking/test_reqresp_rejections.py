@@ -8,7 +8,7 @@ peer sends malformed framing.
 
 import pytest
 
-from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from consensus_testing import DecodeFailure, ExpectedRejection, NetworkingCodecTestFiller
 from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -25,8 +25,7 @@ def test_reqresp_decode_rejects_empty_request(
     refuse before any downstream parsing.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "reqresp_request", "bytes": "0x"},
+        codec=DecodeFailure(decoder="reqresp_request", raw_bytes="0x"),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
@@ -42,8 +41,7 @@ def test_reqresp_decode_rejects_invalid_varint_prefix(
     can uniformly treat wire-level framing errors as a single class.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "reqresp_request", "bytes": "0x8080"},
+        codec=DecodeFailure(decoder="reqresp_request", raw_bytes="0x8080"),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
@@ -59,7 +57,6 @@ def test_reqresp_decode_rejects_declared_length_above_max(
     sender from forcing resource allocation proportional to a claimed size.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "reqresp_request", "bytes": "0x81808005"},
+        codec=DecodeFailure(decoder="reqresp_request", raw_bytes="0x81808005"),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

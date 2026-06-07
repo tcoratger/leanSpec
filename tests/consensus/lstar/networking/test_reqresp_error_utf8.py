@@ -2,7 +2,7 @@
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
+from consensus_testing import NetworkingCodecTestFiller, ReqRespResponseRoundtrip
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -20,11 +20,7 @@ def test_reqresp_error_at_max_error_message_size(
     """
     payload = b"e" * 256
     networking_codec_test(
-        codec_name="reqresp_response",
-        input={
-            "responseCode": 1,
-            "sszData": "0x" + payload.hex(),
-        },
+        codec=ReqRespResponseRoundtrip(response_code=1, ssz_data="0x" + payload.hex()),
     )
 
 
@@ -40,11 +36,7 @@ def test_reqresp_error_with_multi_byte_utf8(
     """
     payload = "errür😀fail".encode()
     networking_codec_test(
-        codec_name="reqresp_response",
-        input={
-            "responseCode": 2,
-            "sszData": "0x" + payload.hex(),
-        },
+        codec=ReqRespResponseRoundtrip(response_code=2, ssz_data="0x" + payload.hex()),
     )
 
 
@@ -59,9 +51,5 @@ def test_reqresp_error_resource_unavailable_with_informational_text(
     """
     payload = b"block not found"
     networking_codec_test(
-        codec_name="reqresp_response",
-        input={
-            "responseCode": 3,
-            "sszData": "0x" + payload.hex(),
-        },
+        codec=ReqRespResponseRoundtrip(response_code=3, ssz_data="0x" + payload.hex()),
     )

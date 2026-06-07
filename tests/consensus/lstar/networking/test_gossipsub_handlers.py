@@ -2,12 +2,24 @@
 
 import pytest
 
-from consensus_testing import GossipsubHandlerTestFiller
+from consensus_testing import (
+    CachedMessage,
+    GossipsubEvent,
+    GossipsubHandlerTestFiller,
+    GossipsubInitialState,
+    GossipsubMeshParameters,
+    IncomingGraft,
+    IncomingIHave,
+    IncomingIWant,
+    IncomingPrune,
+    IncomingPublish,
+    PeerConfiguration,
+)
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
 TOPIC = "test_topic"
-PARAMS = {"d": 4, "dLow": 3, "dHigh": 6, "dLazy": 3}
+PARAMS = GossipsubMeshParameters(d=4, d_low=3, d_high=6, d_lazy=3)
 MESSAGE_ID = "0x8dc6bba09a9550cdccb1b1b432bb04919901ce1e"
 """Message ID for topic=b'test_topic', data=0xdeadbeef, invalid-snappy domain."""
 
@@ -23,15 +35,15 @@ def test_graft_accept(gossipsub_handler_test: GossipsubHandlerTestFiller) -> Non
     gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["peerAx"]},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-                "peerBx": {"subscriptions": [TOPIC]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["peerAx"]},
+            peers={
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerBx": PeerConfiguration(subscriptions=[TOPIC]),
             },
-        },
-        event={"fromPeer": "peerBx", "graft": [{"topicId": TOPIC}]},
+        ),
+        event=GossipsubEvent(from_peer="peerBx", graft=[IncomingGraft(topic_id=TOPIC)]),
     )
 
 
@@ -39,18 +51,18 @@ def test_graft_reject_capacity(gossipsub_handler_test: GossipsubHandlerTestFille
     """Reject GRAFT with PRUNE when mesh is at d_high."""
     gossipsub_handler_test(
         handler_name="graft",
-        params={"d": 4, "dLow": 3, "dHigh": 3, "dLazy": 3},
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["peerAx", "peerBx", "peerCx"]},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-                "peerBx": {"subscriptions": [TOPIC]},
-                "peerCx": {"subscriptions": [TOPIC]},
-                "peerDx": {"subscriptions": [TOPIC]},
+        params=GossipsubMeshParameters(d=4, d_low=3, d_high=3, d_lazy=3),
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["peerAx", "peerBx", "peerCx"]},
+            peers={
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerBx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerCx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerDx": PeerConfiguration(subscriptions=[TOPIC]),
             },
-        },
-        event={"fromPeer": "peerDx", "graft": [{"topicId": TOPIC}]},
+        ),
+        event=GossipsubEvent(from_peer="peerDx", graft=[IncomingGraft(topic_id=TOPIC)]),
     )
 
 
@@ -59,15 +71,15 @@ def test_graft_reject_backoff(gossipsub_handler_test: GossipsubHandlerTestFiller
     gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["peerAx"]},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-                "peerBx": {"subscriptions": [TOPIC], "backoff": {TOPIC: 1060.0}},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["peerAx"]},
+            peers={
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerBx": PeerConfiguration(subscriptions=[TOPIC], backoff={TOPIC: 1060.0}),
             },
-        },
-        event={"fromPeer": "peerBx", "graft": [{"topicId": TOPIC}]},
+        ),
+        event=GossipsubEvent(from_peer="peerBx", graft=[IncomingGraft(topic_id=TOPIC)]),
         now=1000.0,
     )
 
@@ -77,14 +89,10 @@ def test_graft_ignore_unsubscribed(gossipsub_handler_test: GossipsubHandlerTestF
     gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [],
-            "meshes": {},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-            },
-        },
-        event={"fromPeer": "peerAx", "graft": [{"topicId": TOPIC}]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[], meshes={}, peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])}
+        ),
+        event=GossipsubEvent(from_peer="peerAx", graft=[IncomingGraft(topic_id=TOPIC)]),
     )
 
 
@@ -93,14 +101,12 @@ def test_graft_idempotent(gossipsub_handler_test: GossipsubHandlerTestFiller) ->
     gossipsub_handler_test(
         handler_name="graft",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["peerAx"]},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-            },
-        },
-        event={"fromPeer": "peerAx", "graft": [{"topicId": TOPIC}]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["peerAx"]},
+            peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])},
+        ),
+        event=GossipsubEvent(from_peer="peerAx", graft=[IncomingGraft(topic_id=TOPIC)]),
     )
 
 
@@ -112,15 +118,15 @@ def test_prune_with_backoff(gossipsub_handler_test: GossipsubHandlerTestFiller) 
     gossipsub_handler_test(
         handler_name="prune",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["peerAx", "peerBx"]},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-                "peerBx": {"subscriptions": [TOPIC]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["peerAx", "peerBx"]},
+            peers={
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerBx": PeerConfiguration(subscriptions=[TOPIC]),
             },
-        },
-        event={"fromPeer": "peerAx", "prune": [{"topicId": TOPIC, "backoff": 60}]},
+        ),
+        event=GossipsubEvent(from_peer="peerAx", prune=[IncomingPrune(topic_id=TOPIC, backoff=60)]),
     )
 
 
@@ -129,14 +135,12 @@ def test_prune_zero_backoff(gossipsub_handler_test: GossipsubHandlerTestFiller) 
     gossipsub_handler_test(
         handler_name="prune",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["peerAx"]},
-            "peers": {
-                "peerAx": {"subscriptions": [TOPIC]},
-            },
-        },
-        event={"fromPeer": "peerAx", "prune": [{"topicId": TOPIC, "backoff": 0}]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["peerAx"]},
+            peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])},
+        ),
+        event=GossipsubEvent(from_peer="peerAx", prune=[IncomingPrune(topic_id=TOPIC, backoff=0)]),
     )
 
 
@@ -148,17 +152,16 @@ def test_ihave_unseen_triggers_iwant(gossipsub_handler_test: GossipsubHandlerTes
     gossipsub_handler_test(
         handler_name="ihave",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {},
-            "peers": {"peerAx": {"subscriptions": [TOPIC]}},
-            "seenMessageIds": [],
-            "cachedMessages": [],
-        },
-        event={
-            "fromPeer": "peerAx",
-            "ihave": [{"topicId": TOPIC, "messageIds": [MESSAGE_ID]}],
-        },
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={},
+            peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])},
+            seen_message_ids=[],
+            cached_messages=[],
+        ),
+        event=GossipsubEvent(
+            from_peer="peerAx", ihave=[IncomingIHave(topic_id=TOPIC, message_ids=[MESSAGE_ID])]
+        ),
     )
 
 
@@ -167,17 +170,16 @@ def test_ihave_seen_no_iwant(gossipsub_handler_test: GossipsubHandlerTestFiller)
     gossipsub_handler_test(
         handler_name="ihave",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {},
-            "peers": {"peerAx": {"subscriptions": [TOPIC]}},
-            "seenMessageIds": [MESSAGE_ID],
-            "cachedMessages": [],
-        },
-        event={
-            "fromPeer": "peerAx",
-            "ihave": [{"topicId": TOPIC, "messageIds": [MESSAGE_ID]}],
-        },
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={},
+            peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])},
+            seen_message_ids=[MESSAGE_ID],
+            cached_messages=[],
+        ),
+        event=GossipsubEvent(
+            from_peer="peerAx", ihave=[IncomingIHave(topic_id=TOPIC, message_ids=[MESSAGE_ID])]
+        ),
     )
 
 
@@ -186,17 +188,17 @@ def test_ihave_mixed(gossipsub_handler_test: GossipsubHandlerTestFiller) -> None
     gossipsub_handler_test(
         handler_name="ihave",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {},
-            "peers": {"peerAx": {"subscriptions": [TOPIC]}},
-            "seenMessageIds": [MESSAGE_ID],
-            "cachedMessages": [],
-        },
-        event={
-            "fromPeer": "peerAx",
-            "ihave": [{"topicId": TOPIC, "messageIds": [MESSAGE_ID, MESSAGE_ID_2]}],
-        },
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={},
+            peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])},
+            seen_message_ids=[MESSAGE_ID],
+            cached_messages=[],
+        ),
+        event=GossipsubEvent(
+            from_peer="peerAx",
+            ihave=[IncomingIHave(topic_id=TOPIC, message_ids=[MESSAGE_ID, MESSAGE_ID_2])],
+        ),
     )
 
 
@@ -208,19 +210,14 @@ def test_iwant_cached_responds(gossipsub_handler_test: GossipsubHandlerTestFille
     gossipsub_handler_test(
         handler_name="iwant",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {},
-            "peers": {"peerAx": {"subscriptions": [TOPIC]}},
-            "seenMessageIds": [],
-            "cachedMessages": [
-                {"topic": TOPIC, "data": "0xdeadbeef", "messageId": MESSAGE_ID},
-            ],
-        },
-        event={
-            "fromPeer": "peerAx",
-            "iwant": [{"messageIds": [MESSAGE_ID]}],
-        },
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={},
+            peers={"peerAx": PeerConfiguration(subscriptions=[TOPIC])},
+            seen_message_ids=[],
+            cached_messages=[CachedMessage(topic=TOPIC, data="0xdeadbeef", message_id=MESSAGE_ID)],
+        ),
+        event=GossipsubEvent(from_peer="peerAx", iwant=[IncomingIWant(message_ids=[MESSAGE_ID])]),
     )
 
 
@@ -232,19 +229,18 @@ def test_message_forward_to_mesh(gossipsub_handler_test: GossipsubHandlerTestFil
     gossipsub_handler_test(
         handler_name="message",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["senderX", "peerAx", "peerBx"]},
-            "peers": {
-                "senderX": {"subscriptions": [TOPIC]},
-                "peerAx": {"subscriptions": [TOPIC]},
-                "peerBx": {"subscriptions": [TOPIC]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["senderX", "peerAx", "peerBx"]},
+            peers={
+                "senderX": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerBx": PeerConfiguration(subscriptions=[TOPIC]),
             },
-        },
-        event={
-            "fromPeer": "senderX",
-            "publish": [{"topic": TOPIC, "data": "0xdeadbeef"}],
-        },
+        ),
+        event=GossipsubEvent(
+            from_peer="senderX", publish=[IncomingPublish(topic=TOPIC, data="0xdeadbeef")]
+        ),
     )
 
 
@@ -255,19 +251,18 @@ def test_message_duplicate_not_forwarded(
     gossipsub_handler_test(
         handler_name="message",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["senderX", "peerAx"]},
-            "peers": {
-                "senderX": {"subscriptions": [TOPIC]},
-                "peerAx": {"subscriptions": [TOPIC]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["senderX", "peerAx"]},
+            peers={
+                "senderX": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC]),
             },
-            "seenMessageIds": [MESSAGE_ID],
-        },
-        event={
-            "fromPeer": "senderX",
-            "publish": [{"topic": TOPIC, "data": "0xdeadbeef"}],
-        },
+            seen_message_ids=[MESSAGE_ID],
+        ),
+        event=GossipsubEvent(
+            from_peer="senderX", publish=[IncomingPublish(topic=TOPIC, data="0xdeadbeef")]
+        ),
     )
 
 
@@ -278,17 +273,16 @@ def test_message_idontwant_skips_peer(
     gossipsub_handler_test(
         handler_name="message",
         params=PARAMS,
-        initial_state={
-            "subscriptions": [TOPIC],
-            "meshes": {TOPIC: ["senderX", "peerAx", "peerBx"]},
-            "peers": {
-                "senderX": {"subscriptions": [TOPIC]},
-                "peerAx": {"subscriptions": [TOPIC], "dontWantIds": [MESSAGE_ID]},
-                "peerBx": {"subscriptions": [TOPIC]},
+        initial_state=GossipsubInitialState(
+            subscriptions=[TOPIC],
+            meshes={TOPIC: ["senderX", "peerAx", "peerBx"]},
+            peers={
+                "senderX": PeerConfiguration(subscriptions=[TOPIC]),
+                "peerAx": PeerConfiguration(subscriptions=[TOPIC], dont_want_ids=[MESSAGE_ID]),
+                "peerBx": PeerConfiguration(subscriptions=[TOPIC]),
             },
-        },
-        event={
-            "fromPeer": "senderX",
-            "publish": [{"topic": TOPIC, "data": "0xdeadbeef"}],
-        },
+        ),
+        event=GossipsubEvent(
+            from_peer="senderX", publish=[IncomingPublish(topic=TOPIC, data="0xdeadbeef")]
+        ),
     )

@@ -29,7 +29,7 @@ def test_permutation_width24_all_zero(
     """
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": ["0"] * WIDTH},
+        input_state=["0"] * WIDTH,
     )
 
 
@@ -39,7 +39,7 @@ def test_permutation_width24_all_one(
     """Input state of all ones exercises uniform non-zero entries at width 24."""
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": ["1"] * WIDTH},
+        input_state=["1"] * WIDTH,
     )
 
 
@@ -49,7 +49,7 @@ def test_permutation_width24_incremental_index(
     """Input state filled with 0, 1, 2, ..., 23 pins per-slot MDS behaviour."""
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": [str(i) for i in range(WIDTH)]},
+        input_state=[str(i) for i in range(WIDTH)],
     )
 
 
@@ -60,5 +60,5 @@ def test_permutation_width24_p_minus_one_and_near_zero(
     state = [str(P - 1) if i % 2 == 0 else str(i) for i in range(WIDTH)]
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": state},
+        input_state=state,
     )
