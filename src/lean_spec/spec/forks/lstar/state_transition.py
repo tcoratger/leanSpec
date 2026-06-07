@@ -132,7 +132,7 @@ class StateTransitionMixin(LstarSpecBase):
         The function returns a new state with slot == target_slot.
 
         Raises:
-            AssertionError: If target_slot is not in the future.
+            SpecRejectionError: BLOCK_SLOT_NOT_IN_FUTURE if target_slot is not in the future.
         """
         # The target must be strictly greater than the current slot.
         if state.slot >= target_slot:
@@ -182,7 +182,8 @@ class StateTransitionMixin(LstarSpecBase):
           - Set latest_block_header for the new block with an empty state_root.
 
         Raises:
-            AssertionError: If any header check fails.
+            SpecRejectionError: If any header check fails (slot mismatch, block older
+                than the latest header, wrong proposer, or parent root mismatch).
         """
         # Validation
         #
@@ -311,8 +312,7 @@ class StateTransitionMixin(LstarSpecBase):
         Apply full block processing including header and body.
 
         Raises:
-            AssertionError: If block contains duplicate aggregated attestations
-                with no unique participant.
+            SpecRejectionError: If header validation fails.
         """
         # First process the block header.
         state = self.process_block_header(state, block)
@@ -573,7 +573,8 @@ class StateTransitionMixin(LstarSpecBase):
         Signatures are verified outside this function, before it is called.
 
         Raises:
-            AssertionError: If the computed state root is invalid.
+            SpecRejectionError: If slot or header validation fails, or STATE_ROOT_MISMATCH
+                if the block's state root does not match the computed post-state root.
         """
         with observe_state_transition():
             # First, process any intermediate slots.
