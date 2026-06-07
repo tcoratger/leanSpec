@@ -262,7 +262,7 @@ class ForkChoiceTest(BaseTestSpec):
         for step_index, step in enumerate(self.steps):
             old_head = store.head
             rejection_reason: RejectionReason | None = None
-            store_snapshot: StoreSnapshot | None = None
+            store_snapshot: StoreSnapshot
             filled_block: Block | None = None
             filled_attestation: SignedAttestation | None = None
             filled_aggregated: SignedAggregatedAttestation | None = None
@@ -380,6 +380,10 @@ class ForkChoiceTest(BaseTestSpec):
 
                 rejection_reason = self._classify_step_rejection(step, step_index, exception)
 
+                # The rejected call returned nothing, so the store is unchanged.
+                # Snapshot it anyway: clients must verify the no-op.
+                store_snapshot = StoreSnapshot.from_store(store)
+
             else:
                 # Handle unexpected success.
                 # If we expected failure but the step succeeded, that's a test bug.
@@ -389,7 +393,7 @@ class ForkChoiceTest(BaseTestSpec):
                     )
 
             # Emit the filled counterpart of this step.
-            # Expected failures keep their built payload but no snapshot.
+            # Expected failures keep their built payload and the unchanged store.
             match step:
                 case TickStep():
                     filled_steps.append(
