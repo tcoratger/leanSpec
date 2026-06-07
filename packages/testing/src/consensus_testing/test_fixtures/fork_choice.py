@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from pydantic import Field
 
-from consensus_testing.genesis import generate_pre_state
+from consensus_testing.genesis import generate_pre_state, genesis_block_for
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.rejection import classify_rejection
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
@@ -23,7 +23,6 @@ from consensus_testing.test_types import (
     StoreSnapshot,
     TickStep,
 )
-from lean_spec.config import LEAN_ENV
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
@@ -34,16 +33,18 @@ from lean_spec.spec.forks import (
     ValidatorIndex,
 )
 from lean_spec.spec.forks.lstar.containers import (
-    AggregatedAttestations,
     AggregationError,
     Block,
-    BlockBody,
     SignedAggregatedAttestation,
     SignedAttestation,
     State,
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
+from lean_spec.spec.ssz import Bytes32
+
+_resynced_anchor_states: dict[tuple[Bytes32, str], State] = {}
+"""Anchor states with validator keys resynced, keyed by state root and key set digest."""
 
 
 class ForkChoiceFixture(BaseConsensusFixture):
@@ -140,17 +141,7 @@ class ForkChoiceTest(BaseTestSpec):
         """
         if self.anchor_block is not None:
             return self.anchor_block
-        # Build a minimal genesis block from the state's header fields.
-        #
-        # The state already contains the block header.
-        # We extract its fields to create a matching Block.
-        return Block(
-            slot=self.anchor_state.latest_block_header.slot,
-            proposer_index=self.anchor_state.latest_block_header.proposer_index,
-            parent_root=self.anchor_state.latest_block_header.parent_root,
-            state_root=hash_tree_root(self.anchor_state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
+        return genesis_block_for(self.anchor_state)
 
     def _resolved_max_slot(self) -> Slot:
         """
@@ -170,7 +161,7 @@ class ForkChoiceTest(BaseTestSpec):
         # Keys must be generated up to this slot before signing.
         for step in self.steps:
             if isinstance(step, BlockStep):
-                max_slot_value = max(max_slot_value, step.block.slot)
+                max_slot_value = max(max_slot_value, step.block.max_referenced_slot())
             elif isinstance(step, AttestationStep):
                 max_slot_value = max(max_slot_value, step.attestation.slot)
             elif isinstance(step, GossipAggregatedAttestationStep):
@@ -215,26 +206,32 @@ class ForkChoiceTest(BaseTestSpec):
         # Test states use placeholder public_keys.
         # We must replace them with the key manager's actual keys.
         # Otherwise signature verification will fail.
-        updated_validators = []
-        for validator_position, validator in enumerate(self.anchor_state.validators):
-            validator_index = ValidatorIndex(validator_position)
-            attestation_public_key, proposal_public_key = key_manager.get_public_keys(
-                validator_index
-            )
-            updated_validators.append(
-                validator.model_copy(
-                    update={
-                        "attestation_public_key": attestation_public_key.encode_bytes(),
-                        "proposal_public_key": proposal_public_key.encode_bytes(),
-                    }
+        # The result is memoized: repeated fills of the same anchor against
+        # the same key set reuse the rebuilt registry instead of recopying it.
+        memo_key = (hash_tree_root(self.anchor_state), key_manager.key_set_digest())
+        anchor_state = _resynced_anchor_states.get(memo_key)
+        if anchor_state is None:
+            updated_validators = []
+            for validator_position, validator in enumerate(self.anchor_state.validators):
+                validator_index = ValidatorIndex(validator_position)
+                attestation_public_key, proposal_public_key = key_manager.get_public_keys(
+                    validator_index
                 )
+                updated_validators.append(
+                    validator.model_copy(
+                        update={
+                            "attestation_public_key": attestation_public_key.encode_bytes(),
+                            "proposal_public_key": proposal_public_key.encode_bytes(),
+                        }
+                    )
+                )
+            anchor_state = self.anchor_state.model_copy(
+                update={"validators": Validators(data=updated_validators)}
             )
+            _resynced_anchor_states[memo_key] = anchor_state
 
         # Updating validators changes the state root.
         # We must also update the anchor block to match.
-        anchor_state = self.anchor_state.model_copy(
-            update={"validators": Validators(data=updated_validators)}
-        )
         anchor_block = anchor_block.model_copy(update={"state_root": hash_tree_root(anchor_state)})
 
         # Store initialization
@@ -295,7 +292,7 @@ class ForkChoiceTest(BaseTestSpec):
                         # Build a complete signed block from the lightweight spec.
                         # The spec contains minimal fields; we fill the rest.
                         signed_block, store = step.block.build_signed_block_with_store(
-                            store, block_registry, key_manager, LEAN_ENV
+                            store, block_registry, key_manager
                         )
                         filled_block = signed_block.block
 

@@ -9,7 +9,7 @@ from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import AggregationBits, SpecRejectionError
+from lean_spec.spec.forks import AggregationBits, Slot, SpecRejectionError
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AggregatedAttestations,
@@ -125,6 +125,13 @@ class StateTransitionTest(BaseTestSpec):
         exception_raised: Exception | None = None
         spec = LstarSpec()
 
+        # Provision XMSS keys once for every slot any block or attestation references.
+        max_slot = max(
+            (block_spec.max_referenced_slot() for block_spec in self.blocks),
+            default=Slot(0),
+        )
+        key_manager = XmssKeyManager.shared(max_slot=max_slot)
+
         # Filled blocks accumulate as we process, even if a later block fails.
         # This ensures the test fixture includes all blocks that were attempted.
         filled_blocks: list[Block] = []
@@ -134,7 +141,9 @@ class StateTransitionTest(BaseTestSpec):
 
             for block_spec in self.blocks:
                 # Build block and optionally get cached post-state to avoid redundant transitions
-                block, cached_state = self._build_block_from_spec(block_spec, state, block_registry)
+                block, cached_state = self._build_block_from_spec(
+                    block_spec, state, block_registry, key_manager
+                )
 
                 # Store the filled Block for serialization
                 filled_blocks.append(block)
@@ -191,6 +200,7 @@ class StateTransitionTest(BaseTestSpec):
         block_spec: BlockSpec,
         state: State,
         block_registry: dict[str, Block],
+        key_manager: XmssKeyManager,
     ) -> tuple[Block, State | None]:
         """
         Build a Block from a BlockSpec, optionally caching the post-state.
@@ -209,6 +219,7 @@ class StateTransitionTest(BaseTestSpec):
             block_spec: Block specification with optional field overrides.
             state: Current state to build against.
             block_registry: Labeled blocks for parent and target resolution.
+            key_manager: Key manager covering every referenced slot.
 
         Returns:
             Block and cached post-state (None if not computed).
@@ -257,7 +268,7 @@ class StateTransitionTest(BaseTestSpec):
             aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
             if block_spec.attestations:
                 aggregated_payloads = StateTransitionTest._build_aggregated_payloads_from_spec(
-                    block_spec.attestations, state, block_registry
+                    block_spec.attestations, state, block_registry, key_manager
                 )
 
             known_block_roots = frozenset(
@@ -300,12 +311,13 @@ class StateTransitionTest(BaseTestSpec):
                 }
             )
 
-            # The body changed, so re-run the transition to get the correct
-            # post-state and state root.
+            # The body changed, so recompute the root and re-derive the
+            # post-state through the public transition a client runs.
             if post_state is not None:
                 post_state = fork.process_slots(state, block_spec.slot)
                 post_state = fork.process_block(post_state, block)
                 block = block.model_copy(update={"state_root": hash_tree_root(post_state)})
+                post_state = fork.state_transition(state, block=block)
 
         return block, post_state
 
@@ -314,6 +326,7 @@ class StateTransitionTest(BaseTestSpec):
         attestation_specs: list[AggregatedAttestationSpec],
         state: State,
         block_registry: dict[str, Block],
+        key_manager: XmssKeyManager,
     ) -> dict[AttestationData, set[SingleMessageAggregate]]:
         """
         Build aggregated signature payloads from attestation specifications.
@@ -322,14 +335,11 @@ class StateTransitionTest(BaseTestSpec):
             attestation_specs: Attestation specifications from the block spec.
             state: Current state for source checkpoint lookup.
             block_registry: Labels to blocks for resolving target roots.
+            key_manager: Key manager covering every referenced slot.
 
         Returns:
             Aggregated payloads keyed by attestation data.
         """
-        # Compute max slot across all attestation specs for XMSS key lifetime.
-        # XMSS keys require precomputation up to the highest slot used.
-        max_slot = max(spec.slot for spec in attestation_specs)
-        key_manager = XmssKeyManager.shared(max_slot=max_slot)
         payloads: dict[AttestationData, set[SingleMessageAggregate]] = {}
 
         for spec in attestation_specs:

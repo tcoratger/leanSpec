@@ -64,6 +64,19 @@ def generate_pre_state(
     return fork.generate_genesis(genesis_time=genesis_time, validators=validators)
 
 
+def genesis_block_for(state: State) -> Block:
+    """Reconstruct the slot-zero block fully determined by a genesis state."""
+    # The genesis block is determined entirely by the state's stored header.
+    # Its state root is the root of the state it produced.
+    return Block(
+        slot=state.latest_block_header.slot,
+        proposer_index=state.latest_block_header.proposer_index,
+        parent_root=state.latest_block_header.parent_root,
+        state_root=hash_tree_root(state),
+        body=BlockBody(attestations=AggregatedAttestations(data=[])),
+    )
+
+
 def build_anchor(
     num_validators: int,
     anchor_slot: Slot,
@@ -105,16 +118,7 @@ def build_anchor(
     fork = fork or LstarSpec()
     state = generate_pre_state(fork=fork, genesis_time=genesis_time, num_validators=num_validators)
 
-    # Reconstruct the genesis block from the state's latest header.
-    # The genesis block is fully determined by the genesis state.
-    genesis_block = Block(
-        slot=state.latest_block_header.slot,
-        proposer_index=state.latest_block_header.proposer_index,
-        parent_root=state.latest_block_header.parent_root,
-        state_root=hash_tree_root(state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
-    current_block = genesis_block
+    current_block = genesis_block_for(state)
     parent_root = hash_tree_root(current_block)
 
     num_validators_u64 = Uint64(num_validators)
@@ -125,7 +129,7 @@ def build_anchor(
     # justification tracking) that a real mid-chain state would have.
     for next_slot in range(1, int(anchor_slot) + 1):
         slot = Slot(next_slot)
-        proposer_index = ValidatorIndex(int(slot) % int(num_validators_u64))
+        proposer_index = ValidatorIndex.proposer_for_slot(slot, num_validators_u64)
         current_block, state, _, _ = fork.build_block(
             state,
             slot=slot,

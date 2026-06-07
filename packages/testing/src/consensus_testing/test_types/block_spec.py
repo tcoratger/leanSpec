@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 from collections import defaultdict
 
+from consensus_testing.genesis import genesis_block_for
 from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 from consensus_testing.test_types.attestation_specs import AggregatedAttestationSpec
 from lean_spec.base import CamelModel
@@ -26,7 +27,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Store,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
 
 
 class BlockSpec(CamelModel):
@@ -128,8 +129,20 @@ class BlockSpec(CamelModel):
     """
 
     def resolve_proposer_index(self, num_validators: int) -> ValidatorIndex:
-        """Return the proposer index, falling back to round-robin by slot."""
-        return self.proposer_index or ValidatorIndex(int(self.slot) % num_validators)
+        """Return the pinned proposer index, or the spec's scheduled proposer."""
+        if self.proposer_index is not None:
+            return self.proposer_index
+        return ValidatorIndex.proposer_for_slot(self.slot, Uint64(num_validators))
+
+    def max_referenced_slot(self) -> Slot:
+        """Return the highest slot this block or any attestation it carries needs keys for."""
+        # XMSS keys are slot-bound.
+        # Every signed message under this block must be covered.
+        attestation_slots = [attestation_spec.slot for attestation_spec in self.attestations or []]
+        forced_attestation_slots = [
+            forced_attestation.slot for forced_attestation in self.forced_attestations or []
+        ]
+        return max([self.slot, *attestation_slots, *forced_attestation_slots])
 
     def resolve_parent_root(
         self,
@@ -339,14 +352,7 @@ class BlockSpec(CamelModel):
         proposer_index = self.resolve_proposer_index(len(state.validators))
 
         # Build a genesis block registry so attestation specs can resolve labels.
-        anchor_block = Block(
-            slot=state.latest_block_header.slot,
-            proposer_index=state.latest_block_header.proposer_index,
-            parent_root=state.latest_block_header.parent_root,
-            state_root=hash_tree_root(state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
-        block_registry: dict[str, Block] = {"genesis": anchor_block}
+        block_registry: dict[str, Block] = {"genesis": genesis_block_for(state)}
 
         # Resolve the parent root.
         # The default is the latest block header from the slot-advanced state.
@@ -435,7 +441,6 @@ class BlockSpec(CamelModel):
         store: Store,
         block_registry: dict[str, Block],
         key_manager: XmssKeyManager,
-        lean_env: str,
     ) -> tuple[SignedBlock, Store]:
         """
         Build a complete signed block through the Store's attestation pipeline.
@@ -443,27 +448,28 @@ class BlockSpec(CamelModel):
         Simulates what a real node does when proposing a block.
         Replays the gossip, aggregation, and proposal pipeline through the Store.
 
-        Returns a Store enriched with the aggregated single-message aggregate payloads built
-        during the simulated pipeline. The caller can persist these so future
-        block builds can re-aggregate the same attestations rather than
-        reconstructing them from on-chain block bodies (which would require
-        splitting the block-level multi-message aggregate proof — a heavy and, in the test
-        recursive-aggregation mode, unreliable operation). Other fields of
-        the original Store (gossip signatures, time, head, etc.) are
-        preserved so the simulated build does not consume state the caller
-        is tracking separately.
+        Returns a Store enriched with the aggregated single-message aggregate
+        payloads built during the simulated pipeline.
+        The caller persists these so future block builds can re-aggregate the
+        same attestations without splitting the block-level merged proof.
+
+        Why the payloads merge into the known pool directly: a real node
+        recovers them through the sync layer's deconstruct-on-import path,
+        which defers acceptance by one tick.
+        The harness keeps them immediately known so a block authored for the
+        very next slot can already build on them.
 
         Args:
             store: Fork choice store for head state lookup and gossip processing.
             block_registry: Labeled blocks for fork creation.
             key_manager: Key manager for signing.
-            lean_env: Signature scheme environment name ("test" or "prod").
 
         Returns:
             The signed block and the Store with new known payloads merged in.
         """
         spec = LstarSpec()
-        proposer_index = self.resolve_proposer_index(len(store.states[store.head].validators))
+        num_validators = len(store.states[store.head].validators)
+        proposer_index = self.resolve_proposer_index(num_validators)
 
         # Resolve parent block.
         # Parent can be specified by label (for forks) or defaults to head.
@@ -516,22 +522,35 @@ class BlockSpec(CamelModel):
                 is_aggregator=True,
             )
 
-        # Trigger Store aggregation to merge gossip signatures into known payloads.
+        # Trigger Store aggregation to merge gossip signatures into payloads.
         # Aggregation runs on a local clone: gossip pools mutate here, but the
         # caller's gossip-signature view must not be consumed by this simulated
         # build. Only the freshly aggregated single-message aggregate payloads propagate back.
         aggregation_store, _ = spec.aggregate(store)
-        merged_store = spec.accept_new_attestations(aggregation_store)
 
-        # Build the block through the spec's State.build_block().
-        final_block, _, _, block_proofs = spec.build_block(
-            parent_state,
-            slot=self.slot,
-            proposer_index=proposer_index,
-            parent_root=parent_root,
-            known_block_roots=set(store.blocks.keys()),
-            aggregated_payloads=merged_store.latest_known_aggregated_payloads,
-        )
+        # A real proposer builds on the canonical head as the scheduled validator.
+        scheduled_proposer = ValidatorIndex.proposer_for_slot(self.slot, Uint64(num_validators))
+        if parent_root == store.head and proposer_index == scheduled_proposer:
+            # Honest-node path: the spec's propose entry advances the clock,
+            # accepts pending attestations, checks proposer authorization,
+            # builds the block, and enforces the justified-divergence invariant.
+            # Its persistence lands on the throwaway clone and is discarded;
+            # the real import happens later through on_block.
+            merged_store, final_block, block_proofs = spec.produce_block_with_signatures(
+                aggregation_store, self.slot, proposer_index
+            )
+        else:
+            # Fork building or a pinned non-scheduled proposer.
+            # No honest node proposes here, so the propose entry cannot apply.
+            merged_store = spec.accept_new_attestations(aggregation_store)
+            final_block, _, _, block_proofs = spec.build_block(
+                parent_state,
+                slot=self.slot,
+                proposer_index=proposer_index,
+                parent_root=parent_root,
+                known_block_roots=set(store.blocks.keys()),
+                aggregated_payloads=merged_store.latest_known_aggregated_payloads,
+            )
 
         # Merge new known payloads (built locally) back into the caller's
         # store while leaving every other field untouched.
@@ -574,10 +593,12 @@ class BlockSpec(CamelModel):
                     }
                 )
 
-            # Recompute state root with the modified body.
+            # Recompute the state root with the modified body, then replay the
+            # public transition a client runs so the stamped root is validated.
             post_state = spec.process_slots(parent_state, self.slot)
             post_state = spec.process_block(post_state, final_block)
             final_block = final_block.model_copy(update={"state_root": hash_tree_root(post_state)})
+            spec.state_transition(parent_state, block=final_block)
 
         signed_block = self._sign_block(
             final_block, block_proofs, proposer_index, key_manager, parent_state
