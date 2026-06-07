@@ -394,7 +394,7 @@ class ForkChoiceMixin(LstarSpecBase):
             for validator_index in validator_indices
         ]
 
-        # Verify the single-message aggregate single-message aggregated proof.
+        # Verify the single-message aggregate proof.
         try:
             aggregated_proof.verify(
                 public_keys=public_keys,
