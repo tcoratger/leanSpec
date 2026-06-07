@@ -317,17 +317,17 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # Phase 3: finish each chain from the released hash to its endpoint.
         chain_ends: list[HashDigestVector] = []
-        for chain_index, xi in enumerate(codeword):
-            # The signature provides the digest after xi steps along the chain.
-            # We hash the remaining BASE - 1 - xi times to reach the endpoint.
+        for chain_index, digit in enumerate(codeword):
+            # The signature provides the digest after digit steps along the chain.
+            # We hash the remaining BASE - 1 - digit times to reach the endpoint.
             start_digest = signature.hashes[chain_index]
             end_digest = self.poseidon.hash_chain(
                 config=config,
                 parameter=public_key.parameter,
                 epoch=slot,
                 chain_index=chain_index,
-                start_step=xi,
-                num_steps=config.BASE - 1 - xi,
+                start_step=digit,
+                num_steps=config.BASE - 1 - digit,
                 start_digest=start_digest,
             )
             chain_ends.append(end_digest)
