@@ -359,10 +359,6 @@ def test_produce_block_includes_pending_attestations(
     - Covers validators {1, 2}
     - Target slot 2
     """
-    # The same scenario, authored through the fluent builder.
-    # Each block carries its head check; the gossiped aggregate is delivered
-    # between ticks; the final block reads the pending pool with no explicit
-    # attestation spec.
     fork_choice_test(
         steps=(
             ForkChoiceScenario()
