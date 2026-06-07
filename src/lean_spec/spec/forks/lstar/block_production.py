@@ -3,6 +3,7 @@
 from collections.abc import Set as AbstractSet
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks.lstar._base import LstarSpecBase
 from lean_spec.spec.forks.lstar.aggregation import select_proofs_for_coverage
 from lean_spec.spec.forks.lstar.config import (
@@ -245,7 +246,9 @@ class BlockProductionMixin(LstarSpecBase):
                         (
                             proof,
                             [
-                                state.validators[validator_index].get_attestation_public_key()
+                                PublicKey.decode_bytes(
+                                    bytes(state.validators[validator_index].attestation_public_key)
+                                )
                                 for validator_index in proof.participants.to_validator_indices()
                             ],
                         )

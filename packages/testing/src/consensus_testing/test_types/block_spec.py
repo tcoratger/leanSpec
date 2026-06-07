@@ -9,7 +9,7 @@ from consensus_testing.keys import XmssKeyManager, create_dummy_signature
 from consensus_testing.test_types.attestation_specs import AggregatedAttestationSpec
 from lean_spec.base import CamelModel
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.crypto.xmss.containers import Signature
+from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.spec.forks import AggregationBits, Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
@@ -299,7 +299,9 @@ class BlockSpec(CamelModel):
 
             public_keys_per_aggregate: list[list] = [
                 [
-                    state.validators[validator_index].get_attestation_public_key()
+                    PublicKey.decode_bytes(
+                        bytes(state.validators[validator_index].attestation_public_key)
+                    )
                     for validator_index in attestation_proof.participants.to_validator_indices()
                 ]
                 for attestation_proof in attestation_proofs

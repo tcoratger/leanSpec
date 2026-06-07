@@ -33,11 +33,7 @@ class AggregatedAttestation(Container):
     """Bitfield indicating which validators participated in the aggregation."""
 
     data: AttestationData
-    """Combined attestation data similar to the beacon chain format.
-
-    Multiple validator attestations are aggregated here without the complexity of
-    committee assignments.
-    """
+    """Attestation data common to every validator in the aggregate."""
 
 
 class SignedAggregatedAttestation(Container):
@@ -48,7 +44,7 @@ class SignedAggregatedAttestation(Container):
     """
 
     data: AttestationData
-    """Combined attestation data similar to the beacon chain format."""
+    """Attestation data common to every validator in the aggregate."""
 
     proof: SingleMessageAggregate
     """Aggregated single-message proof covering all participating validators."""

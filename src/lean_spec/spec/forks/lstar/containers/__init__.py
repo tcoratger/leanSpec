@@ -6,7 +6,8 @@ The types are split across submodules by domain role:
 
 - interval, identifiers, participation: scalar units and registry index sets
 - aggregation: post-quantum signature aggregation proofs
-- validator: genesis configuration and the validator registry
+- genesis: chain configuration committed into the state
+- validator: the validator registry
 - checkpoint: Casper-FFG checkpoints and the attestation vote they anchor
 - attestation, block: vote envelopes and the blocks that carry them
 - state, store: per-block consensus state and the node's fork-choice view
@@ -32,6 +33,7 @@ from lean_spec.spec.forks.lstar.containers.block import (
     SignedBlock,
 )
 from lean_spec.spec.forks.lstar.containers.checkpoint import AttestationData, Checkpoint
+from lean_spec.spec.forks.lstar.containers.genesis import GenesisConfig
 from lean_spec.spec.forks.lstar.containers.identifiers import (
     SubnetId,
     ValidatorIndex,
@@ -48,7 +50,6 @@ from lean_spec.spec.forks.lstar.containers.state import (
 )
 from lean_spec.spec.forks.lstar.containers.store import AttestationSignatureEntry, Store
 from lean_spec.spec.forks.lstar.containers.validator import (
-    GenesisConfig,
     Validator,
     Validators,
 )

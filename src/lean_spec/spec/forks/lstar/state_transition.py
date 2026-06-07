@@ -476,11 +476,15 @@ class StateTransitionMixin(LstarSpecBase):
                 # drag latest_justified backwards.
                 if target.slot > latest_justified.slot:
                     latest_justified = target
-                justified_slots = justified_slots.with_justified(
-                    finalized_slot,
-                    target.slot,
-                    Boolean(True),
-                )
+
+                # The justifiable filter above guarantees an in-range index.
+                justified_index = target.slot.justified_index_after(finalized_slot)
+                assert justified_index is not None
+
+                # Rebind to a copy so the pre-state bitfield is never mutated.
+                updated_justified_bits = list(justified_slots.data)
+                updated_justified_bits[justified_index] = Boolean(True)
+                justified_slots = JustifiedSlots(data=updated_justified_bits)
 
                 # There is no longer any need to track individual votes for this block.
                 del justifications[target.root]
@@ -516,7 +520,7 @@ class StateTransitionMixin(LstarSpecBase):
                     # is now finalized (latest <= finalized_slot).
                     delta = int(finalized_slot - old_finalized_slot)
                     if delta > 0:
-                        justified_slots = justified_slots.shift_window(delta)
+                        justified_slots = JustifiedSlots(data=justified_slots.data[delta:])
                         assert all(root in root_to_slot for root in justifications), (
                             "Justification root missing from root_to_slot"
                         )
