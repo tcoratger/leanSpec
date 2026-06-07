@@ -1,20 +1,10 @@
-"""Tests for the GenesisConfig and Validator containers."""
+"""Tests for the Validator containers."""
 
 import pytest
 from pydantic import ValidationError
 
-from lean_spec.spec.forks.lstar.containers import GenesisConfig, Validator
-from lean_spec.spec.ssz import Bytes52, Uint64
-
-
-class TestGenesisConfigImmutability:
-    """Frozen-model semantics forbid post-construction mutation."""
-
-    def test_assigning_genesis_time_raises(self) -> None:
-        """Assigning a new genesis time on a constructed config raises."""
-        config = GenesisConfig(genesis_time=Uint64(1_700_000_000))
-        with pytest.raises(ValidationError, match="frozen"):
-            config.genesis_time = Uint64(1_700_000_001)
+from lean_spec.spec.forks.lstar.containers import Validator
+from lean_spec.spec.ssz import Bytes52
 
 
 class TestValidatorImmutability:

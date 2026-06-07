@@ -15,12 +15,7 @@ class BlockBody(Container):
 
 
 class BlockHeader(Container):
-    """
-    Metadata summarizing a block.
-
-    Contains parent reference, state root, and body hash.
-    Smaller than full blocks.
-    """
+    """Metadata summarizing a block without its body."""
 
     slot: Slot
     """The slot in which the block was proposed."""
@@ -32,7 +27,7 @@ class BlockHeader(Container):
     """The root of the parent block."""
 
     state_root: Bytes32
-    """The root of the state after applying transactions in this block."""
+    """The root of the state after applying this block."""
 
     body_root: Bytes32
     """The root of the block body."""
@@ -51,7 +46,7 @@ class Block(Container):
     """The root of the parent block."""
 
     state_root: Bytes32
-    """The root of the state after applying transactions in this block."""
+    """The root of the state after applying this block."""
 
     body: BlockBody
     """The block's payload."""
@@ -61,9 +56,8 @@ class SignedBlock(Container):
     """
     Envelope carrying a block with a single aggregated proof for all signatures.
 
-    The proof is a multi-message aggregate multi-message proof.
-    It binds every attestation in the body plus the proposer's signature
-    over the block root.
+    The single proof binds every attestation in the body.
+    It also binds the proposer signature over the block root.
     """
 
     block: Block

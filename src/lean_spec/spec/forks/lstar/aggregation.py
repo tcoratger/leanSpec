@@ -1,6 +1,7 @@
 """Lstar fork — attestation aggregation."""
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks.lstar._base import LstarSpecBase, LstarStore
 from lean_spec.spec.forks.lstar.containers import (
     SignedAggregatedAttestation,
@@ -141,7 +142,9 @@ class AggregationMixin(LstarSpecBase):
             raw_signatures = [
                 (
                     signature_entry.validator_index,
-                    validators[signature_entry.validator_index].get_attestation_public_key(),
+                    PublicKey.decode_bytes(
+                        bytes(validators[signature_entry.validator_index].attestation_public_key)
+                    ),
                     signature_entry.signature,
                 )
                 for signature_entry in sorted(
@@ -171,7 +174,9 @@ class AggregationMixin(LstarSpecBase):
                 (
                     child_proof,
                     [
-                        validators[validator_index].get_attestation_public_key()
+                        PublicKey.decode_bytes(
+                            bytes(validators[validator_index].attestation_public_key)
+                        )
                         for validator_index in child_proof.participants.to_validator_indices()
                     ],
                 )

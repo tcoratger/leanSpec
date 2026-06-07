@@ -558,12 +558,18 @@ class SyncService:
         for attestation in block_attestations:
             public_keys_per_message.append(
                 [
-                    validators[validator_index].get_attestation_public_key()
+                    PublicKey.decode_bytes(
+                        bytes(validators[validator_index].attestation_public_key)
+                    )
                     for validator_index in attestation.aggregation_bits.to_validator_indices()
                 ]
             )
         public_keys_per_message.append(
-            [validators[block.block.proposer_index].get_proposal_public_key()]
+            [
+                PublicKey.decode_bytes(
+                    bytes(validators[block.block.proposer_index].proposal_public_key)
+                )
+            ]
         )
 
         # Index local partial single-message aggregate proofs by AttestationData root. Equivalent
@@ -620,7 +626,9 @@ class SyncService:
                             (
                                 child,
                                 [
-                                    validators[validator_index].get_attestation_public_key()
+                                    PublicKey.decode_bytes(
+                                        bytes(validators[validator_index].attestation_public_key)
+                                    )
                                     for validator_index in child.participants.to_validator_indices()
                                 ],
                             )

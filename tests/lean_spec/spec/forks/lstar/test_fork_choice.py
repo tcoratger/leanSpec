@@ -8,6 +8,7 @@ from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 
 from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry, Store
 from lean_spec.spec.forks.lstar.config import (
@@ -1573,7 +1574,9 @@ class TestIntegrationScenarios:
         head_state = store.states[store.head]
         public_keys_per_aggregate: list[list] = [
             [
-                head_state.validators[validator_index].get_attestation_public_key()
+                PublicKey.decode_bytes(
+                    bytes(head_state.validators[validator_index].attestation_public_key)
+                )
                 for validator_index in proof.participants.to_validator_indices()
             ]
             for proof in signatures

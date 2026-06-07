@@ -67,7 +67,9 @@ class SignatureMixin(LstarSpecBase):
 
             public_keys_per_message.append(
                 [
-                    validators[validator_index].get_attestation_public_key()
+                    PublicKey.decode_bytes(
+                        bytes(validators[validator_index].attestation_public_key)
+                    )
                     for validator_index in validator_indices
                 ]
             )
@@ -89,7 +91,9 @@ class SignatureMixin(LstarSpecBase):
                 RejectionReason.PROPOSER_INDEX_OUT_OF_RANGE, "Proposer index out of range"
             )
 
-        public_keys_per_message.append([validators[proposer_index].get_proposal_public_key()])
+        public_keys_per_message.append(
+            [PublicKey.decode_bytes(bytes(validators[proposer_index].proposal_public_key))]
+        )
         message_bindings.append((hash_tree_root(block), block.slot))
 
         try:

@@ -5,7 +5,8 @@ from typing import Self
 from lean_spec.spec.forks.lstar.config import HISTORICAL_ROOTS_LIMIT, VALIDATOR_REGISTRY_LIMIT
 from lean_spec.spec.forks.lstar.containers.block import BlockHeader
 from lean_spec.spec.forks.lstar.containers.checkpoint import Checkpoint
-from lean_spec.spec.forks.lstar.containers.validator import GenesisConfig, Validators
+from lean_spec.spec.forks.lstar.containers.genesis import GenesisConfig
+from lean_spec.spec.forks.lstar.containers.validator import Validators
 from lean_spec.spec.forks.lstar.slot import Slot
 from lean_spec.spec.ssz import Boolean, Bytes32, Container, SSZList
 from lean_spec.spec.ssz.bitfields import BaseBitlist
@@ -66,63 +67,11 @@ class JustifiedSlots(BaseBitlist):
                 f"(finalized_boundary={finalized_slot}, tracked_length={len(self)})"
             ) from e
 
-    def with_justified(
-        self,
-        finalized_slot: Slot,
-        target_slot: Slot,
-        value: Boolean,
-    ) -> Self:
-        """
-        Return a new bitfield with the justification status updated.
-
-        This method follows the immutable pattern:
-        - Returns 'self' if the slot is finalized (immutable).
-        - Returns a clone with the specific bit updated for active slots.
-
-        Args:
-            finalized_slot: The anchor point for the tracking window.
-            target_slot: The slot to update.
-            value: The new justification status.
-
-        Returns:
-            A new, updated JustifiedSlots instance.
-
-        Raises:
-            IndexError: If the target slot is active but outside the tracked range.
-        """
-        # Determine the position of the target relative to the anchor.
-        #
-        # If the slot is behind the finalized boundary, we return 'self' unchanged.
-        # We cannot modify the status of finalized history, and treating it as a
-        # no-op preserves the immutability of the conceptual chain history.
-        if (relative_index := target_slot.justified_index_after(finalized_slot)) is None:
-            return self
-
-        # Ensure we are not trying to write to a future slot that does not exist
-        # in our tracking list yet. The state must be explicitly extended first.
-        if relative_index >= len(self):
-            raise IndexError(
-                f"Slot {target_slot} is outside the tracked range "
-                f"(finalized_boundary={finalized_slot}, tracked_length={len(self)})"
-            )
-
-        # Clone and update in one smooth operation.
-        #
-        # 1. Create a shallow copy of the data list to avoid mutating the original.
-        # 2. Update the specific bit in the copy.
-        # 3. Construct a new instance with the updated data.
-        new_data = list(self.data)
-        new_data[relative_index] = value
-
-        return type(self)(data=new_data)
-
     def extend_to_slot(self, finalized_slot: Slot, target_slot: Slot) -> Self:
         """
         Extend the tracking capacity to cover a new target slot.
 
-        This prepares the state to process a new block by ensuring the
-        bitfield is long enough to store its justification status.
-        Gaps are filled with False (unjustified).
+        Slots between the old end and the target are filled with False.
 
         Args:
             finalized_slot: The anchor point for the tracking window.
@@ -131,10 +80,7 @@ class JustifiedSlots(BaseBitlist):
         Returns:
             A new instance with sufficient capacity.
         """
-        # Calculate the index required to store the status of the target.
-        #
-        # If the target is already finalized, no extension is needed because
-        # we don't track finalized data.
+        # A finalized target has no tracked index, so nothing to extend.
         if (relative_index := target_slot.justified_index_after(finalized_slot)) is None:
             return self
 
@@ -151,32 +97,12 @@ class JustifiedSlots(BaseBitlist):
         # We extend the existing data with False values to bridge the gap.
         return type(self)(data=list(self.data) + [Boolean(False)] * gap_size)
 
-    def shift_window(self, delta: int) -> Self:
-        """
-        Advance the tracking window by dropping slots that became finalized.
-
-        A non-positive delta keeps the tracking window unchanged.
-        """
-        # If the boundary hasn't moved forward, the window stays the same.
-        if delta <= 0:
-            return self
-
-        # Return a new instance containing only the relevant subset of data.
-        return type(self)(data=self.data[delta:])
-
 
 class JustificationValidators(BaseBitlist):
-    """
-    Per-root validator vote bitfields, concatenated into one flat bitlist.
-
-    Each tracked root contributes one bit per registered validator.
-    The cap is the maximum tracked roots times the validator registry limit.
-
-    Why this product: a larger cap inflates the bitlist's merkle tree depth.
-    That changes the state root for identical data, so this limit is consensus-critical.
-    """
+    """Per-root validator vote bitfields, concatenated into one flat bitlist."""
 
     LIMIT = int(HISTORICAL_ROOTS_LIMIT) * int(VALIDATOR_REGISTRY_LIMIT)
+    """One bit per tracked-root and registered-validator pair."""
 
 
 class State(Container):

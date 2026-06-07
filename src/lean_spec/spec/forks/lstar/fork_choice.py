@@ -4,6 +4,7 @@ import math
 from collections import defaultdict
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.forks.lstar._base import LstarSpecBase, LstarStore
 from lean_spec.spec.forks.lstar.config import (
@@ -319,7 +320,9 @@ class ForkChoiceMixin(LstarSpecBase):
                     f"Validator {validator_index} not found in state "
                     f"{attestation_data.target.root.hex()}",
                 )
-            public_key = key_state.validators[validator_index].get_attestation_public_key()
+            public_key = PublicKey.decode_bytes(
+                bytes(key_state.validators[validator_index].attestation_public_key)
+            )
 
             if not TARGET_SIGNATURE_SCHEME.verify(
                 public_key, attestation_data.slot, hash_tree_root(attestation_data), signature
@@ -388,7 +391,7 @@ class ForkChoiceMixin(LstarSpecBase):
 
         # Prepare public keys for verification
         public_keys = [
-            validators[validator_index].get_attestation_public_key()
+            PublicKey.decode_bytes(bytes(validators[validator_index].attestation_public_key))
             for validator_index in validator_indices
         ]
 

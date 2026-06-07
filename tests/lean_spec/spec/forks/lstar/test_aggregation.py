@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.merkleization import hash_tree_root
+from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import AttestationSignatureEntry
 from lean_spec.spec.forks.lstar.aggregation import select_proofs_for_coverage
@@ -499,7 +500,10 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     }
 
     public_keys = [
-        head_state.validators[ValidatorIndex(i)].get_attestation_public_key() for i in range(2)
+        PublicKey.decode_bytes(
+            bytes(head_state.validators[ValidatorIndex(i)].attestation_public_key)
+        )
+        for i in range(2)
     ]
     aggregated_attestations[0].proof.verify(
         public_keys=public_keys,

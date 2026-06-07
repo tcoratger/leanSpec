@@ -22,7 +22,7 @@ from lean_spec.node.sync.service import SyncService
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.constants import TARGET_CONFIG
-from lean_spec.spec.crypto.xmss.containers import Signature
+from lean_spec.spec.crypto.xmss.containers import PublicKey, Signature
 from lean_spec.spec.crypto.xmss.types import (
     HashDigestList,
     HashDigestVector,
@@ -464,12 +464,16 @@ def make_signed_block_from_store(
     head_state = new_store.states[new_store.head]
     public_keys_per_aggregate: list[list] = [
         [
-            head_state.validators[validator_index].get_attestation_public_key()
+            PublicKey.decode_bytes(
+                bytes(head_state.validators[validator_index].attestation_public_key)
+            )
             for validator_index in attestation_proof.participants.to_validator_indices()
         ]
         for attestation_proof in attestation_proofs
     ]
-    proposer_public_key = head_state.validators[proposer_index].get_proposal_public_key()
+    proposer_public_key = PublicKey.decode_bytes(
+        bytes(head_state.validators[proposer_index].proposal_public_key)
+    )
     public_keys_per_aggregate.append([proposer_public_key])
 
     proposer_signature = key_manager.sign_block_root(proposer_index, slot, block_root)
