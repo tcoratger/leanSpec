@@ -57,8 +57,7 @@ class Slot(Uint64):
         # Convert to int for pure arithmetic operations below.
         delta = int(self - finalized_slot)
 
-        # Pronic check uses the discriminant 4*delta + 1, computed once.
-        # For pronic delta = n(n+1) this equals (2n+1)^2, an odd perfect square.
+        # Compute the pronic discriminant and its integer square root once.
         pronic_discriminant = 4 * delta + 1
         discriminant_root = math.isqrt(pronic_discriminant)
 
@@ -75,6 +74,8 @@ class Slot(Uint64):
             # Rule 3: Slots at pronic number distances are justifiable.
             #
             # Pronic numbers have the form n(n+1): 2, 6, 12, 20, 30, 42, 56, ...
-            # Check: the discriminant is an odd perfect square.
+            # Mathematical insight: For pronic delta = n(n+1), we have:
+            #   4*delta + 1 = 4n(n+1) + 1 = (2n+1)^2
+            # Check: 4*delta+1 is an odd perfect square
             or (discriminant_root**2 == pronic_discriminant and discriminant_root % 2 == 1)
         )
