@@ -127,7 +127,7 @@ class BaseBitvector(SSZModel):
         """
         # Build the packed bits as one integer, then split into little-endian bytes.
         packed_bits = sum(1 << i for i, bit in enumerate(self.data) if bit)
-        return packed_bits.to_bytes(math.ceil(self.LENGTH / 8), "little")
+        return packed_bits.to_bytes(self.get_byte_length(), "little")
 
     @classmethod
     @override
