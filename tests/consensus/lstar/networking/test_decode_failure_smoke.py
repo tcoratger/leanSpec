@@ -7,7 +7,7 @@ independently of later negative-path content PRs.
 
 import pytest
 
-from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from consensus_testing import DecodeFailure, ExpectedRejection, NetworkingCodecTestFiller
 from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -21,7 +21,6 @@ def test_decode_failure_varint_truncated(networking_codec_test: NetworkingCodecT
     networking_codec fixture.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "varint", "bytes": "0x80"},
+        codec=DecodeFailure(decoder="varint", raw_bytes="0x80"),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

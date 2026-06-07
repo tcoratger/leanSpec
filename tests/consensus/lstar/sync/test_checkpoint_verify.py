@@ -9,7 +9,7 @@ store.
 
 import pytest
 
-from consensus_testing import SyncTestFiller
+from consensus_testing import SyncTestFiller, VerifyCheckpoint
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -25,8 +25,7 @@ def test_checkpoint_verify_rejects_empty_validator_set(
     errors. Clients must refuse the anchor before any store setup.
     """
     sync_test(
-        operation="verify_checkpoint",
-        input={"numValidators": 0},
+        operation=VerifyCheckpoint(num_validators=0),
     )
 
 
@@ -41,8 +40,7 @@ def test_checkpoint_verify_accepts_small_validator_set(
     the accepted branch in addition to the rejection branch above.
     """
     sync_test(
-        operation="verify_checkpoint",
-        input={"numValidators": 4},
+        operation=VerifyCheckpoint(num_validators=4),
     )
 
 
@@ -57,6 +55,5 @@ def test_checkpoint_verify_accepts_eight_validator_set(
     end of the practical test envelope.
     """
     sync_test(
-        operation="verify_checkpoint",
-        input={"numValidators": 8},
+        operation=VerifyCheckpoint(num_validators=8),
     )

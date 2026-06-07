@@ -1,8 +1,11 @@
 """Slot clock test fixture for timing conformance testing."""
 
-from typing import Any, ClassVar
+from typing import Annotated, ClassVar, Literal, Union
+
+from pydantic import Field
 
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from lean_spec.base import StrictBaseModel
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.forks import Interval, Slot
 from lean_spec.spec.forks.lstar.config import (
@@ -13,21 +16,160 @@ from lean_spec.spec.forks.lstar.config import (
 from lean_spec.spec.ssz import Uint64
 
 
+class SlotClockConfig(StrictBaseModel):
+    """Timing constants every conversion in the vector assumes."""
+
+    seconds_per_slot: int
+    """Wall-clock seconds per slot."""
+
+    intervals_per_slot: int
+    """Sub-slot intervals per slot."""
+
+    milliseconds_per_interval: int
+    """Wall-clock milliseconds per interval."""
+
+
+class IntervalOutput(StrictBaseModel):
+    """Computed interval count."""
+
+    interval: int
+    """Interval count the client must reproduce."""
+
+
+class SlotOutput(StrictBaseModel):
+    """Computed slot number."""
+
+    slot: int
+    """Slot number the client must reproduce."""
+
+
+class TotalIntervalsOutput(StrictBaseModel):
+    """Computed total interval count since genesis."""
+
+    total_intervals: int
+    """Total intervals elapsed since genesis."""
+
+
+class FromUnixTime(StrictBaseModel):
+    """Convert a unix timestamp to the interval count since genesis."""
+
+    kind: Literal["from_unix_time"] = "from_unix_time"
+    """Discriminator field for serialization."""
+
+    genesis_time: int
+    """Unix genesis timestamp in seconds."""
+
+    unix_seconds: float
+    """Wall-clock timestamp to convert."""
+
+    def run(self) -> IntervalOutput:
+        """Compute intervals since genesis at the given timestamp."""
+        clock = SlotClock(genesis_time=Uint64(self.genesis_time), time_fn=lambda: self.unix_seconds)
+        return IntervalOutput(interval=int(clock.total_intervals()))
+
+
+class FromSlot(StrictBaseModel):
+    """Convert a slot number to the interval at that slot's start."""
+
+    kind: Literal["from_slot"] = "from_slot"
+    """Discriminator field for serialization."""
+
+    slot: int
+    """Slot number to convert."""
+
+    def run(self) -> IntervalOutput:
+        """Compute the interval at the slot's start."""
+        return IntervalOutput(interval=int(Interval.from_slot(Slot(self.slot))))
+
+
+class CurrentSlot(StrictBaseModel):
+    """Compute the current slot from genesis time and a wall-clock timestamp."""
+
+    kind: Literal["current_slot"] = "current_slot"
+    """Discriminator field for serialization."""
+
+    genesis_time: int
+    """Unix genesis timestamp in seconds."""
+
+    current_time_milliseconds: float
+    """Wall-clock timestamp in milliseconds."""
+
+    def run(self) -> SlotOutput:
+        """Compute the current slot at the given timestamp."""
+        clock = SlotClock(
+            genesis_time=Uint64(self.genesis_time),
+            time_fn=lambda: self.current_time_milliseconds / 1000.0,
+        )
+        return SlotOutput(slot=int(clock.current_slot()))
+
+
+class CurrentInterval(StrictBaseModel):
+    """Compute the current interval within the slot."""
+
+    kind: Literal["current_interval"] = "current_interval"
+    """Discriminator field for serialization."""
+
+    genesis_time: int
+    """Unix genesis timestamp in seconds."""
+
+    current_time_milliseconds: float
+    """Wall-clock timestamp in milliseconds."""
+
+    def run(self) -> IntervalOutput:
+        """Compute the in-slot interval at the given timestamp."""
+        clock = SlotClock(
+            genesis_time=Uint64(self.genesis_time),
+            time_fn=lambda: self.current_time_milliseconds / 1000.0,
+        )
+        return IntervalOutput(interval=int(clock.current_interval()))
+
+
+class TotalIntervals(StrictBaseModel):
+    """Compute the total intervals elapsed since genesis."""
+
+    kind: Literal["total_intervals"] = "total_intervals"
+    """Discriminator field for serialization."""
+
+    genesis_time: int
+    """Unix genesis timestamp in seconds."""
+
+    current_time_milliseconds: float
+    """Wall-clock timestamp in milliseconds."""
+
+    def run(self) -> TotalIntervalsOutput:
+        """Compute total intervals since genesis at the given timestamp."""
+        clock = SlotClock(
+            genesis_time=Uint64(self.genesis_time),
+            time_fn=lambda: self.current_time_milliseconds / 1000.0,
+        )
+        return TotalIntervalsOutput(total_intervals=int(clock.total_intervals()))
+
+
+SlotClockOperation = Annotated[
+    Union[FromUnixTime, FromSlot, CurrentSlot, CurrentInterval, TotalIntervals],
+    Field(discriminator="kind"),
+]
+"""Discriminated union of every slot clock conversion under test."""
+
+SlotClockOutput = IntervalOutput | SlotOutput | TotalIntervalsOutput
+"""Union of the computed results, paired with the operation kind."""
+
+
 class SlotClockFixture(BaseConsensusFixture):
     """
     Emitted vector for slot clock timing conformance.
 
-    JSON output: operation, input, output.
+    JSON output: operation, config, output.
     """
 
-    operation: str
-    """Operation under test."""
+    operation: SlotClockOperation
+    """Conversion under test, with its typed inputs."""
 
-    input: dict[str, Any]
-    """Operation-specific input parameters."""
+    config: SlotClockConfig
+    """Timing constants the conversion assumes."""
 
-    output: dict[str, Any]
-    """Computed output including the timing config."""
+    output: SlotClockOutput
+    """Computed result the client must reproduce."""
 
 
 class SlotClockTest(BaseTestSpec):
@@ -41,69 +183,17 @@ class SlotClockTest(BaseTestSpec):
     format_name: ClassVar[str] = "slot_clock_test"
     description: ClassVar[str] = "Tests slot clock time-to-slot/interval conversion"
 
-    operation: str
-    """Operation under test: from_unix_time, from_slot, current_slot,
-    current_interval, or total_intervals."""
-
-    input: dict[str, Any]
-    """Operation-specific input parameters."""
+    operation: SlotClockOperation
+    """Conversion to run, with its typed inputs."""
 
     def generate(self) -> SlotClockFixture:
-        """Dispatch to the operation handler and produce computed output."""
-        config = {
-            "secondsPerSlot": int(SECONDS_PER_SLOT),
-            "intervalsPerSlot": int(INTERVALS_PER_SLOT),
-            "millisecondsPerInterval": int(MILLISECONDS_PER_INTERVAL),
-        }
-        match self.operation:
-            case "from_unix_time":
-                computed_output = self._make_from_unix_time()
-            case "from_slot":
-                computed_output = self._make_from_slot()
-            case "current_slot":
-                computed_output = self._make_current_slot()
-            case "current_interval":
-                computed_output = self._make_current_interval()
-            case "total_intervals":
-                computed_output = self._make_total_intervals()
-            case _:
-                raise ValueError(f"Unknown operation: {self.operation}")
+        """Run the conversion and emit the vector."""
         return SlotClockFixture(
             operation=self.operation,
-            input=self.input,
-            output={"config": config, **computed_output},
+            config=SlotClockConfig(
+                seconds_per_slot=int(SECONDS_PER_SLOT),
+                intervals_per_slot=int(INTERVALS_PER_SLOT),
+                milliseconds_per_interval=int(MILLISECONDS_PER_INTERVAL),
+            ),
+            output=self.operation.run(),
         )
-
-    def _make_from_unix_time(self) -> dict[str, Any]:
-        """Convert unix timestamp to interval count since genesis."""
-        genesis_time = Uint64(self.input["genesisTime"])
-        unix_seconds = float(self.input["unixSeconds"])
-        clock = SlotClock(genesis_time=genesis_time, time_fn=lambda: unix_seconds)
-        return {"interval": int(clock.total_intervals())}
-
-    def _make_from_slot(self) -> dict[str, Any]:
-        """Convert slot number to interval at that slot's start."""
-        slot = Slot(self.input["slot"])
-        interval = Interval.from_slot(slot)
-        return {"interval": int(interval)}
-
-    def _make_current_slot(self) -> dict[str, Any]:
-        """Compute current slot from genesis time and current timestamp."""
-        genesis_time = Uint64(self.input["genesisTime"])
-        current_time = float(self.input["currentTimeMs"]) / 1000.0
-        clock = SlotClock(genesis_time=genesis_time, time_fn=lambda: current_time)
-        return {"slot": int(clock.current_slot())}
-
-    def _make_current_interval(self) -> dict[str, Any]:
-        """Compute current interval within the slot (0-4)."""
-        genesis_time = Uint64(self.input["genesisTime"])
-        current_time = float(self.input["currentTimeMs"]) / 1000.0
-        clock = SlotClock(genesis_time=genesis_time, time_fn=lambda: current_time)
-        return {"interval": int(clock.current_interval())}
-
-    def _make_total_intervals(self) -> dict[str, Any]:
-        """Compute total intervals elapsed since genesis."""
-        genesis_time = Uint64(self.input["genesisTime"])
-        current_time = float(self.input["currentTimeMs"]) / 1000.0
-        clock = SlotClock(genesis_time=genesis_time, time_fn=lambda: current_time)
-        return {"totalIntervals": int(clock.total_intervals())}

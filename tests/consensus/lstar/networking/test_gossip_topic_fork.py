@@ -9,7 +9,7 @@ wrong-fork messages into their subscriptions.
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
+from consensus_testing import GossipTopicRoundtrip, NetworkingCodecTestFiller
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -24,12 +24,9 @@ def test_gossip_topic_network_name_matches(
     name equal to the expected one must pass the check.
     """
     networking_codec_test(
-        codec_name="gossip_topic",
-        input={
-            "kind": "block",
-            "forkDigest": "0x12345678",
-            "expectedForkDigest": "0x12345678",
-        },
+        codec=GossipTopicRoundtrip(
+            topic_kind="block", network_name="0x12345678", expected_network_name="0x12345678"
+        ),
     )
 
 
@@ -45,12 +42,9 @@ def test_gossip_topic_network_name_mismatch(
     verdict.
     """
     networking_codec_test(
-        codec_name="gossip_topic",
-        input={
-            "kind": "block",
-            "forkDigest": "0x12345678",
-            "expectedForkDigest": "0xdeadbeef",
-        },
+        codec=GossipTopicRoundtrip(
+            topic_kind="block", network_name="0x12345678", expected_network_name="0xdeadbeef"
+        ),
     )
 
 
@@ -65,11 +59,10 @@ def test_gossip_topic_network_name_match_on_attestation_subnet(
     topic components.
     """
     networking_codec_test(
-        codec_name="gossip_topic",
-        input={
-            "kind": "attestation",
-            "forkDigest": "0xabcdef01",
-            "subnetId": 7,
-            "expectedForkDigest": "0xabcdef01",
-        },
+        codec=GossipTopicRoundtrip(
+            topic_kind="attestation",
+            network_name="0xabcdef01",
+            subnet_id=7,
+            expected_network_name="0xabcdef01",
+        ),
     )

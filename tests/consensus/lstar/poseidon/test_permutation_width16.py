@@ -29,7 +29,7 @@ def test_permutation_width16_all_zero(
     """
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": ["0"] * WIDTH},
+        input_state=["0"] * WIDTH,
     )
 
 
@@ -45,7 +45,7 @@ def test_permutation_width16_all_one(
     """
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": ["1"] * WIDTH},
+        input_state=["1"] * WIDTH,
     )
 
 
@@ -61,7 +61,7 @@ def test_permutation_width16_incremental_index(
     """
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": [str(i) for i in range(WIDTH)]},
+        input_state=[str(i) for i in range(WIDTH)],
     )
 
 
@@ -78,5 +78,5 @@ def test_permutation_width16_p_minus_one_and_near_zero(
     state = [str(P - 1) if i % 2 == 0 else str(i) for i in range(WIDTH)]
     poseidon_permutation_test(
         width=WIDTH,
-        input={"inputState": state},
+        input_state=state,
     )

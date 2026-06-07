@@ -9,15 +9,13 @@ from typing import Any, ClassVar, Self
 from pydantic import Field
 
 from consensus_testing.rejection import classify_rejection
-from lean_spec.base import CamelModel
+from lean_spec.base import CamelModel, StrictBaseModel
 from lean_spec.config import LEAN_ENV
 from lean_spec.spec.forks import RejectionReason
 
 
-class FixtureInfo(CamelModel):
+class FixtureInfo(StrictBaseModel):
     """Metadata envelope emitted alongside every fixture."""
-
-    model_config = CamelModel.model_config | {"frozen": True}
 
     comment: str = "`leanSpec` generated test"
     """Provenance note for consumers."""
@@ -39,7 +37,7 @@ class FixtureInfo(CamelModel):
     """
 
 
-class ExpectedRejection(CamelModel):
+class ExpectedRejection(StrictBaseModel):
     """
     Author-side expectation that an input must be rejected.
 
@@ -47,8 +45,6 @@ class ExpectedRejection(CamelModel):
     The reason is the language-neutral contract clients assert against.
     The optional substring pins the rejection to a specific spec assertion.
     """
-
-    model_config = CamelModel.model_config | {"frozen": True}
 
     reason: RejectionReason
     """Reason the vector's input must be rejected."""

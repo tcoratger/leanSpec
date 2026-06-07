@@ -9,7 +9,7 @@ and produce the same ordered list of (code, sszData) records.
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
+from consensus_testing import NetworkingCodecTestFiller, ReqRespResponseStream, ResponseChunkSpec
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -23,13 +23,12 @@ def test_stream_two_success_chunks(networking_codec_test: NetworkingCodecTestFil
     stops after the first chunk drops half the response.
     """
     networking_codec_test(
-        codec_name="reqresp_response_stream",
-        input={
-            "chunks": [
-                {"responseCode": 0, "sszData": "0xdeadbeef"},
-                {"responseCode": 0, "sszData": "0xcafebabe"},
-            ],
-        },
+        codec=ReqRespResponseStream(
+            chunks=[
+                ResponseChunkSpec(response_code=0, ssz_data="0xdeadbeef"),
+                ResponseChunkSpec(response_code=0, ssz_data="0xcafebabe"),
+            ]
+        ),
     )
 
 
@@ -45,13 +44,12 @@ def test_stream_success_then_resource_unavailable(
     the error terminator.
     """
     networking_codec_test(
-        codec_name="reqresp_response_stream",
-        input={
-            "chunks": [
-                {"responseCode": 0, "sszData": "0x" + "11" * 16},
-                {"responseCode": 3, "sszData": "0x" + b"not found".hex()},
-            ],
-        },
+        codec=ReqRespResponseStream(
+            chunks=[
+                ResponseChunkSpec(response_code=0, ssz_data="0x" + "11" * 16),
+                ResponseChunkSpec(response_code=3, ssz_data="0x" + b"not found".hex()),
+            ]
+        ),
     )
 
 
@@ -67,12 +65,11 @@ def test_stream_three_success_chunks_with_compressible_payloads(
     produce identical output to stateful parsers.
     """
     networking_codec_test(
-        codec_name="reqresp_response_stream",
-        input={
-            "chunks": [
-                {"responseCode": 0, "sszData": "0x" + "00" * 64},
-                {"responseCode": 0, "sszData": "0x" + "ff" * 64},
-                {"responseCode": 0, "sszData": "0x" + "aa" * 64},
-            ],
-        },
+        codec=ReqRespResponseStream(
+            chunks=[
+                ResponseChunkSpec(response_code=0, ssz_data="0x" + "00" * 64),
+                ResponseChunkSpec(response_code=0, ssz_data="0x" + "ff" * 64),
+                ResponseChunkSpec(response_code=0, ssz_data="0x" + "aa" * 64),
+            ]
+        ),
     )

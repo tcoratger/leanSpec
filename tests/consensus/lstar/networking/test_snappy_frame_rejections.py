@@ -2,7 +2,7 @@
 
 import pytest
 
-from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from consensus_testing import DecodeFailure, ExpectedRejection, NetworkingCodecTestFiller
 from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -19,8 +19,7 @@ def test_snappy_frame_decode_rejects_empty_input(
     with SnappyDecompressionError.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "snappy_frame", "bytes": "0x"},
+        codec=DecodeFailure(decoder="snappy_frame", raw_bytes="0x"),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
@@ -37,8 +36,7 @@ def test_snappy_frame_decode_rejects_wrong_stream_identifier(
     the stream at the identifier check.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "snappy_frame", "bytes": "0x" + "00" * 10},
+        codec=DecodeFailure(decoder="snappy_frame", raw_bytes="0x" + "00" * 10),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
@@ -57,7 +55,8 @@ def test_snappy_frame_decode_rejects_unknown_unskippable_chunk(
     stream_identifier = "ff060000734e61507059"
     unknown_chunk = "03000000"
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "snappy_frame", "bytes": "0x" + stream_identifier + unknown_chunk},
+        codec=DecodeFailure(
+            decoder="snappy_frame", raw_bytes="0x" + stream_identifier + unknown_chunk
+        ),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

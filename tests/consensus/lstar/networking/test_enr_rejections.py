@@ -2,7 +2,7 @@
 
 import pytest
 
-from consensus_testing import ExpectedRejection, NetworkingCodecTestFiller
+from consensus_testing import DecodeFailure, ExpectedRejection, NetworkingCodecTestFiller
 from lean_spec.spec.forks import RejectionReason
 
 pytestmark = pytest.mark.valid_until("Lstar")
@@ -20,8 +20,7 @@ def test_enr_decode_rejects_oversize_payload(
     """
     oversize = "0x" + "ff" * 301
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "enr", "bytes": oversize},
+        codec=DecodeFailure(decoder="enr", raw_bytes=oversize),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )
 
@@ -37,7 +36,6 @@ def test_enr_decode_rejects_malformed_rlp(
     fails and the error surfaces as a ValueError on the ENR API.
     """
     networking_codec_test(
-        codec_name="decode_failure",
-        input={"decoder": "enr", "bytes": "0x00"},
+        codec=DecodeFailure(decoder="enr", raw_bytes="0x00"),
         expected_rejection=ExpectedRejection(reason=RejectionReason.DECODE_ERROR),
     )

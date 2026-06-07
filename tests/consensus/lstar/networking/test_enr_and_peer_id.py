@@ -2,7 +2,7 @@
 
 import pytest
 
-from consensus_testing import NetworkingCodecTestFiller
+from consensus_testing import EnrRoundtrip, NetworkingCodecTestFiller, PeerIdentifierDerivation
 
 pytestmark = pytest.mark.valid_until("Lstar")
 
@@ -71,42 +71,58 @@ ENR_HIGH_SEQ = (
 
 def test_enr_official_eip778(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Official EIP-778 vector. Exercises node_id, ip4, udp_port, multiaddr, signature."""
-    networking_codec_test(codec_name="enr", input={"enrString": OFFICIAL_ENR})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=OFFICIAL_ENR),
+    )
 
 
 def test_enr_with_extensions(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ENR with extension keys: eth2, attnets, QUIC, is_aggregator."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_WITH_EXTENSIONS})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_WITH_EXTENSIONS),
+    )
 
 
 def test_enr_minimal_seq_zero(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """Minimal ENR with seq=0. Only required keys (id + secp256k1)."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_MINIMAL})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_MINIMAL),
+    )
 
 
 def test_enr_no_eth2_field(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ENR with ip4 + udp but no eth2 or attnets. Verifies absent optional fields."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_NO_ETH2})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_NO_ETH2),
+    )
 
 
 def test_enr_eth2_far_future_fork(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ENR with eth2 where next_fork_epoch is max uint64 (far future). Verifies large epoch."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_ETH2_FAR_FUTURE})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_ETH2_FAR_FUTURE),
+    )
 
 
 def test_enr_attnets_all_zeros(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ENR with attnets bitfield all zeros. Verifies empty subscribed subnet list."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_ATTNETS_ALL_ZEROS})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_ATTNETS_ALL_ZEROS),
+    )
 
 
 def test_enr_attnets_all_ones(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ENR with attnets bitfield all ones. Verifies all 64 subnets are subscribed."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_ATTNETS_ALL_ONES})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_ATTNETS_ALL_ONES),
+    )
 
 
 def test_enr_high_seq(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ENR with high sequence number (2^32 - 1). Verifies large seq parsing."""
-    networking_codec_test(codec_name="enr", input={"enrString": ENR_HIGH_SEQ})
+    networking_codec_test(
+        codec=EnrRoundtrip(enr_string=ENR_HIGH_SEQ),
+    )
 
 
 # --- PeerId ---
@@ -115,47 +131,41 @@ def test_enr_high_seq(networking_codec_test: NetworkingCodecTestFiller) -> None:
 def test_peer_id_ed25519(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ED25519 PeerId from libp2p spec. 32-byte key, identity multihash."""
     networking_codec_test(
-        codec_name="peer_id",
-        input={
-            "keyType": "ed25519",
-            "publicKey": "0x1ed1e8fae2c4a144b8be8fd4b47bf3d3b34b871c3cacf6010f0e42d474fce27e",
-        },
+        codec=PeerIdentifierDerivation(
+            key_type="ed25519",
+            public_key="0x1ed1e8fae2c4a144b8be8fd4b47bf3d3b34b871c3cacf6010f0e42d474fce27e",
+        ),
     )
 
 
 def test_peer_id_secp256k1(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """secp256k1 PeerId from libp2p spec. 33-byte key, identity multihash."""
     networking_codec_test(
-        codec_name="peer_id",
-        input={
-            "keyType": "secp256k1",
-            "publicKey": "0x037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99",
-        },
+        codec=PeerIdentifierDerivation(
+            key_type="secp256k1",
+            public_key="0x037777e994e452c21604f91de093ce415f5432f701dd8cd1a7a6fea0e630bfca99",
+        ),
     )
 
 
 def test_peer_id_ecdsa(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """ECDSA PeerId from libp2p spec. 91-byte key, SHA256 multihash (over 42 bytes)."""
     networking_codec_test(
-        codec_name="peer_id",
-        input={
-            "keyType": "ecdsa",
-            "publicKey": (
-                "0x3059301306072a8648ce3d020106082a8648ce3d030107034200"
-                "04de3d300fa36ae0e8f5d530899d83abab44abf3161f162a4bc901d8e6ec"
-                "da020e8b6d5f8da30525e71d6851510c098e5c47c646a597fb4dcec034e9"
-                "f77c409e62"
-            ),
-        },
+        codec=PeerIdentifierDerivation(
+            key_type="ecdsa",
+            public_key="0x3059301306072a8648ce3d020106082a8648ce3d030107034200"
+            "04de3d300fa36ae0e8f5d530899d83abab44abf3161f162a4bc901d8e6ec"
+            "da020e8b6d5f8da30525e71d6851510c098e5c47c646a597fb4dcec034e9"
+            "f77c409e62",
+        ),
     )
 
 
 def test_peer_id_secp256k1_from_enr(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """secp256k1 PeerId using the public key from the official EIP-778 ENR."""
     networking_codec_test(
-        codec_name="peer_id",
-        input={
-            "keyType": "secp256k1",
-            "publicKey": "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138",
-        },
+        codec=PeerIdentifierDerivation(
+            key_type="secp256k1",
+            public_key="0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138",
+        ),
     )
