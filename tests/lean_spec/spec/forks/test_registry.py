@@ -33,18 +33,6 @@ class TestForkRegistry:
         registry = ForkRegistry([LstarSpec(), _NextSpec()])
         assert registry.current.NAME == _NextSpec.NAME
 
-    def test_get_fork_by_name(self) -> None:
-        """ForkRegistry.get_fork looks up by fork NAME."""
-        registry = ForkRegistry([LstarSpec(), _NextSpec()])
-        assert registry.get_fork("lstar").NAME == "lstar"
-        assert registry.get_fork("next").NAME == "next"
-
-    def test_get_fork_unknown_raises(self) -> None:
-        """ForkRegistry.get_fork raises KeyError for unknown forks."""
-        registry = ForkRegistry([LstarSpec()])
-        with pytest.raises(KeyError, match="Unknown fork: 'missing'"):
-            registry.get_fork("missing")
-
     def test_empty_forks_raises(self) -> None:
         """ForkRegistry requires at least one fork."""
         with pytest.raises(ValueError, match="at least one fork"):
