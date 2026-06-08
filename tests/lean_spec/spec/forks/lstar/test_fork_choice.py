@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import NamedTuple
+
 import pytest
 from hypothesis import given, settings, strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
@@ -27,6 +30,7 @@ from lean_spec.spec.forks.lstar.containers import (
     SingleMessageAggregate,
     Validators,
 )
+from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Uint64
 from lean_spec.spec.ssz.byte_arrays import ByteList512KiB, Bytes32
@@ -412,195 +416,382 @@ def test_compute_lmd_ghost_head_rejects_unknown_start_root(
         spec._compute_lmd_ghost_head(base_store, start_root=unknown_root, attestations={})
 
 
-# Slot used by every time-check case below.
-ATTESTATION_SLOT = Slot(2)
-"""Slot of the attestation under test."""
+class ValidateAttestationFixture(NamedTuple):
+    """A known-good store plus the named block roots its valid attestation references."""
 
-ATTESTATION_START_INTERVAL = Interval.from_slot(ATTESTATION_SLOT)
-"""First interval at which ATTESTATION_SLOT begins."""
-
-DISPARITY_BOUNDARY_INTERVAL = ATTESTATION_START_INTERVAL - Interval(int(GOSSIP_DISPARITY_INTERVALS))
-"""Latest local interval that still admits the attestation."""
-
-JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL = DISPARITY_BOUNDARY_INTERVAL - Interval(1)
-"""First local interval that rejects the attestation."""
-
-ONE_FULL_SLOT_BEHIND_INTERVAL = ATTESTATION_START_INTERVAL - Interval(int(INTERVALS_PER_SLOT))
-"""Local interval one full slot behind the attestation's slot start."""
+    store: Store
+    genesis_root: Bytes32
+    block_at_slot_one_root: Bytes32
+    block_at_slot_two_root: Bytes32
+    block_above_skipped_slots_root: Bytes32
+    sibling_at_slot_two_root: Bytes32
+    orphan_at_slot_two_root: Bytes32
 
 
-class TestValidateAttestationHeadChecks:
-    """Head checkpoint must be consistent and at least as recent as source and target."""
+def _build_validate_attestation_fixture(
+    spec: LstarSpec, observer_store: Store
+) -> ValidateAttestationFixture:
+    """Build a known-good store whose default attestation passes every validation stage.
 
-    def test_head_checkpoint_slot_mismatch_rejected(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """Head checkpoint slot must match the actual block slot."""
-        store = observer_store
+    Chain topology, all reusing the genesis post-state:
 
-        # Build a one-block chain on top of genesis.
-        # This gives us a real block whose actual slot is 1.
-        slot_1 = Slot(1)
-        proposer = ValidatorIndex(1)
-        store, block, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
-        block_root = hash_tree_root(block)
+        genesis(0) -> block_at_slot_one(1) -> block_at_slot_two(2) -> block_above_skipped(4)
+                   -> sibling_at_slot_two(2)                       (fork off genesis)
+        unknown(99) -> orphan_at_slot_two(2)                       (parent absent from store)
+    """
+    genesis_root = observer_store.latest_justified.root
 
-        genesis_root = store.latest_justified.root
+    store, block_at_slot_one_root = _add_known_block(
+        observer_store, Slot(1), ValidatorIndex(1), genesis_root, 1
+    )
+    store, block_at_slot_two_root = _add_known_block(
+        store, Slot(2), ValidatorIndex(2), block_at_slot_one_root, 2
+    )
+    # Slot 3 is skipped: this block sits at slot 4 directly above the slot-2 block.
+    store, block_above_skipped_slots_root = _add_known_block(
+        store, Slot(4), ValidatorIndex(4), block_at_slot_two_root, 4
+    )
+    # A sibling at slot 2 forking straight off genesis, off the main chain.
+    store, sibling_at_slot_two_root = _add_known_block(
+        store, Slot(2), ValidatorIndex(3), genesis_root, 5
+    )
+    # A block at slot 2 whose parent root the store has never seen.
+    store, orphan_at_slot_two_root = _add_known_block(
+        store, Slot(2), ValidatorIndex(2), make_bytes32(99), 6
+    )
 
-        # Craft an attestation where the head checkpoint claims slot 999.
-        # The block actually lives at slot 1.
-        # This violates the consistency check: checkpoint slot must match block slot.
-        attestation = Attestation(
-            validator_index=ValidatorIndex(0),
-            data=AttestationData(
-                slot=slot_1,
-                head=Checkpoint(root=block_root, slot=Slot(999)),
-                target=Checkpoint(root=block_root, slot=slot_1),
-                source=Checkpoint(root=genesis_root, slot=Slot(0)),
-            ),
-        )
+    # Pin the local clock to the start of the attestation's slot.
+    # This isolates topology and ancestry cases from the time check.
+    store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
 
-        with pytest.raises(AssertionError, match="Head checkpoint slot mismatch"):
-            spec.validate_attestation(store, attestation.data)
+    return ValidateAttestationFixture(
+        store=store,
+        genesis_root=genesis_root,
+        block_at_slot_one_root=block_at_slot_one_root,
+        block_at_slot_two_root=block_at_slot_two_root,
+        block_above_skipped_slots_root=block_above_skipped_slots_root,
+        sibling_at_slot_two_root=sibling_at_slot_two_root,
+        orphan_at_slot_two_root=orphan_at_slot_two_root,
+    )
 
-    def test_head_slot_less_than_source_rejected(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """Head cannot be older than the justified source."""
-        store = observer_store
 
-        # Build two blocks so we have three known slots: genesis (0), slot 1, slot 2.
-        slot_1 = Slot(1)
-        slot_2 = Slot(2)
-        proposer = ValidatorIndex(1)
-        store, block_1, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
-        block_1_root = hash_tree_root(block_1)
+def _valid_attestation_data(fixture: ValidateAttestationFixture) -> AttestationData:
+    """The default attestation that passes every stage: source genesis, target slot 1, head slot 2.
 
-        store, block_2, _ = spec.produce_block_with_signatures(store, slot_2, ValidatorIndex(2))
-        block_2_root = hash_tree_root(block_2)
+    slot=2, source=genesis@0, target=block_at_slot_one@1, head=block_at_slot_two@2.
+    All checkpoints lie on one parent chain and all slots match their blocks.
+    """
+    return AttestationData(
+        slot=Slot(2),
+        source=Checkpoint(root=fixture.genesis_root, slot=Slot(0)),
+        target=Checkpoint(root=fixture.block_at_slot_one_root, slot=Slot(1)),
+        head=Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+    )
 
-        genesis_root = store.latest_justified.root
 
-        # Point the head back to genesis (slot 0) while source is at slot 1.
-        # Time flows forward: the chain tip cannot be older than the justified source.
-        # Since source <= target is enforced first, head < source also means head < target.
-        # The topology check catches this via the head >= target assertion.
-        attestation = Attestation(
-            validator_index=ValidatorIndex(0),
-            data=AttestationData(
-                slot=slot_2,
-                head=Checkpoint(root=genesis_root, slot=Slot(0)),
-                target=Checkpoint(root=block_2_root, slot=slot_2),
-                source=Checkpoint(root=block_1_root, slot=slot_1),
-            ),
-        )
+class ValidateAttestationCase(NamedTuple):
+    """One isolated scenario: a single mutation of the valid base and its expected outcome."""
 
-        with pytest.raises(AssertionError, match="Head checkpoint must not be older than target"):
-            spec.validate_attestation(store, attestation.data)
+    case_id: str
+    mutate: Callable[[ValidateAttestationFixture, AttestationData], tuple[Store, AttestationData]]
+    expected_reason: RejectionReason | None
+    expected_message_substring: str | None
 
-    def test_head_slot_less_than_target_rejected(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """Head cannot be older than the target."""
-        store = observer_store
 
-        # Two blocks again: slot 1 and slot 2.
-        slot_1 = Slot(1)
-        slot_2 = Slot(2)
-        proposer = ValidatorIndex(1)
-        store, block_1, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
-        block_1_root = hash_tree_root(block_1)
-
-        store, block_2, _ = spec.produce_block_with_signatures(store, slot_2, ValidatorIndex(2))
-        block_2_root = hash_tree_root(block_2)
-
-        genesis_root = store.latest_justified.root
-
-        # Head at slot 1, target at slot 2.
-        # The head is the chain tip a validator votes for.
-        # It must be at least as recent as the target checkpoint.
-        # Slot 1 < slot 2 violates this ordering.
-        attestation = Attestation(
-            validator_index=ValidatorIndex(0),
-            data=AttestationData(
-                slot=slot_2,
-                head=Checkpoint(root=block_1_root, slot=slot_1),
-                target=Checkpoint(root=block_2_root, slot=slot_2),
-                source=Checkpoint(root=genesis_root, slot=Slot(0)),
-            ),
-        )
-
-        with pytest.raises(AssertionError, match="Head checkpoint must not be older than target"):
-            spec.validate_attestation(store, attestation.data)
-
-    def test_valid_attestation_with_correct_head_passes(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """An attestation with all checkpoints consistent should pass."""
-        store = observer_store
-
-        # Produce a single block at slot 1.
-        slot_1 = Slot(1)
-        proposer = ValidatorIndex(1)
-        store, block, _ = spec.produce_block_with_signatures(store, slot_1, proposer)
-        block_root = hash_tree_root(block)
-
-        genesis_root = store.latest_justified.root
-
-        # All checkpoints are well-ordered and consistent:
-        #
-        # - Source: genesis at slot 0 (justified ancestor)
-        # - Target: block at slot 1 (finalization target)
-        # - Head: same block at slot 1 (chain tip)
-        #
-        # Source <= target <= head, and all slots match their blocks.
-        # This should pass every validation stage.
-        attestation = Attestation(
-            validator_index=ValidatorIndex(0),
-            data=AttestationData(
-                slot=slot_1,
-                head=Checkpoint(root=block_root, slot=slot_1),
-                target=Checkpoint(root=block_root, slot=slot_1),
-                source=Checkpoint(root=genesis_root, slot=Slot(0)),
-            ),
-        )
-
-        spec.validate_attestation(store, attestation.data)
-
-    def test_head_equal_to_source_and_target_passes(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """All three checkpoints pointing to genesis (slot 0) is valid."""
-        store = observer_store
-
-        genesis_root = store.latest_justified.root
-
-        # All three checkpoints reference the same genesis block at slot 0.
-        # This is the degenerate case: no chain progress yet.
-        # The ordering source <= target <= head holds trivially (0 <= 0 <= 0).
-        genesis_checkpoint = Checkpoint(root=genesis_root, slot=Slot(0))
-
-        attestation = Attestation(
-            validator_index=ValidatorIndex(0),
-            data=AttestationData(
+VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
+    ValidateAttestationCase(
+        case_id="valid_three_slot_chain_passes",
+        mutate=lambda fixture, attestation_data: (fixture.store, attestation_data),
+        expected_reason=None,
+        expected_message_substring=None,
+    ),
+    ValidateAttestationCase(
+        case_id="all_checkpoints_at_genesis_passes",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            AttestationData(
                 slot=Slot(0),
-                head=genesis_checkpoint,
-                target=genesis_checkpoint,
-                source=genesis_checkpoint,
+                source=Checkpoint(root=fixture.genesis_root, slot=Slot(0)),
+                target=Checkpoint(root=fixture.genesis_root, slot=Slot(0)),
+                head=Checkpoint(root=fixture.genesis_root, slot=Slot(0)),
             ),
-        )
+        ),
+        expected_reason=None,
+        expected_message_substring=None,
+    ),
+    ValidateAttestationCase(
+        case_id="at_disparity_boundary_passes",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store.model_copy(
+                update={
+                    "time": Interval.from_slot(Slot(2)) - Interval(int(GOSSIP_DISPARITY_INTERVALS))
+                }
+            ),
+            attestation_data,
+        ),
+        expected_reason=None,
+        expected_message_substring=None,
+    ),
+    ValidateAttestationCase(
+        case_id="attestation_in_past_passes",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store.model_copy(
+                update={
+                    "time": Interval.from_slot(Slot(2)) + Interval(int(INTERVALS_PER_SLOT) * 10)
+                }
+            ),
+            attestation_data,
+        ),
+        expected_reason=None,
+        expected_message_substring=None,
+    ),
+    ValidateAttestationCase(
+        case_id="head_above_skipped_slots_passes",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store.model_copy(update={"time": Interval.from_slot(Slot(4))}),
+            attestation_data.model_copy(
+                update={
+                    "slot": Slot(4),
+                    "head": Checkpoint(root=fixture.block_above_skipped_slots_root, slot=Slot(4)),
+                }
+            ),
+        ),
+        expected_reason=None,
+        expected_message_substring=None,
+    ),
+    ValidateAttestationCase(
+        case_id="unknown_source_block_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"source": Checkpoint(root=make_bytes32(200), slot=Slot(0))}
+            ),
+        ),
+        expected_reason=RejectionReason.UNKNOWN_SOURCE_BLOCK,
+        expected_message_substring="Unknown source block",
+    ),
+    ValidateAttestationCase(
+        case_id="unknown_target_block_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"target": Checkpoint(root=make_bytes32(201), slot=Slot(1))}
+            ),
+        ),
+        expected_reason=RejectionReason.UNKNOWN_TARGET_BLOCK,
+        expected_message_substring="Unknown target block",
+    ),
+    ValidateAttestationCase(
+        case_id="unknown_head_block_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"head": Checkpoint(root=make_bytes32(202), slot=Slot(2))}
+            ),
+        ),
+        expected_reason=RejectionReason.UNKNOWN_HEAD_BLOCK,
+        expected_message_substring="Unknown head block",
+    ),
+    ValidateAttestationCase(
+        case_id="source_after_target_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={
+                    "source": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+                    "target": Checkpoint(root=fixture.block_at_slot_one_root, slot=Slot(1)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.SOURCE_AFTER_TARGET,
+        expected_message_substring="Source checkpoint slot must not exceed target",
+    ),
+    ValidateAttestationCase(
+        case_id="head_older_than_target_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={
+                    "target": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+                    "head": Checkpoint(root=fixture.block_at_slot_one_root, slot=Slot(1)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.HEAD_OLDER_THAN_TARGET,
+        expected_message_substring="Head checkpoint must not be older than target",
+    ),
+    ValidateAttestationCase(
+        case_id="source_slot_mismatch_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"source": Checkpoint(root=fixture.genesis_root, slot=Slot(1))}
+            ),
+        ),
+        expected_reason=RejectionReason.SOURCE_SLOT_MISMATCH,
+        expected_message_substring="Source checkpoint slot mismatch",
+    ),
+    ValidateAttestationCase(
+        case_id="target_slot_mismatch_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"target": Checkpoint(root=fixture.block_at_slot_one_root, slot=Slot(2))}
+            ),
+        ),
+        expected_reason=RejectionReason.TARGET_SLOT_MISMATCH,
+        expected_message_substring="Target checkpoint slot mismatch",
+    ),
+    ValidateAttestationCase(
+        case_id="head_slot_mismatch_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"head": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(3))}
+            ),
+        ),
+        expected_reason=RejectionReason.HEAD_SLOT_MISMATCH,
+        expected_message_substring="Head checkpoint slot mismatch",
+    ),
+    ValidateAttestationCase(
+        case_id="source_not_ancestor_of_target_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={
+                    "source": Checkpoint(root=fixture.sibling_at_slot_two_root, slot=Slot(2)),
+                    "target": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.SOURCE_NOT_ANCESTOR_OF_TARGET,
+        expected_message_substring="Source checkpoint must be ancestor of target",
+    ),
+    ValidateAttestationCase(
+        case_id="target_not_ancestor_of_head_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={
+                    "target": Checkpoint(root=fixture.sibling_at_slot_two_root, slot=Slot(2)),
+                    "head": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.TARGET_NOT_ANCESTOR_OF_HEAD,
+        expected_message_substring="Target checkpoint must be ancestor of head",
+    ),
+    ValidateAttestationCase(
+        case_id="head_with_unknown_parent_chain_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={"head": Checkpoint(root=fixture.orphan_at_slot_two_root, slot=Slot(2))}
+            ),
+        ),
+        expected_reason=RejectionReason.TARGET_NOT_ANCESTOR_OF_HEAD,
+        expected_message_substring="Target checkpoint must be ancestor of head",
+    ),
+    ValidateAttestationCase(
+        case_id="just_beyond_disparity_boundary_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store.model_copy(
+                update={
+                    "time": Interval.from_slot(Slot(2))
+                    - Interval(int(GOSSIP_DISPARITY_INTERVALS))
+                    - Interval(1)
+                }
+            ),
+            attestation_data,
+        ),
+        expected_reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
+        expected_message_substring="Attestation too far in future",
+    ),
+    ValidateAttestationCase(
+        case_id="one_full_slot_in_future_rejected",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store.model_copy(
+                update={"time": Interval.from_slot(Slot(2)) - Interval(int(INTERVALS_PER_SLOT))}
+            ),
+            attestation_data,
+        ),
+        expected_reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
+        expected_message_substring="Attestation too far in future",
+    ),
+    ValidateAttestationCase(
+        case_id="ordering_unknown_source_beats_source_after_target",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={
+                    "source": Checkpoint(root=make_bytes32(200), slot=Slot(2)),
+                    "target": Checkpoint(root=fixture.block_at_slot_one_root, slot=Slot(1)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.UNKNOWN_SOURCE_BLOCK,
+        expected_message_substring="Unknown source block",
+    ),
+    ValidateAttestationCase(
+        case_id="ordering_source_slot_mismatch_beats_ancestry",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store,
+            attestation_data.model_copy(
+                update={
+                    "source": Checkpoint(root=fixture.sibling_at_slot_two_root, slot=Slot(1)),
+                    "target": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.SOURCE_SLOT_MISMATCH,
+        expected_message_substring="Source checkpoint slot mismatch",
+    ),
+    ValidateAttestationCase(
+        case_id="ordering_topology_beats_time_check",
+        mutate=lambda fixture, attestation_data: (
+            fixture.store.model_copy(
+                update={"time": Interval.from_slot(Slot(2)) - Interval(int(INTERVALS_PER_SLOT))}
+            ),
+            attestation_data.model_copy(
+                update={
+                    "source": Checkpoint(root=fixture.block_at_slot_two_root, slot=Slot(2)),
+                    "target": Checkpoint(root=fixture.block_at_slot_one_root, slot=Slot(1)),
+                }
+            ),
+        ),
+        expected_reason=RejectionReason.SOURCE_AFTER_TARGET,
+        expected_message_substring="Source checkpoint slot must not exceed target",
+    ),
+]
+"""Every isolated scenario exercising validate_attestation, one mutation per case."""
 
-        spec.validate_attestation(store, attestation.data)
+
+class TestValidateAttestation:
+    """validate_attestation enforces availability, topology, consistency, ancestry, and timing."""
+
+    @pytest.mark.parametrize(
+        "case",
+        VALIDATE_ATTESTATION_CASES,
+        ids=[case.case_id for case in VALIDATE_ATTESTATION_CASES],
+    )
+    def test_validate_attestation(
+        self,
+        spec: LstarSpec,
+        observer_store: Store,
+        case: ValidateAttestationCase,
+    ) -> None:
+        """Each case mutates one thing from the valid base and asserts the exact outcome."""
+        fixture = _build_validate_attestation_fixture(spec, observer_store)
+        store, attestation_data = case.mutate(fixture, _valid_attestation_data(fixture))
+
+        if case.expected_reason is None:
+            assert spec.validate_attestation(store, attestation_data) is None
+            return
+
+        assert case.expected_message_substring is not None
+        with pytest.raises(SpecRejectionError, match=case.expected_message_substring) as rejection:
+            spec.validate_attestation(store, attestation_data)
+        assert rejection.value.reason == case.expected_reason
 
 
 def _add_known_block(
@@ -625,190 +816,6 @@ def _add_known_block(
         }
     )
     return updated_store, block_root
-
-
-class TestValidateAttestationAncestryChecks:
-    """Source, target, and head must lie on one parent chain."""
-
-    def test_proper_ancestor_chain_passes(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """A vote whose checkpoints form one chain across three slots validates."""
-        store = observer_store
-        genesis_root = store.latest_justified.root
-        store, target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        store, head_root = _add_known_block(store, Slot(2), ValidatorIndex(2), target_root, 2)
-        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
-
-        attestation_data = AttestationData(
-            slot=Slot(2),
-            source=Checkpoint(root=genesis_root, slot=Slot(0)),
-            target=Checkpoint(root=target_root, slot=Slot(1)),
-            head=Checkpoint(root=head_root, slot=Slot(2)),
-        )
-
-        spec.validate_attestation(store, attestation_data)
-
-    def test_target_must_be_ancestor_of_head(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """A head on a sibling fork must not validate against this target."""
-        store = observer_store
-        genesis_root = store.latest_justified.root
-        store, target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        store, sibling_head_root = _add_known_block(
-            store, Slot(2), ValidatorIndex(2), genesis_root, 2
-        )
-        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
-
-        attestation_data = AttestationData(
-            slot=Slot(2),
-            source=Checkpoint(root=genesis_root, slot=Slot(0)),
-            target=Checkpoint(root=target_root, slot=Slot(1)),
-            head=Checkpoint(root=sibling_head_root, slot=Slot(2)),
-        )
-
-        with pytest.raises(AssertionError, match="Target checkpoint must be ancestor of head"):
-            spec.validate_attestation(store, attestation_data)
-
-    def test_source_must_be_ancestor_of_target(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """A source on a sibling fork must not validate against this target."""
-        store = observer_store
-        genesis_root = store.latest_justified.root
-        store, source_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        store, target_parent_root = _add_known_block(
-            store, Slot(1), ValidatorIndex(2), genesis_root, 2
-        )
-        store, target_root = _add_known_block(
-            store, Slot(2), ValidatorIndex(2), target_parent_root, 3
-        )
-        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
-
-        attestation_data = AttestationData(
-            slot=Slot(2),
-            source=Checkpoint(root=source_root, slot=Slot(1)),
-            target=Checkpoint(root=target_root, slot=Slot(2)),
-            head=Checkpoint(root=target_root, slot=Slot(2)),
-        )
-
-        with pytest.raises(AssertionError, match="Source checkpoint must be ancestor of target"):
-            spec.validate_attestation(store, attestation_data)
-
-    def test_head_with_unknown_parent_chain_rejected(
-        self,
-        spec: LstarSpec,
-        observer_store: Store,
-    ) -> None:
-        """A head whose parent chain leaves the store cannot prove ancestry."""
-        store = observer_store
-        genesis_root = store.latest_justified.root
-        store, target_root = _add_known_block(store, Slot(1), ValidatorIndex(1), genesis_root, 1)
-        store, orphan_head_root = _add_known_block(
-            store, Slot(2), ValidatorIndex(2), make_bytes32(99), 2
-        )
-        store = store.model_copy(update={"time": Interval.from_slot(Slot(2))})
-
-        attestation_data = AttestationData(
-            slot=Slot(2),
-            source=Checkpoint(root=genesis_root, slot=Slot(0)),
-            target=Checkpoint(root=target_root, slot=Slot(1)),
-            head=Checkpoint(root=orphan_head_root, slot=Slot(2)),
-        )
-
-        with pytest.raises(AssertionError, match="Target checkpoint must be ancestor of head"):
-            spec.validate_attestation(store, attestation_data)
-
-
-class TestValidateAttestationTimeCheck:
-    """
-    Time check boundaries.
-
-    Each case sets `store.time` explicitly to isolate the time check from
-    on_tick side effects (aggregation, safe-target update, acceptance).
-    """
-
-    @staticmethod
-    def _build_two_block_chain(spec: LstarSpec, store: Store) -> tuple[Store, AttestationData]:
-        """Produce blocks at slots 1 and ATTESTATION_SLOT; return ATTESTATION_SLOT data."""
-        store, _, _ = spec.produce_block_with_signatures(store, Slot(1), ValidatorIndex(1))
-        store, block_2, _ = spec.produce_block_with_signatures(
-            store, ATTESTATION_SLOT, ValidatorIndex(int(ATTESTATION_SLOT))
-        )
-        block_2_root = hash_tree_root(block_2)
-        genesis_root = store.latest_justified.root
-
-        attestation_data = AttestationData(
-            slot=ATTESTATION_SLOT,
-            head=Checkpoint(root=block_2_root, slot=ATTESTATION_SLOT),
-            target=Checkpoint(root=block_2_root, slot=ATTESTATION_SLOT),
-            source=Checkpoint(root=genesis_root, slot=Slot(0)),
-        )
-        return store, attestation_data
-
-    def test_attestation_at_current_slot_passes(
-        self, spec: LstarSpec, observer_store: Store
-    ) -> None:
-        """A vote at the current slot is always accepted, every interval."""
-        store, attestation_data = self._build_two_block_chain(spec, observer_store)
-
-        # Sweep every interval in the attestation's slot.
-        for offset in range(int(INTERVALS_PER_SLOT)):
-            local = store.model_copy(update={"time": ATTESTATION_START_INTERVAL + Interval(offset)})
-            spec.validate_attestation(local, attestation_data)
-
-    def test_attestation_in_past_passes(self, spec: LstarSpec, observer_store: Store) -> None:
-        """A vote from a past slot is always accepted."""
-        store, attestation_data = self._build_two_block_chain(spec, observer_store)
-
-        # Place the local clock several slots ahead.
-        far_future = ATTESTATION_START_INTERVAL + Interval(int(INTERVALS_PER_SLOT) * 10)
-        store = store.model_copy(update={"time": far_future})
-        spec.validate_attestation(store, attestation_data)
-
-    def test_attestation_at_disparity_boundary_passes(
-        self, spec: LstarSpec, observer_store: Store
-    ) -> None:
-        """At the disparity boundary the attestation is still accepted."""
-        store, attestation_data = self._build_two_block_chain(spec, observer_store)
-
-        store = store.model_copy(update={"time": DISPARITY_BOUNDARY_INTERVAL})
-        spec.validate_attestation(store, attestation_data)
-
-    def test_attestation_just_beyond_disparity_boundary_rejected(
-        self, spec: LstarSpec, observer_store: Store
-    ) -> None:
-        """One interval past the disparity boundary the attestation is rejected."""
-        store, attestation_data = self._build_two_block_chain(spec, observer_store)
-
-        store = store.model_copy(update={"time": JUST_BEYOND_DISPARITY_BOUNDARY_INTERVAL})
-
-        with pytest.raises(AssertionError, match="Attestation too far in future"):
-            spec.validate_attestation(store, attestation_data)
-
-    def test_attestation_one_full_slot_in_future_rejected(
-        self, spec: LstarSpec, observer_store: Store
-    ) -> None:
-        """
-        Regression: a full-slot future window must be rejected.
-
-        An earlier rule admitted votes up to a full slot ahead.
-        That window let an adversary pre-publish next-slot aggregates
-        before any honest validator could produce them.
-        """
-        store, attestation_data = self._build_two_block_chain(spec, observer_store)
-
-        store = store.model_copy(update={"time": ONE_FULL_SLOT_BEHIND_INTERVAL})
-
-        with pytest.raises(AssertionError, match="Attestation too far in future"):
-            spec.validate_attestation(store, attestation_data)
 
 
 def test_prunes_entries_with_head_at_finalized(spec: LstarSpec, pruning_store: Store) -> None:
@@ -1575,7 +1582,7 @@ class TestIntegrationScenarios:
         public_keys_per_aggregate: list[list] = [
             [
                 PublicKey.decode_bytes(
-                    bytes(head_state.validators[validator_index].attestation_public_key)
+                    head_state.validators[validator_index].attestation_public_key
                 )
                 for validator_index in proof.participants.to_validator_indices()
             ]
@@ -1635,7 +1642,7 @@ def test_on_block_processes_multi_validator_aggregations(
 
     # Verify attestations can be extracted from aggregated payloads
     extracted_attestations = spec.extract_attestations_from_aggregated_payloads(
-        updated_store, updated_store.latest_known_aggregated_payloads
+        updated_store.latest_known_aggregated_payloads
     )
     assert ValidatorIndex(1) in extracted_attestations
     assert ValidatorIndex(2) in extracted_attestations
@@ -1938,7 +1945,7 @@ class TestOnGossipAggregatedAttestation:
 
     def test_invalid_proof_rejected(self, key_manager: XmssKeyManager, spec: LstarSpec) -> None:
         """
-        Corrupted aggregated proof is rejected with AssertionError.
+        Corrupted aggregated proof is rejected as an invalid signature.
 
         A proof with tampered bytes should fail verification.
         """

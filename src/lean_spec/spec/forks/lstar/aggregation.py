@@ -143,7 +143,7 @@ class AggregationMixin(LstarSpecBase):
                 (
                     signature_entry.validator_index,
                     PublicKey.decode_bytes(
-                        bytes(validators[signature_entry.validator_index].attestation_public_key)
+                        validators[signature_entry.validator_index].attestation_public_key
                     ),
                     signature_entry.signature,
                 )
@@ -174,9 +174,7 @@ class AggregationMixin(LstarSpecBase):
                 (
                     child_proof,
                     [
-                        PublicKey.decode_bytes(
-                            bytes(validators[validator_index].attestation_public_key)
-                        )
+                        PublicKey.decode_bytes(validators[validator_index].attestation_public_key)
                         for validator_index in child_proof.participants.to_validator_indices()
                     ],
                 )

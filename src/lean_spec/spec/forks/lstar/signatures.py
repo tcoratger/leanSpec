@@ -67,9 +67,7 @@ class SignatureMixin(LstarSpecBase):
 
             public_keys_per_message.append(
                 [
-                    PublicKey.decode_bytes(
-                        bytes(validators[validator_index].attestation_public_key)
-                    )
+                    PublicKey.decode_bytes(validators[validator_index].attestation_public_key)
                     for validator_index in validator_indices
                 ]
             )
@@ -92,7 +90,7 @@ class SignatureMixin(LstarSpecBase):
             )
 
         public_keys_per_message.append(
-            [PublicKey.decode_bytes(bytes(validators[proposer_index].proposal_public_key))]
+            [PublicKey.decode_bytes(validators[proposer_index].proposal_public_key)]
         )
         message_bindings.append((hash_tree_root(block), block.slot))
 

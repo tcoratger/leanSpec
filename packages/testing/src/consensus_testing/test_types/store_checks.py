@@ -379,7 +379,7 @@ class StoreChecks(SelectiveCheck):
                     label = "in latest_known"
 
                 extracted_attestations = LstarSpec().extract_attestations_from_aggregated_payloads(
-                    store, payloads
+                    payloads
                 )
                 if attestation_check.validator not in extracted_attestations:
                     raise AssertionError(

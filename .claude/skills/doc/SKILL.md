@@ -38,8 +38,11 @@ When a header doc grows past one overview line, organize the detail under these 
 - **Algorithm** — step-by-step, only for genuinely non-obvious math or CS concepts.
 - **Performance** — complexity, allocation, hot-path notes.
 - **Invariants** — preconditions and rules the caller must preserve.
-- **Why X** — load-bearing rationale that deserves a header instead of buried prose.
 - **Args / Returns / Raises** — Google style, bullets.
+
+Never title a section "Why ..." (for example "# Why the finalized slot is the cutoff").
+That phrasing reads as AI filler.
+State the rationale as plain prose, the way an engineer would explain it to a colleague.
 
 ## Workflow
 
@@ -96,7 +99,7 @@ These are the failure modes most likely to slip into leanSpec PRs:
 ## Gold-standard exemplar
 
 The target style for a well-documented Python function in this project.
-Note the tight one-sentence-per-line header, the structured WHY section, the phase-labeled body, and the ASCII layout diagram.
+Note the tight one-sentence-per-line header, the plain-prose rationale, the phase-labeled body, and the ASCII layout diagram.
 
 ```python
 def encode_bitlist(bits: Sequence[Boolean]) -> bytes:
@@ -109,10 +112,8 @@ def encode_bitlist(bits: Sequence[Boolean]) -> bytes:
     A single 1 bit is placed immediately after the last data bit.
     The trailing bit lets the decoder recover the original count.
 
-    # Why a delimiter
-
     SSZ encodes bitlists as raw bytes with no length prefix.
-    Without a marker, [1, 0] and [1, 0, 0, 0, 0, 0, 0, 0] would share the byte 0x01.
+    Without that trailing bit, [1, 0] and [1, 0, 0, 0, 0, 0, 0, 0] would share the byte 0x01.
     A trailing 1 bit is the smallest sentinel that disambiguates them.
 
     # Layout

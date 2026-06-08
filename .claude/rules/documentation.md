@@ -153,8 +153,11 @@ They are the shared vocabulary for navigating doc-heavy code.
 - **Performance** — complexity, allocation behavior, hot-path notes.
 - **Invariants** — preconditions and rules the caller must preserve.
 - **Args / Returns / Raises** — Google style, one bullet per item.
-- **Why X** — load-bearing rationale that deserves a header instead of being buried in prose.
-  Examples: "Why this threshold", "Why we skip the first byte", "Why a delimiter".
+
+Do NOT title a section "Why ..." (for example "# Why the finalized slot is the cutoff").
+That phrasing reads as AI-generated filler.
+Write the rationale as plain prose, the way a human engineer would explain it to a colleague.
+The reasoning still belongs in the doc — just state it directly, without a question-style banner over it.
 
 ## Inline comment patterns
 
@@ -226,6 +229,8 @@ No floating explanation blocks separated from the code they describe.
 - Padding simple module or file headers with prose.
 - Describing individual methods inside the class header — each gets its own docstring.
 - Banner-style separator comments such as `# =====` or `# -----`.
+- "Why ..."-titled section headers (e.g. "# Why the finalized slot is the cutoff") — they read as AI filler; state the reasoning in plain prose instead.
+- Marketing or salesy tone of any kind — write plain, human, engineer-to-engineer wording.
 - Dense prose blocks longer than three contiguous lines — break into bullets or labeled sub-sections.
 - Algorithm recap in the docstring when the body already has labeled phase comments.
 - Skipping the WHY comment when behavior is non-obvious from code.
