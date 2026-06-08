@@ -157,8 +157,9 @@ class TestSignBlock:
             body=sync_service.store.blocks[sync_service.store.head].body,
         )
 
-        with pytest.raises(ValueError, match="No secret key for validator 42"):
+        with pytest.raises(ValueError) as exception_info:
             service._sign_block(block, ValidatorIndex(42), [])
+        assert str(exception_info.value) == "No secret key for validator 42"
 
 
 class TestSignAttestation:
@@ -226,8 +227,9 @@ class TestSignAttestation:
         )
         attestation_data = spec.produce_attestation_data(sync_service.store, Slot(1))
 
-        with pytest.raises(ValueError, match="No secret key for validator 99"):
+        with pytest.raises(ValueError) as exception_info:
             service._sign_attestation(attestation_data, ValidatorIndex(99))
+        assert str(exception_info.value) == "No secret key for validator 99"
 
 
 class TestSignWithKey:

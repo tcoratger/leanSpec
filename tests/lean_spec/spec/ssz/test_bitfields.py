@@ -1,7 +1,6 @@
 """Tests for the Bitvector and Bitlist types."""
 
 import io
-import re
 from typing import Any
 
 import pytest
@@ -58,8 +57,9 @@ class TestBitvector:
 
     def test_instantiate_raw_type_raises_error(self) -> None:
         """Direct instantiation of the abstract base raises SSZTypeError."""
-        with pytest.raises(SSZTypeError, match=re.escape("BaseBitvector must define LENGTH")):
+        with pytest.raises(SSZTypeError) as exception_info:
             BaseBitvector(data=[])
+        assert str(exception_info.value) == "BaseBitvector must define LENGTH"
 
     def test_instantiation_success(self) -> None:
         """Instantiation succeeds with exactly LENGTH boolean items."""
@@ -89,13 +89,12 @@ class TestBitvector:
         self, bits: list[Boolean], expected_element_count: int
     ) -> None:
         """Wrong-length input raises with the exact element count in the message."""
-        with pytest.raises(
-            ValueOrValidationError,
-            match=re.escape(
-                f"Bitvector4 requires exactly 4 elements, got {expected_element_count}"
-            ),
-        ):
+        with pytest.raises(ValueOrValidationError) as exception_info:
             Bitvector4(data=bits)
+        assert (
+            str(exception_info.value)
+            == f"Bitvector4 requires exactly 4 elements, got {expected_element_count}"
+        )
 
     def test_pydantic_validation_accepts_valid_list(self) -> None:
         """Pydantic validation accepts a valid list of booleans."""
@@ -145,8 +144,9 @@ class TestBitlist:
 
     def test_instantiate_raw_type_raises_error(self) -> None:
         """Direct instantiation of the abstract base raises SSZTypeError."""
-        with pytest.raises(SSZTypeError, match=re.escape("BaseBitlist must define LIMIT")):
+        with pytest.raises(SSZTypeError) as exception_info:
             BaseBitlist(data=[])
+        assert str(exception_info.value) == "BaseBitlist must define LIMIT"
 
     def test_instantiation_success(self) -> None:
         """Instantiation succeeds with any number of items up to LIMIT."""
@@ -175,21 +175,17 @@ class TestBitlist:
         self, non_iterable: Any, type_name: str
     ) -> None:
         """Non-iterable input raises SSZTypeError naming the offending type."""
-        with pytest.raises(
-            (SSZTypeError, ValidationError),
-            match=re.escape(f"Expected iterable, got {type_name}"),
-        ):
+        with pytest.raises((SSZTypeError, ValidationError)) as exception_info:
             Bitlist8(data=non_iterable)
+        assert str(exception_info.value) == f"Expected iterable, got {type_name}"
 
     @pytest.mark.parametrize("rejected", ["0101", b"\x00\x01"])
     def test_instantiation_from_str_or_bytes_raises(self, rejected: Any) -> None:
         """str and bytes are iterable but explicitly rejected — their elements are not booleans."""
         type_name = type(rejected).__name__
-        with pytest.raises(
-            (SSZTypeError, ValidationError),
-            match=re.escape(f"Expected iterable, got {type_name}"),
-        ):
+        with pytest.raises((SSZTypeError, ValidationError)) as exception_info:
             Bitlist8(data=rejected)
+        assert str(exception_info.value) == f"Expected iterable, got {type_name}"
 
     def test_instantiation_over_limit_raises_error(self) -> None:
         """Input exceeding LIMIT raises with the exact size in the message."""
@@ -197,11 +193,9 @@ class TestBitlist:
         class Bitlist4(BaseBitlist):
             LIMIT = 4
 
-        with pytest.raises(
-            ValueOrValidationError,
-            match=re.escape("Bitlist4 exceeds limit of 4, got 5"),
-        ):
+        with pytest.raises(ValueOrValidationError) as exception_info:
             Bitlist4(data=[Boolean(bit) for bit in [True, False, True, False, True]])
+        assert str(exception_info.value) == "Bitlist4 exceeds limit of 4, got 5"
 
     def test_pydantic_validation_accepts_valid_list(self) -> None:
         """Pydantic validation accepts a valid list of booleans."""
@@ -271,11 +265,9 @@ class TestBitlist:
             LIMIT = 4
 
         bitlist = Bitlist4(data=[Boolean(True), Boolean(False), Boolean(True)])
-        with pytest.raises(
-            ValueOrValidationError,
-            match=re.escape("Bitlist4 exceeds limit of 4, got 5"),
-        ):
+        with pytest.raises(ValueOrValidationError) as exception_info:
             _ = bitlist + [Boolean(False), Boolean(True)]
+        assert str(exception_info.value) == "Bitlist4 exceeds limit of 4, got 5"
 
 
 class TestBitfieldSSZ:
@@ -297,11 +289,11 @@ class TestBitfieldSSZ:
             LIMIT = 10
 
         assert Bitlist10.is_fixed_size() is False
-        with pytest.raises(
-            SSZTypeError,
-            match=re.escape("Bitlist10: variable-size bitlist has no fixed byte length"),
-        ):
+        with pytest.raises(SSZTypeError) as exception_info:
             Bitlist10.get_byte_length()
+        assert (
+            str(exception_info.value) == "Bitlist10: variable-size bitlist has no fixed byte length"
+        )
 
     @pytest.mark.parametrize(
         "length, bits, expected_hex",
@@ -380,8 +372,9 @@ class TestBitfieldSSZ:
         class Bitvector8(BaseBitvector):
             LENGTH = 8
 
-        with pytest.raises(SSZValueError, match=re.escape("Bitvector8: expected 1 bytes, got 2")):
+        with pytest.raises(SSZValueError) as exception_info:
             Bitvector8.decode_bytes(b"\x01\x02")
+        assert str(exception_info.value) == "Bitvector8: expected 1 bytes, got 2"
 
     def test_bitvector_deserialize_invalid_scope(self) -> None:
         """Bitvector.deserialize rejects a scope mismatching the type's byte length."""
@@ -390,10 +383,9 @@ class TestBitfieldSSZ:
             LENGTH = 8
 
         stream = io.BytesIO(b"\xff")
-        with pytest.raises(
-            SSZSerializationError, match=re.escape("Bitvector8: expected 1 bytes, got 2")
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bitvector8.deserialize(stream, scope=2)
+        assert str(exception_info.value) == "Bitvector8: expected 1 bytes, got 2"
 
     def test_bitvector_deserialize_premature_end(self) -> None:
         """Bitvector.deserialize rejects a stream that ends before the declared scope."""
@@ -402,10 +394,9 @@ class TestBitfieldSSZ:
             LENGTH = 16
 
         stream = io.BytesIO(b"\xff")
-        with pytest.raises(
-            SSZSerializationError, match=re.escape("Bitvector16: expected 2 bytes, got 1")
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bitvector16.deserialize(stream, scope=2)
+        assert str(exception_info.value) == "Bitvector16: expected 2 bytes, got 1"
 
     def test_bitlist_decode_empty_bytes(self) -> None:
         """Bitlist.decode_bytes rejects an empty byte sequence."""
@@ -413,11 +404,9 @@ class TestBitfieldSSZ:
         class Bitlist8(BaseBitlist):
             LIMIT = 8
 
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("Bitlist8: cannot decode empty bytes"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bitlist8.decode_bytes(b"")
+        assert str(exception_info.value) == "Bitlist8: cannot decode empty bytes"
 
     def test_bitlist_decode_all_zero_bytes(self) -> None:
         """Bitlist.decode_bytes rejects non-empty input with no 1 bits — no delimiter to locate."""
@@ -425,11 +414,9 @@ class TestBitfieldSSZ:
         class Bitlist8(BaseBitlist):
             LIMIT = 8
 
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("Bitlist8: no delimiter bit found"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bitlist8.decode_bytes(b"\x00")
+        assert str(exception_info.value) == "Bitlist8: no delimiter bit found"
 
     def test_bitlist_decode_exceeds_limit(self) -> None:
         """Bitlist.decode_bytes rejects encodings whose recovered bit count exceeds LIMIT."""
@@ -438,11 +425,9 @@ class TestBitfieldSSZ:
             LIMIT = 8
 
         # Bytes [0xFF, 0xFF, 0x01] mean 16 data bits + delimiter at bit 16 — > LIMIT=8.
-        with pytest.raises(
-            SSZValueError,
-            match=re.escape("Bitlist8 exceeds limit of 8, got 16"),
-        ):
+        with pytest.raises(SSZValueError) as exception_info:
             Bitlist8.decode_bytes(b"\xff\xff\x01")
+        assert str(exception_info.value) == "Bitlist8 exceeds limit of 8, got 16"
 
     def test_bitlist_deserialize_premature_end(self) -> None:
         """Bitlist.deserialize rejects a stream that ends before the declared scope."""
@@ -451,11 +436,9 @@ class TestBitfieldSSZ:
             LIMIT = 16
 
         stream = io.BytesIO(b"\xff")
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("Bitlist16: expected 2 bytes, got 1"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bitlist16.deserialize(stream, scope=2)
+        assert str(exception_info.value) == "Bitlist16: expected 2 bytes, got 1"
 
 
 @given(bits=st.lists(st.booleans(), max_size=8))

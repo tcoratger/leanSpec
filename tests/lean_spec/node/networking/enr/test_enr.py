@@ -157,19 +157,22 @@ class TestTextFormatValidation:
         """ENR must start with 'enr:' prefix."""
         # Remove prefix from valid ENR
         invalid = OFFICIAL_ENR_STRING[len(ENR_PREFIX) :]
-        with pytest.raises(ValueError, match=r"must start with 'enr:'"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(invalid)
+        assert str(exception_info.value) == "ENR must start with 'enr:'"
 
     def test_wrong_prefix_rejected(self) -> None:
         """ENR with wrong prefix is rejected."""
         invalid = "eth:" + OFFICIAL_ENR_STRING[len(ENR_PREFIX) :]
-        with pytest.raises(ValueError, match=r"must start with 'enr:'"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(invalid)
+        assert str(exception_info.value) == "ENR must start with 'enr:'"
 
     def test_empty_string_rejected(self) -> None:
         """Empty string is rejected."""
-        with pytest.raises(ValueError, match=r"must start with 'enr:'"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string("")
+        assert str(exception_info.value) == "ENR must start with 'enr:'"
 
     def test_prefix_only_rejected(self) -> None:
         """Prefix only without data is rejected."""
@@ -179,8 +182,9 @@ class TestTextFormatValidation:
     def test_invalid_base64_rejected(self) -> None:
         """Invalid base64 encoding is rejected."""
         invalid = "enr:!!!invalid-base64!!!"
-        with pytest.raises(ValueError, match=r"Invalid base64"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(invalid)
+        assert str(exception_info.value) == "Invalid base64 encoding: Incorrect padding"
 
     def test_base64url_without_padding(self) -> None:
         """Base64url without padding is handled correctly."""
@@ -191,8 +195,9 @@ class TestTextFormatValidation:
     def test_case_sensitive_prefix(self) -> None:
         """Prefix is case-sensitive (ENR: is invalid)."""
         invalid = "ENR:" + OFFICIAL_ENR_STRING[len(ENR_PREFIX) :]
-        with pytest.raises(ValueError, match=r"must start with 'enr:'"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(invalid)
+        assert str(exception_info.value) == "ENR must start with 'enr:'"
 
 
 class TestRLPStructureValidation:
@@ -205,8 +210,9 @@ class TestRLPStructureValidation:
         rlp_data = encode_rlp([b"\x00" * 64])
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
-        with pytest.raises(ValueError, match=r"at least signature and seq"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(f"enr:{b64_content}")
+        assert str(exception_info.value) == "ENR must have at least signature and seq"
 
     def test_odd_number_of_kv_pairs_rejected(self) -> None:
         """ENR key/value pairs must be even count."""
@@ -214,15 +220,17 @@ class TestRLPStructureValidation:
         rlp_data = encode_rlp([b"\x00" * 64, b"\x01", b"id"])
         b64_content = base64.urlsafe_b64encode(rlp_data).decode("utf-8").rstrip("=")
 
-        with pytest.raises(ValueError, match=r"key/value pairs must be even"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(f"enr:{b64_content}")
+        assert str(exception_info.value) == "ENR key/value pairs must be even"
 
     def test_empty_rlp_rejected(self) -> None:
         """Empty RLP data is rejected."""
         b64_content = base64.urlsafe_b64encode(b"").decode("utf-8").rstrip("=")
 
-        with pytest.raises(ValueError, match=r"Invalid RLP"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(f"enr:{b64_content}")
+        assert str(exception_info.value) == "Invalid RLP encoding: Empty RLP data"
 
     def test_malformed_rlp_rejected(self) -> None:
         """Malformed RLP is rejected."""
@@ -230,8 +238,9 @@ class TestRLPStructureValidation:
         malformed = bytes([0xC5, 0x01, 0x02])  # Claims 5 bytes but only has 2
         b64_content = base64.urlsafe_b64encode(malformed).decode("utf-8").rstrip("=")
 
-        with pytest.raises(ValueError, match=r"Invalid RLP"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(f"enr:{b64_content}")
+        assert str(exception_info.value) == "Invalid RLP encoding: Data too short: need 6, have 3"
 
     def test_valid_minimal_enr(self) -> None:
         """Minimal valid ENR with only required fields parses."""
@@ -438,12 +447,13 @@ class TestValidationMethods:
     def test_construction_fails_for_wrong_signature_length(self) -> None:
         """ENR construction fails when signature is not exactly 64 bytes."""
         # 63 bytes should fail - Bytes64 enforces exactly 64 bytes
-        with pytest.raises(SSZValueError, match="requires exactly 64 bytes"):
+        with pytest.raises(SSZValueError) as exception_info:
             ENR(
                 signature=Bytes64(b"\x00" * 63),
                 seq=SeqNumber(1),
                 pairs={keys.ID: b"v4", keys.SECP256K1: b"\x02" + b"\x00" * 32},
             )
+        assert str(exception_info.value) == "Bytes64 requires exactly 64 bytes, got 63"
 
 
 class TestMultiaddrGeneration:
@@ -811,8 +821,9 @@ class TestMaxSizeEnforcement:
             assert len(padded) == 301
             b64 = base64.urlsafe_b64encode(padded).decode().rstrip("=")
 
-            with pytest.raises(ValueError, match="exceeds max size"):
+            with pytest.raises(ValueError) as exception_info:
                 ENR.from_string(f"enr:{b64}")
+            assert str(exception_info.value) == "ENR exceeds max size: 301 > 300"
 
 
 class TestKeyOrderingEnforcement:
@@ -852,8 +863,11 @@ class TestKeyOrderingEnforcement:
         )
         b64 = base64.urlsafe_b64encode(rlp).decode().rstrip("=")
 
-        with pytest.raises(ValueError, match="lexicographically sorted"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(f"enr:{b64}")
+        assert str(exception_info.value) == (
+            "ENR keys must be lexicographically sorted per EIP-778: 'id' follows 'secp256k1'"
+        )
 
     def test_duplicate_keys_rejected(self) -> None:
         """ENR with duplicate keys is rejected."""
@@ -870,8 +884,11 @@ class TestKeyOrderingEnforcement:
         )
         b64 = base64.urlsafe_b64encode(rlp).decode().rstrip("=")
 
-        with pytest.raises(ValueError, match="lexicographically sorted"):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string(f"enr:{b64}")
+        assert str(exception_info.value) == (
+            "ENR keys must be lexicographically sorted per EIP-778: 'id' follows 'id'"
+        )
 
 
 class TestRoundTripSerialization:

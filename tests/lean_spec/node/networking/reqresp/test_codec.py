@@ -62,21 +62,24 @@ class TestRequestCodec:
 
     def test_decode_empty_raises(self) -> None:
         """Empty input raises CodecError."""
-        with pytest.raises(CodecError, match="Empty request"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(b"")
+        assert str(exception_info.value) == "Empty request"
 
     def test_decode_invalid_varint_raises(self) -> None:
         """Invalid varint raises CodecError."""
-        with pytest.raises(CodecError, match="length"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff")
+        assert str(exception_info.value) == "Invalid request length: Varint exceeds 10 bytes"
 
     def test_length_mismatch_raises(self) -> None:
         """Mismatched declared length raises CodecError."""
         # Encode valid request, then modify the length prefix
         encoded = bytearray(encode_request(b"test"))
         encoded[0] = 0x10  # Change declared length to 16
-        with pytest.raises(CodecError, match="mismatch"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(bytes(encoded))
+        assert str(exception_info.value) == "Length mismatch: declared 16, got 4"
 
 
 class TestResponseCodec:
@@ -114,13 +117,15 @@ class TestResponseCodec:
 
     def test_decode_empty_raises(self) -> None:
         """Empty input raises CodecError."""
-        with pytest.raises(CodecError, match="Empty response"):
+        with pytest.raises(CodecError) as exception_info:
             ResponseCode.decode(b"")
+        assert str(exception_info.value) == "Empty response"
 
     def test_decode_too_short_raises(self) -> None:
         """Too-short input raises CodecError."""
-        with pytest.raises(CodecError, match="too short"):
+        with pytest.raises(CodecError) as exception_info:
             ResponseCode.decode(b"\x00")
+        assert str(exception_info.value) == "Response too short"
 
     def test_unknown_code_handled(self) -> None:
         """Unknown response codes are handled gracefully."""
@@ -206,8 +211,9 @@ class TestBoundaryConditions:
         malformed = bytes([0x80] * 10 + [0x01])
         assert len(malformed) == 11
 
-        with pytest.raises(VarintError, match="exceeds 10 bytes"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(malformed)
+        assert str(exception_info.value) == "Varint exceeds 10 bytes"
 
     def test_payload_at_max_size(self) -> None:
         """Payload at exactly MAX_PAYLOAD_SIZE is accepted."""
@@ -227,8 +233,11 @@ class TestBoundaryConditions:
         """Payload exceeding MAX_PAYLOAD_SIZE is rejected on encode."""
         oversized = b"X" * (MAX_PAYLOAD_SIZE + 1)
 
-        with pytest.raises(CodecError, match="too large"):
+        with pytest.raises(CodecError) as exception_info:
             encode_request(oversized)
+        assert str(exception_info.value) == (
+            f"Payload too large: {MAX_PAYLOAD_SIZE + 1} > {MAX_PAYLOAD_SIZE}"
+        )
 
     def test_declared_length_over_max_rejected_on_decode(self) -> None:
         """Declared length exceeding MAX_PAYLOAD_SIZE is rejected on decode."""
@@ -240,8 +249,11 @@ class TestBoundaryConditions:
         # Skip the original varint (which is 1 byte for "test" length 4)
         malformed = oversized_length + valid_encoded[1:]
 
-        with pytest.raises(CodecError, match="too large"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(malformed)
+        assert str(exception_info.value) == (
+            f"Declared length too large: {MAX_PAYLOAD_SIZE + 1} > {MAX_PAYLOAD_SIZE}"
+        )
 
     def test_response_payload_at_max_size(self) -> None:
         """Response payload at exactly MAX_PAYLOAD_SIZE is accepted."""
@@ -280,8 +292,9 @@ class TestMaliciousInputs:
         # Original encodes length 5, change to claim length 100
         malformed = encode_varint(100) + valid[1:]
 
-        with pytest.raises(CodecError, match="mismatch"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(malformed)
+        assert str(exception_info.value) == "Length mismatch: declared 100, got 5"
 
     def test_length_mismatch_too_long(self) -> None:
         """Declared length smaller than actual decompressed data is rejected."""
@@ -292,8 +305,9 @@ class TestMaliciousInputs:
         # Change to claim length 5 instead of 19
         malformed = encode_varint(5) + valid[1:]
 
-        with pytest.raises(CodecError, match="mismatch"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(malformed)
+        assert str(exception_info.value) == "Length mismatch: declared 5, got 19"
 
     def test_truncated_snappy_stream(self) -> None:
         """Truncated snappy framed data is rejected."""
@@ -302,8 +316,11 @@ class TestMaliciousInputs:
         # Cut off the last few bytes to truncate the snappy frame
         truncated = valid[:-5]
 
-        with pytest.raises(CodecError, match="Decompression failed"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(truncated)
+        assert str(exception_info.value) == (
+            "Decompression failed: Chunk extends past end: need 13 bytes at 14, have 8"
+        )
 
     def test_invalid_snappy_stream_identifier(self) -> None:
         """Invalid snappy stream identifier is rejected."""
@@ -315,8 +332,9 @@ class TestMaliciousInputs:
 
         malformed = varint_prefix + fake_snappy
 
-        with pytest.raises(CodecError, match="Decompression failed"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(malformed)
+        assert str(exception_info.value) == "Decompression failed: Invalid stream identifier"
 
     def test_corrupted_snappy_crc(self) -> None:
         """Snappy frame with corrupted CRC is rejected."""
@@ -332,16 +350,22 @@ class TestMaliciousInputs:
         crc_start = 1 + 10 + 4  # Offset to CRC
         corrupted[crc_start] ^= 0xFF  # Flip all bits in first CRC byte
 
-        with pytest.raises(CodecError, match="Decompression failed"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(bytes(corrupted))
+        assert str(exception_info.value) == (
+            "Decompression failed: CRC mismatch: stored 0x50dac131, computed 0x50dac1ce"
+        )
 
     def test_missing_snappy_data(self) -> None:
         """Request with varint but no snappy data is rejected."""
         # Just a varint with no payload
         malformed = encode_varint(100)
 
-        with pytest.raises(CodecError, match="Decompression failed"):
+        with pytest.raises(CodecError) as exception_info:
             decode_request(malformed)
+        assert str(exception_info.value) == (
+            "Decompression failed: Input too short for framed snappy"
+        )
 
     def test_response_with_truncated_payload(self) -> None:
         """Response with truncated payload is rejected."""
@@ -350,8 +374,11 @@ class TestMaliciousInputs:
         # Truncate the payload
         truncated = valid[:-10]
 
-        with pytest.raises(CodecError, match="Decompression failed"):
+        with pytest.raises(CodecError) as exception_info:
             ResponseCode.decode(truncated)
+        assert str(exception_info.value) == (
+            "Decompression failed: Chunk extends past end: need 22 bytes at 14, have 12"
+        )
 
     def test_response_code_boundary_values(self) -> None:
         """Response codes at boundary values are handled correctly."""

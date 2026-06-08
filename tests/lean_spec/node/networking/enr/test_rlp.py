@@ -296,23 +296,27 @@ class TestEncodeTypeErrors:
 
     def test_encode_invalid_type_int(self) -> None:
         """Encoding an integer directly raises TypeError."""
-        with pytest.raises(TypeError, match=r"^Cannot RLP encode type: int$"):
+        with pytest.raises(TypeError) as exception_info:
             encode_rlp(42)  # type: ignore[arg-type]
+        assert str(exception_info.value) == "Cannot RLP encode type: int"
 
     def test_encode_invalid_type_str(self) -> None:
         """Encoding a string directly raises TypeError."""
-        with pytest.raises(TypeError, match=r"^Cannot RLP encode type: str$"):
+        with pytest.raises(TypeError) as exception_info:
             encode_rlp("hello")  # type: ignore[arg-type]
+        assert str(exception_info.value) == "Cannot RLP encode type: str"
 
     def test_encode_invalid_type_none(self) -> None:
         """Encoding None raises TypeError."""
-        with pytest.raises(TypeError, match=r"^Cannot RLP encode type: NoneType$"):
+        with pytest.raises(TypeError) as exception_info:
             encode_rlp(None)  # type: ignore[arg-type]
+        assert str(exception_info.value) == "Cannot RLP encode type: NoneType"
 
     def test_encode_invalid_nested_type(self) -> None:
         """Encoding a list with invalid nested type raises TypeError."""
-        with pytest.raises(TypeError, match=r"^Cannot RLP encode type: int$"):
+        with pytest.raises(TypeError) as exception_info:
             encode_rlp([b"valid", 123])  # type: ignore[list-item]
+        assert str(exception_info.value) == "Cannot RLP encode type: int"
 
 
 class TestDecodeEmptyString:
@@ -445,86 +449,94 @@ class TestDecodeErrors:
 
     def test_decode_empty_data(self) -> None:
         """Decoding empty data raises RLPDecodingError."""
-        with pytest.raises(RLPDecodingError, match=r"^Empty RLP data$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(b"")
+        assert str(exception_info.value) == "Empty RLP data"
 
     def test_decode_trailing_data(self) -> None:
         """Extra bytes after valid RLP raise RLPDecodingError."""
         # Valid empty string (0x80) followed by extra byte
-        with pytest.raises(RLPDecodingError, match=r"^Trailing data: decoded 1 of 2 bytes$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("8000"))
+        assert str(exception_info.value) == "Trailing data: decoded 1 of 2 bytes"
 
     def test_decode_short_string_truncated(self) -> None:
         """Truncated short string raises RLPDecodingError."""
         # 0x83 indicates 3-byte string, but only 2 bytes provided
-        with pytest.raises(RLPDecodingError, match=r"^Data too short: need 4, have 3$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("836465"))  # "de" instead of "dog"
+        assert str(exception_info.value) == "Data too short: need 4, have 3"
 
     def test_decode_long_string_truncated_length(self) -> None:
         """Truncated length field in long string raises RLPDecodingError."""
         # 0xb9 indicates 2-byte length, but only 1 byte provided
-        with pytest.raises(RLPDecodingError, match=r"^Data too short: need 3, have 2$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("b904"))
+        assert str(exception_info.value) == "Data too short: need 3, have 2"
 
     def test_decode_long_string_truncated_payload(self) -> None:
         """Truncated payload in long string raises RLPDecodingError."""
         # 0xb838 indicates 56 bytes, but insufficient data provided
-        with pytest.raises(RLPDecodingError, match=r"^Data too short: need 58, have 4$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("b8380000"))  # Only 2 bytes of payload
+        assert str(exception_info.value) == "Data too short: need 58, have 4"
 
     def test_decode_short_list_truncated(self) -> None:
         """Truncated short list raises RLPDecodingError."""
         # 0xc3 indicates 3-byte payload, but only 2 bytes provided
-        with pytest.raises(RLPDecodingError, match=r"^Data too short: need 4, have 3$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("c38080"))
+        assert str(exception_info.value) == "Data too short: need 4, have 3"
 
     def test_decode_long_list_truncated_length(self) -> None:
         """Truncated length field in long list raises RLPDecodingError."""
         # 0xf9 indicates 2-byte length, but only 1 byte provided
-        with pytest.raises(RLPDecodingError, match=r"^Data too short: need 3, have 2$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("f904"))
+        assert str(exception_info.value) == "Data too short: need 3, have 2"
 
     def test_decode_non_canonical_long_string_for_short(self) -> None:
         """Using long string encoding for short string is non-canonical."""
         # 0xb801 indicates long string with 1-byte length containing 0x38 (56)
         # but 0x38 <= 55, so this should be encoded as short string
-        expected_error_pattern = r"^Non-canonical: long string encoding for short string$"
-        with pytest.raises(RLPDecodingError, match=expected_error_pattern):
+        with pytest.raises(RLPDecodingError) as exception_info:
             # 0xb8 followed by length 0x37 (55) - should have used short encoding
             decode_rlp(bytes.fromhex("b837") + b"a" * 55)
+        assert str(exception_info.value) == "Non-canonical: long string encoding for short string"
 
     def test_decode_non_canonical_long_list_for_short(self) -> None:
         """Using long list encoding for short list is non-canonical."""
         # 0xf8 followed by length 0x37 (55) - should have used short encoding
-        expected_error_pattern = r"^Non-canonical: long list encoding for short list$"
-        with pytest.raises(RLPDecodingError, match=expected_error_pattern):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("f837") + bytes.fromhex("80") * 55)
+        assert str(exception_info.value) == "Non-canonical: long list encoding for short list"
 
     def test_decode_non_canonical_leading_zeros_long_string(self) -> None:
         """Long string whose multi-byte length carries a leading zero is non-canonical."""
         # 0xb9 marks a long string with two length bytes.
         # The length bytes 00 38 decode to 56.
         # The leading zero is redundant since the canonical form is 0xb8 38 with one length byte.
-        expected_error_pattern = r"^Non-canonical: leading zeros in length encoding$"
-        with pytest.raises(RLPDecodingError, match=expected_error_pattern):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("b90038") + b"a" * 56)
+        assert str(exception_info.value) == "Non-canonical: leading zeros in length encoding"
 
     def test_decode_non_canonical_leading_zeros_long_list(self) -> None:
         """Long list whose multi-byte length carries a leading zero is non-canonical."""
         # 0xf9 marks a long list with two length bytes.
         # The length bytes 00 38 decode to 56.
         # The leading zero is redundant since the canonical form is 0xf8 38 with one length byte.
-        expected_error_pattern = r"^Non-canonical: leading zeros in length encoding$"
-        with pytest.raises(RLPDecodingError, match=expected_error_pattern):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("f90038") + bytes.fromhex("80") * 56)
+        assert str(exception_info.value) == "Non-canonical: leading zeros in length encoding"
 
     def test_decode_list_payload_length_mismatch(self) -> None:
         """Inner item that overshoots the parent list boundary is rejected."""
         # Outer list 0xc3 declares three payload bytes.
         # Inner short string 0x85 declares five data bytes.
         # Those five bytes fit in the buffer but extend past the outer list's payload end.
-        with pytest.raises(RLPDecodingError, match=r"^List payload length mismatch$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp(bytes.fromhex("c3856161616161"))
+        assert str(exception_info.value) == "List payload length mismatch"
 
 
 class TestDecodeListFunction:
@@ -537,14 +549,16 @@ class TestDecodeListFunction:
 
     def test_decode_list_not_a_list(self) -> None:
         """decode_list raises error when data is not a list."""
-        with pytest.raises(RLPDecodingError, match=r"^Expected RLP list$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp_list(bytes.fromhex("83646f67"))  # Encodes "dog", not a list
+        assert str(exception_info.value) == "Expected RLP list"
 
     def test_decode_list_nested_list_rejected(self) -> None:
         """decode_list raises error when list contains nested lists."""
         # First element of [[[], []], []] is the inner list at index 0.
-        with pytest.raises(RLPDecodingError, match=r"^Element 0 is not bytes$"):
+        with pytest.raises(RLPDecodingError) as exception_info:
             decode_rlp_list(bytes.fromhex("c4c2c0c0c0"))  # [[[], []], []]
+        assert str(exception_info.value) == "Element 0 is not bytes"
 
 
 class TestEncodeDecodeRoundtrip:

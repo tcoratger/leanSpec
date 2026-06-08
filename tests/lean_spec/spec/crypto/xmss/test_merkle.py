@@ -101,7 +101,7 @@ def test_commit_open_verify_roundtrip(
 
 def test_new_rejects_nodes_overflowing_their_level() -> None:
     """A node run that does not fit its level raises with the level and bounds named."""
-    with pytest.raises(ValueError, match=r"Overflow at layer 0: start=3, count=2, max=4"):
+    with pytest.raises(ValueError) as exception_info:
         HashSubTree.new(
             poseidon=POSEIDON,
             config=TEST_CONFIG,
@@ -111,30 +111,34 @@ def test_new_rejects_nodes_overflowing_their_level() -> None:
             parameter=random_parameter(TEST_CONFIG),
             lowest_layer_nodes=[random_domain(TEST_CONFIG), random_domain(TEST_CONFIG)],
         )
+    assert str(exception_info.value) == "Overflow at layer 0: start=3, count=2, max=4"
 
 
 def test_new_top_tree_rejects_odd_depth() -> None:
     """The top tree requires an even depth for the top-bottom split."""
-    with pytest.raises(ValueError, match=r"Depth must be even for top-bottom split, got 7."):
+    with pytest.raises(ValueError) as exception_info:
         HashSubTree.new_top_tree(
             POSEIDON, TEST_CONFIG, 7, Uint64(0), random_parameter(TEST_CONFIG), []
         )
+    assert str(exception_info.value) == "Depth must be even for top-bottom split, got 7."
 
 
 def test_new_bottom_tree_rejects_odd_depth() -> None:
     """The bottom tree requires an even depth for the top-bottom split."""
-    with pytest.raises(ValueError, match=r"Depth must be even for top-bottom split, got 7."):
+    with pytest.raises(ValueError) as exception_info:
         HashSubTree.new_bottom_tree(
             POSEIDON, TEST_CONFIG, 7, Uint64(0), random_parameter(TEST_CONFIG), []
         )
+    assert str(exception_info.value) == "Depth must be even for top-bottom split, got 7."
 
 
 def test_new_bottom_tree_rejects_wrong_leaf_count() -> None:
     """The bottom tree requires exactly the square-root-of-lifetime leaves."""
-    with pytest.raises(ValueError, match=r"Expected 16 leaves for depth=8, got 0."):
+    with pytest.raises(ValueError) as exception_info:
         HashSubTree.new_bottom_tree(
             POSEIDON, TEST_CONFIG, 8, Uint64(0), random_parameter(TEST_CONFIG), []
         )
+    assert str(exception_info.value) == "Expected 16 leaves for depth=8, got 0."
 
 
 def test_root_rejects_empty_subtree() -> None:
@@ -144,8 +148,9 @@ def test_root_rejects_empty_subtree() -> None:
         lowest_layer=Uint64(0),
         layers=HashTreeLayers(data=[]),
     )
-    with pytest.raises(ValueError, match=r"Empty subtree has no root."):
+    with pytest.raises(ValueError) as exception_info:
         subtree.root()
+    assert str(exception_info.value) == "Empty subtree has no root."
 
 
 def test_root_rejects_empty_top_layer() -> None:
@@ -156,8 +161,9 @@ def test_root_rejects_empty_top_layer() -> None:
         lowest_layer=Uint64(0),
         layers=HashTreeLayers(data=[empty_layer]),
     )
-    with pytest.raises(ValueError, match=r"Top layer is empty."):
+    with pytest.raises(ValueError) as exception_info:
         subtree.root()
+    assert str(exception_info.value) == "Top layer is empty."
 
 
 def test_path_rejects_empty_subtree() -> None:
@@ -167,8 +173,9 @@ def test_path_rejects_empty_subtree() -> None:
         lowest_layer=Uint64(0),
         layers=HashTreeLayers(data=[]),
     )
-    with pytest.raises(ValueError, match=r"Empty subtree."):
+    with pytest.raises(ValueError) as exception_info:
         subtree.path(Uint64(0))
+    assert str(exception_info.value) == "Empty subtree."
 
 
 def test_path_rejects_position_out_of_bounds() -> None:
@@ -182,8 +189,9 @@ def test_path_rejects_position_out_of_bounds() -> None:
         lowest_layer=Uint64(0),
         layers=HashTreeLayers(data=[layer]),
     )
-    with pytest.raises(ValueError, match=r"Position 5 out of bounds."):
+    with pytest.raises(ValueError) as exception_info:
         subtree.path(Uint64(5))
+    assert str(exception_info.value) == "Position 5 out of bounds."
 
 
 def test_path_rejects_sibling_out_of_bounds() -> None:
@@ -204,8 +212,9 @@ def test_path_rejects_sibling_out_of_bounds() -> None:
         lowest_layer=Uint64(0),
         layers=HashTreeLayers(data=[leaf_layer, middle_layer, root_layer]),
     )
-    with pytest.raises(ValueError, match=r"Sibling index 1 out of bounds."):
+    with pytest.raises(ValueError) as exception_info:
         subtree.path(Uint64(0))
+    assert str(exception_info.value) == "Sibling index 1 out of bounds."
 
 
 @pytest.fixture(scope="module")
@@ -256,8 +265,9 @@ def test_combined_path_rejects_depth_mismatch(
     mismatched = HashSubTree(
         depth=Uint64(6), lowest_layer=bottom_zero.lowest_layer, layers=bottom_zero.layers
     )
-    with pytest.raises(ValueError, match=r"Depth mismatch: top=8, bottom=6."):
+    with pytest.raises(ValueError) as exception_info:
         combined_path(top, mismatched, Uint64(0))
+    assert str(exception_info.value) == "Depth mismatch: top=8, bottom=6."
 
 
 def test_combined_path_rejects_odd_depth(
@@ -269,8 +279,9 @@ def test_combined_path_rejects_odd_depth(
     odd_bottom = HashSubTree(
         depth=Uint64(7), lowest_layer=bottom_zero.lowest_layer, layers=bottom_zero.layers
     )
-    with pytest.raises(ValueError, match=r"Depth must be even, got 7."):
+    with pytest.raises(ValueError) as exception_info:
         combined_path(odd_top, odd_bottom, Uint64(7))
+    assert str(exception_info.value) == "Depth must be even, got 7."
 
 
 def test_combined_path_rejects_wrong_bottom_tree(
@@ -278,11 +289,9 @@ def test_combined_path_rejects_wrong_bottom_tree(
 ) -> None:
     """A position belonging to a sibling bottom tree is refused."""
     _, top, bottom_zero, _ = prf_trees
-    with pytest.raises(
-        ValueError,
-        match=r"Wrong bottom tree: position 16 needs start 16, got 0.",
-    ):
+    with pytest.raises(ValueError) as exception_info:
         combined_path(top, bottom_zero, Uint64(16))
+    assert str(exception_info.value) == "Wrong bottom tree: position 16 needs start 16, got 0."
 
 
 def test_from_prf_key_builds_a_bottom_tree() -> None:

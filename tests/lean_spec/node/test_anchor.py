@@ -48,7 +48,7 @@ class TestAnchorFromCheckpoint:
                 new_callable=AsyncMock,
                 return_value=checkpoint_state,
             ),
-            pytest.raises(CheckpointSyncError, match="genesis time mismatch"),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await Anchor.from_checkpoint(
                 url="http://localhost:5052",
@@ -56,6 +56,7 @@ class TestAnchorFromCheckpoint:
                 fork=LstarSpec(),
                 validator_index=None,
             )
+        assert str(exception_info.value) == ("genesis time mismatch: checkpoint=1000, local=2000")
 
     async def test_verification_failure_raises(self) -> None:
         """Structural verification failure raises CheckpointSyncError."""
@@ -74,7 +75,7 @@ class TestAnchorFromCheckpoint:
                 "lean_spec.node.anchor.verify_checkpoint_state",
                 return_value=False,
             ),
-            pytest.raises(CheckpointSyncError, match="structural verification"),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await Anchor.from_checkpoint(
                 url="http://localhost:5052",
@@ -82,6 +83,7 @@ class TestAnchorFromCheckpoint:
                 fork=LstarSpec(),
                 validator_index=None,
             )
+        assert str(exception_info.value) == ("checkpoint state failed structural verification")
 
     async def test_network_error_propagates(self) -> None:
         """Network errors surface as CheckpointSyncError."""
@@ -95,7 +97,7 @@ class TestAnchorFromCheckpoint:
                 new_callable=AsyncMock,
                 side_effect=CheckpointSyncError("connection refused"),
             ),
-            pytest.raises(CheckpointSyncError, match="connection refused"),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await Anchor.from_checkpoint(
                 url="http://localhost:5052",
@@ -103,6 +105,7 @@ class TestAnchorFromCheckpoint:
                 fork=LstarSpec(),
                 validator_index=None,
             )
+        assert str(exception_info.value) == "connection refused"
 
     async def test_success_builds_store_and_status(self) -> None:
         """Successful checkpoint sync produces a populated anchor."""

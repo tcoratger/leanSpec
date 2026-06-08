@@ -251,7 +251,12 @@ def test_keypair_decodes_public_and_secret_hex(keypair_a: KeyPair) -> None:
 
 def test_keypair_rejects_invalid_public_key_hex(keypair_a: KeyPair) -> None:
     """A malformed public-key hex string surfaces as a validation error."""
-    with pytest.raises(ValidationError, match="invalid PublicKey hex"):
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for KeyPair\npublic_key\n"
+        r"  Value error, invalid PublicKey hex: "
+        r"Value 4022250974 exceeds field modulus 2130706433 .*\Z",
+    ):
         KeyPair.model_validate(
             {
                 "public_key": "deadbeef",
@@ -262,7 +267,11 @@ def test_keypair_rejects_invalid_public_key_hex(keypair_a: KeyPair) -> None:
 
 def test_keypair_rejects_invalid_secret_key_hex(keypair_a: KeyPair) -> None:
     """A malformed secret-key hex string surfaces as a validation error."""
-    with pytest.raises(ValidationError, match="invalid SecretKey hex"):
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for KeyPair\nsecret_key\n"
+        r"  Value error, invalid SecretKey hex: PRFKey: expected 32 bytes, got 4 .*\Z",
+    ):
         KeyPair.model_validate(
             {
                 "public_key": keypair_a.public_key.encode_bytes().hex(),

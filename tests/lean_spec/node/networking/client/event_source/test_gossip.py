@@ -228,8 +228,9 @@ class TestGossipMessageError:
 
     def test_can_be_raised_and_caught(self) -> None:
         """Can be raised and caught properly."""
-        with pytest.raises(GossipMessageError, match="specific error"):
+        with pytest.raises(GossipMessageError) as exception_info:
             raise GossipMessageError("specific error")
+        assert str(exception_info.value) == "specific error"
 
 
 class TestGossipHandlerGetTopic:
@@ -261,36 +262,49 @@ class TestGossipHandlerGetTopic:
         """Raises GossipMessageError for topic with missing parts."""
         handler = GossipHandler(network_name="0x00000000")
 
-        with pytest.raises(GossipMessageError, match="Invalid topic"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.get_topic("/invalid/topic")
+        assert str(exception_info.value) == (
+            "Invalid topic: Invalid topic format: expected 4 parts, got 2"
+        )
 
     def test_invalid_topic_format_wrong_prefix(self) -> None:
         """Raises GossipMessageError for wrong network prefix."""
         handler = GossipHandler(network_name="0x00000000")
 
-        with pytest.raises(GossipMessageError, match="Invalid topic"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.get_topic("/wrongprefix/0x00000000/block/ssz_snappy")
+        assert str(exception_info.value) == (
+            "Invalid topic: Invalid prefix: expected 'leanconsensus', got 'wrongprefix'"
+        )
 
     def test_invalid_topic_format_wrong_encoding(self) -> None:
         """Raises GossipMessageError for wrong encoding suffix."""
         handler = GossipHandler(network_name="0x00000000")
 
-        with pytest.raises(GossipMessageError, match="Invalid topic"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.get_topic("/leanconsensus/0x00000000/block/ssz")
+        assert str(exception_info.value) == (
+            "Invalid topic: Invalid encoding: expected 'ssz_snappy', got 'ssz'"
+        )
 
     def test_invalid_topic_format_unknown_topic_name(self) -> None:
         """Raises GossipMessageError for unknown topic name."""
         handler = GossipHandler(network_name="0x00000000")
 
-        with pytest.raises(GossipMessageError, match="Invalid topic"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.get_topic("/leanconsensus/0x00000000/unknown/ssz_snappy")
+        assert str(exception_info.value) == "Invalid topic: Unknown topic: 'unknown'"
 
     def test_empty_topic_string(self) -> None:
         """Raises GossipMessageError for empty topic string."""
         handler = GossipHandler(network_name="0x00000000")
 
-        with pytest.raises(GossipMessageError, match="Invalid topic"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.get_topic("")
+        assert str(exception_info.value) == (
+            "Invalid topic: Invalid topic format: expected 4 parts, got 1"
+        )
 
 
 class TestGossipHandlerDecodeMessage:
@@ -325,8 +339,11 @@ class TestGossipHandlerDecodeMessage:
         handler = GossipHandler(network_name="0x00000000")
         compressed = compress(b"\x00" * 32)
 
-        with pytest.raises(GossipMessageError, match="Invalid topic"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message("/bad/topic", compressed)
+        assert str(exception_info.value) == (
+            "Invalid topic: Invalid topic format: expected 4 parts, got 2"
+        )
 
     def test_decode_invalid_snappy_compression(self) -> None:
         """Raises GossipMessageError for invalid Snappy data."""
@@ -336,8 +353,12 @@ class TestGossipHandlerDecodeMessage:
         # Snappy format: [uncompressed_length varint][compressed_data]
         invalid_snappy = b"\xe8\x07"  # varint for 1000, but no data following
 
-        with pytest.raises(GossipMessageError, match="Snappy decompression failed"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message(topic_str, invalid_snappy)
+        assert str(exception_info.value) == (
+            "Snappy decompression failed: "
+            "Unexpected end of input at position 2, output has 0 bytes but expected 1000"
+        )
 
     def test_decode_invalid_ssz_encoding(self) -> None:
         """Raises GossipMessageError for invalid SSZ data."""
@@ -346,16 +367,18 @@ class TestGossipHandlerDecodeMessage:
         # Valid Snappy compression wrapping garbage SSZ
         compressed = compress(b"\xff\xff\xff\xff")
 
-        with pytest.raises(GossipMessageError, match="SSZ decode failed"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message(topic_str, compressed)
+        assert str(exception_info.value) == "SSZ decode failed: Uint32: expected 4 bytes, got 0"
 
     def test_decode_empty_snappy_data(self) -> None:
         """Raises GossipMessageError for empty compressed data."""
         handler = GossipHandler(network_name="0x00000000")
         topic_str = make_block_topic()
 
-        with pytest.raises(GossipMessageError, match="Snappy decompression failed"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message(topic_str, b"")
+        assert str(exception_info.value) == "Snappy decompression failed: Empty input"
 
     def test_decode_truncated_ssz_data(self) -> None:
         """Raises GossipMessageError for truncated SSZ data."""
@@ -366,8 +389,9 @@ class TestGossipHandlerDecodeMessage:
         compressed = compress(truncated)
         topic_str = make_block_topic()
 
-        with pytest.raises(GossipMessageError, match="SSZ decode failed"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message(topic_str, compressed)
+        assert str(exception_info.value) == "SSZ decode failed: Slot: expected 8 bytes, got 2"
 
 
 class TestReadGossipMessage:
@@ -403,8 +427,9 @@ class TestReadGossipMessage:
         """Raises GossipMessageError for empty stream."""
         stream = MockStream(b"")
 
-        with pytest.raises(GossipMessageError, match="Empty gossip message"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Empty gossip message"
 
     async def test_read_truncated_topic_length(self) -> None:
         """Raises GossipMessageError for incomplete topic length varint."""
@@ -412,8 +437,9 @@ class TestReadGossipMessage:
         incomplete_varint = b"\x80"  # Continuation bit set, needs more bytes
         stream = MockStream(incomplete_varint)
 
-        with pytest.raises(GossipMessageError, match="Truncated gossip message"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Truncated gossip message"
 
     async def test_read_truncated_topic_string(self) -> None:
         """Raises GossipMessageError for truncated topic string."""
@@ -423,8 +449,9 @@ class TestReadGossipMessage:
         truncated = encode_varint(100) + topic_bytes[:10]
         stream = MockStream(truncated)
 
-        with pytest.raises(GossipMessageError, match="Truncated gossip message"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Truncated gossip message"
 
     async def test_read_truncated_data_length(self) -> None:
         """Raises GossipMessageError for truncated data length varint."""
@@ -434,8 +461,9 @@ class TestReadGossipMessage:
         gossip_wire = encode_varint(len(topic_bytes)) + topic_bytes + b"\x80"
         stream = MockStream(gossip_wire)
 
-        with pytest.raises(GossipMessageError, match="Truncated gossip message"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Truncated gossip message"
 
     async def test_read_truncated_data(self) -> None:
         """Raises GossipMessageError for truncated message data."""
@@ -448,8 +476,9 @@ class TestReadGossipMessage:
         )
         stream = MockStream(gossip_wire)
 
-        with pytest.raises(GossipMessageError, match="Truncated gossip message"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Truncated gossip message"
 
     async def test_read_invalid_utf8_topic(self) -> None:
         """Raises GossipMessageError for invalid UTF-8 in topic."""
@@ -460,8 +489,12 @@ class TestReadGossipMessage:
         gossip_wire += encode_varint(4) + b"test"
         stream = MockStream(gossip_wire)
 
-        with pytest.raises(GossipMessageError, match="Invalid topic encoding"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == (
+            "Invalid topic encoding: "
+            "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte"
+        )
 
     async def test_read_small_chunks(self) -> None:
         """Successfully reads message delivered in small chunks."""
@@ -613,8 +646,12 @@ class TestGossipReceptionEdgeCases:
         # This will fail during decompression with "Truncated" or similar error
         corrupted = b"\xff\xff\xff\x7f"  # varint claiming huge uncompressed length
 
-        with pytest.raises(GossipMessageError, match="Snappy decompression failed"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message(topic_str, corrupted)
+        assert str(exception_info.value) == (
+            "Snappy decompression failed: "
+            "Unexpected end of input at position 4, output has 0 bytes but expected 268435455"
+        )
 
     async def test_very_long_topic_string(self) -> None:
         """Handles messages with unusually long topic strings."""
@@ -656,8 +693,9 @@ class TestGossipReceptionEdgeCases:
         gossip_wire = encode_varint(len(topic_bytes)) + topic_bytes
         stream = MockStream(gossip_wire)
 
-        with pytest.raises(GossipMessageError, match="Truncated gossip message"):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Truncated gossip message"
 
 
 class TestGossipHandlerForkMismatch:
@@ -675,15 +713,21 @@ class TestGossipHandlerForkMismatch:
         block = _make_block()
         compressed = compress(block.encode_bytes())
 
-        with pytest.raises(ForkMismatchError, match=f"expected {FORK_DIGEST}"):
+        with pytest.raises(ForkMismatchError) as exception_info:
             handler.decode_message(_block_topic(WRONG_FORK_DIGEST), compressed)
+        assert str(exception_info.value) == (
+            f"Fork mismatch: expected {FORK_DIGEST}, got {WRONG_FORK_DIGEST}"
+        )
 
     def test_get_topic_raises_fork_mismatch(self) -> None:
         """Rejects topic strings with mismatched network name."""
         handler = GossipHandler(network_name=FORK_DIGEST)
 
-        with pytest.raises(ForkMismatchError, match=f"got {WRONG_FORK_DIGEST}"):
+        with pytest.raises(ForkMismatchError) as exception_info:
             handler.get_topic(_block_topic(WRONG_FORK_DIGEST))
+        assert str(exception_info.value) == (
+            f"Fork mismatch: expected {FORK_DIGEST}, got {WRONG_FORK_DIGEST}"
+        )
 
     def test_fork_mismatch_error_attributes(self) -> None:
         """ForkMismatchError exposes expected and actual digests."""
@@ -738,8 +782,9 @@ class TestGossipHandlerAggregationTopic:
         handler = GossipHandler(network_name=FORK_DIGEST)
         compressed = compress(b"\xff\xff\xff\xff")
 
-        with pytest.raises(GossipMessageError, match="SSZ decode failed"):
+        with pytest.raises(GossipMessageError) as exception_info:
             handler.decode_message(_aggregation_topic(), compressed)
+        assert str(exception_info.value) == "SSZ decode failed: Slot: expected 8 bytes, got 4"
 
 
 class TestReadGossipMessageChunked:

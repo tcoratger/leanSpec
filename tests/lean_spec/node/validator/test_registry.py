@@ -461,12 +461,15 @@ class TestValidatorRegistryFromYaml:
         manifest_file = tmp_path / "manifest.yaml"
         _write_manifest(manifest_file, [_manifest_entry_dict(0)])
 
-        with pytest.raises(ValueError, match="key file not found"):
+        with pytest.raises(ValueError) as exception_info:
             ValidatorRegistry.from_yaml(
                 node_id="node_0",
                 validators_path=validators_file,
                 manifest_path=manifest_file,
             )
+        assert str(exception_info.value) == (
+            f"Attestation key file not found: {tmp_path / 'att_key_0.ssz'}"
+        )
 
     def test_missing_proposal_key_file_raises(self, tmp_path: Path, km: XmssKeyManager) -> None:
         """Missing proposal SSZ file raises ValueError after the attestation key loads."""
@@ -480,12 +483,15 @@ class TestValidatorRegistryFromYaml:
         kp = km[ValidatorIndex(0)]
         (tmp_path / "att_key_0.ssz").write_bytes(kp.attestation_keypair.secret_key.encode_bytes())
 
-        with pytest.raises(ValueError, match="key file not found"):
+        with pytest.raises(ValueError) as exception_info:
             ValidatorRegistry.from_yaml(
                 node_id="node_0",
                 validators_path=validators_file,
                 manifest_path=manifest_file,
             )
+        assert str(exception_info.value) == (
+            f"Proposal key file not found: {tmp_path / 'prop_key_0.ssz'}"
+        )
 
     def test_corrupt_attestation_key_file_raises(self, tmp_path: Path) -> None:
         """A corrupt attestation SSZ file raises ValueError with a clear message."""
@@ -497,12 +503,15 @@ class TestValidatorRegistryFromYaml:
         (tmp_path / "att_key_0.ssz").write_bytes(b"not valid ssz")
         (tmp_path / "prop_key_0.ssz").write_bytes(b"prop0")
 
-        with pytest.raises(ValueError, match="Failed to load attestation key"):
+        with pytest.raises(ValueError) as exception_info:
             ValidatorRegistry.from_yaml(
                 node_id="node_0",
                 validators_path=validators_file,
                 manifest_path=manifest_file,
             )
+        assert str(exception_info.value) == (
+            "Failed to load attestation key for validator 0: PRFKey: expected 32 bytes, got 13"
+        )
 
     def test_corrupt_proposal_key_file_raises(self, tmp_path: Path, km: XmssKeyManager) -> None:
         """A corrupt proposal SSZ file raises ValueError after the attestation key loads."""
@@ -517,12 +526,15 @@ class TestValidatorRegistryFromYaml:
         (tmp_path / "att_key_0.ssz").write_bytes(kp.attestation_keypair.secret_key.encode_bytes())
         (tmp_path / "prop_key_0.ssz").write_bytes(b"not valid ssz")
 
-        with pytest.raises(ValueError, match="Failed to load proposal key"):
+        with pytest.raises(ValueError) as exception_info:
             ValidatorRegistry.from_yaml(
                 node_id="node_0",
                 validators_path=validators_file,
                 manifest_path=manifest_file,
             )
+        assert str(exception_info.value) == (
+            "Failed to load proposal key for validator 0: PRFKey: expected 32 bytes, got 13"
+        )
 
     def test_only_assigned_node_keys_are_loaded(self, tmp_path: Path, km: XmssKeyManager) -> None:
         """Keys for validators belonging to other nodes are never touched."""
@@ -552,5 +564,9 @@ class TestValidatorRegistryFromKeysDirectory:
 
     def test_missing_manifest_raises(self, tmp_path: Path) -> None:
         """The loader raises when the manifest file is absent."""
-        with pytest.raises(FileNotFoundError, match="Validator keys manifest not found"):
+        with pytest.raises(FileNotFoundError) as exception_info:
             ValidatorRegistry.from_keys_directory(node_id="lean_spec_0", base_directory=tmp_path)
+        assert str(exception_info.value) == (
+            "Validator keys manifest not found: "
+            f"{tmp_path / 'hash-sig-keys' / 'validator-keys-manifest.yaml'}"
+        )

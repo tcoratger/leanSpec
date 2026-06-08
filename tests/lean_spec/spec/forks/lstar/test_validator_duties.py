@@ -246,8 +246,11 @@ class TestBlockProduction:
         slot = Slot(1)
         wrong_validator = ValidatorIndex(2)  # Not proposer for slot 1
 
-        with pytest.raises(AssertionError, match="is not the proposer for slot"):
+        with pytest.raises(AssertionError) as exception_info:
             spec.produce_block_with_signatures(sample_store, slot, wrong_validator)
+        assert str(exception_info.value) == (
+            f"Validator {wrong_validator} is not the proposer for slot {slot}"
+        )
 
     def test_produce_block_with_attestations(
         self, sample_store: Store, key_manager: XmssKeyManager, spec: LstarSpec
@@ -612,8 +615,11 @@ class TestValidatorErrorHandling:
         # The forkchoice head walk asserts that the justified root is known.
         # Calling produce_block on a store whose latest_justified.root is
         # missing from blocks must fail loudly with that invariant message.
-        with pytest.raises(AssertionError, match="not in store.blocks"):
+        with pytest.raises(AssertionError) as exception_info:
             spec.produce_block_with_signatures(store, Slot(1), ValidatorIndex(1))
+        assert str(exception_info.value) == (
+            f"start_root {checkpoint.root.hex()} not in store.blocks"
+        )
 
     def test_validator_operations_invalid_parameters(
         self, sample_store: Store, spec: LstarSpec

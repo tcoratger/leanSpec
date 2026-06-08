@@ -72,12 +72,15 @@ class TestTagEncoding:
 
     def test_invalid_literal_length_raises(self) -> None:
         """Literal length < 1 raises ValueError."""
-        with pytest.raises(ValueError, match=">= 1"):
+        with pytest.raises(ValueError) as exception_info:
             encode_literal_tag(0)
+        assert str(exception_info.value) == "Literal length must be >= 1, got 0"
 
     def test_invalid_copy_params_raise(self) -> None:
         """Invalid copy parameters raise ValueError."""
-        with pytest.raises(ValueError, match="length"):
+        with pytest.raises(ValueError) as exception_info:
             encode_copy_tag(0, 100)
-        with pytest.raises(ValueError, match="offset"):
+        assert str(exception_info.value) == "Copy length must be >= 1, got 0"
+        with pytest.raises(ValueError) as exception_info:
             encode_copy_tag(4, 0)
+        assert str(exception_info.value) == "Copy offset must be >= 1, got 0"

@@ -210,13 +210,15 @@ class TestSkipField:
 
     def test_skip_unknown_wire_type_raises(self) -> None:
         """Unknown wire type raises ProtobufDecodeError."""
-        with pytest.raises(ProtobufDecodeError, match="Unknown wire type"):
+        with pytest.raises(ProtobufDecodeError) as exception_info:
             _skip_field(b"\x00", 0, 3)
+        assert str(exception_info.value) == "Unknown wire type: 3"
 
     def test_skip_deprecated_group_type_raises(self) -> None:
         """Deprecated group wire type (4) raises ProtobufDecodeError."""
-        with pytest.raises(ProtobufDecodeError, match="Unknown wire type"):
+        with pytest.raises(ProtobufDecodeError) as exception_info:
             _skip_field(b"\x00", 0, 4)
+        assert str(exception_info.value) == "Unknown wire type: 4"
 
 
 class TestEmptyDecode:
@@ -274,15 +276,17 @@ class TestLengthValidation:
         # Field 1, wire type 2 (length-delimited), length=100 but only 3 bytes.
         encoded_field = encode_tag(1, WIRE_TYPE_LENGTH_DELIMITED) + b"\x64abc"
 
-        with pytest.raises(ProtobufDecodeError, match="exceeds data size"):
+        with pytest.raises(ProtobufDecodeError) as exception_info:
             SubOpts.decode(encoded_field)
+        assert str(exception_info.value) == "Length field 100 at position 1 exceeds data size 5"
 
     def test_truncated_rpc_field(self) -> None:
         """RPC with truncated field raises ProtobufDecodeError."""
         encoded_rpc = encode_tag(1, WIRE_TYPE_LENGTH_DELIMITED) + b"\xff\x01"
 
-        with pytest.raises(ProtobufDecodeError, match="exceeds data size"):
+        with pytest.raises(ProtobufDecodeError) as exception_info:
             RPC.decode(encoded_rpc)
+        assert str(exception_info.value) == "Length field 255 at position 1 exceeds data size 3"
 
 
 class TestMultiTopicControl:

@@ -16,17 +16,35 @@ class TestCheckpointConstruction:
 
     def test_extra_field_is_rejected(self) -> None:
         """Construction with an unknown field raises a Pydantic validation error."""
-        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for Checkpoint\nepoch\n"
+            r"  Extra inputs are not permitted \[type=extra_forbidden, "
+            r"input_value=Slot\(0\), input_type=Slot\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/extra_forbidden\Z",
+        ):
             Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0), epoch=Slot(0))  # type: ignore[call-arg]
 
     def test_missing_root_is_rejected(self) -> None:
         """Omitting the root raises a Pydantic validation error."""
-        with pytest.raises(ValidationError, match="root"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for Checkpoint\nroot\n"
+            r"  Field required \[type=missing, input_value=\{'slot': Slot\(0\)\}, "
+            r"input_type=dict\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/missing\Z",
+        ):
             Checkpoint(slot=Slot(0))  # type: ignore[call-arg]
 
     def test_missing_slot_is_rejected(self) -> None:
         """Omitting the slot raises a Pydantic validation error."""
-        with pytest.raises(ValidationError, match="slot"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for Checkpoint\nslot\n"
+            r"  Field required \[type=missing, input_value=.*, input_type=dict\]\n"
+            r"    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/missing\Z",
+        ):
             Checkpoint(root=Bytes32(b"\x00" * 32))  # type: ignore[call-arg]
 
     def test_wrong_root_type_is_rejected(self) -> None:
@@ -74,13 +92,25 @@ class TestCheckpointImmutability:
     def test_assigning_root_raises(self) -> None:
         """Assigning a new root on a constructed checkpoint raises."""
         cp = Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0))
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for Checkpoint\nroot\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=.*, "
+            r"input_type=.*\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             cp.root = Bytes32(b"\xff" * 32)
 
     def test_assigning_slot_raises(self) -> None:
         """Assigning a new slot on a constructed checkpoint raises."""
         cp = Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0))
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for Checkpoint\nslot\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=Slot\(99\), "
+            r"input_type=Slot\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             cp.slot = Slot(99)
 
 

@@ -3,7 +3,6 @@
 import hashlib
 import io
 import json
-import re
 from typing import Any
 
 import pytest
@@ -83,23 +82,23 @@ class TestBaseBytesConstruction:
     )
     def test_construction_with_wrong_length_raises(self, wrong_input: Any, count: int) -> None:
         """Inputs whose length doesn't match LENGTH raise with the exact element count."""
-        with pytest.raises(
-            SSZValueError,
-            match=re.escape(f"Bytes4 requires exactly 4 bytes, got {count}"),
-        ):
+        with pytest.raises(SSZValueError) as exception_info:
             Bytes4(wrong_input)
+        assert str(exception_info.value) == f"Bytes4 requires exactly 4 bytes, got {count}"
 
     @pytest.mark.parametrize("bad_input", [42, None, 1.5])
     def test_construction_with_non_coercible_input_raises(self, bad_input: Any) -> None:
         """Inputs outside the accepted union raise TypeError naming the offending type."""
         name = type(bad_input).__name__
-        with pytest.raises(TypeError, match=re.escape(f"Cannot coerce {name} to bytes")):
+        with pytest.raises(TypeError) as exception_info:
             Bytes4(bad_input)
+        assert str(exception_info.value) == f"Cannot coerce {name} to bytes"
 
     def test_construction_without_length_attribute_raises(self) -> None:
         """Direct instantiation of the abstract base raises SSZTypeError."""
-        with pytest.raises(SSZTypeError, match=re.escape("BaseBytes must define LENGTH")):
+        with pytest.raises(SSZTypeError) as exception_info:
             BaseBytes(b"")
+        assert str(exception_info.value) == "BaseBytes must define LENGTH"
 
     def test_zero_factory(self) -> None:
         """The zero classmethod returns an instance of LENGTH zero bytes."""
@@ -128,21 +127,23 @@ class TestBaseBytesEquality:
     def test_cross_type_equality_raises(self, other: Any) -> None:
         """Comparing with any non-BaseBytes value raises TypeError."""
         name = type(other).__name__
-        with pytest.raises(
-            TypeError,
-            match=re.escape(f"Unsupported operand type(s) for ==: 'Bytes4' and '{name}'"),
-        ):
+        with pytest.raises(TypeError) as exception_info:
             _ = Bytes4(b"\x00\x01\x02\x03") == other
+        assert (
+            str(exception_info.value)
+            == f"Unsupported operand type(s) for ==: 'Bytes4' and '{name}'"
+        )
 
     @pytest.mark.parametrize("other", [b"\x00\x01\x02\x03", "string", 1.5, None, 42])
     def test_cross_type_inequality_raises(self, other: Any) -> None:
         """Inequality with any non-BaseBytes value raises TypeError."""
         name = type(other).__name__
-        with pytest.raises(
-            TypeError,
-            match=re.escape(f"Unsupported operand type(s) for !=: 'Bytes4' and '{name}'"),
-        ):
+        with pytest.raises(TypeError) as exception_info:
             _ = Bytes4(b"\x00\x01\x02\x03") != other
+        assert (
+            str(exception_info.value)
+            == f"Unsupported operand type(s) for !=: 'Bytes4' and '{name}'"
+        )
 
     def test_hash_distinct_from_raw_bytes(self) -> None:
         """The hash binds the value to its concrete type, so equal raw bytes hash differently."""
@@ -240,20 +241,16 @@ class TestBaseBytesSSZ:
     def test_deserialize_scope_mismatch_raises(self) -> None:
         """deserialize rejects a scope that doesn't match LENGTH."""
         buffer = io.BytesIO(b"\x00\x01\x02\x03")
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("Bytes4: expected 4 bytes, got 3"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bytes4.deserialize(buffer, 3)
+        assert str(exception_info.value) == "Bytes4: expected 4 bytes, got 3"
 
     def test_deserialize_stream_truncation_raises(self) -> None:
         """deserialize detects when the stream ends before delivering scope bytes."""
         buffer = io.BytesIO(b"\x00\x01")
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("Bytes4: expected 4 bytes, got 2"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Bytes4.deserialize(buffer, 4)
+        assert str(exception_info.value) == "Bytes4: expected 4 bytes, got 2"
 
 
 class TestBaseBytesPydantic:
@@ -309,16 +306,15 @@ class TestBaseByteListConstruction:
 
     def test_construction_over_limit_raises(self) -> None:
         """Input exceeding LIMIT raises with the exact size in the message."""
-        with pytest.raises(
-            SSZValueError,
-            match=re.escape("ByteList5 exceeds limit of 5, got 6"),
-        ):
+        with pytest.raises(SSZValueError) as exception_info:
             ByteList5(data=b"\x00" * 6)
+        assert str(exception_info.value) == "ByteList5 exceeds limit of 5, got 6"
 
     def test_construction_without_limit_attribute_raises(self) -> None:
         """Direct instantiation of the abstract base raises SSZTypeError."""
-        with pytest.raises(SSZTypeError, match=re.escape("BaseByteList must define LIMIT")):
+        with pytest.raises(SSZTypeError) as exception_info:
             BaseByteList(data=b"")
+        assert str(exception_info.value) == "BaseByteList must define LIMIT"
 
 
 class TestBaseByteListEquality:
@@ -340,21 +336,23 @@ class TestBaseByteListEquality:
     def test_cross_type_equality_raises(self, other: Any) -> None:
         """Comparing with any non-BaseByteList value raises TypeError."""
         name = type(other).__name__
-        with pytest.raises(
-            TypeError,
-            match=re.escape(f"Unsupported operand type(s) for ==: 'ByteList16' and '{name}'"),
-        ):
+        with pytest.raises(TypeError) as exception_info:
             _ = ByteList16(data=b"\x00\x01\x02") == other
+        assert (
+            str(exception_info.value)
+            == f"Unsupported operand type(s) for ==: 'ByteList16' and '{name}'"
+        )
 
     @pytest.mark.parametrize("other", [b"\x00\x01\x02", "string", 1.5, None, 42])
     def test_cross_type_inequality_raises(self, other: Any) -> None:
         """Inequality with any non-BaseByteList value raises TypeError."""
         name = type(other).__name__
-        with pytest.raises(
-            TypeError,
-            match=re.escape(f"Unsupported operand type(s) for !=: 'ByteList16' and '{name}'"),
-        ):
+        with pytest.raises(TypeError) as exception_info:
             _ = ByteList16(data=b"\x00\x01\x02") != other
+        assert (
+            str(exception_info.value)
+            == f"Unsupported operand type(s) for !=: 'ByteList16' and '{name}'"
+        )
 
     def test_hash_includes_type(self) -> None:
         """Instances of different bytelist types with the same data hash differently."""
@@ -408,11 +406,12 @@ class TestBaseByteListSSZ:
 
     def test_get_byte_length_raises(self) -> None:
         """get_byte_length raises a descriptive error for variable-size types."""
-        with pytest.raises(
-            SSZTypeError,
-            match=re.escape("ByteList16: variable-size byte list has no fixed byte length"),
-        ):
+        with pytest.raises(SSZTypeError) as exception_info:
             ByteList16.get_byte_length()
+        assert (
+            str(exception_info.value)
+            == "ByteList16: variable-size byte list has no fixed byte length"
+        )
 
     @pytest.mark.parametrize(
         "limit, data",
@@ -444,29 +443,23 @@ class TestBaseByteListSSZ:
     def test_deserialize_negative_scope_raises(self) -> None:
         """deserialize rejects a negative scope."""
         buffer = io.BytesIO(b"")
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("ByteList16: negative scope"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             ByteList16.deserialize(buffer, -1)
+        assert str(exception_info.value) == "ByteList16: negative scope"
 
     def test_deserialize_over_limit_raises(self) -> None:
         """deserialize rejects a scope exceeding LIMIT."""
         buffer = io.BytesIO(b"\x00" * 6)
-        with pytest.raises(
-            SSZValueError,
-            match=re.escape("ByteList5 exceeds limit of 5, got 6"),
-        ):
+        with pytest.raises(SSZValueError) as exception_info:
             ByteList5.deserialize(buffer, 6)
+        assert str(exception_info.value) == "ByteList5 exceeds limit of 5, got 6"
 
     def test_deserialize_stream_truncation_raises(self) -> None:
         """deserialize detects when the stream ends before delivering scope bytes."""
         buffer = io.BytesIO(b"\x00\x01")
-        with pytest.raises(
-            SSZSerializationError,
-            match=re.escape("ByteList16: expected 3 bytes, got 2"),
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             ByteList16.deserialize(buffer, 3)
+        assert str(exception_info.value) == "ByteList16: expected 3 bytes, got 2"
 
 
 class TestBaseByteListPydantic:

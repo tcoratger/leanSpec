@@ -143,13 +143,15 @@ class TestParseMultiaddr:
 
     def test_missing_host_raises(self) -> None:
         """Missing ip4/ip6 component raises ValueError."""
-        with pytest.raises(ValueError, match=r"No host in multiaddr"):
+        with pytest.raises(ValueError) as exception_info:
             parse_multiaddr("/udp/9000/quic-v1")
+        assert str(exception_info.value) == "No host in multiaddr: /udp/9000/quic-v1"
 
     def test_missing_port_raises(self) -> None:
         """Missing udp component raises ValueError."""
-        with pytest.raises(ValueError, match=r"No port in multiaddr"):
+        with pytest.raises(ValueError) as exception_info:
             parse_multiaddr("/ip4/127.0.0.1/quic-v1")
+        assert str(exception_info.value) == "No port in multiaddr: /ip4/127.0.0.1/quic-v1"
 
     def test_unknown_components_skipped(self) -> None:
         """Unknown protocol components are silently skipped."""
@@ -288,8 +290,9 @@ class TestQuicStreamWrite:
     async def test_write_after_fin_raises(self, quic_stream: QuicStream) -> None:
         """Per RFC 9000, no data can be sent after FIN (write-side closed)."""
         quic_stream._write_closed = True
-        with pytest.raises(QuicTransportError, match=r"Stream write side is closed"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_stream.write(b"data")
+        assert str(exception_info.value) == "Stream write side is closed"
 
 
 # QuicStream — half-close (FIN) per RFC 9000 Section 3
@@ -461,8 +464,9 @@ class TestQuicConnectionOpenStream:
     async def test_open_stream_when_closed_raises(self, quic_connection: QuicConnection) -> None:
         """Opening a stream on a closed connection raises an error."""
         quic_connection._closed = True
-        with pytest.raises(QuicTransportError, match=r"Connection is closed"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_connection.open_stream(ProtocolId("/test/1.0"))
+        assert str(exception_info.value) == "Connection is closed"
 
 
 class TestQuicConnectionAcceptStream:
@@ -471,8 +475,9 @@ class TestQuicConnectionAcceptStream:
     async def test_accept_stream_when_closed_raises(self, quic_connection: QuicConnection) -> None:
         """Accepting a stream on a closed connection raises an error."""
         quic_connection._closed = True
-        with pytest.raises(QuicTransportError, match=r"Connection is closed"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_connection.accept_stream()
+        assert str(exception_info.value) == "Connection is closed"
 
     async def test_accept_stream_returns_queued(
         self, quic_connection: QuicConnection, mock_protocol: MagicMock
@@ -745,8 +750,11 @@ class TestQuicStreamWriteFinDetection:
         mock_internal_stream.send_fin = True
         mock_protocol._quic._streams = {0: mock_internal_stream}
 
-        with pytest.raises(QuicTransportError, match=r"aioquic FIN already sent"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_stream.write(b"data")
+        assert str(exception_info.value) == (
+            "Stream 0 write side is closed (aioquic FIN already sent)"
+        )
 
         # Write side is permanently closed after detecting FIN.
         assert quic_stream._write_closed is True
@@ -800,8 +808,9 @@ class TestQuicStreamWriteException:
         # Simulate aioquic raising a FIN-related error.
         mock_protocol._quic.send_stream_data.side_effect = RuntimeError("FIN already sent")
 
-        with pytest.raises(QuicTransportError, match=r"Write failed on stream 0"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_stream.write(b"data")
+        assert str(exception_info.value) == "Write failed on stream 0: FIN already sent"
 
         # Write side is permanently closed.
         assert quic_stream._write_closed is True
@@ -814,8 +823,9 @@ class TestQuicStreamWriteException:
         # Simulate aioquic raising a stream-closed error.
         mock_protocol._quic.send_stream_data.side_effect = RuntimeError("stream is closed")
 
-        with pytest.raises(QuicTransportError, match=r"Write failed on stream 0"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_stream.write(b"data")
+        assert str(exception_info.value) == "Write failed on stream 0: stream is closed"
 
         assert quic_stream._write_closed is True
 
@@ -832,8 +842,9 @@ class TestQuicStreamWriteException:
         # Simulate a transient error unrelated to stream state.
         mock_protocol._quic.send_stream_data.side_effect = RuntimeError("buffer overflow")
 
-        with pytest.raises(QuicTransportError, match=r"Write failed on stream 0"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await quic_stream.write(b"data")
+        assert str(exception_info.value) == "Write failed on stream 0: buffer overflow"
 
         # Write side stays open — the error was transient.
         assert quic_stream._write_closed is False
@@ -1012,8 +1023,9 @@ class TestQuicConnectionManagerConnect:
 
     async def test_connect_non_quic_raises(self, manager: QuicConnectionManager) -> None:
         """Connecting to a non-QUIC multiaddr is rejected immediately."""
-        with pytest.raises(QuicTransportError, match=r"Not a QUIC multiaddr"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await manager.connect("/ip4/127.0.0.1/udp/9000")
+        assert str(exception_info.value) == "Not a QUIC multiaddr: /ip4/127.0.0.1/udp/9000"
 
     @patch("lean_spec.node.networking.transport.quic.connection.quic_connect")
     async def test_connect_happy_path_with_peer_id(
@@ -1104,8 +1116,9 @@ class TestQuicConnectionManagerConnect:
         mock_cm.__aenter__ = AsyncMock(side_effect=OSError("connection refused"))
         mock_quic_connect.return_value = mock_cm
 
-        with pytest.raises(QuicTransportError, match=r"Failed to connect"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await manager.connect("/ip4/127.0.0.1/udp/9000/quic-v1")
+        assert str(exception_info.value) == "Failed to connect: connection refused"
 
 
 class TestQuicConnectionManagerListen:
@@ -1144,8 +1157,9 @@ class TestQuicConnectionManagerListen:
     ) -> None:
         """Listening on a non-QUIC multiaddr is rejected immediately."""
         callback = AsyncMock()
-        with pytest.raises(QuicTransportError, match=r"Not a QUIC multiaddr"):
+        with pytest.raises(QuicTransportError) as exception_info:
             await manager_with_temp_directory.listen("/ip4/0.0.0.0/udp/9000", callback)
+        assert str(exception_info.value) == "Not a QUIC multiaddr: /ip4/0.0.0.0/udp/9000"
 
     @patch("lean_spec.node.networking.transport.quic.connection.QuicConfiguration")
     @patch("lean_spec.node.networking.transport.quic.connection.quic_serve")

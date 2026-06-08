@@ -53,32 +53,29 @@ class TestJustifiedSlotsIsSlotJustified:
     def test_target_beyond_tracked_length_raises_with_boundary_and_length(self) -> None:
         """A future target past the tracked range raises naming the boundary and length."""
         justified_slots = JustifiedSlots(data=[Boolean(True)])
-        with pytest.raises(
-            IndexError,
-            match=r"Slot 5 is outside the tracked range "
-            r"\(finalized_boundary=0, tracked_length=1\)",
-        ):
+        with pytest.raises(IndexError) as exception_info:
             justified_slots.is_slot_justified(Slot(0), Slot(5))
+        assert str(exception_info.value) == (
+            "Slot 5 is outside the tracked range (finalized_boundary=0, tracked_length=1)"
+        )
 
     def test_target_beyond_tracked_length_with_nonzero_anchor_reports_anchor(self) -> None:
         """The out-of-range error reports the non-zero finalized anchor and the length."""
         justified_slots = JustifiedSlots(data=[Boolean(True), Boolean(False)])
-        with pytest.raises(
-            IndexError,
-            match=r"Slot 7 is outside the tracked range "
-            r"\(finalized_boundary=2, tracked_length=2\)",
-        ):
+        with pytest.raises(IndexError) as exception_info:
             justified_slots.is_slot_justified(Slot(2), Slot(7))
+        assert str(exception_info.value) == (
+            "Slot 7 is outside the tracked range (finalized_boundary=2, tracked_length=2)"
+        )
 
     def test_empty_bitfield_future_target_raises(self) -> None:
         """An empty bitfield cannot answer any future slot and raises."""
         justified_slots = JustifiedSlots(data=[])
-        with pytest.raises(
-            IndexError,
-            match=r"Slot 1 is outside the tracked range "
-            r"\(finalized_boundary=0, tracked_length=0\)",
-        ):
+        with pytest.raises(IndexError) as exception_info:
             justified_slots.is_slot_justified(Slot(0), Slot(1))
+        assert str(exception_info.value) == (
+            "Slot 1 is outside the tracked range (finalized_boundary=0, tracked_length=0)"
+        )
 
 
 class TestJustifiedSlotsExtendToSlot:
@@ -214,8 +211,12 @@ class TestSlotBitfieldLimits:
 
     def test_justified_slots_exceeding_limit_raises(self) -> None:
         """A justified-slot bitfield longer than its limit is rejected."""
-        with pytest.raises(SSZValueError, match=r"exceeds limit"):
+        with pytest.raises(SSZValueError) as exception_info:
             JustifiedSlots(data=[Boolean(False)] * (int(HISTORICAL_ROOTS_LIMIT) + 1))
+        assert str(exception_info.value) == (
+            f"JustifiedSlots exceeds limit of {int(HISTORICAL_ROOTS_LIMIT)}, "
+            f"got {int(HISTORICAL_ROOTS_LIMIT) + 1}"
+        )
 
     def test_justified_slots_at_limit_constructs(self) -> None:
         """A justified-slot bitfield exactly at its limit constructs successfully."""
@@ -272,5 +273,11 @@ class TestStateImmutability:
     def test_assigning_slot_raises(self) -> None:
         """Assigning a new slot on a constructed state raises."""
         genesis_state = make_genesis_state(num_validators=1)
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for State\nslot\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=Slot\(1\), "
+            r"input_type=Slot\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             genesis_state.slot = Slot(1)

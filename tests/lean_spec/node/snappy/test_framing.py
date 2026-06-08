@@ -58,8 +58,9 @@ class TestStreamIdentifier:
         """Invalid stream identifier content is rejected."""
         # Valid header structure but wrong content
         bad_stream = b"\xff\x06\x00\x00BADDAT"
-        with pytest.raises(SnappyDecompressionError, match="Invalid stream identifier"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(bad_stream)
+        assert str(exception_info.value) == "Invalid stream identifier"
 
     def test_wrong_identifier_length_rejected(self) -> None:
         """Stream identifier with wrong length is rejected."""
@@ -68,8 +69,9 @@ class TestStreamIdentifier:
         valid_part = STREAM_IDENTIFIER
         bad_identifier_chunk = b"\xff\x05\x00\x00sNaPp"  # Only 5 bytes, not 6
         bad_stream = valid_part + bad_identifier_chunk
-        with pytest.raises(SnappyDecompressionError, match="must be 6 bytes"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(bad_stream)
+        assert str(exception_info.value) == "Stream identifier chunk must be 6 bytes, got 5"
 
 
 class TestChunkFormat:
@@ -154,8 +156,13 @@ class TestCRC32C:
         crc_pos = len(STREAM_IDENTIFIER) + 4
         compressed[crc_pos] ^= 0xFF
 
-        with pytest.raises(SnappyDecompressionError, match="CRC mismatch"):
+        stored_crc = int.from_bytes(compressed[crc_pos : crc_pos + 4], "little")
+        computed_crc = _mask_crc(_crc32c(uncompressed))
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(bytes(compressed))
+        assert str(exception_info.value) == (
+            f"CRC mismatch: stored {stored_crc:#x}, computed {computed_crc:#x}"
+        )
 
 
 class TestCompressedChunk:
@@ -257,8 +264,9 @@ class TestChunkSizeLimits:
         malicious.extend(b"\x00" * 4)  # CRC
         malicious.extend(b"\x00" * 70000)  # Oversized payload
 
-        with pytest.raises(SnappyDecompressionError, match="exceeds"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(bytes(malicious))
+        assert str(exception_info.value) == "Uncompressed chunk exceeds 65536 bytes"
 
 
 class TestReservedChunks:
@@ -272,8 +280,9 @@ class TestReservedChunks:
             malicious.append(chunk_type)
             malicious.extend(b"\x00\x00\x00")  # Zero length
 
-            with pytest.raises(SnappyDecompressionError, match="unskippable"):
+            with pytest.raises(SnappyDecompressionError) as exception_info:
                 frame_decompress(bytes(malicious))
+            assert str(exception_info.value) == (f"Unknown unskippable chunk type: {chunk_type:#x}")
 
     def test_skippable_chunk_ignored(self) -> None:
         """Reserved skippable chunks (0x80-0xFD) are silently skipped."""
@@ -312,19 +321,22 @@ class TestEdgeCases:
 
     def test_empty_input(self) -> None:
         """Empty input raises appropriate error."""
-        with pytest.raises(SnappyDecompressionError, match="too short"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(b"")
+        assert str(exception_info.value) == "Input too short for framed snappy"
 
     def test_truncated_stream_identifier(self) -> None:
         """Truncated stream identifier raises error."""
-        with pytest.raises(SnappyDecompressionError, match="too short"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(b"\xff\x06\x00")
+        assert str(exception_info.value) == "Input too short for framed snappy"
 
     def test_truncated_chunk_header(self) -> None:
         """Truncated chunk header raises error."""
         truncated = STREAM_IDENTIFIER + b"\x00\x10"  # Incomplete header
-        with pytest.raises(SnappyDecompressionError, match="Truncated"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(truncated)
+        assert str(exception_info.value) == "Truncated chunk header"
 
     def test_truncated_chunk_data(self) -> None:
         """Truncated chunk data raises error."""
@@ -332,8 +344,9 @@ class TestEdgeCases:
         compressed = frame_compress(uncompressed)
         # Truncate some bytes from the end
         truncated = compressed[:-5]
-        with pytest.raises(SnappyDecompressionError, match="extends past end"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             frame_decompress(truncated)
+        assert str(exception_info.value) == "Chunk extends past end: need 8 bytes at 14, have 3"
 
     def test_roundtrip_various_sizes(self) -> None:
         """Roundtrip works for various data sizes."""

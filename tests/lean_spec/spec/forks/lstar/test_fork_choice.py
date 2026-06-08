@@ -412,8 +412,9 @@ def test_compute_lmd_ghost_head_rejects_unknown_start_root(
     unknown_root = Bytes32(b"\xee" * 32)
     assert unknown_root not in base_store.blocks
 
-    with pytest.raises(AssertionError, match="not in store.blocks"):
+    with pytest.raises(AssertionError) as exception_info:
         spec._compute_lmd_ghost_head(base_store, start_root=unknown_root, attestations={})
+    assert str(exception_info.value) == f"start_root {unknown_root.hex()} not in store.blocks"
 
 
 class ValidateAttestationFixture(NamedTuple):
@@ -495,7 +496,7 @@ class ValidateAttestationCase(NamedTuple):
     case_id: str
     mutate: Callable[[ValidateAttestationFixture, AttestationData], tuple[Store, AttestationData]]
     expected_reason: RejectionReason | None
-    expected_message_substring: str | None
+    expected_message: str | None
 
 
 VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
@@ -503,7 +504,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
         case_id="valid_three_slot_chain_passes",
         mutate=lambda fixture, attestation_data: (fixture.store, attestation_data),
         expected_reason=None,
-        expected_message_substring=None,
+        expected_message=None,
     ),
     ValidateAttestationCase(
         case_id="all_checkpoints_at_genesis_passes",
@@ -517,7 +518,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=None,
-        expected_message_substring=None,
+        expected_message=None,
     ),
     ValidateAttestationCase(
         case_id="at_disparity_boundary_passes",
@@ -530,7 +531,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             attestation_data,
         ),
         expected_reason=None,
-        expected_message_substring=None,
+        expected_message=None,
     ),
     ValidateAttestationCase(
         case_id="attestation_in_past_passes",
@@ -543,7 +544,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             attestation_data,
         ),
         expected_reason=None,
-        expected_message_substring=None,
+        expected_message=None,
     ),
     ValidateAttestationCase(
         case_id="head_above_skipped_slots_passes",
@@ -557,7 +558,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=None,
-        expected_message_substring=None,
+        expected_message=None,
     ),
     ValidateAttestationCase(
         case_id="unknown_source_block_rejected",
@@ -568,7 +569,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.UNKNOWN_SOURCE_BLOCK,
-        expected_message_substring="Unknown source block",
+        expected_message=f"Unknown source block: {make_bytes32(200).hex()}",
     ),
     ValidateAttestationCase(
         case_id="unknown_target_block_rejected",
@@ -579,7 +580,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.UNKNOWN_TARGET_BLOCK,
-        expected_message_substring="Unknown target block",
+        expected_message=f"Unknown target block: {make_bytes32(201).hex()}",
     ),
     ValidateAttestationCase(
         case_id="unknown_head_block_rejected",
@@ -590,7 +591,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.UNKNOWN_HEAD_BLOCK,
-        expected_message_substring="Unknown head block",
+        expected_message=f"Unknown head block: {make_bytes32(202).hex()}",
     ),
     ValidateAttestationCase(
         case_id="source_after_target_rejected",
@@ -604,7 +605,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.SOURCE_AFTER_TARGET,
-        expected_message_substring="Source checkpoint slot must not exceed target",
+        expected_message="Source checkpoint slot must not exceed target",
     ),
     ValidateAttestationCase(
         case_id="head_older_than_target_rejected",
@@ -618,7 +619,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.HEAD_OLDER_THAN_TARGET,
-        expected_message_substring="Head checkpoint must not be older than target",
+        expected_message="Head checkpoint must not be older than target",
     ),
     ValidateAttestationCase(
         case_id="source_slot_mismatch_rejected",
@@ -629,7 +630,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.SOURCE_SLOT_MISMATCH,
-        expected_message_substring="Source checkpoint slot mismatch",
+        expected_message="Source checkpoint slot mismatch",
     ),
     ValidateAttestationCase(
         case_id="target_slot_mismatch_rejected",
@@ -640,7 +641,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.TARGET_SLOT_MISMATCH,
-        expected_message_substring="Target checkpoint slot mismatch",
+        expected_message="Target checkpoint slot mismatch",
     ),
     ValidateAttestationCase(
         case_id="head_slot_mismatch_rejected",
@@ -651,7 +652,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.HEAD_SLOT_MISMATCH,
-        expected_message_substring="Head checkpoint slot mismatch",
+        expected_message="Head checkpoint slot mismatch",
     ),
     ValidateAttestationCase(
         case_id="source_not_ancestor_of_target_rejected",
@@ -665,7 +666,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.SOURCE_NOT_ANCESTOR_OF_TARGET,
-        expected_message_substring="Source checkpoint must be ancestor of target",
+        expected_message="Source checkpoint must be ancestor of target",
     ),
     ValidateAttestationCase(
         case_id="target_not_ancestor_of_head_rejected",
@@ -679,7 +680,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.TARGET_NOT_ANCESTOR_OF_HEAD,
-        expected_message_substring="Target checkpoint must be ancestor of head",
+        expected_message="Target checkpoint must be ancestor of head",
     ),
     ValidateAttestationCase(
         case_id="head_with_unknown_parent_chain_rejected",
@@ -690,7 +691,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.TARGET_NOT_ANCESTOR_OF_HEAD,
-        expected_message_substring="Target checkpoint must be ancestor of head",
+        expected_message="Target checkpoint must be ancestor of head",
     ),
     ValidateAttestationCase(
         case_id="just_beyond_disparity_boundary_rejected",
@@ -705,7 +706,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             attestation_data,
         ),
         expected_reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
-        expected_message_substring="Attestation too far in future",
+        expected_message="Attestation too far in future",
     ),
     ValidateAttestationCase(
         case_id="one_full_slot_in_future_rejected",
@@ -716,7 +717,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             attestation_data,
         ),
         expected_reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
-        expected_message_substring="Attestation too far in future",
+        expected_message="Attestation too far in future",
     ),
     ValidateAttestationCase(
         case_id="ordering_unknown_source_beats_source_after_target",
@@ -730,7 +731,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.UNKNOWN_SOURCE_BLOCK,
-        expected_message_substring="Unknown source block",
+        expected_message=f"Unknown source block: {make_bytes32(200).hex()}",
     ),
     ValidateAttestationCase(
         case_id="ordering_source_slot_mismatch_beats_ancestry",
@@ -744,7 +745,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.SOURCE_SLOT_MISMATCH,
-        expected_message_substring="Source checkpoint slot mismatch",
+        expected_message="Source checkpoint slot mismatch",
     ),
     ValidateAttestationCase(
         case_id="ordering_topology_beats_time_check",
@@ -760,7 +761,7 @@ VALIDATE_ATTESTATION_CASES: list[ValidateAttestationCase] = [
             ),
         ),
         expected_reason=RejectionReason.SOURCE_AFTER_TARGET,
-        expected_message_substring="Source checkpoint slot must not exceed target",
+        expected_message="Source checkpoint slot must not exceed target",
     ),
 ]
 """Every isolated scenario exercising validate_attestation, one mutation per case."""
@@ -788,10 +789,11 @@ class TestValidateAttestation:
             assert spec.validate_attestation(store, attestation_data) is None
             return
 
-        assert case.expected_message_substring is not None
-        with pytest.raises(SpecRejectionError, match=case.expected_message_substring) as rejection:
+        assert case.expected_message is not None
+        with pytest.raises(SpecRejectionError) as exception_info:
             spec.validate_attestation(store, attestation_data)
-        assert rejection.value.reason == case.expected_reason
+        assert str(exception_info.value) == case.expected_message
+        assert exception_info.value.reason == case.expected_reason
 
 
 def _add_known_block(
@@ -1347,8 +1349,9 @@ class TestJustificationLogic:
         )
 
         # This attestation should fail validation because source is unknown
-        with pytest.raises(AssertionError, match="Unknown source block"):
+        with pytest.raises(AssertionError) as exception_info:
             spec.validate_attestation(store, attestation.data)
+        assert str(exception_info.value) == f"Unknown source block: {invalid_source.root.hex()}"
 
     def test_justification_tracking_with_multiple_targets(
         self,
@@ -1986,7 +1989,10 @@ class TestOnGossipAggregatedAttestation:
             proof=corrupted_proof,
         )
 
-        with pytest.raises(AssertionError, match="signature verification failed"):
+        with pytest.raises(
+            AssertionError,
+            match=r"(?s)^Committee aggregation signature verification failed: .*\Z",
+        ):
             spec.on_gossip_aggregated_attestation(store, signed_aggregated)
 
     def test_multiple_proofs_accumulate(self, key_manager: XmssKeyManager, spec: LstarSpec) -> None:

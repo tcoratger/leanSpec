@@ -1,7 +1,6 @@
 """Tests for the Boolean Type."""
 
 import io
-import re
 from typing import Any, Callable
 
 import pytest
@@ -57,19 +56,18 @@ def test_instantiation_from_valid_types(valid_value: bool | int) -> None:
 @pytest.mark.parametrize("invalid_int", [-1, 2, 100])
 def test_instantiation_from_invalid_int_raises_error(invalid_int: int) -> None:
     """Tests that instantiating with an int other than 0 or 1 raises SSZValueError."""
-    with pytest.raises(
-        SSZValueError,
-        match=re.escape(f"Boolean value must be 0 or 1, not {invalid_int}"),
-    ):
+    with pytest.raises(SSZValueError) as exception_info:
         Boolean(invalid_int)
+    assert str(exception_info.value) == f"Boolean value must be 0 or 1, not {invalid_int}"
 
 
 @pytest.mark.parametrize("invalid_type", [1.0, "True", b"\x01", None])
 def test_instantiation_from_invalid_types_raises_error(invalid_type: Any) -> None:
     """Tests that instantiating with non-bool/non-int types raises SSZTypeError."""
     name = type(invalid_type).__name__
-    with pytest.raises(SSZTypeError, match=re.escape(f"Expected bool or int, got {name}")):
+    with pytest.raises(SSZTypeError) as exception_info:
         Boolean(invalid_type)
+    assert str(exception_info.value) == f"Expected bool or int, got {name}"
 
 
 def test_wrapping_existing_boolean_succeeds() -> None:
@@ -97,11 +95,9 @@ def test_instantiation_and_type() -> None:
 )
 def test_arithmetic_operators_raise_error(op: Callable[[Any, Any], Any]) -> None:
     """Tests that all arithmetic operators are disabled and raise TypeError."""
-    with pytest.raises(
-        TypeError,
-        match=re.escape("Arithmetic operations are not supported for Boolean."),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         op(Boolean(True), Boolean(False))
+    assert str(exception_info.value) == "Arithmetic operations are not supported for Boolean."
 
 
 def test_bitwise_operators() -> None:
@@ -121,42 +117,30 @@ def test_bitwise_operators() -> None:
 def test_bitwise_operators_with_other_types_raise_error(invalid_operand: Any) -> None:
     """Tests that bitwise operations with non-Boolean types raise TypeError."""
     name = type(invalid_operand).__name__
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for &: 'Boolean' and '{name}'"),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         _ = Boolean(True) & invalid_operand
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for |: 'Boolean' and '{name}'"),
-    ):
+    assert str(exception_info.value) == f"Unsupported operand type(s) for &: 'Boolean' and '{name}'"
+    with pytest.raises(TypeError) as exception_info:
         _ = Boolean(True) | invalid_operand
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for ^: 'Boolean' and '{name}'"),
-    ):
+    assert str(exception_info.value) == f"Unsupported operand type(s) for |: 'Boolean' and '{name}'"
+    with pytest.raises(TypeError) as exception_info:
         _ = Boolean(True) ^ invalid_operand
+    assert str(exception_info.value) == f"Unsupported operand type(s) for ^: 'Boolean' and '{name}'"
 
 
 @pytest.mark.parametrize("other", [1, 0, "x", 1.0, None])
 def test_reverse_bitwise_with_other_types_raise(other: Any) -> None:
     """Bitwise ops with a non-Boolean LHS raise TypeError via the reflected dunder."""
     name = type(other).__name__
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for &: 'Boolean' and '{name}'"),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         _ = other & Boolean(True)
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for |: 'Boolean' and '{name}'"),
-    ):
+    assert str(exception_info.value) == f"Unsupported operand type(s) for &: 'Boolean' and '{name}'"
+    with pytest.raises(TypeError) as exception_info:
         _ = other | Boolean(True)
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for ^: 'Boolean' and '{name}'"),
-    ):
+    assert str(exception_info.value) == f"Unsupported operand type(s) for |: 'Boolean' and '{name}'"
+    with pytest.raises(TypeError) as exception_info:
         _ = other ^ Boolean(True)
+    assert str(exception_info.value) == f"Unsupported operand type(s) for ^: 'Boolean' and '{name}'"
 
 
 @pytest.mark.parametrize(
@@ -191,42 +175,38 @@ def test_inequality_same_type(left: Boolean, right: Boolean, expected: bool) -> 
 def test_equality_cross_type_raises(other: Any) -> None:
     """Boolean compared to any non-Boolean value raises TypeError on the LHS."""
     name = type(other).__name__
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for ==: 'Boolean' and '{name}'"),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         _ = Boolean(True) == other
+    assert (
+        str(exception_info.value) == f"Unsupported operand type(s) for ==: 'Boolean' and '{name}'"
+    )
 
 
 @pytest.mark.parametrize("other", [True, False, 1, 0, "a string", 1.0, None])
 def test_inequality_cross_type_raises(other: Any) -> None:
     """Boolean != non-Boolean value raises TypeError on the LHS."""
     name = type(other).__name__
-    with pytest.raises(
-        TypeError,
-        match=re.escape(f"Unsupported operand type(s) for !=: 'Boolean' and '{name}'"),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         _ = Boolean(True) != other
+    assert (
+        str(exception_info.value) == f"Unsupported operand type(s) for !=: 'Boolean' and '{name}'"
+    )
 
 
 @pytest.mark.parametrize("other", [1, 0])
 def test_equality_reflected_int_raises(other: int) -> None:
     """int == Boolean: Boolean subclasses int so its __eq__ runs first and raises."""
-    with pytest.raises(
-        TypeError,
-        match=re.escape("Unsupported operand type(s) for ==: 'Boolean' and 'int'"),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         _ = other == Boolean(True)
+    assert str(exception_info.value) == "Unsupported operand type(s) for ==: 'Boolean' and 'int'"
 
 
 @pytest.mark.parametrize("other", [1, 0])
 def test_inequality_reflected_int_raises(other: int) -> None:
     """int != Boolean: Boolean subclasses int so its __ne__ runs first and raises."""
-    with pytest.raises(
-        TypeError,
-        match=re.escape("Unsupported operand type(s) for !=: 'Boolean' and 'int'"),
-    ):
+    with pytest.raises(TypeError) as exception_info:
         _ = other != Boolean(True)
+    assert str(exception_info.value) == "Unsupported operand type(s) for !=: 'Boolean' and 'int'"
 
 
 def test_repr_and_str() -> None:
@@ -275,23 +255,21 @@ class TestBooleanSSZ:
 
     def test_decode_invalid_length(self) -> None:
         """Tests that decode_bytes fails with incorrect byte length."""
-        with pytest.raises(SSZSerializationError, match=r"^Boolean: expected 1 byte, got 0$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.decode_bytes(b"")
-        with pytest.raises(SSZSerializationError, match=r"^Boolean: expected 1 byte, got 2$"):
+        assert str(exception_info.value) == "Boolean: expected 1 byte, got 0"
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.decode_bytes(b"\x00\x01")
+        assert str(exception_info.value) == "Boolean: expected 1 byte, got 2"
 
     def test_decode_invalid_value(self) -> None:
         """Tests that decode_bytes fails with an invalid byte value."""
-        with pytest.raises(
-            SSZSerializationError,
-            match=r"^Boolean: byte must be 0x00 or 0x01, got 0x02$",
-        ):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.decode_bytes(b"\x02")
-        with pytest.raises(
-            SSZSerializationError,
-            match=r"^Boolean: byte must be 0x00 or 0x01, got 0xff$",
-        ):
+        assert str(exception_info.value) == "Boolean: byte must be 0x00 or 0x01, got 0x02"
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.decode_bytes(b"\xff")
+        assert str(exception_info.value) == "Boolean: byte must be 0x00 or 0x01, got 0xff"
 
     @pytest.mark.parametrize("value", [True, False])
     def test_serialize_deserialize_roundtrip(self, value: bool) -> None:
@@ -312,18 +290,21 @@ class TestBooleanSSZ:
     def test_deserialize_invalid_scope(self) -> None:
         """Tests that deserialize fails with an incorrect scope."""
         stream = io.BytesIO(b"\x01")
-        with pytest.raises(SSZSerializationError, match=r"^Boolean: expected scope of 1, got 0$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.deserialize(stream, scope=0)
+        assert str(exception_info.value) == "Boolean: expected scope of 1, got 0"
 
         stream.seek(0)
-        with pytest.raises(SSZSerializationError, match=r"^Boolean: expected scope of 1, got 2$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.deserialize(stream, scope=2)
+        assert str(exception_info.value) == "Boolean: expected scope of 1, got 2"
 
     def test_deserialize_premature_stream_end(self) -> None:
         """Tests that deserialize fails if the stream ends prematurely."""
         stream = io.BytesIO(b"")  # Empty stream
-        with pytest.raises(SSZSerializationError, match=r"^Boolean: expected 1 byte, got 0$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             Boolean.deserialize(stream, scope=1)
+        assert str(exception_info.value) == "Boolean: expected 1 byte, got 0"
 
 
 @given(boolean_value=st.booleans())
