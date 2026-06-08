@@ -1,5 +1,6 @@
 """Core definition of the KoalaBear prime field Fp."""
 
+import math
 from typing import IO, Any, Final, NoReturn, Self, override
 
 from pydantic.annotated_handlers import GetCoreSchemaHandler
@@ -22,7 +23,7 @@ The prime is chosen because the cube map (x -> x^3) is an automorphism of the mu
 P_BITS: Final = 31
 """The number of bits in the prime P."""
 
-P_BYTES: Final = (P_BITS + 7) // 8
+P_BYTES: Final = math.ceil(P_BITS / 8)
 """The size of a KoalaBear field element in bytes."""
 
 

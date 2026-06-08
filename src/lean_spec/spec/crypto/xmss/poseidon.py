@@ -140,9 +140,10 @@ class PoseidonXmss(StrictBaseModel):
         state[:cap_length] = capacity_value
 
         # Phase 2: absorb each chunk by overwriting the rate slots.
+        #
+        # Padding makes every chunk exactly rate wide, so the slice always matches.
         for chunk in batched(padded_input, rate):
-            for j, chunk_element in enumerate(chunk):
-                state[cap_length + j] = chunk_element
+            state[cap_length : cap_length + rate] = chunk
             state = engine.permute(state)
 
         # Phase 3: squeeze rate slots, permuting until enough output is available.
