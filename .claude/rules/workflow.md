@@ -22,6 +22,6 @@ just            # List all available recipes
 ## Common Tasks
 
 - **Main specs**: `src/lean_spec/`
-- **Unit tests**: `tests/lean_spec/` (mirrors source structure)
+- **Unit tests**: `tests/` (mirrors source structure)
 - **Consensus spec tests**: `tests/consensus/` (generates test vectors)
 

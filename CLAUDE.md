@@ -84,9 +84,9 @@ subspecifications that the Lean Ethereum protocol relies on.
   - The bar: a reviewer reading any single line in isolation should know what each name refers to.
     If they would have to scroll up to find out, the name is wrong.
 - **CRITICAL - TEST STRUCTURE MIRRORS SOURCE STRUCTURE**: This is a STRICT requirement. The
-  test tree under `tests/lean_spec/` mirrors the source tree under `src/lean_spec/` one-to-one.
+  test tree under `tests/` mirrors the source tree under `src/lean_spec/` one-to-one.
   A source module `src/lean_spec/<path>/<name>.py` has its unit tests in
-  `tests/lean_spec/<path>/test_<name>.py`, and every test file tests the single source module it
+  `tests/<path>/test_<name>.py`, and every test file tests the single source module it
   mirrors.
   - When you MOVE a class or function to a different module, MOVE its tests to the matching test
     module in the SAME change. Never leave tests behind in the old location.
@@ -94,9 +94,19 @@ subspecifications that the Lean Ethereum protocol relies on.
     an unrelated test file.
   - When you DELETE or RENAME a source module, delete or rename its test module to match.
   - A test file must never test a type that lives in a different source module. For example, tests
-    for `Interval` (in `spec/forks/lstar/containers/interval.py`) belong in
-    `tests/lean_spec/spec/forks/lstar/containers/test_interval.py`, never in
-    `node/chain/test_clock.py`.
+    for `SlotClock` (in `node/chain/clock.py`) belong in `tests/node/chain/test_clock.py`,
+    never in an unrelated test module.
+  - This mirroring covers non-fork modules only (`node/`, `spec/crypto/`, `spec/ssz/`, etc.). The
+    fork specs under `src/lean_spec/spec/forks/` are exempt — see the forks-are-vectors rule below.
+- **CRITICAL - FORKS ARE TESTED BY VECTORS, NOT PYTESTS**: This is a STRICT requirement. The fork
+  specs under `src/lean_spec/spec/forks/` are tested exclusively through consensus test vectors
+  under `tests/consensus/` (generated with `uv run fill`), never through pytest unit tests.
+  - There is NO `tests/spec/forks/` tree, and you must never create one.
+  - When you add or change any fork behavior — fork choice, state transition, block production,
+    validator duties, aggregation, the containers, slot/interval math, the fork registry or
+    protocol — add or update a consensus test-vector fixture, not a pytest.
+  - Write these with the `state_transition`, `fork_choice`, `ssz`, `slot_clock`, `verify_signatures`,
+    and related fixtures in `packages/testing/src/consensus_testing/`.
 - **CRITICAL - ASSERT THE COMPLETE ERROR MESSAGE**: This is a STRICT requirement. When a test
   checks a raised exception, assert the FULL message with string equality, never a substring or
   partial regex. A partial match lets the rest of the message drift or regress unnoticed.

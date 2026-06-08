@@ -2,7 +2,8 @@
 
 from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
@@ -12,9 +13,12 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import Bytes52, Uint64
+from lean_spec.spec.ssz import Bytes32, Bytes52, Uint64
 
 _DEFAULT_GENESIS_TIME = Uint64(0)
+
+_DEFAULT_VALIDATOR_INDEX = ValidatorIndex(0)
+"""Owning validator for a genesis store, unless overridden."""
 
 
 def _build_validators(num_validators: int) -> Validators:
@@ -136,3 +140,64 @@ def build_anchor(
         parent_root = hash_tree_root(current_block)
 
     return state, current_block
+
+
+def make_validators(count: int) -> Validators:
+    """Build a validator registry of the given size with zeroed public keys."""
+    return Validators(
+        data=[
+            Validator(
+                attestation_public_key=Bytes52(b"\x00" * 52),
+                proposal_public_key=Bytes52(b"\x00" * 52),
+                index=ValidatorIndex(validator_position),
+            )
+            for validator_position in range(count)
+        ]
+    )
+
+
+def make_genesis_state(num_validators: int = 3, genesis_time: int = 0) -> State:
+    """Build a genesis state with zeroed validator keys."""
+    return LstarSpec().generate_genesis(
+        genesis_time=Uint64(genesis_time),
+        validators=make_validators(num_validators),
+    )
+
+
+def make_genesis_block(state: State) -> Block:
+    """Build the genesis block matching a genesis state."""
+    return Block(
+        slot=Slot(0),
+        proposer_index=ValidatorIndex(0),
+        parent_root=Bytes32.zero(),
+        state_root=hash_tree_root(state),
+        body=BlockBody(attestations=AggregatedAttestations(data=[])),
+    )
+
+
+def make_genesis_store(
+    num_validators: int = 4,
+    *,
+    genesis_time: int = 0,
+    validator_index: ValidatorIndex | None = _DEFAULT_VALIDATOR_INDEX,
+    observer: bool = False,
+    keyed: bool = True,
+    time: Interval | None = None,
+) -> Store:
+    """
+    Build a genesis fork-choice store.
+
+    Uses real XMSS keys when keyed, else zeroed keys for any validator count.
+    Set observer for a store with no owning validator.
+    """
+    state = (
+        generate_pre_state(genesis_time=Uint64(genesis_time), num_validators=num_validators)
+        if keyed
+        else make_genesis_state(num_validators=num_validators, genesis_time=genesis_time)
+    )
+    store = LstarSpec().create_store(
+        state,
+        make_genesis_block(state),
+        validator_index=None if observer else validator_index,
+    )
+    return store if time is None else store.model_copy(update={"time": time})

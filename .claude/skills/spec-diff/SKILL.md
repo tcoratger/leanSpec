@@ -12,7 +12,7 @@ Show what changed in the **spec code** (`src/lean_spec/`) and **consensus test v
 test fixtures that generate cross-client test vectors.
 
 **Excluded**: Test framework infrastructure (`packages/testing/`, `consensus_testing/`),
-unit tests (`tests/lean_spec/`), interop tests (`tests/interop/`),
+unit tests (`tests/`), interop tests (`tests/interop/`),
 documentation (`docs/`), CI/tooling configs, and the node implementation layer
 (networking, sync, storage, node runner).
 

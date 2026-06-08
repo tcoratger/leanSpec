@@ -8,7 +8,7 @@ paths:
 
 **Two types of tests:**
 
-1. **Unit tests** (`tests/lean_spec/`) - Standard pytest tests for implementation
+1. **Unit tests** (`tests/`) - Standard pytest tests for implementation
 2. **Spec tests** (`tests/consensus/`) - Generate JSON test vectors via fillers
 
 **Test Filling Framework:**
