@@ -524,7 +524,7 @@ class ReqRespServer:
             # - Correct size (80 bytes for Status)
             # - Valid field offsets
             try:
-                _request = Status.decode_bytes(ssz_bytes)  # noqa: F841
+                Status.decode_bytes(ssz_bytes)
             except Exception as exception:
                 # SSZ decode failure: wrong size, malformed offsets, etc.
                 #
