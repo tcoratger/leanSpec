@@ -232,10 +232,11 @@ class TestBatchWrite:
         with db.batch_write():
             db.put_head_root(root)
 
-        with pytest.raises(ValueError, match="intentional"):
+        with pytest.raises(ValueError) as exception_info:
             with db.batch_write():
                 db.put_head_root(Bytes32(b"\x13" * 32))
                 raise ValueError("intentional")
+        assert str(exception_info.value) == "intentional"
 
         # Original value preserved after rollback.
         assert db.get_head_root() == root
@@ -329,8 +330,11 @@ class TestErrorPaths:
         )
         db._connection.commit()
 
-        with pytest.raises(StorageCorruptionError, match="Corrupt block"):
+        with pytest.raises(StorageCorruptionError) as exception_info:
             db.get_block(root)
+        assert str(exception_info.value) == (
+            f"Corrupt block data for root {root.hex()}: ValidatorIndex: expected 8 bytes, got 5"
+        )
 
     def test_corrupt_state_data_raises_corruption_error(self, db: SQLiteDatabase) -> None:
         """Reading corrupt state data raises StorageCorruptionError."""
@@ -343,8 +347,11 @@ class TestErrorPaths:
         )
         db._connection.commit()
 
-        with pytest.raises(StorageCorruptionError, match="Corrupt state"):
+        with pytest.raises(StorageCorruptionError) as exception_info:
             db.get_state(root)
+        assert str(exception_info.value) == (
+            f"Corrupt state data for block root {root.hex()}: Slot: expected 8 bytes, got 5"
+        )
 
     def test_corrupt_checkpoint_data_raises_corruption_error(self, db: SQLiteDatabase) -> None:
         """Reading corrupt checkpoint data raises StorageCorruptionError."""
@@ -355,8 +362,11 @@ class TestErrorPaths:
         )
         db._connection.commit()
 
-        with pytest.raises(StorageCorruptionError, match="Corrupt justified"):
+        with pytest.raises(StorageCorruptionError) as exception_info:
             db.get_justified_checkpoint()
+        assert str(exception_info.value) == (
+            "Corrupt justified checkpoint data: Bytes32: expected 32 bytes, got 13"
+        )
 
     def test_read_after_close_raises(self, db: SQLiteDatabase) -> None:
         """Operations on a closed database raise StorageReadError."""

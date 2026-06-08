@@ -123,8 +123,9 @@ class TestLiveNetworkEventSourceSetForkDigest:
         es.set_network_name("0xdeadbeef")
 
         # Old default digest should now be rejected
-        with pytest.raises(ForkMismatchError, match="expected 0xdeadbeef"):
+        with pytest.raises(ForkMismatchError) as exception_info:
             es._gossip_handler.get_topic(_block_topic("0x00000000"))
+        assert str(exception_info.value) == "Fork mismatch: expected 0xdeadbeef, got 0x00000000"
 
 
 class TestLiveNetworkEventSourceSetBlockLookup:

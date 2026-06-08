@@ -129,9 +129,13 @@ class TestFetchFinalizedState:
                 "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=transport),
             ),
-            pytest.raises(CheckpointSyncError, match="Network error"),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await fetch_finalized_state("http://example.com", State)
+        assert str(exception_info.value) == (
+            "Network error while connecting to "
+            "http://example.com/lean/v0/states/finalized: connection refused"
+        )
 
     @pytest.mark.parametrize(
         ("status_code", "status_text"),
@@ -156,9 +160,10 @@ class TestFetchFinalizedState:
                 "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=transport),
             ),
-            pytest.raises(CheckpointSyncError, match=f"HTTP error {status_code}"),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await fetch_finalized_state("http://example.com", State)
+        assert str(exception_info.value) == f"HTTP error {status_code}: {status_text}"
 
     async def test_corrupt_ssz_raises_checkpoint_sync_error(self) -> None:
         """
@@ -175,9 +180,10 @@ class TestFetchFinalizedState:
                 "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=transport),
             ),
-            pytest.raises(CheckpointSyncError, match="Failed to fetch state"),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await fetch_finalized_state("http://example.com", State)
+        assert str(exception_info.value) == "Failed to fetch state: Slot: expected 8 bytes, got 2"
 
     async def test_trailing_slash_stripped_from_url(self) -> None:
         """

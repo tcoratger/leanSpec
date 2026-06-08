@@ -947,8 +947,9 @@ class TestReqRespClientBlocksByRange:
         connection = MockRangeConnection(peer_id=peer_id, streams=[stream])
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        with pytest.raises(CodecError, match=r"Non-monotonic slot"):
+        with pytest.raises(CodecError) as exception_info:
             await client.request_blocks_by_range(peer_id, Slot(40), Uint64(2))
+        assert str(exception_info.value) == "Non-monotonic slot: 40 <= 40"
 
     async def test_out_of_range_slot_raises_codec_error(self, peer_id: PeerId) -> None:
         """A block whose slot falls outside the requested range is rejected."""
@@ -960,8 +961,9 @@ class TestReqRespClientBlocksByRange:
         connection = MockRangeConnection(peer_id=peer_id, streams=[stream])
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        with pytest.raises(CodecError, match=r"outside requested range"):
+        with pytest.raises(CodecError) as exception_info:
             await client.request_blocks_by_range(peer_id, Slot(50), Uint64(3))
+        assert str(exception_info.value) == "Block slot 60 outside requested range"
 
     async def test_parent_root_continuity_violation_across_skipped_slot(
         self, peer_id: PeerId
@@ -984,8 +986,14 @@ class TestReqRespClientBlocksByRange:
         connection = MockRangeConnection(peer_id=peer_id, streams=[stream])
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        with pytest.raises(CodecError, match=r"Parent root mismatch"):
+        expected_parent_root = hash_tree_root(first.block).hex()
+        with pytest.raises(CodecError) as exception_info:
             await client.request_blocks_by_range(peer_id, Slot(70), Uint64(5))
+        assert str(exception_info.value) == (
+            f"Parent root mismatch at slot 73: "
+            f"expected {expected_parent_root}, "
+            f"got {bad.block.parent_root.hex()}"
+        )
 
     async def test_parent_root_continuity_holds_across_skipped_slots(self, peer_id: PeerId) -> None:
         """A correct parent_root linkage across empty slots is accepted."""
@@ -1022,8 +1030,9 @@ class TestReqRespClientBlocksByRange:
         connection = MockRangeConnection(peer_id=peer_id, streams=[stream])
         client.register_connection(peer_id, connection)  # type: ignore[arg-type]
 
-        with pytest.raises(CodecError, match=r"more than count"):
+        with pytest.raises(CodecError) as exception_info:
             await client.request_blocks_by_range(peer_id, Slot(100), Uint64(2))
+        assert str(exception_info.value) == "Peer sent more than count BlocksByRange chunks"
 
     async def test_timeout_returns_empty_list(self, peer_id: PeerId) -> None:
         """A request that times out returns an empty list rather than raising."""

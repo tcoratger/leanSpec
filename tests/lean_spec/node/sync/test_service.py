@@ -383,8 +383,9 @@ class TestInvalidStateTransition:
         """Direct IDLE -> SYNCED transition raises ValueError."""
         assert sync_service.state == SyncState.IDLE
 
-        with pytest.raises(ValueError, match="Invalid state transition"):
+        with pytest.raises(ValueError) as exception_info:
             await sync_service._transition_to(SyncState.SYNCED)
+        assert str(exception_info.value) == "Invalid state transition: IDLE -> SYNCED"
 
     async def test_self_transition_raises_value_error(
         self,
@@ -393,8 +394,9 @@ class TestInvalidStateTransition:
         """A transition to the current state is rejected as a no-op move."""
         assert sync_service.state == SyncState.IDLE
 
-        with pytest.raises(ValueError, match="Invalid state transition"):
+        with pytest.raises(ValueError) as exception_info:
             await sync_service._transition_to(SyncState.IDLE)
+        assert str(exception_info.value) == "Invalid state transition: IDLE -> IDLE"
 
 
 class TestIdleToCaughtUp:

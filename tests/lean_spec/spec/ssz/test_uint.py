@@ -2,7 +2,6 @@
 
 import io
 import operator
-import re
 from itertools import permutations
 from typing import Any, Type
 
@@ -85,8 +84,9 @@ def test_instantiation_from_invalid_types_raises_error(
 ) -> None:
     """Tests that instantiating with non-integer types raises SSZTypeError."""
     expected_message = f"Expected int, got {expected_type_name}"
-    with pytest.raises(SSZTypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(SSZTypeError) as exception_info:
         uint_class(invalid_value)
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -102,8 +102,9 @@ def test_instantiation_and_type(uint_class: Type[BaseUint]) -> None:
 def test_instantiation_negative(uint_class: Type[BaseUint]) -> None:
     """Tests that instantiating with a negative number raises SSZValueError."""
     expected_message = f"-5 out of range for {uint_class.__name__} [0, {2**uint_class.BITS - 1}]"
-    with pytest.raises(SSZValueError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(SSZValueError) as exception_info:
         uint_class(-5)
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -111,8 +112,9 @@ def test_instantiation_too_large(uint_class: Type[BaseUint]) -> None:
     """Tests that instantiating with a value >= MAX raises SSZValueError."""
     max_value = 2**uint_class.BITS
     expected_message = f"{max_value} out of range for {uint_class.__name__} [0, {max_value - 1}]"
-    with pytest.raises(SSZValueError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(SSZValueError) as exception_info:
         uint_class(max_value)
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -136,20 +138,23 @@ def test_arithmetic_operators(uint_class: Type[BaseUint]) -> None:
     # Addition
     assert left + right == uint_class(a_value + b_value)
     expected_message = f"{max_int + b_value} out of range for {name} [0, {max_int}]"
-    with pytest.raises(SSZValueError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(SSZValueError) as exception_info:
         _ = max_value + right
+    assert str(exception_info.value) == expected_message
 
     # Subtraction
     assert left - right == uint_class(a_value - b_value)
     expected_message = f"{b_value - a_value} out of range for {name} [0, {max_int}]"
-    with pytest.raises(SSZValueError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(SSZValueError) as exception_info:
         _ = right - left
+    assert str(exception_info.value) == expected_message
 
     # Multiplication
     assert left * right == uint_class(a_value * b_value)
     expected_message = f"{max_int * b_value} out of range for {name} [0, {max_int}]"
-    with pytest.raises(SSZValueError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(SSZValueError) as exception_info:
         _ = max_value * right
+    assert str(exception_info.value) == expected_message
 
     # Floor Division
     assert left // right == uint_class(a_value // b_value)
@@ -161,8 +166,9 @@ def test_arithmetic_operators(uint_class: Type[BaseUint]) -> None:
     assert uint_class(b_value) ** uint_class(4) == uint_class(b_value**4)
     if uint_class.BITS <= 16:  # Pow gets too big quickly
         expected_message = f"{a_value**b_value} out of range for {name} [0, {max_int}]"
-        with pytest.raises(SSZValueError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(SSZValueError) as exception_info:
             _ = left**right
+        assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -171,24 +177,29 @@ def test_reverse_arithmetic_operators_raise_error(uint_class: Type[BaseUint]) ->
     name = uint_class.__name__
 
     expected_message = f"Unsupported operand type(s) for +: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 100 + uint_class(3)
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for -: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 100 - uint_class(3)
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for *: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 100 * uint_class(3)
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for //: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 100 // uint_class(3)
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for %: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 100 % uint_class(3)
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -201,8 +212,9 @@ def test_divmod(uint_class: Type[BaseUint]) -> None:
     assert isinstance(remainder, uint_class)
 
     expected_message = f"Unsupported operand type(s) for divmod: '{uint_class.__name__}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = divmod(100, uint_class(3))
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -232,24 +244,29 @@ def test_bitwise_operators(uint_class: Type[BaseUint]) -> None:
     assert left >> uint_class(2) == uint_class(0b11)
 
     expected_message = f"Unsupported operand type(s) for &: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = left & 1
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for |: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = left | 1
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for ^: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = left ^ 1
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for <<: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = left << 1
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for >>: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = left >> 1
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -271,30 +288,36 @@ def test_all_comparisons_with_other_types_raise_error(
     name = uint_class.__name__
 
     expected_message = f"Unsupported operand type(s) for ==: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = uint_class(10) == 10
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for !=: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 10 != uint_class(10)
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for >: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = uint_class(10) > 5
+    assert str(exception_info.value) == expected_message
 
     # 5 < uint(10) routes to uint(10).__gt__(5) because uint is a strict int subclass.
     expected_message = f"Unsupported operand type(s) for >: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 5 < uint_class(10)
+    assert str(exception_info.value) == expected_message
 
     expected_message = f"Unsupported operand type(s) for >=: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = uint_class(10) >= 10
+    assert str(exception_info.value) == expected_message
 
     # 10 <= uint(10) routes to uint(10).__ge__(10) by subclass priority.
     expected_message = f"Unsupported operand type(s) for >=: '{name}' and 'int'"
-    with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+    with pytest.raises(TypeError) as exception_info:
         _ = 10 <= uint_class(10)
+    assert str(exception_info.value) == expected_message
 
 
 @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
@@ -420,8 +443,9 @@ class TestUintSSZ:
         expected_message = (
             f"{uint_class.__name__}: expected {expected_length} bytes, got {expected_length - 1}"
         )
-        with pytest.raises(SSZSerializationError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             uint_class.decode_bytes(invalid_data)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_serialize_deserialize_stream_roundtrip(self, uint_class: Type[BaseUint]) -> None:
@@ -452,8 +476,9 @@ class TestUintSSZ:
             f"{uint_class.__name__}: invalid scope, "
             f"expected {byte_length} bytes, got {invalid_scope}"
         )
-        with pytest.raises(SSZSerializationError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             uint_class.deserialize(stream, scope=invalid_scope)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_deserialize_stream_too_short(self, uint_class: Type[BaseUint]) -> None:
@@ -464,8 +489,9 @@ class TestUintSSZ:
         expected_message = (
             f"{uint_class.__name__}: expected {byte_length} bytes, got {byte_length - 1}"
         )
-        with pytest.raises(SSZSerializationError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(SSZSerializationError) as exception_info:
             uint_class.deserialize(stream, scope=byte_length)
+        assert str(exception_info.value) == expected_message
 
 
 class TestForwardArithmeticTypeErrors:
@@ -490,8 +516,9 @@ class TestForwardArithmeticTypeErrors:
         expected_message = (
             f"Unsupported operand type(s) for {op_symbol}: '{uint_class.__name__}' and 'int'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             getattr(uint_class(5), method)(3)
+        assert str(exception_info.value) == expected_message
 
 
 class TestReverseArithmeticSuccessPaths:
@@ -577,8 +604,9 @@ class TestPowShiftStrictOperands:
             f"Unsupported operand type(s) for **: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(2) ** bad
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [100, True])
@@ -588,8 +616,9 @@ class TestPowShiftStrictOperands:
             f"Unsupported operand type(s) for **: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             pow(uint_class(2), uint_class(10), bad)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [2, True])
@@ -599,8 +628,9 @@ class TestPowShiftStrictOperands:
             f"Unsupported operand type(s) for **: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(3).__rpow__(bad)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [100, True])
@@ -610,8 +640,9 @@ class TestPowShiftStrictOperands:
             f"Unsupported operand type(s) for **: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(10).__rpow__(uint_class(2), bad)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [3, True])
@@ -621,8 +652,9 @@ class TestPowShiftStrictOperands:
             f"Unsupported operand type(s) for <<: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(1) << bad
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     @pytest.mark.parametrize("bad", [2, True])
@@ -632,8 +664,9 @@ class TestPowShiftStrictOperands:
             f"Unsupported operand type(s) for >>: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(8) >> bad
+        assert str(exception_info.value) == expected_message
 
 
 class TestDivmodEdgeCases:
@@ -645,8 +678,9 @@ class TestDivmodEdgeCases:
         expected_message = (
             f"Unsupported operand type(s) for divmod: '{uint_class.__name__}' and 'int'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             divmod(uint_class(10), 3)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_rdivmod_success(self, uint_class: Type[BaseUint]) -> None:
@@ -706,8 +740,9 @@ class TestReverseShiftOperators:
             f"Unsupported operand type(s) for <<: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(2).__rlshift__(bad)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_rrshift_success(self, uint_class: Type[BaseUint]) -> None:
@@ -725,8 +760,9 @@ class TestReverseShiftOperators:
             f"Unsupported operand type(s) for >>: "
             f"'{uint_class.__name__}' and '{type(bad).__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(2).__rrshift__(bad)
+        assert str(exception_info.value) == expected_message
 
 
 class TestComparisonTypeErrors:
@@ -736,15 +772,17 @@ class TestComparisonTypeErrors:
     def test_lt_rejects_plain_int(self, uint_class: Type[BaseUint]) -> None:
         """Less-than raises TypeError when compared to a plain int directly."""
         expected_message = f"Unsupported operand type(s) for <: '{uint_class.__name__}' and 'int'"
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(5).__lt__(10)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_le_rejects_plain_int(self, uint_class: Type[BaseUint]) -> None:
         """Less-than-or-equal raises TypeError when compared to a plain int directly."""
         expected_message = f"Unsupported operand type(s) for <=: '{uint_class.__name__}' and 'int'"
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             uint_class(5).__le__(10)
+        assert str(exception_info.value) == expected_message
 
 
 class TestIndexReturnsPlainInt:
@@ -769,8 +807,9 @@ class TestCrossWidthEqualityIsStrict:
         expected_message = (
             f"Unsupported operand type(s) for ==: '{type_a.__name__}' and '{type_b.__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             _ = type_a(5) == type_b(5)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("type_a, type_b", CROSS_UINT_TYPE_PAIRS)
     def test_ne_across_widths_raises(self, type_a: Type[BaseUint], type_b: Type[BaseUint]) -> None:
@@ -778,8 +817,9 @@ class TestCrossWidthEqualityIsStrict:
         expected_message = (
             f"Unsupported operand type(s) for !=: '{type_a.__name__}' and '{type_b.__name__}'"
         )
-        with pytest.raises(TypeError, match=rf"^{re.escape(expected_message)}$"):
+        with pytest.raises(TypeError) as exception_info:
             _ = type_a(5) != type_b(5)
+        assert str(exception_info.value) == expected_message
 
     @pytest.mark.parametrize("uint_class", ALL_UINT_TYPES)
     def test_eq_same_width_same_value_still_equal(self, uint_class: Type[BaseUint]) -> None:

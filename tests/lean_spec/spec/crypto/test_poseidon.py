@@ -108,7 +108,11 @@ class TestPoseidonParamsValidation:
 
     def test_invalid_mds_first_row_length(self) -> None:
         """Raises error when mds_first_row length doesn't match width."""
-        with pytest.raises(ValueError, match=r"Length of mds_first_row must equal width\."):
+        with pytest.raises(
+            ValueError,
+            match=r"(?s)^1 validation error for PoseidonParams\n"
+            r"  Value error, Length of mds_first_row must equal width\. .*\Z",
+        ):
             PoseidonParams(
                 width=3,
                 rounds_f=8,
@@ -119,7 +123,11 @@ class TestPoseidonParamsValidation:
 
     def test_invalid_round_constants_count(self) -> None:
         """Raises error when round_constants count is incorrect."""
-        with pytest.raises(ValueError, match=r"Incorrect number of round constants provided\."):
+        with pytest.raises(
+            ValueError,
+            match=r"(?s)^1 validation error for PoseidonParams\n"
+            r"  Value error, Incorrect number of round constants provided\. .*\Z",
+        ):
             PoseidonParams(
                 width=3,
                 rounds_f=8,
@@ -130,7 +138,11 @@ class TestPoseidonParamsValidation:
 
     def test_width_must_be_positive(self) -> None:
         """Rejects a non-positive width."""
-        with pytest.raises(ValidationError, match=r"Input should be greater than 0"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for PoseidonParams\nwidth\n"
+            r"  Input should be greater than 0 .*\Z",
+        ):
             PoseidonParams(
                 width=0,
                 rounds_f=8,
@@ -141,7 +153,11 @@ class TestPoseidonParamsValidation:
 
     def test_rounds_f_must_be_positive(self) -> None:
         """Rejects a non-positive full-round count before the even-check runs."""
-        with pytest.raises(ValidationError, match=r"Input should be greater than 0"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for PoseidonParams\nrounds_f\n"
+            r"  Input should be greater than 0 .*\Z",
+        ):
             PoseidonParams(
                 width=3,
                 rounds_f=0,
@@ -152,7 +168,11 @@ class TestPoseidonParamsValidation:
 
     def test_rounds_p_must_be_non_negative(self) -> None:
         """Rejects a negative partial-round count."""
-        with pytest.raises(ValidationError, match=r"Input should be greater than or equal to 0"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for PoseidonParams\nrounds_p\n"
+            r"  Input should be greater than or equal to 0 .*\Z",
+        ):
             PoseidonParams(
                 width=3,
                 rounds_f=8,
@@ -165,7 +185,8 @@ class TestPoseidonParamsValidation:
         """Rejects an empty MDS first row."""
         with pytest.raises(
             ValidationError,
-            match=r"List should have at least 1 item after validation, not 0",
+            match=r"(?s)^1 validation error for PoseidonParams\nmds_first_row\n"
+            r"  List should have at least 1 item after validation, not 0 .*\Z",
         ):
             PoseidonParams(
                 width=3,
@@ -179,7 +200,8 @@ class TestPoseidonParamsValidation:
         """Rejects an empty round-constants list."""
         with pytest.raises(
             ValidationError,
-            match=r"List should have at least 1 item after validation, not 0",
+            match=r"(?s)^1 validation error for PoseidonParams\nround_constants\n"
+            r"  List should have at least 1 item after validation, not 0 .*\Z",
         ):
             PoseidonParams(
                 width=3,
@@ -191,7 +213,11 @@ class TestPoseidonParamsValidation:
 
     def test_rounds_f_must_be_even(self) -> None:
         """Rejects odd full-round counts that would leave constants unused."""
-        with pytest.raises(ValidationError, match=r"Input should be a multiple of 2"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for PoseidonParams\nrounds_f\n"
+            r"  Input should be a multiple of 2 .*\Z",
+        ):
             PoseidonParams(
                 width=3,
                 rounds_f=7,
@@ -207,14 +233,16 @@ class TestPoseidonEngine:
     def test_permute_wrong_state_length_too_short(self) -> None:
         """Raises error when input state is too short."""
         engine = Poseidon(PARAMS_16)
-        with pytest.raises(ValueError, match=r"^Input state must have length 16$"):
+        with pytest.raises(ValueError) as exception_info:
             engine.permute([Fp(1)] * 10)
+        assert str(exception_info.value) == "Input state must have length 16"
 
     def test_permute_wrong_state_length_too_long(self) -> None:
         """Raises error when input state is too long."""
         engine = Poseidon(PARAMS_16)
-        with pytest.raises(ValueError, match=r"^Input state must have length 16$"):
+        with pytest.raises(ValueError) as exception_info:
             engine.permute([Fp(1)] * 20)
+        assert str(exception_info.value) == "Input state must have length 16"
 
     def test_permute_determinism(self) -> None:
         """Same input produces same output."""

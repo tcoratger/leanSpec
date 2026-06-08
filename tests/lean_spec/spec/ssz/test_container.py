@@ -382,8 +382,12 @@ class TestFromHex:
 
     def test_from_hex_bad_hex_raises_value_error(self) -> None:
         """Non-hex characters surface a ValueError from the underlying parser."""
-        with pytest.raises(ValueError, match="non-hexadecimal number"):
+        with pytest.raises(ValueError) as exception_info:
             OneByte.from_hex("zz")
+        assert (
+            str(exception_info.value)
+            == "non-hexadecimal number found in fromhex() arg at position 0"
+        )
 
 
 class TestHexStringValidator:
@@ -417,7 +421,20 @@ class TestHexStringValidator:
     def test_wrong_length_hex_raises_with_class_name(self) -> None:
         """Hex with too many bytes raises a validation error tagged by the class name."""
         # 2 hex bytes ("abcd") cannot fit a 1-byte container; trailing bytes trigger the error.
-        with pytest.raises(ValidationError, match="invalid OneByte hex"):
+        #
+        # The trailing docs URL embeds the installed pydantic version, so it is anchored
+        # with a regex that pins every stable character and generalizes only the version.
+        with pytest.raises(
+            ValidationError,
+            match=(
+                r"(?s)^1 validation error for OneByte\n"
+                r"  Value error, invalid OneByte hex: "
+                r"OneByte: 1 trailing byte\(s\) after decode "
+                r"\[type=value_error, input_value='abcd', input_type=str\]\n"
+                r"    For further information visit "
+                r"https://errors\.pydantic\.dev/[^/]+/v/value_error\Z"
+            ),
+        ):
             OneByte.model_validate("abcd")
 
     def test_nested_container_field_accepts_hex_string(self) -> None:

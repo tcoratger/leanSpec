@@ -187,8 +187,13 @@ def test_sign_requires_prepared_interval() -> None:
 
     # Signing should fail
     message = Bytes32(b"\x42" * 32)
-    with pytest.raises(ValueError, match="outside the prepared interval"):
+    with pytest.raises(ValueError) as exception_info:
         scheme.sign(secret_key, outside_epoch, message)
+    assert str(exception_info.value) == (
+        f"Slot {outside_epoch} is outside the prepared interval "
+        f"[{prepared_interval.start}, {prepared_interval.stop}). "
+        f"Call advance_preparation() to slide the window forward."
+    )
 
 
 def test_deterministic_signing() -> None:
@@ -238,15 +243,17 @@ def test_expand_activation_time(
 
 def test_key_gen_rejects_range_exceeding_lifetime() -> None:
     """A requested range past the lifetime is refused."""
-    with pytest.raises(ValueError, match="Activation range exceeds the key's lifetime."):
+    with pytest.raises(ValueError) as exception_info:
         TEST_SIGNATURE_SCHEME.key_gen(Slot(200), Uint64(100))
+    assert str(exception_info.value) == "Activation range exceeds the key's lifetime."
 
 
 def test_sign_rejects_slot_outside_activation() -> None:
     """Signing a slot the key was never activated for is refused."""
     secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32)).secret_key
-    with pytest.raises(ValueError, match="Key is not active for the specified slot."):
+    with pytest.raises(ValueError) as exception_info:
         TEST_SIGNATURE_SCHEME.sign(secret_key, Slot(200), Bytes32(b"\x42" * 32))
+    assert str(exception_info.value) == "Key is not active for the specified slot."
 
 
 def test_sign_raises_when_no_encoding_found(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -258,10 +265,11 @@ def test_sign_raises_when_no_encoding_found(monkeypatch: pytest.MonkeyPatch) -> 
     secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32)).secret_key
     monkeypatch.setattr(interface, "target_sum_encode", lambda *args, **kwargs: None)
     tries = TEST_SIGNATURE_SCHEME.config.MAX_TRIES
-    with pytest.raises(
-        RuntimeError, match=f"Failed to find a valid message encoding after {tries} tries."
-    ):
+    with pytest.raises(RuntimeError) as exception_info:
         TEST_SIGNATURE_SCHEME.sign(secret_key, Slot(0), Bytes32(b"\x42" * 32))
+    assert str(exception_info.value) == (
+        f"Failed to find a valid message encoding after {tries} tries."
+    )
 
 
 def test_sign_raises_on_wrong_codeword_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -273,10 +281,9 @@ def test_sign_raises_on_wrong_codeword_dimension(monkeypatch: pytest.MonkeyPatch
     secret_key = TEST_SIGNATURE_SCHEME.key_gen(Slot(0), Uint64(32)).secret_key
     short = [0] * (TEST_SIGNATURE_SCHEME.config.DIMENSION - 1)
     monkeypatch.setattr(interface, "target_sum_encode", lambda *args, **kwargs: short)
-    with pytest.raises(
-        RuntimeError, match="Encoding is broken: returned too many or too few chunks."
-    ):
+    with pytest.raises(RuntimeError) as exception_info:
         TEST_SIGNATURE_SCHEME.sign(secret_key, Slot(0), Bytes32(b"\x42" * 32))
+    assert str(exception_info.value) == "Encoding is broken: returned too many or too few chunks."
 
 
 def test_advance_preparation_is_a_noop_at_the_end() -> None:

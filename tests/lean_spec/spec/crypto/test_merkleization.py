@@ -146,8 +146,9 @@ def test_merkleize_with_limit_padding() -> None:
 
 def test_merkleize_error_on_exceeding_limit() -> None:
     """Raises when the chunk count exceeds the limit."""
-    with pytest.raises(ValueError, match="input exceeds limit"):
+    with pytest.raises(ValueError) as exception_info:
         merkleize(sample_chunks[0:5], limit=4)
+    assert str(exception_info.value) == "merkleize: input exceeds limit"
 
 
 def test_mix_in_length() -> None:
@@ -811,8 +812,11 @@ def test_hash_tree_root_vector_of_variable_containers() -> None:
 )
 def test_hash_tree_root_unsupported_type_raises(unsupported_value: object) -> None:
     """The dispatch fallback rejects values without a registered handler."""
-    with pytest.raises(TypeError, match=r"hash_tree_root: unsupported value type"):
+    with pytest.raises(TypeError) as exception_info:
         hash_tree_root(unsupported_value)
+    assert str(exception_info.value) == (
+        f"hash_tree_root: unsupported value type {type(unsupported_value).__name__}"
+    )
 
 
 def test_hash_tree_root_is_deterministic() -> None:

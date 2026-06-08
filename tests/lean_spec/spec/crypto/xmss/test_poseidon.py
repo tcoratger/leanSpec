@@ -29,8 +29,9 @@ def test_get_engine_caches_supported_widths(width: int) -> None:
 @pytest.mark.parametrize("width", [0, 8, 15, 17, 32])
 def test_get_engine_rejects_unsupported_width(width: int) -> None:
     """An unsupported width raises with the offending value named."""
-    with pytest.raises(ValueError, match=f"Width must be 16 or 24, got {width}"):
+    with pytest.raises(ValueError) as exception_info:
         POSEIDON._get_engine(width)
+    assert str(exception_info.value) == f"Width must be 16 or 24, got {width}"
 
 
 @pytest.mark.parametrize("width", [16, 24])
@@ -55,8 +56,9 @@ def test_compress_is_deterministic() -> None:
 
 def test_compress_rejects_output_longer_than_input() -> None:
     """Requesting more output than the raw input length raises."""
-    with pytest.raises(ValueError, match="Input vector is too short for requested output length."):
+    with pytest.raises(ValueError) as exception_info:
         POSEIDON.compress([Fp(value=1), Fp(value=2)], 16, 8)
+    assert str(exception_info.value) == "Input vector is too short for requested output length."
 
 
 def test_safe_domain_separator_returns_capacity_length() -> None:
@@ -84,8 +86,9 @@ def test_sponge_squeezes_more_than_one_rate_block() -> None:
 
 def test_sponge_rejects_capacity_not_smaller_than_width() -> None:
     """A capacity that fills the whole state leaves no rate slot and raises."""
-    with pytest.raises(ValueError, match="Capacity length must be smaller than the state width."):
+    with pytest.raises(ValueError) as exception_info:
         POSEIDON.sponge([Fp(value=1)], [Fp(value=0)] * 16, 1, 16)
+    assert str(exception_info.value) == "Capacity length must be smaller than the state width."
 
 
 def test_tweak_hash_chain_uses_width_sixteen_compression() -> None:

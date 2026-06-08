@@ -80,17 +80,21 @@ class TestBase58:
 
     def test_base58_decode_invalid_character(self) -> None:
         """Decoding invalid characters raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid Base58 character"):
+        with pytest.raises(ValueError) as exception_info:
             Base58.decode("0")  # '0' not in Base58
+        assert str(exception_info.value) == "Invalid Base58 character: '0'"
 
-        with pytest.raises(ValueError, match="Invalid Base58 character"):
+        with pytest.raises(ValueError) as exception_info:
             Base58.decode("O")  # 'O' not in Base58
+        assert str(exception_info.value) == "Invalid Base58 character: 'O'"
 
-        with pytest.raises(ValueError, match="Invalid Base58 character"):
+        with pytest.raises(ValueError) as exception_info:
             Base58.decode("I")  # 'I' not in Base58
+        assert str(exception_info.value) == "Invalid Base58 character: 'I'"
 
-        with pytest.raises(ValueError, match="Invalid Base58 character"):
+        with pytest.raises(ValueError) as exception_info:
             Base58.decode("l")  # 'l' not in Base58
+        assert str(exception_info.value) == "Invalid Base58 character: 'l'"
 
 
 class TestMultihash:

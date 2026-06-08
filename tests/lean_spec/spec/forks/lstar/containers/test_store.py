@@ -15,5 +15,11 @@ class TestStoreImmutability:
     def test_assigning_time_raises(self) -> None:
         """Assigning a new time on a constructed store raises."""
         store = make_store(num_validators=1)
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for Store\[State, Block\]\ntime\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=Interval\(1\), "
+            r"input_type=Interval\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             store.time = Interval(1)

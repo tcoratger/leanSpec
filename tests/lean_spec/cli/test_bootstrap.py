@@ -169,13 +169,19 @@ class TestBootnodeResolution:
         self, make_boot: Callable[..., NodeBootstrap], enr_without_udp: str
     ) -> None:
         """An ENR lacking UDP info is rejected before any dial attempt."""
-        with pytest.raises(CliValidationError, match=r"no UDP connection info"):
+        with pytest.raises(CliValidationError) as exception_info:
             make_boot("--bootnode", enr_without_udp)
+        assert str(exception_info.value) == (
+            "ENR has no UDP connection info: ENR(seq=1, ip=192.168.1.1)"
+        )
 
     def test_malformed_enr_rejected(self, make_boot: Callable[..., NodeBootstrap]) -> None:
         """A malformed ENR fails at RLP decoding."""
-        with pytest.raises(ValueError, match=r"Invalid RLP"):
+        with pytest.raises(ValueError) as exception_info:
             make_boot("--bootnode", "enr:YWJj")
+        assert str(exception_info.value) == (
+            "Invalid RLP encoding: Trailing data: decoded 1 of 3 bytes"
+        )
 
     def test_mixed_inputs_preserve_order(
         self, make_boot: Callable[..., NodeBootstrap], enr_with_udp: str
@@ -209,8 +215,12 @@ class TestNodeBootstrapValidation:
         self, make_boot: Callable[..., NodeBootstrap]
     ) -> None:
         """The aggregator flag requires a validator keys path."""
-        with pytest.raises(CliValidationError, match="--is-aggregator requires --validator-keys"):
+        with pytest.raises(CliValidationError) as exception_info:
             make_boot("--is-aggregator")
+        assert str(exception_info.value) == (
+            "--is-aggregator requires --validator-keys to be set; "
+            "an aggregator with no validators has no role in the network"
+        )
 
 
 class TestAggregateSubnetIds:
@@ -240,8 +250,9 @@ class TestAggregateSubnetIds:
         self, make_boot: Callable[..., NodeBootstrap]
     ) -> None:
         """Subnet extras without aggregator mode raise a typed validation error."""
-        with pytest.raises(CliValidationError, match="requires --is-aggregator"):
+        with pytest.raises(CliValidationError) as exception_info:
             make_boot("--aggregate-subnet-ids", "1,2,3")
+        assert str(exception_info.value) == "--aggregate-subnet-ids requires --is-aggregator"
 
     def test_malformed_extras_rejected(
         self, make_boot: Callable[..., NodeBootstrap], tmp_path: Path
@@ -249,7 +260,7 @@ class TestAggregateSubnetIds:
         """A non-integer token in the extras list raises a typed validation error."""
         # The integer parser runs before any registry load.
         # Any non-empty validator-keys path is enough to reach the parse branch.
-        with pytest.raises(CliValidationError, match="comma-separated integers"):
+        with pytest.raises(CliValidationError) as exception_info:
             make_boot(
                 "--validator-keys",
                 str(tmp_path / "keys"),
@@ -257,6 +268,9 @@ class TestAggregateSubnetIds:
                 "--aggregate-subnet-ids",
                 "1,abc,3",
             )
+        assert str(exception_info.value) == (
+            "--aggregate-subnet-ids expects comma-separated integers, got '1,abc,3'"
+        )
 
 
 class TestApiConfigResolution:

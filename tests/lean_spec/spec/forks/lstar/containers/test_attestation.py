@@ -73,7 +73,13 @@ class TestAggregatedAttestationImmutability:
             aggregation_bits=AggregationBits.from_indices([ValidatorIndex(1)]),
             data=attestation_data,
         )
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for AggregatedAttestation\ndata\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=.*, "
+            r"input_type=.*\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             aggregate.data = attestation_data
 
     def test_assigning_aggregation_bits_raises(self) -> None:
@@ -86,7 +92,13 @@ class TestAggregatedAttestationImmutability:
         )
         bits = AggregationBits.from_indices([ValidatorIndex(1)])
         aggregate = AggregatedAttestation(aggregation_bits=bits, data=attestation_data)
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for AggregatedAttestation\naggregation_bits\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=.*, "
+            r"input_type=.*\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             aggregate.aggregation_bits = bits
 
 
@@ -106,5 +118,11 @@ class TestSignedAggregatedAttestationImmutability:
             proof=ByteList512KiB(data=b""),
         )
         signed = SignedAggregatedAttestation(data=attestation_data, proof=proof)
-        with pytest.raises(ValidationError, match="frozen"):
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for SignedAggregatedAttestation\nproof\n"
+            r"  Instance is frozen \[type=frozen_instance, input_value=.*, "
+            r"input_type=.*\]\n    For further information visit "
+            r"https://errors\.pydantic\.dev/[^\s]+/v/frozen_instance\Z",
+        ):
             signed.proof = proof

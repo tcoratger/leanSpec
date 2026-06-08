@@ -93,16 +93,18 @@ class TestNegotiateServer:
     async def test_server_empty_supported(self) -> None:
         """Server raises error when no supported protocols."""
         stream, _ = _create_stream_pair()
-        with pytest.raises(NegotiationError, match="No supported protocols"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream.negotiate_server(set())
+        assert str(exception_info.value) == "No supported protocols"
 
     async def test_server_invalid_header(self) -> None:
         """Server raises error on invalid client header."""
         server, client = _create_stream_pair()
         await _write_message(client, "/wrong/1.0.0")
 
-        with pytest.raises(NegotiationError, match="Invalid multistream header"):
+        with pytest.raises(NegotiationError) as exception_info:
             await server.negotiate_server({GOSSIPSUB_ID})
+        assert str(exception_info.value) == "Invalid multistream header: '/wrong/1.0.0'"
 
     async def test_server_too_many_attempts(self) -> None:
         """Client uses too many attempts"""
@@ -120,8 +122,11 @@ class TestNegotiateServer:
 
         task = asyncio.create_task(client_task())
 
-        with pytest.raises(NegotiationError, match="Too many negotiation attempts"):
+        with pytest.raises(NegotiationError) as exception_info:
             await server.negotiate_server({GOSSIPSUB_ID})
+        assert str(exception_info.value) == (
+            f"Too many negotiation attempts (>{MAX_NEGOTIATION_ATTEMPTS})"
+        )
         await task
 
     @pytest.mark.anyio
@@ -135,8 +140,9 @@ class TestNegotiateServer:
 
         server._stream.read = slow_read  # type: ignore[method-assign]
 
-        with pytest.raises(NegotiationError, match="Negotiation timed out"):
+        with pytest.raises(NegotiationError) as exception_info:
             await server.negotiate_server({GOSSIPSUB_ID}, timeout=0.1)
+        assert str(exception_info.value) == "Negotiation timed out after 0.1s"
 
 
 class TestLazyClient:
@@ -170,8 +176,9 @@ class TestLazyClient:
             await _write_message(server, NA)
 
         task = asyncio.create_task(server_task())
-        with pytest.raises(NegotiationError, match="Protocol rejected"):
+        with pytest.raises(NegotiationError) as exception_info:
             await client.negotiate_lazy_client(ProtocolId("/unsupported"))
+        assert str(exception_info.value) == "Protocol rejected: /unsupported"
         await task
 
     async def test_lazy_client_invalid_header(self) -> None:
@@ -179,8 +186,9 @@ class TestLazyClient:
         client, server = _create_stream_pair()
         await _write_message(server, "/wrong/1.0.0")
 
-        with pytest.raises(NegotiationError, match="Invalid multistream header"):
+        with pytest.raises(NegotiationError) as exception_info:
             await client.negotiate_lazy_client(GOSSIPSUB_ID)
+        assert str(exception_info.value) == "Invalid multistream header: '/wrong/1.0.0'"
 
     @pytest.mark.anyio
     async def test_lazy_client_unexpected_response(self) -> None:
@@ -194,8 +202,9 @@ class TestLazyClient:
             await _write_message(server, "/unexpected")
 
         task = asyncio.create_task(server_task())
-        with pytest.raises(NegotiationError, match="Unexpected response"):
+        with pytest.raises(NegotiationError) as exception_info:
             await client.negotiate_lazy_client(GOSSIPSUB_ID)
+        assert str(exception_info.value) == "Unexpected response: '/unexpected'"
         await task
 
 
@@ -349,16 +358,18 @@ class TestMessageFormat:
         stream, peer = _create_stream_pair()
         await peer.finish_write()
         await peer.drain()
-        with pytest.raises(NegotiationError, match="Connection closed while reading length"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Connection closed while reading length"
 
     async def test_read_negotiation_message_varint_too_long(self) -> None:
         """Varint too long"""
         stream, peer = _create_stream_pair()
         peer.write(b"\x80\x80\x80\x80\x80\x80")
         await peer.drain()
-        with pytest.raises(NegotiationError, match="Varint too long"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Varint too long"
 
     async def test_read_negotiation_message_message_too_long(self) -> None:
         """Message too long"""
@@ -369,16 +380,18 @@ class TestMessageFormat:
         peer.write(length_prefix)
         await peer.drain()
 
-        with pytest.raises(NegotiationError, match="Message too large"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == f"Message too large: {too_big_length}"
 
     async def test_read_negotiation_message_empty_message(self) -> None:
         """Empty message"""
         stream, peer = _create_stream_pair()
         peer.write(encode_varint(0))
         await peer.drain()
-        with pytest.raises(NegotiationError, match="Empty message"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Empty message"
 
     async def test_read_negotiation_message_no_trailing_newline(self) -> None:
         """No trailing newline"""
@@ -388,8 +401,9 @@ class TestMessageFormat:
         peer.write(length_prefix + message_payload)
         await peer.drain()
 
-        with pytest.raises(NegotiationError, match="Message must end with newline"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Message must end with newline"
 
     async def test_read_negotiation_message_invalid_varint(self, monkeypatch) -> None:
         """Invalid varint"""
@@ -403,8 +417,9 @@ class TestMessageFormat:
 
         monkeypatch.setattr(module, "decode_varint", fake_decode_varint)
 
-        with pytest.raises(NegotiationError, match="Invalid varint: bad varint"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Invalid varint: bad varint"
 
     async def test_write_negotiation_message_format(self) -> None:
         """Write negotiation message with correct varint"""
@@ -473,8 +488,9 @@ class TestBufferedIO:
         stream, peer = _create_stream_pair()
         stream._stream._read_queue.put_nowait(b"partial")  # type: ignore[attribute-defined]
         stream._stream._read_queue.put_nowait(b"")  # type: ignore[attribute-defined]
-        with pytest.raises(EOFError, match="Stream closed"):
+        with pytest.raises(EOFError) as exception_info:
             await stream.readexactly(100)
+        assert str(exception_info.value) == "Stream closed before enough data received"
 
     async def test_drain_empty_buffer(self) -> None:
         """drain() with no buffered data is a no-op."""
@@ -528,15 +544,17 @@ class TestReadNegotiationMessage:
         """Raises error when connection closes while reading length."""
         stream, peer = _create_stream_pair()
         stream._stream._read_queue.put_nowait(b"")  # type: ignore[attribute-defined]
-        with pytest.raises(NegotiationError, match="Connection closed"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Connection closed while reading length"
 
     async def test_message_varint_too_long(self) -> None:
         """Raises error when varint has more than 5 continuation bytes."""
         stream, peer = _create_stream_pair()
         stream._stream._read_queue.put_nowait(bytes([0x80, 0x80, 0x80, 0x80, 0x80, 0x80]))  # type: ignore[attribute-defined]
-        with pytest.raises(NegotiationError, match="Varint too long"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Varint too long"
 
     @pytest.mark.anyio
     async def test_message_invalid_varint(self) -> None:
@@ -547,22 +565,25 @@ class TestReadNegotiationMessage:
             side_effect=ValueError("Invalid varint encoding"),
         ):
             stream._stream.read = AsyncMock(return_value=bytes([0x7F]))  # type: ignore[method-assign]
-            with pytest.raises(NegotiationError, match="Invalid varint"):
+            with pytest.raises(NegotiationError) as exception_info:
                 await stream._read_negotiation_message()
+            assert str(exception_info.value) == "Invalid varint: Invalid varint encoding"
 
     async def test_message_too_large(self) -> None:
         """Raises error when message exceeds MAX_MESSAGE_SIZE."""
         stream, peer = _create_stream_pair()
         stream._buffer = bytes([0x80, 0x10])
-        with pytest.raises(NegotiationError, match="Message too large"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Message too large: 2048"
 
     async def test_message_empty(self) -> None:
         """Raises error when message length is zero."""
         stream, peer = _create_stream_pair()
         stream._buffer = bytes([0])
-        with pytest.raises(NegotiationError, match="Empty message"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Empty message"
 
     async def test_message_no_trailing_newline(self) -> None:
         """Raises error when message doesn't end with newline."""
@@ -570,8 +591,9 @@ class TestReadNegotiationMessage:
         message_payload = b"no newline"
         length_prefix = encode_varint(len(message_payload))
         stream._buffer = length_prefix + message_payload
-        with pytest.raises(NegotiationError, match="Message must end with newline"):
+        with pytest.raises(NegotiationError) as exception_info:
             await stream._read_negotiation_message()
+        assert str(exception_info.value) == "Message must end with newline"
 
 
 @dataclass

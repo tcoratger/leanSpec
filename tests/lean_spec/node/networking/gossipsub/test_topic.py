@@ -45,8 +45,9 @@ class TestTopicForkValidation:
 
     def test_from_string_validated_raises_on_invalid_topic(self) -> None:
         """Test from_string_validated raises ValueError for invalid topics."""
-        with pytest.raises(ValueError, match="expected 4 parts"):
+        with pytest.raises(ValueError) as exception_info:
             GossipTopic.from_string_validated("/invalid/topic", "0x12345678")
+        assert str(exception_info.value) == "Invalid topic format: expected 4 parts, got 2"
 
 
 class TestTopicFormatting:
@@ -85,11 +86,16 @@ class TestTopicFormatting:
 
     def test_invalid_topic_string(self) -> None:
         """Test handling of invalid topic strings."""
-        with pytest.raises(ValueError, match="expected 4 parts"):
+        with pytest.raises(ValueError) as exception_info:
             GossipTopic.from_string("/invalid/topic")
+        assert str(exception_info.value) == "Invalid topic format: expected 4 parts, got 2"
 
-        with pytest.raises(ValueError, match="Invalid prefix"):
+        with pytest.raises(ValueError) as exception_info:
             GossipTopic.from_string("/wrongprefix/0x123/block/ssz_snappy")
+        assert (
+            str(exception_info.value)
+            == "Invalid prefix: expected 'leanconsensus', got 'wrongprefix'"
+        )
 
     def test_topic_kind_enum(self) -> None:
         """Test TopicKind enum."""

@@ -38,7 +38,11 @@ def test_decomposition_validator_rejects_bad_product() -> None:
     """A configuration whose product does not equal the prime minus one is rejected."""
     kwargs = _valid_config_kwargs()
     kwargs["Q"] = 128
-    with pytest.raises(ValueError, match=f"Q \\* BASE\\^Z must equal P-1={P - 1}"):
+    with pytest.raises(
+        ValueError,
+        match=r"(?s)^1 validation error for XmssConfig\n"
+        rf"  Value error, Q \* BASE\^Z must equal P-1={P - 1} .*\Z",
+    ):
         XmssConfig(**kwargs)
 
 

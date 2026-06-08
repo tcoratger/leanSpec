@@ -290,11 +290,11 @@ def test_single_message_aggregate_verify_rejects_public_key_count_mismatch(
     # The bitfield names two validators but only one key is supplied.
     only_one = [key_manager[ValidatorIndex(0)].attestation_keypair.public_key]
 
-    with pytest.raises(
-        AggregationError,
-        match="single-message aggregate verify expected 2 pubkeys for participants, got 1",
-    ):
+    with pytest.raises(AggregationError) as exception_info:
         proof.verify(public_keys=only_one, message=make_bytes32(161), slot=attestation_args[0])
+    assert str(exception_info.value) == (
+        "single-message aggregate verify expected 2 pubkeys for participants, got 1"
+    )
 
 
 def test_multi_message_aggregate_split_by_message_rejected_under_test_prover(
@@ -336,7 +336,10 @@ def test_multi_message_aggregate_split_by_message_rejected_under_test_prover(
         public_keys_per_aggregate=[public_keys_a, public_keys_b],
     )
 
-    with pytest.raises(AggregationError, match="multi-message aggregate split failed"):
+    with pytest.raises(
+        AggregationError,
+        match=r"(?s)^multi-message aggregate split failed: .*\Z",
+    ):
         merged.split_by_message(
             message=hash_tree_root(attestation_data_a),
             public_keys_per_message=[public_keys_a, public_keys_b],
@@ -356,7 +359,10 @@ def test_aggregate_wrong_message_fails_verification(key_manager: XmssKeyManager)
         key_manager, [validator_index], (attestation_data.slot, 121, 122, source)
     )
 
-    with pytest.raises(AggregationError, match="verification failed"):
+    with pytest.raises(
+        AggregationError,
+        match=r"(?s)^single-message aggregate verification failed: .*\Z",
+    ):
         proof.verify(
             public_keys=[key_manager[validator_index].attestation_keypair.public_key],
             message=make_bytes32(123),
@@ -376,7 +382,10 @@ def test_aggregate_wrong_slot_fails_verification(key_manager: XmssKeyManager) ->
         key_manager, [validator_index], (attestation_data.slot, 131, 132, source)
     )
 
-    with pytest.raises(AggregationError, match="verification failed"):
+    with pytest.raises(
+        AggregationError,
+        match=r"(?s)^single-message aggregate verification failed: .*\Z",
+    ):
         proof.verify(
             public_keys=[key_manager[validator_index].attestation_keypair.public_key],
             message=hash_tree_root(attestation_data),
@@ -404,7 +413,10 @@ def test_aggregate_corrupted_proof_fails_verification(key_manager: XmssKeyManage
         proof=ByteList512KiB(data=bytes(corrupted_bytes)),
     )
 
-    with pytest.raises(AggregationError, match="verification failed"):
+    with pytest.raises(
+        AggregationError,
+        match=r"(?s)^single-message aggregate verification failed: .*\Z",
+    ):
         proof.verify(
             public_keys=[key_manager[validator_index].attestation_keypair.public_key],
             message=hash_tree_root(attestation_data),
@@ -442,8 +454,11 @@ def test_aggregate_child_signed_different_message_fails(key_manager: XmssKeyMana
 
 def test_multi_message_aggregate_rejects_empty_parts() -> None:
     """multi-message aggregate aggregation requires at least one single-message aggregate input."""
-    with pytest.raises(AggregationError, match="at least one single-message aggregate input"):
+    with pytest.raises(AggregationError) as exception_info:
         MultiMessageAggregate.aggregate(single_message_aggregates=[], public_keys_per_aggregate=[])
+    assert str(exception_info.value) == (
+        "multi-message aggregate requires at least one single-message aggregate input"
+    )
 
 
 def test_multi_message_aggregate_rejects_mismatched_public_key_layout(
@@ -461,11 +476,14 @@ def test_multi_message_aggregate_rejects_mismatched_public_key_layout(
     # Layout claims one public_key for a part that binds two participants.
     wrong_layout = [[key_manager[ValidatorIndex(0)].attestation_keypair.public_key]]
 
-    with pytest.raises(AggregationError, match="expected 2 pubkeys, got 1"):
+    with pytest.raises(AggregationError) as exception_info:
         MultiMessageAggregate.aggregate(
             single_message_aggregates=[single_message_aggregate],
             public_keys_per_aggregate=wrong_layout,
         )
+    assert str(exception_info.value) == (
+        "multi-message aggregate entry 0 expected 2 pubkeys, got 1"
+    )
 
 
 def test_multi_message_aggregate_propagates_prover_error(key_manager: XmssKeyManager) -> None:
@@ -488,7 +506,10 @@ def test_multi_message_aggregate_propagates_prover_error(key_manager: XmssKeyMan
         proof=ByteList512KiB(data=bytes(corrupted_bytes)),
     )
 
-    with pytest.raises(AggregationError, match="merge_many_type_1 failed"):
+    with pytest.raises(
+        AggregationError,
+        match=r"(?s)^.*merge_many_type_1 failed.*\Z",
+    ):
         MultiMessageAggregate.aggregate(
             single_message_aggregates=[corrupted_aggregate], public_keys_per_aggregate=[public_keys]
         )
@@ -587,7 +608,10 @@ def test_multi_message_aggregate_verify_rejects_message_swap(key_manager: XmssKe
 
     # Swap the parallel messages: aggregate_a's public_keys are now paired with aggregate_b's
     # message and vice versa.
-    with pytest.raises(AggregationError, match="verification failed"):
+    with pytest.raises(
+        AggregationError,
+        match=r"(?s)^multi-message aggregate verification failed: .*\Z",
+    ):
         merged.verify(
             public_keys_per_message=[public_keys_a, public_keys_b],
             messages=[
@@ -616,8 +640,11 @@ def test_multi_message_aggregate_verify_rejects_mismatched_messages_length(
         public_keys_per_aggregate=[public_keys],
     )
 
-    with pytest.raises(AggregationError, match="expected 1 message bindings, got 0"):
+    with pytest.raises(AggregationError) as exception_info:
         merged.verify(
             public_keys_per_message=[public_keys],
             messages=[],
         )
+    assert str(exception_info.value) == (
+        "multi-message aggregate verify expected 1 message bindings, got 0"
+    )

@@ -5,7 +5,6 @@ Tests for the KoalaBear prime field Fp.
 import io
 import json
 import random
-import re
 from typing import Any
 
 import pytest
@@ -46,8 +45,9 @@ def test_base_field_arithmetic() -> None:
     assert left != "5"
 
     # Test error on inverting the zero element
-    with pytest.raises(ZeroDivisionError, match=r"^Cannot invert the zero element\.$"):
+    with pytest.raises(ZeroDivisionError) as exception_info:
         Fp(value=0).inverse()
+    assert str(exception_info.value) == "Cannot invert the zero element."
 
 
 def test_ssz_type_properties() -> None:
@@ -83,15 +83,17 @@ def test_ssz_deserialize_wrong_scope() -> None:
     """Test deserialize error when scope doesn't match P_BYTES."""
     encoded_bytes = b"\x2a\x00\x00\x00"
     stream = io.BytesIO(encoded_bytes)
-    with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 3$"):
+    with pytest.raises(SSZSerializationError) as exception_info:
         Fp.deserialize(stream, 3)
+    assert str(exception_info.value) == "Expected 4 bytes for Fp, got 3"
 
 
 def test_ssz_deserialize_short_data() -> None:
     """Test deserialize error when stream has insufficient data."""
     stream = io.BytesIO(b"\x01\x02\x03")  # Only 3 bytes
-    with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 3$"):
+    with pytest.raises(SSZSerializationError) as exception_info:
         Fp.deserialize(stream, 4)
+    assert str(exception_info.value) == "Expected 4 bytes for Fp, got 3"
 
 
 def test_ssz_deserialize_exceeds_modulus() -> None:
@@ -100,8 +102,9 @@ def test_ssz_deserialize_exceeds_modulus() -> None:
     # Encode a value >= P (use P itself)
     invalid_data = P.to_bytes(4, byteorder="little")
     stream = io.BytesIO(invalid_data)
-    with pytest.raises(SSZValueError, match=rf"^Value {P} exceeds field modulus {P}$"):
+    with pytest.raises(SSZValueError) as exception_info:
         Fp.deserialize(stream, 4)
+    assert str(exception_info.value) == f"Value {P} exceeds field modulus {P}"
 
 
 def test_ssz_encode_decode_bytes() -> None:
@@ -164,8 +167,9 @@ def test_ssz_deterministic() -> None:
 )
 def test_new_rejects_non_int_inputs(bad_value: Any, type_name: str) -> None:
     """Constructing Fp with a non-int input raises SSZTypeError naming the offending type."""
-    with pytest.raises(SSZTypeError, match=rf"^Field value must be an integer, got {type_name}$"):
+    with pytest.raises(SSZTypeError) as exception_info:
         Fp(bad_value)
+    assert str(exception_info.value) == f"Field value must be an integer, got {type_name}"
 
 
 @pytest.mark.parametrize(
@@ -195,11 +199,9 @@ def test_reverse_arithmetic_rejects_int_left_operand(op: str) -> None:
         "*": lambda: 1 * field_element,
         "/": lambda: 1 / field_element,
     }
-    with pytest.raises(
-        TypeError,
-        match=rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$",
-    ):
+    with pytest.raises(TypeError) as exception_info:
         operations[op]()
+    assert str(exception_info.value) == f"Unsupported operand type(s) for {op}: 'Fp' and 'int'"
 
 
 @pytest.mark.parametrize("op", ["+", "-", "*", "/"])
@@ -212,18 +214,17 @@ def test_forward_arithmetic_rejects_raw_int_right_operand(op: str) -> None:
         "*": lambda: field_element * 3,
         "/": lambda: field_element / 3,
     }
-    with pytest.raises(
-        TypeError,
-        match=rf"^Unsupported operand type\(s\) for {re.escape(op)}: 'Fp' and 'int'$",
-    ):
+    with pytest.raises(TypeError) as exception_info:
         operations[op]()
+    assert str(exception_info.value) == f"Unsupported operand type(s) for {op}: 'Fp' and 'int'"
 
 
 def test_forward_arithmetic_rejects_bool_right_operand() -> None:
     """Forward arithmetic against a bool right operand is rejected as a non-Fp type."""
     field_element = Fp(2)
-    with pytest.raises(TypeError, match=r"^Unsupported operand type\(s\) for \+: 'Fp' and 'bool'$"):
+    with pytest.raises(TypeError) as exception_info:
         field_element + True  # noqa: B015
+    assert str(exception_info.value) == "Unsupported operand type(s) for +: 'Fp' and 'bool'"
 
 
 def test_negation_of_zero_stays_zero() -> None:
@@ -263,8 +264,9 @@ def test_truediv_inverts_multiplication(dividend: Fp, divisor: Fp) -> None:
 
 def test_truediv_by_zero_raises_zero_division() -> None:
     """Dividing by the zero element raises ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError, match=r"^Cannot invert the zero element\.$"):
+    with pytest.raises(ZeroDivisionError) as exception_info:
         Fp(5) / Fp(0)
+    assert str(exception_info.value) == "Cannot invert the zero element."
 
 
 def test_equality_matrix_covers_same_other_and_foreign_types() -> None:
@@ -318,8 +320,9 @@ def test_encode_decode_bytes_round_trip_at_p_minus_one() -> None:
 
 def test_decode_bytes_rejects_oversized_input() -> None:
     """A five-byte buffer is rejected because the scope guard fires before any read."""
-    with pytest.raises(SSZSerializationError, match=r"^Expected 4 bytes for Fp, got 5$"):
+    with pytest.raises(SSZSerializationError) as exception_info:
         Fp.decode_bytes(b"\x00\x00\x00\x00\x01")
+    assert str(exception_info.value) == "Expected 4 bytes for Fp, got 5"
 
 
 class _PydanticModelWithFp(BaseModel):

@@ -46,15 +46,23 @@ class TestCamelModelToJson:
         """Overriding serialization mode raises an error instead of being silently accepted."""
         model = SampleCamelModel(first_name="Bob", current_slot=7)
 
-        with pytest.raises(TypeError, match="does not accept 'mode' or 'by_alias'"):
+        with pytest.raises(TypeError) as exception_info:
             model.to_json(mode="python")
+        assert str(exception_info.value) == (
+            "to_json() does not accept 'mode' or 'by_alias'; "
+            "mode is pinned to 'json' and by_alias to True"
+        )
 
     def test_to_json_rejects_by_alias_kwarg(self) -> None:
         """Overriding alias style raises an error instead of being silently accepted."""
         model = SampleCamelModel(first_name="Carol", current_slot=0)
 
-        with pytest.raises(TypeError, match="does not accept 'mode' or 'by_alias'"):
+        with pytest.raises(TypeError) as exception_info:
             model.to_json(by_alias=False)
+        assert str(exception_info.value) == (
+            "to_json() does not accept 'mode' or 'by_alias'; "
+            "mode is pinned to 'json' and by_alias to True"
+        )
 
     def test_to_json_forwards_extra_kwargs(self) -> None:
         """

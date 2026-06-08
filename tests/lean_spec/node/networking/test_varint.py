@@ -46,8 +46,9 @@ class TestEncodeVarint:
 
     def test_negative_raises(self) -> None:
         """Negative values are rejected."""
-        with pytest.raises(ValueError, match="non-negative"):
+        with pytest.raises(ValueError) as exception_info:
             encode_varint(-1)
+        assert str(exception_info.value) == "Varint must be non-negative"
 
 
 class TestDecodeVarint:
@@ -65,18 +66,21 @@ class TestDecodeVarint:
 
     def test_truncated_raises(self) -> None:
         """Continuation bit set on last byte with no follow-up raises."""
-        with pytest.raises(VarintError, match="Truncated"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(b"\x80", 0)
+        assert str(exception_info.value) == "Truncated varint"
 
     def test_empty_raises(self) -> None:
         """Empty input raises."""
-        with pytest.raises(VarintError, match="Truncated"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(b"", 0)
+        assert str(exception_info.value) == "Truncated varint"
 
     def test_too_long_raises(self) -> None:
         """More than 10 continuation bytes (>64-bit) raises."""
-        with pytest.raises(VarintError, match="exceeds 10 bytes"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(b"\x80" * 11, 0)
+        assert str(exception_info.value) == "Varint exceeds 10 bytes"
 
 
 class TestVarintRoundtrip:
@@ -150,13 +154,15 @@ class TestMaxBytesParameter:
 
     def test_five_byte_cap_rejects_value_needing_six_bytes(self) -> None:
         """A value past the five-byte ceiling is rejected on encode."""
-        with pytest.raises(ValueError, match="does not fit in 5 bytes"):
+        with pytest.raises(ValueError) as exception_info:
             encode_varint(2**35, max_bytes=5)
+        assert str(exception_info.value) == "Varint value does not fit in 5 bytes"
 
     def test_five_byte_cap_rejects_six_byte_input(self) -> None:
         """A six-byte continuation run is rejected on decode."""
-        with pytest.raises(VarintError, match="exceeds 5 bytes"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(b"\x80" * 6, 0, max_bytes=5)
+        assert str(exception_info.value) == "Varint exceeds 5 bytes"
 
     def test_five_byte_cap_accepts_five_bytes_at_boundary(self) -> None:
         """Five continuation bytes followed by a terminator decode successfully."""

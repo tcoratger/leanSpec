@@ -35,13 +35,18 @@ class TestForkRegistry:
 
     def test_empty_forks_raises(self) -> None:
         """ForkRegistry requires at least one fork."""
-        with pytest.raises(ValueError, match="at least one fork"):
+        with pytest.raises(ValueError) as exception_info:
             ForkRegistry([])
+        assert str(exception_info.value) == "ForkRegistry requires at least one fork"
 
     def test_non_monotonic_version_rejected(self) -> None:
         """ForkRegistry rejects forks whose versions do not strictly increase."""
-        with pytest.raises(ValueError, match="strictly increasing VERSION"):
+        with pytest.raises(ValueError) as exception_info:
             ForkRegistry([_NextSpec(), LstarSpec()])
+        assert str(exception_info.value) == (
+            "Forks must be ordered by strictly increasing VERSION: "
+            f"[{_NextSpec.VERSION}, {LstarSpec.VERSION}]"
+        )
 
     def test_duplicate_version_rejected(self) -> None:
         """ForkRegistry rejects two forks sharing a VERSION."""
@@ -50,8 +55,12 @@ class TestForkRegistry:
             NAME = "shadow"
             VERSION = LstarSpec.VERSION
 
-        with pytest.raises(ValueError, match="strictly increasing VERSION"):
+        with pytest.raises(ValueError) as exception_info:
             ForkRegistry([LstarSpec(), ShadowSpec()])
+        assert str(exception_info.value) == (
+            "Forks must be ordered by strictly increasing VERSION: "
+            f"[{LstarSpec.VERSION}, {ShadowSpec.VERSION}]"
+        )
 
     def test_duplicate_name_rejected(self) -> None:
         """ForkRegistry rejects two forks sharing a NAME."""
@@ -60,5 +69,8 @@ class TestForkRegistry:
             NAME = LstarSpec.NAME
             VERSION = LstarSpec.VERSION + 10
 
-        with pytest.raises(ValueError, match="names must be unique"):
+        with pytest.raises(ValueError) as exception_info:
             ForkRegistry([LstarSpec(), TwinSpec()])
+        assert str(exception_info.value) == (
+            f"Fork names must be unique: [{LstarSpec.NAME!r}, {TwinSpec.NAME!r}]"
+        )

@@ -62,23 +62,27 @@ class TestSnappyLengthPrefix:
 
     def test_encode_negative_raises(self) -> None:
         """Negative values raise ValueError."""
-        with pytest.raises(ValueError, match="non-negative"):
+        with pytest.raises(ValueError) as exception_info:
             encode_varint(-1, max_bytes=SNAPPY_VARINT_MAX_BYTES)
+        assert str(exception_info.value) == "Varint must be non-negative"
 
     def test_encode_overflow_raises(self) -> None:
         """Values past the five-byte cap raise ValueError."""
-        with pytest.raises(ValueError, match="does not fit in 5 bytes"):
+        with pytest.raises(ValueError) as exception_info:
             encode_varint(2**35, max_bytes=SNAPPY_VARINT_MAX_BYTES)
+        assert str(exception_info.value) == "Varint value does not fit in 5 bytes"
 
     def test_decode_truncated_raises(self) -> None:
         """Truncated varints raise a varint error."""
-        with pytest.raises(VarintError, match="Truncated"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(b"\x80", max_bytes=SNAPPY_VARINT_MAX_BYTES)
+        assert str(exception_info.value) == "Truncated varint"
 
     def test_decode_too_long_raises(self) -> None:
         """A six-byte continuation run exceeds the snappy cap."""
-        with pytest.raises(VarintError, match="exceeds 5 bytes"):
+        with pytest.raises(VarintError) as exception_info:
             decode_varint(b"\x80" * 6, max_bytes=SNAPPY_VARINT_MAX_BYTES)
+        assert str(exception_info.value) == "Varint exceeds 5 bytes"
 
     def test_decode_with_offset(self) -> None:
         """Decoding at an offset works correctly."""
@@ -91,8 +95,9 @@ class TestSnappyLengthPrefix:
 
     def test_decompress_wraps_oversize_prefix(self) -> None:
         """A length prefix that overruns the cap surfaces as a decompression error."""
-        with pytest.raises(SnappyDecompressionError, match="Invalid length varint"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(b"\x80" * 6)
+        assert str(exception_info.value) == "Invalid length varint: Varint exceeds 5 bytes"
 
 
 class TestCorruptedData:
@@ -169,8 +174,9 @@ class TestCorruptedData:
         # Copy-2 tag for offset 100, length 5: tag=0x12 (4<<2|2), offset=100,0
         malformed = b"\x0a\x12\x64\x00"
 
-        with pytest.raises(SnappyDecompressionError, match="offset"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(malformed)
+        assert str(exception_info.value) == "Copy offset 100 exceeds output buffer size 0"
 
 
 class TestDecompressionEdgeCases:
@@ -178,10 +184,12 @@ class TestDecompressionEdgeCases:
 
     def test_empty_raises(self) -> None:
         """Empty input raises an error."""
-        with pytest.raises(SnappyDecompressionError, match="Empty"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(b"")
+        assert str(exception_info.value) == "Empty input"
 
     def test_invalid_varint_raises(self) -> None:
         """Invalid varint in header raises an error."""
-        with pytest.raises(SnappyDecompressionError, match="varint"):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(b"\xff\xff\xff\xff\xff\xff")
+        assert str(exception_info.value) == "Invalid length varint: Varint exceeds 5 bytes"
