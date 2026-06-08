@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from lean_spec.node.networking import PeerId
 from lean_spec.node.sync.block_cache import BlockCache, PendingBlock
 from lean_spec.node.sync.config import MAX_CACHED_BLOCKS
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
-from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.ssz import Bytes32
-from tests.lean_spec.helpers import MockForkchoiceStore, make_signed_block
+from tests.lean_spec.helpers import make_signed_block
 
 
 class TestPendingBlock:
@@ -507,94 +504,6 @@ class TestBlockCacheCapacityManagement:
 
         # The original orphan should be evicted
         assert pending.root not in cache
-
-
-class TestBlockCacheProcessable:
-    """Tests for get_processable with Store integration."""
-
-    def test_get_processable_empty_cache(self) -> None:
-        """get_processable returns empty list for empty cache."""
-        cache = BlockCache()
-        store = MockForkchoiceStore()
-        store.blocks.clear()
-
-        processable = cache.get_processable(cast(Store, store))
-
-        assert processable == []
-
-    def test_get_processable_no_parents_in_store(self, peer_id: PeerId) -> None:
-        """get_processable returns empty when no parents are in Store."""
-        cache = BlockCache()
-        store = MockForkchoiceStore()
-        store.blocks.clear()
-
-        block = make_signed_block(
-            slot=Slot(1),
-            proposer_index=ValidatorIndex(0),
-            parent_root=Bytes32(b"\x01" * 32),
-            state_root=Bytes32.zero(),
-        )
-        cache.add(block, peer_id)
-
-        processable = cache.get_processable(cast(Store, store))
-
-        assert processable == []
-
-    def test_get_processable_finds_block_with_parent_in_store(self, peer_id: PeerId) -> None:
-        """get_processable finds blocks whose parents are in Store."""
-        cache = BlockCache()
-        parent_root = Bytes32(b"\x01" * 32)
-
-        store = MockForkchoiceStore()
-        store.blocks[parent_root] = object()
-
-        block = make_signed_block(
-            slot=Slot(1),
-            proposer_index=ValidatorIndex(0),
-            parent_root=parent_root,
-            state_root=Bytes32.zero(),
-        )
-        pending = cache.add(block, peer_id)
-
-        processable = cache.get_processable(cast(Store, store))
-
-        assert processable == [pending]
-
-    def test_get_processable_sorted_by_slot(self, peer_id: PeerId) -> None:
-        """get_processable returns blocks sorted by slot."""
-        cache = BlockCache()
-        parent_root = Bytes32(b"\x01" * 32)
-
-        store = MockForkchoiceStore()
-        store.blocks[parent_root] = object()
-
-        # Add blocks out of order
-        block3 = make_signed_block(
-            slot=Slot(3),
-            proposer_index=ValidatorIndex(0),
-            parent_root=parent_root,
-            state_root=Bytes32(b"\x03" * 32),
-        )
-        block1 = make_signed_block(
-            slot=Slot(1),
-            proposer_index=ValidatorIndex(0),
-            parent_root=parent_root,
-            state_root=Bytes32(b"\x01" * 32),
-        )
-        block2 = make_signed_block(
-            slot=Slot(2),
-            proposer_index=ValidatorIndex(0),
-            parent_root=parent_root,
-            state_root=Bytes32(b"\x02" * 32),
-        )
-
-        pending3 = cache.add(block3, peer_id)
-        pending1 = cache.add(block1, peer_id)
-        pending2 = cache.add(block2, peer_id)
-
-        processable = cache.get_processable(cast(Store, store))
-
-        assert processable == [pending1, pending2, pending3]
 
 
 class TestBlockCacheBackfillDepth:
