@@ -552,8 +552,11 @@ class ForkChoiceMixin(LstarSpecBase):
         for attestation_data, proofs in aggregated_payloads.items():
             for proof in proofs:
                 for validator_index in proof.participants.to_validator_indices():
-                    existing = attestations.get(validator_index)
-                    if existing is None or existing.slot < attestation_data.slot:
+                    current_attestation_data = attestations.get(validator_index)
+                    if (
+                        current_attestation_data is None
+                        or current_attestation_data.slot < attestation_data.slot
+                    ):
                         attestations[validator_index] = attestation_data
         return attestations
 
@@ -666,7 +669,7 @@ class ForkChoiceMixin(LstarSpecBase):
         # Descend the tree, choosing the heaviest branch at every fork.
         while children := children_map.get(head):
             # Choose best child: most attestations, then lexicographically highest hash
-            head = max(children, key=lambda x: (weights[x], x))
+            head = max(children, key=lambda child_root: (weights[child_root], child_root))
 
         return head
 

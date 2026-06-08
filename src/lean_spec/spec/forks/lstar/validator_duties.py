@@ -68,8 +68,9 @@ class ValidatorDutiesMixin(LstarSpecBase):
         # This keeps the target from advancing too far ahead of the safe target.
         # It balances liveness against safety.
         for _ in range(int(JUSTIFICATION_LOOKBACK_SLOTS)):
-            if store.blocks[target_block_root].slot > lower_bound_slot:
-                target_block_root = store.blocks[target_block_root].parent_root
+            target_block = store.blocks[target_block_root]
+            if target_block.slot > lower_bound_slot:
+                target_block_root = target_block.parent_root
             else:
                 break
 
@@ -77,8 +78,10 @@ class ValidatorDutiesMixin(LstarSpecBase):
         #
         # Walk back until we find a slot that satisfies justifiability rules
         # relative to the latest finalized checkpoint.
-        while store.blocks[target_block_root].slot > finalized_slot:
+        while True:
             target_block = store.blocks[target_block_root]
+            if target_block.slot <= finalized_slot:
+                break
             if target_block.slot.is_justifiable_after(finalized_slot):
                 break
             target_block_root = target_block.parent_root

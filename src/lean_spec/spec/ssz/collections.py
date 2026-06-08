@@ -599,15 +599,18 @@ class SSZList[T: SSZType](_SSZSequence[T]):
         first_offset = int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
         if first_offset > scope or first_offset % BYTES_PER_LENGTH_OFFSET != 0:
             raise SSZSerializationError(f"{cls.__name__}: invalid offset {first_offset}")
-        count = first_offset // BYTES_PER_LENGTH_OFFSET
-        if count > cls.LIMIT:
-            raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {count}")
+        num_elements = first_offset // BYTES_PER_LENGTH_OFFSET
+        if num_elements > cls.LIMIT:
+            raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {num_elements}")
 
         # Read the remaining offsets, append scope as the final boundary,
         # then pairwise-iterate the boundary list to yield each body's byte span.
         offsets = [
             first_offset,
-            *(int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET)) for _ in range(count - 1)),
+            *(
+                int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
+                for _ in range(num_elements - 1)
+            ),
             scope,
         ]
         _validate_offsets(offsets, scope, cls.__name__)
