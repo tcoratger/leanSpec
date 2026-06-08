@@ -308,12 +308,8 @@ class MeshState:
 
         fanout.last_published = time.time()
 
-        # Fill fanout up to D peers
-        if len(fanout.peers) < self.params.d:
-            candidates = available_peers - fanout.peers
-            needed = self.params.d - len(fanout.peers)
-            new_peers = random.sample(list(candidates), min(needed, len(candidates)))
-            fanout.peers.update(new_peers)
+        # Top up to D peers, reusing the same fill routine the heartbeat runs.
+        self.fill_fanout(topic, available_peers)
 
         return fanout.peers.copy()
 
