@@ -825,12 +825,17 @@ class ForkChoiceMixin(LstarSpecBase):
         # Union each vote's pending proofs with its counted proofs.
         #
         # Each union builds a fresh set, so the caller's store stays untouched.
+        #
+        # Iterate in insertion order: counted votes first, then pending-only votes.
+        # A plain key-set union would order by hash, and the equal-slot tie-break in
+        # the LMD walk keeps the first-seen vote, so a nondeterministic order would
+        # make the head depend on hash seeding and diverge across clients.
         known_payloads = store.latest_known_aggregated_payloads
         new_payloads = store.latest_new_aggregated_payloads
         merged_aggregated_payloads = {
             attestation_data: known_payloads.get(attestation_data, set())
             | new_payloads.get(attestation_data, set())
-            for attestation_data in known_payloads.keys() | new_payloads.keys()
+            for attestation_data in {**known_payloads, **new_payloads}
         }
 
         # Promote into the counted pool and clear the pending one.
