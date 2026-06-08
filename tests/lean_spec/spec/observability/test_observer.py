@@ -1,15 +1,12 @@
-"""Tests for the spec observer singleton and its Prometheus adapter."""
+"""Tests for the spec observer singleton and its context managers."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
-from typing import Any
 
 import pytest
-from prometheus_client import CollectorRegistry, Histogram
 
-from lean_spec.node.metrics import PrometheusObserver, registry as metrics
 from lean_spec.spec.observability import (
     observe_on_attestation,
     observe_on_block,
@@ -20,20 +17,6 @@ from lean_spec.spec.observability import (
 from lean_spec.spec.observability.observer import _NullObserver
 
 
-@pytest.fixture
-def fresh_registry() -> CollectorRegistry:
-    """Create an isolated Prometheus registry for each test."""
-    return CollectorRegistry()
-
-
-@pytest.fixture(autouse=True)
-def _reset_metrics() -> Iterator[None]:
-    """Ensure metrics are uninitialized before and after each test."""
-    metrics.reset()
-    yield
-    metrics.reset()
-
-
 @pytest.fixture(autouse=True)
 def _reset_observer() -> Iterator[None]:
     """Restore the default no-op observer between tests."""
@@ -41,38 +24,11 @@ def _reset_observer() -> Iterator[None]:
     set_observer(_NullObserver())
 
 
-def _init_metrics(registry: CollectorRegistry) -> None:
-    """Initialize metrics with the given isolated registry."""
-    metrics.init(registry=registry)
-
-
-def _get_histogram_sum(histogram: Any) -> float:
-    """Read the cumulative observed sum of a Prometheus Histogram."""
-    assert isinstance(histogram, Histogram)
-    return histogram._sum.get()
-
-
-# Each row pairs an observer hook with the Prometheus histogram it records into
-# and the context manager that publishes it.
+# Each row pairs an observer hook with the context manager that publishes it.
 SPEC_EVENTS = [
-    pytest.param(
-        "state_transition_timed",
-        "lean_state_transition_time_seconds",
-        observe_state_transition,
-        id="state_transition",
-    ),
-    pytest.param(
-        "on_block_timed",
-        "lean_fork_choice_block_processing_time_seconds",
-        observe_on_block,
-        id="on_block",
-    ),
-    pytest.param(
-        "on_attestation_timed",
-        "lean_attestation_validation_time_seconds",
-        observe_on_attestation,
-        id="on_attestation",
-    ),
+    pytest.param("state_transition_timed", observe_state_transition, id="state_transition"),
+    pytest.param("on_block_timed", observe_on_block, id="on_block"),
+    pytest.param("on_attestation_timed", observe_on_attestation, id="on_attestation"),
 ]
 
 
@@ -80,72 +36,27 @@ class TestNullObserverDefault:
     """The no-op observer is the registered singleton until set_observer is called."""
 
     def test_default_observer_is_null(self) -> None:
+        """The process starts with the no-op observer registered."""
         assert isinstance(observer_module._observer, _NullObserver)
 
-    @pytest.mark.parametrize(("method_name", "_metric_attribute", "_cm"), SPEC_EVENTS)
+    @pytest.mark.parametrize(("method_name", "_cm"), SPEC_EVENTS)
     def test_null_observer_discards_events(
         self,
         method_name: str,
-        _metric_attribute: str,
         _cm: Callable[[], AbstractContextManager[None]],
     ) -> None:
-        getattr(_NullObserver(), method_name)(0.5)
+        """Every hook on the no-op observer accepts a sample and returns None."""
+        assert getattr(_NullObserver(), method_name)(0.5) is None
 
 
 class TestSetObserver:
     """set_observer replaces the module singleton."""
 
     def test_replaces_singleton(self) -> None:
-        observer = PrometheusObserver()
+        """Registering an observer makes it the module singleton."""
+        observer = _RecordingObserver()
         set_observer(observer)
         assert observer_module._observer is observer
-
-
-class TestPrometheusObserverUninitialized:
-    """PrometheusObserver is a no-op when metrics have not been initialized."""
-
-    @pytest.mark.parametrize(("method_name", "_metric_attribute", "_cm"), SPEC_EVENTS)
-    def test_no_error_when_metrics_not_initialized(
-        self,
-        method_name: str,
-        _metric_attribute: str,
-        _cm: Callable[[], AbstractContextManager[None]],
-    ) -> None:
-        getattr(PrometheusObserver(), method_name)(0.1)
-
-
-class TestPrometheusObserverWithRegistry:
-    """Each hook forwards into its paired Prometheus histogram."""
-
-    @pytest.mark.parametrize(("method_name", "metric_attribute", "_cm"), SPEC_EVENTS)
-    def test_observes_single_value(
-        self,
-        fresh_registry: CollectorRegistry,
-        method_name: str,
-        metric_attribute: str,
-        _cm: Callable[[], AbstractContextManager[None]],
-    ) -> None:
-        _init_metrics(fresh_registry)
-
-        getattr(PrometheusObserver(), method_name)(0.5)
-
-        assert _get_histogram_sum(getattr(metrics, metric_attribute)) == 0.5
-
-    @pytest.mark.parametrize(("method_name", "metric_attribute", "_cm"), SPEC_EVENTS)
-    def test_accumulates_multiple_values(
-        self,
-        fresh_registry: CollectorRegistry,
-        method_name: str,
-        metric_attribute: str,
-        _cm: Callable[[], AbstractContextManager[None]],
-    ) -> None:
-        _init_metrics(fresh_registry)
-
-        observer = PrometheusObserver()
-        getattr(observer, method_name)(0.5)
-        getattr(observer, method_name)(0.75)
-
-        assert _get_histogram_sum(getattr(metrics, metric_attribute)) == 1.25
 
 
 class _RecordingObserver:
@@ -171,13 +82,13 @@ class _RecordingObserver:
 class TestObserveContextManagers:
     """Each observe_* context manager publishes on clean exit, not on raise."""
 
-    @pytest.mark.parametrize(("method_name", "_metric_attribute", "cm"), SPEC_EVENTS)
+    @pytest.mark.parametrize(("method_name", "cm"), SPEC_EVENTS)
     def test_publishes_on_clean_exit(
         self,
         method_name: str,
-        _metric_attribute: str,
         cm: Callable[[], AbstractContextManager[None]],
     ) -> None:
+        """A clean exit publishes exactly one non-negative duration to the hook."""
         observer = _RecordingObserver()
         set_observer(observer)
 
@@ -187,13 +98,13 @@ class TestObserveContextManagers:
         assert len(observer.samples[method_name]) == 1
         assert observer.samples[method_name][0] >= 0.0
 
-    @pytest.mark.parametrize(("method_name", "_metric_attribute", "cm"), SPEC_EVENTS)
+    @pytest.mark.parametrize(("method_name", "cm"), SPEC_EVENTS)
     def test_does_not_publish_when_body_raises(
         self,
         method_name: str,
-        _metric_attribute: str,
         cm: Callable[[], AbstractContextManager[None]],
     ) -> None:
+        """A body that raises propagates the exception and publishes nothing."""
         observer = _RecordingObserver()
         set_observer(observer)
 
