@@ -258,7 +258,7 @@ class BlockProductionMixin(LstarSpecBase):
                             proof,
                             [
                                 PublicKey.decode_bytes(
-                                    bytes(state.validators[validator_index].attestation_public_key)
+                                    state.validators[validator_index].attestation_public_key
                                 )
                                 for validator_index in proof.participants.to_validator_indices()
                             ],

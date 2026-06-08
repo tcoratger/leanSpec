@@ -464,15 +464,13 @@ def make_signed_block_from_store(
     head_state = new_store.states[new_store.head]
     public_keys_per_aggregate: list[list] = [
         [
-            PublicKey.decode_bytes(
-                bytes(head_state.validators[validator_index].attestation_public_key)
-            )
+            PublicKey.decode_bytes(head_state.validators[validator_index].attestation_public_key)
             for validator_index in attestation_proof.participants.to_validator_indices()
         ]
         for attestation_proof in attestation_proofs
     ]
     proposer_public_key = PublicKey.decode_bytes(
-        bytes(head_state.validators[proposer_index].proposal_public_key)
+        head_state.validators[proposer_index].proposal_public_key
     )
     public_keys_per_aggregate.append([proposer_public_key])
 

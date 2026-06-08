@@ -500,9 +500,7 @@ def test_aggregated_signatures_prefers_full_gossip_payload(
     }
 
     public_keys = [
-        PublicKey.decode_bytes(
-            bytes(head_state.validators[ValidatorIndex(i)].attestation_public_key)
-        )
+        PublicKey.decode_bytes(head_state.validators[ValidatorIndex(i)].attestation_public_key)
         for i in range(2)
     ]
     aggregated_attestations[0].proof.verify(

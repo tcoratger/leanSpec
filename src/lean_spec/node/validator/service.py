@@ -453,7 +453,7 @@ class ValidatorService:
         if not validator_index.is_within_registry(Uint64(len(validators))):
             raise ValueError(f"Validator {validator_index} not found in state validators")
         proposer_public_key = PublicKey.decode_bytes(
-            bytes(validators[validator_index].proposal_public_key)
+            validators[validator_index].proposal_public_key
         )
 
         # Wrap the proposer's raw XMSS signature into a singleton single-message aggregate.
@@ -483,9 +483,7 @@ class ValidatorService:
                         f"active set has {num_validators} validators"
                     )
                 participant_public_keys.append(
-                    PublicKey.decode_bytes(
-                        bytes(validators[validator_index].attestation_public_key)
-                    )
+                    PublicKey.decode_bytes(validators[validator_index].attestation_public_key)
                 )
             public_keys_per_aggregate.append(participant_public_keys)
         public_keys_per_aggregate.append([proposer_public_key])
