@@ -97,3 +97,13 @@ subspecifications that the Lean Ethereum protocol relies on.
     for `Interval` (in `spec/forks/lstar/containers/interval.py`) belong in
     `tests/lean_spec/spec/forks/lstar/containers/test_interval.py`, never in
     `node/chain/test_clock.py`.
+- **CRITICAL - ASSERT THE COMPLETE ERROR MESSAGE**: This is a STRICT requirement. When a test
+  checks a raised exception, assert the FULL message with string equality, never a substring or
+  partial regex. A partial match lets the rest of the message drift or regress unnoticed.
+  - Use `with pytest.raises(SomeError) as exception_info:` then
+    `assert str(exception_info.value) == "the entire expected message"`.
+  - Do NOT use `pytest.raises(SomeError, match="fragment")` to assert a fragment. If you use
+    `match=`, it must anchor the whole message (`match=r"^...full message...$"` with regex
+    metacharacters escaped); prefer the explicit full-equality assertion above.
+  - This mirrors the full-equality rule for ordinary assertions: assert the whole object, never a
+    piece of it.

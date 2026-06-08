@@ -33,14 +33,20 @@ def test_int_to_base_p_known_decomposition(
     assert int_to_base_p(integer_value, num_limbs) == [Fp(value=limb) for limb in expected_limbs]
 
 
-def test_int_to_base_p_zero_limbs_returns_empty() -> None:
-    """Requesting zero limbs yields an empty list."""
-    assert int_to_base_p(12345, 0) == []
+def test_int_to_base_p_zero_limbs_accepts_only_zero() -> None:
+    """Zero fits in zero limbs and yields an empty list."""
+    assert int_to_base_p(0, 0) == []
 
 
-def test_int_to_base_p_truncates_high_limbs() -> None:
-    """A value wider than the requested limbs drops its high digits."""
-    assert int_to_base_p(P**2 + P + 7, 1) == [Fp(value=7)]
+def test_int_to_base_p_rejects_overflow() -> None:
+    """A value wider than the requested limbs is rejected, not truncated."""
+    with pytest.raises(ValueError) as exception_info:
+        int_to_base_p(P**2 + P + 7, 1)
+    assert str(exception_info.value) == "value does not fit in 1 base-P limbs"
+
+    with pytest.raises(ValueError) as exception_info:
+        int_to_base_p(12345, 0)
+    assert str(exception_info.value) == "value does not fit in 0 base-P limbs"
 
 
 def test_int_to_base_p_roundtrip_is_reversible() -> None:
