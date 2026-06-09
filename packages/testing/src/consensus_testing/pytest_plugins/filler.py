@@ -195,7 +195,7 @@ def pytest_configure(config: pytest.Config) -> None:
         "smoke=True also keeps it in the fast mocked lane",
     )
 
-    # The prod scheme is the authoritative cross-client set, so it always runs real.
+    # Crypto mode is chosen explicitly and applies to either scheme.
     AggregationProver.set_mode(CryptoMode(config.getoption("--crypto")))
 
     # Get options

@@ -45,7 +45,7 @@ from consensus_testing.keys_cli import PINNED_KEY_SET_DIGESTS, download_keys
     "--crypto",
     type=click.Choice(["mocked", "real"], case_sensitive=False),
     default="mocked",
-    help="Aggregation prover mode (default: mocked; --scheme=prod forces real)",
+    help="Aggregation prover mode (default: mocked; pass real for the authoritative set)",
 )
 @click.pass_context
 def fill(
@@ -72,8 +72,9 @@ def fill(
     # Only the pytest subprocess below starts fresh and sees this export.
     os.environ["LEAN_ENV"] = scheme.lower()
 
-    # The prod scheme is the authoritative cross-client set, so it always runs real.
-    crypto_mode = "real" if scheme.lower() == "prod" else crypto.lower()
+    # Crypto mode is independent of the scheme.
+    # Both schemes mock by default and run the prover only when asked.
+    crypto_mode = crypto.lower()
 
     # Check and download keys if needed
     keys_directory = get_keys_directory(scheme.lower())
