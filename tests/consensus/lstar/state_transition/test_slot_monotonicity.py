@@ -18,25 +18,20 @@ def test_process_slots_target_equal_to_state_slot_rejected(
     state_transition_test: StateTransitionTestFiller,
 ) -> None:
     """
-    Block at a slot already reached by the state is rejected.
+    Slots only advance forward, so a block at the current slot is rejected.
 
-    Scenario
-    --------
-    - Pre-advance the state to slot 1.
-    - Submit a block at slot 1 without skipping slot processing.
-    - The state transition invokes slot advancement targeting slot 1.
+    Given
+    -----
+    - the state is pre-advanced to slot 1.
 
-    Expected Behavior
-    -----------------
-    Slot advancement fails with AssertionError: "Target slot must be in the future"
+    When
+    ----
+    - a block at slot 1 is processed without skipping slot processing.
 
-    Why This Matters
-    ----------------
-    Guards the slot-monotonicity invariant:
-
-    - Slots only advance forward.
-    - A target at or below the current slot is rejected.
-    - Protects against replay of already-processed slots.
+    Then
+    ----
+    - slot advancement targets slot 1, which is not in the future.
+    - the block is rejected as not in the future.
     """
     pre_state = generate_pre_state()
     pre_state = LstarSpec().process_slots(pre_state, Slot(1))
@@ -58,28 +53,22 @@ def test_block_at_parent_slot_rejected_when_slot_processing_skipped(
     state_transition_test: StateTransitionTestFiller,
 ) -> None:
     """
-    A second block at the same slot as its parent is rejected.
+    A second block at the same slot as the chain tip is rejected.
 
-    Scenario
-    --------
-    - Pre-advance state to slot 1 so slot processing is not re-run.
-    - Submit a first block at slot 1 (skip_slot_processing=True). The latest
-      block header now sits at slot 1.
-    - Submit a second block at slot 1 (skip_slot_processing=True).
+    Given
+    -----
+    - the state is pre-advanced to slot 1, so slot processing is not re-run.
+    - first(1) is processed, skipping slot processing.
+    - the chain tip header now sits at slot 1.
 
-    Expected Behavior
-    -----------------
-    Block header validation fails with AssertionError:
-    "Block is older than latest header"
+    When
+    ----
+    - a second block at slot 1 is processed, skipping slot processing.
 
-    Why This Matters
-    ----------------
-    Enforces strict newness of each block relative to the last processed header:
-
-    - Prevents replacing an already-processed block at the same slot.
-    - Blocks header-rewrite attacks.
-    - Complements the slot-mismatch check by rejecting even slot-matching blocks
-      when the chain tip is at or above the claimed slot.
+    Then
+    ----
+    - the second block is not newer than the chain tip header.
+    - the block is rejected as older than the latest header.
     """
     pre_state = generate_pre_state()
     pre_state = LstarSpec().process_slots(pre_state, Slot(1))

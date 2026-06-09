@@ -1,11 +1,4 @@
-"""
-ENR decoder: non-canonical key-order rejection vector.
-
-EIP-778 requires ENR key/value pairs to be lexicographically ordered
-in the signed RLP list. A decoder that accepts unordered keys would
-verify records whose canonical form differs from the bytes on the
-wire, breaking the signature covenant.
-"""
+"""Rejection vector for an ENR whose RLP keys are not in canonical order."""
 
 import pytest
 
@@ -44,11 +37,20 @@ def test_enr_decode_rejects_non_canonical_key_order(
     networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
-    An ENR with keys outside lexicographic order must be rejected.
+    An ENR with keys outside lexicographic order is rejected.
 
-    Pins EIP-778's canonical-ordering requirement. A client that decodes
-    such a record would verify a signature over bytes the signer never
-    produced.
+    Given
+    -----
+    - an RLP-encoded ENR whose key/value pairs are not lexicographically sorted.
+    - the "ip" key precedes the "id" key, violating canonical order.
+
+    When
+    ----
+    - the bytes are decoded.
+
+    Then
+    ----
+    - decoding is rejected because the key order is non-canonical.
     """
     networking_codec_test(
         codec=DecodeFailure(decoder="enr", raw_bytes=UNSORTED_ENR_HEX),

@@ -3,7 +3,23 @@
 from collections.abc import Callable
 
 from consensus_testing import forks
-from consensus_testing.genesis import build_anchor, generate_pre_state
+from consensus_testing.genesis import (
+    build_anchor,
+    generate_pre_state,
+    make_genesis_block,
+    make_genesis_state,
+    make_genesis_store,
+    make_validators,
+)
+from consensus_testing.mocks import (
+    MockEventSource,
+    MockForkchoiceStore,
+    MockNetworkRequester,
+    RecordedCall,
+    RecordingSyncDatabase,
+    StoreInterceptingSpec,
+    create_mock_sync_service,
+)
 from consensus_testing.test_fixtures import (
     FIXTURE_FORMATS,
     ApiEndpointFixture,
@@ -108,6 +124,13 @@ from consensus_testing.test_types import (
     StoreSnapshot,
     TickStep,
 )
+from consensus_testing.values import (
+    TEST_VALIDATOR_INDEX,
+    make_signed_attestation,
+    make_signed_block,
+    make_test_block,
+    make_test_status,
+)
 
 StateTransitionTestFiller = Callable[..., StateTransitionFixture]
 ForkChoiceTestFiller = Callable[..., ForkChoiceFixture]
@@ -169,6 +192,24 @@ __all__ = [
     "forks",
     "build_anchor",
     "generate_pre_state",
+    # Unit-test builders and value constructors
+    "make_genesis_block",
+    "make_genesis_state",
+    "make_genesis_store",
+    "make_validators",
+    "create_mock_sync_service",
+    "TEST_VALIDATOR_INDEX",
+    "make_signed_attestation",
+    "make_signed_block",
+    "make_test_block",
+    "make_test_status",
+    # Unit-test fakes
+    "MockEventSource",
+    "MockForkchoiceStore",
+    "MockNetworkRequester",
+    "RecordedCall",
+    "RecordingSyncDatabase",
+    "StoreInterceptingSpec",
     # Base types
     "FIXTURE_FORMATS",
     "BaseConsensusFixture",

@@ -93,6 +93,15 @@ class BaseConsensusFixture(CamelModel):
     This is the field clients assert against.
     """
 
+    proof_setting: int = 0
+    """
+    Aggregation proof regime, mirroring eth2's bls_setting.
+
+    - 0 means the proof is mocked and must not be verified.
+    - 1 means the proof is real and must verify.
+    - 2 means the proof is real and must fail verification.
+    """
+
     def with_info(self, info: FixtureInfo, network: str) -> Self:
         """
         Return a copy carrying the metadata envelope and network name.

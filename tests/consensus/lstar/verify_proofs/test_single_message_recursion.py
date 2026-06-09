@@ -12,13 +12,29 @@ from lean_spec.spec.forks import Checkpoint, RejectionReason, Slot, ValidatorInd
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
 def test_single_message_recursion_one_child_one_raw(
     verify_single_message_proofs_test: VerifySingleMessageProofsTestFiller,
 ) -> None:
-    """Outer aggregate folding one single-validator child with one raw signer must verify."""
+    """
+    An outer aggregate folding one child and one raw signer verifies.
+
+    Given
+    -----
+    - an outer aggregate over V0 and V1.
+    - one child aggregate covering V0.
+    - V1 contributing as a raw signer.
+
+    When
+    ----
+    - the aggregate proof is verified.
+
+    Then
+    ----
+    - verification succeeds.
+    """
     verify_single_message_proofs_test(
         validator_indices=[ValidatorIndex(0), ValidatorIndex(1)],
         attestation_data=AttestationData(
@@ -34,7 +50,23 @@ def test_single_message_recursion_one_child_one_raw(
 def test_single_message_recursion_two_children(
     verify_single_message_proofs_test: VerifySingleMessageProofsTestFiller,
 ) -> None:
-    """Outer aggregate folding two disjoint children with no raw signers must verify."""
+    """
+    An outer aggregate folding two disjoint children with no raw signers verifies.
+
+    Given
+    -----
+    - an outer aggregate over V0 through V3.
+    - one child aggregate covering V0 and V1.
+    - one child aggregate covering V2 and V3.
+
+    When
+    ----
+    - the aggregate proof is verified.
+
+    Then
+    ----
+    - verification succeeds.
+    """
     verify_single_message_proofs_test(
         validator_indices=[
             ValidatorIndex(0),
@@ -58,7 +90,24 @@ def test_single_message_recursion_two_children(
 def test_single_message_recursion_two_children_with_raw(
     verify_single_message_proofs_test: VerifySingleMessageProofsTestFiller,
 ) -> None:
-    """Outer aggregate folding two children plus a raw signer must verify."""
+    """
+    An outer aggregate folding two children plus a raw signer verifies.
+
+    Given
+    -----
+    - an outer aggregate over V0 through V3.
+    - one child aggregate covering V0 and V1.
+    - one child aggregate covering V2.
+    - V3 contributing as a raw signer.
+
+    When
+    ----
+    - the aggregate proof is verified.
+
+    Then
+    ----
+    - verification succeeds.
+    """
     verify_single_message_proofs_test(
         validator_indices=[
             ValidatorIndex(0),
@@ -82,7 +131,24 @@ def test_single_message_recursion_two_children_with_raw(
 def test_single_message_recursion_wrong_message(
     verify_single_message_proofs_test: VerifySingleMessageProofsTestFiller,
 ) -> None:
-    """Recursively folded proof rebound to an alternate head root must not verify."""
+    """
+    A recursively folded proof rebound to an alternate head root is rejected.
+
+    Given
+    -----
+    - an outer aggregate over V0 through V3.
+    - one child aggregate covering V0 and V1.
+    - one child aggregate covering V2 and V3.
+    - the proof rebound to a head root that differs from the honest message.
+
+    When
+    ----
+    - the aggregate proof is verified.
+
+    Then
+    ----
+    - verification fails because the signed message no longer matches the proof.
+    """
     verify_single_message_proofs_test(
         validator_indices=[
             ValidatorIndex(0),
@@ -108,7 +174,24 @@ def test_single_message_recursion_wrong_message(
 def test_single_message_recursion_wrong_slot(
     verify_single_message_proofs_test: VerifySingleMessageProofsTestFiller,
 ) -> None:
-    """Recursively folded proof bound to one slot but emitted under the next must not verify."""
+    """
+    A recursively folded proof emitted under the wrong slot is rejected.
+
+    Given
+    -----
+    - an outer aggregate over V0 through V3.
+    - one child aggregate covering V0 and V1.
+    - one child aggregate covering V2.
+    - the proof bound to one slot but emitted under the next.
+
+    When
+    ----
+    - the aggregate proof is verified.
+
+    Then
+    ----
+    - verification fails because the emitted slot does not match the bound slot.
+    """
     verify_single_message_proofs_test(
         validator_indices=[
             ValidatorIndex(0),

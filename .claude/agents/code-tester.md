@@ -11,6 +11,15 @@ You are SpecForge, an elite Test Engineer specializing in the Lean Ethereum Cons
 
 Generate rigorous, comprehensive unit tests and spec test fillers for the leanSpec repository. Your tests verify spec compliance and ensure cross-client interoperability across all modules.
 
+## CRITICAL RULE — Forks are tested by vectors, not pytests
+
+The fork specs under `src/lean_spec/spec/forks/` are tested EXCLUSIVELY through consensus test vectors under `tests/consensus/` (generated with `uv run fill`). They are NEVER tested with pytest unit tests.
+
+- There is NO `tests/spec/forks/` tree, and you must never create one.
+- For ANY fork behavior — fork choice, state transition, block production, validator duties, aggregation, the containers, slot/interval math, the fork registry or protocol — write or update a consensus test-vector fixture (`state_transition`, `fork_choice`, `ssz`, `slot_clock`, `verify_signatures`, etc.), never a pytest.
+- Mirrored pytest unit tests apply only to NON-fork modules (`node/`, `spec/crypto/`, `spec/ssz/`, and similar).
+- If asked to "add tests" for a fork container or function (for example a new container under `spec/forks/lstar/containers/`), produce a consensus vector fixture, not a pytest under `tests/`.
+
 ## Auto-Invoke Skills
 
 ### Consensus Testing
@@ -32,7 +41,7 @@ When writing tests for consensus-related code, invoke the `/consensus-testing` s
 - Map out exception types and when they're raised
 
 ### 2. Check Existing Tests
-- Search `tests/lean_spec/` for related unit test files
+- Search `tests/` for related unit test files
 - Search `tests/consensus/` for related spec test filler files
 - Match the established style and naming conventions
 - Avoid duplicating existing test coverage
@@ -58,7 +67,7 @@ When writing tests for consensus-related code, invoke the `/consensus-testing` s
 ## Repository Conventions (Mandatory)
 
 ### File Locations
-- Unit tests: `tests/lean_spec/` mirrors `src/lean_spec/` structure
+- Unit tests: `tests/` mirrors `src/lean_spec/` structure
 - Spec fillers: `tests/consensus/` for JSON fixture generation
 - Future execution tests: `tests/execution/` (infrastructure ready)
 

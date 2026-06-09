@@ -74,6 +74,51 @@ Mutation: <what we change and why>
 
 Never write essay-style prose blocks in test docstrings.
 
+## Consensus test-vector format
+
+Tests under `tests/consensus/` follow one fixed skeleton so any vector reads the same way.
+The full standard lives in `.claude/rules/documentation.md` under "Consensus test-vector docstrings".
+The module-level file header is exactly one line.
+The body carries no inline comments — the docstring is the single source of truth.
+
+The skeleton is a one-line summary, then Given, When, Then.
+One atomic fact per bullet, fixed notation for blocks, validators, votes, and the chain.
+
+```python
+def test_justified_divergence_self_heals_in_next_block(
+    fork_choice_test: ForkChoiceTestFiller,
+) -> None:
+    """
+    A block adopts the votes that justify a slot from a fork it did not extend.
+
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis
+        - common(1)
+          - block_2(2) -> block_3(3)
+          - fork_4(4)
+    - block_3 includes V0's vote for block_2.
+    - fork_4 includes V1, V2, V3's votes for common.
+    - fork_4 reaches 3 votes, so it justifies slot 1.
+    - block_3 has only 1 vote, so it justifies nothing.
+    - the views diverge: node = slot 1, head chain = slot 0.
+
+    When
+    ----
+    - block_5 is built on block_3, carrying no votes of its own.
+
+    Then
+    ----
+    - block_5 pulls the slot-1 votes from the pool and includes them.
+    - the head chain justifies slot 1, matching the node.
+    - finalized stays at slot 0.
+    """
+```
+
+Reference exemplar: tests/consensus/lstar/fork_choice/test_attestation_source_divergence.py.
+
 ## Project-specific anti-patterns
 
 These are the failure modes most likely to slip into leanSpec PRs:

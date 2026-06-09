@@ -1,10 +1,4 @@
-"""
-Poseidon permutation: width-24 known-answer vectors.
-
-Pins the output state of the Poseidon permutation over the KoalaBear
-field at state width 24 for four structural input patterns. Mirrors
-the width-16 coverage on the larger parameter set.
-"""
+"""Poseidon permutation width-24 known-answer vectors over the KoalaBear field."""
 
 import pytest
 
@@ -20,12 +14,20 @@ def test_permutation_width24_all_zero(
     poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
     """
-    Input state of all zeros pins the round-constant-only output at width 24.
+    An all-zero input pins the output that depends only on the round constants.
 
-    With a zero state the only contribution to every S-box input is the
-    round-constants stream. The output state depends purely on the
-    round constants and MDS matrix, making this vector sensitive to
-    tables-of-constants drift at the larger width.
+    Given
+    -----
+    - a width-24 input state of all zeros.
+
+    When
+    ----
+    - the permutation runs once.
+
+    Then
+    ----
+    - the output state equals the reference vector.
+    - the output is a sensitive diff for any round-constant table drift.
     """
     poseidon_permutation_test(
         width=WIDTH,
@@ -36,7 +38,21 @@ def test_permutation_width24_all_zero(
 def test_permutation_width24_all_one(
     poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
-    """Input state of all ones exercises uniform non-zero entries at width 24."""
+    """
+    An all-one input exercises uniform non-zero entries.
+
+    Given
+    -----
+    - a width-24 input state where every element is the smallest non-zero value.
+
+    When
+    ----
+    - the permutation runs once.
+
+    Then
+    ----
+    - the output state equals the reference vector.
+    """
     poseidon_permutation_test(
         width=WIDTH,
         input_state=["1"] * WIDTH,
@@ -46,7 +62,22 @@ def test_permutation_width24_all_one(
 def test_permutation_width24_incremental_index(
     poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
-    """Input state filled with 0, 1, 2, ..., 23 pins per-slot MDS behaviour."""
+    """
+    Distinct per-slot entries expose per-position behaviour.
+
+    Given
+    -----
+    - a width-24 input state filled with 0, 1, 2, up to 23.
+
+    When
+    ----
+    - the permutation runs once.
+
+    Then
+    ----
+    - the output state equals the reference vector.
+    - any off-by-one in row indexing or constant slicing perturbs the output.
+    """
     poseidon_permutation_test(
         width=WIDTH,
         input_state=[str(i) for i in range(WIDTH)],
@@ -56,7 +87,22 @@ def test_permutation_width24_incremental_index(
 def test_permutation_width24_p_minus_one_and_near_zero(
     poseidon_permutation_test: PoseidonPermutationTestFiller,
 ) -> None:
-    """Alternating P - 1 and small positives stress reduction at width 24."""
+    """
+    A mix of field-boundary and small values stresses the reduction path.
+
+    Given
+    -----
+    - a width-24 input state alternating the maximum field element P minus 1 and small values.
+
+    When
+    ----
+    - the permutation runs once.
+
+    Then
+    ----
+    - the output state equals the reference vector.
+    - the widest intermediates inside the S-box reduce correctly.
+    """
     state = [str(P - 1) if i % 2 == 0 else str(i) for i in range(WIDTH)]
     poseidon_permutation_test(
         width=WIDTH,

@@ -24,11 +24,22 @@ MESSAGE_ID_2 = "0x" + "bb" * 20
 MESSAGE_ID_3 = "0x" + "cc" * 20
 
 
-# --- SubOpts ---
-
-
 def test_sub_opts_subscribe(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """SubOpts encoding for a topic subscription."""
+    """
+    A subscribe entry round-trips through the RPC encoding.
+
+    Given
+    -----
+    - an RPC with one subscription entry that subscribes to a topic.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[RpcSubscriptionSpec(subscribe=True, topic_id=TOPIC_A)], publish=[]
@@ -37,7 +48,21 @@ def test_sub_opts_subscribe(networking_codec_test: NetworkingCodecTestFiller) ->
 
 
 def test_sub_opts_unsubscribe(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """SubOpts encoding for a topic unsubscription."""
+    """
+    An unsubscribe entry round-trips through the RPC encoding.
+
+    Given
+    -----
+    - an RPC with one subscription entry that unsubscribes from a topic.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[RpcSubscriptionSpec(subscribe=False, topic_id=TOPIC_A)], publish=[]
@@ -46,7 +71,21 @@ def test_sub_opts_unsubscribe(networking_codec_test: NetworkingCodecTestFiller) 
 
 
 def test_sub_opts_empty_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """SubOpts with an empty topic string."""
+    """
+    A subscribe entry with an empty topic round-trips.
+
+    Given
+    -----
+    - an RPC with one subscription entry whose topic is an empty string.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[RpcSubscriptionSpec(subscribe=True, topic_id="")], publish=[]
@@ -54,18 +93,44 @@ def test_sub_opts_empty_topic(networking_codec_test: NetworkingCodecTestFiller) 
     )
 
 
-# --- Message ---
-
-
 def test_message_topic_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Published message with only the topic field set."""
+    """
+    A published message with only a topic round-trips.
+
+    Given
+    -----
+    - an RPC with one published message that sets only the topic field.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(subscriptions=[], publish=[RpcMessageSpec(topic=TOPIC_A)]),
     )
 
 
 def test_message_all_fields(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Published message with every optional field populated."""
+    """
+    A published message with every field round-trips.
+
+    Given
+    -----
+    - an RPC with one published message.
+    - the from_peer, data, seqno, topic, signature, and key fields are all set.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -84,17 +149,43 @@ def test_message_all_fields(networking_codec_test: NetworkingCodecTestFiller) ->
 
 
 def test_message_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Published message with no fields set. Encodes as zero bytes."""
+    """
+    A published message with no fields encodes to zero bytes and round-trips.
+
+    Given
+    -----
+    - an RPC with one published message that sets no fields.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the message encodes to zero bytes.
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(subscriptions=[], publish=[RpcMessageSpec()]),
     )
 
 
-# --- ControlGraft ---
-
-
 def test_graft_single_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """GRAFT requesting mesh membership for one topic."""
+    """
+    A GRAFT for one topic round-trips through the RPC encoding.
+
+    Given
+    -----
+    - an RPC whose control message holds a GRAFT for one topic.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -105,7 +196,21 @@ def test_graft_single_topic(networking_codec_test: NetworkingCodecTestFiller) ->
 
 
 def test_graft_empty_topic(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """GRAFT with an empty topic string."""
+    """
+    A GRAFT with an empty topic round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds a GRAFT with an empty topic.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[], publish=[], control=RpcControlSpec(graft=[RpcGraftSpec(topic_id="")])
@@ -113,11 +218,22 @@ def test_graft_empty_topic(networking_codec_test: NetworkingCodecTestFiller) -> 
     )
 
 
-# --- ControlIHave ---
-
-
 def test_ihave_single_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IHAVE advertising one cached message ID."""
+    """
+    An IHAVE advertising one message id round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IHAVE with one message id.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -130,7 +246,21 @@ def test_ihave_single_id(networking_codec_test: NetworkingCodecTestFiller) -> No
 
 
 def test_ihave_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IHAVE advertising three cached message IDs."""
+    """
+    An IHAVE advertising three message ids round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IHAVE with three message ids.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -147,7 +277,21 @@ def test_ihave_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) ->
 
 
 def test_ihave_empty_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IHAVE with a topic but no message IDs."""
+    """
+    An IHAVE with a topic but no message ids round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IHAVE with a topic and no ids.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -157,11 +301,22 @@ def test_ihave_empty_ids(networking_codec_test: NetworkingCodecTestFiller) -> No
     )
 
 
-# --- ControlIWant ---
-
-
 def test_iwant_single_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IWANT requesting one message by ID."""
+    """
+    An IWANT requesting one message id round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IWANT with one message id.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -172,7 +327,21 @@ def test_iwant_single_id(networking_codec_test: NetworkingCodecTestFiller) -> No
 
 
 def test_iwant_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IWANT requesting two messages by ID."""
+    """
+    An IWANT requesting two message ids round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IWANT with two message ids.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -182,11 +351,22 @@ def test_iwant_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) ->
     )
 
 
-# --- ControlPrune ---
-
-
 def test_prune_topic_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """PRUNE with topic but no peer exchange or backoff."""
+    """
+    A PRUNE with only a topic round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds a PRUNE with a topic and no backoff.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -197,7 +377,21 @@ def test_prune_topic_only(networking_codec_test: NetworkingCodecTestFiller) -> N
 
 
 def test_prune_with_backoff(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """PRUNE with a 60-second backoff duration."""
+    """
+    A PRUNE with a 60-second backoff round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds a PRUNE with a 60-second backoff.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -209,11 +403,24 @@ def test_prune_with_backoff(networking_codec_test: NetworkingCodecTestFiller) ->
 
 def test_prune_with_two_minute_backoff(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """
-    PRUNE with a 120-second backoff duration.
+    A PRUNE with a 120-second backoff round-trips.
 
-    Peer exchange records are not part of the lean wire format.
-    The previous version of this vector carried them in its input
-    where the untyped builder silently dropped them.
+    Given
+    -----
+    - an RPC whose control message holds a PRUNE with a 120-second backoff.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+
+    Notes
+    -----
+    - peer exchange records are not part of the lean wire format.
+    - this vector carries no peer exchange records.
     """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
@@ -224,11 +431,22 @@ def test_prune_with_two_minute_backoff(networking_codec_test: NetworkingCodecTes
     )
 
 
-# --- ControlIDontWant ---
-
-
 def test_idontwant_single_id(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IDONTWANT declining one message. Gossipsub v1.2 extension."""
+    """
+    An IDONTWANT declining one message id round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IDONTWANT with one message id.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -239,7 +457,21 @@ def test_idontwant_single_id(networking_codec_test: NetworkingCodecTestFiller) -
 
 
 def test_idontwant_multiple_ids(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """IDONTWANT declining two messages."""
+    """
+    An IDONTWANT declining two message ids round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IDONTWANT with two message ids.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -251,11 +483,22 @@ def test_idontwant_multiple_ids(networking_codec_test: NetworkingCodecTestFiller
     )
 
 
-# --- ControlMessage ---
-
-
 def test_control_single_graft(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Control message containing only a single GRAFT."""
+    """
+    A control message holding a single GRAFT round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds one GRAFT.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -266,7 +509,21 @@ def test_control_single_graft(networking_codec_test: NetworkingCodecTestFiller) 
 
 
 def test_control_all_types(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Control message with one of each control type."""
+    """
+    A control message holding one of each control type round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds an IHAVE, IWANT, GRAFT, PRUNE, and IDONTWANT.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -283,17 +540,43 @@ def test_control_all_types(networking_codec_test: NetworkingCodecTestFiller) -> 
 
 
 def test_control_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Empty control message. All repeated fields empty, encodes to zero bytes."""
+    """
+    An empty control message encodes to zero bytes and round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds no entries.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the control message encodes to zero bytes.
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(subscriptions=[], publish=[], control=RpcControlSpec()),
     )
 
 
-# --- Full RPC ---
-
-
 def test_rpc_subscriptions_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """RPC with only subscription changes."""
+    """
+    An RPC with only subscription changes round-trips.
+
+    Given
+    -----
+    - an RPC with two subscribe entries and no messages or control.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[
@@ -306,7 +589,21 @@ def test_rpc_subscriptions_only(networking_codec_test: NetworkingCodecTestFiller
 
 
 def test_rpc_publish_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """RPC with only published messages."""
+    """
+    An RPC with only published messages round-trips.
+
+    Given
+    -----
+    - an RPC with two published messages and no subscriptions or control.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -319,7 +616,22 @@ def test_rpc_publish_only(networking_codec_test: NetworkingCodecTestFiller) -> N
 
 
 def test_rpc_control_only(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """RPC with only control messages."""
+    """
+    An RPC with only control messages round-trips.
+
+    Given
+    -----
+    - an RPC whose control message holds a GRAFT and a PRUNE.
+    - no subscriptions or published messages are present.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[],
@@ -333,7 +645,22 @@ def test_rpc_control_only(networking_codec_test: NetworkingCodecTestFiller) -> N
 
 
 def test_rpc_full(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """RPC with subscriptions, published messages, and control all present."""
+    """
+    A full RPC carrying every section round-trips.
+
+    Given
+    -----
+    - an RPC with a subscription, a published message, and a control message.
+    - the control message holds a GRAFT and an IDONTWANT.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(
             subscriptions=[RpcSubscriptionSpec(subscribe=True, topic_id=TOPIC_A)],
@@ -347,7 +674,21 @@ def test_rpc_full(networking_codec_test: NetworkingCodecTestFiller) -> None:
 
 
 def test_rpc_empty(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Empty RPC. No subscriptions, messages, or control."""
+    """
+    An empty RPC round-trips.
+
+    Given
+    -----
+    - an RPC with no subscriptions, no messages, and no control.
+
+    When
+    ----
+    - the RPC is encoded and decoded.
+
+    Then
+    ----
+    - the decoded RPC matches the input.
+    """
     networking_codec_test(
         codec=GossipsubRpcRoundtrip(subscriptions=[], publish=[]),
     )

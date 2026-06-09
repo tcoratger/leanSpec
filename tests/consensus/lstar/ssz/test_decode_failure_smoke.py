@@ -1,9 +1,4 @@
-"""
-Smoke test for the ssz fixture's decode-failure mode.
-
-Exercises the new `raw_bytes` + `expected_rejection` path so the framework
-change is covered independently of later negative-path content PRs.
-"""
+"""SSZ smoke test for the decode-failure fixture path."""
 
 from typing import ClassVar
 
@@ -24,11 +19,21 @@ class SmokeBitlist8(BaseBitlist):
 
 def test_ssz_decode_failure_bitlist_exceeds_limit(ssz_test: SSZTestFiller) -> None:
     """
-    Decoding a bitlist whose contents imply a length above its LIMIT raises.
+    Decoding a bitlist whose contents imply too many bits is rejected.
 
-    The payload `0x0010` encodes 16 bits before the sentinel. The `LIMIT`
-    on the decoder type is 8, so SSZ decode must reject. This pins the new
-    `raw_bytes` + `expected_rejection` path on the ssz fixture.
+    Given
+    -----
+    - a bitlist type capped at eight bits.
+    - the input bytes 0x0010, which place the sentinel at bit sixteen.
+
+    When
+    ----
+    - the input is decoded into that type.
+
+    Then
+    ----
+    - decoding is rejected.
+    - the reason is that the implied bit-length exceeds the limit.
     """
     ssz_test(
         type_name="SmokeBitlist8",
