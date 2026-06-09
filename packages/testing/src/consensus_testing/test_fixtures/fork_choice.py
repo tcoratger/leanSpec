@@ -292,10 +292,24 @@ class ForkChoiceTest(BaseTestSpec):
                         )
 
                     case BlockStep():
+                        # A step expecting the unknown-parent rejection may point
+                        # the block at a parent the store never imported.
+                        # The builder then skips the state transition and hands
+                        # the block straight to the spec, where that guard fires.
+                        deliver_unknown_parent = (
+                            step.expected_rejection is not None
+                            and step.expected_rejection.reason
+                            is RejectionReason.UNKNOWN_PARENT_BLOCK
+                        )
+
                         # Build a complete signed block from the lightweight spec.
                         # The spec contains minimal fields; we fill the rest.
                         signed_block, store = step.block.build_signed_block_with_store(
-                            store, block_registry, key_manager, LEAN_ENV
+                            store,
+                            block_registry,
+                            key_manager,
+                            LEAN_ENV,
+                            deliver_unknown_parent=deliver_unknown_parent,
                         )
                         filled_block = signed_block.block
 

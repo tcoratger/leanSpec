@@ -2,12 +2,15 @@
 
 from consensus_testing.keys import XmssKeyManager
 from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Interval, Slot, ValidatorIndex
+from lean_spec.spec.forks import Checkpoint, Interval, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestations,
     Block,
     BlockBody,
+    JustificationRoots,
+    JustificationValidators,
+    JustifiedSlots,
     State,
     Validator,
     Validators,
@@ -81,11 +84,16 @@ def build_anchor(
     a real state reached via the normal state transition from genesis,
     plus the real block at that slot.
 
+    A checkpoint-synced node trusts the anchor as both justified and finalized.
+    So the returned state pins both checkpoints to the anchor block at the anchor slot.
+    The justification window is rebased onto that boundary, leaving nothing tracked yet.
+
     The resulting (state, block) pair is internally consistent. That means:
 
     - Block state_root equals hash_tree_root(state).
     - State historical_block_hashes lists the real roots for slots 0..anchor_slot-1.
     - State latest_block_header matches the anchor block header (without state_root).
+    - State latest_finalized and latest_justified both name the anchor at the anchor slot.
 
     Args:
         fork: Fork dispatching genesis construction.
@@ -138,6 +146,36 @@ def build_anchor(
             known_block_roots={parent_root},
         )
         parent_root = hash_tree_root(current_block)
+
+    # Rebase the state onto the anchor as a freshly checkpoint-synced node would see it.
+    #
+    # The empty-block advance leaves both checkpoints at the genesis boundary (slot 0).
+    # A node that syncs from this anchor trusts it as finalized at the anchor slot.
+    # So both checkpoints move to the anchor block at the anchor slot.
+    anchor_root = hash_tree_root(current_block)
+    anchor_checkpoint = Checkpoint(root=anchor_root, slot=anchor_slot)
+
+    # The justified-slots window is stored relative to the finalized boundary.
+    #
+    # Its first bit is the slot just after finalization.
+    # Moving the boundary forward by the anchor slot drops that many leading bits.
+    # No slot beyond the anchor is materialized, so the rebased window is empty.
+    rebase_distance = int(anchor_slot - state.latest_finalized.slot)
+    rebased_justified_slots = JustifiedSlots(data=state.justified_slots.data[rebase_distance:])
+
+    # No votes carry past the new finalized boundary, so pending tallies reset.
+    state = state.model_copy(
+        update={
+            "latest_finalized": anchor_checkpoint,
+            "latest_justified": anchor_checkpoint,
+            "justified_slots": rebased_justified_slots,
+            "justifications_roots": JustificationRoots(data=[]),
+            "justifications_validators": JustificationValidators(data=[]),
+        }
+    )
+
+    # The block must point at the rebased state, so recompute its state root.
+    current_block = current_block.model_copy(update={"state_root": hash_tree_root(state)})
 
     return state, current_block
 

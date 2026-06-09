@@ -52,7 +52,7 @@ def test_store_init_from_non_genesis_anchor(
     - finalized references the anchor root at slot 10.
     - the store clock sits at the anchor slot with no pre-anchor intervals.
     - the anchor block is the only entry in the store.
-    - the anchor state's embedded checkpoint slots are ignored.
+    - the anchor state's embedded checkpoints already name the anchor slot.
     """
     anchor_state, anchor_block = build_anchor(
         num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
@@ -272,8 +272,8 @@ def test_non_genesis_anchor_is_internally_consistent(
     Then
     ----
     - the anchor block's recorded post state matches the hash of the anchor state.
-    - the justified checkpoint slot is not above the anchor slot.
-    - the finalized checkpoint slot is not above the anchor slot.
+    - the justified and finalized checkpoints are the same checkpoint at the anchor slot.
+    - that checkpoint names the anchor block as the chain produced it.
     - the recorded block history covers every slot from 0 up to the anchor.
     - the store accepts the anchor and a no-op step runs cleanly.
     """
@@ -283,8 +283,8 @@ def test_non_genesis_anchor_is_internally_consistent(
 
     assert anchor_block.state_root == hash_tree_root(anchor_state)
 
-    assert anchor_state.latest_justified.slot <= ANCHOR_SLOT
-    assert anchor_state.latest_finalized.slot <= ANCHOR_SLOT
+    assert anchor_state.latest_justified == anchor_state.latest_finalized
+    assert anchor_state.latest_finalized.slot == ANCHOR_SLOT
 
     assert len(anchor_state.historical_block_hashes) == int(ANCHOR_SLOT)
 

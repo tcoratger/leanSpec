@@ -432,12 +432,42 @@ class BlockSpec(CamelModel):
             final_block, aggregated_signatures, proposer_index, key_manager, state
         )
 
+    def _build_unknown_parent_block(
+        self,
+        store: Store,
+        parent_root: Bytes32,
+    ) -> SignedBlock:
+        """
+        Build a block whose parent the store never imported.
+
+        The unknown-parent guard rejects it before the state transition or
+        signature checks, so an empty body and placeholder proof suffice.
+        """
+        anchor_state = store.states[store.head]
+        proposer_index = self.resolve_proposer_index(len(anchor_state.validators))
+
+        # An empty body keeps the block trivially well formed.
+        # The state root is left at zero: the guard rejects before checking it.
+        block = Block(
+            slot=self.slot,
+            proposer_index=proposer_index,
+            parent_root=parent_root,
+            state_root=Bytes32.zero(),
+            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+        )
+
+        # An empty proof decodes structurally.
+        # The unknown-parent guard fires before proof verification, so a
+        # placeholder proof never reaches a verifier.
+        return SignedBlock(block=block, proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"")))
+
     def build_signed_block_with_store(
         self,
         store: Store,
         block_registry: dict[str, Block],
         key_manager: XmssKeyManager,
         lean_env: str,
+        deliver_unknown_parent: bool = False,
     ) -> tuple[SignedBlock, Store]:
         """
         Build a complete signed block through the Store's attestation pipeline.
@@ -460,6 +490,11 @@ class BlockSpec(CamelModel):
             block_registry: Labeled blocks for fork creation.
             key_manager: Key manager for signing.
             lean_env: Signature scheme environment name ("test" or "prod").
+            deliver_unknown_parent: When True and the parent state is absent,
+                build a structurally valid block against the anchor state with
+                its parent root overridden, instead of raising.
+                This hands the block to the spec so its own unknown-parent
+                guard runs and rejects it.
 
         Returns:
             The signed block and the Store with new known payloads merged in.
@@ -471,8 +506,19 @@ class BlockSpec(CamelModel):
         # Parent can be specified by label (for forks) or defaults to head.
         parent_root = self.resolve_parent_root(block_registry, default_root=store.head)
 
-        # Verify the parent's state exists in the store.
+        # The parent's state is missing from the store.
+        #
+        # The normal path treats this as a hard harness error: no state means
+        # the builder cannot run the state transition for this fork.
+        #
+        # The unknown-parent path is the one exception.
+        # A test may deliberately fabricate a parent root the store never saw,
+        # to exercise the spec's own unknown-parent rejection.
+        # That guard runs before the state transition, so the block needs no
+        # valid post-state — it only needs to be structurally well formed.
         if parent_root not in store.states:
+            if deliver_unknown_parent:
+                return self._build_unknown_parent_block(store, parent_root), store
             raise ValueError(
                 f"Parent (root=0x{parent_root.hex()}) "
                 "has no state in store - cannot build on this fork"
