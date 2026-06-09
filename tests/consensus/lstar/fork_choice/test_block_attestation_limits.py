@@ -32,26 +32,29 @@ def test_block_with_maximum_attestations(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Block with MAX_ATTESTATIONS_DATA distinct entriesis accepted by the store.
+    A block holding exactly the maximum number of distinct votes is accepted.
 
-    Scenario
-    --------
-    1. Compute the first MAX_ATTESTATIONS_DATA justifiable slots after genesis
-       (immediate, square, and pronic distances from finalized slot 0)
-    2. Build a linear chain with one block per justifiable slot
-    3. A final block includes one attestation per target, each with a single
-       validator vote
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> one block per justifiable slot after genesis
+    - the justifiable slots are the immediate, square, and pronic distances from slot 0.
+    - the chain holds exactly the maximum number of distinct attestation data entries.
 
-    Expected Behavior
-    -----------------
-    1. Store accepts the block without errors
-    2. Head advances to the final block slot
+    When
+    ----
+    - a final block carries one vote per justifiable slot.
+
+    Then
+    ----
+    - the store accepts the block.
+    - head advances to the final block.
     """
     n = int(MAX_ATTESTATIONS_DATA)
     targets = _justifiable_slots(n)
     proposal_slot = Slot(targets[-1] + Slot(1))
 
-    # Linear chain: one block per justifiable slot.
     chain: list[ForkChoiceStep] = [
         BlockStep(
             block=BlockSpec(
@@ -63,7 +66,6 @@ def test_block_with_maximum_attestations(
         for i, s in enumerate(targets)
     ]
 
-    # Final block carrying exactly MAX_ATTESTATIONS_DATA distinct attestations.
     chain.append(
         BlockStep(
             block=BlockSpec(
@@ -92,25 +94,28 @@ def test_block_exceeding_maximum_attestations_is_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Block with MAX_ATTESTATIONS_DATA + 1 distinct entries is rejected.
+    A block holding one more than the maximum number of distinct votes is rejected.
 
-    Scenario
-    --------
-    1. Build the same chain as the maximum test, but with one extra justifiable
-       target slot
-    2. The final block carries MAX_ATTESTATIONS_DATA entries through the normal
-       builder, plus one forced attestation that pushes the count over the limit
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> one block per justifiable slot after genesis
+    - the chain holds one more justifiable slot than the maximum allows.
 
-    Expected Behavior
-    -----------------
-    Store rejects the block with an assertion about exceeding the maximum
-    number of distinct AttestationData entries.
+    When
+    ----
+    - a final block carries the maximum number of votes from the builder.
+    - one forced vote pushes the count one over the limit.
+
+    Then
+    ----
+    - the store rejects the block for exceeding the distinct attestation data limit.
     """
     n = int(MAX_ATTESTATIONS_DATA)
     targets = _justifiable_slots(n + 1)
     proposal_slot = Slot(targets[-1] + Slot(1))
 
-    # Linear chain: one block per justifiable slot (N + 1 blocks).
     chain: list[ForkChoiceStep] = [
         BlockStep(
             block=BlockSpec(
@@ -122,8 +127,6 @@ def test_block_exceeding_maximum_attestations_is_rejected(
         for i, s in enumerate(targets)
     ]
 
-    # Final block: N attestations through the builder (hits MAX cap),
-    # plus 1 forced attestation targeting the extra slot.
     builder_targets = targets[:n]
     forced_target = targets[n]
 

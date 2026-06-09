@@ -12,11 +12,19 @@ def test_enr_decode_rejects_oversize_payload(
     networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
-    An ENR RLP payload above the 300-byte cap is rejected.
+    An ENR payload above the 300-byte cap is rejected.
 
-    EIP-778 caps the encoded ENR at 300 bytes so records can travel
-    comfortably through DNS TXT records. A 301-byte input must be
-    rejected before any RLP parsing runs.
+    Given
+    -----
+    - a 301-byte input, one byte over the 300-byte ENR size cap.
+
+    When
+    ----
+    - the bytes are decoded.
+
+    Then
+    ----
+    - decoding is rejected because the payload exceeds the size cap.
     """
     oversize = "0x" + "ff" * 301
     networking_codec_test(
@@ -29,11 +37,20 @@ def test_enr_decode_rejects_malformed_rlp(
     networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
-    An input that cannot be parsed as an RLP list is rejected.
+    An input that is not an RLP list is rejected.
 
-    The byte 0x00 is valid RLP for the single byte value 0x00, not for a
-    list structure. The ENR decoder requires a list header, so the parse
-    fails and the error surfaces as a ValueError on the ENR API.
+    Given
+    -----
+    - the single byte 0x00.
+    - this is valid RLP for the value 0x00, but not for a list.
+
+    When
+    ----
+    - the bytes are decoded.
+
+    Then
+    ----
+    - decoding is rejected because a list header was required.
     """
     networking_codec_test(
         codec=DecodeFailure(decoder="enr", raw_bytes="0x00"),

@@ -19,32 +19,25 @@ def test_head_advances_through_deep_chain(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice head advances through a deep chain correctly.
+    The head follows a long linear chain to its tip.
 
-    Scenario
-    --------
-    Build a long chain (slots 1-20) and verify head reaches the end.
+    Given
+    -----
+    - the chain:
+        genesis -> block(1) -> ... -> block_20(20)
+    - no block carries any vote.
 
-    Expected Behavior:
-        - Head advances through all 20 blocks
-        - Final head = slot 20
-        - Fork choice scales to longer chains
+    When
+    ----
+    - 20 blocks are added one per slot.
 
-    Why This Matters
-    ----------------
-    This tests that the fork choice algorithm scales to longer chains and
-    correctly handles the tree-walking logic through many blocks.
-
-    Real networks have chains thousands of blocks long. The algorithm must:
-    - Efficiently traverse deep trees
-    - Maintain correct head even with many ancestors
-    - Not degrade in performance or correctness with depth
-
-    A 20-block chain is a modest test of this scalability.
+    Then
+    ----
+    - head advances through every block.
+    - the final head is block_20 at slot 20.
     """
     steps = []
     for i in range(1, 21):
-        # Add label to last block so we can verify root
         if i == 20:
             steps.append(
                 BlockStep(
@@ -70,30 +63,23 @@ def test_head_with_gaps_in_slots(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice head handles missing slots correctly.
+    The head tolerates small gaps where slots carry no block.
 
-    Scenario
-    --------
-    Build blocks at slots 1, 3, 5, 7, 9 (skipping even slots).
+    Given
+    -----
+    - the chain:
+        genesis -> block(1) -> block(3) -> block(5) -> block(7) -> block(9)
+    - slots 2, 4, 6, and 8 carry no block.
+    - no block carries any vote.
 
-    Expected Behavior:
-        - Head advances to each present block
-        - Skipped slots don't affect fork choice
-        - Head correctly identifies the leaf despite gaps
+    When
+    ----
+    - blocks are added at the odd slots only.
 
-    Why This Matters
-    ----------------
-    Missed slots are common in production:
-    - Offline proposers
-    - Network partitions
-    - Proposer failures
-
-    Fork choice must handle sparse block production correctly. The algorithm
-    doesn't require consecutive slots - it works with any tree structure where
-    gaps are simply missing nodes.
-
-    This verifies the algorithm handles real-world conditions where not every
-    slot has a block, which is the norm rather than the exception.
+    Then
+    ----
+    - head advances to each present block.
+    - the final head is the block at slot 9.
     """
     fork_choice_test(
         steps=[
@@ -102,19 +88,19 @@ def test_head_with_gaps_in_slots(
                 checks=StoreChecks(head_slot=Slot(1)),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(3)),  # Skip slot 2
+                block=BlockSpec(slot=Slot(3)),
                 checks=StoreChecks(head_slot=Slot(3)),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(5)),  # Skip slot 4
+                block=BlockSpec(slot=Slot(5)),
                 checks=StoreChecks(head_slot=Slot(5)),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(7)),  # Skip slot 6
+                block=BlockSpec(slot=Slot(7)),
                 checks=StoreChecks(head_slot=Slot(7)),
             ),
             BlockStep(
-                block=BlockSpec(slot=Slot(9)),  # Skip slot 8
+                block=BlockSpec(slot=Slot(9)),
                 checks=StoreChecks(head_slot=Slot(9)),
             ),
         ],
@@ -125,31 +111,23 @@ def test_head_with_large_gaps(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice head handles large gaps between blocks.
+    The head tolerates large gaps between blocks.
 
-    Scenario
-    --------
-    Build blocks at slots 1, 10, 20, 30 (gaps of 9-10 slots).
+    Given
+    -----
+    - the chain:
+        genesis -> block(1) -> block(10) -> block(20) -> block(30)
+    - gaps of nine or ten slots sit between blocks.
+    - no block carries any vote.
 
-    Expected Behavior:
-        - Head advances despite large gaps
-        - Fork choice is gap-size independent
-        - Head reaches the furthest block
+    When
+    ----
+    - blocks are added at slots 1, 10, 20, and 30.
 
-    Why This Matters
-    ----------------
-    Large gaps can occur during:
-    - Extended network partitions
-    - Chain reorganizations
-    - Periods of high validator downtime
-    - Initial sync after being offline
-
-    The fork choice algorithm must remain correct regardless of gap size.
-    Distance between blocks should not affect the correctness of head selection -
-    only the tree structure matters.
-
-    This test verifies that even with dramatic gaps (representing severe network
-    conditions), fork choice still identifies the correct head.
+    Then
+    ----
+    - head advances to each block despite the gaps.
+    - the final head is the block at slot 30.
     """
     fork_choice_test(
         steps=[
@@ -177,27 +155,27 @@ def test_duplicate_block_processed_idempotently(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Processing the same block twice leaves the fork choice store unchanged.
+    Re-submitting an identical block leaves the store unchanged.
 
-    Scenario
-    --------
-    Four validators. Build a chain, then re-submit the last block::
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> block_2(2)
+    - block_2 includes 3 votes for block_1.
+    - block_2 justifies slot 1.
+    - block_2_dup repeats block_2 with identical parameters.
 
-        genesis -> block_1(1) -> block_2(2) -> block_2_dup(2)
-                                                 (same root)
+    When
+    ----
+    - block_2 is submitted, then block_2_dup is submitted.
 
-    Block 2 carries attestations from V0-V2 targeting slot 1.
-    This crosses the 2/3 threshold and justifies slot 1.
-
-    Then block 2 is re-submitted with identical parameters.
-    The store detects the duplicate root and returns unchanged.
-
-    Expected post-state
-    -------------------
-    - Both steps succeed (no error)
-    - Second block has the same root as the first (filled_block_root_label)
-    - Head, justified, finalized all unchanged after the duplicate
-    - No double-counting of attestation votes
+    Then
+    ----
+    - both steps succeed.
+    - block_2_dup resolves to the same root as block_2.
+    - head, justified, and finalized stay unchanged after the duplicate.
+    - the repeated votes are not double-counted.
     """
     fork_choice_test(
         steps=[
@@ -205,8 +183,6 @@ def test_duplicate_block_processed_idempotently(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(head_slot=Slot(1)),
             ),
-            # Block 2 with attestations that justify slot 1.
-            # Threshold: 3*3=9 >= 2*4=8 -> justifies.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -233,15 +209,6 @@ def test_duplicate_block_processed_idempotently(
                     latest_finalized_slot=Slot(0),
                 ),
             ),
-            # Re-submit the exact same block.
-            # Same slot, same parent, same proposer, same attestations
-            # -> deterministic state_root -> same block root.
-            #
-            # The store's on_block checks: block_root in self.blocks.
-            # It finds the root from step 2 -> returns self unchanged.
-            #
-            # filled_block_root_label="block_2" proves the roots match.
-            # The unchanged justified/finalized proves no double-counting.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -277,37 +244,33 @@ def test_head_with_two_competing_forks(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice selects head when two forks compete with equal weight.
+    Two equal-weight forks resolve by lexicographic tiebreaker.
 
-    Scenario
-    --------
-    Create two competing forks from a common ancestor, each with one block
-    at a distinct slot.
+    Given
+    -----
+    - the chain:
+        genesis -> common(1)
+        - fork_a(2)
+        - fork_b(3)
+    - each fork has one block and one proposer vote.
+    - the two forks carry equal weight.
 
-    Expected Behavior:
-        - After slot 1: head = slot 1 (common ancestor)
-        - After fork A (slot 2): head = fork A (only fork)
-        - After fork B (slot 3): both forks have equal weight
-          (1 proposer attestation each), head chosen by lexicographic tiebreaker
+    When
+    ----
+    - both forks are added from the common ancestor.
 
-    Why This Matters
-    ----------------
-    This is an important fork choice scenario: two forks of equal weight
-    competing for the head. Fork choice must deterministically select a head.
-
-    The algorithm uses lexicographic order of block roots as a tie-breaker,
-    ensuring all nodes agree on the same head even when forks have equal weight.
-
-    This prevents network splits and ensures consensus converges.
+    Then
+    ----
+    - head is common after slot 1.
+    - head is fork_a while it is the only fork.
+    - the tiebreaker picks the head by lexicographic root once fork_b exists.
     """
     fork_choice_test(
         steps=[
-            # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
-            # Fork A at slot 2
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -316,15 +279,12 @@ def test_head_with_two_competing_forks(
                 ),
                 checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
-            # Fork B at slot 3 (same parent as fork A, equal weight)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
                     parent_label="common",
                     label="fork_b",
                 ),
-                # Both forks have equal weight (1 proposer attestation each)
-                # Head determined by lexicographic tiebreaker on block roots
                 checks=StoreChecks(
                     lexicographic_head_among=["fork_a", "fork_b"],
                 ),
@@ -337,39 +297,34 @@ def test_head_switches_to_heavier_fork(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice head switches when a competing fork becomes heavier.
+    The head switches to a fork once a new vote makes it heavier.
 
-    Scenario
-    --------
-    Create two forks from a common ancestor at distinct slots, then extend
-    one fork to make it heavier.
+    Given
+    -----
+    - the chain:
+        genesis -> common(1)
+        - fork_a(2)
+        - fork_b(3) -> fork_b_4(4)
+    - fork_a and fork_b start with equal weight.
+    - fork_b_4 includes V2's vote for fork_b.
 
-    Expected Behavior:
-        - After fork A (slot 2): head = fork A (only fork)
-        - After fork B (slot 3): equal weight, tiebreaker decides
-        - After extending fork B (slot 4): head = fork B's child (fork B wins!)
+    When
+    ----
+    - both forks are added, then fork_b is extended with a vote.
 
-    Why This Matters
-    ----------------
-    This demonstrates the core LMD-GHOST property: the head follows the heaviest
-    subtree. When fork B is extended with a child block, that child's proposer
-    implicitly attests to fork B, giving it more weight.
-
-    Fork choice recognizes this weight increase and switches the head to fork B's
-    descendant. This is how the protocol reaches consensus - validators converge
-    on the fork with the most support (weight).
-
-    This is also how reorgs happen: a previously non-canonical fork can become
-    canonical if it gains more attestation weight.
+    Then
+    ----
+    - head is fork_a while it is the only fork.
+    - the tiebreaker picks the head once fork_b ties it.
+    - the new vote gives fork_b more weight.
+    - head switches to fork_b_4.
     """
     fork_choice_test(
         steps=[
-            # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
-            # Fork A at slot 2
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -378,7 +333,6 @@ def test_head_switches_to_heavier_fork(
                 ),
                 checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a"),
             ),
-            # Fork B at slot 3 (same parent, equal weight, tiebreaker decides)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -389,7 +343,6 @@ def test_head_switches_to_heavier_fork(
                     lexicographic_head_among=["fork_a", "fork_b"],
                 ),
             ),
-            # Extend fork B with an attestation for fork_b → gives it more weight
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -414,38 +367,33 @@ def test_head_with_deep_fork_split(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Fork choice handles deep fork splits correctly.
+    The head follows the deeper fork once it accumulates more weight.
 
-    Scenario
-    --------
-    Create two forks that diverge from a common ancestor but are built
-    at different slots (no duplicate slots).
+    Given
+    -----
+    - the chain:
+        genesis -> common(1)
+        - fork_a_2(2) -> fork_a_3(3) -> fork_a_4(4)
+        - fork_b_5(5) -> fork_b_6(6) -> fork_b_7(7) -> fork_b_8(8)
+    - fork_a holds three blocks built first.
+    - fork_b starts later and grows to four blocks.
+    - each block after the branch head votes for its parent.
 
-    Expected Behavior:
-        - Fork A extends earlier to slot 4
-        - Fork B starts later but extends to slot 8
-        - Head eventually follows the heavier fork B
+    When
+    ----
+    - fork_a is built, then fork_b is built deeper.
 
-    Why This Matters
-    ----------------
-    In practice, forks can persist for multiple slots before one gains dominance.
-    This tests that fork choice correctly follows the deeper fork, which has
-    accumulated more proposer attestations along its chain.
-
-    Each block in a fork adds weight from its proposer's attestation. A longer
-    fork has more accumulated weight from the proposers along its length.
-
-    This is how the protocol ensures liveness: the chain that continues to grow
-    (accumulating blocks and attestations) becomes the canonical chain.
+    Then
+    ----
+    - head stays on fork_a_4 while fork_b is shorter.
+    - head moves to fork_b_8 once fork_b grows heavier.
     """
     fork_choice_test(
         steps=[
-            # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(head_slot=Slot(1), head_root_label="common"),
             ),
-            # Fork A: earlier branch (slots 2 - 4)
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="common", label="fork_a_2"),
                 checks=StoreChecks(head_slot=Slot(2), head_root_label="fork_a_2"),
@@ -482,7 +430,6 @@ def test_head_with_deep_fork_split(
                 ),
                 checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
             ),
-            # Fork B: competing branch starting later (slots 5 - 8)
             BlockStep(
                 block=BlockSpec(slot=Slot(5), parent_label="common", label="fork_b_5"),
                 checks=StoreChecks(head_slot=Slot(4), head_root_label="fork_a_4"),
@@ -542,42 +489,44 @@ def test_head_selection_by_weight_not_depth(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Shorter fork with more attestation weight wins over deeper fork.
+    A shorter fork with more votes beats a deeper fork with fewer votes.
 
-    Scenario
-    --------
-    Six validators. Two forks diverge from a common ancestor::
-
+    Given
+    -----
+    - 6 validators; a slot needs 4 votes (2/3) to be justified.
+    - the chain:
         genesis -> common(1)
-            |- a_2 -> a_3 -> a_4 -> a_5 -> a_6   (5 deep, V0 attests)
-            +- b_9 -> b_12                         (2 deep, V1-V3 attest)
+        - a_2(2) -> a_3(3) -> a_4(4) -> a_5(5) -> a_6(6)
+        - b_9(9) -> b_12(12)
+    - fork_a is five blocks deep.
+    - a_3 includes V0's vote for a_2.
+    - fork_a carries 1 vote total.
+    - fork_b is two blocks deep.
+    - b_12 includes V1, V2, V3's votes for b_9.
+    - fork_b carries 3 votes total.
+    - 3 votes stay below the 4-vote threshold (3/6).
+    - no fork reaches justification.
 
-    - Fork A: 5 blocks, 1 attestation (V0 on a_2)
-    - Fork B: 2 blocks, 3 attestations (V1-V3 on b_9)
-    - 3 attesters stay below the 2/3 threshold (3*3=9 < 2*6=12),
-      so no justification is triggered
+    When
+    ----
+    - fork_a is built first, then fork_b is built.
 
-    Expected post-state
-    -------------------
-    - Head = b_12 (weight 3 > weight 1 at the fork point)
-    - Justified slot: 0 (unchanged, no supermajority reached)
+    Then
+    ----
+    - head stays on a_6 while fork_a is the only branch.
+    - head stays on a_6 after b_9, which carries no vote yet.
+    - fork_b's 3 votes outweigh fork_a's 1 vote at the fork point.
+    - head moves to b_12.
+    - justified stays at slot 0.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=6),
         steps=[
-            # Fork point for both chains.
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(head_slot=Slot(1)),
             ),
-            # Fork A: 5 blocks deep, minimal attestation weight
-            #
-            #   common(1) -> a_2 -> a_3 -> a_4 -> a_5 -> a_6
-            #
-            # Only V0 attests (in a_3, targeting a_2).
-            # Five blocks but just 1 unit of attestation weight.
             BlockStep(block=BlockSpec(slot=Slot(2), parent_label="common", label="a_2")),
-            # V0 attests to a_2. This is fork A's only attestation weight.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -595,32 +544,14 @@ def test_head_selection_by_weight_not_depth(
             ),
             BlockStep(block=BlockSpec(slot=Slot(4), parent_label="a_3", label="a_4")),
             BlockStep(block=BlockSpec(slot=Slot(5), parent_label="a_4", label="a_5")),
-            # After a_6: fork A is the only branch, so it is the head.
             BlockStep(
                 block=BlockSpec(slot=Slot(6), parent_label="a_5", label="a_6"),
                 checks=StoreChecks(head_slot=Slot(6), head_root_label="a_6"),
             ),
-            # Fork B: 2 blocks deep, heavy attestation weight
-            #
-            #   common(1) -> b_9 -> b_12
-            #
-            # Slot 9 is justifiable after finalized=0: delta=9, perfect
-            # square (3^2). Slot 12: delta=12, pronic (3*4).
-            #
-            # Three validators (V1-V3) attest in b_12, targeting b_9.
-            # Threshold: 3*3=9 < 2*6=12 -> below 2/3 supermajority,
-            # so NO justification is triggered. This ensures the test
-            # exercises pure weight comparison, not justification pruning.
-            # After b_9: no attestations yet, fork A still heavier -> head stays on a_6.
             BlockStep(
                 block=BlockSpec(slot=Slot(9), parent_label="common", label="b_9"),
                 checks=StoreChecks(head_slot=Slot(6), head_root_label="a_6"),
             ),
-            # b_12 carries 3 attestations for b_9.
-            # At the fork point "common", the weight comparison is:
-            #   Fork A subtree: 1 (V0)
-            #   Fork B subtree: 3 (V1, V2, V3)
-            # LMD-GHOST descends into fork B -> head = b_12.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(12),
@@ -642,7 +573,6 @@ def test_head_selection_by_weight_not_depth(
                 checks=StoreChecks(
                     head_slot=Slot(12),
                     head_root_label="b_12",
-                    # Invariant: no justification triggered (3 < 4 needed for 2/3).
                     latest_justified_slot=Slot(0),
                 ),
             ),
@@ -654,59 +584,48 @@ def test_fork_from_before_finalization_not_considered(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    A fork with majority weight is ignored when it originates before finalization.
+    A heavier fork is ignored when it branches before the finalized slot.
 
-    Scenario
-    --------
-    Eight validators. Canonical chain achieves finalization at slot 3.
-    A dead fork branches from block_2 (before finalization) and carries
-    attestations from 5/8 validators -- more weight than canonical::
-
+    Given
+    -----
+    - 8 validators; a slot needs 6 votes (2/3) to be justified.
+    - the chain:
         genesis -> block_1(1) -> block_2(2) -> block_3(3) -> block_4(4) -> block_5(5)
-                                     \\
-                                      +-> dead_6(6) -> dead_7(7)
-                                           [V3-V7 attest here: weight 5]
+        - dead_6(6) -> dead_7(7)
+    - the dead fork branches off block_2, below the finalized slot.
+    - blocks 2 through 5 each include 6 votes for their parent.
+    - the canonical chain justifies slot 4 and finalizes slot 3.
+    - dead_7 includes V3, V4, V5, V6, V7's votes for dead_6.
+    - V3, V4, V5 move their latest vote from the canonical chain to the dead fork.
+    - the dead fork holds 5 votes, more than the canonical chain.
+    - 5 votes stay below the 6-vote threshold (5/8).
+    - the dead fork reaches no justification.
 
-    Canonical: V0-V5 (6/8) attest in each block -> justification chain.
-    Dead fork: V3-V7 (5/8) attest in dead_7 targeting dead_6.
+    When
+    ----
+    - the canonical chain is built, then the dead fork is built off block_2.
 
-    - 5 attesters stay below 2/3 threshold (3*5=15 < 2*8=16),
-      so no justification is triggered on the dead fork
-    - V3-V5's dead fork attestations (slot 9) override their canonical
-      ones (slot 5), giving the dead fork MORE total weight than canonical
+    Then
+    ----
+    - head stays on block_5 after dead_6, which carries no vote yet.
+    - head stays on block_5 after dead_7, despite the dead fork's extra weight.
+    - justified stays at slot 4.
+    - finalized stays at slot 3.
 
-    Expected post-state
-    -------------------
-    - Head = block_5 (despite dead fork having weight 5 vs canonical 3)
-    - Justified = slot 4 (unchanged, dead fork did not trigger justification)
-    - Finalized = slot 3
-
-    Why the dead fork loses
-    -----------------------
-    LMD-GHOST starts from the justified root (block_4, slot 4).
-    The forward walk visits block_4 -> block_5 -> done.
-    The dead fork branches from block_2, which is an ancestor of
-    block_4, not a descendant. It is never reached in the walk.
+    Reachability
+    ------------
+    - head selection starts from the justified root at block_4.
+    - the forward walk reaches block_4, then block_5, then stops.
+    - the dead fork branches off block_2, an ancestor of block_4.
+    - the walk never descends into the dead fork, so its weight cannot count.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Canonical justification / finalization chain
-            #
-            #   genesis -> 1 -> 2 -> 3 -> 4 -> 5
-            #
-            # V0-V5 (6/8) attest in each block.
-            # Threshold: 3*6=18 >= 2*8=16 -> supermajority each time.
-            #
-            #   After block 2: justified=1, finalized=0
-            #   After block 3: justified=2, finalized=1
-            #   After block 4: justified=3, finalized=2
-            #   After block 5: justified=4, finalized=3
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(head_slot=Slot(1)),
             ),
-            # Justify slot 1: 6/8 validators attest.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -727,8 +646,6 @@ def test_fork_from_before_finalization_not_considered(
                     latest_finalized_slot=Slot(0),
                 ),
             ),
-            # Justify slot 2, finalize slot 1.
-            # Finalization: range(1+1, 2) is empty -> no gap -> finalizes source.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -749,7 +666,6 @@ def test_fork_from_before_finalization_not_considered(
                     latest_finalized_slot=Slot(1),
                 ),
             ),
-            # Justify slot 3, finalize slot 2.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -770,7 +686,6 @@ def test_fork_from_before_finalization_not_considered(
                     latest_finalized_slot=Slot(2),
                 ),
             ),
-            # Justify slot 4, finalize slot 3.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(5),
@@ -792,43 +707,6 @@ def test_fork_from_before_finalization_not_considered(
                     latest_finalized_slot=Slot(3),
                 ),
             ),
-            # Dead fork with majority weight
-            #
-            #   block_2(2) -> dead_6(6) -> dead_7(7)
-            #
-            # Two blocks branching from block_2 (slot 2, before finalized slot 3).
-            # dead_7 carries attestations from V3-V7 (5/8) targeting dead_6.
-            #
-            # Why 5 attesters, not 6?
-            # Threshold: 3*5=15 < 2*8=16 -> below supermajority.
-            # No justification on the dead fork. If we used 6/8 attesters,
-            # the store's justified would advance to dead_6 (slot 6 > slot 4),
-            # and LMD-GHOST would start from dead_6 -- defeating the test.
-            #
-            # Slot justifiability:
-            # - Slot 6: delta=6 from finalized=0 (dead fork state), pronic (2*3). Valid.
-            #
-            # Weight after dead_7 is processed:
-            #
-            #   Validator | Latest head    | Slot | Source
-            #   V0        | block_4        |  5   | canonical
-            #   V1        | block_4        |  5   | canonical
-            #   V2        | block_4        |  5   | canonical
-            #   V3        | dead_6         |  7   | dead fork (overrides canonical slot 5)
-            #   V4        | dead_6         |  7   | dead fork (overrides canonical slot 5)
-            #   V5        | dead_6         |  7   | dead fork (overrides canonical slot 5)
-            #   V6        | dead_6         |  7   | dead fork (never attested on canonical)
-            #   V7        | dead_6         |  7   | dead fork (never attested on canonical)
-            #
-            # Dead fork subtree weight: 5 (V3-V7)
-            # Canonical subtree weight from justified root: 0
-            #   (V0-V2 head=block_4 at slot 4 = start_slot, weight walk stops immediately)
-            #
-            # Despite having MORE weight, the dead fork is unreachable.
-            # LMD-GHOST walks forward from block_4 -> block_5 -> done.
-            # Dead fork blocks are children of block_2, never visited.
-            # dead_6: first dead fork block. No attestations yet.
-            # Head stays on canonical (block_5).
             BlockStep(
                 block=BlockSpec(slot=Slot(6), parent_label="block_2", label="dead_6"),
                 checks=StoreChecks(
@@ -836,10 +714,6 @@ def test_fork_from_before_finalization_not_considered(
                     head_root_label="block_5",
                 ),
             ),
-            # dead_7: carries 5/8 attestations targeting dead_6.
-            # V3-V7 now have their latest head on the dead fork.
-            # Dead fork has weight 5 vs canonical's 0 from the justified root.
-            # Yet the head does NOT move -- finalization constrains fork choice.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(7),
@@ -857,8 +731,6 @@ def test_fork_from_before_finalization_not_considered(
                 checks=StoreChecks(
                     head_slot=Slot(5),
                     head_root_label="block_5",
-                    # Invariant: justified did NOT advance to dead fork.
-                    # 5/8 attesters: 3*5=15 < 2*8=16 -> below threshold.
                     latest_justified_slot=Slot(4),
                     latest_finalized_slot=Slot(3),
                 ),

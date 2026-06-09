@@ -19,33 +19,24 @@ def test_block_with_duplicate_aggregated_attestation_data_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Blocks containing two aggregated attestations with identical data are rejected.
+    A block carrying two byte-identical votes is rejected.
 
-    Scenario
-    --------
-    - Slot 1: common ancestor block accepted by the store.
-    - Slot 2: proposer builds a block whose body contains two aggregated
-      attestations that reference identical data:
-        - same slot
-        - same target
-        - same source
-        - same validator set
-      The two entries are appended via forced attestations so the builder's
-      merge-by-data pass does not collapse them.
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1)
+    - two votes from V0 share the same slot, target, source, and validator set.
+    - the two votes are forced in so the builder does not merge them.
 
-    Expected Behavior
-    -----------------
-    Fork-choice store rejects the block with AssertionError containing:
-    "Block contains duplicate AttestationData"
+    When
+    ----
+    - a block at slot 2 carries both identical votes.
 
-    Why This Matters
-    ----------------
-    Each unique AttestationData must appear at most once per block:
-
-    - Prevents inflating attestation weight by repeating the same vote.
-    - Keeps signature-aggregation accounting one-to-one with data.
-    - Without this check, a proposer could double-count votes from a single
-      validator set just by repeating the entry.
+    Then
+    ----
+    - the store rejects the block for holding duplicate attestation data.
+    - the rule stops a proposer inflating weight by repeating one vote.
     """
     duplicated_spec = AggregatedAttestationSpec(
         validator_indices=[ValidatorIndex(0)],
@@ -56,7 +47,6 @@ def test_block_with_duplicate_aggregated_attestation_data_rejected(
 
     fork_choice_test(
         steps=[
-            # Common ancestor at slot 1
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(
@@ -64,7 +54,6 @@ def test_block_with_duplicate_aggregated_attestation_data_rejected(
                     head_root_label="block_1",
                 ),
             ),
-            # Slot 2 block carrying two byte-identical aggregated attestations
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),

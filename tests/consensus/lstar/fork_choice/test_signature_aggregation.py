@@ -19,18 +19,25 @@ def test_multiple_specs_same_target_merge_into_one(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Multiple attestation specs with identical data merge into single aggregation.
+    Two attestations sharing one target merge into a single aggregation.
 
-    Scenario
-    --------
-    Block at slot 2 includes:
-    - Validators 0, 1 attesting to block 1
-    - Validators 2, 3 attesting to block 1 (same target)
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - block_2 includes V0, V1's votes for block_1.
+    - block_2 includes V2, V3's votes for block_1.
+    - both votes carry identical attestation data.
 
-    Expected
-    --------
-    - 1 aggregated attestation (merged)
-    - Covers all validators {0, 1, 2, 3}
+    When
+    ----
+    - block_2 is added with both votes.
+
+    Then
+    ----
+    - block_2 holds 1 aggregated attestation.
+    - that aggregation covers V0, V1, V2, V3.
     """
     fork_choice_test(
         steps=[
@@ -79,18 +86,26 @@ def test_different_targets_create_separate_aggregations(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestations with different targets stay separate.
+    Attestations with different targets stay separate aggregations.
 
-    Scenario
-    --------
-    Block at slot 3 includes:
-    - Validators 0, 1 targeting block 1
-    - Validators 2, 3 targeting block 2
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3)
+    - block_3 includes V0, V1's votes for block_1.
+    - block_3 includes V2, V3's votes for block_2.
+    - the two votes target different blocks.
 
-    Expected
-    --------
-    - 2 separate aggregated attestations
-    - Cannot merge because different AttestationData
+    When
+    ----
+    - block_3 is added with both votes.
+
+    Then
+    ----
+    - block_3 holds 2 aggregated attestations.
+    - one aggregation covers V0, V1 targeting block_1.
+    - one aggregation covers V2, V3 targeting block_2.
     """
     fork_choice_test(
         steps=[
@@ -145,19 +160,26 @@ def test_mixed_attestations_multiple_targets_and_validators(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Complex scenario with mixed attestations from different sources and targets.
+    A block carrying votes for two different targets keeps them in two aggregations.
 
-    Scenario
-    --------
-    Block at slot 4 includes attestations for both block 2 and block 3:
-    - Validators 0, 1 attest to block 2 (older)
-    - Validators 2, 3 attest to block 3 (newer)
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3) -> block_4(4)
+    - block_4 includes V0, V1's votes for block_2.
+    - block_4 includes V2, V3's votes for block_3.
+    - the two votes target blocks at different chain positions.
 
-    Expected
-    --------
-    - 2 separate aggregations (different targets)
-    - Each aggregation has correct participants
-    - Demonstrates handling attestations for multiple chain positions
+    When
+    ----
+    - block_4 is added with both votes.
+
+    Then
+    ----
+    - block_4 holds 2 aggregated attestations.
+    - one aggregation covers V0, V1 targeting block_2.
+    - one aggregation covers V2, V3 targeting block_3.
     """
     fork_choice_test(
         steps=[
@@ -177,14 +199,12 @@ def test_mixed_attestations_multiple_targets_and_validators(
                 block=BlockSpec(
                     slot=Slot(4),
                     attestations=[
-                        # Attestations for older block
                         AggregatedAttestationSpec(
                             validator_indices=[ValidatorIndex(0), ValidatorIndex(1)],
                             slot=Slot(2),
                             target_slot=Slot(2),
                             target_root_label="block_2",
                         ),
-                        # Attestations for newer block
                         AggregatedAttestationSpec(
                             validator_indices=[ValidatorIndex(2), ValidatorIndex(3)],
                             slot=Slot(3),
@@ -218,17 +238,23 @@ def test_all_validators_attest_in_single_aggregation(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Maximum aggregation: all 4 validators in a single attestation.
+    All validators voting for one target fold into a single aggregation.
 
-    Scenario
-    --------
-    All validators attest to block 1 in block 2.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - block_2 includes V0, V1, V2, V3's votes for block_1.
 
-    Expected
-    --------
-    - Single aggregated attestation
-    - All 4 validators as participants
-    - Demonstrates complete coverage in one proof
+    When
+    ----
+    - block_2 is added with the votes.
+
+    Then
+    ----
+    - block_2 holds 1 aggregated attestation.
+    - that aggregation covers V0, V1, V2, V3.
     """
     fork_choice_test(
         steps=[

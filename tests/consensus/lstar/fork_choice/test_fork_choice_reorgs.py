@@ -19,39 +19,29 @@ def test_simple_one_block_reorg(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Simplest reorg: one-block fork overtakes another via extension.
+    Extending a fork makes it heavier and triggers a one-block reorg.
 
-    Scenario
-    --------
-    - Slot 1: Common ancestor (chain_base)
-    - Slot 2: Fork A created, becomes head
-    - Slot 3: Fork B created (competing fork from same parent)
-    - Slot 4: Fork B extended → triggers reorg from A to B
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        chain_base(1)
+        - fork_a_2(2)
+        - fork_b_3(3)
+    - fork_a_2 and fork_b_3 share chain_base as parent.
+    - fork_a_2 is the head while it stands alone.
+    - fork_b_3 ties fork_a_2 on weight, so the tiebreaker decides the head.
 
-    Expected Behavior
-    -----------------
-    1. After fork_a_2: head = fork_a_2 (only fork)
-    2. After fork_b_3: equal weight, tiebreaker decides
-    3. After fork_b_4: head = fork_b_4 (fork B heavier due to extension)
+    When
+    ----
+    - fork_b_4 extends fork_b_3, carrying V2's vote for fork_b_3.
 
-    Reorg Details:
-        - **Depth**: 1 block (fork_a_2 becomes non-canonical)
-        - **Trigger**: Fork extension (proposer attestation)
-        - **Weight advantage**: Fork B has 2 proposer attestations vs 1
-
-    Why This Matters
-    ----------------
-    This is the most common reorg scenario in practice:
-    - Two blocks proposed at nearly the same time
-    - Network temporarily splits (half see A first, half see B first)
-    - Next proposer builds on one fork, resolving the split
-    - Fork choice converges to the extended fork
-
-    Tests the fundamental property: extending a fork makes it heavier.
+    Then
+    ----
+    - head switches to fork_b_4.
     """
     fork_choice_test(
         steps=[
-            # Common ancestor at slot 1
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="chain_base"),
                 checks=StoreChecks(
@@ -59,7 +49,6 @@ def test_simple_one_block_reorg(
                     head_root_label="chain_base",
                 ),
             ),
-            # Fork A at slot 2 (becomes initial head)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -71,7 +60,6 @@ def test_simple_one_block_reorg(
                     head_root_label="fork_a_2",
                 ),
             ),
-            # Fork B at slot 3 (same parent, equal weight)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -82,7 +70,6 @@ def test_simple_one_block_reorg(
                     lexicographic_head_among=["fork_a_2", "fork_b_3"],
                 ),
             ),
-            # Extend fork B with attestation → triggers reorg to fork B
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -110,47 +97,30 @@ def test_two_block_reorg_progressive_building(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Two-block reorg via progressive fork building.
+    A late-starting fork overtakes a leading fork by gathering more votes.
 
-    Scenario
-    --------
-    - Slot 1: Common ancestor
-    - Slots 2-3: Fork A extends to 2 blocks
-    - Slots 4-6: Fork B starts late from base, catches up, then overtakes
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        base(1)
+        - fork_a_2(2) -> fork_a_3(3)
+        - fork_b_4(4) -> fork_b_5(5) -> fork_b_6(6)
+    - fork_a_3 carries V0's vote for fork_a_2, giving fork A weight 1.
+    - fork B starts late at slot 4 and builds with no votes through slot 5.
+    - fork A leads while fork B has weight 0.
 
-    Chain State Evolution:
-        Slot 1: base
-        Slot 2: base ← fork_a_2 (head)
-        Slot 3: base ← fork_a_2 ← fork_a_3 (head, weight=1)
-        Slot 4: base ← fork_a_2 ← fork_a_3 (head, weight=1)
-                base ← fork_b_4
-        Slot 5: base ← fork_a_2 ← fork_a_3 (head, weight=1)
-                base ← fork_b_4 ← fork_b_5
-        Slot 6: base ← fork_a_2 ← fork_a_3 (weight=1, abandoned)
-                base ← fork_b_4 ← fork_b_5 ← fork_b_6 (head, weight=2 - REORG!)
+    When
+    ----
+    - fork_b_6 extends fork B, carrying V1, V3's votes for fork_b_5.
 
-    Expected Behavior
-    -----------------
-    1. Fork A leads for slots 2-3 (2 blocks, weight=1)
-    2. Fork B starts late at slot 4 (builds on base)
-    3. Fork B overtakes at slot 6 (weight=2 > fork A's 1)
-    4. Two-block reorg: fork_a_2 and fork_a_3 become non-canonical
-
-    Reorg Details:
-        - **Depth**: 2 blocks
-        - **Trigger**: Progressive building on alternative fork
-        - **Weight advantage**: Fork B has 2 attestations vs 1
-
-    Why This Matters
-    ----------------
-    Demonstrates that an initially leading fork can be overtaken if:
-    - Proposers switch to building on the alternative fork
-    - The alternative fork accumulates more attestations over time
-    - Network temporarily favored one fork but consensus shifted
+    Then
+    ----
+    - fork B reaches weight 2, above fork A's weight 1.
+    - head switches to fork_b_6, reverting fork_a_2 and fork_a_3.
     """
     fork_choice_test(
         steps=[
-            # Common ancestor
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -158,7 +128,6 @@ def test_two_block_reorg_progressive_building(
                     head_root_label="base",
                 ),
             ),
-            # Fork A: slot 2
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="base", label="fork_a_2"),
                 checks=StoreChecks(
@@ -166,7 +135,6 @@ def test_two_block_reorg_progressive_building(
                     head_root_label="fork_a_2",
                 ),
             ),
-            # Fork A: slot 3 (extends lead with attestation, weight=1)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -183,26 +151,23 @@ def test_two_block_reorg_progressive_building(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    head_root_label="fork_a_3",  # Fork A leads (weight=1)
+                    head_root_label="fork_a_3",
                 ),
             ),
-            # Fork B: slot 4 (starts late from base, fork A still leads)
             BlockStep(
                 block=BlockSpec(slot=Slot(4), parent_label="base", label="fork_b_4"),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    head_root_label="fork_a_3",  # Fork A leads (weight=1 vs 0)
+                    head_root_label="fork_a_3",
                 ),
             ),
-            # Fork B: slot 5
             BlockStep(
                 block=BlockSpec(slot=Slot(5), parent_label="fork_b_4", label="fork_b_5"),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    head_root_label="fork_a_3",  # Fork A still leads (weight=1 vs 0)
+                    head_root_label="fork_a_3",
                 ),
             ),
-            # Fork B: slot 6 (2 attestations overtake fork A's 1)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(6),
@@ -219,7 +184,7 @@ def test_two_block_reorg_progressive_building(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_b_6",  # REORG! 2-block deep
+                    head_root_label="fork_b_6",
                 ),
             ),
         ],
@@ -230,36 +195,33 @@ def test_three_block_deep_reorg(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Three-block reorg where a shorter fork wins via attestation weight.
+    A shorter fork wins a three-block reorg when a voter switches sides.
 
-    Scenario
-    --------
-    - Slot 1: Common base
-    - Slots 2-4: Fork A builds 3-block chain with 2 attestations (validators 2, 3)
-    - Slot 5: Fork B branches from base with 0 weight, fork A still leads
-    - Slot 6: Fork B gains 3 attestations (validators 0, 2, 5) → reorg
+    Given
+    -----
+    - 6 validators.
+    - the chain:
+        base(1)
+        - fork_a_2(2) -> fork_a_3(3) -> fork_a_4(4)
+        - fork_b_5(5) -> fork_b_6(6)
+    - fork_a_4 carries V2, V3's votes for fork_a_3, giving fork A weight 2.
+    - fork B branches from base at slot 5 with weight 0.
+    - fork A leads while fork B has no votes.
 
-    Fork B is shorter (2 blocks) but heavier (3 attestations vs 1).
-    Validator 2 switches from fork A to fork B, reducing fork A's net weight.
+    When
+    ----
+    - fork_b_6 extends fork B, carrying V0, V2, V5's votes for fork_b_5.
+    - V2 switches its vote from fork A to fork B.
 
-    Timeline:
-        Slot 4: Fork A = 2 (validators 2, 3), fork B = 0
-        Slot 5: Fork A = 2, fork B = 0 (fork B has 1 block, still lighter)
-        Slot 6: Fork A = 1 (validator 3), fork B = 3 (validators 0, 2, 5) → reorg
-
-    Properties verified:
-    - Fork choice correctly switches even after multiple canonical blocks
-    - Weight calculation works correctly over extended depth
-    - No "stickiness" bias toward existing head
-    - Objective heaviest fork always wins
-
-    This tests the protocol's ability to recover from significant disagreement
-    about chain history, ensuring safety and liveness even in adversarial scenarios.
+    Then
+    ----
+    - fork A drops to weight 1, held by V3 alone.
+    - fork B reaches weight 3.
+    - head switches to fork_b_6, reverting three fork A blocks.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=6),
         steps=[
-            # Common base
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -267,7 +229,6 @@ def test_three_block_deep_reorg(
                     head_root_label="base",
                 ),
             ),
-            # Fork A: slot 2
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="base", label="fork_a_2"),
                 checks=StoreChecks(
@@ -275,7 +236,6 @@ def test_three_block_deep_reorg(
                     head_root_label="fork_a_2",
                 ),
             ),
-            # Fork A: slot 3
             BlockStep(
                 block=BlockSpec(slot=Slot(3), parent_label="fork_a_2", label="fork_a_3"),
                 checks=StoreChecks(
@@ -283,7 +243,6 @@ def test_three_block_deep_reorg(
                     head_root_label="fork_a_3",
                 ),
             ),
-            # Fork A: slot 4 (with attestations for fork_a_3, weight=2)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -303,17 +262,13 @@ def test_three_block_deep_reorg(
                     head_root_label="fork_a_4",
                 ),
             ),
-            # Fork B: slot 5 (branches from base, fork A still leads)
             BlockStep(
                 block=BlockSpec(slot=Slot(5), parent_label="base", label="fork_b_5"),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    head_root_label="fork_a_4",  # Fork A leads (weight=2 vs 0)
+                    head_root_label="fork_a_4",
                 ),
             ),
-            # Fork B: slot 6 (3 attestations overtake fork A's weight)
-            # Validator 2 switches allegiance: was attesting to fork A, now fork B.
-            # Net weight: fork A = 1 (validator 3), fork B = 3 (validators 0, 2, 5)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(6),
@@ -334,7 +289,7 @@ def test_three_block_deep_reorg(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_b_6",  # DEEP REORG! 3 blocks
+                    head_root_label="fork_b_6",
                 ),
             ),
         ],
@@ -345,56 +300,32 @@ def test_reorg_with_slot_gaps(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Reorg occurs correctly even with missed slots in the chain.
+    A reorg resolves by vote weight even when the chain skips slots.
 
-    Scenario
-    --------
-    - Slot 1: Base
-    - Slot 3: Fork A (skipping slot 2)
-    - Slot 4: Fork B (competing)
-    - Slot 7: Fork A extended (skipping slots 4-6)
-    - Slot 8: Fork B extended with explicit attestations (skipping slots 5-7)
-    - Slot 9: Fork B extended again → triggers reorg
+    Given
+    -----
+    - 8 validators.
+    - the chain:
+        base(1)
+        - fork_a_3(3) -> fork_a_7(7)
+        - fork_b_4(4) -> fork_b_8(8) -> fork_b_9(9)
+    - slots 2, 5, 6 produce no blocks.
+    - fork_a_7 carries V3's vote for fork_a_3, giving fork A weight 1.
+    - fork B leads with no votes until slot 8.
 
-    Missed Slots: 2, 5, 6 (no blocks produced)
+    When
+    ----
+    - fork_b_8 carries V0, V2, V5, V6's votes for fork_b_4.
+    - fork_b_9 extends fork B further.
 
-    Expected Behavior
-    -----------------
-    1. Sparse block production doesn't affect fork choice logic
-    2. Weight calculation only considers actual blocks
-    3. Reorg happens based on attestation weight, not slot numbers
-
-    Weight Dynamics
-    ---------------
-    Fork A accumulates 3 organic proposer gossip votes:
-
-    - V3 (fork_a_3 proposer): votes for Fork A
-    - V4 (fork_b_4 proposer): votes for Fork A (head points to A when V4 attests)
-    - V7 (fork_a_7 proposer): votes for Fork A
-
-    Fork B overcomes with 4 explicit attestations in fork_b_8's body
-    from non-proposer validators {0, 2, 5, 6}, then reinforced by
-    fork_b_8 and fork_b_9 proposer gossip.
-
-    Why This Matters
-    ----------------
-    Missed slots are extremely common in production:
-    - Offline validators (expected ~1% downtime)
-    - Network issues preventing timely block propagation
-    - Intentional skips during network congestion
-
-    Fork choice must remain robust with sparse block production:
-    - Gaps don't create bias toward any fork
-    - Only actual blocks contribute weight
-    - Reorg logic works identically whether slots are consecutive or sparse
-
-    This test ensures the algorithm works correctly in realistic network
-    conditions where perfect block production is impossible.
+    Then
+    ----
+    - fork B reaches weight 4, above fork A's weight 1.
+    - head switches to fork_b_9 despite the missed slots.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Base at slot 1
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -402,7 +333,6 @@ def test_reorg_with_slot_gaps(
                     head_root_label="base",
                 ),
             ),
-            # Fork A at slot 3 (missed slot 2)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -414,7 +344,6 @@ def test_reorg_with_slot_gaps(
                     head_root_label="fork_a_3",
                 ),
             ),
-            # Fork B at slot 4 (competing, missed slot 2-3)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -422,7 +351,6 @@ def test_reorg_with_slot_gaps(
                     label="fork_b_4",
                 ),
             ),
-            # Fork A at slot 7 (missed slots 4-6) with attestation for fork A
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(7),
@@ -442,10 +370,6 @@ def test_reorg_with_slot_gaps(
                     head_root_label="fork_a_7",
                 ),
             ),
-            # Fork B at slot 8 with explicit attestations for fork_b's chain.
-            #
-            # Four non-proposer validators explicitly attest to fork_b_4,
-            # giving Fork B 4 votes vs Fork A's 1.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(8),
@@ -466,20 +390,15 @@ def test_reorg_with_slot_gaps(
                     ],
                 ),
             ),
-            # Fork B at slot 9
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(9),
                     parent_label="fork_b_8",
                     label="fork_b_9",
                 ),
-                # Fork B overtakes Fork A. REORG.
-                #
-                # Fork A: 1 vote (V3 explicit)
-                # Fork B: 4 votes (V0, V2, V5, V6 explicit)
                 checks=StoreChecks(
                     head_slot=Slot(9),
-                    head_root_label="fork_b_9",  # REORG with sparse blocks
+                    head_root_label="fork_b_9",
                 ),
             ),
         ],
@@ -490,51 +409,33 @@ def test_three_way_fork_competition(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Three competing forks with progressive elimination until one wins.
+    Three competing forks resolve to the one that gathers the most votes.
 
-    Scenario
-    --------
-    Three forks (A, B, C) compete from a common ancestor, each at a distinct
-    slot. Fork choice progressively eliminates weaker forks as stronger ones
-    extend.
+    Given
+    -----
+    - 8 validators.
+    - the chain:
+        base(1)
+        - fork_a_2(2)
+        - fork_b_3(3) -> fork_b_6(6) -> fork_b_7(7)
+        - fork_c_4(4) -> fork_c_5(5)
+    - forks A, B, C branch from base at slots 2, 3, 4 with equal weight.
+    - the three-way tie is broken by the tiebreaker.
+    - fork_c_5 carries V0's vote for fork_c_4, so fork C leads.
+    - fork_b_6 extends fork B with no votes, so fork C still leads.
 
-    Fork Topology:
-                       base (slot 1)
-                      /    |       \
-                     /     |        \
-              fork_a_2  fork_b_3  fork_c_4
-              (slot 2)  (slot 3)  (slot 4)
-                |          |         |
-                |          |         +--- fork_c_5 (slot 5)
-                |          +--- fork_b_6 (slot 6)
-                |          +--- fork_b_7 (slot 7) ← Winner
-                +--- abandoned
+    When
+    ----
+    - fork_b_7 extends fork B, carrying V1, V2's votes for fork_b_6.
 
-    Expected Behavior
-    -----------------
-    1. Three forks created at slots 2, 3, 4 (equal weight, three-way tie)
-    2. Fork C extends to slot 5 with attestation → becomes head
-    3. Fork B extends to slot 6 (no attestation) → fork C still leads
-    4. Fork B extends to slot 7 with 2 attestations → wins
-    5. Forks A and C become non-canonical
-
-    Why This Matters
-    ----------------
-    Multi-fork scenarios can occur during:
-    - Network partitions splitting validators 3+ ways
-    - Rapid block production creating multiple conflicting proposals
-    - Byzantine validators intentionally creating competing forks
-
-    Properties verified:
-    - Fork choice handles 3+ simultaneous competing forks
-    - Head selection remains consistent and deterministic
-    - Progressive elimination works correctly
-    - Final winner is objectively the heaviest fork
+    Then
+    ----
+    - fork B reaches weight 2, above fork C's weight 1.
+    - head switches to fork_b_7.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Common base
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -542,7 +443,6 @@ def test_three_way_fork_competition(
                     head_root_label="base",
                 ),
             ),
-            # Three forks at distinct slots (2, 3, 4)
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="base", label="fork_a_2"),
                 checks=StoreChecks(
@@ -570,7 +470,6 @@ def test_three_way_fork_competition(
                     lexicographic_head_among=["fork_a_2", "fork_b_3", "fork_c_4"],
                 ),
             ),
-            # Fork C extends to slot 5 with attestation → takes lead
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(5),
@@ -590,7 +489,6 @@ def test_three_way_fork_competition(
                     head_root_label="fork_c_5",
                 ),
             ),
-            # Fork B extends to slot 6 (no attestation, fork C still leads)
             BlockStep(
                 block=BlockSpec(slot=Slot(6), parent_label="fork_b_3", label="fork_b_6"),
                 checks=StoreChecks(
@@ -598,7 +496,6 @@ def test_three_way_fork_competition(
                     head_root_label="fork_c_5",
                 ),
             ),
-            # Fork B extends to slot 7 with 2 attestations → wins
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(7),
@@ -626,45 +523,30 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Established heavy fork successfully resists light competing fork.
+    An established heavy fork resists a lighter fork that arrives late.
 
-    Scenario
-    --------
-    - Fork A builds substantial lead (5 blocks)
-    - Fork B created late, builds 3 blocks
-    - Fork A maintains head despite fork B's growth
+    Given
+    -----
+    - 8 validators.
+    - the chain:
+        base(1)
+        - fork_a_2(2) -> fork_a_3(3) -> fork_a_4(4) -> fork_a_5(5) -> fork_a_6(6)
+        - fork_b_2(7) -> fork_b_3(8) -> fork_b_4(9)
+    - fork A gathers V2, V3, V4, V5's votes across its chain, reaching weight 4.
+    - fork B branches from base at slot 7 and builds with no votes.
 
-    Chain Evolution:
-        Slots 1-5: Fork A builds uncontested (5 blocks)
-        Slot 6:    Fork B starts from slot 1 (late competitor)
-        Slots 6-8: Fork B builds 3 blocks (total 3 vs fork A's 5)
-        Result:    Fork A remains canonical (reorg prevented)
+    When
+    ----
+    - fork B extends to three blocks at slots 7, 8, 9.
 
-    Expected Behavior
-    -----------------
-    1. Fork A establishes 5-block lead
-    2. Fork B starts competing from an earlier slot
-    3. Fork B builds rapidly but can't match fork A's depth
-    4. Head remains on fork A throughout (no reorg)
-
-    Why This Matters
-    ----------------
-    Reorg resistance is crucial for chain stability:
-    - Prevents cheap disruption of established chain
-    - Requires substantial work to overtake canonical fork
-    - Protects against late-arriving competing forks
-    - Ensures finality can eventually be reached
-
-    Attack Prevention:
-    - Attacker can't easily reorg established blocks
-    - Must match or exceed weight of canonical chain
-    - Time advantage gives canonical chain strong position
-    - Network naturally converges on heaviest fork
+    Then
+    ----
+    - fork B stays below fork A's weight at every step.
+    - head stays at fork_a_6 throughout.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Common base
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -672,7 +554,6 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
                     head_root_label="base",
                 ),
             ),
-            # Fork A builds 5-block lead with attestations for weight.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -757,29 +638,28 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_a_6",  # Fork A has weight=4
+                    head_root_label="fork_a_6",
                 ),
             ),
-            # Fork B attempts to compete (starting from base, building late)
             BlockStep(
                 block=BlockSpec(slot=Slot(7), parent_label="base", label="fork_b_2"),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_a_6",  # Fork A maintains head (6 vs 1)
+                    head_root_label="fork_a_6",
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(8), parent_label="fork_b_2", label="fork_b_3"),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_a_6",  # Fork A still leads (6 vs 2)
+                    head_root_label="fork_a_6",
                 ),
             ),
             BlockStep(
                 block=BlockSpec(slot=Slot(9), parent_label="fork_b_3", label="fork_b_4"),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_a_6",  # Fork A resists (6 vs 3) - No reorg!
+                    head_root_label="fork_a_6",
                 ),
             ),
         ],
@@ -790,53 +670,35 @@ def test_back_and_forth_reorg_oscillation(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Multiple reorgs as two forks alternately extend (pathological case).
+    The head oscillates between two forks as each alternately gathers votes.
 
-    Scenario
-    --------
-    Two forks alternate extensions, causing head to oscillate back and forth.
-    This is a pathological case that shouldn't happen in healthy networks but
-    tests fork choice correctness under extreme conditions.
+    Given
+    -----
+    - 8 validators.
+    - the chain:
+        base(1)
+        - fork_a_2(2) -> fork_a_5(5) -> fork_a_6(6)
+        - fork_b_3(3) -> fork_b_4(4) -> fork_b_7(7) -> fork_b_8(8)
+    - fork_a_2 leads while it stands alone.
+    - fork_b_3 ties fork_a_2, so the tiebreaker decides the head.
 
-    Oscillation Pattern:
-        Slot 2: Fork A created ← head (only fork)
-        Slot 3: Fork B created → tie, tiebreaker decides
-        Slot 4: Fork B extends with attestation ← head switches to B (REORG #1)
-        Slot 5: Fork A extends (no attestation) → B still leads
-        Slot 6: Fork A extends with 2 attestations ← head switches to A (REORG #2)
-        Slot 7: Fork B extends (no attestation) → A still leads
-        Slot 8: Fork B extends with 2 attestations ← head switches to B (REORG #3)
+    When
+    ----
+    - fork_b_4 carries V0's vote for fork_b_3.
+    - fork_a_5 extends fork A with no votes.
+    - fork_a_6 carries V6, V7's votes for fork_a_5.
+    - fork_b_7 extends fork B with no votes.
+    - fork_b_8 carries V1, V7's votes for fork_b_7.
 
-    Expected Behavior
-    -----------------
-    1. Head oscillates: A → B → A → B
-    2. Each extension with attestations triggers reorg to that fork
-    3. Fork choice remains consistent and correct throughout
-
-    Why This Matters
-    ----------------
-    While extremely rare, this scenario can theoretically occur:
-    - Two validator groups in different network segments
-    - Each group primarily seeing their own fork first
-    - Alternating proposer selection between groups
-    - High network latency preventing convergence
-
-    Properties Tested:
-    - Fork choice handles rapid reorg sequences
-    - No state corruption despite frequent head changes
-    - Tie-breaking remains consistent
-    - Weight calculation correct after multiple reorgs
-    - System eventually stabilizes to heaviest fork
-
-    This stress test verifies robustness under worst-case fork competition,
-    ensuring the protocol remains safe even in pathological network conditions.
-    In practice, networks self-heal from such scenarios through attestation
-    convergence.
+    Then
+    ----
+    - fork_b_4 takes the head with weight 1.
+    - fork_a_6 takes the head back with weight 2.
+    - fork_b_8 takes the head again with weight 2.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Common base
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -844,7 +706,6 @@ def test_back_and_forth_reorg_oscillation(
                     head_root_label="base",
                 ),
             ),
-            # Fork A at slot 2 (takes initial lead)
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="base", label="fork_a_2"),
                 checks=StoreChecks(
@@ -852,14 +713,12 @@ def test_back_and_forth_reorg_oscillation(
                     head_root_label="fork_a_2",
                 ),
             ),
-            # Fork B at slot 3 (ties, tiebreaker decides)
             BlockStep(
                 block=BlockSpec(slot=Slot(3), parent_label="base", label="fork_b_3"),
                 checks=StoreChecks(
                     lexicographic_head_among=["fork_a_2", "fork_b_3"],
                 ),
             ),
-            # Fork B extends to slot 4 with attestation → REORG #1
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -879,7 +738,6 @@ def test_back_and_forth_reorg_oscillation(
                     head_root_label="fork_b_4",
                 ),
             ),
-            # Fork A extends to slot 5 (catches up, no attestation)
             BlockStep(
                 block=BlockSpec(slot=Slot(5), parent_label="fork_a_2", label="fork_a_5"),
                 checks=StoreChecks(
@@ -887,7 +745,6 @@ def test_back_and_forth_reorg_oscillation(
                     head_root_label="fork_b_4",
                 ),
             ),
-            # Fork A extends to slot 6 with 2 attestations → REORG #2
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(6),
@@ -907,7 +764,6 @@ def test_back_and_forth_reorg_oscillation(
                     head_root_label="fork_a_6",
                 ),
             ),
-            # Fork B extends to slot 7 (catches up, no attestation)
             BlockStep(
                 block=BlockSpec(slot=Slot(7), parent_label="fork_b_4", label="fork_b_7"),
                 checks=StoreChecks(
@@ -915,7 +771,6 @@ def test_back_and_forth_reorg_oscillation(
                     head_root_label="fork_a_6",
                 ),
             ),
-            # Fork B extends to slot 8 with 2 attestations → REORG #3
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(8),
@@ -943,39 +798,36 @@ def test_reorg_depth_across_deep_chain_split(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Deep reorg: 10 blocks reverted when head switches to a competing fork.
+    Switching to a heavier competing fork reverts ten blocks at once.
 
-    Scenario
-    --------
-    - Slot 1: Common ancestor
-    - Slots 2-11: Fork A builds 10-block chain with 1 attestation (becomes head)
-    - Slots 2-11: Fork B builds 10-block chain (parallel, same slots)
-    - Slot 12: Fork B extended with 6/8 attestations → triggers deep reorg
+    Given
+    -----
+    - 8 validators.
+    - the chain:
+        common(1)
+        - a_2(2) -> ... -> a_11(11)
+        - b_2(2) -> ... -> b_11(11) -> b_12(12)
+    - a_11 carries V7's vote for common, giving fork A weight 1.
+    - fork A leads while fork B carries no votes.
+    - both forks stay in the store, since nothing is finalized.
 
-    Chain State Evolution:
-        Slot 1:  common
-        Slot 11: common ← a_2 ← ... ← a_11 (head, weight=1)
-                 common ← b_2 ← ... ← b_11
-        Slot 12: common ← a_2 ← ... ← a_11 (abandoned)
-                 common ← b_2 ← ... ← b_11 ← b_12 (head, weight=6 - REORG!)
+    When
+    ----
+    - b_12 carries V0 through V5's votes for b_11.
 
-    Expected Behavior
-    -----------------
-    1. Fork A leads through slots 2-11 (anchored by explicit attestation)
-    2. Fork B blocks are added but don't overtake (lighter)
-    3. At slot 12, fork B extends with 6 attestations → head switches to B
-    4. Ten blocks reverted: a_2 through a_11 become non-canonical
-    5. Both forks remain in the store (no pruning without finalization)
+    Then
+    ----
+    - fork B reaches weight 6, above fork A's weight 1.
+    - head switches to b_12, reverting ten fork A blocks.
+    - both fork tips remain in the store.
 
-    Reorg Details:
-        - **Depth**: 10 blocks (a_2 through a_11)
-        - **Trigger**: Supermajority attestation weight on competing fork
-        - **Weight advantage**: Fork B has 6 explicit attestations vs fork A's 1
+    Note
+    ----
+    - fork A targets common at slot 1 to keep its vote within the justified range.
     """
     fork_choice_test(
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Common ancestor at slot 1
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
                 checks=StoreChecks(
@@ -983,7 +835,6 @@ def test_reorg_depth_across_deep_chain_split(
                     head_root_label="common",
                 ),
             ),
-            # Fork A: slots 2-10 (no attestations)
             *[
                 BlockStep(
                     block=BlockSpec(
@@ -994,11 +845,6 @@ def test_reorg_depth_across_deep_chain_split(
                 )
                 for i in range(2, 11)
             ],
-            # Fork A: slot 11 with attestation to anchor fork A as head.
-            #
-            # Targets common (slot 1) so the attestation data stays within
-            # justified_slots range when fork B blocks are built later.
-            # This weight keeps fork A canonical while fork B is constructed.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(11),
@@ -1018,7 +864,6 @@ def test_reorg_depth_across_deep_chain_split(
                     head_root_label="a_11",
                 ),
             ),
-            # Fork B: slots 2-11, parent chain from "common"
             *[
                 BlockStep(
                     block=BlockSpec(
@@ -1029,10 +874,6 @@ def test_reorg_depth_across_deep_chain_split(
                 )
                 for i in range(2, 12)
             ],
-            # Fork B: slot 12 with 6/8 attestations targeting b_11 → deep reorg.
-            #
-            # Six validators attest to b_11, overwhelming fork A's single
-            # attestation. Head switches from a_11 to b_12, reverting 10 blocks.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(12),
@@ -1074,46 +915,33 @@ def test_reorg_on_newly_justified_slot(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Reorg occurs correctly when forks cross justification boundaries.
+    Fork choice switches to a justified fork even when it is lighter and shorter.
 
-    Scenario
-    --------
-    Two forks compete. Fork A is heavier and longer, but Fork B manages to
-    become justified. Fork choice must switch to the justified fork regardless
-    of weight/length.
+    Given
+    -----
+    - 8 validators; a slot needs 6 votes (2/3) to be justified.
+    - the chain:
+        base(1)
+        - fork_a_1(2) -> fork_a_2(3) -> fork_a_3(4)
+        - fork_b_1(5) -> fork_b_2(6)
+    - fork_a_2 carries V2's vote for fork_a_1, giving fork A weight 1.
+    - fork A leads on weight and length while fork B is light.
+    - fork A branches from base, so it does not descend from fork_b_1.
 
-    - Slot 1: Base
-    - Slots 2-4: Fork A extends (becomes head with depth 3)
-    - Slot 5: Fork B appears (descending from Base, skipping slots 2-4)
-    - Slot 6: Fork B extends. This block contains enough attestations to
-              justify Fork B at Slot 5.
+    When
+    ----
+    - fork_b_2 carries V0, V1, V3, V5, V6, V7's votes for fork_b_1.
+    - those 6 votes justify fork_b_1 at slot 5.
 
-    Expected Behavior
-    -----------------
-    1. Fork A takes the lead initially (Slots 2-4) as the heaviest chain.
-    2. Fork B appears at Slot 5 but is initially lighter.
-    3. At Slot 6, the new block includes attestations that justify Fork B at Slot 5.
-    4. The justified checkpoint updates to Slot 5 (fork_b_1).
-    5. Fork A is immediately discarded because it does not descend from the new
-       justified checkpoint (Fork A is on a branch from Slot 1).
-    6. Fork B becomes the canonical head.
-
-    Why This Matters
-    ----------------
-    Justification is a critical safety mechanism:
-    - Limits which blocks can be attested to
-    - Ensures fork choice respects finality constraints
-
-    This test ensures:
-    - Reorgs respect justification boundaries
-    - Fork choice works correctly across justifiable slots
-    - Safety guarantees maintained during reorgs
+    Then
+    ----
+    - the justified checkpoint moves to fork_b_1 at slot 5.
+    - fork A is discarded, since it does not descend from the new checkpoint.
+    - head becomes fork_b_2.
     """
     fork_choice_test(
-        # Using 8 validators: Fork A has 1 attester, Fork B needs 6 of 8 for 2/3 supermajority
         anchor_state=generate_pre_state(num_validators=8),
         steps=[
-            # Common base at slot 1
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
                 checks=StoreChecks(
@@ -1121,7 +949,6 @@ def test_reorg_on_newly_justified_slot(
                     head_root_label="base",
                 ),
             ),
-            # Fork A: slot 2
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(2),
@@ -1133,11 +960,6 @@ def test_reorg_on_newly_justified_slot(
                     head_root_label="fork_a_1",
                 ),
             ),
-            # Fork A: slot 3 with attestation targeting fork_a_1
-            #
-            # V2's head vote points to fork_a_1, which is in fork A's subtree.
-            # This gives fork A weight=1, ensuring it leads over fork B
-            # until fork B achieves justification.
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -1157,8 +979,6 @@ def test_reorg_on_newly_justified_slot(
                     head_root_label="fork_a_2",
                 ),
             ),
-            # Fork A: slot 4
-            # Fork A is the heaviest chain (1 attestation and also 3 blocks)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(4),
@@ -1170,8 +990,6 @@ def test_reorg_on_newly_justified_slot(
                     head_root_label="fork_a_3",
                 ),
             ),
-            # Fork B: slot 5 (first block of fork B)
-            # Fork A is still the heaviest chain (1 attestation + 3 blocks)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(5),
@@ -1183,9 +1001,6 @@ def test_reorg_on_newly_justified_slot(
                     head_root_label="fork_a_3",
                 ),
             ),
-            # Fork B: slot 6
-            # Attestations from 6 of 8 validators target fork_b_1,
-            # crossing the 2/3 supermajority threshold (75%).
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(6),
@@ -1209,7 +1024,7 @@ def test_reorg_on_newly_justified_slot(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    head_root_label="fork_b_2",  # Fork B now leads as fork_b_1 is justified
+                    head_root_label="fork_b_2",
                     latest_justified_slot=Slot(5),
                     latest_justified_root_label="fork_b_1",
                 ),

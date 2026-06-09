@@ -66,70 +66,198 @@ ENR_HIGH_SEQ = (
 """ENR with high sequence number (2^32 - 1)."""
 
 
-# --- ENR ---
-
-
 def test_enr_official_eip778(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Official EIP-778 vector. Exercises node_id, ip4, udp_port, multiaddr, signature."""
+    """
+    The official EIP-778 record round-trips unchanged.
+
+    Given
+    -----
+    - the official EIP-778 ENR text vector.
+    - the record carries node_id, ip4, udp port, multiaddr, and signature.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=OFFICIAL_ENR),
     )
 
 
 def test_enr_with_extensions(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ENR with extension keys: eth2, attnets, QUIC, is_aggregator."""
+    """
+    A record carrying every extension key round-trips unchanged.
+
+    Given
+    -----
+    - an ENR with the eth2, attnets, QUIC, and aggregator extension keys.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_WITH_EXTENSIONS),
     )
 
 
 def test_enr_minimal_seq_zero(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """Minimal ENR with seq=0. Only required keys (id + secp256k1)."""
+    """
+    A minimal record with only required keys round-trips unchanged.
+
+    Given
+    -----
+    - an ENR with seq=0.
+    - only the required id and secp256k1 keys are present.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_MINIMAL),
     )
 
 
 def test_enr_no_eth2_field(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ENR with ip4 + udp but no eth2 or attnets. Verifies absent optional fields."""
+    """
+    A record with no eth2 or attnets keys round-trips with those fields absent.
+
+    Given
+    -----
+    - an ENR with ip4 and udp keys.
+    - the eth2 and attnets keys are absent.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    - the optional eth2 and attnets fields stay absent.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_NO_ETH2),
     )
 
 
 def test_enr_eth2_far_future_fork(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ENR with eth2 where next_fork_epoch is max uint64 (far future). Verifies large epoch."""
+    """
+    A record with a far-future fork epoch round-trips unchanged.
+
+    Given
+    -----
+    - an ENR whose eth2 key sets the next fork epoch to the maximum uint64.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    - the large fork epoch survives the round-trip.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_ETH2_FAR_FUTURE),
     )
 
 
 def test_enr_attnets_all_zeros(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ENR with attnets bitfield all zeros. Verifies empty subscribed subnet list."""
+    """
+    A record with an all-zero attnets bitfield round-trips unchanged.
+
+    Given
+    -----
+    - an ENR whose attnets bitfield is all zeros.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    - no subnets are reported as subscribed.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_ATTNETS_ALL_ZEROS),
     )
 
 
 def test_enr_attnets_all_ones(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ENR with attnets bitfield all ones. Verifies all 64 subnets are subscribed."""
+    """
+    A record with an all-ones attnets bitfield round-trips unchanged.
+
+    Given
+    -----
+    - an ENR whose attnets bitfield is all ones.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    - all 64 subnets are reported as subscribed.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_ATTNETS_ALL_ONES),
     )
 
 
 def test_enr_high_seq(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ENR with high sequence number (2^32 - 1). Verifies large seq parsing."""
+    """
+    A record with a large sequence number round-trips unchanged.
+
+    Given
+    -----
+    - an ENR whose seq field is 2^32 - 1.
+
+    When
+    ----
+    - the record is decoded and re-encoded.
+
+    Then
+    ----
+    - the re-encoded record matches the input.
+    - the large seq value survives the round-trip.
+    """
     networking_codec_test(
         codec=EnrRoundtrip(enr_string=ENR_HIGH_SEQ),
     )
 
 
-# --- PeerId ---
-
-
 def test_peer_id_ed25519(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ED25519 PeerId from libp2p spec. 32-byte key, identity multihash."""
+    """
+    An ed25519 key derives the libp2p peer_id.
+
+    Given
+    -----
+    - a 32-byte ed25519 public key from the libp2p test vectors.
+
+    When
+    ----
+    - the peer_id is derived from the key.
+
+    Then
+    ----
+    - the derived peer_id uses an identity multihash over the key.
+    """
     networking_codec_test(
         codec=PeerIdentifierDerivation(
             key_type="ed25519",
@@ -139,7 +267,21 @@ def test_peer_id_ed25519(networking_codec_test: NetworkingCodecTestFiller) -> No
 
 
 def test_peer_id_secp256k1(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """secp256k1 PeerId from libp2p spec. 33-byte key, identity multihash."""
+    """
+    A secp256k1 key derives the libp2p peer_id.
+
+    Given
+    -----
+    - a 33-byte secp256k1 public key from the libp2p test vectors.
+
+    When
+    ----
+    - the peer_id is derived from the key.
+
+    Then
+    ----
+    - the derived peer_id uses an identity multihash over the key.
+    """
     networking_codec_test(
         codec=PeerIdentifierDerivation(
             key_type="secp256k1",
@@ -149,7 +291,21 @@ def test_peer_id_secp256k1(networking_codec_test: NetworkingCodecTestFiller) -> 
 
 
 def test_peer_id_ecdsa(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """ECDSA PeerId from libp2p spec. 91-byte key, SHA256 multihash (over 42 bytes)."""
+    """
+    An ECDSA key derives the libp2p peer_id with a hashed multihash.
+
+    Given
+    -----
+    - a 91-byte ECDSA public key from the libp2p test vectors.
+
+    When
+    ----
+    - the peer_id is derived from the key.
+
+    Then
+    ----
+    - the derived peer_id uses a SHA-256 multihash (digest is 42 bytes).
+    """
     networking_codec_test(
         codec=PeerIdentifierDerivation(
             key_type="ecdsa",
@@ -162,7 +318,21 @@ def test_peer_id_ecdsa(networking_codec_test: NetworkingCodecTestFiller) -> None
 
 
 def test_peer_id_secp256k1_from_enr(networking_codec_test: NetworkingCodecTestFiller) -> None:
-    """secp256k1 PeerId using the public key from the official EIP-778 ENR."""
+    """
+    The secp256k1 key from the official record derives its peer_id.
+
+    Given
+    -----
+    - the secp256k1 public key taken from the official EIP-778 ENR.
+
+    When
+    ----
+    - the peer_id is derived from the key.
+
+    Then
+    ----
+    - the derived peer_id uses an identity multihash over the key.
+    """
     networking_codec_test(
         codec=PeerIdentifierDerivation(
             key_type="secp256k1",

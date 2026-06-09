@@ -29,7 +29,23 @@ SLOT_3_JUST_BEYOND_BOUNDARY_INTERVAL = SLOT_3_BOUNDARY_INTERVAL - 1
 def test_valid_gossip_aggregated_attestation(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """A valid aggregated gossip attestation is accepted."""
+    """
+    A valid aggregated gossip attestation is accepted.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+
+    When
+    ----
+    - V1 gossips an aggregate voting for block_2 at slot 2.
+
+    Then
+    ----
+    - the aggregate is validated and stored.
+    """
     fork_choice_test(
         steps=[
             BlockStep(
@@ -56,7 +72,23 @@ def test_valid_gossip_aggregated_attestation(
 def test_aggregated_attestation_unknown_source_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Aggregated attestation referencing unknown source is rejected."""
+    """
+    An aggregate naming an unknown source block is rejected.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+
+    When
+    ----
+    - V1 gossips an aggregate for block_2 whose source root is absent from the store.
+
+    Then
+    ----
+    - validation fails with an unknown source block.
+    """
     fork_choice_test(
         steps=[
             BlockStep(
@@ -89,7 +121,23 @@ def test_aggregated_attestation_unknown_source_rejected(
 def test_aggregated_attestation_target_slot_mismatch_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Aggregated attestation with wrong target slot is rejected."""
+    """
+    An aggregate whose target slot disagrees with the target block is rejected.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+
+    When
+    ----
+    - V1 gossips an aggregate naming target slot 3 for block_2, which sits at slot 2.
+
+    Then
+    ----
+    - validation fails with a target checkpoint slot mismatch.
+    """
     fork_choice_test(
         steps=[
             BlockStep(
@@ -120,7 +168,23 @@ def test_aggregated_attestation_target_slot_mismatch_rejected(
 def test_aggregated_attestation_head_slot_mismatch_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Head checkpoint slot mismatches are rejected."""
+    """
+    An aggregate whose head slot disagrees with the head block is rejected.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+
+    When
+    ----
+    - V1 gossips an aggregate naming head slot 5 for block_1, which sits at slot 1.
+
+    Then
+    ----
+    - validation fails with a head checkpoint slot mismatch.
+    """
     fork_choice_test(
         steps=[
             BlockStep(
@@ -153,7 +217,23 @@ def test_aggregated_attestation_head_slot_mismatch_rejected(
 def test_aggregated_attestation_source_after_target_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Topology violations (source > target) are rejected."""
+    """
+    An aggregate whose source slot exceeds its target slot is rejected.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3)
+
+    When
+    ----
+    - V1 gossips an aggregate with source block_3 at slot 3 and target block_2 at slot 2.
+
+    Then
+    ----
+    - validation fails because source slot must not exceed target.
+    """
     fork_choice_test(
         steps=[
             BlockStep(
@@ -190,7 +270,24 @@ def test_aggregated_attestation_source_after_target_rejected(
 def test_aggregated_attestation_too_far_in_future_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
-    """Attestations whose slot is multiple slots ahead of local time are rejected."""
+    """
+    An aggregate whose slot is two slots ahead of local time is rejected.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is at slot 2.
+
+    When
+    ----
+    - V1 gossips an aggregate at slot 4, two slots in the future.
+
+    Then
+    ----
+    - validation fails with attestation too far in future.
+    """
     fork_choice_test(
         steps=[
             BlockStep(
@@ -222,17 +319,22 @@ def test_aggregated_attestation_at_disparity_boundary_allowed(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Aggregate exactly at the disparity boundary is allowed.
+    An aggregate exactly at the disparity boundary is accepted.
 
-    Scenario
-    --------
-    Build a chain through slot 2.
-    Tick to the latest local interval that still admits a slot-3 vote.
-    Gossip a slot-3 aggregate.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is the latest interval that still admits a slot-3 vote.
 
-    Expected:
+    When
+    ----
+    - V1 gossips an aggregate at slot 3.
 
-    - Aggregate is validated and stored.
+    Then
+    ----
+    - the aggregate is validated and stored.
     """
     fork_choice_test(
         steps=[
@@ -261,17 +363,22 @@ def test_aggregated_attestation_just_beyond_disparity_boundary_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Aggregate one interval beyond the disparity boundary is rejected.
+    An aggregate one interval beyond the disparity boundary is rejected.
 
-    Scenario
-    --------
-    Build a chain through slot 2.
-    Tick to one interval before the disparity boundary for a slot-3 vote.
-    Gossip a slot-3 aggregate.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is one interval before the boundary for a slot-3 vote.
 
-    Expected:
+    When
+    ----
+    - V1 gossips an aggregate at slot 3.
 
-    - Validation fails with "Attestation too far in future" error.
+    Then
+    ----
+    - validation fails with attestation too far in future.
     """
     fork_choice_test(
         steps=[
@@ -305,20 +412,27 @@ def test_aggregated_attestation_one_full_slot_in_future_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Aggregate a full slot ahead of local time is rejected.
+    An aggregate a full slot ahead of local time is rejected.
 
-    Regression: an earlier rule admitted aggregates up to a full slot ahead.
-    That window let an adversary pre-publish next-slot aggregates before
-    any honest validator could produce them.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is slot 2 interval 0.
 
-    Scenario
-    --------
-    Build a chain through slot 2.
-    At slot-2 interval 0, gossip a slot-3 aggregate (5 intervals ahead).
+    When
+    ----
+    - V1 gossips an aggregate at slot 3, five intervals ahead.
 
-    Expected:
+    Then
+    ----
+    - validation fails with attestation too far in future.
 
-    - Validation fails with "Attestation too far in future" error.
+    Regression
+    ----------
+    - an earlier rule admitted aggregates up to a full slot ahead.
+    - that window let an adversary pre-publish next-slot aggregates early.
     """
     fork_choice_test(
         steps=[

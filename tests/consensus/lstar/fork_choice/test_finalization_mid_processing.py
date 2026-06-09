@@ -1,11 +1,4 @@
-"""
-Fork Choice: Finalization advances mid-attestation processing.
-
-This test verifies that attestations see updated finalized_slot during processing,
-as required by the 3sf-mini specification.
-
-Reference: https://github.com/leanEthereum/leanSpec/pull/443
-"""
+"""Fork Choice: Finalization advances mid-attestation processing."""
 
 import pytest
 
@@ -25,37 +18,38 @@ def test_finalization_advances_mid_attestation_processing(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Verify attestations see updated finalized_slot during processing.
+    A later vote in a block sees the finalized slot advanced by an earlier vote.
 
-    Scenario
-    --------
-    Process two attestations (both with supermajority) in the same block:
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> ... -> block_7(7) -> (8)
+    - block_3 includes 3 votes for block_1.
+    - block_3 justifies slot 1.
+    - vote A targets block_2 from V0, V1, V2.
+    - vote B targets block_7 from V0, V1, V2.
+    - both votes ride in the block at slot 8.
 
-    - Attestation A: source=1, target=2 -> justifies slot 2, finalizes slot 1
-    - Attestation B: source=1, target=7 -> only justifiable after finalization
+    When
+    ----
+    - the block at slot 8 processes vote A, then vote B.
+
+    Then
+    ----
+    - vote A justifies slot 2 and finalizes slot 1.
+    - vote B sees finalized at slot 1, which makes slot 7 justifiable.
+    - vote B justifies slot 7.
+    - justified reaches slot 7.
+    - finalized reaches slot 1.
 
     Justifiability
     --------------
-    Slot 7 justifiability depends on finalized_slot:
-
-    - finalized=0: delta=7, NOT justifiable (7 > 5, not square, not pronic)
-    - finalized=1: delta=6, IS justifiable (pronic = 2*3)
-
-    Expected Behavior
-    ----------------------------
-
-    1. Attestation A justifies slot 2 and finalizes slot 1
-    2. Attestation B sees updated finalized_slot=1, is justifiable, gets processed
-    3. Attestation B justifies slot 7 (supermajority)
-    4. latest_justified_slot = 7 (B processed after A)
-
-    Reference
-    ---------
-    https://github.com/leanEthereum/leanSpec/pull/443
+    - slot 7 at delta 7 from finalized 0 is not justifiable.
+    - slot 7 at delta 6 from finalized 1 is justifiable (pronic 2*3).
     """
     fork_choice_test(
         steps=[
-            # Build chain through slot 7
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(head_slot=Slot(1)),
@@ -64,8 +58,6 @@ def test_finalization_advances_mid_attestation_processing(
                 block=BlockSpec(slot=Slot(2), label="block_2"),
                 checks=StoreChecks(head_slot=Slot(2)),
             ),
-            # Slot 3: Justify slot 1 (source=0 -> target=1)
-            # Need 3/4 validators for supermajority (3*3=9 >= 2*4=8)
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(3),
@@ -89,7 +81,6 @@ def test_finalization_advances_mid_attestation_processing(
                     latest_finalized_slot=Slot(0),
                 ),
             ),
-            # Extend chain to slot 7
             BlockStep(
                 block=BlockSpec(slot=Slot(4), label="block_4"),
                 checks=StoreChecks(head_slot=Slot(4)),
@@ -106,16 +97,10 @@ def test_finalization_advances_mid_attestation_processing(
                 block=BlockSpec(slot=Slot(7), label="block_7"),
                 checks=StoreChecks(head_slot=Slot(7)),
             ),
-            # Slot 8: The critical block with both attestations
             BlockStep(
                 block=BlockSpec(
                     slot=Slot(8),
                     attestations=[
-                        # Attestation A: Justify slot 2 and finalize slot 1
-                        # Source will be slot 1 (latest_justified from parent state)
-                        # Target is slot 2
-                        # Finalization: range(1+1, 2) = empty -> finalizes slot 1
-                        # Need 3/4 validators for supermajority
                         AggregatedAttestationSpec(
                             validator_indices=[
                                 ValidatorIndex(0),
@@ -126,13 +111,6 @@ def test_finalization_advances_mid_attestation_processing(
                             target_slot=Slot(2),
                             target_root_label="block_2",
                         ),
-                        # Attestation B: Target slot 7 - ALSO needs supermajority
-                        # With finalized=0: delta=7, NOT justifiable -> SKIPPED
-                        # With finalized=1: delta=6, IS justifiable (pronic) -> PROCESSED
-                        #
-                        # If processed, slot 7 becomes justified and latest_justified=7
-                        # If skipped, latest_justified stays at 2
-                        # This is how we detect the bug!
                         AggregatedAttestationSpec(
                             validator_indices=[
                                 ValidatorIndex(0),
@@ -147,7 +125,6 @@ def test_finalization_advances_mid_attestation_processing(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(8),
-                    # B is processed -> slot 7 justified -> latest_justified=7
                     latest_justified_slot=Slot(7),
                     latest_finalized_slot=Slot(1),
                 ),

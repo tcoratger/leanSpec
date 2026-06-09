@@ -1,4 +1,4 @@
-"""API endpoint: /metrics scrape contract vector."""
+"""API endpoint /metrics scrape contract vector."""
 
 import pytest
 
@@ -11,13 +11,22 @@ def test_metrics_endpoint_scrape_contract(
     api_endpoint_test: ApiEndpointTestFiller,
 ) -> None:
     """
-    GET /metrics returns the Prometheus-format scrape with the required metric names.
+    The metrics endpoint returns the Prometheus scrape with the required metric names.
 
-    The endpoint body is dynamic (counters accumulate, timestamps shift),
-    so the vector pins only the stable contract: status 200, the
-    Prometheus text-exposition content type, and the full list of
-    metric names a compliant node must expose. Clients replay the
-    fixture and confirm every listed metric appears in their scrape.
+    Given
+    -----
+    - a node started from a 4-validator genesis.
+    - the endpoint body is dynamic as counters accumulate and timestamps shift.
+
+    When
+    ----
+    - the metrics endpoint is queried.
+
+    Then
+    ----
+    - the status is 200.
+    - the content type is the Prometheus text-exposition format.
+    - every metric name a compliant node must expose is present.
     """
     api_endpoint_test(
         endpoint="/metrics",

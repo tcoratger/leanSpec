@@ -1,9 +1,4 @@
-"""
-Smoke test for the networking_codec fixture's decode_failure dispatcher.
-
-Exercises the new `decode_failure` codec so the framework change is covered
-independently of later negative-path content PRs.
-"""
+"""Smoke vector for the decode-failure dispatch path of the networking codec fixture."""
 
 import pytest
 
@@ -15,10 +10,19 @@ pytestmark = pytest.mark.valid_until("Lstar")
 
 def test_decode_failure_varint_truncated(networking_codec_test: NetworkingCodecTestFiller) -> None:
     """
-    A truncated varint (continuation bit set on the final byte) must fail to decode.
+    A truncated varint is rejected.
 
-    Pins the new `decode_failure` codec dispatch path on the
-    networking_codec fixture.
+    Given
+    -----
+    - a single varint byte with the continuation bit set on its final byte.
+
+    When
+    ----
+    - the bytes are decoded.
+
+    Then
+    ----
+    - decoding is rejected because more bytes were expected.
     """
     networking_codec_test(
         codec=DecodeFailure(decoder="varint", raw_bytes="0x80"),

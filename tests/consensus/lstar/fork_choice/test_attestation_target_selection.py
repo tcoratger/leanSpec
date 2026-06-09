@@ -19,24 +19,24 @@ def test_attestation_target_at_genesis_initially(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target starts at genesis before safe target updates.
+    The attestation target stays at genesis until the safe target advances.
 
-    Scenario
-    --------
-    Process two blocks at slots 1 and 2.
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> block_2(2)
+    - no block carries any vote.
+    - the safe target is still at genesis.
 
-    Expected:
-        - After slot 1: target = slot 0 (genesis/finalized)
-        - After slot 2: target = slot 0 (genesis/finalized)
-        - Target root automatically validated against block at slot 0
+    When
+    ----
+    - blocks are added at slots 1 and 2 with empty bodies.
 
-    Why This Matters
-    ----------------
-    Initially, the safe target is at genesis (slot 0), so the attestation
-    target walks back from head to genesis.
-
-    This conservative behavior ensures validators don't attest too far ahead
-    before there's sufficient attestation weight to advance the safe target.
+    Then
+    ----
+    - head follows the latest block.
+    - the attestation target stays at slot 0 after each block.
     """
     fork_choice_test(
         steps=[
@@ -51,7 +51,7 @@ def test_attestation_target_at_genesis_initially(
                 block=BlockSpec(slot=Slot(2)),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(0),  # Still genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
         ],
@@ -62,26 +62,26 @@ def test_attestation_target_advances_with_attestations(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target advances as attestation weight accumulates.
+    The attestation target advances as votes accumulate behind the head.
 
-    Scenario
-    --------
-    Build a longer chain (slots 1-5) where attestations cause target advancement.
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> block_2(2) -> block_3(3) -> block_4(4) -> (5)
+    - each block after slot 1 carries one vote for its parent.
 
-    Expected:
-        - Initial blocks: target stays at genesis (slot 0)
-        - Later blocks: target advances as attestations accumulate
-        - Target remains behind head for safety
+    When
+    ----
+    - blocks are added one per slot through slot 5.
 
-    Why This Matters
-    ----------------
-    As validators attest to blocks, the safe target advances, which in turn
-    allows the attestation target to move forward.
-
-    This demonstrates the dynamic nature of target selection: conservative initially,
-    but advancing as consensus strengthens through attestation accumulation.
-
-    The target advances only when sufficient attestation weight supports it.
+    Then
+    ----
+    - head follows the latest block.
+    - the target stays at slot 0 through slot 3.
+    - the target advances to slot 1 after slot 4.
+    - the target advances to slot 2 after slot 5.
+    - the target always lags behind the head.
     """
     fork_choice_test(
         steps=[
@@ -89,7 +89,7 @@ def test_attestation_target_advances_with_attestations(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(0),  # Still at genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -107,7 +107,7 @@ def test_attestation_target_advances_with_attestations(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(0),  # Still at genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -125,7 +125,7 @@ def test_attestation_target_advances_with_attestations(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(0),  # Still at genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -143,7 +143,7 @@ def test_attestation_target_advances_with_attestations(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    attestation_target_slot=Slot(1),  # Advances to slot 1
+                    attestation_target_slot=Slot(1),
                 ),
             ),
             BlockStep(
@@ -160,7 +160,7 @@ def test_attestation_target_advances_with_attestations(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    attestation_target_slot=Slot(2),  # Continues advancing
+                    attestation_target_slot=Slot(2),
                 ),
             ),
         ],
@@ -171,23 +171,24 @@ def test_attestation_target_with_slot_gaps(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target handles missed slots correctly.
+    The attestation target tolerates missed slots in the chain.
 
-    Scenario
-    --------
-    Process blocks at slots 1, 3, 5 (skipping even slots).
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block(1) -> block(3) -> block(5)
+    - slots 2 and 4 carry no block.
+    - no block carries any vote.
 
-    Expected:
-        - Targets advance despite gaps
-        - Targets remain justifiable
-        - Safe target stays valid
+    When
+    ----
+    - blocks are added at slots 1, 3, and 5.
 
-    Why This Matters
-    ----------------
-    Missed slots are common when proposers fail or network partitions occur.
-
-    The target selection must handle sparse block production gracefully,
-    ensuring validators can still make progress even with gaps in the chain.
+    Then
+    ----
+    - head follows the latest block.
+    - the target stays at slot 0 after each block.
     """
     fork_choice_test(
         steps=[
@@ -220,25 +221,25 @@ def test_attestation_target_with_extended_chain(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target advances progressively over extended chain.
+    The attestation target advances gradually over a longer chain.
 
-    Scenario
-    --------
-    Build a longer chain (slots 1-8) observing target advancement pattern.
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> ... -> block_7(7) -> (8)
+    - each block after slot 1 carries one vote for its parent.
 
-    Expected:
-        - Initial slots: target at genesis (conservative)
-        - Middle slots: target advances to slot 1
-        - Target advances gradually, not jumping to head
+    When
+    ----
+    - blocks are added one per slot through slot 8.
 
-    Why This Matters
-    ----------------
-    Over extended chains, the target selection should show smooth,
-    gradual advancement as attestation weight accumulates.
-
-    The target lags behind the head, providing a stable reference point that
-    advances only when sufficient consensus has formed. This prevents validators
-    from attesting too far ahead without adequate safety guarantees.
+    Then
+    ----
+    - head follows the latest block.
+    - the target stays at slot 0 through slot 3.
+    - the target then advances one slot per block: 1, 2, 3, 4, 5.
+    - the target always lags behind the head.
     """
     fork_choice_test(
         steps=[
@@ -246,7 +247,7 @@ def test_attestation_target_with_extended_chain(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
                 checks=StoreChecks(
                     head_slot=Slot(1),
-                    attestation_target_slot=Slot(0),  # Genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -264,7 +265,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(2),
-                    attestation_target_slot=Slot(0),  # Still genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -282,7 +283,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(3),
-                    attestation_target_slot=Slot(0),  # Still genesis
+                    attestation_target_slot=Slot(0),
                 ),
             ),
             BlockStep(
@@ -300,7 +301,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(4),
-                    attestation_target_slot=Slot(1),  # Advances to slot 1
+                    attestation_target_slot=Slot(1),
                 ),
             ),
             BlockStep(
@@ -318,7 +319,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(5),
-                    attestation_target_slot=Slot(2),  # Stable at 2
+                    attestation_target_slot=Slot(2),
                 ),
             ),
             BlockStep(
@@ -336,7 +337,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(6),
-                    attestation_target_slot=Slot(3),  # Continues to advance
+                    attestation_target_slot=Slot(3),
                 ),
             ),
             BlockStep(
@@ -354,7 +355,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(7),
-                    attestation_target_slot=Slot(4),  # Continues advancing
+                    attestation_target_slot=Slot(4),
                 ),
             ),
             BlockStep(
@@ -371,7 +372,7 @@ def test_attestation_target_with_extended_chain(
                 ),
                 checks=StoreChecks(
                     head_slot=Slot(8),
-                    attestation_target_slot=Slot(5),  # Continues advancing
+                    attestation_target_slot=Slot(5),
                 ),
             ),
         ],
@@ -382,50 +383,51 @@ def test_attestation_target_justifiable_constraint(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target advances while respecting justifiability rules.
+    The attestation target only ever lands on a justifiable slot.
 
-    Scenario
-    --------
-    Build a 10-slot chain and observe how the attestation target advances
-    over time while remaining justifiable relative to genesis (finalized at slot 0).
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> ... -> block_15(15)
+    - each block after slot 1 carries one vote for its parent.
+    - finalized stays at slot 0.
 
-    Justifiability Rules (see Slot.is_justifiable_after)
-    -----------------------------------------------------
+    When
+    ----
+    - blocks are added one per slot through slot 15.
 
-    The target starts from current head and looks back at most 3 slots towards safe target.
+    Then
+    ----
+    - head follows the latest block.
+    - the target follows the expected sequence below.
+    - the target never lands on a non-justifiable slot.
 
-    Then, a slot is deemed justifiable at distance delta from finalization if:
-    1. delta ≤ 5
-    2. delta is a perfect square (1, 4, 9, 16, 25, ...)
-    3. delta is a pronic number (2, 6, 12, 20, 30, ...)
-
-    Why This Matters
-    ----------------
-    The justifiability rules prevent long-range attacks by restricting which
-    checkpoints validators can attest to. The mathematical pattern (perfect squares
-    and pronic numbers) creates increasingly sparse justifiable slots as the chain
-    grows beyond finalization, providing security guarantees.
-
-    The test verifies that the target selection algorithm respects these rules
-    and never selects a non-justifiable target.
+    Justifiability
+    --------------
+    - the target starts from the head and walks back at most 3 slots.
+    - a slot at distance delta from finalized is justifiable when delta is at most 5.
+    - or when delta is a perfect square (1, 4, 9, 16, ...).
+    - or when delta is a pronic number (2, 6, 12, 20, ...).
+    - sparse slots beyond the immediate window block long-range attacks.
     """
     num_validators = 4
     expected_targets = {
-        1: 0,  # 3-slot walkback reaches safe target at slot 0
-        2: 0,  # 3-slot walkback reaches safe target at slot 0
-        3: 0,  # 3-slot walkback reaches safe target at slot 0
-        4: 1,  # delta = 4 - 3 - 0 = 1, Rule 1: delta 1 ≤ 5
-        5: 2,  # delta = 5 - 3 - 0 = 2, Rule 1: delta 2 ≤ 5
-        6: 3,  # delta = 6 - 3 - 0 = 3, Rule 1: delta 3 ≤ 5
-        7: 4,  # delta = 7 - 3 - 0 = 4, Rule 1: delta 4 ≤ 5
-        8: 5,  # delta = 8 - 3 - 0 = 5, Rule 1: delta 5 ≤ 5
-        9: 6,  # delta = 6 - 0 = 6, Rule 3: pronic number (2*3)
-        10: 6,  # delta = 10 - 3 - 0 = 7
-        11: 6,  # delta = 11 - 3 - 0 = 8
-        12: 9,  # delta = 9 - 0 = 9, Rule 2: perfect square (3^2)
-        13: 9,  # delta = 13 - 3 - 0 = 10
-        14: 9,  # delta = 14 - 3 - 0 = 11
-        15: 12,  # delta = 15 - 3 - 0 = 12, Rule 3: pronic number (3*4)
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 1,
+        5: 2,
+        6: 3,
+        7: 4,
+        8: 5,
+        9: 6,
+        10: 6,
+        11: 6,
+        12: 9,
+        13: 9,
+        14: 9,
+        15: 12,
     }
 
     steps = []
@@ -444,7 +446,6 @@ def test_attestation_target_justifiable_constraint(
                                 target_root_label=f"block_{i - 1}",
                             ),
                         ]
-                        # Slot 1 can't attest to genesis (root 0x00 not in store.blocks)
                         if i >= 2
                         else None
                     ),
@@ -463,35 +464,30 @@ def test_attestation_target_walkback_bounded_by_lookback(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target walks back at most JUSTIFICATION_LOOKBACK_SLOTS from head.
+    The attestation target walks back no more than the lookback bound from the head.
 
-    Scenario
-    --------
-    Build a long chain (10+ blocks) with no attestations so the safe target
-    stays at genesis. Pick the smallest such head where
-    (head - JUSTIFICATION_LOOKBACK_SLOTS) is justifiable from genesis, so the
-    bounded walk lands cleanly without the secondary justifiability walk
-    altering the result.
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> ... -> block_head(head)
+    - no block carries any vote.
+    - the safe target stays at genesis.
+    - the head is the smallest one where (head - lookback) is justifiable from genesis.
 
-    Expected:
-        - Head far ahead of safe target
-        - Safe target at genesis (slot 0)
-        - Attestation target at (head - JUSTIFICATION_LOOKBACK_SLOTS)
-        - NOT at the safe target (slot 0)
+    When
+    ----
+    - blocks are added one per slot up to the chosen head.
 
-    Why This Matters
-    ----------------
-    The walkback bound keeps the attestation target conservatively behind
-    head, anchored toward safe target.
-
-    Without the bound, validators would target blocks too close to head,
-    bypassing the safe target governor and attesting to blocks without
-    sufficient supermajority endorsement.
+    Then
+    ----
+    - head sits far ahead of the safe target.
+    - the safe target stays at slot 0.
+    - the target lands on (head - lookback).
+    - the target does not fall back to the safe target at slot 0.
     """
     lookback = int(JUSTIFICATION_LOOKBACK_SLOTS)
 
-    # Smallest "long chain" head where the bounded walk lands on a
-    # justifiable slot, so the secondary justifiability walk is a no-op.
     head = 10
     while not Slot(head - lookback).is_justifiable_after(Slot(0)):
         head += 1
@@ -516,20 +512,30 @@ def test_attestation_target_selection_after_finality_has_moved(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation target selection respects a non-zero finalized boundary.
+    The attestation target respects a finalized boundary above genesis.
 
-    Scenario
-    --------
-    1. Justify block_1 in block_3
-    2. Process block_8 so slots 2 and 7 become justified and slot 1 becomes finalized
-    3. Extend the empty chain through block_11
+    Given
+    -----
+    - 4 validators; a slot needs 3 votes (2/3) to be justified.
+    - the chain:
+        genesis -> block_1(1) -> ... -> block_8(8) -> ... -> block_11(11)
+    - block_3 includes 3 votes for block_1.
+    - block_3 justifies slot 1.
+    - block_8 includes 3 votes for block_2 and 3 votes for block_7.
+    - block_8 justifies slots 2 and 7.
+    - block_8 finalizes slot 1.
+    - blocks 4 through 7 and 9 through 11 carry no votes.
 
-    Expected Behavior
-    -----------------
-    1. latest_justified_slot remains 7
-    2. latest_finalized_slot remains 1
-    3. safe_target settles on block_7
-    4. The attestation target also resolves to block_7
+    When
+    ----
+    - the chain extends past finality through block_11.
+
+    Then
+    ----
+    - justified stays at slot 7.
+    - finalized stays at slot 1.
+    - the safe target settles on block_7.
+    - the target pins to block_7 as the head extends.
     """
     fork_choice_test(
         steps=[
@@ -615,9 +621,6 @@ def test_attestation_target_selection_after_finality_has_moved(
                     latest_finalized_slot=Slot(1),
                 ),
             ),
-            # First block after finality moves.
-            # Full check that the walkback respects the new finalized boundary
-            # instead of falling back to genesis.
             BlockStep(
                 block=BlockSpec(slot=Slot(9), parent_label="block_8", label="block_9"),
                 checks=StoreChecks(
@@ -629,7 +632,6 @@ def test_attestation_target_selection_after_finality_has_moved(
                     attestation_target_slot=Slot(7),
                 ),
             ),
-            # Target must stay pinned on block_7 as the head extends.
             BlockStep(
                 block=BlockSpec(slot=Slot(10), parent_label="block_9", label="block_10"),
                 checks=StoreChecks(

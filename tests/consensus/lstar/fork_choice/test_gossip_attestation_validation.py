@@ -30,16 +30,21 @@ def test_valid_gossip_attestation(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Valid gossip attestation is processed successfully.
+    A valid gossip attestation is accepted.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit a valid gossip attestation from validator 1 for slot 2.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Attestation is validated and stored successfully
-        - Store head remains at slot 2
+    When
+    ----
+    - V1 gossips a vote for block_2 at slot 2.
+
+    Then
+    ----
+    - the attestation is validated and stored.
     """
     fork_choice_test(
         steps=[
@@ -67,16 +72,21 @@ def test_attestation_target_slot_mismatch_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation with target checkpoint slot mismatch is rejected.
+    A vote whose target slot disagrees with the target block is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Attempt to submit attestation where target_slot (3) does not match
-    the target block's actual slot (2).
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validation fails with "Target checkpoint slot mismatch" error
+    When
+    ----
+    - V1 gossips a vote naming target slot 3 for block_2, which sits at slot 2.
+
+    Then
+    ----
+    - validation fails with a target checkpoint slot mismatch.
     """
     fork_choice_test(
         steps=[
@@ -109,15 +119,22 @@ def test_attestation_too_far_in_future_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation for slot too far in the future is rejected.
+    A vote whose slot is two slots ahead of local time is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Attempt to submit attestation for slot 4 (2 slots in the future).
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is at slot 2.
 
-    Expected:
-        - Validation fails with "Attestation too far in future" error
+    When
+    ----
+    - V1 gossips a vote at slot 4, two slots in the future.
+
+    Then
+    ----
+    - validation fails with attestation too far in future.
     """
     fork_choice_test(
         steps=[
@@ -150,17 +167,22 @@ def test_attestation_at_disparity_boundary_allowed(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation exactly at the disparity boundary is allowed.
+    A vote exactly at the disparity boundary is accepted.
 
-    Scenario
-    --------
-    Build a chain through slot 2.
-    Tick to the latest local interval that still admits a slot-3 vote.
-    Submit a slot-3 attestation.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is the latest interval that still admits a slot-3 vote.
 
-    Expected:
+    When
+    ----
+    - V1 gossips a vote at slot 3.
 
-    - Attestation is validated successfully.
+    Then
+    ----
+    - the attestation is validated.
     """
     fork_choice_test(
         steps=[
@@ -189,17 +211,22 @@ def test_attestation_just_beyond_disparity_boundary_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation one interval beyond the disparity boundary is rejected.
+    A vote one interval beyond the disparity boundary is rejected.
 
-    Scenario
-    --------
-    Build a chain through slot 2.
-    Tick to one interval before the disparity boundary for a slot-3 vote.
-    Submit a slot-3 attestation.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is one interval before the boundary for a slot-3 vote.
 
-    Expected:
+    When
+    ----
+    - V1 gossips a vote at slot 3.
 
-    - Validation fails with "Attestation too far in future" error.
+    Then
+    ----
+    - validation fails with attestation too far in future.
     """
     fork_choice_test(
         steps=[
@@ -233,20 +260,27 @@ def test_attestation_one_full_slot_in_future_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation a full slot ahead of local time is rejected.
+    A vote a full slot ahead of local time is rejected.
 
-    Regression: an earlier rule admitted votes up to a full slot ahead.
-    That window let an adversary pre-publish next-slot aggregates before
-    any honest validator could produce them.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is slot 2 interval 0.
 
-    Scenario
-    --------
-    Build a chain through slot 2.
-    At slot-2 interval 0, submit a slot-3 attestation (5 intervals ahead).
+    When
+    ----
+    - V1 gossips a vote at slot 3, five intervals ahead.
 
-    Expected:
+    Then
+    ----
+    - validation fails with attestation too far in future.
 
-    - Validation fails with "Attestation too far in future" error.
+    Regression
+    ----------
+    - an earlier rule admitted votes up to a full slot ahead.
+    - that window let an adversary pre-publish next-slot votes early.
     """
     fork_choice_test(
         steps=[
@@ -279,16 +313,23 @@ def test_multiple_gossip_attestations_from_different_validators(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Multiple gossip attestations from different validators are processed.
+    Gossip votes from several validators are each accepted independently.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1-5.
-    Submit gossip attestations from multiple validators.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3) -> block_4(4) -> block_5(5)
 
-    Expected:
-        - All attestations are validated and stored
-        - No conflicts between validators
+    When
+    ----
+    - V0 gossips a vote for block_5.
+    - V1 gossips a vote for block_5.
+    - V2 gossips a vote for block_5.
+
+    Then
+    ----
+    - every vote is validated and stored.
     """
     fork_choice_test(
         steps=[
@@ -344,16 +385,22 @@ def test_gossip_attestation_with_invalid_signature(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation with invalid signature is rejected.
+    A vote carrying an invalid signature is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Attempt to submit attestation with dummy (invalid) signature.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Signature verification fails
-        - Attestation is rejected
+    When
+    ----
+    - V1 gossips a vote for block_2 with an invalid signature.
+
+    Then
+    ----
+    - signature verification fails.
+    - the attestation is rejected.
     """
     fork_choice_test(
         steps=[
@@ -387,16 +434,22 @@ def test_gossip_attestation_with_unknown_validator(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation from unknown validator is rejected.
+    A vote from a validator index outside the registry is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Attempt to submit attestation with validator index beyond registry.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validator lookup fails
-        - Attestation is rejected
+    When
+    ----
+    - V999 gossips a vote for block_2.
+
+    Then
+    ----
+    - the validator lookup fails.
+    - the attestation is rejected.
     """
     fork_choice_test(
         steps=[
@@ -430,15 +483,21 @@ def test_attestation_source_slot_exceeds_target_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation where source slot exceeds target slot is rejected.
+    A vote whose source slot exceeds its target slot is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1, 2, and 3.
-    Submit attestation with source at slot 3 and target at slot 2.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3)
 
-    Expected:
-        - Validation fails with "Source checkpoint slot must not exceed target"
+    When
+    ----
+    - V1 gossips a vote with source block_3 at slot 3 and target block_2 at slot 2.
+
+    Then
+    ----
+    - validation fails because source slot must not exceed target.
     """
     fork_choice_test(
         steps=[
@@ -477,15 +536,21 @@ def test_attestation_head_older_than_target_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation where head slot is older than target slot is rejected.
+    A vote whose head is older than its target is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1, 2, and 3.
-    Submit attestation with target at slot 3 but head pointing to slot 1.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3)
 
-    Expected:
-        - Validation fails with "Head checkpoint must not be older than target"
+    When
+    ----
+    - V1 gossips a vote with target block_3 at slot 3 and head block_1 at slot 1.
+
+    Then
+    ----
+    - validation fails because head must not be older than target.
     """
     fork_choice_test(
         steps=[
@@ -523,15 +588,21 @@ def test_attestation_source_slot_override_exceeds_target_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation where source slot exceeds target slot is rejected (via slot override).
+    A vote whose overridden source slot exceeds its target slot is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit attestation where the source slot (5) exceeds the target slot (2).
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validation fails because source slot (5) exceeds target slot (2)
+    When
+    ----
+    - V1 gossips a vote for target block_2 at slot 2 with source slot 5.
+
+    Then
+    ----
+    - validation fails because source slot 5 exceeds target slot 2.
     """
     fork_choice_test(
         steps=[
@@ -565,17 +636,23 @@ def test_attestation_source_slot_mismatch_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation with source checkpoint slot mismatch is rejected.
+    A vote whose source slot disagrees with the source block is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit attestation where the source slot (1) does not match
-    the source block's actual slot (0, the genesis/anchor block),
-    but still satisfies source <= target ordering.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - the source block is the genesis anchor at slot 0.
 
-    Expected:
-        - Validation fails with "Source checkpoint slot mismatch"
+    When
+    ----
+    - V1 gossips a vote for block_2 naming source slot 1.
+    - source slot 1 still stays at or below target slot 2.
+
+    Then
+    ----
+    - validation fails with a source checkpoint slot mismatch.
     """
     fork_choice_test(
         steps=[
@@ -609,16 +686,21 @@ def test_attestation_head_slot_mismatch_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation with head checkpoint slot mismatch is rejected.
+    A vote whose head slot disagrees with the head block is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit attestation where the head slot (5) does not match
-    the head block's actual slot (2).
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validation fails with "Head checkpoint slot mismatch"
+    When
+    ----
+    - V1 gossips a vote naming head slot 5 for block_2, which sits at slot 2.
+
+    Then
+    ----
+    - validation fails with a head checkpoint slot mismatch.
     """
     fork_choice_test(
         steps=[
@@ -652,17 +734,24 @@ def test_gossip_attestation_chain_extended_after_gossip(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Chain can be extended after processing gossip attestations.
+    The chain extends normally after gossip votes have been processed.
 
-    Scenario
-    --------
-    Build a chain and submit gossip attestations.
-    Extend the chain with new blocks.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - V0 has gossiped a vote for block_2.
+    - V1 has gossiped a vote for block_2.
 
-    Expected:
-        - Gossip attestations are preserved
-        - Chain extension succeeds
-        - Head advances to new block
+    When
+    ----
+    - block_3 then block_4 extend the chain.
+
+    Then
+    ----
+    - the gossip votes are preserved.
+    - head advances to block_4.
     """
     fork_choice_test(
         steps=[
@@ -710,15 +799,21 @@ def test_attestation_unknown_target_block_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation referencing an unknown target block is rejected.
+    A vote whose target root is absent from the store is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit attestation whose target root does not exist in the store.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validation fails with "Unknown target block"
+    When
+    ----
+    - V1 gossips a vote whose target root does not exist in the store.
+
+    Then
+    ----
+    - validation fails with an unknown target block.
     """
     fork_choice_test(
         steps=[
@@ -753,15 +848,21 @@ def test_attestation_unknown_head_block_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation referencing an unknown head block is rejected.
+    A vote whose head root is absent from the store is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit attestation whose head root does not exist in the store.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validation fails with "Unknown head block"
+    When
+    ----
+    - V1 gossips a vote whose head root does not exist in the store.
+
+    Then
+    ----
+    - validation fails with an unknown head block.
     """
     fork_choice_test(
         steps=[
@@ -796,15 +897,21 @@ def test_attestation_unknown_source_block_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation referencing an unknown source block is rejected.
+    A vote whose source root is absent from the store is rejected.
 
-    Scenario
-    --------
-    Build a chain with blocks at slots 1 and 2.
-    Submit attestation whose source root does not exist in the store.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
 
-    Expected:
-        - Validation fails with "Unknown source block"
+    When
+    ----
+    - V1 gossips a vote whose source root does not exist in the store.
+
+    Then
+    ----
+    - validation fails with an unknown source block.
     """
     fork_choice_test(
         steps=[
@@ -839,19 +946,26 @@ def test_attestation_head_on_sibling_fork_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation whose head sits on a sibling fork of the target is rejected.
+    A vote whose head sits on a sibling fork of its target is rejected.
 
-    Scenario
-    --------
-    Build a common base at slot 1.
-    Create two competing blocks from that same base at slots 2 and 3.
-    Distinct slots give the siblings distinct roots so they never collide.
-    Vote with source on the base, target on the slot-2 block, and head on the
-    slot-3 block.
-    Every slot and availability check passes, yet target and head diverge.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        base(1)
+        - fork_left(2)
+        - fork_right(3)
+    - fork_left and fork_right are siblings of base.
+    - distinct slots give the siblings distinct roots.
 
-    Expected:
-        - Validation fails with "Target checkpoint must be ancestor of head"
+    When
+    ----
+    - V1 gossips a vote with source base, target fork_left, and head fork_right.
+    - every slot and availability check passes.
+
+    Then
+    ----
+    - validation fails because target must be an ancestor of head.
     """
     fork_choice_test(
         steps=[
@@ -891,21 +1005,26 @@ def test_attestation_source_on_sibling_fork_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    Attestation whose source sits on a sibling fork of the target is rejected.
+    A vote whose source sits on a sibling fork of its target is rejected.
 
-    Scenario
-    --------
-    Build a common base at slot 1.
-    Create a slot-2 block on one branch from that base.
-    Create a slot-3 block on a competing branch from that same base.
-    Distinct slots give the branches distinct roots so they never collide.
-    Extend the competing branch with a slot-4 block.
-    Vote with source on the abandoned slot-2 block, target on the slot-4 block,
-    and head on that same slot-4 block.
-    Source slot precedes the target slot, yet source lies off the target chain.
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        base(1)
+        - fork_left(2)
+        - fork_right(3) -> fork_right_head(4)
+    - fork_left lies on a branch the vote does not extend.
+    - distinct slots give the branches distinct roots.
 
-    Expected:
-        - Validation fails with "Source checkpoint must be ancestor of target"
+    When
+    ----
+    - V1 gossips a vote with source fork_left, target fork_right_head, and head fork_right_head.
+    - source slot 2 precedes the target slot 4.
+
+    Then
+    ----
+    - validation fails because source must be an ancestor of target.
     """
     fork_choice_test(
         steps=[

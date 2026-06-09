@@ -1,4 +1,4 @@
-"""Varint decoder: invalid-input rejection vectors."""
+"""Varint decoder invalid-input rejection vectors."""
 
 import pytest
 
@@ -14,9 +14,19 @@ def test_varint_truncated_mid_stream_rejected(
     """
     A varint whose final byte still has the continuation bit set is rejected.
 
-    Two bytes (`0x80 0x80`) each carry the continuation bit but there are no
-    further bytes to complete the value. The decoder must raise
-    `VarintError("Truncated varint")`.
+    Given
+    -----
+    - two bytes 0x80 0x80.
+    - both carry the continuation bit.
+    - no further bytes complete the value.
+
+    When
+    ----
+    - the bytes are decoded as a varint.
+
+    Then
+    ----
+    - decoding is rejected because the varint is truncated.
     """
     networking_codec_test(
         codec=DecodeFailure(decoder="varint", raw_bytes="0x8080"),
@@ -28,11 +38,20 @@ def test_varint_longer_than_ten_bytes_rejected(
     networking_codec_test: NetworkingCodecTestFiller,
 ) -> None:
     """
-    A varint running eleven continuation bytes exceeds the 64-bit cap and is rejected.
+    A varint running past ten bytes exceeds the 64-bit cap and is rejected.
 
-    A uint64 fits in at most ten varint bytes (70 bits with 6 unused). Eleven
-    continuation bytes means the decoder cannot represent the value and must
-    raise `VarintError("Varint too long")`.
+    Given
+    -----
+    - eleven continuation bytes.
+    - a 64-bit value fits in at most ten varint bytes.
+
+    When
+    ----
+    - the bytes are decoded as a varint.
+
+    Then
+    ----
+    - decoding is rejected because the varint is too long to represent.
     """
     networking_codec_test(
         codec=DecodeFailure(decoder="varint", raw_bytes="0x" + "80" * 11),

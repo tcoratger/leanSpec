@@ -32,9 +32,6 @@ from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32, Bytes52, Uint64
 pytestmark = pytest.mark.valid_until("Lstar")
 
 
-# --- Helper functions ---
-
-
 def _zero_checkpoint() -> Checkpoint:
     """Build a checkpoint with all-zero root and slot zero."""
     return Checkpoint(root=Bytes32.zero(), slot=Slot(0))
@@ -54,40 +51,101 @@ def _typical_attestation_data() -> AttestationData:
     return AttestationData(slot=Slot(100), head=head, target=target, source=source)
 
 
-# --- Checkpoint ---
-
-
 def test_checkpoint_zero(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Checkpoint with zero values."""
+    """
+    A checkpoint with zero values round-trips unchanged.
+
+    Given
+    -----
+    - a checkpoint with an all-zero root at slot zero.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(type_name="Checkpoint", value=_zero_checkpoint())
 
 
 def test_checkpoint_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Checkpoint with typical values."""
+    """
+    A checkpoint with non-zero values round-trips unchanged.
+
+    Given
+    -----
+    - a checkpoint with a non-zero root at slot 12345.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Checkpoint",
         value=Checkpoint(root=Bytes32(b"\xab" * 32), slot=Slot(12345)),
     )
 
 
-# --- AttestationData ---
-
-
 def test_attestation_data_zero(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for AttestationData with zero values."""
+    """
+    Attestation data with zero values round-trips unchanged.
+
+    Given
+    -----
+    - attestation data with all checkpoints and slot at zero.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(type_name="AttestationData", value=_zero_attestation_data())
 
 
 def test_attestation_data_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for AttestationData with typical values."""
+    """
+    Attestation data with distinct checkpoints round-trips unchanged.
+
+    Given
+    -----
+    - attestation data with distinct head, target, and source checkpoints.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(type_name="AttestationData", value=_typical_attestation_data())
 
 
-# --- Attestation ---
-
-
 def test_attestation_zero(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Attestation with zero values."""
+    """
+    An attestation with zero values round-trips unchanged.
+
+    Given
+    -----
+    - an attestation from validator index 0 with zero attestation data.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Attestation",
         value=Attestation(validator_index=ValidatorIndex(0), data=_zero_attestation_data()),
@@ -95,18 +153,44 @@ def test_attestation_zero(ssz_test: SSZTestFiller) -> None:
 
 
 def test_attestation_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Attestation with typical values."""
+    """
+    An attestation with non-zero values round-trips unchanged.
+
+    Given
+    -----
+    - an attestation from validator index 42 with distinct attestation data.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Attestation",
         value=Attestation(validator_index=ValidatorIndex(42), data=_typical_attestation_data()),
     )
 
 
-# --- SignedAttestation ---
-
-
 def test_signed_attestation_minimal(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for SignedAttestation with minimal values."""
+    """
+    A signed attestation with minimal values round-trips unchanged.
+
+    Given
+    -----
+    - a signed attestation from validator index 0 with zero attestation data.
+    - a placeholder signature.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="SignedAttestation",
         value=SignedAttestation(
@@ -117,11 +201,23 @@ def test_signed_attestation_minimal(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- AggregatedAttestation ---
-
-
 def test_aggregated_attestation_single(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for AggregatedAttestation with single validator."""
+    """
+    An aggregated attestation with one participant round-trips unchanged.
+
+    Given
+    -----
+    - an aggregated attestation with a single set participation bit.
+    - zero attestation data.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="AggregatedAttestation",
         value=AggregatedAttestation(
@@ -132,7 +228,22 @@ def test_aggregated_attestation_single(ssz_test: SSZTestFiller) -> None:
 
 
 def test_aggregated_attestation_multiple(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for AggregatedAttestation with multiple validators."""
+    """
+    An aggregated attestation with several participants round-trips unchanged.
+
+    Given
+    -----
+    - an aggregated attestation with four mixed participation bits.
+    - distinct attestation data.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="AggregatedAttestation",
         value=AggregatedAttestation(
@@ -144,11 +255,22 @@ def test_aggregated_attestation_multiple(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- BlockBody ---
-
-
 def test_block_body_empty(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for BlockBody with no attestations."""
+    """
+    A block body with no attestations round-trips unchanged.
+
+    Given
+    -----
+    - a block body whose attestation list is empty.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="BlockBody",
         value=BlockBody(attestations=AggregatedAttestations(data=[])),
@@ -156,7 +278,21 @@ def test_block_body_empty(ssz_test: SSZTestFiller) -> None:
 
 
 def test_block_body_with_attestation(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for BlockBody with attestations."""
+    """
+    A block body carrying one attestation round-trips unchanged.
+
+    Given
+    -----
+    - a block body with a single aggregated attestation.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="BlockBody",
         value=BlockBody(
@@ -172,11 +308,22 @@ def test_block_body_with_attestation(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- BlockHeader ---
-
-
 def test_block_header_zero(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for BlockHeader with zero values."""
+    """
+    A block header with zero values round-trips unchanged.
+
+    Given
+    -----
+    - a block header at slot zero with proposer index 0 and all-zero roots.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="BlockHeader",
         value=BlockHeader(
@@ -190,7 +337,21 @@ def test_block_header_zero(ssz_test: SSZTestFiller) -> None:
 
 
 def test_block_header_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for BlockHeader with typical values."""
+    """
+    A block header with non-zero values round-trips unchanged.
+
+    Given
+    -----
+    - a block header at slot 100 with proposer index 3 and distinct roots.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="BlockHeader",
         value=BlockHeader(
@@ -203,11 +364,22 @@ def test_block_header_typical(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- Block ---
-
-
 def test_block_empty_body(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Block with empty body."""
+    """
+    A block with an empty body round-trips unchanged.
+
+    Given
+    -----
+    - a block at slot zero whose body holds no attestations.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Block",
         value=Block(
@@ -221,7 +393,22 @@ def test_block_empty_body(ssz_test: SSZTestFiller) -> None:
 
 
 def test_block_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Block with attestations."""
+    """
+    A block carrying one attestation round-trips unchanged.
+
+    Given
+    -----
+    - a block at slot 100 with distinct roots.
+    - a body holding a single aggregated attestation.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Block",
         value=Block(
@@ -243,11 +430,23 @@ def test_block_typical(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- SignedBlock ---
-
-
 def test_signed_block_minimal(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for SignedBlock with empty proof bytes."""
+    """
+    A signed block with empty proof bytes round-trips unchanged.
+
+    Given
+    -----
+    - a block at slot 1 with an empty body.
+    - a multi-message aggregate with empty proof bytes.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     block = Block(
         slot=Slot(1),
         proposer_index=ValidatorIndex(0),
@@ -265,7 +464,22 @@ def test_signed_block_minimal(ssz_test: SSZTestFiller) -> None:
 
 
 def test_signed_block_with_proof_bytes(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for SignedBlock with non-empty proof bytes."""
+    """
+    A signed block with proof bytes round-trips unchanged.
+
+    Given
+    -----
+    - a block at slot 2 with distinct roots and an empty body.
+    - a multi-message aggregate carrying four bytes of proof content.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     block = Block(
         slot=Slot(2),
         proposer_index=ValidatorIndex(1),
@@ -282,24 +496,60 @@ def test_signed_block_with_proof_bytes(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- Config ---
-
-
 def test_config_zero(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Config with zero genesis time."""
+    """
+    A config with zero genesis time round-trips unchanged.
+
+    Given
+    -----
+    - a config whose genesis time is zero.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(type_name="Config", value=GenesisConfig(genesis_time=Uint64(0)))
 
 
 def test_config_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Config with typical genesis time."""
+    """
+    A config with a non-zero genesis time round-trips unchanged.
+
+    Given
+    -----
+    - a config whose genesis time is 1609459200.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(type_name="Config", value=GenesisConfig(genesis_time=Uint64(1609459200)))
 
 
-# --- Validator ---
-
-
 def test_validator_zero(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Validator with zero values."""
+    """
+    A validator with zero values round-trips unchanged.
+
+    Given
+    -----
+    - a validator at index 0 with all-zero public keys.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Validator",
         value=Validator(
@@ -311,7 +561,21 @@ def test_validator_zero(ssz_test: SSZTestFiller) -> None:
 
 
 def test_validator_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Validator with typical values."""
+    """
+    A validator with non-zero values round-trips unchanged.
+
+    Given
+    -----
+    - a validator at index 42 with non-zero public keys.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Validator",
         value=Validator(
@@ -322,11 +586,23 @@ def test_validator_typical(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- State ---
-
-
 def test_state_minimal(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for State with minimal values."""
+    """
+    A state with minimal values round-trips unchanged.
+
+    Given
+    -----
+    - a state at slot zero with a zero block header and zero checkpoints.
+    - a single validator and empty history lists.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     zero_cp = _zero_checkpoint()
     zero_header = BlockHeader(
         slot=Slot(0),
@@ -361,7 +637,22 @@ def test_state_minimal(ssz_test: SSZTestFiller) -> None:
 
 
 def test_state_with_validators(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for State with multiple validators and history."""
+    """
+    A state with several validators and history round-trips unchanged.
+
+    Given
+    -----
+    - a state at slot 100 with non-zero checkpoints and block header.
+    - four validators, two historical block hashes, and justification data.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="State",
         value=State(
@@ -412,11 +703,23 @@ def test_state_with_validators(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- SignedAggregatedAttestation ---
-
-
 def test_signed_aggregated_attestation_minimal(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for SignedAggregatedAttestation with one participant and empty proof."""
+    """
+    A signed aggregated attestation with one participant round-trips unchanged.
+
+    Given
+    -----
+    - a signed aggregated attestation over zero attestation data.
+    - a proof with one participant and empty proof bytes.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     data = _zero_attestation_data()
     ssz_test(
         type_name="SignedAggregatedAttestation",
@@ -431,7 +734,22 @@ def test_signed_aggregated_attestation_minimal(ssz_test: SSZTestFiller) -> None:
 
 
 def test_signed_aggregated_attestation_typical(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for SignedAggregatedAttestation with mixed participation bits."""
+    """
+    A signed aggregated attestation with mixed participation round-trips unchanged.
+
+    Given
+    -----
+    - a signed aggregated attestation over distinct attestation data.
+    - a proof with four mixed participation bits and six bytes of proof content.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     data = _typical_attestation_data()
     wire = b"\xca\xfe\xba\xbe\xde\xad"
     ssz_test(
@@ -448,11 +766,23 @@ def test_signed_aggregated_attestation_typical(ssz_test: SSZTestFiller) -> None:
     )
 
 
-# --- Boundary-value tests ---
-
-
 def test_checkpoint_max_slot(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Checkpoint at the maximum 64-bit slot and all-0xff root."""
+    """
+    A checkpoint at the maximum slot round-trips unchanged.
+
+    Given
+    -----
+    - a checkpoint with an all-0xff root.
+    - the maximum 64-bit slot value.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Checkpoint",
         value=Checkpoint(root=Bytes32(b"\xff" * 32), slot=Slot(2**64 - 1)),
@@ -460,7 +790,22 @@ def test_checkpoint_max_slot(ssz_test: SSZTestFiller) -> None:
 
 
 def test_block_body_max_attestations(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for BlockBody with four attestations of varying aggregation sizes."""
+    """
+    A block body with four attestations round-trips unchanged.
+
+    Given
+    -----
+    - a block body holding four aggregated attestations.
+    - participation bitfields of varying sizes across the attestations.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="BlockBody",
         value=BlockBody(
@@ -498,7 +843,22 @@ def test_block_body_max_attestations(ssz_test: SSZTestFiller) -> None:
 
 
 def test_validator_max_index(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for Validator at the maximum 64-bit index with all-0xff public keys."""
+    """
+    A validator at the maximum index round-trips unchanged.
+
+    Given
+    -----
+    - a validator with all-0xff public keys.
+    - the maximum 64-bit index value.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="Validator",
         value=Validator(
@@ -510,7 +870,22 @@ def test_validator_max_index(ssz_test: SSZTestFiller) -> None:
 
 
 def test_state_with_full_history(ssz_test: SSZTestFiller) -> None:
-    """SSZ roundtrip for State with five block hashes, eight justification bits, and three roots."""
+    """
+    A state with full history round-trips unchanged.
+
+    Given
+    -----
+    - a state at slot 500 with five historical block hashes.
+    - eight justification bits and three justification roots.
+
+    When
+    ----
+    - the value is encoded and then decoded.
+
+    Then
+    ----
+    - the decoded value equals the original.
+    """
     ssz_test(
         type_name="State",
         value=State(

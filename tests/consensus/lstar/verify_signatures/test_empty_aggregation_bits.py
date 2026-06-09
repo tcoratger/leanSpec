@@ -1,4 +1,4 @@
-"""Signature verification: empty aggregation_bits rejection vector."""
+"""Signature verification rejects an aggregate that names zero participants."""
 
 import pytest
 
@@ -19,27 +19,20 @@ def test_empty_aggregation_bits_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
     """
-    A signed block whose attestation references zero participants is rejected.
+    An aggregate that names zero participants is rejected.
 
-    Scenario
-    --------
-    - Anchor state has 3 validators.
-    - Block at slot 1 carries one aggregated attestation.
-    - The tamper hook replaces the first attestation's aggregation_bits
-      with a bitfield where no bit is set.
+    Given
+    -----
+    - a registry of 3 validators.
+    - an aggregate whose participation bitfield has no bit set.
 
-    Expected Behavior
-    -----------------
-    Signature verification fails with AssertionError:
-    "Aggregated attestation must reference at least one validator"
+    When
+    ----
+    - signature verification runs.
 
-    Why This Matters
-    ----------------
-    An aggregated attestation with no participants carries no signed
-    message. The block builder never produces one because its
-    aggregation pass starts from a non-empty validator set, but a
-    malicious peer could. Clients must raise before attempting to look
-    up public keys for a zero-participant attestation.
+    Then
+    ----
+    - verification is rejected because the aggregate names no participants.
     """
     verify_signatures_test(
         anchor_state=generate_pre_state(num_validators=3),

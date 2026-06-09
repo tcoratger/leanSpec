@@ -1,10 +1,4 @@
-"""
-API endpoint conformance vectors after the chain has advanced past genesis.
-
-Existing API fixtures pin responses against a genesis-only store. This
-file pins the same endpoints after an empty-block chain has advanced,
-so clients' response shapes at non-zero slots are also captured.
-"""
+"""API endpoint conformance vectors after the chain has advanced past genesis."""
 
 import pytest
 
@@ -19,35 +13,68 @@ GENESIS_4V_AT_SLOT_3 = {"numValidators": 4, "genesisTime": 0, "anchorSlot": 3}
 
 def test_fork_choice_tree_at_slot_3(api_endpoint_test: ApiEndpointTestFiller) -> None:
     """
-    Fork-choice response carries a multi-node tree once the chain advances.
+    The fork-choice endpoint returns a multi-node tree once the chain advances.
 
-    With the chain at slot 3 the store holds four blocks (genesis plus
-    slots 1 through 3). The response's nodes list, head root, and
-    parent-root linkage are pinned so clients diverge only when their
-    tree traversal or SSZ root computation differs.
+    Given
+    -----
+    - 4 validators.
+    - the chain has advanced to slot 3.
+    - the store holds four blocks (genesis plus slots 1 through 3).
+
+    When
+    ----
+    - the fork-choice endpoint is queried.
+
+    Then
+    ----
+    - the response lists all four nodes.
+    - the response pins the head root.
+    - the response pins the parent-root linkage.
     """
     api_endpoint_test(endpoint="/lean/v0/fork_choice", genesis_params=GENESIS_4V_AT_SLOT_3)
 
 
 def test_finalized_state_at_slot_3(api_endpoint_test: ApiEndpointTestFiller) -> None:
     """
-    Finalized-state response returns the SSZ-encoded anchor state after chain advance.
+    The finalized-state endpoint returns the anchor state after the chain advances.
 
-    Finalization has not yet moved past genesis (no attestations have
-    been injected), but the served state now carries non-empty
-    historical_block_hashes because the chain has processed three empty
-    blocks. Pins the exact SSZ bytes at that configuration.
+    Given
+    -----
+    - 4 validators.
+    - the chain has processed three empty blocks to slot 3.
+    - no attestations have been injected.
+
+    When
+    ----
+    - the finalized-state endpoint is queried.
+
+    Then
+    ----
+    - finalization stays at genesis.
+    - the served state carries non-empty historical block hashes.
+    - the exact serialized state bytes are pinned.
     """
     api_endpoint_test(endpoint="/lean/v0/states/finalized", genesis_params=GENESIS_4V_AT_SLOT_3)
 
 
 def test_justified_checkpoint_at_slot_3(api_endpoint_test: ApiEndpointTestFiller) -> None:
     """
-    Justified-checkpoint response at a non-genesis slot pins the slot=0 root.
+    The justified-checkpoint endpoint reports the genesis root at a non-genesis slot.
 
-    Without attestations, justification remains at genesis even after
-    the chain advances. This vector pins that the response still
-    reports the genesis checkpoint, not a synthesised advance.
+    Given
+    -----
+    - 4 validators.
+    - the chain has advanced to slot 3.
+    - no attestations have been injected.
+
+    When
+    ----
+    - the justified-checkpoint endpoint is queried.
+
+    Then
+    ----
+    - justification stays at genesis.
+    - the response reports the slot-0 checkpoint root.
     """
     api_endpoint_test(
         endpoint="/lean/v0/checkpoints/justified",
