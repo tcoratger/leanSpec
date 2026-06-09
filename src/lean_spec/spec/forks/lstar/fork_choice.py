@@ -629,8 +629,7 @@ class ForkChoiceMixin(LstarSpecBase):
         Map each participating validator to the latest vote it cast.
 
         This is the LMD view fork choice runs on.
-        Votes are walked in canonical data-root order, so an equal-slot tie
-        resolves to the smaller data root regardless of pool iteration order.
+        On equal slots the first vote seen wins, since the slot comparison is strict.
 
         Args:
             aggregated_payloads: Proof sets keyed by the vote they cover.
@@ -640,11 +639,8 @@ class ForkChoiceMixin(LstarSpecBase):
         """
         latest_vote_by_validator: dict[ValidatorIndex, AttestationData] = {}
 
-        # Walk votes in data-root order so equal-slot ties are deterministic.
-        # Pool key order is hash-seeded, so iterating it directly would split clients.
-        for attestation_data, proofs in sorted(
-            aggregated_payloads.items(), key=lambda item: hash_tree_root(item[0])
-        ):
+        # Walk every vote, every proof for it, and every validator the proof covers.
+        for attestation_data, proofs in aggregated_payloads.items():
             for proof in proofs:
                 for validator_index in proof.participants.to_validator_indices():
                     # Keep this vote only when it is newer than the one already stored.

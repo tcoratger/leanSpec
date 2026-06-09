@@ -246,7 +246,7 @@ def test_same_slot_equivocating_attesters_count_once(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
     """
-    An equivocating validator is counted once, on the canonically chosen fork.
+    An equivocating validator is counted once, on the fork it first voted.
 
     Given
     -----
@@ -258,7 +258,7 @@ def test_same_slot_equivocating_attesters_count_once(
     - one vote at slot 3 targets fork_a from V0, V1, V2.
     - one vote at slot 3 targets fork_b from V0, V1, V3, V4.
     - V0 and V1 equivocate by voting on both forks at the same slot.
-    - the equal-slot tie resolves to fork_a by canonical data-root order.
+    - fork_a is gossiped first, so V0 and V1's first votes stick to it.
 
     When
     ----
