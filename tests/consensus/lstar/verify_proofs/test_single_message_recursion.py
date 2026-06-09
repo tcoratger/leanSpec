@@ -12,7 +12,7 @@ from lean_spec.spec.forks import Checkpoint, RejectionReason, Slot, ValidatorInd
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
 def test_single_message_recursion_one_child_one_raw(

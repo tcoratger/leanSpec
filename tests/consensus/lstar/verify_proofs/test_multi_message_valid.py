@@ -7,7 +7,7 @@ from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
 def test_multi_message_single_component_single_validator(

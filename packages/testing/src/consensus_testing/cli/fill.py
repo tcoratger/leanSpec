@@ -41,6 +41,12 @@ from consensus_testing.keys_cli import PINNED_KEY_SET_DIGESTS, download_keys
     default="test",
     help="XMSS signature scheme (default: test)",
 )
+@click.option(
+    "--crypto",
+    type=click.Choice(["mocked", "real"], case_sensitive=False),
+    default="mocked",
+    help="Aggregation prover mode (default: mocked; --scheme=prod forces real)",
+)
 @click.pass_context
 def fill(
     ctx: click.Context,
@@ -49,6 +55,7 @@ def fill(
     fork: str,
     clean: bool,
     scheme: str,
+    crypto: str,
 ) -> None:
     """
     Generate consensus test fixtures from test specifications.
@@ -64,6 +71,9 @@ def fill(
     # The current process froze the old value when the package imported.
     # Only the pytest subprocess below starts fresh and sees this export.
     os.environ["LEAN_ENV"] = scheme.lower()
+
+    # The prod scheme is the authoritative cross-client set, so it always runs real.
+    crypto_mode = "real" if scheme.lower() == "prod" else crypto.lower()
 
     # Check and download keys if needed
     keys_directory = get_keys_directory(scheme.lower())
@@ -95,6 +105,7 @@ def fill(
         f"--rootdir={project_root}",
         f"--output={output}",
         f"--fork={fork}",
+        f"--crypto={crypto_mode}",
     ]
 
     if clean:

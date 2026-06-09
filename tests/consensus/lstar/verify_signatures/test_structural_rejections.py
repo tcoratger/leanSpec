@@ -17,9 +17,10 @@ from consensus_testing import (
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
+@pytest.mark.real_crypto(smoke=True)
 def test_corrupt_proof_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:
@@ -78,6 +79,7 @@ def test_proof_component_count_mismatch_rejected(
     )
 
 
+@pytest.mark.real_crypto(smoke=True)
 def test_proof_reused_under_different_message_rejected(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:

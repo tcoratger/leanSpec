@@ -15,7 +15,7 @@ from lean_spec.spec.forks import Checkpoint, RejectionReason, Slot, ValidatorInd
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
 def test_multi_message_wrong_message_in_one_component(

@@ -10,7 +10,7 @@ from consensus_testing import (
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
 def test_proposer_signature(
@@ -41,6 +41,7 @@ def test_proposer_signature(
     )
 
 
+@pytest.mark.real_crypto(smoke=True)
 def test_proposer_and_attester_signatures(
     verify_signatures_test: VerifySignaturesTestFiller,
 ) -> None:

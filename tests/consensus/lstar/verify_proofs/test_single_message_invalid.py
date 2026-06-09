@@ -13,9 +13,10 @@ from lean_spec.spec.forks import Checkpoint, RejectionReason, Slot, ValidatorInd
 from lean_spec.spec.forks.lstar.containers import AttestationData
 from lean_spec.spec.ssz import Bytes32
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
+@pytest.mark.real_crypto(smoke=True)
 def test_single_message_wrong_message(
     verify_single_message_proofs_test: VerifySingleMessageProofsTestFiller,
 ) -> None:

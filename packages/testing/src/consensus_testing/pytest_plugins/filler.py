@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from consensus_testing.crypto_mode import AggregationProver, CryptoMode
 from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
 from consensus_testing.test_fixtures import FIXTURE_FORMATS, FixtureInfo
@@ -147,6 +148,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Clean output directory before generating",
     )
+    group.addoption(
+        "--crypto",
+        action="store",
+        default="mocked",
+        choices=["mocked", "real"],
+        help="Aggregation prover mode: mocked (default) or real",
+    )
 
 
 def pytest_ignore_collect(collection_path: Path) -> bool | None:
@@ -181,6 +189,14 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "valid_until(fork): specifies until which fork a test case is valid",
     )
+    config.addinivalue_line(
+        "markers",
+        "real_crypto(smoke=False): build and verify with the real prover, never the mock; "
+        "smoke=True also keeps it in the fast mocked lane",
+    )
+
+    # The prod scheme is the authoritative cross-client set, so it always runs real.
+    AggregationProver.set_mode(CryptoMode(config.getoption("--crypto")))
 
     # Get options
     output_directory = Path(config.getoption("--output"))
@@ -234,21 +250,31 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Modify collected test items to deselect tests not valid for the selected fork."""
+    """
+    Deselect tests not valid for the fork, and full real-crypto tests in the mocked lane.
+
+    Real-crypto vectors cannot be mocked, so the fast mocked lane keeps only the
+    smoke subset and leaves the rest to the real lane.
+    """
     if not hasattr(config, "test_fork_class"):
         return
 
     fork_class = config.test_fork_class
     verbose = config.getoption("verbose")
+    mocking = AggregationProver.get_mode() == CryptoMode.MOCKED
     deselected_items = []
     selected_items = []
 
     for test_item in items:
-        if not _check_markers_valid_for_fork(list(test_item.iter_markers()), fork_class):
-            if verbose < 2:
-                deselected_items.append(test_item)
-            else:
-                selected_items.append(test_item)
+        markers = list(test_item.iter_markers())
+        invalid_for_fork = not _check_markers_valid_for_fork(markers, fork_class)
+        real_crypto_markers = [marker for marker in markers if marker.name == "real_crypto"]
+        non_smoke_real_crypto = bool(real_crypto_markers) and not any(
+            marker.kwargs.get("smoke") for marker in real_crypto_markers
+        )
+
+        if (invalid_for_fork and verbose < 2) or (mocking and non_smoke_real_crypto):
+            deselected_items.append(test_item)
         else:
             selected_items.append(test_item)
 
@@ -408,7 +434,28 @@ def base_spec_filler_parametrizer(spec_class: Any) -> Any:
 
         def fill_and_collect(**spec_fields: Any) -> Any:
             test_spec = spec_class(**spec_fields)
-            filled_fixture = test_spec.generate().with_info(
+
+            # Mock the prover unless the run is real or the test opted into real crypto.
+            mock_prover = AggregationProver.get_mode() == CryptoMode.MOCKED and (
+                not request.node.get_closest_marker("real_crypto")
+            )
+            if mock_prover:
+                with AggregationProver.mocked():
+                    generated_fixture = test_spec.generate()
+            else:
+                generated_fixture = test_spec.generate()
+
+            # - 0 mocked,
+            # - 1 real and must verify,
+            # - 2 real and must fail verification.
+            if mock_prover:
+                proof_setting = 0
+            elif test_spec.expected_rejection is not None:
+                proof_setting = 2
+            else:
+                proof_setting = 1
+
+            filled_fixture = generated_fixture.with_info(
                 info=FixtureInfo(
                     test_id=request.node.nodeid,
                     description=test_case_description,
@@ -416,7 +463,7 @@ def base_spec_filler_parametrizer(spec_class: Any) -> Any:
                     key_set_digest=XmssKeyManager.shared().key_set_digest(),
                 ),
                 network=fork.name(),
-            )
+            ).model_copy(update={"proof_setting": proof_setting})
 
             if hasattr(request.config, "fixture_collector"):
                 request.config.fixture_collector.add_fixture(

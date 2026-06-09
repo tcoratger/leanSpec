@@ -11,7 +11,7 @@ from consensus_testing import (
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.real_crypto]
 
 
 def test_proposer_index_out_of_range_rejected(
