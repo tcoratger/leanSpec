@@ -76,34 +76,29 @@ def build_anchor(
     anchor_slot: Slot,
     fork: LstarSpec | None = None,
     genesis_time: Uint64 = _DEFAULT_GENESIS_TIME,
+    synced: bool = False,
 ) -> tuple[State, Block]:
     """
-    Build a consistent non-genesis anchor by advancing the genesis state.
+    Build a non-genesis anchor by advancing the genesis state to a slot.
 
-    Simulates the mid-chain view that a checkpoint-synced node would have:
-    a real state reached via the normal state transition from genesis,
-    plus the real block at that slot.
+    By default the anchor keeps the genesis checkpoints, modelling a mid-chain
+    state that has not finalized anything yet.
 
-    A checkpoint-synced node trusts the anchor as both justified and finalized.
-    So the returned state pins both checkpoints to the anchor block at the anchor slot.
-    The justification window is rebased onto that boundary, leaving nothing tracked yet.
+    With synced set, it models a checkpoint-synced node instead: both checkpoints
+    pin to the anchor slot and the justification window rebases onto that boundary.
 
-    The resulting (state, block) pair is internally consistent. That means:
-
-    - Block state_root equals hash_tree_root(state).
-    - State historical_block_hashes lists the real roots for slots 0..anchor_slot-1.
-    - State latest_block_header matches the anchor block header (without state_root).
-    - State latest_finalized and latest_justified both name the anchor at the anchor slot.
+    Either way the returned pair is internally consistent.
+    The block state root equals the hash of the state.
 
     Args:
-        fork: Fork dispatching genesis construction.
         num_validators: Size of the validator set in the anchor state.
         anchor_slot: Slot at which the anchor block lives. Must be > 0.
+        fork: Fork dispatching genesis construction.
         genesis_time: Genesis timestamp for the underlying pre-state.
+        synced: Pin both checkpoints to the anchor slot, for checkpoint-sync vectors.
 
     Returns:
-        A tuple of (anchor_state, anchor_block) ready to seed a fork choice
-        store at a non-genesis starting point.
+        A tuple of (anchor_state, anchor_block).
 
     Raises:
         ValueError: If anchor_slot is not strictly positive.
@@ -146,6 +141,10 @@ def build_anchor(
             known_block_roots={parent_root},
         )
         parent_root = hash_tree_root(current_block)
+
+    # A plain mid-chain anchor keeps the genesis checkpoints from the advance.
+    if not synced:
+        return state, current_block
 
     # Rebase the state onto the anchor as a freshly checkpoint-synced node would see it.
     #

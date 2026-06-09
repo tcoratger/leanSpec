@@ -55,7 +55,7 @@ def test_store_init_from_non_genesis_anchor(
     - the anchor state's embedded checkpoints already name the anchor slot.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     anchor_time_intervals = Interval(int(ANCHOR_SLOT) * int(INTERVALS_PER_SLOT))
@@ -108,7 +108,7 @@ def test_extend_chain_from_non_genesis_anchor(
     - every appended block is retained in the store.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     fork_choice_test(
@@ -196,7 +196,7 @@ def test_fork_off_non_genesis_anchor(
     - all four blocks remain in the store.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     fork_choice_test(
@@ -278,7 +278,7 @@ def test_non_genesis_anchor_is_internally_consistent(
     - the store accepts the anchor and a no-op step runs cleanly.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     assert anchor_block.state_root == hash_tree_root(anchor_state)
@@ -324,7 +324,7 @@ def test_store_from_anchor_rejects_mismatched_state_root(
     - no store is returned to the caller.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     assert anchor_block.state_root == hash_tree_root(anchor_state)

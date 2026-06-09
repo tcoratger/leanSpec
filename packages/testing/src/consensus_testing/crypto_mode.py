@@ -29,10 +29,14 @@ class CryptoMode(StrEnum):
 class AggregationProver:
     """Process-wide control over how aggregation proofs are built and checked."""
 
-    _prover_names = ("aggregate_type_1", "merge_many_type_1", "split_type_2_by_msg")
+    _prover_names = (
+        "aggregate_single_message",
+        "merge_many_single_message_proof",
+        "split_multi_message_proof_by_message",
+    )
     """Spec-module bindings that build a proof and return an (info, wire) pair."""
 
-    _verifier_names = ("verify_type_1", "verify_type_2_with_messages")
+    _verifier_names = ("verify_single_message_proof", "verify_multi_message_proof_with_messages")
     """Spec-module bindings that verify a proof and raise on rejection."""
 
     _mode = CryptoMode.MOCKED

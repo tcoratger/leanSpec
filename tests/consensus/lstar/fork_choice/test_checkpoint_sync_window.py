@@ -50,7 +50,7 @@ def test_post_anchor_vote_justifies_first_slot_above_anchor(
     - finalized stays at the anchor at slot 10.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     fork_choice_test(
@@ -132,7 +132,7 @@ def test_post_anchor_votes_can_finalize_above_anchor(
     - finalized advances to source_11 at slot 11.
     """
     anchor_state, anchor_block = build_anchor(
-        num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
+        synced=True, num_validators=NUM_VALIDATORS, anchor_slot=ANCHOR_SLOT
     )
 
     fork_choice_test(
