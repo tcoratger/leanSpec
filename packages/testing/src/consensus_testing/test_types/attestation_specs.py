@@ -161,11 +161,11 @@ class AggregatedAttestationSpec(AttestationSpec):
 
     aggregation_bits: AggregationBits | None = None
     """
-    Raw aggregation bits placed into the block body verbatim.
+    Raw aggregation bits for the block body, overriding index derivation.
 
-    When unset, bits are derived from the validator indices.
-    Only the state transition forced-attestation path honors an override.
-    Signed paths always derive bits from the validator indices.
+    - When unset, bits are derived from the validator indices.
+    - When set, the bits are used verbatim, even when zero-length or padded.
+    - Only the unsigned forced-attestation path honors the override.
     """
 
     def resolve_aggregation_bits(self) -> AggregationBits:
