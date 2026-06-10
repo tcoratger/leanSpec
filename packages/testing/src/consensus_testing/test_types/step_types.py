@@ -1,6 +1,6 @@
 """Step types for fork choice tests: author-facing inputs and emitted results."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import Field, field_serializer, model_validator
 
@@ -173,7 +173,7 @@ class GossipAggregatedAttestationStep(BaseForkChoiceStep):
 
 # Discriminated union type for all fork choice steps
 ForkChoiceStep = Annotated[
-    TickStep | BlockStep | AttestationStep | GossipAggregatedAttestationStep,
+    Union[TickStep, BlockStep, AttestationStep, GossipAggregatedAttestationStep],
     Field(discriminator="step_type"),
 ]
 
@@ -281,9 +281,11 @@ class FilledGossipAggregatedAttestationStep(BaseFilledStep):
 
 # Discriminated union type for all emitted fork choice steps
 FilledForkChoiceStep = Annotated[
-    FilledTickStep
-    | FilledBlockStep
-    | FilledAttestationStep
-    | FilledGossipAggregatedAttestationStep,
+    Union[
+        FilledTickStep,
+        FilledBlockStep,
+        FilledAttestationStep,
+        FilledGossipAggregatedAttestationStep,
+    ],
     Field(discriminator="step_type"),
 ]

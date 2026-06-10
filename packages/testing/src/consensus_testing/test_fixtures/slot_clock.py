@@ -1,6 +1,6 @@
 """Slot clock test fixture for timing conformance testing."""
 
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, ClassVar, Literal, Union
 
 from pydantic import Field
 
@@ -146,7 +146,7 @@ class TotalIntervals(StrictBaseModel):
 
 
 SlotClockOperation = Annotated[
-    FromUnixTime | FromSlot | CurrentSlot | CurrentInterval | TotalIntervals,
+    Union[FromUnixTime, FromSlot, CurrentSlot, CurrentInterval, TotalIntervals],
     Field(discriminator="kind"),
 ]
 """Discriminated union of every slot clock conversion under test."""
