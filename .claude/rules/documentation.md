@@ -168,12 +168,25 @@ A reader new to the domain should understand the invariant and the data flow wit
 
 Use these labels inside inline comments where they add clarity:
 
-- `# Why:` — when the reason is not obvious from the code.
 - `# Invariant:` — the rule being enforced or relied upon.
 - `# Threshold:` — for supermajority or quorum arithmetic.
 - `# Timing:` — for interval, slot, or epoch calculations.
 - `# Phase N:` — for multi-step algorithms.
 - `# Fixture state:` — concrete numbers in tests.
+
+NEVER use a `# Why:` label.
+A comment exists only when the reason is non-obvious, so labelling it "Why" is redundant noise.
+State the reason directly as plain prose.
+
+Bad:
+```python
+# Why: the bitfield is attacker-controlled, so bound every index first.
+```
+
+Good:
+```python
+# The bitfield is attacker-controlled, so bound every index first.
+```
 
 ### Concrete values over abstract descriptions
 

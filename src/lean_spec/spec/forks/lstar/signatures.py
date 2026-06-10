@@ -22,55 +22,68 @@ class SignatureMixin(LstarSpecBase):
         validators: Validators,
     ) -> bool:
         """
-        Verify the merged multi-message aggregate proof carried by a signed block.
+        Verify the merged aggregate proof carried by a signed block.
 
-        The block envelope holds one multi-message aggregate proof binding
-        every body attestation plus the proposer's signature over the
-        block root.
+        A block carries one proof.
+        It binds every body attestation plus the proposer's endorsement.
+
+        The proof itself holds neither public keys nor messages.
+        It only proves: these keys, signing these messages, produced this aggregate.
+        So the caller must reconstruct both lists and the verifier checks them.
+
+        Two parallel lists drive the check.
+        Entry i pairs the public keys of one component with the message it signed.
 
         Args:
-            signed_block: The signed block whose merged proof is checked.
-            validators: Validator registry providing public keys for verification.
+            signed_block: Block whose merged proof is verified.
+            validators: Registry that maps each index to its public keys.
 
         Returns:
-            True if the merged proof is valid.
+            True when the proof is valid.
 
         Raises:
-            AssertionError: On any structural or cryptographic mismatch.
+            SpecRejectionError: Carrying one of three reasons.
+                - VALIDATOR_INDEX_OUT_OF_RANGE when an attester index exceeds the registry.
+                - PROPOSER_INDEX_OUT_OF_RANGE when the proposer index exceeds the registry.
+                - INVALID_BLOCK_PROOF when the cryptographic check fails.
         """
         block = signed_block.block
-        aggregated_attestations = block.body.attestations
-
         num_validators = Uint64(len(validators))
+
+        # Public keys of each signing component, one entry per signed message.
         public_keys_per_message: list[list[PublicKey]] = []
 
-        # Each component is bound to the message and slot it signed.
+        # The message each component signed, paired index-for-index with the keys above.
         #
-        # Without this binding a proposer could pair honest signatures
-        # with attacker-chosen attestation data that resolves to the same
-        # public_keys, crediting validators for votes they never cast.
+        # The binding pins each key set to the exact data it signed.
+        # Without it a proposer could reuse honest signatures over forged data.
         message_bindings: list[tuple[Bytes32, Slot]] = []
 
-        # One public_key set per attestation, in body order.
-        #
-        # The attestation list and the proof component list are parallel.
         # Each attestation names the validators that voted for its data.
-        # Its matching proof component proves those validators signed.
-        for aggregated_attestation in aggregated_attestations:
-            validator_indices = aggregated_attestation.aggregation_bits.to_validator_indices()
-            for validator_index in validator_indices:
-                if not validator_index.is_within_registry(num_validators):
+        #
+        # Invariant: this list stays parallel to the proof's components.
+        # The producer builds attestations first, in body order, so we match that.
+        for aggregated_attestation in block.body.attestations:
+            voter_indices = aggregated_attestation.aggregation_bits.to_validator_indices()
+
+            # The bitfield is attacker-controlled so every index is bounds-checked
+            # against the active set before it indexes the registry below.
+            for voter_index in voter_indices:
+                if not voter_index.is_within_registry(num_validators):
                     raise SpecRejectionError(
                         RejectionReason.VALIDATOR_INDEX_OUT_OF_RANGE,
                         "Validator index out of range",
                     )
 
+            # Resolve each voter to the attestation key it signs with.
             public_keys_per_message.append(
                 [
-                    PublicKey.decode_bytes(validators[validator_index].attestation_public_key)
-                    for validator_index in validator_indices
+                    PublicKey.decode_bytes(validators[voter_index].attestation_public_key)
+                    for voter_index in voter_indices
                 ]
             )
+
+            # Bind that key set to the attestation data root and its slot.
             message_bindings.append(
                 (
                     hash_tree_root(aggregated_attestation.data),
@@ -78,22 +91,28 @@ class SignatureMixin(LstarSpecBase):
                 )
             )
 
-        # Final component: the proposer's signature over the block root.
+        # The proposer's endorsement is the final component, appended last.
         #
-        # The proposer signs the block root with their proposal key.
-        # This proves the proposer endorsed this specific block.
-        # It is a single-participant entry, distinct from the vote entries.
-        proposer_index = block.proposer_index
-        if not proposer_index.is_within_registry(num_validators):
+        # It is the only thing tying the proof to this specific block.
+        # It signs the block root with the proposal key, not the attestation key.
+        # So it stands as a single-participant entry distinct from the votes above.
+        #
+        # The proposer index is attacker-controlled, so bound it before indexing.
+        if not block.proposer_index.is_within_registry(num_validators):
             raise SpecRejectionError(
                 RejectionReason.PROPOSER_INDEX_OUT_OF_RANGE, "Proposer index out of range"
             )
 
+        # Resolve the proposal key, the lone signer of this component.
         public_keys_per_message.append(
-            [PublicKey.decode_bytes(validators[proposer_index].proposal_public_key)]
+            [PublicKey.decode_bytes(validators[block.proposer_index].proposal_public_key)]
         )
+
+        # Bind it to the block root and the block's own slot.
         message_bindings.append((hash_tree_root(block), block.slot))
 
+        # Check the proof against the reconstructed keys and messages.
+        # A failure here means the aggregate does not match what the block claims.
         try:
             signed_block.proof.verify(
                 public_keys_per_message=public_keys_per_message,
