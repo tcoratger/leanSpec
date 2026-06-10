@@ -2,10 +2,12 @@
 
 from consensus_testing.test_fixtures.api_endpoint import ApiEndpointFixture, ApiEndpointTest
 from consensus_testing.test_fixtures.base import (
+    PROOF_FAILURE_REJECTION_REASONS,
     BaseConsensusFixture,
     BaseTestSpec,
     ExpectedRejection,
     FixtureInfo,
+    ProofSetting,
 )
 from consensus_testing.test_fixtures.fork_choice import ForkChoiceFixture, ForkChoiceTest
 from consensus_testing.test_fixtures.gossipsub_handler import (
@@ -159,6 +161,8 @@ __all__ = [
     "BaseTestSpec",
     "ExpectedRejection",
     "FixtureInfo",
+    "ProofSetting",
+    "PROOF_FAILURE_REJECTION_REASONS",
     "StateTransitionFixture",
     "StateTransitionTest",
     "ForkChoiceFixture",

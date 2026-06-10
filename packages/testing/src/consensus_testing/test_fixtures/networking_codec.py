@@ -1,6 +1,7 @@
 """Networking codec test fixture for wire-format conformance testing."""
 
-from typing import Annotated, ClassVar, Literal
+from collections.abc import Callable
+from typing import Annotated, ClassVar, Final, Literal
 
 from pydantic import Field
 
@@ -558,14 +559,9 @@ class PeerIdentifierDerivation(StrictBaseModel):
 
     def run(self) -> PeerIdentifierOutput:
         """Derive the identifier and assert the Base58 roundtrip."""
-        key_type_map = {
-            "ed25519": KeyType.ED25519,
-            "secp256k1": KeyType.SECP256K1,
-            "ecdsa": KeyType.ECDSA,
-            "rsa": KeyType.RSA,
-        }
+        # The literal values match the enum member names once upper-cased.
         protobuf = PublicKeyProtobuf(
-            key_type=key_type_map[self.key_type], key_data=from_hex(self.public_key)
+            key_type=KeyType[self.key_type.upper()], key_data=from_hex(self.public_key)
         )
         peer_id = PeerId.from_public_key(protobuf)
         peer_id_string = str(peer_id)
@@ -661,6 +657,18 @@ class DecodeFailureOutput(StrictBaseModel):
     """Name of the decoder that must reject the input."""
 
 
+_DECODERS_BY_NAME: Final[dict[str, Callable[[bytes], object]]] = {
+    "varint": decode_varint,
+    "snappy_frame": frame_decompress,
+    "snappy_block": decompress,
+    "gossipsub_rpc": RPC.decode,
+    "reqresp_request": decode_request,
+    "reqresp_response": ResponseCode.decode,
+    "enr": ENR.from_rlp,
+}
+"""Wire-format decoders keyed by the name a rejection vector targets."""
+
+
 class DecodeFailure(StrictBaseModel):
     """Assert that a wire-format decoder rejects malformed input."""
 
@@ -683,17 +691,8 @@ class DecodeFailure(StrictBaseModel):
 
     def attempt_decode(self) -> Exception | None:
         """Run the decoder on the malformed input and return what it raised."""
-        decoders = {
-            "varint": decode_varint,
-            "snappy_frame": frame_decompress,
-            "snappy_block": decompress,
-            "gossipsub_rpc": RPC.decode,
-            "reqresp_request": decode_request,
-            "reqresp_response": ResponseCode.decode,
-            "enr": ENR.from_rlp,
-        }
         try:
-            decoders[self.decoder](from_hex(self.raw_bytes))
+            _DECODERS_BY_NAME[self.decoder](from_hex(self.raw_bytes))
         except Exception as exception:
             return exception
         return None

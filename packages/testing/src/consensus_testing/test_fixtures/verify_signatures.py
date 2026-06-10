@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from consensus_testing.genesis import generate_pre_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import BlockSpec
+from lean_spec.base import StrictBaseModel
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
     AggregationBits,
@@ -30,7 +31,7 @@ from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
 
 
-class SetProposerIndex(BaseModel):
+class SetProposerIndex(StrictBaseModel):
     """
     Rewrite the block's proposer index.
 
@@ -43,7 +44,7 @@ class SetProposerIndex(BaseModel):
     """Replacement proposer index written into the block."""
 
 
-class ClearFirstAttestationBits(BaseModel):
+class ClearFirstAttestationBits(StrictBaseModel):
     """
     Replace the first body attestation with one whose participation bits carry no set bit.
 
@@ -51,7 +52,7 @@ class ClearFirstAttestationBits(BaseModel):
     """
 
 
-class CorruptProof(BaseModel):
+class CorruptProof(StrictBaseModel):
     """
     Replace the merged proof with a short non-decodable blob.
 
@@ -59,7 +60,7 @@ class CorruptProof(BaseModel):
     """
 
 
-class AppendPhantomAttestation(BaseModel):
+class AppendPhantomAttestation(StrictBaseModel):
     """
     Add a body attestation with no matching proof component.
 
@@ -67,7 +68,7 @@ class AppendPhantomAttestation(BaseModel):
     """
 
 
-class MutateStateRoot(BaseModel):
+class MutateStateRoot(StrictBaseModel):
     """
     Change a block field after signing so the block root differs.
 
@@ -76,7 +77,7 @@ class MutateStateRoot(BaseModel):
     """
 
 
-class SwapFirstTwoAttestations(BaseModel):
+class SwapFirstTwoAttestations(StrictBaseModel):
     """
     Swap the first two body attestations and re-sign only the proposer.
 

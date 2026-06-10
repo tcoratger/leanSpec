@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import BaseModel
-
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from lean_spec.base import StrictBaseModel
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.crypto.xmss.containers import PublicKey
 from lean_spec.spec.forks import (
@@ -28,7 +27,7 @@ ALTERNATE_HEAD_ROOT: Bytes32 = Bytes32(b"\xee" * 32)
 """Sentinel head root used by the rebind tamper to bind one component off-target."""
 
 
-class RebindToAlternateHeadRoot(BaseModel):
+class RebindToAlternateHeadRoot(StrictBaseModel):
     """
     Rebind one component's proof to an alternate head root.
 
@@ -40,14 +39,14 @@ class RebindToAlternateHeadRoot(BaseModel):
     """Index of the component whose proof is rebound (0 for single-message vectors)."""
 
 
-class IncrementEmittedSlot(BaseModel):
+class IncrementEmittedSlot(StrictBaseModel):
     """Bump one component's emitted slot while its proof stays bound to the original slot."""
 
     component_index: int = 0
     """Index of the component whose emitted slot is bumped (0 for single-message vectors)."""
 
 
-class SwapParticipantPublicKey(BaseModel):
+class SwapParticipantPublicKey(StrictBaseModel):
     """
     Replace one participant's public key with another validator's attestation key.
 
@@ -65,7 +64,7 @@ class SwapParticipantPublicKey(BaseModel):
     """Validator whose attestation key replaces the original."""
 
 
-class SwapMessageBindings(BaseModel):
+class SwapMessageBindings(StrictBaseModel):
     """
     Swap the emitted message-slot bindings of two components.
 
@@ -81,7 +80,7 @@ class SwapMessageBindings(BaseModel):
     """Index of the other component whose emitted message-slot binding is swapped."""
 
 
-class DropMessageBinding(BaseModel):
+class DropMessageBinding(StrictBaseModel):
     """
     Drop one component's emitted message-slot binding while keeping its keys.
 
