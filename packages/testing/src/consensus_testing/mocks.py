@@ -85,14 +85,6 @@ class MockNetworkRequester:
             raise ConnectionError("Network failed")
         return [self.blocks_by_root[root] for root in roots if root in self.blocks_by_root]
 
-    async def request_block_by_root(
-        self,
-        peer_id: PeerId,
-        root: Bytes32,
-    ) -> SignedBlock | None:
-        """Return a single block by root, or none if absent."""
-        return self.blocks_by_root.get(root)
-
     async def request_blocks_by_range(
         self,
         peer_id: PeerId,
