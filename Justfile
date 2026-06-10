@@ -85,6 +85,31 @@ test-consensus *args:
 fill-ci *args:
     uv run --group test fill --fork=Lstar --clean -n auto --dist=worksteal "$@"
 
+# Generate the order-sensitive vectors twice under different hash seeds and diff.
+# Only the vectors marked order_sensitive run, so this stays cheap.
+# A difference means an emitted vector depends on set or dict iteration order,
+# which is hash-seeded and would break cross-client reproducibility.
+# Pass a path to widen the scope (for example the whole tests/consensus tree).
+[group('tests')]
+fill-determinism *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    target="{{args}}"
+    [ -z "$target" ] && target="tests/consensus -m order_sensitive"
+    first="$(mktemp -d)"
+    second="$(mktemp -d)"
+    trap 'rm -rf "$first" "$second"' EXIT
+    # Single process: the marked subset is small, so xdist worker startup would
+    # cost more than it saves, and one process pins the hash seed cleanly.
+    PYTHONHASHSEED=1 uv run --group test fill --fork=Lstar --clean -n 0 -o "$first" $target -q
+    PYTHONHASHSEED=2 uv run --group test fill --fork=Lstar --clean -n 0 -o "$second" $target -q
+    if diff -rq "$first" "$second"; then
+        echo "Determinism check passed: fixtures are byte-identical across hash seeds."
+    else
+        echo "Determinism check FAILED: emitted vectors differ across PYTHONHASHSEED." >&2
+        exit 1
+    fi
+
 # Run API conformance tests against an external client
 [group('tests')]
 apitest server_url *args:

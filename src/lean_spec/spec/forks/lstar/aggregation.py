@@ -113,9 +113,11 @@ class AggregationMixin(LstarSpecBase):
         #
         # Known payloads cannot start a round alone, since re-aggregating them adds nothing.
         # They serve only as fallback building blocks once fresh evidence exists.
-        for attestation_data in (
-            store.latest_new_aggregated_payloads.keys() | store.attestation_signatures.keys()
-        ):
+        # Iterate in insertion order, in order to have a deterministic pool order.
+        for attestation_data in {
+            **store.latest_new_aggregated_payloads,
+            **store.attestation_signatures,
+        }:
             # Phase 1: Select.
             #
             # Reuse existing proofs first to keep the proof tree shallow.

@@ -14,7 +14,7 @@ from consensus_testing import (
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.config import MAX_ATTESTATIONS_DATA
 
-pytestmark = pytest.mark.valid_until("Lstar")
+pytestmark = [pytest.mark.valid_until("Lstar"), pytest.mark.order_sensitive]
 
 
 def _justifiable_slots(n: int) -> list[Slot]:

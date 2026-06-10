@@ -476,8 +476,14 @@ class GossipsubHandlerTest(BaseTestSpec):
         # Each entry represents one RPC sent to a peer.
         # The structure mirrors the gossipsub RPC wire format.
         # Fixture consumers use this to assert exact outbound behavior.
+        # Emit outbound RPCs in canonical recipient order.
+        # The send order to mesh peers is set-driven.
+        # It is not consensus-relevant.
+        # Sorting by recipient keeps the emitted vector reproducible across runs.
         sent_rpcs = []
-        for recipient_peer_id, rpc in capture.sent:
+        for recipient_peer_id, rpc in sorted(
+            capture.sent, key=lambda entry: peer_names.get(entry[0], str(entry[0]))
+        ):
             subscriptions = (
                 [
                     SentSubscription(

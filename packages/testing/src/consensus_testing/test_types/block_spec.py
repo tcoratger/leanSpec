@@ -178,7 +178,7 @@ class BlockSpec(CamelModel):
     ) -> tuple[
         list[Attestation],
         dict[AttestationData, dict[ValidatorIndex, Signature]],
-        set[Attestation],
+        list[Attestation],
     ]:
         """
         Build attestations and signatures from this block's attestation specs.
@@ -195,11 +195,14 @@ class BlockSpec(CamelModel):
                 - Subset of attestations that have valid (non-dummy) signatures
         """
         if self.attestations is None:
-            return [], {}, set()
+            return [], {}, []
 
         attestations: list[Attestation] = []
         signature_lookup: dict[AttestationData, dict[ValidatorIndex, Signature]] = {}
-        valid_attestations: set[Attestation] = set()
+        # A list, not a set.
+        # Build order is the canonical order consumers gossip in.
+        # That keeps the emitted block body reproducible across runs.
+        valid_attestations: list[Attestation] = []
 
         for aggregated_spec in self.attestations:
             # Build attestation data once.
@@ -224,7 +227,7 @@ class BlockSpec(CamelModel):
                         validator_index,
                         attestation_data,
                     )
-                    valid_attestations.add(attestation)
+                    valid_attestations.append(attestation)
                 else:
                     signature = create_dummy_signature()
 
