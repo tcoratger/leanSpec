@@ -117,3 +117,14 @@ subspecifications that the Lean Ethereum protocol relies on.
     metacharacters escaped); prefer the explicit full-equality assertion above.
   - This mirrors the full-equality rule for ordinary assertions: assert the whole object, never a
     piece of it.
+- **CRITICAL - KEEP TEST DOCUMENTATION IN SYNC WITH THE TEST**: This is a STRICT requirement. Every
+  time you change a test, update the documentation that describes it in the SAME change, following
+  the documentation rules (`.claude/rules/documentation.md`, and for `tests/consensus/` the
+  Given/When/Then standard in that file). A test's docstring is part of the test; a change that
+  leaves the docstring describing the old behavior is incomplete.
+  - When you add, remove, or change a step, assertion, or expected value, reconcile the docstring so
+    it still describes exactly what the test does.
+  - For `tests/consensus/` vectors, the step assertions and the Given/When/Then docstring must stay
+    one-to-one: if an assertion changes, the matching docstring line changes with it.
+  - Do not weaken a docstring into vagueness to avoid updating it; describe the new behavior
+    precisely, as the doc-writer rules require.

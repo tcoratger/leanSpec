@@ -323,8 +323,10 @@ def test_fork_above_finalized_wins_at_or_below_loses(
             BlockStep(
                 block=BlockSpec(slot=Slot(6), parent_label="block_4", label="above_6"),
                 checks=StoreChecks(
-                    head_slot=Slot(5),
-                    head_root_label="block_5",
+                    latest_justified_slot=Slot(4),
+                    latest_justified_root_label="block_4",
+                    latest_finalized_slot=Slot(3),
+                    latest_finalized_root_label="block_3",
                 ),
             ),
             BlockStep(
