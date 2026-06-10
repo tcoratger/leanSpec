@@ -103,7 +103,7 @@ def test_aggregated_attestation_proof_verification_failure_rejected(
             GossipAggregatedAttestationStep(
                 attestation=AggregatedAttestationSpec(
                     validator_indices=[ValidatorIndex(1)],
-                    signer_ids=[ValidatorIndex(2)],
+                    signer_indices=[ValidatorIndex(2)],
                     slot=Slot(2),
                     target_slot=Slot(2),
                     target_root_label="block_2",

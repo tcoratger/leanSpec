@@ -103,7 +103,10 @@ class StateTransitionTest(BaseTestSpec):
         """Reject signature-flavored attestation fields at construction."""
         for block_spec in self.blocks:
             for attestation_spec in block_spec.attestations or []:
-                if not attestation_spec.valid_signature or attestation_spec.signer_ids is not None:
+                if (
+                    not attestation_spec.valid_signature
+                    or attestation_spec.signer_indices is not None
+                ):
                     raise ValueError(
                         "state transition assumes signatures were verified upstream; "
                         "author invalid-signature scenarios through the fork choice "
