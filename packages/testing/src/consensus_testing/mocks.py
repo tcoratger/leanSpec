@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, cast
+from typing import cast
 
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.node.networking import PeerId
@@ -21,38 +21,14 @@ from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.containers import (
+    Block,
     SignedAggregatedAttestation,
     SignedAttestation,
     SignedBlock,
+    State,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
-
-
-class StoreInterceptingSpec(LstarSpec):
-    """Spec stub that delegates consensus calls to the store it receives."""
-
-    def on_block(self, store: Any, signed_block: Any, *args: Any, **kwargs: Any) -> Any:
-        """Delegate block processing to the store."""
-        kwargs.pop("scheme", None)
-        return store.on_block(signed_block, *args, **kwargs)
-
-    def on_gossip_attestation(
-        self, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
-    ) -> Any:
-        """Delegate attestation processing to the store."""
-        kwargs.pop("scheme", None)
-        return store.on_gossip_attestation(signed_attestation, *args, **kwargs)
-
-    def on_gossip_aggregated_attestation(
-        self, store: Any, signed_attestation: Any, *args: Any, **kwargs: Any
-    ) -> Any:
-        """Delegate aggregated-attestation processing to the store."""
-        return store.on_gossip_aggregated_attestation(signed_attestation, *args, **kwargs)
-
-    def tick_interval(self, store: Any, has_proposal: bool, is_aggregator: bool = False) -> Any:
-        """Delegate interval ticking to the store."""
-        return store.tick_interval(has_proposal, is_aggregator)
 
 
 @dataclass
@@ -148,7 +124,16 @@ class _MockBlock:
 
 @dataclass
 class MockForkchoiceStore:
-    """In-memory forkchoice store double for sync-service tests."""
+    """
+    In-memory forkchoice store double for sync-service tests.
+
+    One instance plays two roles at once.
+    It answers reads for the head, blocks, and checkpoints.
+    It also processes incoming blocks and attestations.
+
+    Processing reads its own fields, not a separate store.
+    So the leading store argument the protocol passes is accepted and ignored.
+    """
 
     head: Bytes32 = field(default_factory=Bytes32.zero)
     """Root of the head block fork choice currently selects."""
@@ -172,10 +157,10 @@ class MockForkchoiceStore:
     )
     """Highest finalized checkpoint observed."""
 
-    blocks: dict[Bytes32, object] = field(default_factory=dict)
+    blocks: dict[Bytes32, Block | _MockBlock] = field(default_factory=dict)
     """Known blocks, keyed by root."""
 
-    states: dict[Bytes32, object] = field(default_factory=dict)
+    states: dict[Bytes32, State] = field(default_factory=dict)
     """Post-state of each block, keyed by root."""
 
     reject_attestation: Callable[[SignedAttestation], bool] | None = None
@@ -184,7 +169,7 @@ class MockForkchoiceStore:
     reject_aggregated_attestation: Callable[[SignedAggregatedAttestation], bool] | None = None
     """When it returns true for an aggregate, processing raises instead."""
 
-    on_block_post_state: object | None = None
+    on_block_post_state: State | None = None
     """Post-state recorded for each processed block, when set."""
 
     advance_justified_on_block: bool = False
@@ -205,26 +190,26 @@ class MockForkchoiceStore:
         """Seed the store with a genesis block stub at the head root."""
         self.blocks.setdefault(self.head, _MockBlock(slot=self.head_slot))
 
-    def on_block(self, block: SignedBlock, **kwargs: object) -> MockForkchoiceStore:
+    def on_block(self, _store: Store, signed_block: SignedBlock) -> MockForkchoiceStore:
         """Record a block as the new head and apply the configured side effects."""
-        root = hash_tree_root(block.block)
-        self.blocks[root] = block.block
+        root = hash_tree_root(signed_block.block)
+        self.blocks[root] = signed_block.block
         self.head = root
         # The double has no real safe-target rule, so the head doubles as it.
         self.safe_target = root
-        self.head_slot = block.block.slot
+        self.head_slot = signed_block.block.slot
         if self.on_block_post_state is not None:
             self.states[root] = self.on_block_post_state
         if self.advance_justified_on_block:
-            self.latest_justified = Checkpoint(root=root, slot=block.block.slot)
+            self.latest_justified = Checkpoint(root=root, slot=signed_block.block.slot)
         if self.advance_finalized_on_block:
-            self.latest_finalized = Checkpoint(root=root, slot=block.block.slot)
+            self.latest_finalized = Checkpoint(root=root, slot=signed_block.block.slot)
         return self
 
     def on_gossip_attestation(
         self,
+        _store: Store,
         signed_attestation: SignedAttestation,
-        *,
         is_aggregator: bool = False,
     ) -> MockForkchoiceStore:
         """Record a gossip attestation, unless the reject predicate fires."""
@@ -235,6 +220,7 @@ class MockForkchoiceStore:
 
     def on_gossip_aggregated_attestation(
         self,
+        _store: Store,
         signed_attestation: SignedAggregatedAttestation,
     ) -> MockForkchoiceStore:
         """Record an aggregated attestation, unless the reject predicate fires."""
@@ -321,7 +307,7 @@ class RecordingSyncDatabase:
         """Record a finalized-checkpoint write."""
         self._record("put_finalized_checkpoint", checkpoint)
 
-    def prune_before_slot(self, slot: object, *, keep_roots: frozenset) -> int:
+    def prune_before_slot(self, slot: object, *, keep_roots: frozenset[Bytes32]) -> int:
         """Record a prune request and report zero rows removed."""
         self._record("prune_before_slot", slot, keep_roots=keep_roots)
         return 0
@@ -337,13 +323,18 @@ def create_mock_sync_service(
     peer_manager = PeerManager()
     peer_manager.add_peer(PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED))
 
+    # One double fills both roles the service expects.
+    # Its fields answer store reads.
+    # Its methods answer the processing the service drives.
+    forkchoice_double = MockForkchoiceStore()
+
     return SyncService(
-        store=cast(Store, MockForkchoiceStore()),
+        store=cast(Store, forkchoice_double),
         peer_manager=peer_manager,
         block_cache=BlockCache(),
         clock=SlotClock(genesis_time=Uint64(0), time_fn=lambda: 1000.0),
         network=MockNetworkRequester(),
-        spec=StoreInterceptingSpec(),
+        spec=cast(LstarSpec, forkchoice_double),
         database=database,
         genesis_start=genesis_start,
     )

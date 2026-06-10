@@ -60,7 +60,7 @@ class TestGossipBlockProcessing:
             processed_blocks.append(root)
             new_store = MockForkchoiceStore()
             new_store.blocks = dict(s.blocks)
-            new_store.blocks[root] = object()
+            new_store.blocks[root] = block.block
             return new_store
 
         head_sync = HeadSync(
@@ -196,7 +196,7 @@ class TestDescendantProcessing:
             processing_order.append(root)
             new_store = MockForkchoiceStore()
             new_store.blocks = dict(s.blocks)
-            new_store.blocks[root] = object()
+            new_store.blocks[root] = block.block
             return new_store
 
         head_sync = HeadSync(
@@ -249,7 +249,7 @@ class TestDescendantProcessing:
             root = hash_tree_root(block.block)
             new_store = MockForkchoiceStore()
             new_store.blocks = dict(s.blocks)
-            new_store.blocks[root] = object()
+            new_store.blocks[root] = block.block
             return new_store
 
         head_sync = HeadSync(
@@ -352,7 +352,7 @@ class TestStorePropagation:
             root = hash_tree_root(block.block)
             new_store = MockForkchoiceStore()
             new_store.blocks = dict(s.blocks)
-            new_store.blocks[root] = object()
+            new_store.blocks[root] = block.block
             return new_store
 
         head_sync = HeadSync(

@@ -17,7 +17,6 @@ from consensus_testing.mocks import (
     MockNetworkRequester,
     RecordedCall,
     RecordingSyncDatabase,
-    StoreInterceptingSpec,
     create_mock_sync_service,
 )
 from consensus_testing.test_fixtures import (
@@ -209,7 +208,6 @@ __all__ = [
     "MockNetworkRequester",
     "RecordedCall",
     "RecordingSyncDatabase",
-    "StoreInterceptingSpec",
     # Base types
     "FIXTURE_FORMATS",
     "BaseConsensusFixture",
