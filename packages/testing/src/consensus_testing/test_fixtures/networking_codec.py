@@ -1,7 +1,7 @@
 """Networking codec test fixture for wire-format conformance testing."""
 
 from collections.abc import Callable
-from typing import Annotated, ClassVar, Final, Literal, Union
+from typing import Annotated, ClassVar, Final, Literal
 
 from pydantic import Field
 
@@ -699,20 +699,18 @@ class DecodeFailure(StrictBaseModel):
 
 
 NetworkingCodec = Annotated[
-    Union[
-        VarintRoundtrip,
-        GossipTopicRoundtrip,
-        GossipMessageIdentifier,
-        GossipsubRpcRoundtrip,
-        ReqRespRequestRoundtrip,
-        ReqRespResponseRoundtrip,
-        ReqRespResponseStream,
-        EnrRoundtrip,
-        PeerIdentifierDerivation,
-        SnappyBlockRoundtrip,
-        SnappyFrameRoundtrip,
-        DecodeFailure,
-    ],
+    VarintRoundtrip
+    | GossipTopicRoundtrip
+    | GossipMessageIdentifier
+    | GossipsubRpcRoundtrip
+    | ReqRespRequestRoundtrip
+    | ReqRespResponseRoundtrip
+    | ReqRespResponseStream
+    | EnrRoundtrip
+    | PeerIdentifierDerivation
+    | SnappyBlockRoundtrip
+    | SnappyFrameRoundtrip
+    | DecodeFailure,
     Field(discriminator="kind"),
 ]
 """Discriminated union of every networking codec case under test."""
