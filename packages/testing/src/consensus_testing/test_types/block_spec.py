@@ -365,8 +365,8 @@ class BlockSpec(CamelModel):
             for attestation_spec in (self.attestations or [])
             if not attestation_spec.valid_signature
             or (
-                attestation_spec.signer_ids is not None
-                and attestation_spec.signer_ids != attestation_spec.validator_indices
+                attestation_spec.signer_indices is not None
+                and attestation_spec.signer_indices != attestation_spec.validator_indices
             )
         ]
 

@@ -145,7 +145,7 @@ class AggregatedAttestationSpec(AttestationSpec):
     validator_indices: list[ValidatorIndex]
     """The indices of validators making the attestation (required)."""
 
-    signer_ids: list[ValidatorIndex] | None = None
+    signer_indices: list[ValidatorIndex] | None = None
     """
     Override which validators actually sign the attestation.
 
@@ -187,7 +187,7 @@ class AggregatedAttestationSpec(AttestationSpec):
         # - Actual signers produce the cryptographic material.
         # They default to the same set for honest attestations.
         validator_indices = self.validator_indices
-        signer_ids = self.signer_ids or self.validator_indices
+        signer_indices = self.signer_indices or self.validator_indices
 
         # Path 1: Invalid signature.
         #
@@ -202,7 +202,7 @@ class AggregatedAttestationSpec(AttestationSpec):
             return SignedAggregatedAttestation(data=attestation_data, proof=proof)
 
         # Path 2: Valid signature.
-        proof = key_manager.sign_and_aggregate(signer_ids, attestation_data)
+        proof = key_manager.sign_and_aggregate(signer_indices, attestation_data)
 
         # Path 3: Participant mismatch.
         #
@@ -211,7 +211,7 @@ class AggregatedAttestationSpec(AttestationSpec):
         # The proof is cryptographically valid for the actual signers,
         # but the claimed participants no longer match.
         # The store must detect and reject this inconsistency.
-        if self.signer_ids and self.signer_ids != self.validator_indices:
+        if self.signer_indices and self.signer_indices != self.validator_indices:
             proof = SingleMessageAggregate(
                 participants=AggregationBits.from_indices(validator_indices),
                 proof=proof.proof,
@@ -257,9 +257,9 @@ class AggregatedAttestationSpec(AttestationSpec):
 
         if not self.valid_signature:
             invalid_proof = SingleMessageAggregate(participants=aggregation_bits, proof=placeholder)
-        elif self.signer_ids is not None:
+        elif self.signer_indices is not None:
             # Valid proof from wrong validators (participant mismatch).
-            valid_proof = key_manager.sign_and_aggregate(self.signer_ids, attestation_data)
+            valid_proof = key_manager.sign_and_aggregate(self.signer_indices, attestation_data)
             invalid_proof = SingleMessageAggregate(
                 participants=aggregation_bits, proof=valid_proof.proof
             )
