@@ -3,6 +3,7 @@
 import hashlib
 import json
 from abc import abstractmethod
+from enum import IntEnum
 from functools import cached_property
 from typing import Any, ClassVar, Self
 
@@ -58,6 +59,25 @@ class ExpectedRejection(StrictBaseModel):
     """
 
 
+class ProofSetting(IntEnum):
+    """Aggregation proof regime emitted with each fixture."""
+
+    MOCKED = 0
+    """The proof is mocked and must not be verified."""
+
+    REAL_AND_VALID = 1
+    """The proof is real and must verify."""
+
+    REAL_AND_INVALID = 2
+    """The proof is real and must fail verification."""
+
+
+PROOF_FAILURE_REJECTION_REASONS: frozenset[RejectionReason] = frozenset(
+    {RejectionReason.INVALID_SIGNATURE, RejectionReason.INVALID_BLOCK_PROOF}
+)
+"""Rejection reasons whose direct cause is the aggregation proof failing to verify."""
+
+
 class BaseConsensusFixture(CamelModel):
     """
     Base class for all consensus test fixtures.
@@ -93,14 +113,8 @@ class BaseConsensusFixture(CamelModel):
     This is the field clients assert against.
     """
 
-    proof_setting: int = 0
-    """
-    Aggregation proof regime, mirroring eth2's bls_setting.
-
-    - 0 means the proof is mocked and must not be verified.
-    - 1 means the proof is real and must verify.
-    - 2 means the proof is real and must fail verification.
-    """
+    proof_setting: ProofSetting = ProofSetting.MOCKED
+    """Aggregation proof regime, emitted as an integer; each value documents its own meaning."""
 
     def with_info(self, info: FixtureInfo, network: str) -> Self:
         """

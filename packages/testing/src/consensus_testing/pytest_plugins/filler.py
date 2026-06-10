@@ -13,7 +13,12 @@ import pytest
 from consensus_testing.crypto_mode import AggregationProver, CryptoMode
 from consensus_testing.forks import FORKS_BY_NAME
 from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
-from consensus_testing.test_fixtures import FIXTURE_FORMATS, FixtureInfo
+from consensus_testing.test_fixtures import (
+    FIXTURE_FORMATS,
+    PROOF_FAILURE_REJECTION_REASONS,
+    FixtureInfo,
+    ProofSetting,
+)
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.ssz import Bytes32
 
@@ -450,15 +455,19 @@ def base_spec_filler_parametrizer(spec_class: Any) -> Any:
             else:
                 generated_fixture = test_spec.generate()
 
-            # - 0 mocked,
-            # - 1 real and must verify,
-            # - 2 real and must fail verification.
+            # A mocked proof is never verified.
+            # A real proof must fail only when the rejection is itself a proof failure.
+            # A non-crypto rejection (such as an unknown parent) still carries a valid proof.
+            expected_rejection = test_spec.expected_rejection
             if mock_prover:
-                proof_setting = 0
-            elif test_spec.expected_rejection is not None:
-                proof_setting = 2
+                proof_setting = ProofSetting.MOCKED
+            elif (
+                expected_rejection is not None
+                and expected_rejection.reason in PROOF_FAILURE_REJECTION_REASONS
+            ):
+                proof_setting = ProofSetting.REAL_AND_INVALID
             else:
-                proof_setting = 1
+                proof_setting = ProofSetting.REAL_AND_VALID
 
             filled_fixture = generated_fixture.with_info(
                 info=FixtureInfo(
