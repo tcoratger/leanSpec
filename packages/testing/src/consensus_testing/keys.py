@@ -201,12 +201,12 @@ class XmssKeyManager:
             return cached
 
         # No suitable cached manager exists. Build a new one and cache it.
-        manager = cls(max_slot=max_slot, scheme_name=LEAN_ENV)
+        manager = cls(max_slot=max_slot)
         cls._cache[LEAN_ENV] = manager
         return manager
 
     @classmethod
-    def reset_signing_state(cls, scheme_name: str | None = None) -> None:
+    def reset_signing_state(cls) -> None:
         """
         Clear advanced secret-key state from the cached manager.
 
@@ -216,26 +216,19 @@ class XmssKeyManager:
 
         Only the mutable signing state is cleared. The JSON and public-key
         caches are immutable and preserved to avoid expensive re-loading.
-
-        Args:
-            scheme_name: Scheme entry to reset. Defaults to the current LEAN_ENV.
         """
-        cached = cls._cache.get(LEAN_ENV if scheme_name is None else scheme_name)
+        cached = cls._cache.get(LEAN_ENV)
         if cached is not None:
             cached._secret_state.clear()
 
-    def __init__(
-        self,
-        max_slot: Slot = DEFAULT_MAX_SLOT,
-        scheme_name: str = "test",
-    ) -> None:
-        """Initialize with a scheme name and maximum slot for key validity."""
-        if scheme_name not in LEAN_ENV_TO_SCHEMES:
-            raise ValueError(f"Unknown scheme: {scheme_name!r}")
+    def __init__(self, max_slot: Slot = DEFAULT_MAX_SLOT) -> None:
+        """Initialize with the active scheme and a maximum slot for key validity."""
+        if LEAN_ENV not in LEAN_ENV_TO_SCHEMES:
+            raise ValueError(f"Unknown scheme: {LEAN_ENV!r}")
         self.max_slot = max_slot
-        self.scheme_name = scheme_name
-        self.scheme = LEAN_ENV_TO_SCHEMES[scheme_name]
-        self._keys_directory = get_keys_directory(scheme_name)
+        self.scheme_name = LEAN_ENV
+        self.scheme = LEAN_ENV_TO_SCHEMES[LEAN_ENV]
+        self._keys_directory = get_keys_directory(LEAN_ENV)
 
         # Raw JSON cache: nested dict of hex-encoded SSZ strings, very lightweight.
         self._json_cache: dict[ValidatorIndex, dict[str, dict[str, str]]] = {}
