@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from consensus_testing.crypto_mode import AggregationProver, CryptoMode
-from consensus_testing.forks import FORKS_BY_NAME
+from consensus_testing.forks import FORKS_BY_NAME, BaseFork
 from consensus_testing.keys import DEFAULT_MAX_SLOT, XmssKeyManager
 from consensus_testing.test_fixtures import (
     FIXTURE_FORMATS,
@@ -108,9 +108,11 @@ class FixtureCollector:
 
         if config is not None:
             fixture_path = self.fixture_output_file(test_nodeid, fixture_format)
-            config.fixture_path_absolute = str(fixture_path.absolute())  # type: ignore[attribute-defined]
-            config.fixture_path_relative = str(fixture_path.relative_to(self.output_directory))  # type: ignore[attribute-defined]
-            config.fixture_format = fixture_format  # type: ignore[attribute-defined]
+            config.stash[FIXTURE_PATH_ABSOLUTE_KEY] = str(fixture_path.absolute())
+            config.stash[FIXTURE_PATH_RELATIVE_KEY] = str(
+                fixture_path.relative_to(self.output_directory)
+            )
+            config.stash[FIXTURE_FORMAT_KEY] = fixture_format
 
     def write_fixtures(self) -> None:
         """Write all collected fixtures to disk, grouped by test function."""
@@ -130,6 +132,22 @@ class FixtureCollector:
 
             with open(output_file, "w") as output_handle:
                 json.dump(all_tests, output_handle, indent=4)
+
+
+FIXTURE_COLLECTOR_KEY: pytest.StashKey[FixtureCollector] = pytest.StashKey()
+"""Stash key for the session's fixture collector."""
+
+TEST_FORK_CLASS_KEY: pytest.StashKey[type[BaseFork]] = pytest.StashKey()
+"""Stash key for the fork class selected by the fork option."""
+
+FIXTURE_PATH_ABSOLUTE_KEY: pytest.StashKey[str] = pytest.StashKey()
+"""Stash key for the absolute path of the current test's fixture file."""
+
+FIXTURE_PATH_RELATIVE_KEY: pytest.StashKey[str] = pytest.StashKey()
+"""Stash key for the current test's fixture path relative to the output directory."""
+
+FIXTURE_FORMAT_KEY: pytest.StashKey[str] = pytest.StashKey()
+"""Stash key for the current test's fixture format name."""
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -224,8 +242,8 @@ def pytest_configure(config: pytest.Config) -> None:
         )
         pytest.exit("Missing required --fork option.", returncode=pytest.ExitCode.USAGE_ERROR)
 
-    fork_class = FORKS_BY_NAME.get(fork_name.lower())
-    if fork_class is None:
+    fork_name_normalized = fork_name.lower()
+    if fork_name_normalized not in FORKS_BY_NAME:
         print(
             f"Error: Unsupported fork: {fork_name}\n",
             file=sys.stderr,
@@ -235,6 +253,8 @@ def pytest_configure(config: pytest.Config) -> None:
             file=sys.stderr,
         )
         pytest.exit("Invalid fork specified.", returncode=pytest.ExitCode.USAGE_ERROR)
+
+    fork_class = FORKS_BY_NAME[fork_name_normalized]
 
     # Check output directory
     if output_directory.exists() and any(output_directory.iterdir()):
@@ -255,8 +275,8 @@ def pytest_configure(config: pytest.Config) -> None:
 
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    config.fixture_collector = FixtureCollector(output_directory, fork_name)  # type: ignore[attribute-defined]
-    config.test_fork_class = fork_class  # type: ignore[attribute-defined]
+    config.stash[FIXTURE_COLLECTOR_KEY] = FixtureCollector(output_directory, fork_name)
+    config.stash[TEST_FORK_CLASS_KEY] = fork_class
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -266,10 +286,10 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     Real-crypto vectors cannot be mocked, so the fast mocked lane keeps only the
     smoke subset and leaves the rest to the real lane.
     """
-    if not hasattr(config, "test_fork_class"):
+    if TEST_FORK_CLASS_KEY not in config.stash:
         return
 
-    fork_class = config.test_fork_class
+    fork_class = config.stash[TEST_FORK_CLASS_KEY]
     verbose = config.getoption("verbose")
     mocking = AggregationProver.get_mode() == CryptoMode.MOCKED
     deselected_items = []
@@ -354,8 +374,8 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Write all collected fixtures at the end of the session."""
-    if hasattr(session.config, "fixture_collector"):
-        session.config.fixture_collector.write_fixtures()
+    if FIXTURE_COLLECTOR_KEY in session.config.stash:
+        session.config.stash[FIXTURE_COLLECTOR_KEY].write_fixtures()
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -365,17 +385,16 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
     report = outcome.get_result()
 
     if call.when == "call":
-        if hasattr(item.config, "fixture_path_absolute") and hasattr(
-            item.config, "fixture_path_relative"
-        ):
+        stash = item.config.stash
+        if FIXTURE_PATH_ABSOLUTE_KEY in stash and FIXTURE_PATH_RELATIVE_KEY in stash:
             report.user_properties.append(
-                ("fixture_path_absolute", item.config.fixture_path_absolute)
+                ("fixture_path_absolute", stash[FIXTURE_PATH_ABSOLUTE_KEY])
             )
             report.user_properties.append(
-                ("fixture_path_relative", item.config.fixture_path_relative)
+                ("fixture_path_relative", stash[FIXTURE_PATH_RELATIVE_KEY])
             )
-        if hasattr(item.config, "fixture_format"):
-            report.user_properties.append(("fixture_format", item.config.fixture_format))
+        if FIXTURE_FORMAT_KEY in stash:
+            report.user_properties.append(("fixture_format", stash[FIXTURE_FORMAT_KEY]))
 
 
 @pytest.fixture
@@ -479,8 +498,8 @@ def base_spec_filler_parametrizer(spec_class: Any) -> Any:
                 network=fork.name(),
             ).model_copy(update={"proof_setting": proof_setting})
 
-            if hasattr(request.config, "fixture_collector"):
-                request.config.fixture_collector.add_fixture(
+            if FIXTURE_COLLECTOR_KEY in request.config.stash:
+                request.config.stash[FIXTURE_COLLECTOR_KEY].add_fixture(
                     fixture_format=spec_class.format_name,
                     fixture=filled_fixture,
                     test_nodeid=request.node.nodeid,
@@ -498,7 +517,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     if "fork" not in metafunc.fixturenames:
         return
 
-    fork_class = metafunc.config.test_fork_class  # type: ignore[attribute-defined]
+    fork_class = metafunc.config.stash[TEST_FORK_CLASS_KEY]
 
     if not _check_markers_valid_for_fork(list(metafunc.definition.iter_markers()), fork_class):
         verbose = metafunc.config.getoption("verbose")
