@@ -85,11 +85,13 @@ test-consensus *args:
 fill-ci *args:
     uv run --group test fill --fork=Lstar --clean -n auto --dist=worksteal "$@"
 
-# Generate the order-sensitive vectors twice under different hash seeds and diff.
-# Only the vectors marked order_sensitive run, so this stays cheap.
+# Standalone determinism audit: regenerate vectors twice under different hash seeds and diff.
+# The fill command already gates the order_sensitive subset on every run.
+# This recipe runs that audit on its own, or widens it past the marked subset.
+# Pass a path to cover the whole tree (for example tests/consensus) and catch a
+# filler that should be marked order_sensitive but is not.
 # A difference means an emitted vector depends on set or dict iteration order,
 # which is hash-seeded and would break cross-client reproducibility.
-# Pass a path to widen the scope (for example the whole tests/consensus tree).
 [group('tests')]
 fill-determinism *args:
     #!/usr/bin/env bash
@@ -101,8 +103,9 @@ fill-determinism *args:
     trap 'rm -rf "$first" "$second"' EXIT
     # Single process: the marked subset is small, so xdist worker startup would
     # cost more than it saves, and one process pins the hash seed cleanly.
-    PYTHONHASHSEED=1 uv run --group test fill --fork=Lstar --clean -n 0 -o "$first" $target -q
-    PYTHONHASHSEED=2 uv run --group test fill --fork=Lstar --clean -n 0 -o "$second" $target -q
+    # This recipe is itself the determinism check, so the per-fill gate is skipped.
+    PYTHONHASHSEED=1 uv run --group test fill --fork=Lstar --clean --no-check-determinism -n 0 -o "$first" $target -q
+    PYTHONHASHSEED=2 uv run --group test fill --fork=Lstar --clean --no-check-determinism -n 0 -o "$second" $target -q
     if diff -rq "$first" "$second"; then
         echo "Determinism check passed: fixtures are byte-identical across hash seeds."
     else
