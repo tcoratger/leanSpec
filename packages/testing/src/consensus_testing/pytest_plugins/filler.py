@@ -197,7 +197,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "order_sensitive: emission could depend on set or dict iteration order; "
-        "the determinism check generates this vector twice and diffs the output",
+        "the fill command regenerates these vectors under two hash seeds and diffs the output",
     )
 
     # Crypto mode is chosen explicitly and applies to either scheme.
