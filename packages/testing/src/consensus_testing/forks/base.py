@@ -11,16 +11,11 @@ class BaseForkMeta(ABCMeta):
     For example, if ForkB inherits from ForkA, then ForkA precedes ForkB.
     """
 
-    @abstractmethod
-    def name(cls) -> str:
-        """Return the name of the fork."""
-        pass
-
-    def __repr__(cls) -> str:
+    def __repr__(cls: "type[BaseFork]") -> str:
         """Print the name of the fork, instead of the class."""
         return cls.name()
 
-    def __le__(cls, other: "BaseForkMeta") -> bool:
+    def __le__(cls: "type[BaseFork]", other: "type[BaseFork]") -> bool:
         """Check if this fork is older or equal to another (cls <= other)."""
         return cls is other or issubclass(other, cls)
 
