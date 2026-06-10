@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 from pydantic import field_serializer
 
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from consensus_testing.test_fixtures.hex_codec import from_hex, to_hex
 from lean_spec.base import CamelModel
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.crypto.merkleization import hash_tree_root
@@ -20,7 +21,7 @@ def _serialize_ssz_value(ssz_value: SSZType) -> Any:
     if isinstance(ssz_value, Boolean):
         return bool(ssz_value)
     if isinstance(ssz_value, bytes):
-        return "0x" + ssz_value.hex()
+        return to_hex(ssz_value)
     if isinstance(ssz_value, int):
         return str(ssz_value)
     if isinstance(ssz_value, Fp):
@@ -125,8 +126,8 @@ class SSZTest(BaseTestSpec):
             type_name=self.type_name,
             value=self.value,
             raw_bytes=self.raw_bytes,
-            serialized="0x" + ssz_bytes.hex(),
-            root="0x" + root.hex(),
+            serialized=to_hex(ssz_bytes),
+            root=to_hex(root),
         )
 
     def _generate_decode_failure(self) -> SSZFixture:
@@ -143,7 +144,7 @@ class SSZTest(BaseTestSpec):
         if self.raw_bytes is None:
             raise ValueError("raw_bytes is required when expected_rejection is set")
 
-        raw = bytes.fromhex(self.raw_bytes.removeprefix("0x"))
+        raw = from_hex(self.raw_bytes)
         decoder = type(self.value)
         exception_raised: Exception | None = None
         try:
@@ -155,7 +156,7 @@ class SSZTest(BaseTestSpec):
             type_name=self.type_name,
             value=self.value,
             raw_bytes=self.raw_bytes,
-            serialized="0x" + raw.hex(),
+            serialized=to_hex(raw),
             root="",
             rejection_reason=self.assert_decode_rejection(
                 exception_raised, f"{decoder.__name__}.decode_bytes"

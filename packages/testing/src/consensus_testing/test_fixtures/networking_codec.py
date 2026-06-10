@@ -5,6 +5,7 @@ from typing import Annotated, ClassVar, Literal, Union
 from pydantic import Field
 
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from consensus_testing.test_fixtures.hex_codec import from_hex, to_hex
 from lean_spec.base import StrictBaseModel
 from lean_spec.node.networking.enr.enr import ENR
 from lean_spec.node.networking.gossipsub.message import GossipsubMessage
@@ -30,16 +31,6 @@ from lean_spec.node.networking.transport.peer_id import KeyType, PeerId, PublicK
 from lean_spec.node.networking.varint import decode_varint, encode_varint
 from lean_spec.node.snappy import compress, decompress, frame_compress, frame_decompress
 from lean_spec.spec.forks import SubnetId
-
-
-def _to_hex(data: bytes) -> str:
-    """Format raw bytes as a 0x-prefixed hex string."""
-    return "0x" + data.hex()
-
-
-def _from_hex(hex_str: str) -> bytes:
-    """Parse a 0x-prefixed hex string into raw bytes."""
-    return bytes.fromhex(hex_str.removeprefix("0x"))
 
 
 class EncodedOutput(StrictBaseModel):
@@ -79,7 +70,7 @@ class VarintRoundtrip(StrictBaseModel):
         )
         assert byte_length == len(encoded), f"Length: {byte_length} != {len(encoded)}"
 
-        return VarintOutput(encoded=_to_hex(encoded), byte_length=byte_length)
+        return VarintOutput(encoded=to_hex(encoded), byte_length=byte_length)
 
 
 class GossipTopicOutput(StrictBaseModel):
@@ -166,9 +157,9 @@ class GossipMessageIdentifier(StrictBaseModel):
     def run(self) -> GossipMessageIdentifierOutput:
         """Compute the identifier: SHA256(domain + uint64_le(len(topic)) + topic + data)[:20]."""
         message_id = GossipsubMessage.compute_id(
-            _from_hex(self.topic), _from_hex(self.data), domain=_from_hex(self.domain)
+            from_hex(self.topic), from_hex(self.data), domain=from_hex(self.domain)
         )
-        return GossipMessageIdentifierOutput(message_id=_to_hex(message_id))
+        return GossipMessageIdentifierOutput(message_id=to_hex(message_id))
 
 
 class RpcSubscriptionSpec(StrictBaseModel):
@@ -205,12 +196,12 @@ class RpcMessageSpec(StrictBaseModel):
     def build(self) -> Message:
         """Convert to the wire-format message."""
         return Message(
-            from_peer=_from_hex(self.from_peer) if self.from_peer else b"",
-            data=_from_hex(self.data) if self.data else b"",
-            seqno=_from_hex(self.seqno) if self.seqno else b"",
+            from_peer=from_hex(self.from_peer) if self.from_peer else b"",
+            data=from_hex(self.data) if self.data else b"",
+            seqno=from_hex(self.seqno) if self.seqno else b"",
             topic=TopicId(self.topic),
-            signature=_from_hex(self.signature) if self.signature else b"",
-            key=_from_hex(self.key) if self.key else b"",
+            signature=from_hex(self.signature) if self.signature else b"",
+            key=from_hex(self.key) if self.key else b"",
         )
 
 
@@ -279,14 +270,12 @@ class RpcControlSpec(StrictBaseModel):
             ihave=[
                 ControlIHave(
                     topic_id=TopicId(ihave.topic_id),
-                    message_ids=[_from_hex(message_id) for message_id in ihave.message_ids],
+                    message_ids=[from_hex(message_id) for message_id in ihave.message_ids],
                 )
                 for ihave in self.ihave
             ],
             iwant=[
-                ControlIWant(
-                    message_ids=[_from_hex(message_id) for message_id in iwant.message_ids]
-                )
+                ControlIWant(message_ids=[from_hex(message_id) for message_id in iwant.message_ids])
                 for iwant in self.iwant
             ],
             graft=[ControlGraft(topic_id=TopicId(graft.topic_id)) for graft in self.graft],
@@ -296,7 +285,7 @@ class RpcControlSpec(StrictBaseModel):
             ],
             idontwant=[
                 ControlIDontWant(
-                    message_ids=[_from_hex(message_id) for message_id in idontwant.message_ids]
+                    message_ids=[from_hex(message_id) for message_id in idontwant.message_ids]
                 )
                 for idontwant in self.idontwant
             ],
@@ -334,7 +323,7 @@ class GossipsubRpcRoundtrip(StrictBaseModel):
         re_encoded = RPC.decode(encoded).encode()
         assert encoded == re_encoded, "RPC roundtrip produced different bytes"
 
-        return EncodedOutput(encoded=_to_hex(encoded))
+        return EncodedOutput(encoded=to_hex(encoded))
 
 
 class ReqRespRequestRoundtrip(StrictBaseModel):
@@ -348,14 +337,14 @@ class ReqRespRequestRoundtrip(StrictBaseModel):
 
     def run(self) -> EncodedOutput:
         """Encode the request, decode it back, and emit the reference bytes."""
-        ssz_data = _from_hex(self.ssz_data)
+        ssz_data = from_hex(self.ssz_data)
         encoded = encode_request(ssz_data)
 
         # Decode must recover the original SSZ bytes.
         decoded = decode_request(encoded)
         assert decoded == ssz_data, "Request roundtrip produced different bytes"
 
-        return EncodedOutput(encoded=_to_hex(encoded))
+        return EncodedOutput(encoded=to_hex(encoded))
 
 
 class ReqRespResponseRoundtrip(StrictBaseModel):
@@ -373,7 +362,7 @@ class ReqRespResponseRoundtrip(StrictBaseModel):
     def run(self) -> EncodedOutput:
         """Encode the response, decode it back, and emit the reference bytes."""
         code = ResponseCode(self.response_code)
-        ssz_data = _from_hex(self.ssz_data)
+        ssz_data = from_hex(self.ssz_data)
         encoded = code.encode(ssz_data)
 
         # Decode must recover both the response code and SSZ bytes.
@@ -381,7 +370,7 @@ class ReqRespResponseRoundtrip(StrictBaseModel):
         assert decoded_code == code, f"Code mismatch: {decoded_code} != {code}"
         assert decoded_data == ssz_data, "Response roundtrip produced different bytes"
 
-        return EncodedOutput(encoded=_to_hex(encoded))
+        return EncodedOutput(encoded=to_hex(encoded))
 
 
 class ResponseChunkSpec(StrictBaseModel):
@@ -424,9 +413,9 @@ class ReqRespResponseStream(StrictBaseModel):
         """Encode every chunk back-to-back and emit the reference stream."""
         buffer = bytearray()
         for chunk in self.chunks:
-            buffer.extend(ResponseCode(chunk.response_code).encode(_from_hex(chunk.ssz_data)))
+            buffer.extend(ResponseCode(chunk.response_code).encode(from_hex(chunk.ssz_data)))
         return ResponseStreamOutput(
-            encoded=_to_hex(bytes(buffer)),
+            encoded=to_hex(bytes(buffer)),
             chunk_count=len(self.chunks),
         )
 
@@ -516,19 +505,19 @@ class EnrRoundtrip(StrictBaseModel):
         eth2_data = enr.eth2_data
         attestation_subnets = enr.attestation_subnets
         return EnrOutput(
-            rlp=_to_hex(rlp_bytes),
+            rlp=to_hex(rlp_bytes),
             seq=int(enr.seq),
             identity_scheme=enr.identity_scheme,
-            node_id=_to_hex(enr.node_id) if enr.node_id else None,
-            public_key=_to_hex(enr.public_key) if enr.public_key else None,
+            node_id=to_hex(enr.node_id) if enr.node_id else None,
+            public_key=to_hex(enr.public_key) if enr.public_key else None,
             ip4=enr.ip4 if enr.ip4 else None,
             udp_port=int(enr.udp_port) if enr.udp_port is not None else None,
             quic_port=int(enr.quic_port) if enr.quic_port is not None else None,
             multiaddr=str(enr.multiaddr()) if enr.multiaddr() is not None else None,
             eth2_data=(
                 EnrEth2DataOutput(
-                    fork_digest=_to_hex(eth2_data.fork_digest),
-                    next_fork_version=_to_hex(eth2_data.next_fork_version),
+                    fork_digest=to_hex(eth2_data.fork_digest),
+                    next_fork_version=to_hex(eth2_data.next_fork_version),
                     next_fork_epoch=int(eth2_data.next_fork_epoch),
                 )
                 if eth2_data is not None
@@ -576,7 +565,7 @@ class PeerIdentifierDerivation(StrictBaseModel):
             "rsa": KeyType.RSA,
         }
         protobuf = PublicKeyProtobuf(
-            key_type=key_type_map[self.key_type], key_data=_from_hex(self.public_key)
+            key_type=key_type_map[self.key_type], key_data=from_hex(self.public_key)
         )
         peer_id = PeerId.from_public_key(protobuf)
         peer_id_string = str(peer_id)
@@ -586,7 +575,7 @@ class PeerIdentifierDerivation(StrictBaseModel):
         assert roundtrip == peer_id, "PeerId Base58 roundtrip failed"
 
         return PeerIdentifierOutput(
-            protobuf_encoded=_to_hex(protobuf.encode()),
+            protobuf_encoded=to_hex(protobuf.encode()),
             peer_id=peer_id_string,
         )
 
@@ -615,14 +604,14 @@ class SnappyBlockRoundtrip(StrictBaseModel):
 
     def run(self) -> SnappyBlockOutput:
         """Compress, decompress back, and emit the reference bytes."""
-        uncompressed_bytes = _from_hex(self.data)
+        uncompressed_bytes = from_hex(self.data)
         compressed = compress(uncompressed_bytes)
 
         decompressed = decompress(compressed)
         assert decompressed == uncompressed_bytes, "Snappy block roundtrip produced different bytes"
 
         return SnappyBlockOutput(
-            compressed=_to_hex(compressed),
+            compressed=to_hex(compressed),
             compressed_length=len(compressed),
             uncompressed_length=len(uncompressed_bytes),
         )
@@ -652,14 +641,14 @@ class SnappyFrameRoundtrip(StrictBaseModel):
 
     def run(self) -> SnappyFrameOutput:
         """Compress with framing, decompress back, and emit the reference bytes."""
-        uncompressed_bytes = _from_hex(self.data)
+        uncompressed_bytes = from_hex(self.data)
         framed = frame_compress(uncompressed_bytes)
 
         decompressed = frame_decompress(framed)
         assert decompressed == uncompressed_bytes, "Snappy frame roundtrip produced different bytes"
 
         return SnappyFrameOutput(
-            framed=_to_hex(framed),
+            framed=to_hex(framed),
             framed_length=len(framed),
             uncompressed_length=len(uncompressed_bytes),
         )
@@ -704,7 +693,7 @@ class DecodeFailure(StrictBaseModel):
             "enr": ENR.from_rlp,
         }
         try:
-            decoders[self.decoder](_from_hex(self.raw_bytes))
+            decoders[self.decoder](from_hex(self.raw_bytes))
         except Exception as exception:
             return exception
         return None
