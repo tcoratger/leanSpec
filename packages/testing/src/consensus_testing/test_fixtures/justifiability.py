@@ -1,9 +1,20 @@
 """3SF-mini justifiability test fixture."""
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from lean_spec.base import StrictBaseModel
 from lean_spec.spec.forks import Slot
+
+
+class JustifiabilityOutput(StrictBaseModel):
+    """Computed delta and justifiability verdict for one candidate slot."""
+
+    delta: int
+    """Slots between the candidate slot and the last finalized slot."""
+
+    is_justifiable: bool
+    """Whether the candidate slot may serve as a justification target."""
 
 
 class JustifiabilityFixture(BaseConsensusFixture):
@@ -19,7 +30,7 @@ class JustifiabilityFixture(BaseConsensusFixture):
     finalized_slot: int
     """Last finalized slot."""
 
-    output: dict[str, Any]
+    output: JustifiabilityOutput
     """Computed delta and justifiability verdict."""
 
 
@@ -50,8 +61,5 @@ class JustifiabilityTest(BaseTestSpec):
         return JustifiabilityFixture(
             slot=self.slot,
             finalized_slot=self.finalized_slot,
-            output={
-                "delta": delta,
-                "isJustifiable": justifiable,
-            },
+            output=JustifiabilityOutput(delta=delta, is_justifiable=justifiable),
         )

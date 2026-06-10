@@ -5,12 +5,27 @@ from typing import Any, ClassVar
 
 from consensus_testing.genesis import build_anchor, generate_pre_state, make_genesis_block
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from lean_spec.base import StrictBaseModel
 from lean_spec.spec.forks import Slot
 from lean_spec.spec.forks.lstar import Store
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Uint64
 
-EndpointHandler = Callable[[Store, "ApiEndpointTest"], dict[str, Any]]
+
+class EndpointResponseContract(StrictBaseModel):
+    """The status, content type, and body one endpoint handler expects a client to return."""
+
+    status_code: int
+    """Expected HTTP status code."""
+
+    content_type: str
+    """Expected response MIME type."""
+
+    body: Any = None
+    """Expected response payload: a JSON object or a hex SSZ string."""
+
+
+EndpointHandler = Callable[[Store, "ApiEndpointTest"], EndpointResponseContract]
 """Uniform signature for all endpoint response builders.
 
 Every handler receives both arguments even if it only needs one.
@@ -51,38 +66,40 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
     return fork.create_store(state, block, validator_index=None)
 
 
-def _health_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _health_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointResponseContract:
     """Static liveness check. Independent of consensus state."""
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "application/json",
-        "expected_body": {"status": "healthy", "service": "lean-rpc-api"},
-    }
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="application/json",
+        body={"status": "healthy", "service": "lean-rpc-api"},
+    )
 
 
-def _justified_response(store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _justified_response(store: Store, _fixture: "ApiEndpointTest") -> EndpointResponseContract:
     """Latest justified checkpoint: slot + root. Root varies with validator count."""
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "application/json",
-        "expected_body": {
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="application/json",
+        body={
             "slot": int(store.latest_justified.slot),
             "root": "0x" + store.latest_justified.root.hex(),
         },
-    }
+    )
 
 
-def _finalized_state_response(store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _finalized_state_response(
+    store: Store, _fixture: "ApiEndpointTest"
+) -> EndpointResponseContract:
     """Full SSZ-encoded finalized state as hex bytes."""
     state = store.states[store.latest_finalized.root]
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "application/octet-stream",
-        "expected_body": "0x" + state.encode_bytes().hex(),
-    }
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="application/octet-stream",
+        body="0x" + state.encode_bytes().hex(),
+    )
 
 
-def _fork_choice_response(store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _fork_choice_response(store: Store, _fixture: "ApiEndpointTest") -> EndpointResponseContract:
     """Fork choice tree: blocks with weights, head, checkpoints, validator count."""
     weights = LstarSpec().compute_block_weights(store)
 
@@ -101,10 +118,10 @@ def _fork_choice_response(store: Store, _fixture: "ApiEndpointTest") -> dict[str
 
     # Validator count from head state (most current view).
     head_state = store.states.get(store.head)
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "application/json",
-        "expected_body": {
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="application/json",
+        body={
             "nodes": nodes,
             "head": "0x" + store.head.hex(),
             "justified": {
@@ -118,19 +135,21 @@ def _fork_choice_response(store: Store, _fixture: "ApiEndpointTest") -> dict[str
             "safe_target": "0x" + store.safe_target.hex(),
             "validator_count": len(head_state.validators) if head_state is not None else 0,
         },
-    }
+    )
 
 
-def _aggregator_status_response(_store: Store, fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _aggregator_status_response(
+    _store: Store, fixture: "ApiEndpointTest"
+) -> EndpointResponseContract:
     """Current aggregator role as seeded by initial_is_aggregator."""
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "application/json",
-        "expected_body": {"is_aggregator": fixture.initial_is_aggregator},
-    }
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="application/json",
+        body={"is_aggregator": fixture.initial_is_aggregator},
+    )
 
 
-def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointResponseContract:
     """
     Prometheus-format metrics scrape.
 
@@ -167,14 +186,16 @@ def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> dict[str, A
     # Touch the module import so spec refactors that remove the registry
     # trip the fixture instead of failing silently.
     assert metrics_registry is not None
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "text/plain; version=0.0.4; charset=utf-8",
-        "expected_body": {"required_metric_names": required_metric_names},
-    }
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="text/plain; version=0.0.4; charset=utf-8",
+        body={"required_metric_names": required_metric_names},
+    )
 
 
-def _aggregator_toggle_response(_store: Store, fixture: "ApiEndpointTest") -> dict[str, Any]:
+def _aggregator_toggle_response(
+    _store: Store, fixture: "ApiEndpointTest"
+) -> EndpointResponseContract:
     """
     Expected response after toggling the aggregator role.
 
@@ -189,14 +210,14 @@ def _aggregator_toggle_response(_store: Store, fixture: "ApiEndpointTest") -> di
             "with a boolean 'enabled' field"
         )
     new_value = body["enabled"]
-    return {
-        "expected_status_code": 200,
-        "expected_content_type": "application/json",
-        "expected_body": {
+    return EndpointResponseContract(
+        status_code=200,
+        content_type="application/json",
+        body={
             "is_aggregator": new_value,
             "previous": fixture.initial_is_aggregator,
         },
-    }
+    )
 
 
 _ENDPOINT_HANDLERS: dict[tuple[str, str], EndpointHandler] = {
@@ -299,7 +320,7 @@ class ApiEndpointTest(BaseTestSpec):
             genesis_params=self.genesis_params,
             request_body=self.request_body,
             initial_is_aggregator=self.initial_is_aggregator,
-            expected_status_code=response_contract["expected_status_code"],
-            expected_content_type=response_contract["expected_content_type"],
-            expected_body=response_contract["expected_body"],
+            expected_status_code=response_contract.status_code,
+            expected_content_type=response_contract.content_type,
+            expected_body=response_contract.body,
         )
