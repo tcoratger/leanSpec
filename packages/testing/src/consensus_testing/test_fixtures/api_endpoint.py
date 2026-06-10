@@ -3,14 +3,12 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from consensus_testing.genesis import build_anchor, generate_pre_state
+from consensus_testing.genesis import build_anchor, generate_pre_state, make_genesis_block
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
-from lean_spec.spec.crypto.merkleization import hash_tree_root
-from lean_spec.spec.forks import Slot, ValidatorIndex
+from lean_spec.spec.forks import Slot
 from lean_spec.spec.forks.lstar import Store
-from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody, State
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.spec.ssz import Uint64
 
 EndpointHandler = Callable[[Store, "ApiEndpointTest"], dict[str, Any]]
 """Uniform signature for all endpoint response builders.
@@ -18,18 +16,6 @@ EndpointHandler = Callable[[Store, "ApiEndpointTest"], dict[str, Any]]
 Every handler receives both arguments even if it only needs one.
 This keeps the dispatch table simple: one signature, one call site.
 """
-
-
-def _make_genesis_block(state: State) -> Block:
-    """Build a slot-0 block anchored to the given genesis state."""
-    body = BlockBody(attestations=AggregatedAttestations(data=[]))
-    return Block(
-        slot=Slot(0),
-        proposer_index=ValidatorIndex(0),
-        parent_root=Bytes32.zero(),
-        state_root=Bytes32(hash_tree_root(state)),
-        body=body,
-    )
 
 
 def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -> Store:
@@ -49,7 +35,7 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
         state = generate_pre_state(
             fork=fork, genesis_time=Uint64(genesis_time), num_validators=num_validators
         )
-        block = _make_genesis_block(state)
+        block = make_genesis_block(state)
         # No validator identity — fixture only reads store data, never signs.
         return fork.create_store(state, block, validator_index=None)
 
