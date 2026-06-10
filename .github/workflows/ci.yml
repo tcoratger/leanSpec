@@ -133,6 +133,9 @@ jobs:
       - name: Fill test fixtures
         run: just fill-ci
 
+      - name: Check fixture determinism (order-sensitive vectors)
+        run: just fill-determinism
+
   interop-tests:
     name: Interop tests - Multi-node consensus
     runs-on: macos-latest
