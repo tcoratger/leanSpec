@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 from unittest.mock import patch
 
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from consensus_testing.test_fixtures.hex_codec import from_hex, to_hex
 from lean_spec.base import StrictBaseModel
 from lean_spec.node.networking import PeerId
 from lean_spec.node.networking.gossipsub.behavior import GossipsubBehavior, PeerState
@@ -41,11 +42,6 @@ class _SendCapture:
 def _peer_id(name: str) -> PeerId:
     """Convert a short test name to a PeerId."""
     return PeerId.from_base58(name)
-
-
-def _unhex(hex_str: str) -> bytes:
-    """Decode a 0x-prefixed hex string to bytes."""
-    return bytes.fromhex(hex_str.removeprefix("0x"))
 
 
 class GossipsubMeshParameters(StrictBaseModel):
@@ -204,19 +200,19 @@ class GossipsubEvent(StrictBaseModel):
             control_components["ihave"] = [
                 ControlIHave(
                     topic_id=TopicId(ihave.topic_id),
-                    message_ids=[_unhex(message_id) for message_id in ihave.message_ids],
+                    message_ids=[from_hex(message_id) for message_id in ihave.message_ids],
                 )
                 for ihave in self.ihave
             ]
         if self.iwant:
             control_components["iwant"] = [
-                ControlIWant(message_ids=[_unhex(message_id) for message_id in iwant.message_ids])
+                ControlIWant(message_ids=[from_hex(message_id) for message_id in iwant.message_ids])
                 for iwant in self.iwant
             ]
         if self.idontwant:
             control_components["idontwant"] = [
                 ControlIDontWant(
-                    message_ids=[_unhex(message_id) for message_id in idontwant.message_ids]
+                    message_ids=[from_hex(message_id) for message_id in idontwant.message_ids]
                 )
                 for idontwant in self.idontwant
             ]
@@ -225,7 +221,7 @@ class GossipsubEvent(StrictBaseModel):
             publish=[
                 Message(
                     topic=TopicId(message.topic),
-                    data=_unhex(message.data) if message.data else b"",
+                    data=from_hex(message.data) if message.data else b"",
                 )
                 for message in self.publish
             ],
@@ -432,7 +428,7 @@ class GossipsubHandlerTest(BaseTestSpec):
 
             # IDONTWANT suppresses forwarding to peers that already have the message.
             for message_id_hex in peer_configuration.dont_want_ids:
-                peer_state.dont_want_ids.add(MessageId(_unhex(message_id_hex)))
+                peer_state.dont_want_ids.add(MessageId(from_hex(message_id_hex)))
             behavior._peers[peer_id] = peer_state
 
         # Mesh topology determines who receives forwarded messages.
@@ -449,7 +445,7 @@ class GossipsubHandlerTest(BaseTestSpec):
         # Duplicate messages are silently dropped; IHAVE for seen IDs
         # does not trigger an IWANT response.
         for message_id_hex in self.initial_state.seen_message_ids:
-            behavior.seen_cache.add(MessageId(_unhex(message_id_hex)), Timestamp(self.now))
+            behavior.seen_cache.add(MessageId(from_hex(message_id_hex)), Timestamp(self.now))
 
         # Message cache holds full message payloads for IWANT responses.
         #
@@ -458,9 +454,9 @@ class GossipsubHandlerTest(BaseTestSpec):
         for cached_message in self.initial_state.cached_messages:
             message = GossipsubMessage(
                 topic=cached_message.topic.encode("utf-8"),
-                raw_data=_unhex(cached_message.data),
+                raw_data=from_hex(cached_message.data),
             )
-            message._cached_id = MessageId(_unhex(cached_message.message_id))
+            message._cached_id = MessageId(from_hex(cached_message.message_id))
             behavior.message_cache.put(TopicId(cached_message.topic), message)
 
         # Build the incoming RPC from the event.
@@ -491,7 +487,7 @@ class GossipsubHandlerTest(BaseTestSpec):
 
             publish = (
                 [
-                    SentPublish(topic=str(message.topic), data="0x" + message.data.hex())
+                    SentPublish(topic=str(message.topic), data=to_hex(message.data))
                     for message in rpc.publish
                 ]
                 if rpc.publish
@@ -518,9 +514,7 @@ class GossipsubHandlerTest(BaseTestSpec):
                     iwant=(
                         [
                             SentMessageIdentifiers(
-                                message_ids=[
-                                    "0x" + message_id.hex() for message_id in iwant.message_ids
-                                ]
+                                message_ids=[to_hex(message_id) for message_id in iwant.message_ids]
                             )
                             for iwant in rpc.control.iwant
                         ]
@@ -531,7 +525,7 @@ class GossipsubHandlerTest(BaseTestSpec):
                         [
                             SentMessageIdentifiers(
                                 message_ids=[
-                                    "0x" + message_id.hex() for message_id in idontwant.message_ids
+                                    to_hex(message_id) for message_id in idontwant.message_ids
                                 ]
                             )
                             for idontwant in rpc.control.idontwant
