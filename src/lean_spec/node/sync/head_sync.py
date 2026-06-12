@@ -63,15 +63,11 @@ class HeadSyncResult:
     """
     Result of processing a gossip block.
 
-    The SyncService only branches on the processed flag; the error string is
-    retained for incident-response logs and post-mortem inspection.
+    The SyncService only branches on the processed flag.
     """
 
     processed: bool
     """True if the block was immediately integrated into the Store."""
-
-    error: str | None = None
-    """Error message if processing failed."""
 
 
 @dataclass(slots=True)
@@ -236,7 +232,6 @@ class HeadSync:
                 )
                 return HeadSyncResult(
                     processed=False,
-                    error=str(exception),
                 ), store
 
             # Process cached descendants.
