@@ -688,6 +688,16 @@ class SyncService:
                 )
 
                 if local_proofs:
+                    # The local proofs arrive in set-iteration order.
+                    # That order is not stable across nodes.
+                    # Folding them stays order-invariant for consensus.
+                    #
+                    # The merged participant bitfield is positional and ascending.
+                    # It names the same validators regardless of child order.
+                    #
+                    # Folding may emit byte-distinct proofs across orderings.
+                    # Every ordering verifies against that same canonical key set.
+                    # No consensus rule compares these re-merged proofs by bytes.
                     combined = SingleMessageAggregate.aggregate(
                         children=[
                             (
