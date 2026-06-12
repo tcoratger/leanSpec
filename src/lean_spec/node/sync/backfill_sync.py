@@ -45,7 +45,7 @@ from typing import Protocol
 from lean_spec.node.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.node.networking.transport.peer_id import PeerId
 from lean_spec.node.sync.block_cache import BlockCache
-from lean_spec.node.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
+from lean_spec.node.sync.config import MAX_BACKFILL_DEPTH
 from lean_spec.node.sync.peer_manager import PeerManager
 from lean_spec.spec.forks import SignedBlock, Slot
 from lean_spec.spec.ssz import Bytes32, Uint64
@@ -220,9 +220,13 @@ class BackfillSync:
         self._pending.update(roots_to_fetch)
 
         try:
-            # Fetch in batches to respect request limits.
-            for batch_start in range(0, len(roots_to_fetch), MAX_BLOCKS_PER_REQUEST):
-                batch = roots_to_fetch[batch_start : batch_start + MAX_BLOCKS_PER_REQUEST]
+            # Split into per-message batches bounded by the wire request limit.
+            #
+            # A by-root request carries at most MAX_REQUEST_BLOCKS roots.
+            # That is the same ceiling the responder enforces.
+            # A wider set becomes several round-trips here.
+            for batch_start in range(0, len(roots_to_fetch), MAX_REQUEST_BLOCKS):
+                batch = roots_to_fetch[batch_start : batch_start + MAX_REQUEST_BLOCKS]
                 await self._fetch_batch(batch, depth)
         finally:
             # Always clear pending status, even on error.
