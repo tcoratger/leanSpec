@@ -568,14 +568,19 @@ class ValidatorService:
 
         signature = scheme.sign(secret_key, slot, message)
 
-        updated_entry = ValidatorEntry(
-            index=validator_entry.index,
-            **{
-                "attestation_secret_key": validator_entry.attestation_secret_key,
-                "proposal_secret_key": validator_entry.proposal_secret_key,
-                key_field: secret_key,
-            },
-        )
+        # Carry over both secret keys, replacing only the one that was advanced.
+        if key_field == "attestation_secret_key":
+            updated_entry = ValidatorEntry(
+                index=validator_entry.index,
+                attestation_secret_key=secret_key,
+                proposal_secret_key=validator_entry.proposal_secret_key,
+            )
+        else:
+            updated_entry = ValidatorEntry(
+                index=validator_entry.index,
+                attestation_secret_key=validator_entry.attestation_secret_key,
+                proposal_secret_key=secret_key,
+            )
         self.registry.add(updated_entry)
         return updated_entry, signature
 
