@@ -124,14 +124,10 @@ class ApiServer:
     def stop(self) -> None:
         """Request graceful shutdown (fire-and-forget). Prefer aclose() in async code."""
         if self._runner is not None:
-            asyncio.create_task(self._async_stop())
+            asyncio.create_task(self.aclose())
 
     async def aclose(self) -> None:
         """Gracefully stop the server. Await this in async code for clean shutdown."""
-        await self._async_stop()
-
-    async def _async_stop(self) -> None:
-        """Gracefully stop the server."""
         if self._runner:
             await self._runner.cleanup()
             self._runner = None
