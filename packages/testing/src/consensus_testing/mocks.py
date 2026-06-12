@@ -122,10 +122,9 @@ class MockEventSource:
 
 @dataclass
 class _MockBlock:
-    """Block stub carrying only the slot and parent root used in lookups."""
+    """Terminal genesis block stub carrying only the slot used in lookups."""
 
     slot: Slot = field(default_factory=lambda: Slot(0))
-    parent_root: Bytes32 = field(default_factory=Bytes32.zero)
 
 
 @dataclass
