@@ -21,10 +21,6 @@ from lean_spec.spec.forks import LstarSpec, Store
 logger = logging.getLogger(__name__)
 
 
-_routes = [web.get(path, handler) for path, handler in ROUTES.items()]
-_routes += [web.route(method, path, handler) for method, path, handler in ADMIN_ROUTES]
-"""aiohttp route definitions generated from ROUTES and ADMIN_ROUTES."""
-
 # The following classes are implementation details.
 # Other implementations may structure their code differently.
 
@@ -103,8 +99,10 @@ class ApiServer:
         # Absence is fine; endpoints return 503 when unset.
         app["aggregator_controller"] = self.aggregator_controller
 
-        # Add all routes
-        app.add_routes(_routes)
+        # Add all routes, generated from ROUTES and ADMIN_ROUTES.
+        routes = [web.get(path, handler) for path, handler in ROUTES.items()]
+        routes += [web.route(method, path, handler) for method, path, handler in ADMIN_ROUTES]
+        app.add_routes(routes)
 
         self._runner = web.AppRunner(app)
         await self._runner.setup()
