@@ -169,8 +169,9 @@ def test_mix_in_length_zero() -> None:
 
 def test_mix_in_length_error_on_negative() -> None:
     """Rejects negative lengths."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as exception_info:
         mix_in_length(sample_chunks[0], -1)
+    assert str(exception_info.value) == "length must be non-negative"
 
 
 def test_zero_tree_root_internal() -> None:

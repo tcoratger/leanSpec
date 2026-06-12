@@ -261,10 +261,12 @@ class TestQuicStreamReset:
     async def test_repeated_reads_after_reset_raise(self, quic_stream: QuicStream) -> None:
         """Subsequent reads after reset continue to raise."""
         quic_stream._receive_reset(error_code=0)
-        with pytest.raises(QuicStreamResetError):
+        with pytest.raises(QuicStreamResetError) as first_read_exception_info:
             await quic_stream.read()
-        with pytest.raises(QuicStreamResetError):
+        assert str(first_read_exception_info.value) == "Stream 0 reset by peer (error_code=0)"
+        with pytest.raises(QuicStreamResetError) as second_read_exception_info:
             await quic_stream.read()
+        assert str(second_read_exception_info.value) == "Stream 0 reset by peer (error_code=0)"
 
     def test_reset_error_is_subclass_of_transport_error(self) -> None:
         """Reset error inherits from the base transport error."""

@@ -348,7 +348,13 @@ def test_pydantic_schema_passes_through_existing_fp_instance() -> None:
 @pytest.mark.parametrize("bad", [P, P + 1, -1])
 def test_pydantic_schema_rejects_out_of_range_ints(bad: int) -> None:
     """Raw integers outside the canonical range are rejected by Pydantic validation."""
-    with pytest.raises(ValidationError):
+    # The union schema reports two errors whose tail differs per bound, and the URL is
+    # version-pinned, so anchor the stable count line and instance-check leg only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^2 validation errors for _PydanticModelWithFp\nx\.is-instance\[Fp\]\n"
+        r"  Input should be an instance of Fp \[type=is_instance_of,",
+    ):
         _PydanticModelWithFp(x=bad)  # ty: ignore[invalid-argument-type]
 
 

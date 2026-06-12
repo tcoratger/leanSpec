@@ -185,8 +185,9 @@ class TestLiveNetworkEventSourceAsyncIteration:
         """Raises StopAsyncIteration immediately when not running."""
         es = _make_event_source()
 
-        with pytest.raises(StopAsyncIteration):
+        with pytest.raises(StopAsyncIteration) as exception_info:
             await es.__anext__()
+        assert str(exception_info.value) == ""
 
 
 class TestLiveNetworkEventSourceDisconnect:

@@ -181,8 +181,9 @@ class TestCatchUp:
         service.sync_service.store = service.sync_service.store.model_copy(
             update={"time": Interval(5)}
         )
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError) as exception_info:
             await service._tick_to(Interval(3))
+        assert str(exception_info.value) == ""
 
     async def test_continues_on_a_store_swapped_in_during_the_yield(self) -> None:
         """A store replaced mid-catch-up is picked up on the next tick, not the stale one."""

@@ -112,8 +112,13 @@ class TestBitvector:
     )
     def test_pydantic_validation_rejects_wrong_length(self, invalid_value: Any) -> None:
         """Pydantic validation rejects lists of the wrong length."""
-        with pytest.raises(ValueOrValidationError):
+        provided_bit_count = len(invalid_value["data"])
+        with pytest.raises(ValueOrValidationError) as exception_info:
             Bitvector4Model(value=invalid_value)
+        assert (
+            str(exception_info.value)
+            == f"Bitvector4 requires exactly 4 elements, got {provided_bit_count}"
+        )
 
     def test_bitvector_is_immutable(self) -> None:
         """Item assignment on a Bitvector raises TypeError — Pydantic models are immutable."""
@@ -122,8 +127,9 @@ class TestBitvector:
             LENGTH = 2
 
         vec = Bitvector2(data=[Boolean(True), Boolean(False)])
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as exception_info:
             vec[0] = False  # type: ignore[index]
+        assert str(exception_info.value) == "'Bitvector2' object does not support item assignment"
 
 
 class TestBitlist:
@@ -207,8 +213,9 @@ class TestBitlist:
     def test_pydantic_validation_rejects_oversized_list(self) -> None:
         """Pydantic validation rejects lists exceeding the limit."""
         invalid_value = {"data": [Boolean(True)] * 9}
-        with pytest.raises(ValueOrValidationError):
+        with pytest.raises(ValueOrValidationError) as exception_info:
             Bitlist8Model(value=invalid_value)  # type: ignore[arg-type]
+        assert str(exception_info.value) == "Bitlist8 exceeds limit of 8, got 9"
 
     def test_get_item_int(self) -> None:
         """Indexing by int returns the Boolean at that position."""
@@ -255,8 +262,11 @@ class TestBitlist:
     def test_add_with_unsupported_type_raises(self) -> None:
         """Adding an unsupported type returns NotImplemented and Python raises TypeError."""
         bitlist = Bitlist8(data=[Boolean(True)])
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as exception_info:
             _ = bitlist + 42
+        assert (
+            str(exception_info.value) == "unsupported operand type(s) for +: 'Bitlist8' and 'int'"
+        )
 
     def test_add_exceeding_limit_raises_error(self) -> None:
         """Concatenation beyond LIMIT raises with the exact size in the message."""

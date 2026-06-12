@@ -377,8 +377,9 @@ class TestSSZVectorAccessors:
         """Item assignment raises because the underlying model is frozen."""
         instance = Uint8Vector2(data=[Uint8(1), Uint8(2)])
 
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as exception_info:
             instance[0] = 3  # type: ignore[index]
+        assert str(exception_info.value) == "'Uint8Vector2' object does not support item assignment"
 
     def test_pydantic_dict_input_coerces_to_vector(self) -> None:
         """Pydantic coerces a dict payload into an SSZVector with typed elements."""

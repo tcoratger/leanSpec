@@ -273,10 +273,11 @@ class TestBatchWrite:
         with db.batch_write():
             db.put_head_root(root)
 
-        with pytest.raises(StorageWriteError):
+        with pytest.raises(StorageWriteError) as exception_info:
             with db.batch_write():
                 db.put_head_root(Bytes32(b"\x16" * 32))
                 raise StorageWriteError("simulated failure")
+        assert str(exception_info.value) == "simulated failure"
 
         assert db.get_head_root() == root
 
@@ -372,7 +373,8 @@ class TestErrorPaths:
         """Operations on a closed database raise StorageReadError."""
         db.close()
 
-        with pytest.raises(StorageReadError):
+        # Anchor only the stable prefix; the trailing sqlite3 internal text varies by version.
+        with pytest.raises(StorageReadError, match=r"^Failed to read head root: "):
             db.get_head_root()
 
 

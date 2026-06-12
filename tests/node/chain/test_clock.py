@@ -264,8 +264,9 @@ class TestSlotClockImmutability:
     def test_is_frozen(self) -> None:
         """The clock is immutable, so reassigning a field raises."""
         clock = SlotClock(genesis_time=Uint64(1_700_000_000))
-        with pytest.raises(AttributeError):
+        with pytest.raises(AttributeError) as exception_info:
             clock.genesis_time = Uint64(1_700_000_001)  # type: ignore[misc]
+        assert str(exception_info.value) == "cannot assign to field 'genesis_time'"
 
 
 class TestReturnTypes:

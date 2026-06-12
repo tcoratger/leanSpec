@@ -361,8 +361,9 @@ def test_verify_path_rejects_excessive_depth_at_ssz_level() -> None:
     The defensive depth guard inside verification cannot be reached through a
     well-formed opening, since the digest list rejects more than its limit.
     """
-    with pytest.raises(SSZValueError):
+    with pytest.raises(SSZValueError) as exception_info:
         HashDigestList(data=[random_domain(PROD_CONFIG) for _ in range(33)])
+    assert str(exception_info.value) == "HashDigestList exceeds limit of 32, got 33"
 
 
 @pytest.mark.parametrize("position", [16, 100])

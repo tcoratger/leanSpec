@@ -114,8 +114,9 @@ class TestCorruptedData:
         corrupted[3] += 1
 
         # The important thing is that decompression fails gracefully.
-        with pytest.raises(SnappyDecompressionError):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(bytes(corrupted))
+        assert str(exception_info.value) == "Copy offset 1768645229 exceeds output buffer size 0"
 
     def test_zero_length_header(self) -> None:
         """Test data with zeroed length header."""
@@ -143,8 +144,9 @@ class TestCorruptedData:
         corrupted[3] = 0x00
 
         # Decompression should fail because we can't produce that many bytes.
-        with pytest.raises(SnappyDecompressionError):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(bytes(corrupted))
+        assert str(exception_info.value) == "Copy offset 766 exceeds output buffer size 0"
 
     @pytest.mark.parametrize("bad_file", ["baddata1.snappy", "baddata2.snappy", "baddata3.snappy"])
     def test_bad_data_files(self, bad_file: str) -> None:
@@ -164,8 +166,11 @@ class TestCorruptedData:
 
         # Truncate to remove some literal data
         truncated = compressed[:-3]
-        with pytest.raises(SnappyDecompressionError):
+        with pytest.raises(SnappyDecompressionError) as exception_info:
             decompress(truncated)
+        assert str(exception_info.value) == (
+            "Literal at position 1 extends past end of input: needs 13 bytes but only 10 available"
+        )
 
     def test_invalid_copy_offset(self) -> None:
         """Test copy referencing beyond available data."""

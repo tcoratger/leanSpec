@@ -37,11 +37,12 @@ class TestTopicForkValidation:
 
     def test_from_string_validated_raises_on_mismatch(self) -> None:
         """Test from_string_validated raises ForkMismatchError on mismatch."""
-        with pytest.raises(ForkMismatchError):
+        with pytest.raises(ForkMismatchError) as exception_info:
             GossipTopic.from_string_validated(
                 "/leanconsensus/12345678/block/ssz_snappy",
                 expected_network_name="deadbeef",
             )
+        assert str(exception_info.value) == "Fork mismatch: expected deadbeef, got 12345678"
 
     def test_from_string_validated_raises_on_invalid_topic(self) -> None:
         """Test from_string_validated raises ValueError for invalid topics."""

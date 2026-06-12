@@ -154,7 +154,9 @@ class TestGenesisConfigValidation:
                 ],
             }
         )
-        with pytest.raises(ValidationError):
+        # Anchor the stable pydantic summary line; the per-error body carries a
+        # version-pinned docs URL that drifts across pydantic releases.
+        with pytest.raises(ValidationError, match=r"^6 validation errors for GenesisConfig\n"):
             _load(yaml_content)
 
     def test_wrong_length_public_key_raises_error(self) -> None:
@@ -170,8 +172,9 @@ class TestGenesisConfigValidation:
                 ],
             }
         )
-        with pytest.raises(SSZValueError):
+        with pytest.raises(SSZValueError) as exception_info:
             _load(yaml_content)
+        assert str(exception_info.value) == "Bytes52 requires exactly 52 bytes, got 5"
 
     def test_missing_genesis_time_raises_error(self) -> None:
         """Requires GENESIS_TIME field."""
@@ -185,7 +188,12 @@ class TestGenesisConfigValidation:
                 ],
             }
         )
-        with pytest.raises(ValidationError):
+        # Anchor the stable pydantic summary and the missing-field tag; the per-error
+        # body carries a version-pinned docs URL that drifts across pydantic releases.
+        with pytest.raises(
+            ValidationError,
+            match=r"^1 validation error for GenesisConfig\nGENESIS_TIME\n  Field required",
+        ):
             _load(yaml_content)
 
     def test_missing_validators_raises_error(self) -> None:
@@ -195,7 +203,12 @@ class TestGenesisConfigValidation:
                 "GENESIS_TIME": 1704085200,
             }
         )
-        with pytest.raises(ValidationError):
+        # Anchor the stable pydantic summary and the missing-field tag; the per-error
+        # body carries a version-pinned docs URL that drifts across pydantic releases.
+        with pytest.raises(
+            ValidationError,
+            match=r"^1 validation error for GenesisConfig\nGENESIS_VALIDATORS\n  Field required",
+        ):
             _load(yaml_content)
 
     def test_validators_not_a_list_raises_error(self) -> None:
@@ -206,7 +219,15 @@ class TestGenesisConfigValidation:
                 "GENESIS_VALIDATORS": "not_a_list",
             }
         )
-        with pytest.raises(ValidationError):
+        # Anchor the stable pydantic summary and the list-type tag; the per-error
+        # body carries a version-pinned docs URL that drifts across pydantic releases.
+        with pytest.raises(
+            ValidationError,
+            match=(
+                r"^1 validation error for GenesisConfig\n"
+                r"GENESIS_VALIDATORS\n  Input should be a valid list"
+            ),
+        ):
             _load(yaml_content)
 
 

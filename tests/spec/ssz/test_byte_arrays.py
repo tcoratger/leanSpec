@@ -474,8 +474,9 @@ class TestBaseByteListPydantic:
 
     def test_rejects_oversized_input(self) -> None:
         """Pydantic rejects data exceeding LIMIT via SSZValueError."""
-        with pytest.raises(SSZValueError):
+        with pytest.raises(SSZValueError) as exception_info:
             ModelLists(payload=ByteList16(data=bytes(range(17))))
+        assert str(exception_info.value) == "ByteList16 exceeds limit of 16, got 17"
 
     def test_json_serialization_to_hex(self) -> None:
         """JSON-mode serialization renders the data field as a 0x-prefixed hex string."""

@@ -1322,24 +1322,28 @@ class TestBlocksByRangeRequestMalformedPayloads:
     def test_truncated_payload_rejected(self) -> None:
         """Payload shorter than 16 bytes is rejected."""
         truncated = b"\x01" * 15  # 15 bytes, need 16
-        with pytest.raises(SSZSerializationError):
+        with pytest.raises(SSZSerializationError) as exception_info:
             BlocksByRangeRequest.decode_bytes(truncated)
+        assert str(exception_info.value) == "Uint64: expected 8 bytes, got 7"
 
     def test_empty_payload_rejected(self) -> None:
         """Zero-length payload is rejected."""
-        with pytest.raises(SSZSerializationError):
+        with pytest.raises(SSZSerializationError) as exception_info:
             BlocksByRangeRequest.decode_bytes(b"")
+        assert str(exception_info.value) == "Slot: expected 8 bytes, got 0"
 
     def test_single_byte_rejected(self) -> None:
         """Single byte payload is rejected."""
-        with pytest.raises(SSZSerializationError):
+        with pytest.raises(SSZSerializationError) as exception_info:
             BlocksByRangeRequest.decode_bytes(b"\x00")
+        assert str(exception_info.value) == "Slot: expected 8 bytes, got 1"
 
     def test_eight_byte_payload_rejected(self) -> None:
         """8 bytes (half-payload, single field) is rejected."""
         partial = (100).to_bytes(8, "little")
-        with pytest.raises(SSZSerializationError):
+        with pytest.raises(SSZSerializationError) as exception_info:
             BlocksByRangeRequest.decode_bytes(partial)
+        assert str(exception_info.value) == "Uint64: expected 8 bytes, got 0"
 
 
 class TestBlocksByRangeProtocolId:

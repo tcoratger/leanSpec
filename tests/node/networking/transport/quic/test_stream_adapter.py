@@ -301,8 +301,9 @@ class TestMessageFormat:
         peer.write(b"ABC")
         await peer.finish_write()
         await peer.drain()
-        with pytest.raises(EOFError):
+        with pytest.raises(EOFError) as exception_info:
             await stream.readexactly(6)
+        assert str(exception_info.value) == "Stream closed before enough data received"
 
     async def test_write_drain_buffers(self) -> None:
         """Write accumulates, drain flushes to stream"""

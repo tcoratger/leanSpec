@@ -108,7 +108,8 @@ class TestObserveContextManagers:
         observer = _RecordingObserver()
         set_observer(observer)
 
-        with pytest.raises(RuntimeError), cm():
+        with pytest.raises(RuntimeError) as exception_info, cm():
             raise RuntimeError("boom")
+        assert str(exception_info.value) == "boom"
 
         assert observer.samples[method_name] == []

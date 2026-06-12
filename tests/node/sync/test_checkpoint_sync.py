@@ -204,10 +204,11 @@ class TestFetchFinalizedState:
                 "lean_spec.node.sync.checkpoint_sync.httpx.AsyncClient",
                 return_value=httpx.AsyncClient(transport=_CapturingTransport()),
             ),
-            pytest.raises(CheckpointSyncError),
+            pytest.raises(CheckpointSyncError) as exception_info,
         ):
             await fetch_finalized_state("http://example.com/", State)
 
+        assert str(exception_info.value) == "Failed to fetch state: Slot: expected 8 bytes, got 1"
         assert captured == [f"http://example.com{FINALIZED_STATE_ENDPOINT}"]
 
 

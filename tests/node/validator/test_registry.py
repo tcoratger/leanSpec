@@ -113,7 +113,11 @@ class TestValidatorManifestEntry:
 
     def test_integer_public_key_rejected(self) -> None:
         """Integer public_keys are rejected — only valid 52-byte hex strings accepted."""
-        with pytest.raises((TypeError, ValidationError)):
+        # Pydantic's multi-line report embeds the rejected integer and its type.
+        # Anchor only the stable type-mismatch line naming the expected key type.
+        with pytest.raises(
+            (TypeError, ValidationError), match=r"Input should be an instance of Bytes52"
+        ):
             ValidatorManifestEntry(
                 index=ValidatorIndex(0),
                 attestation_public_key_hex=0x123,  # type: ignore[arg-type]
@@ -124,7 +128,7 @@ class TestValidatorManifestEntry:
 
     def test_wrong_length_public_key_rejected(self) -> None:
         """Hex strings that don't decode to exactly 52 bytes are rejected."""
-        with pytest.raises((SSZValueError, ValidationError)):
+        with pytest.raises((SSZValueError, ValidationError)) as exception_info:
             ValidatorManifestEntry(
                 index=ValidatorIndex(0),
                 attestation_public_key_hex=Bytes52("0x" + "aa" * 10),
@@ -132,6 +136,7 @@ class TestValidatorManifestEntry:
                 attestation_private_key_file="att.ssz",
                 proposal_private_key_file="prop.ssz",
             )
+        assert str(exception_info.value) == "Bytes52 requires exactly 52 bytes, got 10"
 
 
 class TestValidatorManifest:

@@ -28,7 +28,9 @@ def test_pydantic_validation_accepts_valid_bool(valid_value: bool) -> None:
 @pytest.mark.parametrize("invalid_value", [1, 0, 1.0, "True"])
 def test_pydantic_strict_mode_rejects_invalid_types(invalid_value: Any) -> None:
     """Tests that Pydantic's strict mode rejects types that are not `bool`."""
-    with pytest.raises(ValidationError):
+    # Pydantic's multi-line report embeds the rejected input value and type.
+    # Anchor only the stable type-mismatch line shared across all inputs.
+    with pytest.raises(ValidationError, match=r"Input should be an instance of Boolean"):
         BooleanModel(value=invalid_value)
 
 

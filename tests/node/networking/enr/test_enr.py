@@ -176,8 +176,9 @@ class TestTextFormatValidation:
 
     def test_prefix_only_rejected(self) -> None:
         """Prefix only without data is rejected."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as exception_info:
             ENR.from_string("enr:")
+        assert str(exception_info.value) == "Invalid RLP encoding: Empty RLP data"
 
     def test_invalid_base64_rejected(self) -> None:
         """Invalid base64 encoding is rejected."""

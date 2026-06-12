@@ -682,8 +682,9 @@ class TestGossipReceptionEdgeCases:
         """Handles various malformed varint patterns."""
         stream = MockStream(invalid_data)
 
-        with pytest.raises(GossipMessageError):
+        with pytest.raises(GossipMessageError) as exception_info:
             await read_gossip_message(stream)
+        assert str(exception_info.value) == "Truncated gossip message"
 
     async def test_topic_only_message_missing_data(self) -> None:
         """Raises error when message has topic but no data section."""
@@ -745,8 +746,11 @@ class TestGossipHandlerForkMismatch:
         handler = GossipHandler(network_name=FORK_DIGEST)
         compressed = compress(b"\x00" * 32)
 
-        with pytest.raises(ForkMismatchError):
+        with pytest.raises(ForkMismatchError) as exception_info:
             handler.decode_message(_block_topic(WRONG_FORK_DIGEST), compressed)
+        assert str(exception_info.value) == (
+            f"Fork mismatch: expected {FORK_DIGEST}, got {WRONG_FORK_DIGEST}"
+        )
 
         # Verify it does NOT raise GossipMessageError
         try:

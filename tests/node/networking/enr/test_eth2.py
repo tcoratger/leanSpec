@@ -33,7 +33,16 @@ class TestEth2Data:
             next_fork_version=Version(b"\x02\x00\x00\x00"),
             next_fork_epoch=Uint64(0),
         )
-        with pytest.raises(ValidationError):
+        # Pydantic emits a multi-line frozen-instance report ending in a version-pinned URL.
+        # Anchor the stable header and the frozen-instance reason line, not the URL.
+        with pytest.raises(
+            ValidationError,
+            match=(
+                r"(?s)^1 validation error for Eth2Data\n"
+                r"fork_digest\n"
+                r"  Instance is frozen \[type=frozen_instance,"
+            ),
+        ):
             eth2_data.fork_digest = ForkDigest(b"\x00\x00\x00\x00")
 
     def test_far_future_epoch_value(self) -> None:
@@ -76,21 +85,25 @@ class TestAttestationSubnets:
 
     def test_invalid_subnet_id_in_from_subnet_ids(self) -> None:
         """from_subnet_ids() raises for invalid subnet IDs."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as above_range_exception_info:
             AttestationSubnets.from_subnet_ids([64])
+        assert str(above_range_exception_info.value) == "Subnet ID must be 0-63, got 64"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as negative_exception_info:
             AttestationSubnets.from_subnet_ids([-1])
+        assert str(negative_exception_info.value) == "Subnet ID must be 0-63, got -1"
 
     def test_invalid_subnet_id_in_is_subscribed(self) -> None:
         """is_subscribed() raises for invalid subnet IDs."""
         subnets = AttestationSubnets.none()
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as above_range_exception_info:
             subnets.is_subscribed(64)
+        assert str(above_range_exception_info.value) == "Subnet ID must be 0-63, got 64"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as negative_exception_info:
             subnets.is_subscribed(-1)
+        assert str(negative_exception_info.value) == "Subnet ID must be 0-63, got -1"
 
     def test_from_subnet_ids_empty_list(self) -> None:
         """from_subnet_ids with empty list creates no subscriptions."""

@@ -79,7 +79,12 @@ class TestStrictBaseModel:
         """
         model = SampleStrictModel(slot_number=5, block_root="0xabc")
 
-        with pytest.raises(ValidationError):
+        # Pydantic's report carries a version-pinned URL, so anchor the stable core only.
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for SampleStrictModel\nslot_number\n"
+            r"  Instance is frozen \[type=frozen_instance,",
+        ):
             model.slot_number = 10
 
     def test_extra_fields_forbidden(self) -> None:
@@ -88,7 +93,12 @@ class TestStrictBaseModel:
 
         This catches typos and schema mismatches early.
         """
-        with pytest.raises(ValidationError):
+        # Pydantic's report carries a version-pinned URL, so anchor the stable core only.
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for SampleStrictModel\nunknown_field\n"
+            r"  Extra inputs are not permitted \[type=extra_forbidden,",
+        ):
             SampleStrictModel(
                 slot_number=5,
                 block_root="0xabc",
@@ -102,7 +112,12 @@ class TestStrictBaseModel:
         Without strict mode, Pydantic would silently convert "5" to 5.
         In spec code, this kind of silent coercion hides bugs.
         """
-        with pytest.raises(ValidationError):
+        # Pydantic's report carries a version-pinned URL, so anchor the stable core only.
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)^1 validation error for SampleStrictModel\nslot_number\n"
+            r"  Input should be a valid integer \[type=int_type,",
+        ):
             SampleStrictModel(slot_number="5", block_root="0xabc")  # type: ignore[arg-type]
 
     def test_inherits_camel_serialization(self) -> None:

@@ -2,6 +2,7 @@
 
 import io
 import operator
+import re
 from itertools import permutations
 from typing import Any, Type
 
@@ -63,7 +64,10 @@ def test_pydantic_strict_mode_rejects_invalid_types(
 ) -> None:
     """Tests that Pydantic's strict mode rejects types that could be coerced to an int."""
     model = UINT_MODELS[uint_class]
-    with pytest.raises(ValidationError):
+    # Pydantic's multi-line report embeds the rejected input value and type.
+    # Anchor only the stable type-mismatch line naming the expected uint class.
+    expected_type_mismatch_line = f"Input should be an instance of {uint_class.__name__}"
+    with pytest.raises(ValidationError, match=re.escape(expected_type_mismatch_line)):
         model(value=invalid_value)
 
 

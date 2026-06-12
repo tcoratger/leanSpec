@@ -47,8 +47,9 @@ def test_hash_digest_vector_accepts_exact_length() -> None:
 
 def test_hash_digest_vector_rejects_wrong_length() -> None:
     """A digest vector of the wrong length fails validation."""
-    with pytest.raises(SSZValueError):
+    with pytest.raises(SSZValueError) as exception_info:
         HashDigestVector(data=[Fp(value=0)] * (TEST_CONFIG.HASH_LENGTH_FIELD_ELEMENTS + 1))
+    assert str(exception_info.value) == "HashDigestVector requires exactly 8 elements, got 9"
 
 
 def test_parameter_length_is_parameter_length() -> None:
@@ -75,8 +76,9 @@ def test_hash_digest_list_accepts_limit_entries() -> None:
 def test_hash_digest_list_rejects_over_limit() -> None:
     """A digest list one entry past the cap fails validation."""
     nodes = [random_domain(TEST_CONFIG) for _ in range(NODE_LIST_LIMIT + 1)]
-    with pytest.raises(SSZValueError):
+    with pytest.raises(SSZValueError) as exception_info:
         HashDigestList(data=nodes)
+    assert str(exception_info.value) == "HashDigestList exceeds limit of 32, got 33"
 
 
 def test_hash_tree_opening_roundtrips_through_ssz() -> None:

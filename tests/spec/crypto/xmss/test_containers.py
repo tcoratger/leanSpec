@@ -123,7 +123,12 @@ def test_json_roundtrip_preserves_equality(keypair_a: KeyPair, keypair_b: KeyPai
 def test_frozen_blocks_field_assignment(keypair_a: KeyPair, keypair_b: KeyPair) -> None:
     """Reassigning a field after construction raises (frozen model)."""
     validator_keypair = ValidatorKeyPair(attestation_keypair=keypair_a, proposal_keypair=keypair_b)
-    with pytest.raises(ValidationError):
+    # The reported input value embeds key material, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\n"
+        r"  Instance is frozen \[type=frozen_instance,",
+    ):
         validator_keypair.attestation_keypair = keypair_b
 
 
@@ -133,7 +138,12 @@ def test_extra_fields_rejected(
     """Unknown top-level keys raise so JSON typos fail loud."""
     # A misspelled role name must not silently produce defaults.
     polluted = {**hex_dict, "spurious": "ignored"}
-    with pytest.raises(ValidationError):
+    # Pydantic's report carries a version-pinned URL, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nspurious\n"
+        r"  Extra inputs are not permitted \[type=extra_forbidden,",
+    ):
         ValidatorKeyPair.model_validate(polluted)
 
 
@@ -150,7 +160,12 @@ def test_rejects_non_keypair_non_mapping(
         "attestation_keypair": bad_value,
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
-    with pytest.raises(ValidationError):
+    # The reported input value varies per parametrized bad value, so anchor the core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\n"
+        r"  Input should be a valid dictionary or instance of KeyPair \[type=model_type,",
+    ):
         ValidatorKeyPair.model_validate(keypair_mapping)
 
 
@@ -163,7 +178,12 @@ def test_rejects_missing_public_key(
         "attestation_keypair": {"secret_key": keypair_a.secret_key.encode_bytes().hex()},
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
-    with pytest.raises(ValidationError):
+    # The reported input value embeds key material, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\.publicKey\n"
+        r"  Field required \[type=missing,",
+    ):
         ValidatorKeyPair.model_validate(keypair_mapping)
 
 
@@ -176,7 +196,12 @@ def test_rejects_missing_secret_key(
         "attestation_keypair": {"public_key": keypair_a.public_key.encode_bytes().hex()},
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
-    with pytest.raises(ValidationError):
+    # The reported input value embeds key material, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\.secretKey\n"
+        r"  Field required \[type=missing,",
+    ):
         ValidatorKeyPair.model_validate(keypair_mapping)
 
 
@@ -192,7 +217,12 @@ def test_rejects_non_string_hex_value(
         },
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
-    with pytest.raises(ValidationError):
+    # Pydantic's report carries a version-pinned URL, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\.public_key\n"
+        r"  Input should be a valid dictionary or instance of PublicKey \[type=model_type,",
+    ):
         ValidatorKeyPair.model_validate(keypair_mapping)
 
 
@@ -208,7 +238,13 @@ def test_rejects_invalid_hex_characters(
         },
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
-    with pytest.raises(ValidationError):
+    # The reported input value embeds the long bad hex blob, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\.public_key\n"
+        r"  Value error, non-hexadecimal number found in fromhex\(\) arg at position 0 "
+        r"\[type=value_error,",
+    ):
         ValidatorKeyPair.model_validate(keypair_mapping)
 
 
@@ -222,19 +258,35 @@ def test_rejects_wrong_length_hex(keypair_a: KeyPair, hex_dict: dict[str, dict[s
         },
         "proposal_keypair": hex_dict["proposal_keypair"],
     }
-    with pytest.raises(ValidationError):
+    # Pydantic's report carries a version-pinned URL, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nattestation_keypair\.public_key\n"
+        r"  Value error, invalid PublicKey hex: Value 4022250974 exceeds field modulus "
+        r"2130706433 \[type=value_error,",
+    ):
         ValidatorKeyPair.model_validate(keypair_mapping)
 
 
 def test_rejects_missing_role(hex_dict: dict[str, dict[str, str]]) -> None:
     """Both attestation and proposal roles are required."""
-    with pytest.raises(ValidationError):
+    # The reported input value embeds key material, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for ValidatorKeyPair\nproposalKeypair\n"
+        r"  Field required \[type=missing,",
+    ):
         ValidatorKeyPair.model_validate({"attestation_keypair": hex_dict["attestation_keypair"]})
 
 
 def test_keypair_frozen(keypair_a: KeyPair) -> None:
     """KeyPair fields cannot be reassigned (StrictBaseModel is frozen)."""
-    with pytest.raises(ValidationError):
+    # The reported input value embeds key material, so anchor the stable core only.
+    with pytest.raises(
+        ValidationError,
+        match=r"(?s)^1 validation error for KeyPair\npublic_key\n"
+        r"  Instance is frozen \[type=frozen_instance,",
+    ):
         keypair_a.public_key = keypair_a.public_key
 
 
