@@ -401,6 +401,15 @@ class BaseBitlist(SSZModel):
             raise SSZSerializationError(f"{cls.__name__}: no delimiter bit found")
         delimiter_pos = total.bit_length() - 1
 
+        # The delimiter must sit in the final byte of the input.
+        # Reading the stream as one integer silently drops trailing zero bytes.
+        # So a canonical encoding and one with extra zero bytes decode the same.
+        # Rejecting the padded form keeps a single valid encoding per value.
+        if delimiter_pos // 8 != len(data) - 1:
+            raise SSZSerializationError(
+                f"{cls.__name__}: non-canonical trailing zero bytes after delimiter"
+            )
+
         # Phase 3: extract data bits below the delimiter and enforce the size limit.
         #
         # The delimiter position equals the data bit count. For each bit index i:
