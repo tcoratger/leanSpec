@@ -211,9 +211,6 @@ class Node:
                 block_class=config.fork.block_class,
             )
 
-        #
-        # If database contains valid state, resume from there.
-        # Otherwise, fall through to genesis initialization.
         validator_index = (
             config.validator_registry.primary_index() if config.validator_registry else None
         )
@@ -225,6 +222,9 @@ class Node:
             f"Only LstarSpec is supported at the composition root, got {type(config.fork).__name__}"
         )
         fork = config.fork
+
+        # If the database contains valid state, resume from there.
+        # Otherwise, fall through to genesis initialization.
         store = cls._try_load_store_from_database(
             database, validator_index, config.genesis_time, config.time_fn, fork
         )
