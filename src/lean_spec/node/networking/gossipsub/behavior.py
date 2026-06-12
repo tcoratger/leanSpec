@@ -65,6 +65,7 @@ from itertools import count
 from typing import ClassVar, Final, cast
 
 from lean_spec.node.networking.config import (
+    MAX_PAYLOAD_SIZE,
     MESSAGE_DOMAIN_INVALID_SNAPPY,
     MESSAGE_DOMAIN_VALID_SNAPPY,
     PRUNE_BACKOFF,
@@ -576,6 +577,12 @@ class GossipsubBehavior:
         if not message.topic:
             return
 
+        # Drop messages on topics this node does not participate in.
+        # A peer could otherwise flood arbitrary topics to fill the
+        # message cache and the event queue without ever joining our mesh.
+        if message.topic not in self.mesh.subscriptions:
+            return
+
         topic_bytes = message.topic.encode("utf-8")
 
         # Decompress once for message ID computation and event delivery.
@@ -584,6 +591,12 @@ class GossipsubBehavior:
         # The decompressed data is also passed to the event consumer,
         # eliminating a second decompression there.
         decompressed, domain = _try_decompress(message.data)
+
+        # Snappy decompression is pure Python and otherwise unbounded.
+        # Reject payloads that expand past the wire limit before caching.
+        if len(decompressed) > MAX_PAYLOAD_SIZE:
+            return
+
         message_id = GossipsubMessage.compute_id(topic_bytes, decompressed, domain=domain)
 
         # Deduplicate: each message is processed at most once.

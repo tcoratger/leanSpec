@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from lean_spec.node.networking.config import PRUNE_BACKOFF
+from lean_spec.node.networking.config import MAX_PAYLOAD_SIZE, PRUNE_BACKOFF
 from lean_spec.node.networking.gossipsub.behavior import (
     IDONTWANT_SIZE_THRESHOLD,
     GossipsubMessageEvent,
@@ -31,6 +31,7 @@ from lean_spec.node.networking.gossipsub.rpc import (
     SubOpts,
 )
 from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
+from lean_spec.node.snappy import compress as snappy_compress
 from tests.node.networking.gossipsub.conftest import add_peer, make_behavior, make_peer
 
 
@@ -393,8 +394,9 @@ class TestHandleMessage:
 
     @pytest.mark.asyncio
     async def test_message_event_emitted(self) -> None:
-        """Received message emits GossipsubMessageEvent."""
+        """Received message on a subscribed topic emits GossipsubMessageEvent."""
         behavior, _ = make_behavior()
+        behavior.subscribe(TopicId("topic"))
         peer_id = add_peer(behavior, "peer1")
 
         message = Message(topic=TopicId("topic"), data=b"payload")
@@ -420,22 +422,19 @@ class TestHandleMessage:
         assert behavior._event_queue.empty()
 
     @pytest.mark.asyncio
-    async def test_not_forwarded_when_not_subscribed(self) -> None:
-        """Message is not forwarded when we're not subscribed to the topic."""
+    async def test_dropped_when_not_subscribed(self) -> None:
+        """Message on a topic we don't subscribe to is dropped, not cached or enqueued."""
         behavior, capture = make_behavior()
         peer_id = add_peer(behavior, "peer1")
 
-        # Not subscribed to "topic"
         message = Message(topic=TopicId("topic"), data=b"data")
+        message_id = GossipsubMessage.compute_id(b"topic", b"data")
         await behavior._handle_message(peer_id, message)
 
         assert capture.sent == []
-        assert behavior._event_queue.get_nowait() == GossipsubMessageEvent(
-            peer_id=peer_id,
-            topic=TopicId("topic"),
-            data=b"data",
-            message_id=GossipsubMessage.compute_id(b"topic", b"data"),
-        )
+        assert behavior._event_queue.empty()
+        assert behavior.seen_cache.has(message_id) is False
+        assert behavior.message_cache.get(message_id) is None
 
     @pytest.mark.asyncio
     async def test_idontwant_sent_for_large_messages(self) -> None:
@@ -465,6 +464,26 @@ class TestHandleMessage:
                 ),
             ),
         ]
+
+    @pytest.mark.asyncio
+    async def test_oversized_decompressed_payload_rejected(self) -> None:
+        """A payload that decompresses past the wire limit is dropped before caching."""
+        behavior, capture = make_behavior()
+        topic = TopicId("test_topic")
+        behavior.subscribe(topic)
+        peer_id = add_peer(behavior, "peer1", {topic})
+
+        # Highly compressible bytes that expand one byte past the 10 MiB cap.
+        oversized_payload = b"\x00" * (MAX_PAYLOAD_SIZE + 1)
+        compressed_payload = snappy_compress(oversized_payload)
+        message = Message(topic=topic, data=compressed_payload)
+        message_id = GossipsubMessage.compute_id(topic.encode("utf-8"), oversized_payload)
+        await behavior._handle_message(peer_id, message)
+
+        assert capture.sent == []
+        assert behavior._event_queue.empty()
+        assert behavior.seen_cache.has(message_id) is False
+        assert behavior.message_cache.get(message_id) is None
 
     @pytest.mark.asyncio
     async def test_idontwant_not_sent_for_small_messages(self) -> None:
