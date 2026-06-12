@@ -9,7 +9,11 @@ from typing import Final
 import pytest
 
 from consensus_testing import make_test_block, make_test_status
-from lean_spec.node.networking.config import MAX_ERROR_MESSAGE_SIZE, MAX_REQUEST_BLOCKS
+from lean_spec.node.networking.config import (
+    MAX_ERROR_MESSAGE_SIZE,
+    MAX_PAYLOAD_SIZE,
+    MAX_REQUEST_BLOCKS,
+)
 from lean_spec.node.networking.reqresp.codec import (
     ResponseCode,
     encode_request,
@@ -1199,6 +1203,31 @@ class TestReadRequestBufferLimit:
 
         code, _ = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
+
+    async def test_read_request_rejects_oversized_declared_length_without_buffering(
+        self,
+    ) -> None:
+        """Oversized declared length is rejected on the varint alone, before any payload read."""
+        # A 10-byte varint can claim a length far above the payload cap.
+        # The reader must reject on the length prefix, before reading the body.
+        oversized_declared_length = MAX_PAYLOAD_SIZE + 1
+        varint_bytes = encode_varint(oversized_declared_length)
+
+        # Track every read so a post-varint read would fail the no-buffering claim.
+        @dataclass
+        class CountingStream(MockStream):
+            read_count: int = 0
+
+            async def read(self) -> bytes:
+                self.read_count += 1
+                assert self.read_count == 1, "reader must not buffer after the oversized varint"
+                return self.request_data
+
+        server = ReqRespServer(handler=RequestHandler(our_status=make_test_status()))
+        stream = CountingStream(request_data=varint_bytes)
+
+        assert await server._read_request(stream) == b""
+        assert stream.read_count == 1
 
 
 class TestBlocksByRangeRequestRoundTrip:
