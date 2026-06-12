@@ -207,26 +207,15 @@ class LibP2PQuicProtocol(QuicConnectionProtocol):
         """Initialize the libp2p QUIC protocol handler."""
         super().__init__(*args, **kwargs)
         self.connection: QuicConnection | None = None
-        self.peer_identity: PeerId | None = None
         self.handshake_complete = asyncio.Event()
         self._buffered_events: list[QuicEvent] = []
 
     def quic_event_received(self, event: QuicEvent) -> None:
         """Handle QUIC events."""
         if isinstance(event, HandshakeCompleted):
-            # Extract peer identity from certificate.
-            #
-            # aioquic stores the peer certificate in _quic.tls.
-            # We verify the libp2p extension and extract the identity.
-            try:
-                # Get peer certificate from TLS session.
-                # aioquic may not expose this directly, need to check.
-                # For now, mark handshake complete.
-                # TODO: Extract and verify peer certificate
-                self.peer_identity = None  # Will be set if we can extract certificate
-            except Exception:
-                self.peer_identity = None
-
+            # TODO: extract and verify the peer certificate from the TLS session.
+            # aioquic stores it in the underlying QUIC connection, but does not
+            # expose it directly, so the libp2p identity is not yet recovered.
             self.handshake_complete.set()
 
             # For server-side connections, invoke the handshake callback.
@@ -521,14 +510,12 @@ class QuicConnectionManager:
             protocol._on_handshake = handle_handshake
             return protocol
 
-        # Create a shutdown event to allow graceful termination.
-        shutdown_event = asyncio.Event()
-
         await quic_serve(
             host,
             port,
             configuration=server_config,
             create_protocol=create_protocol,
         )
-        # Keep running until shutdown is requested.
-        await shutdown_event.wait()
+        # Park until cancelled.
+        # The caller stops the server by cancelling this coroutine.
+        await asyncio.Event().wait()

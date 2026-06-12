@@ -537,18 +537,18 @@ class Node:
                 len(self.validator_service.registry) if self.validator_service is not None else 0
             )
             metrics.lean_validators_count.set(count)
-            j = store.latest_justified
-            f = store.latest_finalized
-            j_root = j.root.hex()
-            f_root = f.root.hex()
+            justified_checkpoint = store.latest_justified
+            finalized_checkpoint = store.latest_finalized
+            justified_root = justified_checkpoint.root.hex()
+            finalized_root = finalized_checkpoint.root.hex()
             logger.info("=" * 64)
             logger.info(
                 "Peers=%s | Justified slot=%s root=%s | Finalized slot=%s root=%s",
                 peers_connected,
-                j.slot,
-                j_root,
-                f.slot,
-                f_root,
+                justified_checkpoint.slot,
+                justified_root,
+                finalized_checkpoint.slot,
+                finalized_root,
             )
             logger.info("=" * 64)
 
@@ -578,8 +578,3 @@ class Node:
         Signals the node to stop all services and exit.
         """
         self._shutdown.set()
-
-    @property
-    def is_running(self) -> bool:
-        """Check if node is currently running."""
-        return not self._shutdown.is_set()
