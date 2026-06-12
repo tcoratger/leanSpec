@@ -382,6 +382,29 @@ class QuicConnectionManager:
         """Our local PeerId."""
         return self._peer_id
 
+    def _register_connection(
+        self,
+        protocol: LibP2PQuicProtocol,
+        peer_id: PeerId,
+        remote_address: str,
+    ) -> QuicConnection:
+        """
+        Wrap a handshaken protocol in a connection and register it.
+
+        Wires the connection back onto the protocol so future events reach it.
+        Replays events that arrived between handshake completion and connection
+        assignment, then tracks the connection under its peer ID.
+        """
+        connection = QuicConnection(
+            _protocol=protocol,
+            _peer_id=peer_id,
+            _remote_address=remote_address,
+        )
+        protocol.connection = connection
+        protocol._replay_buffered_events()
+        self._connections[peer_id] = connection
+        return connection
+
     async def connect(self, multiaddr: str) -> QuicConnection:
         """
         Connect to a peer at the given multiaddr.
@@ -440,16 +463,7 @@ class QuicConnectionManager:
                 temp_key = IdentityKeypair.generate()
                 peer_id = temp_key.to_peer_id()
 
-            connection = QuicConnection(
-                _protocol=protocol,
-                _peer_id=peer_id,
-                _remote_address=multiaddr,
-            )
-            protocol.connection = connection
-            protocol._replay_buffered_events()
-
-            self._connections[peer_id] = connection
-            return connection
+            return self._register_connection(protocol, peer_id, multiaddr)
 
         except Exception as exception:
             raise QuicTransportError(f"Failed to connect: {exception}") from exception
@@ -503,14 +517,9 @@ class QuicConnectionManager:
             remote_peer_id = temp_key.to_peer_id()
 
             remote_address = f"/ip4/{host}/udp/{port}/quic-v1/p2p/{remote_peer_id}"
-            connection = QuicConnection(
-                _protocol=protocol_instance,
-                _peer_id=remote_peer_id,
-                _remote_address=remote_address,
+            connection = self._register_connection(
+                protocol_instance, remote_peer_id, remote_address
             )
-            protocol_instance.connection = connection
-            protocol_instance._replay_buffered_events()
-            self._connections[remote_peer_id] = connection
 
             # Invoke callback asynchronously so it doesn't block event processing.
             asyncio.ensure_future(on_connection(connection))
