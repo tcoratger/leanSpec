@@ -92,16 +92,18 @@ class TestBackfillChainResolution:
 
         await backfill_system.fill_missing([block_root])
 
-        cached = backfill_system.block_cache.get(block_root)
-        assert cached is not None
-        assert cached == PendingBlock(
-            block=block,
-            root=block_root,
-            parent_root=Bytes32.zero(),
-            slot=Slot(10),
-            received_from=peer_id,
-            backfill_depth=1,
-        )
+        # The fetched block is the sole child of the zero parent root.
+        # Look it up through the parent index.
+        assert backfill_system.block_cache.get_children(Bytes32.zero()) == [
+            PendingBlock(
+                block=block,
+                root=block_root,
+                parent_root=Bytes32.zero(),
+                slot=Slot(10),
+                received_from=peer_id,
+                backfill_depth=1,
+            )
+        ]
 
     async def test_recursive_parent_chain_resolution(
         self,
@@ -148,39 +150,40 @@ class TestBackfillChainResolution:
 
         await backfill.fill_missing([child_root])
 
-        child_cached = backfill.block_cache.get(child_root)
-        parent_cached = backfill.block_cache.get(parent_root)
-        grandparent_cached = backfill.block_cache.get(grandparent_root)
+        # Each cached block is the sole child of its parent root.
+        # Look each one up through the parent index.
+        assert backfill.block_cache.get_children(parent_root) == [
+            PendingBlock(
+                block=child,
+                root=child_root,
+                parent_root=parent_root,
+                slot=Slot(3),
+                received_from=peer_id,
+                backfill_depth=1,
+            )
+        ]
 
-        assert child_cached is not None
-        assert child_cached == PendingBlock(
-            block=child,
-            root=child_root,
-            parent_root=parent_root,
-            slot=Slot(3),
-            received_from=peer_id,
-            backfill_depth=1,
-        )
+        assert backfill.block_cache.get_children(grandparent_root) == [
+            PendingBlock(
+                block=parent,
+                root=parent_root,
+                parent_root=grandparent_root,
+                slot=Slot(2),
+                received_from=peer_id,
+                backfill_depth=2,
+            )
+        ]
 
-        assert parent_cached is not None
-        assert parent_cached == PendingBlock(
-            block=parent,
-            root=parent_root,
-            parent_root=grandparent_root,
-            slot=Slot(2),
-            received_from=peer_id,
-            backfill_depth=2,
-        )
-
-        assert grandparent_cached is not None
-        assert grandparent_cached == PendingBlock(
-            block=grandparent,
-            root=grandparent_root,
-            parent_root=Bytes32.zero(),
-            slot=Slot(1),
-            received_from=peer_id,
-            backfill_depth=3,
-        )
+        assert backfill.block_cache.get_children(Bytes32.zero()) == [
+            PendingBlock(
+                block=grandparent,
+                root=grandparent_root,
+                parent_root=Bytes32.zero(),
+                slot=Slot(1),
+                received_from=peer_id,
+                backfill_depth=3,
+            )
+        ]
 
     async def test_depth_limit_stops_infinite_recursion(
         self,
