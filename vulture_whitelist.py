@@ -82,6 +82,12 @@ source_type
 exitstatus
 amount
 
+# Inbound-connection callback on the QUIC listener.
+# Callers pass it across modules, so the use is real but invisible here.
+# It stays reserved until inbound peer-identity verification is implemented,
+# at which point the handshake stops rejecting and invokes it.
+on_connection
+
 # logging.Formatter.format override, invoked by the logging framework.
 _.format
 
@@ -98,11 +104,6 @@ _.row_factory
 # Enum member resolved from a command-line string through the enum constructor.
 # The mode is selected by value, so the member name has no direct reference.
 REAL
-
-# XMSS protocol parameter documented in the configuration model.
-# The byte length of a signed message, kept for spec fidelity even though the
-# computation works from the field-element count.
-MESSAGE_LENGTH
 
 # Dataclass field on a peer-subscription event.
 # Set from the subscribe flag at construction and compared through dataclass
