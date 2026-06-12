@@ -82,6 +82,12 @@ source_type
 exitstatus
 amount
 
+# Inbound-connection callback on the QUIC listener.
+# Callers pass it across modules, so the use is real but invisible here.
+# It stays reserved until inbound peer-identity verification is implemented,
+# at which point the handshake stops rejecting and invokes it.
+on_connection
+
 # logging.Formatter.format override, invoked by the logging framework.
 _.format
 

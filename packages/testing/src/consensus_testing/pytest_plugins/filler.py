@@ -217,11 +217,6 @@ def pytest_configure(config: pytest.Config) -> None:
         "real_crypto(smoke=False): build and verify with the real prover, never the mock; "
         "smoke=True also keeps it in the fast mocked lane",
     )
-    config.addinivalue_line(
-        "markers",
-        "order_sensitive: emission could depend on set or dict iteration order; "
-        "the fill command regenerates these vectors under two hash seeds and diffs the output",
-    )
 
     # Crypto mode is chosen explicitly and applies to either scheme.
     AggregationProver.set_mode(CryptoMode(config.getoption("--crypto")))
