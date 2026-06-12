@@ -706,45 +706,27 @@ class TestQuicConnectionManagerConnect:
         # Buffered events from the handshake window are replayed.
         mock_protocol._replay_buffered_events.assert_called_once()
 
-    @patch("lean_spec.node.networking.transport.quic.connection.IdentityKeypair")
     @patch("lean_spec.node.networking.transport.quic.connection.quic_connect")
-    async def test_connect_happy_path_without_peer_id(
+    async def test_connect_without_peer_id_raises(
         self,
         mock_quic_connect: MagicMock,
-        mock_identity_cls: MagicMock,
         manager: QuicConnectionManager,
     ) -> None:
         """
-        Without a p2p component, a temporary peer ID is generated.
+        A multiaddr with no p2p component is rejected, not fabricated.
 
-        Full peer certificate verification is not yet implemented.
-        This fallback allows connections to proceed during development.
+        The remote peer identity is unknown without it, so keying a
+        connection by a fabricated identity would be unsafe.
+        The check happens before dialing, so quic_connect is never called.
         """
+        with pytest.raises(QuicTransportError) as exception_info:
+            await manager.connect("/ip4/127.0.0.1/udp/9000/quic-v1")
+        assert str(exception_info.value) == (
+            "Multiaddr is missing a peer identity: /ip4/127.0.0.1/udp/9000/quic-v1"
+        )
 
-        # Simulate a protocol whose TLS handshake already completed.
-        mock_protocol = MagicMock(spec=LibP2PQuicProtocol)
-        mock_protocol.handshake_complete = asyncio.Event()
-        mock_protocol.handshake_complete.set()
-        mock_protocol.connection = None
-        mock_protocol._buffered_events = []
-        mock_protocol._replay_buffered_events = MagicMock()
-
-        # Wire quic_connect to return our pre-configured protocol.
-        mock_cm = AsyncMock()
-        mock_cm.__aenter__ = AsyncMock(return_value=mock_protocol)
-        mock_quic_connect.return_value = mock_cm
-
-        # Simulate generation of a temporary identity keypair.
-        temp_peer = PeerId.from_base58("tempPeer")
-        mock_temp_key = MagicMock()
-        mock_temp_key.to_peer_id.return_value = temp_peer
-        mock_identity_cls.generate.return_value = mock_temp_key
-
-        # Connect without a peer ID in the multiaddr.
-        connection = await manager.connect("/ip4/127.0.0.1/udp/9000/quic-v1")
-
-        # A temporary peer ID was generated and used.
-        assert connection.peer_id == temp_peer
+        # The rejection precedes any network work.
+        mock_quic_connect.assert_not_called()
 
     @patch("lean_spec.node.networking.transport.quic.connection.quic_connect")
     async def test_connect_wraps_exception(
@@ -762,7 +744,7 @@ class TestQuicConnectionManagerConnect:
         mock_quic_connect.return_value = mock_cm
 
         with pytest.raises(QuicTransportError) as exception_info:
-            await manager.connect("/ip4/127.0.0.1/udp/9000/quic-v1")
+            await manager.connect("/ip4/127.0.0.1/udp/9000/quic-v1/p2p/peerB")
         assert str(exception_info.value) == "Failed to connect: connection refused"
 
 
@@ -852,28 +834,21 @@ class TestQuicConnectionManagerListen:
 
     @patch("lean_spec.node.networking.transport.quic.connection.QuicConfiguration")
     @patch("lean_spec.node.networking.transport.quic.connection.quic_serve")
-    @patch("lean_spec.node.networking.transport.quic.connection.IdentityKeypair")
-    async def test_listen_handle_handshake_creates_connection(
+    async def test_listen_handle_handshake_rejects_inbound_connection(
         self,
-        mock_identity_cls: MagicMock,
         mock_quic_serve: MagicMock,
         mock_config_cls: MagicMock,
         manager_with_temp_directory: QuicConnectionManager,
     ) -> None:
         """
-        The handshake callback creates and registers a QuicConnection.
+        The handshake callback rejects inbound connections, never fabricating one.
 
-        This test captures the protocol factory that listen() passes to
-        quic_serve, then invokes the handshake callback to verify that
-        a connection is correctly wired up and registered.
+        Peer identity verification from the libp2p certificate is not
+        implemented, so the remote identity is unknown.
+        The callback raises rather than register a connection under a
+        fabricated identity.
         """
         mock_config_cls.return_value = MagicMock()
-
-        # Simulate generation of a remote peer identity.
-        temp_peer = PeerId.from_base58("remotePeer")
-        mock_temp_key = MagicMock()
-        mock_temp_key.to_peer_id.return_value = temp_peer
-        mock_identity_cls.generate.return_value = mock_temp_key
 
         # Capture the protocol factory that listen() passes to quic_serve.
         captured_create_protocol = None
@@ -907,23 +882,30 @@ class TestQuicConnectionManagerListen:
         #
         # The parent constructor is patched to avoid aioquic dependencies.
         with patch.object(LibP2PQuicProtocol.__bases__[0], "__init__", return_value=None):
-            protobuf_instance = captured_create_protocol()
+            protocol_instance = captured_create_protocol()
 
         # The factory must have attached a handshake callback.
-        assert protobuf_instance._on_handshake is not None
+        assert protocol_instance._on_handshake is not None
 
         # Simulate the handshake callback being invoked by aioquic.
-        protobuf_instance._quic = MagicMock()
-        protobuf_instance.transmit = MagicMock()
-        protobuf_instance.connection = None
-        protobuf_instance._buffered_events = []
+        protocol_instance._quic = MagicMock()
+        protocol_instance.transmit = MagicMock()
+        protocol_instance.connection = None
+        protocol_instance._buffered_events = []
 
-        protobuf_instance._on_handshake(protobuf_instance)
+        with pytest.raises(QuicTransportError) as exception_info:
+            protocol_instance._on_handshake(protocol_instance)
+        assert str(exception_info.value) == (
+            "Cannot accept inbound connection: "
+            "peer identity verification from the libp2p certificate is not implemented"
+        )
 
-        # The callback creates a connection and registers it in the manager.
-        assert protobuf_instance.connection is not None
-        assert protobuf_instance.connection.peer_id == temp_peer
-        assert temp_peer in manager_with_temp_directory._connections
+        # No connection is wired up and none is registered under a fabricated identity.
+        assert protocol_instance.connection is None
+        assert manager_with_temp_directory._connections == {}
+
+        # The inbound callback is never invoked.
+        callback.assert_not_called()
 
     @patch("lean_spec.node.networking.transport.quic.connection.QuicConfiguration")
     @patch("lean_spec.node.networking.transport.quic.connection.quic_serve")
