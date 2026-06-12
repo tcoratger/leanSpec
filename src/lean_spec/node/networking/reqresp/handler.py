@@ -66,6 +66,7 @@ from typing import Final
 
 from lean_spec.node.networking.config import (
     MAX_ERROR_MESSAGE_SIZE,
+    MAX_PAYLOAD_SIZE,
     MAX_REQUEST_BLOCKS,
     MIN_SLOTS_FOR_BLOCK_REQUESTS,
 )
@@ -458,6 +459,16 @@ class ReqRespServer:
             except VarintError:
                 # Need more data for varint
                 continue
+
+        # Reject an oversized declared length before sizing any buffer.
+        #
+        # The declared length is attacker-controlled.
+        # A 10-byte varint can claim a value up to 2^70.
+        # Without this bound the worst-case expansion below grows astronomically.
+        # The size guard never trips, so the node buffers attacker bytes.
+        # This mirrors the guard in the non-streaming request decoder.
+        if declared_length > MAX_PAYLOAD_SIZE:
+            return b""
 
         # Guard against unbounded compressed data.
         # Snappy's worst-case expansion is ~(n + n/6 + 1024).
