@@ -15,15 +15,14 @@ from dataclasses import dataclass, field
 from aiohttp import web
 
 from lean_spec.node.api.aggregator_controller import AggregatorController
-from lean_spec.node.api.routes import ADMIN_ROUTES, ROUTES
+from lean_spec.node.api.routes import ROUTES
 from lean_spec.spec.forks import LstarSpec, Store
 
 logger = logging.getLogger(__name__)
 
 
-_routes = [web.get(path, handler) for path, handler in ROUTES.items()]
-_routes += [web.route(method, path, handler) for method, path, handler in ADMIN_ROUTES]
-"""aiohttp route definitions generated from ROUTES and ADMIN_ROUTES."""
+_routes = [web.route(route.method, route.path, route.handler) for route in ROUTES]
+"""aiohttp route definitions generated from the route table."""
 
 # The following classes are implementation details.
 # Other implementations may structure their code differently.
