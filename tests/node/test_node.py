@@ -308,14 +308,6 @@ class TestNodeShutdown:
         node.stop()
         assert node._shutdown.is_set()
 
-    def test_is_running_reflects_shutdown_state(self, node_config: NodeConfig) -> None:
-        """is_running property reflects shutdown event state."""
-        node = Node.from_genesis(node_config)
-
-        assert node.is_running is True
-        node.stop()
-        assert node.is_running is False
-
     async def test_wait_shutdown_stops_chain_service(self, node_config: NodeConfig) -> None:
         """Shutdown stops the chain service."""
         node = Node.from_genesis(node_config)

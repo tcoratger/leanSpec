@@ -578,8 +578,3 @@ class Node:
         Signals the node to stop all services and exit.
         """
         self._shutdown.set()
-
-    @property
-    def is_running(self) -> bool:
-        """Check if node is currently running."""
-        return not self._shutdown.is_set()
