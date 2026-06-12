@@ -65,6 +65,7 @@ from itertools import count
 from typing import ClassVar, Final, cast
 
 from lean_spec.node.networking.config import (
+    MAX_PAYLOAD_SIZE,
     MESSAGE_DOMAIN_INVALID_SNAPPY,
     MESSAGE_DOMAIN_VALID_SNAPPY,
     PRUNE_BACKOFF,
@@ -950,6 +951,13 @@ class GossipsubBehavior:
                         except Exception:
                             # Incomplete varint -- wait for more data.
                             break
+
+                        # A declared length is attacker-controlled.
+                        # Without an upper bound, a peer can claim a huge frame
+                        # and force us to buffer reads forever without ever decoding.
+                        # Reject and disconnect before waiting for any of those bytes.
+                        if length > MAX_PAYLOAD_SIZE:
+                            raise ValueError(f"RPC frame too large: {length} > {MAX_PAYLOAD_SIZE}")
 
                         # Not enough bytes yet -- wait for the next read.
                         if len(buffer) < varint_size + length:
