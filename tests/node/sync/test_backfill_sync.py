@@ -8,11 +8,12 @@ import pytest
 
 from consensus_testing import MockNetworkRequester, make_signed_block
 from lean_spec.node.networking import PeerId
+from lean_spec.node.networking.config import MAX_REQUEST_BLOCKS
 from lean_spec.node.networking.peer import PeerInfo
 from lean_spec.node.networking.types import ConnectionState
 from lean_spec.node.sync.backfill_sync import BackfillSync
 from lean_spec.node.sync.block_cache import BlockCache, PendingBlock
-from lean_spec.node.sync.config import MAX_BACKFILL_DEPTH, MAX_BLOCKS_PER_REQUEST
+from lean_spec.node.sync.config import MAX_BACKFILL_DEPTH
 from lean_spec.node.sync.peer_manager import (
     INITIAL_PEER_SCORE,
     SCORE_FAILURE_PENALTY,
@@ -228,15 +229,15 @@ class TestBatchingAndPeerManagement:
         network: MockNetworkRequester,
         peer_id: PeerId,
     ) -> None:
-        """Requests larger than MAX_BLOCKS_PER_REQUEST are split."""
-        num_roots = MAX_BLOCKS_PER_REQUEST + 5
+        """Requests larger than MAX_REQUEST_BLOCKS are split."""
+        num_roots = MAX_REQUEST_BLOCKS + 5
         roots = [Bytes32(i.to_bytes(32, "big")) for i in range(num_roots)]
 
         await backfill_system.fill_missing(roots)
 
         assert network.root_request_log == [
-            (peer_id, roots[:MAX_BLOCKS_PER_REQUEST]),
-            (peer_id, roots[MAX_BLOCKS_PER_REQUEST:]),
+            (peer_id, roots[:MAX_REQUEST_BLOCKS]),
+            (peer_id, roots[MAX_REQUEST_BLOCKS:]),
         ]
 
     async def test_no_requests_without_available_peer(
