@@ -614,18 +614,15 @@ class ValidatorService:
 
         # Saturate at zero lag when the head is ahead of wall clock.
         #
-        # Why:
-        #     Local clock drift is normal. Unconditional trust would let
-        #     a chain 100 slots in the future bypass every check.
+        # Local clock drift is normal.
+        # Unconditional trust would let a chain 100 slots in the future bypass every check.
         lag = 0 if head_slot >= slot else int(slot - head_slot)
 
         # Local stall evidence from the block map.
         #
-        # Why:
-        #     Only blocks with valid signatures enter the map, so the
-        #     freshest entry is an authenticated lower bound on the
-        #     network tip. A stale max here means the network is not
-        #     producing.
+        # Only blocks with valid signatures enter the map.
+        # So the freshest entry is an authenticated lower bound on the network tip.
+        # A stale max here means the network is not producing.
         max_seen_slot = max(
             (b.slot for b in store.blocks.values()),
             default=head_slot,
