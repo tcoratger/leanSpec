@@ -341,7 +341,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     A signature must depend only on the key, the slot, and the message.
     Prior signing activity must never influence the bytes.
 
-    Why: a scheme change breaking this invariant must abort the fill.
+    A scheme change breaking this invariant must abort the fill.
     Emitting order-dependent vectors would be worse than failing.
 
     Under sharded runs every worker process probes its own key state.

@@ -75,7 +75,7 @@ def fill(
         # Use specific XMSS scheme (overrides LEAN_ENV env var)
         fill --fork=Lstar --scheme=prod --clean -v
     """
-    # Why: the spec config reads this flag once, at import time.
+    # The spec config reads this flag once, at import time.
     # The current process froze the old value when the package imported.
     # Only the pytest subprocess below starts fresh and sees this export.
     os.environ["LEAN_ENV"] = scheme.lower()
@@ -91,7 +91,7 @@ def fill(
     if not (keys_directory.exists() and any(keys_directory.glob("*.json"))):
         click.echo(f"Test keys for '{scheme}' scheme not found. Downloading...")
         download_keys(scheme.lower())
-    # Why: stale or modified local keys would silently change every vector.
+    # Stale or modified local keys would silently change every vector.
     elif compute_key_set_digest(keys_directory) != PINNED_KEY_SET_DIGESTS[scheme.lower()]:
         click.echo(f"Local '{scheme}' keys do not match the pinned key set. Re-downloading...")
         download_keys(scheme.lower())
