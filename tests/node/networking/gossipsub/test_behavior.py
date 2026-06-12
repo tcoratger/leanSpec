@@ -13,7 +13,9 @@ import pytest
 
 from lean_spec.node.networking.config import PRUNE_BACKOFF
 from lean_spec.node.networking.gossipsub.behavior import (
+    GOSSIP_RETRANSMISSION,
     IDONTWANT_SIZE_THRESHOLD,
+    MAX_IWANT_MESSAGE_IDS_PER_REQUEST,
     GossipsubMessageEvent,
     GossipsubPeerEvent,
 )
@@ -305,6 +307,53 @@ class TestHandleIWant:
         peer_id = add_peer(behavior, "peer1")
 
         iwant = ControlIWant(message_ids=[b"short"])
+        await behavior._handle_iwant(peer_id, iwant)
+
+        assert capture.sent == []
+
+    @pytest.mark.asyncio
+    async def test_iwant_unknown_peer_sends_nothing(self) -> None:
+        """IWANT from an untracked peer is silently ignored."""
+        behavior, capture = make_behavior()
+        message = GossipsubMessage(topic=b"topic", raw_data=b"payload")
+        behavior.message_cache.put(TopicId("topic"), message)
+
+        iwant = ControlIWant(message_ids=[bytes(message.id)])
+        await behavior._handle_iwant(make_peer("stranger"), iwant)
+
+        assert capture.sent == []
+
+    @pytest.mark.asyncio
+    async def test_iwant_serves_up_to_retransmission_limit_then_skips(self) -> None:
+        """One message is served GOSSIP_RETRANSMISSION times then skipped."""
+        behavior, capture = make_behavior()
+        peer_id = add_peer(behavior, "peer1")
+        message = GossipsubMessage(topic=b"topic", raw_data=b"payload")
+        behavior.message_cache.put(TopicId("topic"), message)
+
+        iwant = ControlIWant(message_ids=[bytes(message.id)])
+        for _ in range(GOSSIP_RETRANSMISSION + 2):
+            await behavior._handle_iwant(peer_id, iwant)
+
+        served_reply = (peer_id, RPC(publish=[Message(topic=TopicId("topic"), data=b"payload")]))
+        assert capture.sent == [served_reply] * GOSSIP_RETRANSMISSION
+
+    @pytest.mark.asyncio
+    async def test_iwant_caps_message_ids_per_request(self) -> None:
+        """Only the first MAX_IWANT_MESSAGE_IDS_PER_REQUEST IDs are processed."""
+        behavior, capture = make_behavior()
+        peer_id = add_peer(behavior, "peer1")
+
+        served_message = GossipsubMessage(topic=b"topic", raw_data=b"payload")
+        behavior.message_cache.put(TopicId("topic"), served_message)
+
+        # Pad the request past the cap with junk IDs, then place the cached ID
+        # one slot beyond the cap so the cap must drop it.
+        junk_ids = [bytes([byte_value] * 20) for byte_value in range(1, 5)]
+        padding_ids = junk_ids * (MAX_IWANT_MESSAGE_IDS_PER_REQUEST // len(junk_ids) + 1)
+        message_ids = padding_ids[:MAX_IWANT_MESSAGE_IDS_PER_REQUEST] + [bytes(served_message.id)]
+
+        iwant = ControlIWant(message_ids=message_ids)
         await behavior._handle_iwant(peer_id, iwant)
 
         assert capture.sent == []
@@ -872,6 +921,19 @@ class TestHeartbeatIntegration:
         await behavior._heartbeat()
 
         assert len(behavior._peers[pid].dont_want_ids) == 0
+
+    @pytest.mark.asyncio
+    async def test_clears_iwant_served_counts(self) -> None:
+        """Heartbeat resets per-peer IWANT retransmission budgets."""
+        behavior, _ = make_behavior()
+        pid = add_peer(behavior, "peer1")
+        behavior._peers[pid].iwant_served_counts[MessageId(b"12345678901234567890")] = 3
+
+        assert len(behavior._peers[pid].iwant_served_counts) == 1
+
+        await behavior._heartbeat()
+
+        assert len(behavior._peers[pid].iwant_served_counts) == 0
 
     @pytest.mark.asyncio
     async def test_gossip_includes_fanout_topics(self) -> None:
