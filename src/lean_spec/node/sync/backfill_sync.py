@@ -285,6 +285,51 @@ class BackfillSync:
             current_slot = current_slot + Slot(batch_count)
             remaining -= batch_count
 
+    async def fill_gap_above_head(
+        self,
+        target_slot: Slot,
+        head_slot: Slot,
+        depth: int = 0,
+    ) -> bool:
+        """
+        Range-fetch the contiguous gap between the head and a target slot.
+
+        When a target block sits several slots above the current head, fetching
+        the gap as one contiguous range is cheaper than recursing parent-by-parent.
+
+        The floor is the head slot, not the finalized slot.
+        Slots above finalized but at or below head are already in the Store.
+        Re-downloading them would be wasted work.
+
+        Args:
+            target_slot: Slot of the block whose parent chain is being filled.
+            head_slot: Highest known canonical slot.
+            depth: Current backfill depth.
+
+        Returns:
+            True if a range fetch was issued, False if the gap was empty.
+        """
+        if target_slot <= head_slot:
+            return False
+
+        gap_floor = head_slot + Slot(1)
+        gap_size = int(target_slot - gap_floor)
+        if gap_size <= 0:
+            return False
+
+        logger.debug(
+            "Backfill gap (%d slots) above head %s; range-fetching from %s.",
+            gap_size,
+            head_slot,
+            gap_floor,
+        )
+        await self.fill_range(
+            start_slot=gap_floor,
+            count=Uint64(gap_size),
+            depth=depth,
+        )
+        return True
+
     async def _fetch_range(
         self,
         start_slot: Slot,
@@ -420,27 +465,12 @@ class BackfillSync:
         # When the earliest received block still has a missing parent far above
         # the highest slot we already know, fetching the gap as a contiguous
         # range is cheaper than recursing parent-by-parent.
-        #
-        # Floor the range at the head slot (highest known canonical slot), not
-        # at the finalized slot. Slots above finalized but at or below head are
-        # already in the Store and should not be re-downloaded.
         if self.store_view is not None and blocks:
             earliest_block = min(blocks, key=lambda b: b.block.slot)
-            head_slot = self.store_view.head_slot()
-            if earliest_block.block.slot > head_slot:
-                gap_floor = head_slot + Slot(1)
-                gap_size = int(earliest_block.block.slot - gap_floor)
-                if gap_size > 0:
-                    logger.debug(
-                        "Backfill gap (%d slots) at slot %s; range-fetching from %s.",
-                        gap_size,
-                        earliest_block.block.slot,
-                        gap_floor,
-                    )
-                    await self.fill_range(
-                        start_slot=gap_floor,
-                        count=Uint64(gap_size),
-                        depth=depth + 1,
-                    )
+            await self.fill_gap_above_head(
+                target_slot=earliest_block.block.slot,
+                head_slot=self.store_view.head_slot(),
+                depth=depth + 1,
+            )
 
         await self.fill_missing(new_orphan_parents, depth=depth + 1)
