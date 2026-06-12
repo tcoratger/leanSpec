@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from aiohttp import web
 
 from lean_spec.node.api.aggregator_controller import AggregatorController
-from lean_spec.node.api.routes import ADMIN_ROUTES, ROUTES
+from lean_spec.node.api.routes import ROUTES
 from lean_spec.spec.forks import LstarSpec, Store
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,8 @@ class ApiServer:
         # Absence is fine; endpoints return 503 when unset.
         app["aggregator_controller"] = self.aggregator_controller
 
-        # Add all routes, generated from ROUTES and ADMIN_ROUTES.
-        routes = [web.get(path, handler) for path, handler in ROUTES.items()]
-        routes += [web.route(method, path, handler) for method, path, handler in ADMIN_ROUTES]
+        # Register every route from the unified table, keyed by its verb.
+        routes = [web.route(route.method, route.path, route.handler) for route in ROUTES]
         app.add_routes(routes)
 
         self._runner = web.AppRunner(app)
