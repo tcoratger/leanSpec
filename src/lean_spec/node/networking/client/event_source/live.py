@@ -662,7 +662,6 @@ class LiveNetworkEventSource:
             peer_id: Peer identifier.
             connection: QuicConnection to use.
         """
-        # Why:
         # The dialing path and the inbound-stream handler can both reach this
         # method concurrently for the same peer.
         # The lock serialises the check-and-open so only one stream is opened.
