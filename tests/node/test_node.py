@@ -184,14 +184,19 @@ class TestDatabaseLoading:
 
     def test_returns_none_when_no_database(self) -> None:
         """No database returns None."""
-        assert Node._try_load_store_from_database(None, validator_index=None) is None
+        assert (
+            Node._try_load_store_from_database(None, validator_index=None, fork=LstarSpec()) is None
+        )
 
     def test_returns_none_when_no_head_root(self) -> None:
         """Empty database returns None."""
         mock_db = MagicMock()
         mock_db.get_head_root.return_value = None
 
-        assert Node._try_load_store_from_database(mock_db, validator_index=None) is None
+        assert (
+            Node._try_load_store_from_database(mock_db, validator_index=None, fork=LstarSpec())
+            is None
+        )
 
     def test_returns_none_when_block_missing(self) -> None:
         """Missing block returns None."""
@@ -200,7 +205,10 @@ class TestDatabaseLoading:
         mock_db.get_block.return_value = None
         mock_db.get_state.return_value = MagicMock()
 
-        assert Node._try_load_store_from_database(mock_db, validator_index=None) is None
+        assert (
+            Node._try_load_store_from_database(mock_db, validator_index=None, fork=LstarSpec())
+            is None
+        )
 
     def test_returns_none_when_state_missing(self) -> None:
         """Missing state returns None."""
@@ -209,21 +217,30 @@ class TestDatabaseLoading:
         mock_db.get_block.return_value = MagicMock()
         mock_db.get_state.return_value = None
 
-        assert Node._try_load_store_from_database(mock_db, validator_index=None) is None
+        assert (
+            Node._try_load_store_from_database(mock_db, validator_index=None, fork=LstarSpec())
+            is None
+        )
 
     def test_returns_none_when_justified_missing(self) -> None:
         """Missing justified checkpoint returns None."""
         mock_db = _make_mock_db_with_partial_data()
         mock_db.get_justified_checkpoint.return_value = None
 
-        assert Node._try_load_store_from_database(mock_db, validator_index=None) is None
+        assert (
+            Node._try_load_store_from_database(mock_db, validator_index=None, fork=LstarSpec())
+            is None
+        )
 
     def test_returns_none_when_finalized_missing(self) -> None:
         """Missing finalized checkpoint returns None."""
         mock_db = _make_mock_db_with_partial_data()
         mock_db.get_finalized_checkpoint.return_value = None
 
-        assert Node._try_load_store_from_database(mock_db, validator_index=None) is None
+        assert (
+            Node._try_load_store_from_database(mock_db, validator_index=None, fork=LstarSpec())
+            is None
+        )
 
     def test_successful_load_uses_wall_clock_time(self) -> None:
         """Store time uses wall clock when it exceeds block-based time."""
@@ -235,6 +252,7 @@ class TestDatabaseLoading:
         store = Node._try_load_store_from_database(
             db,
             validator_index=ValidatorIndex(0),
+            fork=LstarSpec(),
             genesis_time=GENESIS_TIME,
             time_fn=lambda: wall_time,
         )
@@ -258,6 +276,7 @@ class TestDatabaseLoading:
         store = Node._try_load_store_from_database(
             db,
             validator_index=ValidatorIndex(0),
+            fork=LstarSpec(),
             genesis_time=GENESIS_TIME,
             time_fn=lambda: wall_time,
         )
@@ -402,6 +421,7 @@ class TestDatabaseGenesisTimeFallback:
         store = Node._try_load_store_from_database(
             db,
             validator_index=None,
+            fork=LstarSpec(),
             genesis_time=None,
             time_fn=lambda: wall_time,
         )
@@ -422,6 +442,7 @@ class TestDatabaseGenesisTimeFallback:
         store = Node._try_load_store_from_database(
             db,
             validator_index=None,
+            fork=LstarSpec(),
             genesis_time=None,
             time_fn=lambda: wall_time,
         )
