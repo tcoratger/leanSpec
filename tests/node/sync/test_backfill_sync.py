@@ -489,17 +489,3 @@ class TestBackfillOptimizations:
         network.should_fail = False
         await backfill_system.fill_range(start_slot=Slot(1), count=Uint64(10))
         assert backfill_system._max_range_slot == Slot(10)
-
-    async def test_reset_clears_watermark(
-        self,
-        backfill_system: BackfillSync,
-        network: MockNetworkRequester,
-    ) -> None:
-        """reset() restores the watermark so post-reset range fetches are honored."""
-        await backfill_system.fill_range(start_slot=Slot(1), count=Uint64(10))
-        assert backfill_system._max_range_slot == Slot(10)
-
-        backfill_system.reset()
-
-        assert backfill_system._max_range_slot == Slot(0)
-        assert backfill_system._pending == set()

@@ -396,7 +396,3 @@ class HeadSync:
         return HeadSyncResult(
             processed=False,
         ), store
-
-    def reset(self) -> None:
-        """Clear processing state."""
-        self._processing.clear()

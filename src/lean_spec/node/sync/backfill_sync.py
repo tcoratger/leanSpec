@@ -440,8 +440,3 @@ class BackfillSync:
                     )
 
         await self.fill_missing(new_orphan_parents, depth=depth + 1)
-
-    def reset(self) -> None:
-        """Clear all pending state."""
-        self._pending.clear()
-        self._max_range_slot = Slot(0)
