@@ -113,7 +113,30 @@ class TestValidatorManifestEntry:
 
     def test_integer_public_key_rejected(self) -> None:
         """Integer public_keys are rejected — only valid 52-byte hex strings accepted."""
-        with pytest.raises((TypeError, ValidationError)):
+        # The public key field accepts a union of an instance, raw bytes, or a hex string.
+        # An int satisfies none of those, so every union branch reports its own failure.
+        # The match anchors the whole three-error report from start to end.
+        # Only the Pydantic version segment of the documentation URLs is left as a wildcard.
+        with pytest.raises(
+            ValidationError,
+            match=r"(?s)\A3 validation errors for ValidatorManifestEntry\n"
+            r"attestation_public_key_hex\.is-instance\[Bytes52\]\n"
+            r"  Input should be an instance of Bytes52 "
+            r"\[type=is_instance_of, input_value=291, input_type=int\]\n"
+            r"    For further information visit "
+            r"https://errors\.pydantic\.dev/[^/\s]+/v/is_instance_of\n"
+            r"attestation_public_key_hex\.chain"
+            r"\[constrained-bytes,function-plain\[Bytes52\(\)\]\]\n"
+            r"  Input should be a valid bytes "
+            r"\[type=bytes_type, input_value=291, input_type=int\]\n"
+            r"    For further information visit "
+            r"https://errors\.pydantic\.dev/[^/\s]+/v/bytes_type\n"
+            r"attestation_public_key_hex\.chain\[str,function-plain\[Bytes52\(\)\]\]\n"
+            r"  Input should be a valid string "
+            r"\[type=string_type, input_value=291, input_type=int\]\n"
+            r"    For further information visit "
+            r"https://errors\.pydantic\.dev/[^/\s]+/v/string_type\Z",
+        ):
             ValidatorManifestEntry(
                 index=ValidatorIndex(0),
                 attestation_public_key_hex=0x123,  # type: ignore[arg-type]
@@ -124,7 +147,9 @@ class TestValidatorManifestEntry:
 
     def test_wrong_length_public_key_rejected(self) -> None:
         """Hex strings that don't decode to exactly 52 bytes are rejected."""
-        with pytest.raises((SSZValueError, ValidationError)):
+        # The wrong-length hex string is rejected while constructing the public key value.
+        # The model is never reached, so the single raised error is the SSZ length check.
+        with pytest.raises(SSZValueError) as exception_info:
             ValidatorManifestEntry(
                 index=ValidatorIndex(0),
                 attestation_public_key_hex=Bytes52("0x" + "aa" * 10),
@@ -132,6 +157,7 @@ class TestValidatorManifestEntry:
                 attestation_private_key_file="att.ssz",
                 proposal_private_key_file="prop.ssz",
             )
+        assert str(exception_info.value) == "Bytes52 requires exactly 52 bytes, got 10"
 
 
 class TestValidatorManifest:
