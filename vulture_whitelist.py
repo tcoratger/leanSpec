@@ -105,11 +105,6 @@ _.row_factory
 # The mode is selected by value, so the member name has no direct reference.
 REAL
 
-# XMSS protocol parameter documented in the configuration model.
-# The byte length of a signed message, kept for spec fidelity even though the
-# computation works from the field-element count.
-MESSAGE_LENGTH
-
 # Dataclass field on a peer-subscription event.
 # Set from the subscribe flag at construction and compared through dataclass
 # equality in tests, neither of which vulture counts as a read.
