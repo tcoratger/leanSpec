@@ -1,10 +1,12 @@
-"""Tests for the networking domain newtypes."""
+"""Tests for the networking shared types and domain newtypes."""
 
 from __future__ import annotations
 
 import pytest
 
 from lean_spec.node.networking.types import (
+    ConnectionState,
+    Direction,
     DomainType,
     ForkDigest,
     Multiaddr,
@@ -15,6 +17,26 @@ from lean_spec.node.networking.types import (
     Version,
 )
 from lean_spec.spec.ssz import Bytes4, Bytes32, SSZValueError, Uint16, Uint64
+
+
+class TestConnectionState:
+    """Tests for ConnectionState enum."""
+
+    def test_state_values(self) -> None:
+        """ConnectionState has the 4 expected states."""
+        assert ConnectionState.DISCONNECTED == 1
+        assert ConnectionState.CONNECTING == 2
+        assert ConnectionState.CONNECTED == 3
+        assert ConnectionState.DISCONNECTING == 4
+
+
+class TestDirection:
+    """Tests for Direction enum."""
+
+    def test_direction_values(self) -> None:
+        """Direction has inbound and outbound."""
+        assert Direction.INBOUND == 1
+        assert Direction.OUTBOUND == 2
 
 
 class TestDomainType:

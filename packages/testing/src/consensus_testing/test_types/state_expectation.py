@@ -26,13 +26,6 @@ class StateExpectation(SelectiveCheck):
 
     This allows test writers to specify only the fields they care about,
     making tests more focused and maintainable.
-
-    Example:
-        # Only validate slot and justified checkpoint
-        StateExpectation(
-            slot=Slot(10),
-            latest_justified_slot=Slot(8),
-        )
     """
 
     _SCALAR_ACCESSORS: ClassVar[dict[str, Callable[["State"], Any]]] = {
