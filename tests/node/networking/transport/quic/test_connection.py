@@ -532,7 +532,6 @@ class TestLibP2PQuicProtocol:
         """A protocol with mocked parent internals (bypasses aioquic constructor)."""
         protobuf = LibP2PQuicProtocol.__new__(LibP2PQuicProtocol)
         protobuf.connection = None
-        protobuf.peer_identity = None
         protobuf.handshake_complete = asyncio.Event()
         protobuf._buffered_events = []
         protobuf._on_handshake = None
@@ -665,42 +664,6 @@ class TestLibP2PQuicProtocol:
         )
         protocol._replay_buffered_events()
         assert protocol._buffered_events == []
-
-    def test_handshake_exception_sets_peer_identity_none(
-        self, protocol: LibP2PQuicProtocol
-    ) -> None:
-        """
-        Handshake completes even if certificate extraction raises.
-
-        The except branch is defensive — if the try block inside the
-        handshake handler raises, the handshake must still complete
-        so the connection can proceed.
-        """
-        # Trigger a standard handshake event.
-        event = HandshakeCompleted(
-            alpn_protocol="libp2p", early_data_accepted=False, session_resumed=False
-        )
-
-        # Force the first assignment to peer_identity to raise.
-        #
-        # This simulates a failure during certificate extraction.
-        # The except branch catches it and sets peer_identity = None.
-        original_setattr = object.__setattr__
-        call_count = 0
-
-        def raising_setattr(self_inner: object, name: str, value: object) -> None:
-            nonlocal call_count
-            if name == "peer_identity" and call_count == 0:
-                call_count += 1
-                raise RuntimeError("cert extraction failed")
-            original_setattr(self_inner, name, value)
-
-        with patch.object(type(protocol), "__setattr__", raising_setattr):
-            protocol.quic_event_received(event)
-
-        # Despite the exception, handshake completed and identity is set.
-        assert protocol.peer_identity is None
-        assert protocol.handshake_complete.is_set()
 
 
 class TestQuicStreamProtocolId:
@@ -929,7 +892,7 @@ class TestLibP2PQuicProtocolInit:
         """
         All custom attributes start in their expected initial state.
 
-        Connection and peer identity are None until handshake completes.
+        Connection is None until handshake completes.
         The handshake event is unset. No events are buffered yet.
         """
 
@@ -938,7 +901,6 @@ class TestLibP2PQuicProtocolInit:
             protocol = LibP2PQuicProtocol()
 
         assert protocol.connection is None
-        assert protocol.peer_identity is None
         assert not protocol.handshake_complete.is_set()
         assert protocol._buffered_events == []
 
