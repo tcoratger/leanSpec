@@ -418,6 +418,31 @@ class TestBitfieldSSZ:
             Bitlist8.decode_bytes(b"\x00")
         assert str(exception_info.value) == "Bitlist8: no delimiter bit found"
 
+    def test_bitlist_decode_rejects_non_canonical_trailing_zero_byte(self) -> None:
+        """Bitlist.decode_bytes rejects a trailing zero byte after the delimiter byte."""
+
+        class Bitlist8(BaseBitlist):
+            LIMIT = 8
+
+        # Byte 0x0d encodes bits [1, 0, 1] with the delimiter at bit 3.
+        # Appending a zero byte leaves the delimiter in byte 0, not the final byte.
+        with pytest.raises(SSZSerializationError) as exception_info:
+            Bitlist8.decode_bytes(b"\x0d\x00")
+        assert (
+            str(exception_info.value)
+            == "Bitlist8: non-canonical trailing zero bytes after delimiter"
+        )
+
+    def test_bitlist_decode_canonical_encoding_round_trips(self) -> None:
+        """Bitlist.decode_bytes accepts the canonical single-byte encoding of bits [1, 0, 1]."""
+
+        class Bitlist8(BaseBitlist):
+            LIMIT = 8
+
+        assert Bitlist8.decode_bytes(b"\x0d") == Bitlist8(
+            data=(Boolean(True), Boolean(False), Boolean(True))
+        )
+
     def test_bitlist_decode_exceeds_limit(self) -> None:
         """Bitlist.decode_bytes rejects encodings whose recovered bit count exceeds LIMIT."""
 
