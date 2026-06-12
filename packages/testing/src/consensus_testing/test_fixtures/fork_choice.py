@@ -490,7 +490,7 @@ class ForkChoiceTest(BaseTestSpec):
             "steps must be empty when anchor_valid is False: "
             "Store.from_anchor is expected to fail before any step can run"
         )
-        # Why: a vector saying only "reject this anchor" lets a client
+        # A vector saying only "reject this anchor" lets a client
         # reject for the wrong reason and still pass.
         assert self.expected_rejection is not None, (
             "anchor_valid=False requires expected_rejection to be set"
