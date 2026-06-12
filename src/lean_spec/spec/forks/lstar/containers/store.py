@@ -61,7 +61,25 @@ class Store[StateT: Container, BlockT: Container](StrictBaseModel):
     attestation_signatures: dict[AttestationData, set[AttestationSignatureEntry]] = Field(
         default_factory=dict
     )
-    """Per-validator signatures observed, grouped by the vote they sign."""
+    """
+    Per-validator signatures observed, grouped by the vote they sign.
+
+    This pool only shrinks when finalization advances.
+    Pruning drops every vote whose head sits at or below the finalized slot.
+    Between two finalizations the set of distinct vote keys can keep growing.
+
+    A staked validator holds one key entry per distinct vote it signs.
+    The vote's head may be any block descending from the finalized block.
+    During a long non-finalizing window the number of such blocks is unbounded.
+    Each new head a validator signs adds a fresh key here.
+    The signature is verified before insertion, so the writer pays that cost first.
+    The growth is a resource bound, not a safety break.
+
+    The spec sets no cap on this pool.
+    A hard cap would change attestation acceptance and could diverge from the reference.
+    Bounding memory during a non-finalizing window is a node-implementation responsibility.
+    A node may cap retained keys, evict by age, or apply its own admission policy.
+    """
 
     latest_new_aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]] = Field(
         default_factory=dict
