@@ -711,7 +711,7 @@ class TestValidatorServiceRun:
 
         block_slots: list[Slot] = []
 
-        async def mock_produce(self_inner, slot: Slot) -> None:
+        async def mock_produce(_self, slot: Slot) -> None:
             block_slots.append(slot)
             service.stop()
 
@@ -733,7 +733,7 @@ class TestValidatorServiceRun:
 
         attest_slots: list[Slot] = []
 
-        async def mock_attest(self_inner, slot: Slot) -> None:
+        async def mock_attest(_self, slot: Slot) -> None:
             attest_slots.append(slot)
             service.stop()
 
@@ -796,7 +796,7 @@ class TestValidatorServiceRun:
 
         attest_calls: list[Slot] = []
 
-        async def mock_attest(self_inner, slot: Slot) -> None:
+        async def mock_attest(_self, slot: Slot) -> None:
             attest_calls.append(slot)
 
         with (
@@ -824,7 +824,7 @@ class TestValidatorServiceRun:
         )
         service._attested_slots = {Slot(i) for i in range(6)}  # slots 0-5
 
-        async def mock_attest(self_inner, slot: Slot) -> None:
+        async def mock_attest(_self, slot: Slot) -> None:
             service.stop()
 
         with patch.object(ValidatorService, "_produce_attestations", mock_attest):
