@@ -32,6 +32,7 @@ from lean_spec.node.networking.reqresp.message import (
 )
 from lean_spec.node.networking.types import ProtocolId
 from lean_spec.node.networking.varint import encode_varint
+from lean_spec.node.snappy import frame_compress
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Checkpoint, Slot
 from lean_spec.spec.forks.lstar.containers import SignedBlock
@@ -1199,6 +1200,47 @@ class TestReadRequestBufferLimit:
 
         code, _ = ResponseCode.decode(stream.written[0])
         assert code == ResponseCode.INVALID_REQUEST
+
+
+class TestReadRequestStreamClosedFallback:
+    """Tests for the stream-closed decompress fallback in _read_request."""
+
+    async def test_stream_closed_decompress_length_mismatch_returns_empty(self) -> None:
+        """A decompressed length below the declared length yields empty bytes."""
+        server = ReqRespServer(handler=RequestHandler(our_status=make_test_status()))
+
+        # The frame decompresses to 5 bytes, but the prefix declares 9999.
+        # The in-loop check at line 474 rejects the mismatch and reads on.
+        # The stream then closes, and the fallback must reject the short payload.
+        compressed_frame = frame_compress(b"short")
+        wire_bytes = encode_varint(9999) + compressed_frame
+        stream = MockChunkedStream(chunks=[wire_bytes])
+
+        assert await server._read_request(stream) == b""
+
+    async def test_stream_closed_decompress_failure_returns_empty(self) -> None:
+        """A truncated frame that never decompresses yields empty bytes."""
+        server = ReqRespServer(handler=RequestHandler(our_status=make_test_status()))
+
+        # Drop the final byte so the frame is incomplete and always fails to decode.
+        # The in-loop decode raises, the stream closes, and the fallback decode raises again.
+        # The fallback must return empty, never the raw length-prefixed buffer.
+        compressed_frame = frame_compress(b"payload")
+        wire_bytes = encode_varint(7) + compressed_frame[:-1]
+        stream = MockChunkedStream(chunks=[wire_bytes])
+
+        assert await server._read_request(stream) == b""
+
+    async def test_full_frame_decompresses_to_declared_payload(self) -> None:
+        """A complete frame matching the declared length yields the payload."""
+        server = ReqRespServer(handler=RequestHandler(our_status=make_test_status()))
+
+        # The declared length matches the decompressed payload, so the read succeeds.
+        compressed_frame = frame_compress(b"payload")
+        wire_bytes = encode_varint(7) + compressed_frame
+        stream = MockChunkedStream(chunks=[wire_bytes])
+
+        assert await server._read_request(stream) == b"payload"
 
 
 class TestBlocksByRangeRequestRoundTrip:

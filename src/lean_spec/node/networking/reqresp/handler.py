@@ -481,11 +481,18 @@ class ReqRespServer:
 
             chunk = await stream.read()
             if not chunk:
-                # Stream closed, try one more decompress
+                # Stream closed, try one final decompress.
+                # The decompressed payload must still match the declared length.
+                # A short or failed decode means the request is incomplete.
+                # Return empty so the caller raises a clean INVALID_REQUEST,
+                # never the raw length-prefixed buffer as if it were SSZ.
                 try:
-                    return frame_decompress(bytes(compressed_data))
+                    decompressed = frame_decompress(bytes(compressed_data))
                 except SnappyDecompressionError:
-                    return bytes(buffer)
+                    return b""
+                if len(decompressed) == declared_length:
+                    return decompressed
+                return b""
             compressed_data.extend(chunk)
 
     async def _dispatch(
