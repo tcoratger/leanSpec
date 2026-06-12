@@ -433,7 +433,7 @@ class ValidatorService:
 
         # Sign the block root with the proposal key.
         block_root = hash_tree_root(block)
-        _, proposer_signature = self._sign_with_key(
+        proposer_signature = self._sign_with_key(
             validator_entry,
             block.slot,
             block_root,
@@ -521,7 +521,7 @@ class ValidatorService:
             raise ValueError(f"No secret key for validator {validator_index}")
 
         # Sign the attestation data root with the attestation key.
-        _, signature = self._sign_with_key(
+        signature = self._sign_with_key(
             validator_entry,
             attestation_data.slot,
             hash_tree_root(attestation_data),
@@ -540,7 +540,7 @@ class ValidatorService:
         slot: Slot,
         message: Bytes32,
         key_field: Literal["attestation_secret_key", "proposal_secret_key"],
-    ) -> tuple[ValidatorEntry, Signature]:
+    ) -> Signature:
         """
         Prepare an XMSS key for the given slot, sign, and update the registry.
 
@@ -557,7 +557,7 @@ class ValidatorService:
             key_field: Which secret key field to use and advance.
 
         Returns:
-            Tuple of (updated entry, signature).
+            The signature over the message.
         """
         scheme = TARGET_SIGNATURE_SCHEME
         secret_key = getattr(validator_entry, key_field)
@@ -582,7 +582,7 @@ class ValidatorService:
                 proposal_secret_key=secret_key,
             )
         self.registry.add(updated_entry)
-        return updated_entry, signature
+        return signature
 
     def _is_synced_for_duties(
         self,
