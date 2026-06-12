@@ -476,14 +476,14 @@ class ValidatorService:
         public_keys_per_aggregate: list[list[PublicKey]] = []
         for attestation_proof in attestation_proofs:
             participant_public_keys: list[PublicKey] = []
-            for validator_index in attestation_proof.participants.to_validator_indices():
-                if not validator_index.is_within_registry(num_validators):
+            for participant_index in attestation_proof.participants.to_validator_indices():
+                if not participant_index.is_within_registry(num_validators):
                     raise ValueError(
-                        f"Attestation proof references validator {validator_index}; "
+                        f"Attestation proof references validator {participant_index}; "
                         f"active set has {num_validators} validators"
                     )
                 participant_public_keys.append(
-                    PublicKey.decode_bytes(validators[validator_index].attestation_public_key)
+                    PublicKey.decode_bytes(validators[participant_index].attestation_public_key)
                 )
             public_keys_per_aggregate.append(participant_public_keys)
         public_keys_per_aggregate.append([proposer_public_key])
