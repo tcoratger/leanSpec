@@ -333,21 +333,21 @@ class Node:
         # Wire callbacks to publish produced blocks/attestations to the network.
         validator_service: ValidatorService | None = None
         if config.validator_registry is not None:
-            # These wrappers serve a dual purpose:
+            # These callbacks serve a dual purpose:
             #
             # 1. Publish to the network so peers receive the block/attestation.
             # 2. Process locally so the node's own store reflects what it produced.
             #
             # Without local processing, the node would not see its own produced
             # blocks/attestations in forkchoice until they arrived back via gossip.
-            async def publish_attestation_wrapper(attestation: SignedAttestation) -> None:
+            async def publish_and_process_attestation(attestation: SignedAttestation) -> None:
                 subnet_id = attestation.validator_index.compute_subnet_id(
                     ATTESTATION_COMMITTEE_COUNT
                 )
                 await network_service.publish_attestation(attestation, subnet_id)
                 await sync_service.on_gossip_attestation(attestation)
 
-            async def publish_block_wrapper(block: SignedBlock) -> None:
+            async def publish_and_process_block(block: SignedBlock) -> None:
                 await network_service.publish_block(block)
                 await sync_service.on_gossip_block(block, peer_id=None)
 
@@ -356,8 +356,8 @@ class Node:
                 clock=clock,
                 registry=config.validator_registry,
                 spec=fork,
-                on_block=publish_block_wrapper,
-                on_attestation=publish_attestation_wrapper,
+                on_block=publish_and_process_block,
+                on_attestation=publish_and_process_attestation,
             )
 
         return cls(
