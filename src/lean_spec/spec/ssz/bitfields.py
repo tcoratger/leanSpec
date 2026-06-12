@@ -146,6 +146,7 @@ class BaseBitvector(SSZModel):
 
         Raises:
             SSZValueError: If the input length does not match the expected byte count.
+            SSZValueError: If any padding bit above the last data bit is set.
         """
         # Reject inputs whose byte count does not match the expected size.
         expected_byte_count = cls.get_byte_length()
@@ -153,6 +154,17 @@ class BaseBitvector(SSZModel):
             raise SSZValueError(
                 f"{cls.__name__}: expected {expected_byte_count} bytes, got {len(data)}"
             )
+
+        # When the bit count is not a multiple of 8, the last byte holds padding
+        # bits above the highest data bit.
+        # SSZ requires those padding bits to be zero so the encoding is canonical.
+        # Without this check, 0b00011111 and 0b11111111 both decode to a 5-bit
+        # vector of all ones.
+        if trailing_bit_count := cls.LENGTH % 8:
+            if data[-1] >> trailing_bit_count:
+                raise SSZValueError(
+                    f"{cls.__name__}: non-zero padding bits in final byte {data[-1]:#04x}"
+                )
 
         # Read every bit position out of the byte stream.
         #
