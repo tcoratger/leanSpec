@@ -64,6 +64,8 @@ _.validate_target
 _.validate_rejection_is_declared
 _.validate_signatures_are_out_of_scope
 _._yaml_int_to_hex
+_._check_list_lengths
+_._reject_oversized_validator_set
 
 # Pydantic serializers, invoked by the model during serialization.
 _.serialize_value
@@ -169,3 +171,11 @@ y
 first_name
 slot_number
 _.slot_number
+
+# Access tier recorded on every route entry to document the route, not yet
+# read back by the registration path.
+is_admin
+
+# Attribute assignment in slotted-class tests that proves new attributes are
+# rejected; the assignment is the action under test, never read back.
+_.extra_field
