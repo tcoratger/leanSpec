@@ -211,6 +211,14 @@ class StoreChecks(SelectiveCheck):
     - The checkpoint root references an actual block at that slot
     """
 
+    attestation_target_root_label: str | None = None
+    """
+    Expected attestation target checkpoint root by label reference.
+
+    The framework resolves this label to a block root and compares it to the
+    root that the spec would attest to from the current store.
+    """
+
     attestation_checks: list[AttestationCheck] | None = None
     """Optional list of attestation content checks for specific validators."""
 
@@ -346,8 +354,10 @@ class StoreChecks(SelectiveCheck):
             _check("filled_block.root", hash_tree_root(filled_block), expected_filled_block_root)
 
         # Attestation target checkpoint (slot + root consistency)
-        if "attestation_target_slot" in fields:
+        if "attestation_target_slot" in fields or "attestation_target_root_label" in fields:
             attestation_target = LstarSpec().get_attestation_target(store)
+
+        if "attestation_target_slot" in fields:
             _check("attestation_target.slot", attestation_target.slot, self.attestation_target_slot)
 
             block_found = any(
@@ -367,6 +377,16 @@ class StoreChecks(SelectiveCheck):
                     f"Available blocks: {block_roots_at_target_slot}"
                 )
 
+        # Attestation target root pinned to a labeled block
+        if "attestation_target_root_label" in fields:
+            assert self.attestation_target_root_label is not None
+            expected_attestation_target_root = _resolve(self.attestation_target_root_label)
+            _check(
+                "attestation_target.root",
+                attestation_target.root,
+                expected_attestation_target_root,
+            )
+
         # Per-validator attestation content checks
         if "attestation_checks" in fields:
             assert self.attestation_checks is not None
@@ -378,9 +398,18 @@ class StoreChecks(SelectiveCheck):
                     payloads = store.latest_known_aggregated_payloads
                     label = "in latest_known"
 
-                extracted_attestations = LstarSpec().extract_attestations_from_aggregated_payloads(
-                    payloads
-                )
+                # Map each validator to its highest-slot vote across the raw pool.
+                #
+                # The checker inspects pool content before pruning, so no finality cutoff applies.
+                # On equal slots the first vote seen wins, matching the fork-choice rule.
+                extracted_attestations: dict[ValidatorIndex, AttestationData] = {}
+                for attestation_data, proofs in payloads.items():
+                    for proof in proofs:
+                        for participant_index in proof.participants.to_validator_indices():
+                            previous_vote = extracted_attestations.get(participant_index)
+                            if previous_vote is None or previous_vote.slot < attestation_data.slot:
+                                extracted_attestations[participant_index] = attestation_data
+
                 if attestation_check.validator not in extracted_attestations:
                     raise AssertionError(
                         f"Step {step_index}: validator {attestation_check.validator} not found "
