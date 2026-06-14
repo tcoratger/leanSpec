@@ -1001,6 +1001,118 @@ def test_attestation_head_on_sibling_fork_rejected(
     )
 
 
+def test_attestation_slot_near_uint64_max_rejected(
+    fork_choice_test: ForkChoiceTestFiller,
+) -> None:
+    """
+    A vote with a slot near the unsigned 64-bit ceiling is rejected without overflow.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2)
+    - local time is at slot 2.
+
+    When
+    ----
+    - V1 gossips a vote naming target block_2 at slot 2.
+    - the vote's own slot is the largest unsigned 64-bit value.
+
+    Then
+    ----
+    - validation fails with attestation too far in future.
+
+    Regression
+    ----------
+    - an earlier rule multiplied the wire slot into intervals before the bound check.
+    - a near-ceiling slot overflowed the interval constructor and crashed the node.
+    """
+    fork_choice_test(
+        steps=[
+            BlockStep(
+                block=BlockSpec(slot=Slot(1), label="block_1"),
+                checks=StoreChecks(head_slot=Slot(1)),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(2), label="block_2"),
+                checks=StoreChecks(head_slot=Slot(2)),
+            ),
+            AttestationStep(
+                attestation=GossipAttestationSpec(
+                    validator_index=ValidatorIndex(1),
+                    slot=Slot(2**64 - 1),
+                    target_slot=Slot(2),
+                    target_root_label="block_2",
+                    head_slot=Slot(2),
+                    head_root_label="block_2",
+                    valid_signature=False,
+                ),
+                valid=False,
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
+                    message_substring="Attestation too far in future",
+                ),
+            ),
+        ],
+    )
+
+
+def test_attestation_slot_before_head_rejected(
+    fork_choice_test: ForkChoiceTestFiller,
+) -> None:
+    """
+    A vote whose slot precedes the slot of its head block is rejected.
+
+    Given
+    -----
+    - 4 validators.
+    - the chain:
+        block_1(1) -> block_2(2) -> block_3(3)
+
+    When
+    ----
+    - V1 gossips a vote with target block_2 at slot 2 and head block_3 at slot 3.
+    - the vote's own slot is 2, before the head block's slot 3.
+
+    Then
+    ----
+    - validation fails because the vote slot precedes the head it claims to have seen.
+    """
+    fork_choice_test(
+        steps=[
+            BlockStep(
+                block=BlockSpec(slot=Slot(1), label="block_1"),
+                checks=StoreChecks(head_slot=Slot(1)),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(2), label="block_2"),
+                checks=StoreChecks(head_slot=Slot(2)),
+            ),
+            BlockStep(
+                block=BlockSpec(slot=Slot(3), label="block_3"),
+                checks=StoreChecks(head_slot=Slot(3)),
+            ),
+            AttestationStep(
+                attestation=GossipAttestationSpec(
+                    validator_index=ValidatorIndex(1),
+                    slot=Slot(2),
+                    target_slot=Slot(2),
+                    target_root_label="block_2",
+                    head_slot=Slot(3),
+                    head_root_label="block_3",
+                    valid_signature=False,
+                ),
+                valid=False,
+                expected_rejection=ExpectedRejection(
+                    reason=RejectionReason.ATTESTATION_SLOT_BEFORE_HEAD,
+                    message_substring="Attestation slot precedes head",
+                ),
+            ),
+        ],
+    )
+
+
 def test_attestation_source_on_sibling_fork_rejected(
     fork_choice_test: ForkChoiceTestFiller,
 ) -> None:
