@@ -84,11 +84,12 @@ source_type
 exitstatus
 amount
 
-# Inbound-connection callback on the QUIC listener.
-# Callers pass it across modules, so the use is real but invisible here.
-# It stays reserved until inbound peer-identity verification is implemented,
-# at which point the handshake stops rejecting and invokes it.
-on_connection
+# aioquic server-side TLS attribute, read by aioquic during the handshake to
+# decide whether to request the client certificate.
+# aioquic defaults to not requesting it, so we set it by wrapping the lazy
+# connection initializer.
+# aioquic reads it internally, so the assignment looks unused here.
+_._request_client_certificate
 
 # logging.Formatter.format override, invoked by the logging framework.
 _.format
