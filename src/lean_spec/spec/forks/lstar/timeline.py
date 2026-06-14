@@ -58,9 +58,7 @@ class TimelineMixin(LstarSpecBase):
         """
         Advance forkchoice store time to given interval count.
 
-        Ticks store forward interval by interval, performing appropriate
-        actions for each interval type. This method handles time progression
-        incrementally to ensure all interval-specific actions are performed.
+        Stepping one interval at a time runs every interval's action without skipping any.
         """
         all_new_aggregates: list[SignedAggregatedAttestation] = []
 
