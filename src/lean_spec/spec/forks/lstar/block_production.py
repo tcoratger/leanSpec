@@ -1,5 +1,6 @@
 """Lstar fork — proposer-side block building."""
 
+from collections import defaultdict
 from collections.abc import Set as AbstractSet
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
@@ -237,11 +238,13 @@ class BlockProductionMixin(LstarSpecBase):
 
             # Group every proof under the data it attests to.
             # Strict pairing guards against the two lists drifting out of sync.
-            signatures_by_attestation_data: dict[AttestationData, list[SingleMessageAggregate]] = {}
+            signatures_by_attestation_data: defaultdict[
+                AttestationData, list[SingleMessageAggregate]
+            ] = defaultdict(list)
             for attestation, signature in zip(
                 aggregated_attestations, aggregated_signatures, strict=True
             ):
-                signatures_by_attestation_data.setdefault(attestation.data, []).append(signature)
+                signatures_by_attestation_data[attestation.data].append(signature)
 
             # Rebuild the output lists, one entry per distinct data.
             aggregated_attestations = []
