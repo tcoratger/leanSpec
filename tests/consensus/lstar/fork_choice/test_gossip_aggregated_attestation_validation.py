@@ -158,7 +158,7 @@ def test_aggregated_attestation_target_slot_mismatch_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.TARGET_SLOT_MISMATCH,
-                    message_substring="Target checkpoint slot mismatch",
+                    exact_message="Target checkpoint slot mismatch",
                 ),
             ),
         ]

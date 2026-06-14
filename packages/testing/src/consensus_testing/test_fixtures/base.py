@@ -58,6 +58,43 @@ class ExpectedRejection(StrictBaseModel):
     Fill-time self-check only; never serialized into vectors.
     """
 
+    exact_message: str | None = None
+    """
+    Full exception message the rejection must equal.
+
+    Opt-in for negative paths where the message disambiguates one reason
+    shared by several code paths.
+    When set, the raised message must equal this string exactly.
+    Fill-time self-check only; never serialized into vectors.
+    """
+
+    def assert_message_matches(self, exception: Exception, context: str) -> None:
+        """
+        Check the raised message against the authored expectation.
+
+        The exact match takes precedence over the substring when both are set.
+
+        Args:
+            exception: The exception the negative path raised.
+            context: Caller label woven into the failure message.
+
+        Raises:
+            AssertionError: When the message contradicts the expectation.
+        """
+        actual_message = str(exception)
+        if self.exact_message is not None and actual_message != self.exact_message:
+            raise AssertionError(
+                f"{context} failed with wrong error message.\n"
+                f"  Expected exact message: {self.exact_message!r}\n"
+                f"  Actual message: {actual_message!r}"
+            )
+        if self.message_substring is not None and self.message_substring not in actual_message:
+            raise AssertionError(
+                f"{context} failed with wrong error message.\n"
+                f"  Expected message containing: {self.message_substring!r}\n"
+                f"  Actual message: {actual_message!r}"
+            )
+
 
 class ProofSetting(IntEnum):
     """Aggregation proof regime emitted with each fixture."""
@@ -227,12 +264,7 @@ class BaseTestSpec(CamelModel):
             )
 
         # A wrong message means the rejection fired for the wrong reason.
-        expected_substring = self.expected_rejection.message_substring
-        if expected_substring is not None and expected_substring not in str(exception_raised):
-            raise AssertionError(
-                f"Expected exception message containing {expected_substring!r} "
-                f"but got '{exception_raised}'"
-            )
+        self.expected_rejection.assert_message_matches(exception_raised, "Verifier")
 
     def resolve_rejection_reason(self, exception_raised: Exception) -> RejectionReason:
         """

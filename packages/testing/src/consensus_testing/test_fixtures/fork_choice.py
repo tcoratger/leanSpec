@@ -494,13 +494,7 @@ class ForkChoiceTest(BaseTestSpec):
                 validator_index=ValidatorIndex(0),
             )
         except SpecRejectionError as exception:
-            expected_substring = self.expected_rejection.message_substring
-            if expected_substring is not None and expected_substring not in str(exception):
-                raise AssertionError(
-                    "Store.from_anchor failed with wrong error.\n"
-                    f"  Expected error containing: {expected_substring!r}\n"
-                    f"  Actual error: {exception!r}"
-                ) from exception
+            self.expected_rejection.assert_message_matches(exception, "Store.from_anchor")
             # Emit the language-neutral reason clients assert against.
             return ForkChoiceFixture(
                 anchor_state=self.anchor_state,
@@ -530,13 +524,9 @@ class ForkChoiceTest(BaseTestSpec):
         # Verify the failure reason matches when specified.
         expected_rejection = step.expected_rejection
         if expected_rejection is not None:
-            expected_substring = expected_rejection.message_substring
-            if expected_substring is not None and expected_substring not in str(exception):
-                raise AssertionError(
-                    f"Step {step_index} ({type(step).__name__}) failed with wrong error.\n"
-                    f"  Expected error containing: {expected_substring!r}\n"
-                    f"  Actual error: {exception!r}"
-                ) from exception
+            expected_rejection.assert_message_matches(
+                exception, f"Step {step_index} ({type(step).__name__})"
+            )
 
         # Emit the language-neutral reason clients assert against.
         rejection_reason = classify_rejection(exception)
