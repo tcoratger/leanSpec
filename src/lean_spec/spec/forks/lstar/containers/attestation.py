@@ -23,7 +23,7 @@ class SignedAttestation(Attestation):
     """Validator attestation bundled with its signature."""
 
     signature: Signature
-    """Signature aggregation produced by the leanVM (SNARKs in the future)."""
+    """Signature over the attestation data, from the validator's attestation key."""
 
 
 class AggregatedAttestation(Container):
