@@ -130,8 +130,6 @@ class BlockSpec(CamelModel):
 
     def resolve_proposer_index(self, num_validators: int) -> ValidatorIndex:
         """Return the proposer index, falling back to the spec's round-robin schedule."""
-        # Delegate to the spec so an empty registry surfaces the spec's typed
-        # rejection instead of a bare division-by-zero in the test framework.
         return self.proposer_index or ValidatorIndex.proposer_for_slot(
             self.slot, Uint64(num_validators)
         )
