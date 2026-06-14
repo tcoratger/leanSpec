@@ -10,15 +10,7 @@ from lean_spec.spec.ssz import Bytes32, Container
 
 
 class Checkpoint(Container):
-    """
-    A checkpoint in the chain's history.
-
-    A checkpoint marks a specific moment in the chain.
-
-    It combines a block identifier with a slot number.
-
-    Checkpoints are used for justification and finalization.
-    """
+    """A (block root, slot) pair that can be justified and finalized."""
 
     root: Bytes32
     """The root hash of the checkpoint's block."""
