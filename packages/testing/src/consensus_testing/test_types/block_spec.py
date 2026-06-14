@@ -27,7 +27,7 @@ from lean_spec.spec.forks.lstar.containers import (
     Store,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import ByteList512KiB, Bytes32
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
 
 
 class BlockSpec(CamelModel):
@@ -129,8 +129,10 @@ class BlockSpec(CamelModel):
     """
 
     def resolve_proposer_index(self, num_validators: int) -> ValidatorIndex:
-        """Return the proposer index, falling back to round-robin by slot."""
-        return self.proposer_index or ValidatorIndex(int(self.slot) % num_validators)
+        """Return the proposer index, falling back to the spec's round-robin schedule."""
+        return self.proposer_index or ValidatorIndex.proposer_for_slot(
+            self.slot, Uint64(num_validators)
+        )
 
     def resolve_parent_root(
         self,
