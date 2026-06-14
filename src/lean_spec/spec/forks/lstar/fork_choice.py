@@ -9,6 +9,7 @@ from lean_spec.spec.crypto.xmss.interface import TARGET_SIGNATURE_SCHEME
 from lean_spec.spec.forks.lstar._base import LstarSpecBase, LstarStore
 from lean_spec.spec.forks.lstar.config import (
     GOSSIP_DISPARITY_INTERVALS,
+    INTERVALS_PER_SLOT,
     MAX_ATTESTATIONS_DATA,
 )
 from lean_spec.spec.forks.lstar.containers import (
@@ -185,7 +186,8 @@ class ForkChoiceMixin(LstarSpecBase):
             3. The head must be at least as recent as source and target.
             4. Checkpoint slots must match the actual block slots.
             5. Source, target, and head must lie on one parent chain.
-            6. The vote's slot must have started locally (a small disparity margin is allowed).
+            6. The vote's slot cannot precede the slot of the head it claims to have seen.
+            7. The vote's slot must have started locally (a small disparity margin is allowed).
 
         Raises:
             SpecRejectionError: If the attestation fails any of the validation checks above.
@@ -259,6 +261,18 @@ class ForkChoiceMixin(LstarSpecBase):
                 "Target checkpoint must be ancestor of head",
             )
 
+        # Head Consistency Check
+        #
+        # The vote's slot records when the attester observed the head block.
+        # An honest attester cannot have seen the head before the head's own slot.
+        # Anchoring the slot to the head also bounds it from below by a known block,
+        # so the wire slot can no longer be an arbitrary near-2**64 value.
+        if attestation_data.slot < head_checkpoint.slot:
+            raise SpecRejectionError(
+                RejectionReason.ATTESTATION_SLOT_BEFORE_HEAD,
+                "Attestation slot precedes head",
+            )
+
         # Time Check
         #
         # Reject votes whose slot has not started, with a small clock-skew margin.
@@ -270,8 +284,15 @@ class ForkChoiceMixin(LstarSpecBase):
         #     interval 45  ->  admitted only by a whole-slot margin, a full slot early
         #
         # The early window lets an adversary pre-publish next-slot aggregates.
-        attestation_start_interval = Interval.from_slot(attestation_data.slot)
-        if attestation_start_interval > store.time + Interval(GOSSIP_DISPARITY_INTERVALS):
+        #
+        # Compare in slot units with plain-int arithmetic.
+        # Multiplying the wire slot into intervals would overflow the range-checked
+        # interval constructor for a near-2**64 slot and crash before the rejection.
+        # The slot integer comparison is equivalent: with positive intervals per slot,
+        # slot * intervals_per_slot > horizon is the same as slot > horizon // intervals_per_slot.
+        admission_horizon_interval = int(store.time) + int(GOSSIP_DISPARITY_INTERVALS)
+        max_admissible_slot = admission_horizon_interval // int(INTERVALS_PER_SLOT)
+        if int(attestation_data.slot) > max_admissible_slot:
             raise SpecRejectionError(
                 RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE, "Attestation too far in future"
             )
@@ -322,6 +343,7 @@ class ForkChoiceMixin(LstarSpecBase):
             # - their slots are ordered source <= target <= head,
             # - each checkpoint slot matches its block's actual slot from the store,
             # - source, target, and head lie on one parent chain,
+            # - the vote's slot is not before the head block's slot,
             # - the vote's slot has already started locally with a small margin.
             self.validate_attestation(store, attestation_data)
 
@@ -428,6 +450,7 @@ class ForkChoiceMixin(LstarSpecBase):
         # - their slots are ordered source <= target <= head,
         # - each checkpoint slot matches its block's actual slot from the store,
         # - source, target, and head lie on one parent chain,
+        # - the vote's slot is not before the head block's slot,
         # - the vote's slot has already started locally with a small margin.
         self.validate_attestation(store, attestation_data)
 
