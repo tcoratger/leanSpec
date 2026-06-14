@@ -78,7 +78,7 @@ class RejectionReason(StrEnum):
     """The attestation slot is beyond the store's acceptance horizon."""
 
     ATTESTATION_SLOT_BEFORE_HEAD = "ATTESTATION_SLOT_BEFORE_HEAD"
-    """The attestation slot precedes the slot of the head block it claims to have seen."""
+    """The attestation slot precedes its head block's slot."""
 
     VALIDATOR_NOT_IN_STATE = "VALIDATOR_NOT_IN_STATE"
     """The referenced validator does not exist in the state registry."""

@@ -263,10 +263,8 @@ class ForkChoiceMixin(LstarSpecBase):
 
         # Head Consistency Check
         #
-        # The vote's slot records when the attester observed the head block.
-        # An honest attester cannot have seen the head before the head's own slot.
-        # Anchoring the slot to the head bounds it from below by a known block.
-        # The wire slot can then no longer be an arbitrary value near 2**64.
+        # A vote cannot have observed its head before that head existed.
+        # This lower bound also keeps the wire slot clear of the 2**64 overflow edge.
         if attestation_data.slot < head_checkpoint.slot:
             raise SpecRejectionError(
                 RejectionReason.ATTESTATION_SLOT_BEFORE_HEAD,
@@ -285,10 +283,8 @@ class ForkChoiceMixin(LstarSpecBase):
         #
         # The early window lets an adversary pre-publish next-slot aggregates.
         #
-        # Compare in slot units with plain integer arithmetic.
-        # Multiplying the wire slot into intervals would overflow the range-checked constructor.
-        # A slot near 2**64 would then crash the node before this rejection runs.
-        # Dividing the horizon into slots is equivalent, because intervals per slot is positive.
+        # Work in slot units, not intervals.
+        # Multiplying a near-2**64 wire slot into intervals would overflow and crash first.
         admission_horizon_interval = int(store.time) + int(GOSSIP_DISPARITY_INTERVALS)
         max_admissible_slot = admission_horizon_interval // int(INTERVALS_PER_SLOT)
         if int(attestation_data.slot) > max_admissible_slot:
