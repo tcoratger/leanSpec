@@ -206,13 +206,13 @@ def test_block_slot_too_far_in_future_rejected(
 
     Then
     ----
-    - slot processing rejects the block before walking the gap.
+    - the gap exceeds what one import may advance.
     - the block is rejected as too far in the future.
 
     Regression
     ----------
-    - slot processing once looped once per skipped slot with no upper bound.
-    - a far-future wire slot forced billions of iterations, an effective hang.
+    - slot processing once advanced one slot at a time with no upper bound.
+    - a far-future wire slot forced billions of iterations.
     """
     state_transition_test(
         pre=generate_pre_state(),

@@ -52,15 +52,11 @@ With a 4-second slot, this corresponds to a history of approximately 12.1 days.
 
 MAX_SLOTS_PER_IMPORT: Final = HISTORICAL_ROOTS_LIMIT
 """
-Largest slot gap a single block may advance the state across during import.
+Largest slot gap a single block may advance the state during import.
 
-Slot processing walks one state copy per skipped slot and appends one history
-entry per skipped slot.
-A block whose slot exceeds the current state slot by more than the historical
-roots capacity would overflow the history list anyway, so it can never extend
-the chain.
-Bounding the advance here turns an unbounded loop on a far-future wire slot into
-a clean rejection instead of an effective hang.
+Slot processing copies the state once per skipped slot.
+A far-future wire slot would otherwise spin the loop for billions of iterations.
+The value is the historical roots capacity: a larger gap would overflow the history list anyway.
 """
 
 ATTESTATION_COMMITTEE_COUNT: Final = Uint64(1)
