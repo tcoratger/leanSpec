@@ -4,6 +4,8 @@ Fork protocol interface for leanSpec consensus.
 This module is deliberately agnostic of any individual devnet.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, ClassVar, Protocol, Self
@@ -34,7 +36,7 @@ class SpecStateType(SpecSSZType, Protocol):
         ...
 
     @property
-    def config(self) -> "SpecSSZType":
+    def config(self) -> SpecSSZType:
         """Genesis configuration carried by the state."""
         ...
 
@@ -124,7 +126,7 @@ class ForkProtocol(ABC):
     block, attestation, and aggregation topics route compatibly.
     """
 
-    previous: ClassVar["type[ForkProtocol] | None"]
+    previous: ClassVar[type[ForkProtocol] | None]
     """
     Predecessor fork in the upgrade chain, or None for the root fork.
 
