@@ -650,6 +650,9 @@ class ForkChoiceMixin(LstarSpecBase):
             if attestation_data.head.slot <= latest_finalized_slot:
                 continue
 
+            # Every proof here shares one attestation data, so they share one slot.
+            # The strict slot comparison below never overwrites between them.
+            # Set iteration order is therefore non-consensus and safe to leave native.
             for proof in proofs:
                 for validator_index in proof.participants.to_validator_indices():
                     # Keep this vote only when it is newer than the one already stored.
