@@ -83,6 +83,9 @@ class RejectionReason(StrEnum):
     VALIDATOR_INDEX_OUT_OF_RANGE = "VALIDATOR_INDEX_OUT_OF_RANGE"
     """The validator index does not address any registered validator."""
 
+    JUSTIFIED_SLOT_OUT_OF_RANGE = "JUSTIFIED_SLOT_OUT_OF_RANGE"
+    """A justification query named a slot beyond the tracked justification window."""
+
     # Cryptographic verification
     INVALID_SIGNATURE = "INVALID_SIGNATURE"
     """An attestation signature or aggregate proof fails cryptographic verification."""
