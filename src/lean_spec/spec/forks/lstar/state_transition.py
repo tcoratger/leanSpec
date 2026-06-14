@@ -123,11 +123,6 @@ class StateTransitionMixin(LstarSpecBase):
         """
         Advance the state through empty slots up to, but not including, target_slot.
 
-        The loop:
-          - Performs per-slot maintenance (e.g., state root caching).
-          - Increments the slot counter after each call.
-        The function returns a new state with slot == target_slot.
-
         Raises:
             SpecRejectionError: BLOCK_SLOT_NOT_IN_FUTURE if target_slot is not in the future.
         """
@@ -164,19 +159,6 @@ class StateTransitionMixin(LstarSpecBase):
     def process_block_header(self, state: State, block: Block) -> State:
         """
         Validate the block header and update header-linked state.
-
-        Checks:
-          - The block slot equals the current state slot.
-          - The block slot is newer than the latest header slot.
-          - The proposer index matches the round-robin selection.
-          - The parent root matches the hash of the latest block header.
-
-        Updates:
-          - For the first post-genesis block, mark genesis as justified/finalized.
-          - Append the parent root to historical hashes.
-          - Append the justified bit for the parent (true only for genesis).
-          - Insert ZERO_HASH entries for any skipped empty slots.
-          - Set latest_block_header for the new block with an empty state_root.
 
         Raises:
             SpecRejectionError: If any header check fails (slot mismatch, block older
@@ -322,13 +304,7 @@ class StateTransitionMixin(LstarSpecBase):
         attestations: Iterable[AggregatedAttestation],
     ) -> State:
         """
-        Apply attestations and update justification/finalization
-        according to the Lean Consensus 3SF-mini rules.
-
-        This simplified consensus mechanism:
-        1. Processes each attestation
-        2. Updates justified status for target checkpoints
-        3. Applies finalization rules based on justified status
+        Apply attestations and update justification and finalization under the 3SF-mini rules.
 
         Raises:
             SpecRejectionError: EMPTY_AGGREGATION_BITS if an attestation that passes

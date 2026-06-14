@@ -179,16 +179,8 @@ class ForkChoiceMixin(LstarSpecBase):
         """
         Validate incoming attestation before processing.
 
-        Ensures the vote respects the basic laws of time and topology:
-            1. The blocks voted for must exist in our store.
-            2. A vote cannot span backwards in time (source > target).
-            3. The head must be at least as recent as source and target.
-            4. Checkpoint slots must match the actual block slots.
-            5. Source, target, and head must lie on one parent chain.
-            6. The vote's slot must have started locally (a small disparity margin is allowed).
-
         Raises:
-            SpecRejectionError: If the attestation fails any of the validation checks above.
+            SpecRejectionError: If the attestation fails any of the validation checks below.
         """
         source_checkpoint = attestation_data.source
         target_checkpoint = attestation_data.target
@@ -196,7 +188,7 @@ class ForkChoiceMixin(LstarSpecBase):
 
         # Availability Check
         #
-        # We cannot count a vote if we haven't seen the blocks involved.
+        # A vote cannot be counted until the blocks it references are known.
         if source_checkpoint.root not in store.blocks:
             raise SpecRejectionError(
                 RejectionReason.UNKNOWN_SOURCE_BLOCK,
@@ -284,11 +276,6 @@ class ForkChoiceMixin(LstarSpecBase):
     ) -> LstarStore:
         """
         Verify a gossiped attestation and, for aggregators, record its signature.
-
-        Steps:
-            1. Validate the vote: known blocks, matching slots, ancestry, and timing.
-            2. Verify the signature against the validator's key.
-            3. Record the signature, but only when this node aggregates.
 
         Subnet filtering happens at the p2p subscription layer.
         Only attestations from subscribed subnets arrive here, so no subnet check is repeated.
@@ -400,11 +387,6 @@ class ForkChoiceMixin(LstarSpecBase):
 
         One aggregated attestation carries a single proof that stands in for many
         validators who all signed the same vote.
-
-        Steps:
-            1. Validate the vote: known blocks, matching slots, ancestry, and timing.
-            2. Verify the aggregate proof against every participant's key.
-            3. Record the proof in the pending pool.
 
         Args:
             store: Current fork-choice store.
