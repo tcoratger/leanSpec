@@ -43,8 +43,6 @@ class TimelineMixin(LstarSpecBase):
                 store = self.update_safe_target(store)
             case 4:
                 store = self.accept_new_attestations(store)
-            case _:
-                pass
 
         return store, new_aggregates
 
