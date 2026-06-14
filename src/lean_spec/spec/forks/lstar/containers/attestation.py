@@ -27,7 +27,7 @@ class SignedAttestation(Attestation):
 
 
 class AggregatedAttestation(Container):
-    """Aggregated attestation consisting of participation bits and message."""
+    """Attestation shared by many validators, with a bitfield naming them."""
 
     aggregation_bits: AggregationBits
     """Bitfield indicating which validators participated in the aggregation."""
