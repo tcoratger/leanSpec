@@ -10,6 +10,7 @@ from consensus_testing import (
     generate_pre_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
+from lean_spec.spec.forks.lstar.config import MAX_SLOTS_PER_IMPORT
 from lean_spec.spec.forks.lstar.containers import JustifiedSlots
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Boolean, Bytes32
@@ -184,6 +185,44 @@ def test_block_at_very_large_slot_with_many_skipped(
             slot=Slot(500),
             historical_block_hashes_count=500,
             justified_slots=JustifiedSlots(data=[Boolean(False)] * 499),
+        ),
+    )
+
+
+def test_block_slot_too_far_in_future_rejected(
+    state_transition_test: StateTransitionTestFiller,
+) -> None:
+    """
+    A block advancing the state by more than one import may cover is rejected.
+
+    Given
+    -----
+    - the default genesis state at slot 0.
+    - the import advance bound is the historical roots capacity.
+
+    When
+    ----
+    - a block claims a slot one past the import advance bound.
+
+    Then
+    ----
+    - slot processing rejects the block before walking the gap.
+    - the block is rejected as too far in the future.
+
+    Regression
+    ----------
+    - slot processing once looped once per skipped slot with no upper bound.
+    - a far-future wire slot forced billions of iterations, an effective hang.
+    """
+    state_transition_test(
+        pre=generate_pre_state(),
+        blocks=[
+            BlockSpec(slot=Slot(int(MAX_SLOTS_PER_IMPORT) + 1)),
+        ],
+        post=None,
+        expected_rejection=ExpectedRejection(
+            reason=RejectionReason.BLOCK_SLOT_TOO_FAR_IN_FUTURE,
+            message_substring="Block slot too far in future",
         ),
     )
 

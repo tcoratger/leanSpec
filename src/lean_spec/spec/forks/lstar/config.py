@@ -11,6 +11,7 @@ __all__ = [
     "INTERVALS_PER_SLOT",
     "JUSTIFICATION_LOOKBACK_SLOTS",
     "MAX_ATTESTATIONS_DATA",
+    "MAX_SLOTS_PER_IMPORT",
     "MILLISECONDS_PER_INTERVAL",
     "MILLISECONDS_PER_SLOT",
     "SECONDS_PER_SLOT",
@@ -47,6 +48,19 @@ HISTORICAL_ROOTS_LIMIT: Final = Uint64(2**18)
 The maximum number of historical block roots to store in the state.
 
 With a 4-second slot, this corresponds to a history of approximately 12.1 days.
+"""
+
+MAX_SLOTS_PER_IMPORT: Final = HISTORICAL_ROOTS_LIMIT
+"""
+Largest slot gap a single block may advance the state across during import.
+
+Slot processing walks one state copy per skipped slot and appends one history
+entry per skipped slot.
+A block whose slot exceeds the current state slot by more than the historical
+roots capacity would overflow the history list anyway, so it can never extend
+the chain.
+Bounding the advance here turns an unbounded loop on a far-future wire slot into
+a clean rejection instead of an effective hang.
 """
 
 ATTESTATION_COMMITTEE_COUNT: Final = Uint64(1)

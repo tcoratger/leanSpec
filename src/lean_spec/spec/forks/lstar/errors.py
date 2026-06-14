@@ -10,6 +10,9 @@ class RejectionReason(StrEnum):
     BLOCK_SLOT_NOT_IN_FUTURE = "BLOCK_SLOT_NOT_IN_FUTURE"
     """The block slot is not strictly greater than the current state slot."""
 
+    BLOCK_SLOT_TOO_FAR_IN_FUTURE = "BLOCK_SLOT_TOO_FAR_IN_FUTURE"
+    """The block slot exceeds the current state slot by more than one import may advance."""
+
     BLOCK_OLDER_THAN_LATEST_HEADER = "BLOCK_OLDER_THAN_LATEST_HEADER"
     """The block slot is not newer than the latest block header."""
 

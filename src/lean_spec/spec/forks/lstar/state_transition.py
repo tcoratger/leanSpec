@@ -5,6 +5,7 @@ from typing import Any
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar._base import LstarSpecBase
+from lean_spec.spec.forks.lstar.config import MAX_SLOTS_PER_IMPORT
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     AttestationData,
@@ -130,11 +131,24 @@ class StateTransitionMixin(LstarSpecBase):
 
         Raises:
             SpecRejectionError: BLOCK_SLOT_NOT_IN_FUTURE if target_slot is not in the future.
+            SpecRejectionError: BLOCK_SLOT_TOO_FAR_IN_FUTURE if the target slot advances the
+                state by more than one import may cover.
         """
         # The target must be strictly greater than the current slot.
         if state.slot >= target_slot:
             raise SpecRejectionError(
                 RejectionReason.BLOCK_SLOT_NOT_IN_FUTURE, "Target slot must be in the future"
+            )
+
+        # Bound the advance before walking a slot at a time.
+        #
+        # The loop below copies the state once per skipped slot.
+        # A far-future wire slot would otherwise spin for billions of iterations.
+        # Past the history capacity the advance cannot extend the chain anyway,
+        # so reject it here instead of grinding through the work first.
+        if int(target_slot) - int(state.slot) > int(MAX_SLOTS_PER_IMPORT):
+            raise SpecRejectionError(
+                RejectionReason.BLOCK_SLOT_TOO_FAR_IN_FUTURE, "Block slot too far in future"
             )
 
         # Step through each missing slot.
