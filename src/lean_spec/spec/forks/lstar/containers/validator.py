@@ -12,7 +12,7 @@ class Validator(Container):
     """XMSS public key for signing attestations."""
 
     proposal_public_key: Bytes52
-    """XMSS public key for signing proposer attestations in blocks."""
+    """XMSS public key the proposer signs the block root with."""
 
     index: ValidatorIndex = ValidatorIndex(0)
     """Validator index in the registry."""
