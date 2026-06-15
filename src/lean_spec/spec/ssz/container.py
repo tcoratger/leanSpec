@@ -99,7 +99,7 @@ class Container(SSZModel):
 
         # Phase 2: each variable payload spans from its offset to the next.
         # Scope closes the final span.
-        boundaries = [o for _, _, o in var_fields] + [scope]
+        boundaries = [offset for _, _, offset in var_fields] + [scope]
         for (name, ftype, _), (start, end) in zip(var_fields, pairwise(boundaries), strict=True):
             if end < start:
                 raise SSZSerializationError(
