@@ -250,10 +250,10 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # Every chain starts from a secret derived from the PRF.
         # Hashing that start forward by the digit gives the value to reveal.
         # The verifier later finishes the remaining steps to reach the chain end.
-        ots_hashes: list[HashDigestVector] = []
+        released_chain_hashes: list[HashDigestVector] = []
         for chain_index, steps in enumerate(codeword):
             start_digest = secret_key.prf_key.derive_chain_start(config, slot, Uint64(chain_index))
-            ots_digest = self.poseidon.hash_chain(
+            released_chain_digest = self.poseidon.hash_chain(
                 config=config,
                 parameter=secret_key.parameter,
                 epoch=slot,
@@ -262,7 +262,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
                 num_steps=steps,
                 start_digest=start_digest,
             )
-            ots_hashes.append(ots_digest)
+            released_chain_hashes.append(released_chain_digest)
 
         # Phase 4: open this slot's leaf up to the public root.
         #
@@ -276,7 +276,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
 
         # The signature carries the opening, the randomness, and the released chain values.
         # The randomness lets the verifier recompute the same codeword.
-        return Signature(path=path, rho=rho, hashes=HashDigestList(data=ots_hashes))
+        return Signature(path=path, rho=rho, hashes=HashDigestList(data=released_chain_hashes))
 
     def verify(
         self, public_key: PublicKey, slot: Slot, message: Bytes32, signature: Signature
