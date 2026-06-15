@@ -153,21 +153,16 @@ class ForkChoiceTest(BaseTestSpec):
         if self.max_slot is not None:
             return self.max_slot
 
-        max_slot_value = Slot(0)
-
         # Find the maximum slot across all block and attestation steps.
         #
         # XMSS signatures are slot-dependent.
         # Keys must be generated up to this slot before signing.
-        for step in self.steps:
-            if isinstance(step, BlockStep):
-                max_slot_value = max(max_slot_value, step.block.slot)
-            elif isinstance(step, AttestationStep):
-                max_slot_value = max(max_slot_value, step.attestation.slot)
-            elif isinstance(step, GossipAggregatedAttestationStep):
-                max_slot_value = max(max_slot_value, step.attestation.slot)
-
-        return max_slot_value
+        slots_needing_keys = (
+            step.block.slot if isinstance(step, BlockStep) else step.attestation.slot
+            for step in self.steps
+            if isinstance(step, (BlockStep, AttestationStep, GossipAggregatedAttestationStep))
+        )
+        return max(slots_needing_keys, default=Slot(0))
 
     def generate(self) -> ForkChoiceFixture:
         """
