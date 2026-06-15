@@ -467,16 +467,9 @@ class GossipsubHandlerTest(BaseTestSpec):
         with patch("time.time", return_value=self.now):
             await behavior._handle_rpc(from_peer, self.event.build_rpc())
 
-        # Convert captured outbound RPCs to typed expectation entries.
-        #
-        # Each entry represents one RPC sent to a peer.
-        # The structure mirrors the gossipsub RPC wire format.
-        # Fixture consumers use this to assert exact outbound behavior.
-        # Emit outbound RPCs in canonical recipient order.
-        # The send order to mesh peers is set-driven.
-        # It is not consensus-relevant.
-        # Sorting by recipient keeps the emitted vector reproducible across runs.
         sent_rpcs = []
+        # The send order to mesh peers is set-driven, so it is not consensus-relevant.
+        # Sort by recipient name to keep the emitted vector reproducible across runs.
         for recipient_peer_id, rpc in sorted(
             capture.sent, key=lambda entry: peer_names.get(entry[0], str(entry[0]))
         ):
