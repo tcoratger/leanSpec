@@ -27,13 +27,13 @@ class Slot(Uint64):
 
     def is_justifiable_after(self, finalized_slot: "Slot") -> bool:
         """
-        Checks if this slot is a valid candidate for justification after a given finalized slot.
+        Whether this slot can be justified after the given finalized slot.
 
         According to the 3SF-mini specification, a slot is justifiable if its
         distance (delta) from the last finalized slot is:
           1. Less than or equal to 5.
-          2. A perfect square (e.g., 9, 16, 25...).
-          3. A pronic number (of the form x^2 + x, e.g., 6, 12, 20...).
+          2. A perfect square (e.g., 9, 16...).
+          3. A pronic number (of the form x^2 + x, e.g., 6, 12...).
 
         Args:
             finalized_slot: The last slot that was finalized.
