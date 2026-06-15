@@ -15,28 +15,11 @@ from lean_spec.spec.forks.lstar.containers import (
     ValidatorIndex,
 )
 from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
-from lean_spec.spec.ssz import Bytes32, Uint64
+from lean_spec.spec.ssz import Uint64
 
 
 class ValidatorDutiesMixin(LstarSpecBase):
     """Validator duties for the lstar fork."""
-
-    def get_proposal_head(self, store: LstarStore, slot: Slot) -> tuple[LstarStore, Bytes32]:
-        """
-        Get the head for block proposal at given slot.
-
-        Ensures store is up-to-date and processes any pending attestations
-        before returning the canonical head. This guarantees the proposer
-        builds on the most recent view of the chain.
-        """
-        # Advance time to this slot's first interval
-        target_interval = Interval.from_slot(slot)
-        store, _ = self.on_tick(store, target_interval, True)
-
-        # Process any pending attestations before proposal
-        store = self.accept_new_attestations(store)
-
-        return store, store.head
 
     def get_attestation_target(self, store: LstarStore) -> Checkpoint:
         """
@@ -147,11 +130,15 @@ class ValidatorDutiesMixin(LstarSpecBase):
                 or if the produced block fails to close a justified divergence
                 between the store and the head chain.
         """
-        # Retrieve parent block.
+        # Build on the freshest canonical head.
         #
-        # The proposal head reflects the latest chain view after processing
-        # all pending attestations. Building on stale state would orphan the block.
-        store, head_root = self.get_proposal_head(store, slot)
+        # Advance time to this slot's first interval, then fold in pending attestations.
+        # The proposal head then reflects the latest chain view.
+        # Building on stale state would orphan the block.
+        target_interval = Interval.from_slot(slot)
+        store, _ = self.on_tick(store, target_interval, True)
+        store = self.accept_new_attestations(store)
+        head_root = store.head
         head_state = store.states[head_root]
 
         # Verify proposer authorization.
