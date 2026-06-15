@@ -443,9 +443,12 @@ class StoreChecks(SelectiveCheck):
             participants_by_target_slot: dict[Slot, set[int]] = {}
             for attestation_data, proofs in store.latest_new_aggregated_payloads.items():
                 target_slot = attestation_data.target.slot
-                covered = participants_by_target_slot.setdefault(target_slot, set())
+                participants = participants_by_target_slot.setdefault(target_slot, set())
                 for proof in proofs:
-                    covered |= {int(i) for i in proof.participants.to_validator_indices()}
+                    participants.update(
+                        int(validator_index)
+                        for validator_index in proof.participants.to_validator_indices()
+                    )
             for target_slot, expected_participants in self.new_pool_proof_participants.items():
                 _check(
                     f"new_pool_proof_participants[{target_slot}]",
