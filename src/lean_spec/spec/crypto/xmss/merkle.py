@@ -473,18 +473,18 @@ class HashSubTree(Container):
             raise ValueError(f"Position {position} out of bounds.")
 
         siblings: list[HashDigestVector] = []
-        pos = int(position)
+        current_position = int(position)
 
         # Stop one short of the root layer.
         # The root has no sibling.
         for layer in self.layers[:-1]:
             # The sibling sits at the position with the last bit flipped, then we
             # rebase by the layer's start_index because the layer is sparse.
-            sibling_index = (pos ^ 1) - int(layer.start_index)
+            sibling_index = (current_position ^ 1) - int(layer.start_index)
             if not (0 <= sibling_index < len(layer.nodes)):
                 raise ValueError(f"Sibling index {sibling_index} out of bounds.")
             siblings.append(layer.nodes[sibling_index])
-            pos //= 2
+            current_position //= 2
 
         return HashTreeOpening(siblings=HashDigestList(data=siblings))
 
