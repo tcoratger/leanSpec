@@ -9,6 +9,7 @@ from pathlib import Path
 
 import click
 
+from consensus_testing.cli._workspace import find_workspace_root
 from consensus_testing.keys import compute_key_set_digest, get_keys_directory
 from consensus_testing.keys_cli import PINNED_KEY_SET_DIGESTS, download_keys
 
@@ -97,15 +98,7 @@ def fill(
         download_keys(scheme.lower())
 
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-fill.ini"
-    # Find project root by looking for pyproject.toml with [tool.uv.workspace]
-    project_root = Path.cwd()
-    while project_root != project_root.parent:
-        if (project_root / "pyproject.toml").exists():
-            # Check if this is the workspace root
-            pyproject = project_root / "pyproject.toml"
-            if "[tool.uv.workspace]" in pyproject.read_text():
-                break
-        project_root = project_root.parent
+    project_root = find_workspace_root()
 
     # Build pytest arguments
     args = [
