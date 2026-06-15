@@ -56,6 +56,11 @@ class ExpectedRejection(StrictBaseModel):
 
     When None, any exception classified to the expected reason is accepted.
     Fill-time self-check only; never serialized into vectors.
+
+    Permitted only when the full message embeds nondeterministic data
+    that a literal string cannot pin.
+    A substring keeps passing while the rest of the message drifts or regresses.
+    Prefer the full-equality form whenever the message is stable.
     """
 
     exact_message: str | None = None
