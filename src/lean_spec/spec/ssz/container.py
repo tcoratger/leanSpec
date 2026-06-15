@@ -27,8 +27,8 @@ class Container(SSZModel):
         if isinstance(value, str):
             try:
                 return cls.from_hex(value)
-            except SSZError as err:
-                raise ValueError(f"invalid {cls.__name__} hex: {err}") from err
+            except SSZError as exception:
+                raise ValueError(f"invalid {cls.__name__} hex: {exception}") from exception
         return handler(value)
 
     @classmethod
