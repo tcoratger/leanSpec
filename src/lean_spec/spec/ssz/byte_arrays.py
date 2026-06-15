@@ -304,17 +304,19 @@ class BaseByteList(SSZModel):
 
     @field_validator("data", mode="before")
     @classmethod
-    def _validate_byte_list_data(cls, v: Any) -> bytes:
+    def _validate_byte_list_data(cls, value: Any) -> bytes:
         """Enforce the maximum byte count and coerce inputs into a plain bytes object."""
         # Subclasses must declare LIMIT before any instances can be validated.
         if not hasattr(cls, "LIMIT"):
             raise SSZTypeError(f"{cls.__name__} must define LIMIT")
 
         # Coerce the input first, then enforce the upper bound.
-        b = BaseBytes._coerce_to_bytes(v)
-        if len(b) > cls.LIMIT:
-            raise SSZValueError(f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(b)}")
-        return b
+        coerced_bytes = BaseBytes._coerce_to_bytes(value)
+        if len(coerced_bytes) > cls.LIMIT:
+            raise SSZValueError(
+                f"{cls.__name__} exceeds limit of {cls.LIMIT}, got {len(coerced_bytes)}"
+            )
+        return coerced_bytes
 
     @field_serializer("data", when_used="json")
     def _serialize_data(self, value: bytes) -> str:
