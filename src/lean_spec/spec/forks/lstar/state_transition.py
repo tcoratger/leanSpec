@@ -5,6 +5,7 @@ from typing import Any
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar._base import LstarSpecBase
+from lean_spec.spec.forks.lstar.config import MAX_ATTESTATIONS_DATA
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
     Block,
@@ -253,11 +254,34 @@ class StateTransitionMixin(LstarSpecBase):
         Apply attestations and update justification and finalization under 3SF-mini rules.
 
         Raises:
+            SpecRejectionError: TOO_MANY_ATTESTATION_DATA if the distinct data
+                count exceeds the per-block cap.
             SpecRejectionError: EMPTY_AGGREGATION_BITS if an attestation that passes
                 the vote filters has no set bits.
             SpecRejectionError: VALIDATOR_INDEX_OUT_OF_RANGE if a set bit points
                 outside the validator registry.
         """
+        # Bound the distinct votes the block may carry.
+        #
+        # This is a property of the transition itself, not of any one caller.
+        # The state transition and block-production trial blocks both rely on it.
+        #
+        # Each distinct attestation data builds a tally proportional to the
+        # validator count, so an unbounded distinct count amplifies import work.
+        # The SSZ list limit sits far above the consensus cap, so it cannot substitute.
+        #
+        # Split aggregates for one target share their data, so they count once.
+        # Re-marking a voter is idempotent, so repeated data stays valid here.
+        # Only the number of distinct data entries is bounded.
+        aggregated_attestations = tuple(attestations)
+        distinct_attestation_data = {attestation.data for attestation in aggregated_attestations}
+        if len(distinct_attestation_data) > int(MAX_ATTESTATIONS_DATA):
+            raise SpecRejectionError(
+                RejectionReason.TOO_MANY_ATTESTATION_DATA,
+                f"Block contains {len(distinct_attestation_data)} distinct AttestationData "
+                f"entries; maximum is {MAX_ATTESTATIONS_DATA}",
+            )
+
         # Reconstruct the vote-tracking structure
         #
         # The state stores justification data in a compact SSZ layout:
@@ -312,7 +336,7 @@ class StateTransitionMixin(LstarSpecBase):
         # "I vote to extend the chain from SOURCE to TARGET."
         #
         # The rules below filter out invalid or irrelevant votes.
-        for attestation in attestations:
+        for attestation in aggregated_attestations:
             source = attestation.data.source
             target = attestation.data.target
 
