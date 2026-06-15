@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 from lean_spec.spec.crypto.koalabear import Fp
 from lean_spec.spec.ssz import Bytes32, Uint8, Uint16, Uint32
 from lean_spec.spec.ssz.boolean import Boolean
-from lean_spec.spec.ssz.collections import SSZList, SSZVector
+from lean_spec.spec.ssz.collections import SSZList, SSZVector, _validate_offsets
 from lean_spec.spec.ssz.container import Container
 from lean_spec.spec.ssz.exceptions import SSZSerializationError, SSZTypeError, SSZValueError
 
@@ -892,6 +892,20 @@ class TestSSZListSerialization:
         assert VariableContainerList2.decode_bytes(encoded) == VariableContainerList2(
             data=[element]
         )
+
+
+class TestValidateOffsets:
+    """Tests for the offset-table invariant helper, exercised directly."""
+
+    def test_empty_offsets_returns_none(self) -> None:
+        """An empty offset table has no bodies, so the helper accepts it silently."""
+        assert _validate_offsets([], scope=0, type_name="EmptySequence") is None
+
+    def test_final_offset_beyond_scope_rejected(self) -> None:
+        """A monotonic table whose final offset overruns the scope is rejected."""
+        with pytest.raises(SSZSerializationError) as exception_info:
+            _validate_offsets([8, 16], scope=12, type_name="OverScopeSequence")
+        assert str(exception_info.value) == "OverScopeSequence: final offset 16 exceeds scope 12"
 
 
 class TestJsonSerialization:
