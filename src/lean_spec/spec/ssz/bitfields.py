@@ -408,10 +408,10 @@ class BaseBitlist(SSZModel):
         #   int.from_bytes(data, "little")  =  511  =  0b111111111
         #   bit_length()                    =  9
         #   delimiter_pos                   =  8      ->  num_bits = 8
-        total = int.from_bytes(data, "little")
-        if total == 0:
+        packed_integer = int.from_bytes(data, "little")
+        if packed_integer == 0:
             raise SSZSerializationError(f"{cls.__name__}: no delimiter bit found")
-        delimiter_pos = total.bit_length() - 1
+        delimiter_pos = packed_integer.bit_length() - 1
 
         # The delimiter must sit in the final byte of the input.
         # Reading the stream as one integer silently drops trailing zero bytes.
