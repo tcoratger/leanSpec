@@ -596,7 +596,7 @@ class ForkChoiceMixin(LstarSpecBase):
             # Run the state transition from the parent state to this block's post-state.
             post_state = self.state_transition(parent_state, block)
 
-            # Advance the justified and finalized checkpoints from the post-state.
+            # Advance the justified checkpoint from the post-state.
             #
             # A candidate wins only when its slot is strictly higher than the store's.
             # On a slot tie the store keeps its checkpoint, avoiding a silent root swap:
@@ -604,7 +604,6 @@ class ForkChoiceMixin(LstarSpecBase):
             #     store slot 5, candidate slot 7  ->  take candidate
             #     store slot 5, candidate slot 5  ->  keep store
             latest_justified = store.latest_justified.advance_to(post_state.latest_justified)
-            latest_finalized = store.latest_finalized.advance_to(post_state.latest_finalized)
 
             # Seed each block-carried vote into the known pool with an empty proof set.
             #
@@ -625,7 +624,6 @@ class ForkChoiceMixin(LstarSpecBase):
                     "blocks": store.blocks | {block_root: block},
                     "states": store.states | {block_root: post_state},
                     "latest_justified": latest_justified,
-                    "latest_finalized": latest_finalized,
                     "latest_known_aggregated_payloads": new_known_aggregated_payloads,
                 }
             )
@@ -830,7 +828,24 @@ class ForkChoiceMixin(LstarSpecBase):
             start_root=store.latest_justified.root,
             attestations=latest_votes,
         )
-        return store.model_copy(update={"head": new_head})
+        # Invariant: the finalized checkpoint stays on the head's chain.
+        # Climb from the head to its ancestor at the finalized slot.
+        finalized_slot = store.states[new_head].latest_finalized.slot
+        finalized_root = new_head
+        while finalized_root in store.blocks and store.blocks[finalized_root].slot > finalized_slot:
+            parent_root = store.blocks[finalized_root].parent_root
+            if parent_root not in store.blocks:
+                break
+            finalized_root = parent_root
+
+        # A fresh checkpoint-sync anchor stores no block at that slot.
+        # Keep the trusted anchor there rather than emit an unresolved root.
+        if store.blocks[finalized_root].slot == finalized_slot:
+            latest_finalized = Checkpoint(root=finalized_root, slot=finalized_slot)
+        else:
+            latest_finalized = store.latest_finalized
+
+        return store.model_copy(update={"head": new_head, "latest_finalized": latest_finalized})
 
     def accept_new_attestations(self, store: LstarStore) -> LstarStore:
         """

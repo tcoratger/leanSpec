@@ -199,29 +199,17 @@ class ValidatorDutiesMixin(LstarSpecBase):
         # Compute block hash for storage.
         block_hash = hash_tree_root(final_block)
 
-        # Update checkpoints from post-state.
-        #
-        # Locally produced blocks bypass normal block processing.
-        # Checkpoint advances must be propagated manually here.
-        #
-        # Tie semantics mirror the block-import path.
-        # A candidate needs a strictly higher slot to replace the store's view.
+        # A locally produced block skips the import path.
+        # Advance the justified checkpoint manually here.
+        # Leave the finalized checkpoint to head recomputation.
+        # Pinning it from this block's own state would strand it on a later reorg.
         latest_justified = store.latest_justified.advance_to(final_post_state.latest_justified)
-        latest_finalized = store.latest_finalized.advance_to(final_post_state.latest_finalized)
-
-        # Persist block and state.
-        previous_finalized_slot = store.latest_finalized.slot
         store = store.model_copy(
             update={
                 "blocks": store.blocks | {block_hash: final_block},
                 "states": store.states | {block_hash: final_post_state},
                 "latest_justified": latest_justified,
-                "latest_finalized": latest_finalized,
             }
         )
-
-        # Prune stale attestation data when finalization advances
-        if store.latest_finalized.slot > previous_finalized_slot:
-            store = self.prune_stale_attestation_data(store)
 
         return store, final_block, signatures
