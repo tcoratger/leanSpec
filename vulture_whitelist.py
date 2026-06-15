@@ -15,11 +15,8 @@
 
 # Single-dispatch handlers for the hash_tree_root generic function.
 # Dispatched by argument type, so they have no direct call site.
-_htr_uint
-_htr_boolean
-_htr_fp
+_htr_packed_leaf
 _htr_bytes
-_htr_bytevector
 _htr_bytelist
 _htr_bitvector_base
 _htr_bitlist_base
