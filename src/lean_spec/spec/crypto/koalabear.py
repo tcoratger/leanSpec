@@ -20,11 +20,11 @@ The KoalaBear Prime: P = 2^31 - 2^24 + 1
 The prime is chosen because the cube map (x -> x^3) is an automorphism of the multiplicative group.
 """
 
-P_BITS: Final = 31
-"""The number of bits in the prime P."""
+P_BYTES: Final = math.ceil(P.bit_length() / 8)
+"""The size of a KoalaBear field element in bytes.
 
-P_BYTES: Final = math.ceil(P_BITS / 8)
-"""The size of a KoalaBear field element in bytes."""
+The prime spans 31 bits, so a field element fits in 4 bytes.
+"""
 
 
 class Fp(int, SSZType):
