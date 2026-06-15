@@ -151,6 +151,16 @@ def verify_fixture_determinism(config_path: Path, project_root: Path, fork: str)
 
     The mocked prover is forced so proof bytes stay deterministic across both runs.
     A single process pins each seed cleanly, so distribution is disabled.
+
+    This gate covers only hash-seed and iteration-order effects under the mocked prover.
+
+    The real prover emits randomized proof bytes by design.
+    Those proofs are intentionally outside this guarantee.
+    They never reproduce across two fills of identical inputs.
+
+    The non-proof fields of real-crypto vectors are not separately re-checked here.
+    Masking out exactly the randomized proof bytes would need a fragile per-container rule.
+    So no real-crypto diff is attempted.
     """
     consensus_tests = project_root / "tests" / "consensus"
     emitted_under_seed: list[Path] = []
