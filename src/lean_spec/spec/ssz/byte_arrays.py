@@ -393,14 +393,6 @@ class BaseByteList(SSZModel):
         """Return the underlying raw bytes."""
         return self.data
 
-    def __add__(self, other: Any) -> bytes:
-        """Concatenate with a bytes-like value on the right, returning plain bytes."""
-        return self.data + bytes(other)
-
-    def __radd__(self, other: Any) -> bytes:
-        """Concatenate with a bytes-like value on the left, returning plain bytes."""
-        return bytes(other) + self.data
-
     def __repr__(self) -> str:
         """Return the official form: ClassName(hex_string)."""
         tname = type(self).__name__
@@ -431,10 +423,6 @@ class BaseByteList(SSZModel):
     def __hash__(self) -> int:
         """Return a hash that ties the value to its concrete type."""
         return hash((type(self), self.data))
-
-    def hex(self) -> str:
-        """Return the hexadecimal string representation of the underlying bytes."""
-        return self.data.hex()
 
 
 class ByteList512KiB(BaseByteList):

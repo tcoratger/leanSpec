@@ -368,33 +368,15 @@ class TestBaseByteListEquality:
 
 
 class TestBaseByteListOperations:
-    """Repr, hex, bytes coercion, and concatenation."""
+    """Repr and bytes coercion."""
 
     def test_repr(self) -> None:
         """The repr is the class name with the hex content in parentheses."""
         assert repr(ByteList16(data=b"\x00\x01\x02")) == "ByteList16(000102)"
 
-    def test_hex(self) -> None:
-        """The hex method returns the lowercase hex string."""
-        assert ByteList16(data=b"\x00\x01\x02").hex() == "000102"
-
     def test_bytes_dunder(self) -> None:
         """Calling bytes() on an instance returns the underlying bytes."""
         assert bytes(ByteList16(data=b"\x00\x01\x02")) == b"\x00\x01\x02"
-
-    def test_concatenation_returns_plain_bytes(self) -> None:
-        """Concatenation with a bytes-like value returns plain bytes."""
-        byte_list = ByteList16(data=b"\x00\x01\x02")
-        concatenated = byte_list + b"\x03\x04"
-        assert type(concatenated) is bytes
-        assert concatenated == b"\x00\x01\x02\x03\x04"
-
-    def test_reverse_concatenation_returns_plain_bytes(self) -> None:
-        """Concatenation with raw bytes on the left returns plain bytes."""
-        byte_list = ByteList16(data=b"\x00\x01")
-        concatenated = b"\xff" + byte_list
-        assert type(concatenated) is bytes
-        assert concatenated == b"\xff\x00\x01"
 
 
 class TestBaseByteListSSZ:
@@ -496,7 +478,7 @@ def test_json_dumpable_via_hex() -> None:
     hex_encoded_fields = {
         "root": Bytes32(b"\x11" * 32).hex(),
         "key": Bytes4(b"\x00\x01\x02\x03").hex(),
-        "payload": ByteList5(data=b"\x00\x01\x02").hex(),
+        "payload": bytes(ByteList5(data=b"\x00\x01\x02")).hex(),
     }
     assert json.loads(json.dumps(hex_encoded_fields)) == hex_encoded_fields
 
