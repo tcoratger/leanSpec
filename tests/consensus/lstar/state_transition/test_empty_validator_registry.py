@@ -40,6 +40,6 @@ def test_proposer_scheduling_on_empty_registry_rejected(
         post=None,
         expected_rejection=ExpectedRejection(
             reason=RejectionReason.EMPTY_VALIDATOR_REGISTRY,
-            message_substring="Cannot schedule a proposer for an empty validator registry",
+            exact_message="Cannot schedule a proposer for an empty validator registry",
         ),
     )
