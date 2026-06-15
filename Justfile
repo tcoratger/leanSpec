@@ -104,12 +104,12 @@ fill-determinism *args:
     #!/usr/bin/env bash
     set -euo pipefail
     target="{{args}}"
-    [ -z "$target" ] && target="tests/consensus -m order_sensitive"
+    [ -z "$target" ] && target="tests/consensus"
     first="$(mktemp -d)"
     second="$(mktemp -d)"
     trap 'rm -rf "$first" "$second"' EXIT
-    # Single process: xdist worker startup would cost more than it saves here,
-    # and one process pins the hash seed cleanly.
+    # Single process: one process pins the hash seed cleanly, which is what the
+    # audit needs, so the xdist worker fan-out is intentionally skipped here.
     # This recipe is itself the determinism check, so the per-fill gate is skipped.
     PYTHONHASHSEED=1 uv run --group test fill --fork=Lstar --clean --no-check-determinism -n 0 -o "$first" $target -q
     PYTHONHASHSEED=2 uv run --group test fill --fork=Lstar --clean --no-check-determinism -n 0 -o "$second" $target -q
