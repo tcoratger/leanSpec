@@ -8,7 +8,6 @@ from pydantic import Field
 
 from consensus_testing.genesis import generate_pre_state, reconstruct_block_from_header
 from consensus_testing.keys import XmssKeyManager
-from consensus_testing.rejection import classify_rejection
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import (
     AttestationStep,
@@ -377,7 +376,11 @@ class ForkChoiceTest(BaseTestSpec):
                         f"failed unexpectedly: {exception}"
                     ) from exception
 
-                rejection_reason = self._classify_step_rejection(step, step_index, exception)
+                rejection_reason = self.check_rejection_against_expectation(
+                    step.expected_rejection,
+                    exception,
+                    f"Step {step_index} ({type(step).__name__})",
+                )
 
                 # The rejected call returned nothing, so the store is unchanged.
                 # Snapshot it anyway: clients must verify the no-op.
@@ -487,45 +490,17 @@ class ForkChoiceTest(BaseTestSpec):
                 validator_index=ValidatorIndex(0),
             )
         except SpecRejectionError as exception:
-            self.expected_rejection.assert_message_matches(exception, "Store.from_anchor")
             # Emit the language-neutral reason clients assert against.
             return ForkChoiceFixture(
                 anchor_state=self.anchor_state,
                 anchor_block=anchor_block,
                 steps=[],
                 max_slot=max_slot,
-                rejection_reason=self.resolve_rejection_reason(exception),
+                rejection_reason=self.check_rejection_against_expectation(
+                    self.expected_rejection,
+                    exception,
+                    "Store.from_anchor",
+                ),
             )
 
         raise AssertionError("Store.from_anchor was expected to fail but succeeded")
-
-    @staticmethod
-    def _classify_step_rejection(
-        step: TickStep | BlockStep | AttestationStep | GossipAggregatedAttestationStep,
-        step_index: int,
-        exception: Exception,
-    ) -> RejectionReason:
-        """
-        Classify an expected step failure and check it against the authored expectation.
-
-        Returns:
-            The reason emitted into the filled step.
-
-        Raises:
-            AssertionError: If the failure contradicts the authored expectation.
-        """
-        # Verify the failure reason matches when specified.
-        expected_rejection = step.expected_rejection
-        if expected_rejection is not None:
-            expected_rejection.assert_message_matches(
-                exception, f"Step {step_index} ({type(step).__name__})"
-            )
-
-        # Emit the language-neutral reason clients assert against.
-        rejection_reason = classify_rejection(exception)
-        if expected_rejection is not None and rejection_reason is not expected_rejection.reason:
-            raise AssertionError(
-                f"Step {step_index} ({type(step).__name__}) rejection classified as "
-                f"{rejection_reason} but the test expects {expected_rejection.reason}"
-            )
-        return rejection_reason
