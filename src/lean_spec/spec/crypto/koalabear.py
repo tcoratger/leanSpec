@@ -110,10 +110,10 @@ class Fp(int, SSZType):
             raise SSZValueError(f"Value {decoded_integer} exceeds field modulus {P}")
         return cls(decoded_integer)
 
-    def _reject(self, other: Any, op: str) -> NoReturn:
+    def _reject(self, other: Any, op_symbol: str) -> NoReturn:
         """Raise a consistent TypeError for a non-Fp operand."""
         raise TypeError(
-            f"Unsupported operand type(s) for {op}: "
+            f"Unsupported operand type(s) for {op_symbol}: "
             f"'{type(self).__name__}' and '{type(other).__name__}'"
         )
 
