@@ -315,7 +315,7 @@ class BaseBitlist(SSZModel):
         A single 1 bit is placed immediately after the last data bit.
         The trailing bit is what lets the decoder recover the original count.
 
-        # Why a delimiter
+        # Delimiter
 
         SSZ encodes bitlists as raw bytes with no length prefix.
         Without a marker, [1, 0] and [1, 0, 0, 0, 0, 0, 0, 0] would share the byte 0x01.
@@ -357,7 +357,7 @@ class BaseBitlist(SSZModel):
         - Bits above it are zero padding.
         - Empty input is invalid (the empty bitlist still encodes as one byte, 0x01).
 
-        # Why integer interpretation
+        # Integer interpretation
 
         Reading the byte stream as a little-endian integer aligns bits and bytes perfectly:
 
