@@ -20,7 +20,6 @@ from lean_spec.spec.forks.lstar.containers import (
     Validators,
 )
 from lean_spec.spec.forks.lstar.errors import RejectionReason, SpecRejectionError
-from lean_spec.spec.forks.protocol import SpecStateType
 from lean_spec.spec.observability import (
     observe_state_transition,
 )
@@ -75,15 +74,6 @@ def attestation_data_matches_chain(
 
 class StateTransitionMixin(LstarSpecBase):
     """State transition function for the lstar fork."""
-
-    def upgrade_state(self, state: SpecStateType) -> State:
-        """
-        Lstar is the root fork: there is no predecessor, so no migration.
-
-        Returns the input state unchanged.
-        """
-        assert isinstance(state, State)
-        return state
 
     def generate_genesis(self, genesis_time: Uint64, validators: SSZList[Any]) -> State:
         """Generate a genesis state with empty history and proper initial values."""
