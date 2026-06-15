@@ -58,9 +58,7 @@ def test_gossip_aggregated_attestation_empty_participants_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.EMPTY_AGGREGATION_BITS,
-                    message_substring=(
-                        "Aggregated attestation must reference at least one validator"
-                    ),
+                    exact_message="Aggregated attestation must reference at least one validator",
                 ),
             ),
         ]
