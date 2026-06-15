@@ -87,8 +87,8 @@ def observe_state_transition() -> Iterator[None]:
     Time the wrapped state transition and publish the elapsed duration.
 
     Spec code wraps the body of a state transition in this block instead
-    of calling a stopwatch primitive directly. On clean exit the elapsed
-    wall time is published through the observer singleton.
+    of calling a stopwatch primitive directly.
+    On clean exit the elapsed wall time is published through the observer singleton.
 
     Semantics
 
@@ -126,8 +126,8 @@ def observe_on_attestation() -> Iterator[None]:
     Time the wrapped gossip-attestation validation and publish the duration.
 
     Semantics mirror observe_state_transition: publishes only on clean exit,
-    propagates exceptions without emitting an event. The caller remains
-    responsible for classifying the outcome (valid vs invalid counters),
+    propagates exceptions without emitting an event.
+    The caller remains responsible for classifying the outcome (valid vs invalid counters),
     because that classification is a caller-side concern.
     """
     start = time.perf_counter()
