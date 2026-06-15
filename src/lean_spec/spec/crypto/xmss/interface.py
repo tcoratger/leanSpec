@@ -321,6 +321,12 @@ class GeneralizedXmssScheme(StrictBaseModel):
         if len(signature.hashes) != config.DIMENSION:
             return False
 
+        # The authentication path must carry exactly one sibling per tree level.
+        # Bound it against this scheme's own height rather than a global default.
+        # A mismatched height would have the rebuild climb a tree that does not match this key.
+        if len(signature.path.siblings) != config.LOG_LIFETIME:
+            return False
+
         # Phase 3: finish each chain from the released hash to its endpoint.
         chain_ends: list[HashDigestVector] = []
         for chain_index, digit in enumerate(codeword):
