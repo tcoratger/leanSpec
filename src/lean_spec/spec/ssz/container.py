@@ -103,7 +103,7 @@ class Container(SSZModel):
 
         # Phase 2: each variable payload spans from its offset to the next.
         # Scope closes the final span.
-        boundaries = [o for _, _, o in variable_fields] + [scope]
+        boundaries = [offset for _, _, offset in variable_fields] + [scope]
         for (name, field_type, _), (start, end) in zip(
             variable_fields, pairwise(boundaries), strict=True
         ):
