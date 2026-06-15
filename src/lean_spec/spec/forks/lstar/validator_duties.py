@@ -30,7 +30,7 @@ class ValidatorDutiesMixin(LstarSpecBase):
         The algorithm balances advancing the chain head against safety.
 
         The walk starts at the head and goes backward.
-        It takes up to JUSTIFICATION_LOOKBACK_SLOTS steps.
+        It takes up to the justification lookback bound steps.
         It stops once both the lower-bound slot and the justifiability rules are satisfied.
 
         The walk never crosses the finalized boundary.
@@ -39,7 +39,7 @@ class ValidatorDutiesMixin(LstarSpecBase):
         # Start from current head
         target_block_root = store.head
 
-        # Walk back toward the safe target, up to JUSTIFICATION_LOOKBACK_SLOTS steps.
+        # Walk back toward the safe target, up to the justification lookback bound steps.
         #
         # If the safe target is stale behind the finalized checkpoint, the finalized slot
         # becomes the lower bound.
@@ -123,7 +123,7 @@ class ValidatorDutiesMixin(LstarSpecBase):
         Returns the per-attestation single-message aggregate proofs unmerged. The validator
         service signs the block root with the proposal key, wraps that into
         a singleton single-message aggregate, and merges all of them into the block-level
-        multi-message aggregate proof carried by SignedBlock.proof.
+        proof carried by the signed block envelope.
 
         Raises:
             AssertionError: If validator is not the proposer for this slot,
