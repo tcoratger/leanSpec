@@ -90,6 +90,9 @@ class Container(SSZModel):
         if not var_fields:
             return cls(**fields)
 
+        # These offset checks mirror the variable-length collection decoder.
+        # The duplication is intentional: inlining keeps the per-field name in each error.
+        #
         # Canonical form: the first offset must point to the end of the fixed part.
         # Any other value leaves a gap or overlap, allowing two encodings of one value.
         if var_fields[0][2] != bytes_read:

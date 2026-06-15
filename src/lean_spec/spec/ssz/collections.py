@@ -61,6 +61,9 @@ def _validate_offsets(offsets: list[int], scope: int, type_name: str) -> None:
     - Offsets are monotonically non-decreasing, so no body has negative width.
     - The final offset stays within scope, so no body reads past its budget.
 
+    The container decoder repeats these same checks inline.
+    The duplication is intentional: inlining there keeps the per-field name in each error.
+
     Raises:
         SSZSerializationError: When a later offset is smaller than an earlier one.
         SSZSerializationError: When the final offset exceeds the available scope.
