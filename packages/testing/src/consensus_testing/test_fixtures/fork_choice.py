@@ -23,7 +23,6 @@ from consensus_testing.test_types import (
     StoreSnapshot,
     TickStep,
 )
-from lean_spec.config import LEAN_ENV
 from lean_spec.node.chain.clock import SlotClock
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import (
@@ -300,7 +299,6 @@ class ForkChoiceTest(BaseTestSpec):
                             store,
                             block_registry,
                             key_manager,
-                            LEAN_ENV,
                             deliver_unknown_parent=deliver_unknown_parent,
                         )
                         filled_block = signed_block.block
