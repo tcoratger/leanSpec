@@ -263,16 +263,16 @@ class StateTransitionMixin(LstarSpecBase):
         """
         # Bound the distinct votes the block may carry.
         #
-        # This is a property of the transition itself, not of any one caller.
-        # The state transition and block-production trial blocks both rely on it.
+        # The cap belongs to the transition itself, not to any one caller.
+        # Both the state transition and block-production trial blocks rely on it.
         #
-        # Each distinct attestation data builds a tally proportional to the
-        # validator count, so an unbounded distinct count amplifies import work.
+        # Each distinct attestation data builds a tally sized to the validator set.
+        # An unbounded count of them amplifies import work.
         # The SSZ list limit sits far above the consensus cap, so it cannot substitute.
         #
-        # Split aggregates for one target share their data, so they count once.
-        # Re-marking a voter is idempotent, so repeated data stays valid here.
-        # Only the number of distinct data entries is bounded.
+        # Only the distinct count is bounded, not the total.
+        # Split aggregates for one target share their data and count once.
+        # Re-marking a voter from a repeated entry is idempotent, so it stays valid.
         aggregated_attestations = tuple(attestations)
         distinct_attestation_data = {attestation.data for attestation in aggregated_attestations}
         if len(distinct_attestation_data) > int(MAX_ATTESTATIONS_DATA):

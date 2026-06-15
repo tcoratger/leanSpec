@@ -571,8 +571,8 @@ class ForkChoiceMixin(LstarSpecBase):
             #     votes  ->  { vote A, vote B, vote B }  ->  distinct { vote A, vote B }
             #
             # A repeat (fewer distinct than total) is rejected as duplicate data.
-            # The transition itself bounds the distinct-data count, so only the
-            # wire-level duplicate prohibition lives here.
+            # The transition itself bounds the distinct-data count.
+            # Only the wire-level duplicate prohibition lives here.
             aggregated_attestations = block.body.attestations
             attestation_data_set = {attestation.data for attestation in aggregated_attestations}
             if len(attestation_data_set) != len(aggregated_attestations):
