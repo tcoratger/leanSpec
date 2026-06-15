@@ -290,6 +290,43 @@ class BaseTestSpec(CamelModel):
             )
         return classified_reason
 
+    @staticmethod
+    def check_rejection_against_expectation(
+        expected_rejection: ExpectedRejection | None,
+        exception_raised: Exception,
+        context: str,
+    ) -> RejectionReason:
+        """
+        Check a rejection's message and reason against an explicit expectation.
+
+        The expectation is passed in rather than read from the spec.
+        A single processing run can carry several independent rejection points.
+        Each point names its own authored expectation and failure label.
+
+        Args:
+            expected_rejection: The authored expectation, or None when unconstrained.
+            exception_raised: The exception the spec raised for the invalid input.
+            context: Caller label woven into the failure messages.
+
+        Returns:
+            The reason emitted into the test vector.
+
+        Raises:
+            AssertionError: When the message or classified reason contradicts the expectation.
+        """
+        # Verify the failure message matches when an expectation is given.
+        if expected_rejection is not None:
+            expected_rejection.assert_message_matches(exception_raised, context)
+
+        # Emit the language-neutral reason clients assert against.
+        classified_reason = classify_rejection(exception_raised)
+        if expected_rejection is not None and classified_reason is not expected_rejection.reason:
+            raise AssertionError(
+                f"{context} rejection classified as {classified_reason} "
+                f"but the test expects {expected_rejection.reason}"
+            )
+        return classified_reason
+
     def assert_decode_rejection(
         self,
         exception_raised: Exception | None,
