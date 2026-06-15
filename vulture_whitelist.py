@@ -19,8 +19,6 @@ _htr_uint
 _htr_boolean
 _htr_fp
 _htr_bytes
-_htr_bytearray
-_htr_memoryview
 _htr_bytevector
 _htr_bytelist
 _htr_bitvector_base
