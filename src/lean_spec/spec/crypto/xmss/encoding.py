@@ -24,7 +24,7 @@ https://eprint.iacr.org/2026/016.pdf
 
 The target-sum filter is the top-level acceptance test from the canonical Rust instantiation.
 
-# Why the decode can abort
+# Abort condition
 
 The decode turns each uniform field element into uniform base-BASE digits.
 Uniform output is what lets the security analysis model the hash as a random oracle.

@@ -68,7 +68,7 @@ class HashTreeLayer(Container):
         """
         Build a layer whose nodes can all be paired at the next level up.
 
-        # Why pad
+        # Padding
 
         The level above pairs nodes two at a time, then hashes each pair.
         - A run starting on an odd index lacks a left neighbor for its first node.
@@ -561,7 +561,7 @@ def verify_path(
     The leaf is hashed, then folded with each sibling while climbing one level per step.
     The walk succeeds when the recomputed root equals the trusted root.
 
-    # Why return false instead of raising
+    # Failure handling
 
     The opening arrives inside an untrusted signature.
     A malformed opening must be a quiet verification failure, never a crash.
