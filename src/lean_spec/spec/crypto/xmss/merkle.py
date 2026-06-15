@@ -580,12 +580,12 @@ def verify_path(
         True when the path reconstructs the trusted root, false otherwise.
     """
     # Guard against malformed openings.
-    # The opening list caps at 32 entries.
-    # A depth greater than 32 would overflow the position bound check below.
-    depth = len(opening.siblings)
-    if depth > 32:
+    # The opening holds exactly one sibling per tree level.
+    # That count is the scheme height, equal to the configured log lifetime.
+    if len(opening.siblings) != config.LOG_LIFETIME:
         return False
-    if int(position) >= (1 << depth):
+    # The leaf position must fall inside the tree the configured lifetime spans.
+    if int(position) >= int(config.LIFETIME):
         return False
 
     # Phase 1: hash the leaf parts to derive the starting node.
