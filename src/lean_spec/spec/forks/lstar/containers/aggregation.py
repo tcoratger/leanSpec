@@ -315,7 +315,8 @@ class MultiMessageAggregate(Container):
         # The message bindings
 
         Each component is checked against one message and slot supplied by the caller.
-        Without that binding the proof would accept attacker-chosen data resolving to the same keys.
+        Without that binding the proof would accept attacker-chosen data.
+        That data could resolve to the same keys.
         The parallel lists pin every component to the message it actually signed.
 
         Args:
