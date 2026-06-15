@@ -83,7 +83,7 @@ class AttestationCheck(CamelModel):
     """
 
     def validate_attestation(
-        self, attestation: "AttestationData", location: str, step_index: int
+        self, attestation: AttestationData, location: str, step_index: int
     ) -> None:
         """Validate attestation properties."""
         for field_name in self.model_fields_set & _ATTESTATION_SLOT_ACCESSORS.keys():
@@ -312,11 +312,11 @@ class StoreChecks(SelectiveCheck):
 
     def validate_against_store(
         self,
-        store: "Store",
+        store: Store,
         step_index: int,
-        block_registry: dict[str, "Block"] | None = None,
-        filled_block: "Block | None" = None,
-        old_head: "Bytes32 | None" = None,
+        block_registry: dict[str, Block] | None = None,
+        filled_block: Block | None = None,
+        old_head: Bytes32 | None = None,
     ) -> None:
         """
         Validate these checks against actual Store state.
@@ -523,8 +523,8 @@ class StoreChecks(SelectiveCheck):
 
     @staticmethod
     def _validate_block_attestations(
-        expected_checks: list["AggregatedAttestationCheck"],
-        filled_block: "Block",
+        expected_checks: list[AggregatedAttestationCheck],
+        filled_block: Block,
         step_index: int,
     ) -> None:
         """Validate detailed attestation structure in the block body."""
@@ -578,8 +578,8 @@ class StoreChecks(SelectiveCheck):
     @staticmethod
     def _validate_lexicographic_head(
         fork_labels: list[str],
-        store: "Store",
-        block_registry: dict[str, "Block"],
+        store: Store,
+        block_registry: dict[str, Block],
         step_index: int,
     ) -> None:
         """Validate lexicographic tiebreaker behavior."""
