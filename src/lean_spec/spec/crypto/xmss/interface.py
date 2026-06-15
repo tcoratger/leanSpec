@@ -232,7 +232,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         for attempts in range(config.MAX_TRIES):
             rho = secret_key.prf_key.derive_randomness(config, slot, message, Uint64(attempts))
             codeword = target_sum_encode(
-                self.poseidon, config, secret_key.parameter, message, rho, slot
+                self.poseidon, config, secret_key.parameter, slot, rho, message
             )
             if codeword is not None:
                 break
@@ -310,7 +310,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
         # Phase 2: rederive the codeword from the signature's randomness.
         # A failing aborting decode means the signature cannot be valid.
         codeword = target_sum_encode(
-            self.poseidon, config, public_key.parameter, message, signature.rho, slot
+            self.poseidon, config, public_key.parameter, slot, signature.rho, message
         )
         if codeword is None:
             return False

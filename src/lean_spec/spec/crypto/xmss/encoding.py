@@ -148,9 +148,9 @@ def target_sum_encode(
     poseidon: PoseidonXmss,
     config: XmssConfig,
     parameter: Parameter,
-    message: Bytes32,
-    rho: Randomness,
     epoch: Uint64,
+    rho: Randomness,
+    message: Bytes32,
 ) -> list[int] | None:
     """
     Encode a message into a codeword if it meets the target sum.
@@ -161,9 +161,9 @@ def target_sum_encode(
         poseidon: Cached Poseidon engine.
         config: Active XMSS configuration.
         parameter: Public parameter for domain separation.
-        message: Message being signed.
-        rho: Per-attempt randomness.
         epoch: Current epoch.
+        rho: Per-attempt randomness.
+        message: Message being signed.
 
     Returns:
         Codeword on success, None when the attempt must be retried.
