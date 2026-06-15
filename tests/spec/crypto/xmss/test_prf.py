@@ -9,43 +9,27 @@ from lean_spec.spec.ssz import Uint64
 
 
 def test_key_gen_is_random() -> None:
-    """
-    Performs a sanity check on key_gen to ensure it's not deterministic
-    or producing trivial outputs.
-
-    This test mirrors the logic from the reference Rust implementation.
-    """
-    # Check that the key has the correct length.
+    """Freshly generated keys have the fixed length, are all distinct, and never trivial."""
+    # A freshly generated key has the fixed key length.
     key = PRFKey.generate()
     assert len(key) == PRF_KEY_LENGTH
 
-    # Generate multiple keys and ensure they are not all identical.
+    # Generate many keys and require every one to be distinct.
     #
-    # This is a basic check to ensure we are getting fresh randomness.
+    # The set size equals the trial count only when no two keys collide.
+    # This proves the generator is not deterministic across calls.
     num_trials = 10
     keys = {PRFKey.generate() for _ in range(num_trials)}
     assert len(keys) == num_trials
 
-    # Check that the keys are not filled with a single repeated byte.
+    # No generated key is a single byte repeated.
     #
-    # It is astronomically unlikely for a secure random generator to produce
-    # such a key, so this is a good health check.
-    all_same_count = 0
-    for _ in range(num_trials):
-        key = PRFKey.generate()
-        # A set will have size 1 if all elements are the same.
-        if len(set(key)) == 1:
-            all_same_count += 1
-    assert all_same_count < num_trials, "key_gen produced non-random keys"
+    # A secure random generator producing such a key is astronomically unlikely.
+    assert all(len(set(key)) > 1 for key in keys)
 
 
 def test_apply_is_sensitive_to_inputs() -> None:
-    """
-    Tests that changing any input to apply results in a different output.
-
-    This confirms that all parts of the input (key, epoch, chain_index) are
-    being correctly absorbed by the hash function.
-    """
+    """Changing any single input to chain-start derivation changes the output."""
     config = TEST_CONFIG
 
     # Generate a baseline output with a set of initial inputs.

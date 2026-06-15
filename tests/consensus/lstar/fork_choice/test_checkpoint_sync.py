@@ -386,7 +386,7 @@ def test_store_from_anchor_rejects_mismatched_state_root(
         anchor_valid=False,
         expected_rejection=ExpectedRejection(
             reason=RejectionReason.ANCHOR_STATE_ROOT_MISMATCH,
-            message_substring="Anchor block state root must match anchor state hash",
+            exact_message="Anchor block state root must match anchor state hash",
         ),
         steps=[],
     )

@@ -108,7 +108,7 @@ def test_attestation_target_slot_mismatch_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.TARGET_SLOT_MISMATCH,
-                    message_substring="Target checkpoint slot mismatch",
+                    exact_message="Target checkpoint slot mismatch",
                 ),
             ),
         ],
@@ -156,7 +156,7 @@ def test_attestation_too_far_in_future_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
-                    message_substring="Attestation too far in future",
+                    exact_message="Attestation too far in future",
                 ),
             ),
         ],
@@ -249,7 +249,7 @@ def test_attestation_just_beyond_disparity_boundary_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
-                    message_substring="Attestation too far in future",
+                    exact_message="Attestation too far in future",
                 ),
             ),
         ],
@@ -302,7 +302,7 @@ def test_attestation_one_full_slot_in_future_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
-                    message_substring="Attestation too far in future",
+                    exact_message="Attestation too far in future",
                 ),
             ),
         ],
@@ -423,7 +423,7 @@ def test_gossip_attestation_with_invalid_signature(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.INVALID_SIGNATURE,
-                    message_substring="Signature verification failed",
+                    exact_message="Signature verification failed",
                 ),
             ),
         ],
@@ -525,7 +525,7 @@ def test_attestation_source_slot_exceeds_target_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.SOURCE_AFTER_TARGET,
-                    message_substring="Source checkpoint slot must not exceed target",
+                    exact_message="Source checkpoint slot must not exceed target",
                 ),
             ),
         ],
@@ -577,7 +577,7 @@ def test_attestation_head_older_than_target_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.HEAD_OLDER_THAN_TARGET,
-                    message_substring="Head checkpoint must not be older than target",
+                    exact_message="Head checkpoint must not be older than target",
                 ),
             ),
         ],
@@ -625,7 +625,7 @@ def test_attestation_source_slot_override_exceeds_target_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.SOURCE_AFTER_TARGET,
-                    message_substring="Source checkpoint slot must not exceed target",
+                    exact_message="Source checkpoint slot must not exceed target",
                 ),
             ),
         ],
@@ -675,7 +675,7 @@ def test_attestation_source_slot_mismatch_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.SOURCE_SLOT_MISMATCH,
-                    message_substring="Source checkpoint slot mismatch",
+                    exact_message="Source checkpoint slot mismatch",
                 ),
             ),
         ],
@@ -723,7 +723,7 @@ def test_attestation_head_slot_mismatch_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.HEAD_SLOT_MISMATCH,
-                    message_substring="Head checkpoint slot mismatch",
+                    exact_message="Head checkpoint slot mismatch",
                 ),
             ),
         ],
@@ -994,7 +994,7 @@ def test_attestation_head_on_sibling_fork_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.TARGET_NOT_ANCESTOR_OF_HEAD,
-                    message_substring="Target checkpoint must be ancestor of head",
+                    exact_message="Target checkpoint must be ancestor of head",
                 ),
             ),
         ],
@@ -1051,7 +1051,7 @@ def test_attestation_slot_near_uint64_max_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.ATTESTATION_TOO_FAR_IN_FUTURE,
-                    message_substring="Attestation too far in future",
+                    exact_message="Attestation too far in future",
                 ),
             ),
         ],
@@ -1106,7 +1106,7 @@ def test_attestation_slot_before_head_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.ATTESTATION_SLOT_BEFORE_HEAD,
-                    message_substring="Attestation slot precedes head",
+                    exact_message="Attestation slot precedes head",
                 ),
             ),
         ],
@@ -1167,7 +1167,7 @@ def test_attestation_source_on_sibling_fork_rejected(
                 valid=False,
                 expected_rejection=ExpectedRejection(
                     reason=RejectionReason.SOURCE_NOT_ANCESTOR_OF_TARGET,
-                    message_substring="Source checkpoint must be ancestor of target",
+                    exact_message="Source checkpoint must be ancestor of target",
                 ),
             ),
         ],

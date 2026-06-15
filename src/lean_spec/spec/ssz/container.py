@@ -27,8 +27,8 @@ class Container(SSZModel):
         if isinstance(value, str):
             try:
                 return cls.from_hex(value)
-            except SSZError as err:
-                raise ValueError(f"invalid {cls.__name__} hex: {err}") from err
+            except SSZError as exception:
+                raise ValueError(f"invalid {cls.__name__} hex: {exception}") from exception
         return handler(value)
 
     @classmethod
@@ -77,14 +77,14 @@ class Container(SSZModel):
 
         # Phase 1: each slot is either the field itself or an offset to its tail payload.
         for name, field_definition in cls.model_fields.items():
-            ftype: type[SSZType] = field_definition.annotation
-            if ftype.is_fixed_size():
-                width = ftype.get_byte_length()
-                fields[name] = ftype.deserialize(stream, width)
+            field_type: type[SSZType] = field_definition.annotation
+            if field_type.is_fixed_size():
+                width = field_type.get_byte_length()
+                fields[name] = field_type.deserialize(stream, width)
                 bytes_read += width
             else:
                 offset = int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
-                variable_fields.append((name, ftype, offset))
+                variable_fields.append((name, field_type, offset))
                 bytes_read += BYTES_PER_LENGTH_OFFSET
 
         if not variable_fields:
@@ -101,14 +101,14 @@ class Container(SSZModel):
         # Phase 2: each variable payload spans from its offset to the next.
         # Scope closes the final span.
         boundaries = [o for _, _, o in variable_fields] + [scope]
-        for (name, ftype, _), (start, end) in zip(
+        for (name, field_type, _), (start, end) in zip(
             variable_fields, pairwise(boundaries), strict=True
         ):
             if end < start:
                 raise SSZSerializationError(
                     f"{cls.__name__}.{name}: non-monotonic offsets ({start} > {end})"
                 )
-            fields[name] = ftype.deserialize(stream, end - start)
+            fields[name] = field_type.deserialize(stream, end - start)
 
         return cls(**fields)
 
