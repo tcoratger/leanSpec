@@ -206,8 +206,8 @@ class BaseBytes(bytes, SSZType):
 
     def __repr__(self) -> str:
         """Return the official form: ClassName(hex_string)."""
-        tname = type(self).__name__
-        return f"{tname}({self.hex()})"
+        type_name = type(self).__name__
+        return f"{type_name}({self.hex()})"
 
     def __eq__(self, other: object) -> bool:
         """Strict equality — only another byte-array instance compares; anything else raises."""
@@ -403,8 +403,8 @@ class BaseByteList(SSZModel):
 
     def __repr__(self) -> str:
         """Return the official form: ClassName(hex_string)."""
-        tname = type(self).__name__
-        return f"{tname}({self.data.hex()})"
+        type_name = type(self).__name__
+        return f"{type_name}({self.data.hex()})"
 
     def __eq__(self, other: object) -> bool:
         """Strict equality — only another byte-list instance compares; anything else raises."""
