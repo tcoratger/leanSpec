@@ -34,24 +34,24 @@ def _expand_activation_time(
         The half-open bottom-tree index range (start, end).
         It covers slots [start * C, end * C).
     """
-    # C is one bottom tree's worth of slots, the square root of the lifetime.
-    # C is a power of two, so clearing the low bits rounds a slot down to a tree boundary.
-    c = 1 << (log_lifetime // 2)
-    c_mask = ~(c - 1)
+    # One bottom tree spans the square root of the lifetime in slots.
+    # That span is a power of two, so clearing the low bits rounds a slot down to a tree boundary.
+    leaves_per_bottom_tree = 1 << (log_lifetime // 2)
+    bottom_tree_alignment_mask = ~(leaves_per_bottom_tree - 1)
 
     desired_end_slot = desired_activation_slot + desired_num_active_slots
 
     # Phase 1: round the start down and the end up onto tree boundaries.
-    # Adding C - 1 before clearing the low bits rounds the end up rather than down.
-    start = desired_activation_slot & c_mask
-    end = (desired_end_slot + c - 1) & c_mask
+    # Adding the span minus one before clearing the low bits rounds the end up rather than down.
+    start = desired_activation_slot & bottom_tree_alignment_mask
+    end = (desired_end_slot + leaves_per_bottom_tree - 1) & bottom_tree_alignment_mask
 
     # Phase 2: widen to two trees so the resident signing window always fits.
-    if end - start < 2 * c:
-        end = start + 2 * c
+    if end - start < 2 * leaves_per_bottom_tree:
+        end = start + 2 * leaves_per_bottom_tree
 
     # Phase 3: clamp the window into the lifetime.
-    lifetime = c * c
+    lifetime = leaves_per_bottom_tree * leaves_per_bottom_tree
     if end > lifetime:
         duration = end - start
         if duration > lifetime:
@@ -61,10 +61,10 @@ def _expand_activation_time(
         else:
             # Slide the window back so it ends exactly at the lifetime boundary.
             end = lifetime
-            start = (lifetime - duration) & c_mask
+            start = (lifetime - duration) & bottom_tree_alignment_mask
 
     # Convert the slot boundaries to bottom-tree indices.
-    return (start // c, end // c)
+    return (start // leaves_per_bottom_tree, end // leaves_per_bottom_tree)
 
 
 class GeneralizedXmssScheme(StrictBaseModel):
