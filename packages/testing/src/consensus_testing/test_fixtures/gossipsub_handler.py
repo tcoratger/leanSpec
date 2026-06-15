@@ -39,11 +39,6 @@ class _SendCapture:
         self.sent.append((peer_id, rpc))
 
 
-def _peer_id(name: str) -> PeerId:
-    """Convert a short test name to a PeerId."""
-    return PeerId.from_base58(name)
-
-
 class GossipsubMeshParameters(StrictBaseModel):
     """Mesh degree parameters the handler runs under."""
 
@@ -412,7 +407,7 @@ class GossipsubHandlerTest(BaseTestSpec):
         # Peer properties like backoff timers and IDONTWANT sets directly
         # influence handler decisions (e.g., reject GRAFTs, skip forwarding).
         for peer_name, peer_configuration in self.initial_state.peers.items():
-            peer_id = _peer_id(peer_name)
+            peer_id = PeerId.from_base58(peer_name)
             peer_names[peer_id] = peer_name
             peer_state = PeerState(
                 peer_id=peer_id,
@@ -438,7 +433,7 @@ class GossipsubHandlerTest(BaseTestSpec):
         for topic_string, mesh_peer_names in self.initial_state.meshes.items():
             topic = TopicId(topic_string)
             for peer_name in mesh_peer_names:
-                behavior.mesh.add_to_mesh(topic, _peer_id(peer_name))
+                behavior.mesh.add_to_mesh(topic, PeerId.from_base58(peer_name))
 
         # Seen cache tracks previously-received message IDs.
         #
@@ -460,7 +455,7 @@ class GossipsubHandlerTest(BaseTestSpec):
             behavior.message_cache.put(TopicId(cached_message.topic), message)
 
         # Build the incoming RPC from the event.
-        from_peer = _peer_id(self.event.from_peer)
+        from_peer = PeerId.from_base58(self.event.from_peer)
         peer_names.setdefault(from_peer, self.event.from_peer)
 
         # Fix the clock so backoff and TTL checks are deterministic.
