@@ -72,7 +72,7 @@ class Container(SSZModel):
     def deserialize(cls, stream: IO[bytes], scope: int) -> Self:
         """Read the fixed part with offsets, then each variable payload by its offset window."""
         fields: dict[str, SSZType] = {}
-        var_fields: list[tuple[str, type[SSZType], int]] = []
+        variable_fields: list[tuple[str, type[SSZType], int]] = []
         bytes_read = 0
 
         # Phase 1: each slot is either the field itself or an offset to its tail payload.
@@ -84,10 +84,10 @@ class Container(SSZModel):
                 bytes_read += width
             else:
                 offset = int(Uint32.deserialize(stream, BYTES_PER_LENGTH_OFFSET))
-                var_fields.append((name, field_type, offset))
+                variable_fields.append((name, field_type, offset))
                 bytes_read += BYTES_PER_LENGTH_OFFSET
 
-        if not var_fields:
+        if not variable_fields:
             return cls(**fields)
 
         # These offset checks mirror the variable-length collection decoder.
@@ -95,16 +95,17 @@ class Container(SSZModel):
         #
         # Canonical form: the first offset must point to the end of the fixed part.
         # Any other value leaves a gap or overlap, allowing two encodings of one value.
-        if var_fields[0][2] != bytes_read:
+        if variable_fields[0][2] != bytes_read:
+            first_offset = variable_fields[0][2]
             raise SSZSerializationError(
-                f"{cls.__name__}: first offset {var_fields[0][2]} != fixed-part end {bytes_read}"
+                f"{cls.__name__}: first offset {first_offset} != fixed-part end {bytes_read}"
             )
 
         # Phase 2: each variable payload spans from its offset to the next.
         # Scope closes the final span.
-        boundaries = [o for _, _, o in var_fields] + [scope]
+        boundaries = [o for _, _, o in variable_fields] + [scope]
         for (name, field_type, _), (start, end) in zip(
-            var_fields, pairwise(boundaries), strict=True
+            variable_fields, pairwise(boundaries), strict=True
         ):
             if end < start:
                 raise SSZSerializationError(
