@@ -466,7 +466,6 @@ class BlockSpec(CamelModel):
         store: Store,
         block_registry: dict[str, Block],
         key_manager: XmssKeyManager,
-        lean_env: str,
         deliver_unknown_parent: bool = False,
     ) -> tuple[SignedBlock, Store]:
         """
@@ -489,7 +488,6 @@ class BlockSpec(CamelModel):
             store: Fork choice store for head state lookup and gossip processing.
             block_registry: Labeled blocks for fork creation.
             key_manager: Key manager for signing.
-            lean_env: Signature scheme environment name ("test" or "prod").
             deliver_unknown_parent: When True and the parent state is absent,
                 build a structurally valid block against the anchor state with
                 its parent root overridden, instead of raising.
