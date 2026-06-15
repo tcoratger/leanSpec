@@ -20,7 +20,6 @@ from lean_spec.spec.forks.lstar.containers import (
     State,
     ValidatorIndex,
 )
-from lean_spec.spec.forks.lstar.state_transition import attestation_data_matches_chain
 from lean_spec.spec.ssz import ZERO_HASH, Bytes32
 
 
@@ -147,9 +146,7 @@ class BlockProductionMixin(LstarSpecBase):
                     #
                     # This also rejects any checkpoint past the chain view.
                     # That keeps the bounded lookups below in range.
-                    if not attestation_data_matches_chain(
-                        attestation_data, extended_historical_block_hashes
-                    ):
+                    if not attestation_data.lies_on_chain(extended_historical_block_hashes):
                         continue
 
                     # A vote may only build from an already-justified source.

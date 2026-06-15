@@ -1,13 +1,12 @@
 """Lstar fork — state transition: slots, header, body, finalization."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any
 
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks.lstar._base import LstarSpecBase
 from lean_spec.spec.forks.lstar.containers import (
     AggregatedAttestation,
-    AttestationData,
     Block,
     Checkpoint,
     HistoricalBlockHashes,
@@ -25,52 +24,6 @@ from lean_spec.spec.observability import (
     observe_state_transition,
 )
 from lean_spec.spec.ssz import ZERO_HASH, Boolean, Bytes32, SSZList, Uint64
-
-
-def attestation_data_matches_chain(
-    attestation_data: AttestationData,
-    historical_block_hashes: Sequence[Bytes32],
-) -> bool:
-    """
-    Check that attestation checkpoints point to blocks on a chain.
-
-    Args:
-        attestation_data: The attestation being validated.
-        historical_block_hashes: Chain view indexed by slot.
-            Empty slots carry the zero hash.
-
-    Returns:
-        True when all checkpoint roots match the chain at their slot.
-        False when any root is the zero hash.
-        False when any checkpoint slot is past the end of the chain view.
-    """
-    # Reject zero-hash checkpoints up front.
-    #
-    # Empty slots carry the zero hash on the chain.
-    # A vote whose recorded root equals the zero hash is meaningless.
-    if (
-        attestation_data.source.root == ZERO_HASH
-        or attestation_data.target.root == ZERO_HASH
-        or attestation_data.head.root == ZERO_HASH
-    ):
-        return False
-
-    # Reject checkpoints whose slot is beyond the chain view.
-    #
-    # Without this guard, indexed access raises IndexError.
-    source_slot = int(attestation_data.source.slot)
-    target_slot = int(attestation_data.target.slot)
-    head_slot = int(attestation_data.head.slot)
-    chain_length = len(historical_block_hashes)
-    if source_slot >= chain_length or target_slot >= chain_length or head_slot >= chain_length:
-        return False
-
-    # All checkpoint roots must match the chain at their slot.
-    return (
-        attestation_data.source.root == historical_block_hashes[source_slot]
-        and attestation_data.target.root == historical_block_hashes[target_slot]
-        and attestation_data.head.root == historical_block_hashes[head_slot]
-    )
 
 
 class StateTransitionMixin(LstarSpecBase):
@@ -416,9 +369,7 @@ class StateTransitionMixin(LstarSpecBase):
             #
             # This prevents votes about unknown or conflicting forks.
             # It also rejects zero-hash source or target roots.
-            if not attestation_data_matches_chain(
-                attestation.data, state.historical_block_hashes.data
-            ):
+            if not attestation.data.lies_on_chain(state.historical_block_hashes.data):
                 continue
 
             # Ensure time flows forward.
