@@ -463,10 +463,6 @@ class Node:
         if install_signal_handlers:
             self._install_signal_handlers()
 
-        # Start API server if configured
-        if self.api_server is not None:
-            await self.api_server.start()
-
         # Run services concurrently.
         #
         # A separate task monitors the shutdown signal.

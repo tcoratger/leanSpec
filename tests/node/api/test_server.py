@@ -1,14 +1,4 @@
-"""
-Tests for the API server implementation details.
-
-API contract tests (status codes, content types, response structure) are in
-tests/api/ and also run automatically with `uv run pytest`.
-
-These tests cover leanSpec-specific implementation details:
-- Configuration behavior
-- Store integration
-- Error handling when store not initialized
-"""
+"""Tests for the API server implementation: configuration, store wiring, and admin endpoints."""
 
 from __future__ import annotations
 
@@ -328,10 +318,10 @@ class TestAggregatorAdminEndpoint:
         """
         Multiple sequential POSTs converge to the last-writer value.
 
-        Posts must be issued one at a time (not via ``asyncio.gather``);
-        with concurrent requests the server-side arrival order is racy and
-        the last-writer-wins assertion becomes flaky on slower runners
-        (observed: Python 3.14 macOS).
+        Posts must be issued one at a time, never concurrently.
+        Concurrent requests arrive in a racy order.
+        The last-writer-wins assertion then goes flaky on slower runners.
+        Observed on Python 3.14 macOS.
         """
         aggregator_role_stub = _AggregatorRoleStub(is_aggregator=False)
         config = ApiServerConfig(port=15067)

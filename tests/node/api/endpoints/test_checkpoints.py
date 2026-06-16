@@ -47,5 +47,4 @@ class TestJustifiedCheckpoint:
         assert root.startswith("0x"), "Root must have 0x prefix"
         assert len(root) == 66
 
-        # Should be valid hex
         int(root, 16)

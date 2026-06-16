@@ -12,8 +12,8 @@ import pytest
 from consensus_testing import make_genesis_store
 from lean_spec.node.api import ApiServer, ApiServerConfig
 
-# Default port for auto-started local server
 DEFAULT_PORT = 15099
+"""Port for the auto-started local server."""
 
 
 @dataclass(slots=True)
@@ -117,10 +117,8 @@ def server_url(request: pytest.FixtureRequest) -> Generator[str, None, None]:
     external_url = request.config.getoption("--server-url")
 
     if external_url:
-        # Use external server
         yield external_url
     else:
-        # Start local server
         server_thread = _ServerThread(DEFAULT_PORT)
         server_thread.start()
         server_thread.ready.wait(timeout=10.0)
