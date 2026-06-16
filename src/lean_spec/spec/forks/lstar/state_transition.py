@@ -1,4 +1,4 @@
-"""Lstar fork — state transition: slots, header, body, finalization."""
+"""Lstar fork — state transition."""
 
 from collections.abc import Iterable
 from typing import Any
@@ -95,7 +95,7 @@ class StateTransitionMixin(LstarSpecBase):
                     "latest_block_header": state.latest_block_header.model_copy(
                         update={"state_root": cached_state_root}
                     ),
-                    "slot": Slot(state.slot + Slot(1)),
+                    "slot": state.slot + Slot(1),
                 }
             )
 
