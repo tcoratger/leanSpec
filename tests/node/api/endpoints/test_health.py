@@ -2,7 +2,7 @@
 
 import httpx
 
-from lean_spec.node.api.endpoints import health
+from lean_spec.node.api.handlers import SERVICE_NAME, STATUS_HEALTHY
 
 
 def get_health(server_url: str) -> httpx.Response:
@@ -31,7 +31,7 @@ def test_health_response_structure(server_url: str) -> None:
     response_body = response.json()
 
     assert "status" in response_body
-    assert response_body["status"] == health.STATUS_HEALTHY
+    assert response_body["status"] == STATUS_HEALTHY
 
     assert "service" in response_body
-    assert response_body["service"] == health.SERVICE_NAME
+    assert response_body["service"] == SERVICE_NAME

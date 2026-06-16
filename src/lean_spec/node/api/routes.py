@@ -7,21 +7,14 @@ from typing import NamedTuple
 
 from aiohttp import web
 
-from lean_spec.node.api.endpoints import (
-    aggregator,
-    checkpoints,
-    fork_choice,
-    health,
-    metrics,
-    states,
-)
+from lean_spec.node.api.handlers import ApiHandlers
 
 Handler = Callable[[web.Request], Awaitable[web.Response]]
-"""Type alias for aiohttp request handlers."""
+"""Request handler already bound to its dependencies."""
 
 
 class Route(NamedTuple):
-    """One API route: its verb, path, handler, and access tier."""
+    """One API route: its verb, path, and handler."""
 
     method: str
     """HTTP verb the route responds to."""
@@ -32,17 +25,15 @@ class Route(NamedTuple):
     handler: Handler
     """Coroutine that serves requests to this route."""
 
-    is_admin: bool
-    """True for privileged admin routes, False for public read-only routes."""
 
-
-ROUTES: list[Route] = [
-    Route("GET", "/lean/v0/health", health.handle, is_admin=False),
-    Route("GET", "/lean/v0/states/finalized", states.handle_finalized, is_admin=False),
-    Route("GET", "/lean/v0/checkpoints/justified", checkpoints.handle_justified, is_admin=False),
-    Route("GET", "/lean/v0/fork_choice", fork_choice.handle, is_admin=False),
-    Route("GET", "/metrics", metrics.handle, is_admin=False),
-    Route("GET", "/lean/v0/admin/aggregator", aggregator.handle_status, is_admin=True),
-    Route("POST", "/lean/v0/admin/aggregator", aggregator.handle_toggle, is_admin=True),
-]
-"""Every API route, public and admin alike, tagged by access tier."""
+def build_routes(handlers: ApiHandlers) -> list[Route]:
+    """Bind every API route to its handler method."""
+    return [
+        Route("GET", "/lean/v0/health", handlers.health),
+        Route("GET", "/lean/v0/states/finalized", handlers.finalized_state),
+        Route("GET", "/lean/v0/checkpoints/justified", handlers.justified_checkpoint),
+        Route("GET", "/lean/v0/fork_choice", handlers.fork_choice),
+        Route("GET", "/metrics", handlers.metrics),
+        Route("GET", "/lean/v0/admin/aggregator", handlers.aggregator_status),
+        Route("POST", "/lean/v0/admin/aggregator", handlers.aggregator_toggle),
+    ]

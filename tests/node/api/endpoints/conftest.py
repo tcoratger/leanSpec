@@ -10,27 +10,17 @@ import httpx
 import pytest
 
 from consensus_testing import make_genesis_store
-from lean_spec.node.api import AggregatorController, ApiServer, ApiServerConfig
+from lean_spec.node.api import ApiServer, ApiServerConfig
 
 # Default port for auto-started local server
 DEFAULT_PORT = 15099
 
 
 @dataclass(slots=True)
-class _AggregatorStub:
-    """Minimal stub exposing only the is_aggregator flag."""
+class _AggregatorRoleStub:
+    """Minimal stand-in exposing only the aggregator flag the endpoints touch."""
 
     is_aggregator: bool = field(default=False)
-
-
-def _make_conformance_controller(initial: bool = False) -> AggregatorController:
-    """Build an AggregatorController backed by lightweight stubs."""
-    sync_stub = _AggregatorStub(is_aggregator=initial)
-    network_stub = _AggregatorStub(is_aggregator=initial)
-    return AggregatorController(
-        sync_service=sync_stub,  # type: ignore[arg-type]
-        network_service=network_stub,  # type: ignore[arg-type]
-    )
 
 
 class _ServerThread(threading.Thread):
@@ -64,15 +54,14 @@ class _ServerThread(threading.Thread):
                 self.loop.close()
 
     def _create_server(self) -> ApiServer:
-        """Create the API server with a test store and aggregator controller."""
+        """Create the API server with a test store and aggregator flag holder."""
         store = make_genesis_store(num_validators=3, observer=True, genesis_time=int(time.time()))
 
-        controller = _make_conformance_controller(initial=False)
         config = ApiServerConfig(host="127.0.0.1", port=self.port)
         return ApiServer(
             config=config,
             store_getter=lambda: store,
-            aggregator_controller=controller,
+            aggregator_role_control=_AggregatorRoleStub(),
         )
 
     def stop(self) -> None:
