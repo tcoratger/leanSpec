@@ -11,7 +11,6 @@ from aiohttp import web
 
 from lean_spec.node.api.context import AggregatorRoleControl, ApiContext
 from lean_spec.node.api.handlers import ApiHandlers
-from lean_spec.node.api.routes import build_routes
 from lean_spec.spec.forks import LstarSpec, Store
 
 logger = logging.getLogger(__name__)
@@ -70,10 +69,20 @@ class ApiServer:
             aggregator_role_control=self.aggregator_role_control,
         )
         handlers = ApiHandlers(context)
-        routes = [
-            web.route(route.method, route.path, route.handler) for route in build_routes(handlers)
-        ]
-        app.add_routes(routes)
+
+        # The admin routes under /lean/v0/admin are unauthenticated.
+        # Deployments must restrict access to them at the network layer.
+        app.add_routes(
+            [
+                web.get("/lean/v0/health", handlers.health),
+                web.get("/lean/v0/states/finalized", handlers.finalized_state),
+                web.get("/lean/v0/checkpoints/justified", handlers.justified_checkpoint),
+                web.get("/lean/v0/fork_choice", handlers.fork_choice),
+                web.get("/metrics", handlers.metrics),
+                web.get("/lean/v0/admin/aggregator", handlers.aggregator_status),
+                web.post("/lean/v0/admin/aggregator", handlers.aggregator_toggle),
+            ]
+        )
 
         self._runner = web.AppRunner(app)
         await self._runner.setup()

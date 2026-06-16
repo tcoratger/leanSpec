@@ -10,7 +10,7 @@ from lean_spec.spec.ssz import Bytes32
 class ApiResponseBody(BaseModel):
     """Base for every JSON response body, keyed snake_case, never camelCase-aliased."""
 
-    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+    model_config = ConfigDict(frozen=True)
 
 
 class HealthBody(ApiResponseBody):
@@ -63,4 +63,6 @@ class AggregatorToggleBody(ApiResponseBody):
 
 def json_response(body: ApiResponseBody) -> web.Response:
     """Serialize a response model to a JSON HTTP response."""
+    # Build the response by hand rather than via web.json_response.
+    # That helper appends "; charset=utf-8", but the wire contract is the bare media type.
     return web.Response(body=body.model_dump_json(), content_type="application/json")
