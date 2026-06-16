@@ -26,12 +26,6 @@ def test_health_content_type_is_json(server_url: str) -> None:
 
 
 def test_health_response_structure(server_url: str) -> None:
-    """Health endpoint returns expected JSON structure."""
+    """Health response is exactly the healthy status and service identifier."""
     response = get_health(server_url)
-    response_body = response.json()
-
-    assert "status" in response_body
-    assert response_body["status"] == STATUS_HEALTHY
-
-    assert "service" in response_body
-    assert response_body["service"] == SERVICE_NAME
+    assert response.json() == {"status": STATUS_HEALTHY, "service": SERVICE_NAME}

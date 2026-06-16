@@ -1,9 +1,4 @@
-"""
-Tests for the admin aggregator endpoint.
-
-The conformance server is started with the aggregator role seeded to disabled,
-so tests exercise both the happy path and error cases.
-"""
+"""Tests for the admin aggregator endpoint."""
 
 from __future__ import annotations
 

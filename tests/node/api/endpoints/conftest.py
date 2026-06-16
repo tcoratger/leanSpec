@@ -3,7 +3,6 @@
 import asyncio
 import threading
 import time
-from dataclasses import dataclass, field
 from typing import Generator
 
 import httpx
@@ -11,16 +10,10 @@ import pytest
 
 from consensus_testing import make_genesis_store
 from lean_spec.node.api import ApiServer, ApiServerConfig
+from tests.node.api.conftest import AggregatorRoleStub
 
 DEFAULT_PORT = 15099
 """Port for the auto-started local server."""
-
-
-@dataclass(slots=True)
-class _AggregatorRoleStub:
-    """Minimal stand-in exposing only the aggregator flag the endpoints touch."""
-
-    is_aggregator: bool = field(default=False)
 
 
 class _ServerThread(threading.Thread):
@@ -61,7 +54,7 @@ class _ServerThread(threading.Thread):
         return ApiServer(
             config=config,
             store_getter=lambda: store,
-            aggregator_role_control=_AggregatorRoleStub(),
+            aggregator_role_control=AggregatorRoleStub(),
         )
 
     def stop(self) -> None:
