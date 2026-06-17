@@ -30,15 +30,7 @@ class Validators(SSZList[Validator]):
 
     @model_validator(mode="after")
     def _require_index_matches_position(self) -> Self:
-        """
-        Pin each stored index to its list position in the registry.
-
-        Every consensus lookup addresses a validator by its list position.
-        The stored index is serialized into the state root but never read for
-        consensus logic.
-        A position that disagrees with its index is therefore a silent footgun.
-        Rejecting the mismatch at construction keeps the two in lockstep.
-        """
+        """Reject any registry whose stored validator indices disagree with their positions."""
         for registry_position, validator in enumerate(self.data):
             if int(validator.index) != registry_position:
                 raise SSZValueError(
