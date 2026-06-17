@@ -636,7 +636,7 @@ class ForkChoiceMixin(LstarSpecBase):
 
             return store
 
-    def extract_attestations_from_aggregated_payloads(
+    def _extract_attestations_from_aggregated_payloads(
         self,
         aggregated_payloads: dict[AttestationData, set[SingleMessageAggregate]],
         latest_finalized_slot: Slot,
@@ -728,7 +728,7 @@ class ForkChoiceMixin(LstarSpecBase):
             Each block root mapped to its accumulated vote weight.
         """
         # Reduce the counted pool to each validator's latest still-relevant vote.
-        latest_votes = self.extract_attestations_from_aggregated_payloads(
+        latest_votes = self._extract_attestations_from_aggregated_payloads(
             store.latest_known_aggregated_payloads,
             store.latest_finalized.slot,
         )
@@ -815,7 +815,7 @@ class ForkChoiceMixin(LstarSpecBase):
             The store with its head set to the chosen block.
         """
         # Reduce the counted pool to each validator's latest still-relevant vote.
-        latest_votes = self.extract_attestations_from_aggregated_payloads(
+        latest_votes = self._extract_attestations_from_aggregated_payloads(
             store.latest_known_aggregated_payloads,
             store.latest_finalized.slot,
         )
@@ -902,7 +902,7 @@ class ForkChoiceMixin(LstarSpecBase):
         min_target_score = math.ceil(num_validators * 2 / 3)
 
         # Reduce the pending pool to each validator's latest still-relevant vote.
-        latest_votes = self.extract_attestations_from_aggregated_payloads(
+        latest_votes = self._extract_attestations_from_aggregated_payloads(
             store.latest_new_aggregated_payloads,
             store.latest_finalized.slot,
         )
