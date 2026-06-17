@@ -549,7 +549,7 @@ def verify_path(
     parameter: Parameter,
     root: HashDigestVector,
     position: Uint64,
-    leaf_parts: list[HashDigestVector],
+    leaf_chain_ends: list[HashDigestVector],
     opening: HashTreeOpening,
 ) -> bool:
     """
@@ -573,7 +573,7 @@ def verify_path(
         parameter: Public parameter for the hash function.
         root: Trusted root taken from the public key.
         position: Absolute index of the leaf being verified.
-        leaf_parts: Digests that constitute the original leaf.
+        leaf_chain_ends: Digests that constitute the original leaf.
         opening: Sibling path from leaf to root.
 
     Returns:
@@ -593,7 +593,7 @@ def verify_path(
         config,
         parameter,
         TreeTweak(level=0, index=Uint64(position)),
-        leaf_parts,
+        leaf_chain_ends,
     )
     current_position = int(position)
 
