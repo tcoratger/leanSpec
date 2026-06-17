@@ -350,22 +350,22 @@ class ForkChoiceMixin(LstarSpecBase):
             # Validation proved:
             # - the block is known,
             # - blocks are stored together with their post-state.
-            key_state = store.states.get(attestation_data.target.root)
-            assert key_state is not None, (
+            target_post_state = store.states.get(attestation_data.target.root)
+            assert target_post_state is not None, (
                 f"No state available to verify attestation signature for target block "
                 f"{attestation_data.target.root.hex()}"
             )
 
             # The validator index must fall inside that registry.
             # An out-of-range index names a validator the target state never knew.
-            if not validator_index.is_within_registry(Uint64(len(key_state.validators))):
+            if not validator_index.is_within_registry(Uint64(len(target_post_state.validators))):
                 raise SpecRejectionError(
                     RejectionReason.VALIDATOR_NOT_IN_STATE,
                     f"Validator {validator_index} not found in state "
                     f"{attestation_data.target.root.hex()}",
                 )
             public_key = PublicKey.decode_bytes(
-                key_state.validators[validator_index].attestation_public_key
+                target_post_state.validators[validator_index].attestation_public_key
             )
 
             # Verify the signature.
@@ -460,15 +460,15 @@ class ForkChoiceMixin(LstarSpecBase):
         # Validation proved:
         # - the block is known,
         # - blocks are stored together with their post-state.
-        key_state = store.states.get(attestation_data.target.root)
-        assert key_state is not None, (
+        target_post_state = store.states.get(attestation_data.target.root)
+        assert target_post_state is not None, (
             f"No state available to verify committee aggregation for target "
             f"{attestation_data.target.root.hex()}"
         )
 
         # Every participant must fall inside that registry.
         # An out-of-range index names a validator the target state never knew.
-        validators = key_state.validators
+        validators = target_post_state.validators
         for validator_index in validator_indices:
             if not validator_index.is_within_registry(Uint64(len(validators))):
                 raise SpecRejectionError(
