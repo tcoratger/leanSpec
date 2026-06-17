@@ -135,8 +135,7 @@ class StateTransitionMixin(LstarSpecBase):
         # Genesis is the chain's anchor, justified and finalized by definition.
         # So the first block forces its parent to both.
         # Every later block keeps its checkpoints, which only attestations move.
-        is_genesis_parent = parent_header.slot == Slot(0)
-        if is_genesis_parent:
+        if parent_header.slot == Slot(0):
             new_latest_justified = Checkpoint(slot=Slot(0), root=parent_root)
             new_latest_finalized = Checkpoint(slot=Slot(0), root=parent_root)
         else:
