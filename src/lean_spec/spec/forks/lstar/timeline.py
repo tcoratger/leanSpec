@@ -37,12 +37,11 @@ class TimelineMixin(LstarSpecBase):
         Fast confirmation sits at interval 3, after aggregates exist, so the safe
         target reflects the freshest votes the node has seen.
         """
-        # Advance time by one interval
         store = store.model_copy(update={"time": store.time + Interval(1)})
-        current_interval = Interval(int(store.time) % int(INTERVALS_PER_SLOT))
+        interval_within_slot = int(store.time) % int(INTERVALS_PER_SLOT)
         new_aggregates: list[SignedAggregatedAttestation] = []
 
-        match int(current_interval):
+        match interval_within_slot:
             # Slot start: ingest pending attestations once the slot's proposal lands.
             case 0 if has_proposal:
                 store = self.accept_new_attestations(store)
@@ -72,13 +71,10 @@ class TimelineMixin(LstarSpecBase):
         """
         all_new_aggregates: list[SignedAggregatedAttestation] = []
 
-        # Tick forward one interval at a time
         while store.time < target_interval:
-            # Check if proposal should be signaled for next interval
             next_interval = Interval(int(store.time) + 1)
             should_signal_proposal = has_proposal and next_interval == target_interval
 
-            # Advance by one interval with appropriate signaling
             store, new_aggregates = self.tick_interval(store, should_signal_proposal, is_aggregator)
             all_new_aggregates.extend(new_aggregates)
 
