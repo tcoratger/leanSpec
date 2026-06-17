@@ -131,6 +131,8 @@ from consensus_testing.values import (
     make_signed_block,
     make_test_block,
     make_test_status,
+    signed_block_with_empty_proof,
+    store_backed_signed_block_getter,
 )
 
 StateTransitionTestFiller = Callable[..., StateTransitionFixture]
@@ -207,6 +209,8 @@ __all__ = [
     "make_signed_block",
     "make_test_block",
     "make_test_status",
+    "signed_block_with_empty_proof",
+    "store_backed_signed_block_getter",
     # Unit-test fakes
     "MockEventSource",
     "MockForkchoiceStore",
