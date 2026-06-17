@@ -351,7 +351,7 @@ class GeneralizedXmssScheme(StrictBaseModel):
             parameter=public_key.parameter,
             root=public_key.root,
             position=slot,
-            leaf_parts=chain_ends,
+            leaf_chain_ends=chain_ends,
             opening=signature.path,
         )
 
