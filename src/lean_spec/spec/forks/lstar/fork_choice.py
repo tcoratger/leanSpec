@@ -38,6 +38,54 @@ from lean_spec.spec.ssz import Bytes32, Uint64
 class ForkChoiceMixin(LstarSpecBase):
     """Fork choice and store maintenance for the lstar fork."""
 
+    def _ancestor_at_slot(
+        self,
+        store: LstarStore,
+        root: Bytes32,
+        slot: Slot,
+    ) -> Bytes32 | None:
+        """
+        Find the block on a root's parent chain whose slot equals a target.
+
+        Climb parent links from the starting root toward genesis.
+
+        Two failure modes both return None:
+
+        - No block sits at exactly the target slot on this chain.
+          The chain skipped over it, so the climb passes the slot without landing.
+        - The chain left the known tree before reaching the target slot.
+
+        Args:
+            store: Fork-choice store holding the known block tree.
+            root: Starting root whose parent chain is searched.
+            slot: Target slot to land on.
+
+        Returns:
+            The ancestor root sitting at exactly the target slot, or None.
+        """
+        # Climb parent links toward genesis.
+        #
+        # The walk stops the moment a root is absent from the local view.
+        current_root = root
+        while current_root in store.blocks:
+            current_block = store.blocks[current_root]
+
+            # Landed on the target slot: this block is the ancestor.
+            if current_block.slot == slot:
+                return current_root
+
+            # Climbed past the target slot without landing on it.
+            # That slot held no block on this chain.
+            if current_block.slot < slot:
+                return None
+
+            # Still above the target slot.
+            # Step to the parent and keep climbing.
+            current_root = current_block.parent_root
+
+        # The chain left the known tree before reaching the target slot.
+        return None
+
     def _checkpoint_is_ancestor(
         self,
         store: LstarStore,
@@ -59,30 +107,15 @@ class ForkChoiceMixin(LstarSpecBase):
         if ancestor.slot > descendant.slot:
             return False
 
-        # Climb parent links from the descendant toward genesis.
-        #
-        # The walk stops the moment a root is absent from the local view.
-        current_root = descendant.root
-        while current_root in store.blocks:
-            current_block = store.blocks[current_root]
+        # Resolve the block on the descendant's chain sitting at the ancestor's slot.
+        # A missing block there means the ancestor is off this chain entirely.
+        root_at_ancestor_slot = self._ancestor_at_slot(store, descendant.root, ancestor.slot)
+        if root_at_ancestor_slot is None:
+            return False
 
-            # Landed on the ancestor's slot.
-            # - It lies on the chain only when the roots also match.
-            # - A different root here means the checkpoints are on forked branches.
-            if current_block.slot == ancestor.slot:
-                return current_root == ancestor.root
-
-            # Climbed past the ancestor's slot without landing on it.
-            # That slot held no block on this chain, so the ancestor is off it.
-            if current_block.slot < ancestor.slot:
-                return False
-
-            # Still above the ancestor's slot.
-            # Step to the parent and keep climbing.
-            current_root = current_block.parent_root
-
-        # The chain left the known tree before reaching the ancestor's slot.
-        return False
+        # The ancestor lies on the chain only when that block is its exact root.
+        # A different root there means the checkpoints are on forked branches.
+        return root_at_ancestor_slot == ancestor.root
 
     def create_store(
         self,
@@ -825,16 +858,12 @@ class ForkChoiceMixin(LstarSpecBase):
         # Invariant: the finalized checkpoint stays on the head's chain.
         # Climb from the head to its ancestor at the finalized slot.
         finalized_slot = store.states[new_head].latest_finalized.slot
-        finalized_root = new_head
-        while finalized_root in store.blocks and store.blocks[finalized_root].slot > finalized_slot:
-            parent_root = store.blocks[finalized_root].parent_root
-            if parent_root not in store.blocks:
-                break
-            finalized_root = parent_root
+        finalized_root = self._ancestor_at_slot(store, new_head, finalized_slot)
 
-        # A fresh checkpoint-sync anchor stores no block at that slot.
+        # No block sits at that slot on the head's chain, or the chain left the known tree.
+        # A fresh checkpoint-sync anchor is one such case: it stores no block at that slot.
         # Keep the trusted anchor there rather than emit an unresolved root.
-        if store.blocks[finalized_root].slot == finalized_slot:
+        if finalized_root is not None:
             latest_finalized = Checkpoint(root=finalized_root, slot=finalized_slot)
         else:
             latest_finalized = store.latest_finalized
