@@ -1,5 +1,7 @@
 """Slot primitive shared by the consensus and crypto layers."""
 
+from __future__ import annotations
+
 import math
 from typing import Final
 
@@ -12,7 +14,7 @@ IMMEDIATE_JUSTIFICATION_WINDOW: Final = 5
 class Slot(Uint64):
     """A slot number, as a 64-bit unsigned integer."""
 
-    def justified_index_after(self, finalized_slot: "Slot") -> int | None:
+    def justified_index_after(self, finalized_slot: Slot) -> int | None:
         """
         Return the relative bitfield index for justification tracking.
 
@@ -25,7 +27,7 @@ class Slot(Uint64):
         # Slot (finalized_slot + 1) maps to index 0.
         return int(self - finalized_slot) - 1
 
-    def is_justifiable_after(self, finalized_slot: "Slot") -> bool:
+    def is_justifiable_after(self, finalized_slot: Slot) -> bool:
         """
         Whether this slot is a valid justification candidate after a given finalized slot.
 
