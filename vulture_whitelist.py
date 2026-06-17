@@ -54,6 +54,7 @@ _._coerce_and_validate
 _._accept_hex_string
 _._validate_byte_list_data
 _._validate_decomposition
+_._require_index_matches_position
 _.validate_state_length
 _.validate_target
 _.validate_rejection_is_declared
@@ -67,10 +68,6 @@ _.serialize_value
 _.serialize_block
 _._serialize_data
 _._serialize_as_hex
-
-# Fork-upgrade protocol method, invoked polymorphically on a fork transition.
-# A single-fork tree has no transition yet, so there is no call site.
-_.upgrade_state
 
 # Signature parameters mandated by external protocols we cannot rename.
 # The pydantic core-schema hook, the pytest session-finish hook, and the
@@ -169,10 +166,6 @@ y
 first_name
 slot_number
 _.slot_number
-
-# Access tier recorded on every route entry to document the route, not yet
-# read back by the registration path.
-is_admin
 
 # Attribute assignment in slotted-class tests that proves new attributes are
 # rejected; the assignment is the action under test, never read back.
