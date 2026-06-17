@@ -371,18 +371,18 @@ class SyncService:
             raise RuntimeError("HeadSync not initialized")
 
         # Head-sync either processes the block now or caches it pending backfill.
-        gossip_block_outcome, new_store = await self._head_sync.on_gossip_block(
+        new_store = await self._head_sync.on_gossip_block(
             block=block,
             peer_id=peer_id,
             store=self.store,
         )
 
-        # Only update our store if the block was actually processed.
+        # A None result means the block was cached because its parent is unknown.
         #
-        # A block may be cached instead of processed if its parent is unknown.
-        # The processed path never awaits, so a concurrent clock tick cannot
-        # advance the store between the read above and this write-back.
-        if gossip_block_outcome.processed:
+        # When a block is processed, head-sync returns the updated store.
+        # That path never awaits, so a concurrent clock tick cannot advance the
+        # store between the read above and this write-back.
+        if new_store is not None:
             block_root = hash_tree_root(block.block)
             logger.info(
                 "Block processed slot=%s root=%s from peer %s",
