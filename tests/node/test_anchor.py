@@ -8,6 +8,7 @@ import pytest
 
 from consensus_testing import (
     build_genesis_state,
+    reconstruct_block_from_header,
     signed_block_with_empty_proof,
 )
 from lean_spec.node.anchor import Anchor
@@ -16,22 +17,13 @@ from lean_spec.node.sync.checkpoint_sync import CheckpointSyncError
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import SignedBlock, Slot
 from lean_spec.spec.forks.lstar import State
-from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody
 from lean_spec.spec.forks.lstar.spec import LstarSpec
 from lean_spec.spec.ssz import Bytes32, Uint64
 
 
 def _signed_genesis_block(state: State) -> SignedBlock:
     """Wrap the genesis block matching a state with an empty proof."""
-    return signed_block_with_empty_proof(
-        Block(
-            slot=state.latest_block_header.slot,
-            proposer_index=state.latest_block_header.proposer_index,
-            parent_root=state.latest_block_header.parent_root,
-            state_root=hash_tree_root(state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
-    )
+    return signed_block_with_empty_proof(reconstruct_block_from_header(state))
 
 
 class TestAnchorFromGenesis:

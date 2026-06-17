@@ -71,6 +71,22 @@ def build_genesis_state(
     )
 
 
+def reconstruct_block_from_header(state: State) -> Block:
+    """
+    Rebuild the block matching a state's latest header.
+
+    The body is empty by the genesis and empty-block convention.
+    For a genesis state this is the genesis block.
+    """
+    return Block(
+        slot=state.latest_block_header.slot,
+        proposer_index=state.latest_block_header.proposer_index,
+        parent_root=state.latest_block_header.parent_root,
+        state_root=hash_tree_root(state),
+        body=BlockBody(attestations=AggregatedAttestations(data=[])),
+    )
+
+
 def build_anchor(
     num_validators: int,
     anchor_slot: Slot,
@@ -87,15 +103,7 @@ def build_anchor(
     """
     state = build_genesis_state(num_validators, genesis_time=genesis_time, keyed=keyed, fork=fork)
 
-    # Reconstruct the genesis block from the state's latest header.
-    # Its body is empty by the empty-block convention.
-    current_block = Block(
-        slot=state.latest_block_header.slot,
-        proposer_index=state.latest_block_header.proposer_index,
-        parent_root=state.latest_block_header.parent_root,
-        state_root=hash_tree_root(state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
+    current_block = reconstruct_block_from_header(state)
     parent_root = hash_tree_root(current_block)
 
     num_validators_u64 = Uint64(num_validators)

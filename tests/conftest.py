@@ -13,16 +13,12 @@ if "LEAN_ENV" not in os.environ:
 from consensus_testing import (  # noqa: E402
     build_genesis_state,
     build_genesis_store,
+    reconstruct_block_from_header,
 )
 from consensus_testing.keys import XmssKeyManager  # noqa: E402
-from lean_spec.spec.crypto.merkleization import hash_tree_root  # noqa: E402
 from lean_spec.spec.forks import Slot  # noqa: E402
 from lean_spec.spec.forks.lstar import State, Store  # noqa: E402
-from lean_spec.spec.forks.lstar.containers import (  # noqa: E402
-    AggregatedAttestations,
-    Block,
-    BlockBody,
-)
+from lean_spec.spec.forks.lstar.containers import Block  # noqa: E402
 from lean_spec.spec.forks.lstar.spec import LstarSpec  # noqa: E402
 
 # Disable hypothesis deadlines for the whole suite.
@@ -51,13 +47,7 @@ def genesis_state() -> State:
 @pytest.fixture
 def genesis_block(genesis_state: State) -> Block:
     """Genesis block matching the null-key genesis state."""
-    return Block(
-        slot=genesis_state.latest_block_header.slot,
-        proposer_index=genesis_state.latest_block_header.proposer_index,
-        parent_root=genesis_state.latest_block_header.parent_root,
-        state_root=hash_tree_root(genesis_state),
-        body=BlockBody(attestations=AggregatedAttestations(data=[])),
-    )
+    return reconstruct_block_from_header(genesis_state)
 
 
 @pytest.fixture

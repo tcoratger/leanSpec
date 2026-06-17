@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from pydantic import Field
 
-from consensus_testing.genesis import build_genesis_state
+from consensus_testing.genesis import build_genesis_state, reconstruct_block_from_header
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import (
@@ -32,10 +32,8 @@ from lean_spec.spec.forks import (
     ValidatorIndex,
 )
 from lean_spec.spec.forks.lstar.containers import (
-    AggregatedAttestations,
     AggregationError,
     Block,
-    BlockBody,
     SignedAggregatedAttestation,
     SignedAttestation,
     State,
@@ -138,18 +136,8 @@ class ForkChoiceTest(BaseTestSpec):
         """
         if self.anchor_block is not None:
             return self.anchor_block
-        # Build a minimal genesis block from the state's header fields.
-        #
-        # The state already contains the block header.
-        # We extract its fields to create a matching block.
-        # The body is empty by the genesis and empty-block convention.
-        return Block(
-            slot=self.anchor_state.latest_block_header.slot,
-            proposer_index=self.anchor_state.latest_block_header.proposer_index,
-            parent_root=self.anchor_state.latest_block_header.parent_root,
-            state_root=hash_tree_root(self.anchor_state),
-            body=BlockBody(attestations=AggregatedAttestations(data=[])),
-        )
+        # The state already carries the block header, so rebuild the matching block.
+        return reconstruct_block_from_header(self.anchor_state)
 
     def _resolved_max_slot(self) -> Slot:
         """

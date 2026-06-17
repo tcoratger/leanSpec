@@ -7,6 +7,7 @@ from consensus_testing.genesis import (
     build_anchor,
     build_genesis_state,
     build_genesis_store,
+    reconstruct_block_from_header,
 )
 from consensus_testing.mocks import (
     MockEventSource,
@@ -196,6 +197,7 @@ __all__ = [
     "build_anchor",
     "build_genesis_state",
     # Unit-test builders and value constructors
+    "reconstruct_block_from_header",
     "build_genesis_store",
     "create_mock_sync_service",
     "TEST_VALIDATOR_INDEX",
