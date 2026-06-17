@@ -640,7 +640,8 @@ class ForkChoiceMixin(LstarSpecBase):
         Map each participating validator to the latest vote it cast.
 
         This is the LMD view fork choice runs on.
-        On equal slots the first vote seen wins, since the slot comparison is strict.
+        Two votes share a slot only across distinct attestation data, never within one data.
+        On such an equal-slot tie the strict comparison keeps the first distinct data inserted.
 
         A vote whose head sits at or below the finalized slot carries no fork-choice weight.
         Such stale votes are skipped here, so callers pass their pool without pre-filtering.
