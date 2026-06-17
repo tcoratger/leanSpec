@@ -72,7 +72,10 @@ class PoseidonXmss(StrictBaseModel):
 
         # Permute, then add the original padded input element-wise.
         permuted_state = engine.permute(padded_input)
-        final_state = [p + i for p, i in zip(permuted_state, padded_input, strict=True)]
+        final_state = [
+            permuted_element + input_element
+            for permuted_element, input_element in zip(permuted_state, padded_input, strict=True)
+        ]
 
         return final_state[:output_length]
 
@@ -131,25 +134,25 @@ class PoseidonXmss(StrictBaseModel):
         rate = width - len(capacity_value)
 
         # Zero-pad to a multiple of the rate so absorption iterates exact chunks.
-        num_extra = (rate - (len(input_elements) % rate)) % rate
-        padded_input = input_elements + [Fp(value=0)] * num_extra
+        num_padding_elements = (rate - (len(input_elements) % rate)) % rate
+        padded_input = input_elements + [Fp(value=0)] * num_padding_elements
 
         # Layout: capacity slots first, then rate slots.
-        cap_length = len(capacity_value)
+        capacity_length = len(capacity_value)
         state = [Fp(value=0)] * width
-        state[:cap_length] = capacity_value
+        state[:capacity_length] = capacity_value
 
         # Phase 2: absorb each chunk by overwriting the rate slots.
         #
         # Padding makes every chunk exactly rate wide, so the slice always matches.
         for chunk in batched(padded_input, rate):
-            state[cap_length : cap_length + rate] = chunk
+            state[capacity_length : capacity_length + rate] = chunk
             state = engine.permute(state)
 
         # Phase 3: squeeze rate slots, permuting until enough output is available.
         output: list[Fp] = []
         while len(output) < output_length:
-            output.extend(state[cap_length : cap_length + rate])
+            output.extend(state[capacity_length : capacity_length + rate])
             state = engine.permute(state)
 
         return output[:output_length]
