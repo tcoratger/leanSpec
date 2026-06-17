@@ -869,7 +869,7 @@ class ForkChoiceMixin(LstarSpecBase):
         merged_aggregated_payloads = {
             attestation_data: known_payloads.get(attestation_data, set())
             | new_payloads.get(attestation_data, set())
-            for attestation_data in {**known_payloads, **new_payloads}
+            for attestation_data in dict.fromkeys((*known_payloads, *new_payloads))
         }
 
         # Promote into the counted pool and clear the pending one.
