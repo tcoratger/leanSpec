@@ -729,12 +729,10 @@ class ForkChoiceMixin(LstarSpecBase):
 
         # Credit every block on those votes' ancestor chains above finalization.
         #
-        # Return a plain dict so callers read missing blocks as absent, not zero.
-        weights = self._accumulate_ancestor_weights(
-            store, latest_votes, store.latest_finalized.slot
-        )
-
-        return dict(weights)
+        # Every caller reads this map with a default of zero for absent blocks.
+        # The shared accumulator already returns a default-zero mapping.
+        # So returning it directly is observably identical to copying it first.
+        return self._accumulate_ancestor_weights(store, latest_votes, store.latest_finalized.slot)
 
     def _compute_lmd_ghost_head(
         self,
