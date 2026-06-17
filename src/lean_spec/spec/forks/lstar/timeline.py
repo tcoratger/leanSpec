@@ -21,10 +21,10 @@ class TimelineMixin(LstarSpecBase):
     ) -> tuple[LstarStore, list[SignedAggregatedAttestation]]:
         """Advance store time by one interval and perform interval-specific actions."""
         store = store.model_copy(update={"time": store.time + Interval(1)})
-        current_interval = Interval(int(store.time) % int(INTERVALS_PER_SLOT))
+        interval_within_slot = int(store.time) % int(INTERVALS_PER_SLOT)
         new_aggregates: list[SignedAggregatedAttestation] = []
 
-        match int(current_interval):
+        match interval_within_slot:
             # Slot start: ingest pending attestations once the slot's proposal lands.
             case 0 if has_proposal:
                 store = self.accept_new_attestations(store)
