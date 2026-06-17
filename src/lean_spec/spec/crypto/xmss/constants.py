@@ -3,7 +3,7 @@
 import math
 from typing import Final, Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from lean_spec.base import StrictBaseModel
 from lean_spec.config import LEAN_ENV
@@ -15,52 +15,56 @@ from lean_spec.spec.ssz.ssz_base import BYTES_PER_LENGTH_OFFSET
 class XmssConfig(StrictBaseModel):
     """A model holding the configuration constants for an XMSS preset."""
 
-    LOG_LIFETIME: int
+    LOG_LIFETIME: int = Field(gt=0)
     """The base-2 logarithm of the scheme's maximum lifetime."""
 
-    DIMENSION: int
+    DIMENSION: int = Field(gt=0)
     """The total number of hash chains, v."""
 
-    BASE: int
+    BASE: int = Field(gt=0)
     """The alphabet size for the digits of the encoded message."""
 
-    Z: int
+    Z: int = Field(gt=0)
     """Number of base-BASE digits extracted from each field element."""
 
-    Q: int
+    Q: int = Field(gt=0)
     """Quotient such that Q * BASE^Z == P - 1."""
 
-    TARGET_SUM: int
+    TARGET_SUM: int = Field(gt=0)
     """The required sum of all codeword chunks for a signature to be valid."""
 
-    MAX_TRIES: int
+    MAX_TRIES: int = Field(gt=0)
     """How often one should try at most to resample a random value."""
 
-    PARAMETER_LENGTH: int
+    PARAMETER_LENGTH: int = Field(gt=0)
     """The length of the public parameter P.
 
     It is used to specialize the hash function."""
 
-    TWEAK_LENGTH_FIELD_ELEMENTS: int
+    TWEAK_LENGTH_FIELD_ELEMENTS: int = Field(gt=0)
     """The length of a domain-separating tweak."""
 
-    MESSAGE_LENGTH_FIELD_ELEMENTS: int
+    MESSAGE_LENGTH_FIELD_ELEMENTS: int = Field(gt=0)
     """The length of a message after being encoded into field elements."""
 
-    RAND_LENGTH_FIELD_ELEMENTS: int
+    RAND_LENGTH_FIELD_ELEMENTS: int = Field(gt=0)
     """The length of the randomness rho used during message encoding."""
 
-    HASH_LENGTH_FIELD_ELEMENTS: int
+    HASH_LENGTH_FIELD_ELEMENTS: int = Field(gt=0)
     """The output length of the main tweakable hash function."""
 
-    CAPACITY: int
+    CAPACITY: int = Field(gt=0)
     """The capacity of the Poseidon sponge, defining its security level."""
 
     @model_validator(mode="after")
     def _validate_decomposition(self) -> Self:
-        """Verify that Q * BASE^Z == P - 1."""
+        """Verify that Q * BASE^Z == P - 1 and that LOG_LIFETIME is even."""
         if self.Q * self.BASE**self.Z != P - 1:
             raise ValueError(f"Q * BASE^Z must equal P-1={P - 1}")
+        # The key splits into a top tree and bottom trees.
+        # Each covers LOG_LIFETIME / 2 levels, so the lifetime exponent must be even.
+        if self.LOG_LIFETIME % 2 != 0:
+            raise ValueError(f"LOG_LIFETIME must be even, got {self.LOG_LIFETIME}")
         return self
 
     @property
