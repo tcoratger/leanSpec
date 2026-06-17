@@ -126,9 +126,10 @@ class ValidatorDutiesMixin(LstarSpecBase):
         proof carried by the signed block envelope.
 
         Raises:
-            AssertionError: If validator is not the proposer for this slot,
-                or if the produced block fails to close a justified divergence
-                between the store and the head chain.
+            SpecRejectionError: WRONG_PROPOSER if the validator is not the
+                proposer for the target slot.
+            AssertionError: If the produced block fails to close a justified
+                divergence between the store and the head chain.
         """
         # Build on the freshest canonical head.
         #
