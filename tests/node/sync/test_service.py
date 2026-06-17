@@ -11,9 +11,9 @@ from consensus_testing import (
     MockForkchoiceStore,
     RecordedCall,
     RecordingSyncDatabase,
+    build_genesis_state,
+    build_genesis_store,
     create_mock_sync_service,
-    make_genesis_state,
-    make_genesis_store,
     make_signed_attestation,
     make_signed_block,
 )
@@ -52,7 +52,7 @@ def make_store_with_attestation_data(
 ) -> tuple[Store, AttestationData]:
     """Build a keyed store advanced to slot 1, with attestation data for that slot."""
     attestation_slot = Slot(1)
-    store = make_genesis_store(
+    store = build_genesis_store(
         num_validators=num_validators,
         validator_index=validator_index,
         time=Interval.from_slot(attestation_slot),
@@ -615,7 +615,7 @@ class TestBlockPersistence:
         )
         mock_store = cast(MockForkchoiceStore, service.store)
         # Post-state indexing requires both a state to index and an advanced finalized.
-        mock_store.on_block_post_state = make_genesis_state(num_validators=1)
+        mock_store.on_block_post_state = build_genesis_state(num_validators=1, keyed=False)
         mock_store.advance_justified_on_block = True
         mock_store.advance_finalized_on_block = True
         service.state = SyncState.SYNCING
@@ -888,7 +888,7 @@ def _setup(
     is resolved against) with the justified checkpoint still at genesis.
     """
     spec = LstarSpec()
-    base_store = make_genesis_store(
+    base_store = build_genesis_store(
         num_validators=NUM_VALIDATORS, validator_index=ValidatorIndex(0)
     )
 

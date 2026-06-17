@@ -8,7 +8,7 @@ from typing import Generator
 import httpx
 import pytest
 
-from consensus_testing import make_genesis_store, store_backed_signed_block_getter
+from consensus_testing import build_genesis_store, store_backed_signed_block_getter
 from lean_spec.node.api import ApiServer, ApiServerConfig
 from tests.node.api.conftest import AggregatorRoleStub
 
@@ -45,7 +45,7 @@ class _ServerThread(threading.Thread):
 
     def _create_server(self) -> ApiServer:
         """Create the API server with a test store and aggregator flag holder."""
-        store = make_genesis_store(num_validators=3, observer=True, genesis_time=int(time.time()))
+        store = build_genesis_store(num_validators=3, observer=True, genesis_time=int(time.time()))
 
         config = ApiServerConfig(host="127.0.0.1", port=self.port)
         return ApiServer(

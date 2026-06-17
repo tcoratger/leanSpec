@@ -6,7 +6,7 @@ from consensus_testing import (
     BlockSpec,
     ExpectedRejection,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot
 
@@ -33,7 +33,7 @@ def test_proposer_scheduling_on_empty_registry_rejected(
     - the block is rejected as scheduling against an empty registry.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=0),
+        pre=build_genesis_state(num_validators=0),
         blocks=[
             BlockSpec(slot=Slot(1)),
         ],

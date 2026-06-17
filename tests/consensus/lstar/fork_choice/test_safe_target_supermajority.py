@@ -10,7 +10,7 @@ from consensus_testing import (
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -44,7 +44,7 @@ def test_odd_five_validators_three_votes_hold_safe_target_at_genesis(
     - head still advances to block_2, since head selection has no threshold.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=5),
+        anchor_state=build_genesis_state(num_validators=5),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -105,7 +105,7 @@ def test_odd_five_validators_four_votes_advance_safe_target(
     - the safe-target walk advances to block_2.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=5),
+        anchor_state=build_genesis_state(num_validators=5),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -169,7 +169,7 @@ def test_odd_seven_validators_four_votes_hold_safe_target_at_genesis(
     - head still advances to block_2, since head selection has no threshold.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=7),
+        anchor_state=build_genesis_state(num_validators=7),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -231,7 +231,7 @@ def test_odd_seven_validators_five_votes_advance_safe_target(
     - the safe-target walk advances to block_2.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=7),
+        anchor_state=build_genesis_state(num_validators=7),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),

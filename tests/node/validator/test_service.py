@@ -9,7 +9,7 @@ import pytest
 from consensus_testing import (
     TEST_VALIDATOR_INDEX,
     MockNetworkRequester,
-    make_genesis_store,
+    build_genesis_store,
     make_signed_block,
 )
 from consensus_testing.keys import XmssKeyManager
@@ -825,7 +825,7 @@ class TestValidatorServiceIntegration:
     @pytest.fixture
     def real_store(self, key_manager: XmssKeyManager) -> Store:
         """Forkchoice store with validators using real public keys."""
-        return make_genesis_store(num_validators=6, validator_index=TEST_VALIDATOR_INDEX)
+        return build_genesis_store(num_validators=6, validator_index=TEST_VALIDATOR_INDEX)
 
     @pytest.fixture
     def real_sync_service(self, real_store: Store) -> SyncService:

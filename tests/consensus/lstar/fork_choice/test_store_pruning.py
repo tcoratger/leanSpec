@@ -13,7 +13,7 @@ from consensus_testing import (
     GossipAttestationSpec,
     StoreChecks,
     TickStep,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -212,7 +212,7 @@ def test_finalization_prunes_stale_attestation_signatures(
     all_targets = [Slot(i) for i in range(1, 6)]
 
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),

@@ -8,7 +8,7 @@ from consensus_testing import (
     ExpectedRejection,
     SetProposerIndex,
     VerifySignaturesTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
@@ -38,7 +38,7 @@ def test_proposer_index_at_registry_size_rejected(
     - the bound is strict less-than, so the registry size itself is out of range.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[],
@@ -71,7 +71,7 @@ def test_proposer_index_at_last_registry_slot_accepted(
     - the bound is strict less-than, not less-than-or-equal.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(3),
             proposer_index=ValidatorIndex(3),
@@ -103,7 +103,7 @@ def test_attester_index_at_registry_size_rejected(
     - the bound is strict less-than, so the registry size itself is out of range.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(2),
             attestations=[
@@ -143,7 +143,7 @@ def test_attester_index_at_last_registry_slot_accepted(
     - the bound is strict less-than, not less-than-or-equal.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[

@@ -7,7 +7,7 @@ from consensus_testing import (
     BlockSpec,
     StateExpectation,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import VALIDATOR_REGISTRY_LIMIT, Slot, ValidatorIndex
@@ -125,7 +125,7 @@ def test_genesis_custom_time(
     genesis_time = Uint64(1234567890)
 
     state_transition_test(
-        pre=generate_pre_state(genesis_time=genesis_time),
+        pre=build_genesis_state(genesis_time=genesis_time),
         blocks=[],
         post=StateExpectation(
             slot=Slot(0),
@@ -173,7 +173,7 @@ def test_genesis_custom_validator_set(
     - the pending-vote tracking is empty.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=8),
+        pre=build_genesis_state(num_validators=8),
         blocks=[],
         post=StateExpectation(
             slot=Slot(0),
@@ -338,7 +338,7 @@ def test_genesis_single_validator(
     - every block proposer is V0.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=1, genesis_time=Uint64(0)),
+        pre=build_genesis_state(num_validators=1, genesis_time=Uint64(0)),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -402,7 +402,7 @@ def test_first_post_genesis_block_sets_checkpoint_anchor_roots(
     - the history holds the anchor root once.
     - the justified-slots bitfield is empty.
     """
-    pre = generate_pre_state()
+    pre = build_genesis_state()
     anchor_state = LstarSpec().process_slots(pre, Slot(1))
     anchor_root = hash_tree_root(anchor_state.latest_block_header)
 

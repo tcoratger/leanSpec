@@ -7,7 +7,7 @@ from consensus_testing import (
     ExpectedRejection,
     StateExpectation,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import JustifiedSlots
@@ -299,7 +299,7 @@ def test_block_with_wrong_slot(state_transition_test: StateTransitionTestFiller)
     - the block slot does not match the state slot.
     - the block is rejected as a block slot mismatch.
     """
-    pre_state = generate_pre_state()
+    pre_state = build_genesis_state()
     pre_state = LstarSpec().process_slots(pre_state, Slot(1))
 
     state_transition_test(

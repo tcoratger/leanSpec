@@ -2,7 +2,7 @@
 
 from typing import ClassVar, Literal
 
-from consensus_testing.genesis import build_anchor, generate_pre_state
+from consensus_testing.genesis import build_anchor
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.base import StrictBaseModel
 from lean_spec.node.sync.checkpoint_sync import verify_checkpoint_state
@@ -48,17 +48,13 @@ class VerifyCheckpoint(StrictBaseModel):
     def run(self) -> VerifyCheckpointOutput:
         """Build the requested state and report the verification verdict."""
         fork = LstarSpec()
-        if self.anchor_slot == 0:
-            state = generate_pre_state(
-                fork=fork, genesis_time=Uint64(0), num_validators=self.num_validators
-            )
-        else:
-            state, _ = build_anchor(
-                fork=fork,
-                num_validators=self.num_validators,
-                anchor_slot=Slot(self.anchor_slot),
-                genesis_time=Uint64(0),
-            )
+        # Slot 0 makes the anchor builder yield the plain genesis state.
+        state, _ = build_anchor(
+            fork=fork,
+            num_validators=self.num_validators,
+            anchor_slot=Slot(self.anchor_slot),
+            genesis_time=Uint64(0),
+        )
         return VerifyCheckpointOutput(
             valid=verify_checkpoint_state(state),
             state_bytes="0x" + state.encode_bytes().hex(),

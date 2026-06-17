@@ -2,9 +2,11 @@
 
 import httpx
 
-from consensus_testing import reconstruct_block_from_header, signed_block_with_empty_proof
+from consensus_testing import signed_block_with_empty_proof
+from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import SignedBlock
 from lean_spec.spec.forks.lstar import State
+from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody
 
 
 def get_finalized_block(server_url: str) -> httpx.Response:
@@ -46,4 +48,12 @@ class TestFinalizedBlock:
         )
         state = State.decode_bytes(state_response.content)
 
-        assert signed_block == signed_block_with_empty_proof(reconstruct_block_from_header(state))
+        assert signed_block == signed_block_with_empty_proof(
+            Block(
+                slot=state.latest_block_header.slot,
+                proposer_index=state.latest_block_header.proposer_index,
+                parent_root=state.latest_block_header.parent_root,
+                state_root=hash_tree_root(state),
+                body=BlockBody(attestations=AggregatedAttestations(data=[])),
+            )
+        )

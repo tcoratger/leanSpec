@@ -7,7 +7,7 @@ from consensus_testing import (
     BlockSpec,
     ExpectedRejection,
     VerifySignaturesTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
@@ -35,7 +35,7 @@ def test_invalid_proposer_signature(
     - verification is rejected as an invalid block proof.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=1),
+        anchor_state=build_genesis_state(num_validators=1),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[],
@@ -68,7 +68,7 @@ def test_invalid_aggregated_attestation_signature(
     - one bad aggregate rejects the block even when another aggregate is valid.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=3),
+        anchor_state=build_genesis_state(num_validators=3),
         block=BlockSpec(
             slot=Slot(2),
             attestations=[

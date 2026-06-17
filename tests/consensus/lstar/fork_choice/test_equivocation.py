@@ -13,7 +13,7 @@ from consensus_testing import (
     GossipAttestationSpec,
     StoreChecks,
     TickStep,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -135,7 +135,7 @@ def test_equivocating_proposer_with_split_attestations(
     - both forks remain in the store throughout.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=6),
+        anchor_state=build_genesis_state(num_validators=6),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -273,7 +273,7 @@ def test_same_slot_equivocating_attesters_count_once(
     - no slot is justified by the below-threshold votes.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),

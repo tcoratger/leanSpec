@@ -6,7 +6,7 @@ from consensus_testing import (
     BlockSpec,
     StateExpectation,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
@@ -44,7 +44,7 @@ def test_multi_slot_gap_materializes_zero_hash_history(
     - the history holds the zero hash at slot 2.
     - the history holds the zero hash at slot 3.
     """
-    pre = generate_pre_state()
+    pre = build_genesis_state()
     spec = LstarSpec()
     anchor_state = spec.process_slots(pre, Slot(1))
     anchor_root = hash_tree_root(anchor_state.latest_block_header)

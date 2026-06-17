@@ -8,7 +8,7 @@ from consensus_testing import (
     BlockStep,
     ForkChoiceTestFiller,
     StoreChecks,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -56,7 +56,7 @@ def test_heavier_fork_below_finalized_slot_never_wins(
     - the forward walk never reaches the dead fork, so its weight cannot count.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -237,7 +237,7 @@ def test_fork_above_finalized_wins_at_or_below_loses(
     - at branches off block_3, below the justified root, so the walk never reaches it.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -438,7 +438,7 @@ def test_losing_fork_higher_finalized_does_not_latch(
       walk never reaches it and its finalized checkpoint cannot stay canonical.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),

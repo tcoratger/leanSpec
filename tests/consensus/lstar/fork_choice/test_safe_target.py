@@ -11,7 +11,7 @@ from consensus_testing import (
     GossipAggregatedAttestationStep,
     StoreChecks,
     TickStep,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -52,7 +52,7 @@ def test_safe_target_does_not_advance_below_supermajority(
     - head still advances to block_2, since head selection has no threshold.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=6),
+        anchor_state=build_genesis_state(num_validators=6),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -237,7 +237,7 @@ def test_safe_target_follows_heavier_fork_on_split(
     - safe target follows block_b with 4 votes.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=6),
+        anchor_state=build_genesis_state(num_validators=6),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -313,7 +313,7 @@ def test_safe_target_is_conservative_relative_to_lmd_ghost_head(
     - safe target at slot 2 sits behind head at slot 3.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),
@@ -392,7 +392,7 @@ def test_safe_target_ignores_known_pool_at_interval_3(
     - block_1 falls short of the threshold, so the walk halts at slot 0.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=6),
+        anchor_state=build_genesis_state(num_validators=6),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),

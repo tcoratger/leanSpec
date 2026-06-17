@@ -9,7 +9,7 @@ from consensus_testing import (
     ForkChoiceTestFiller,
     GossipAggregatedAttestationStep,
     StoreChecks,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -51,7 +51,7 @@ def test_finalization_prunes_vote_on_orphaned_branch(
     - the orphaned vote targeting slot 4 is pruned despite its head outliving the finalized slot.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), parent_label="genesis", label="block_1"),

@@ -8,7 +8,7 @@ from consensus_testing import (
     BlockStep,
     ForkChoiceTestFiller,
     StoreChecks,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -220,7 +220,7 @@ def test_three_block_deep_reorg(
     - head switches to fork_b_6, reverting three fork A blocks.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=6),
+        anchor_state=build_genesis_state(num_validators=6),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
@@ -324,7 +324,7 @@ def test_reorg_with_slot_gaps(
     - head switches to fork_b_9 despite the missed slots.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
@@ -434,7 +434,7 @@ def test_three_way_fork_competition(
     - head switches to fork_b_7.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
@@ -545,7 +545,7 @@ def test_reorg_prevention_heavy_fork_resists_light_competition(
     - head stays at fork_a_6 throughout.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
@@ -697,7 +697,7 @@ def test_back_and_forth_reorg_oscillation(
     - fork_b_8 takes the head again with weight 2.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),
@@ -826,7 +826,7 @@ def test_reorg_depth_across_deep_chain_split(
     - fork A targets common at slot 1 to keep its vote within the justified range.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
@@ -940,7 +940,7 @@ def test_reorg_on_newly_justified_slot(
     - head becomes fork_b_2.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="base"),

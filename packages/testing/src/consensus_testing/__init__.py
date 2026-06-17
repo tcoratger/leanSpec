@@ -5,11 +5,8 @@ from collections.abc import Callable
 from consensus_testing import forks
 from consensus_testing.genesis import (
     build_anchor,
-    generate_pre_state,
-    make_genesis_state,
-    make_genesis_store,
-    make_validators,
-    reconstruct_block_from_header,
+    build_genesis_state,
+    build_genesis_store,
 )
 from consensus_testing.mocks import (
     MockEventSource,
@@ -197,12 +194,9 @@ __all__ = [
     "BlockSpec",
     "forks",
     "build_anchor",
-    "generate_pre_state",
+    "build_genesis_state",
     # Unit-test builders and value constructors
-    "reconstruct_block_from_header",
-    "make_genesis_state",
-    "make_genesis_store",
-    "make_validators",
+    "build_genesis_store",
     "create_mock_sync_service",
     "TEST_VALIDATOR_INDEX",
     "make_signed_attestation",

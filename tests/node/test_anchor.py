@@ -7,8 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from consensus_testing import (
-    make_genesis_state,
-    reconstruct_block_from_header,
+    build_genesis_state,
     signed_block_with_empty_proof,
 )
 from lean_spec.node.anchor import Anchor
@@ -17,13 +16,22 @@ from lean_spec.node.sync.checkpoint_sync import CheckpointSyncError
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import SignedBlock, Slot
 from lean_spec.spec.forks.lstar import State
+from lean_spec.spec.forks.lstar.containers import AggregatedAttestations, Block, BlockBody
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import Bytes32
+from lean_spec.spec.ssz import Bytes32, Uint64
 
 
 def _signed_genesis_block(state: State) -> SignedBlock:
     """Wrap the genesis block matching a state with an empty proof."""
-    return signed_block_with_empty_proof(reconstruct_block_from_header(state))
+    return signed_block_with_empty_proof(
+        Block(
+            slot=state.latest_block_header.slot,
+            proposer_index=state.latest_block_header.proposer_index,
+            parent_root=state.latest_block_header.parent_root,
+            state_root=hash_tree_root(state),
+            body=BlockBody(attestations=AggregatedAttestations(data=[])),
+        )
+    )
 
 
 class TestAnchorFromGenesis:
@@ -48,7 +56,9 @@ class TestAnchorFromCheckpoint:
 
     async def test_genesis_time_mismatch_raises(self) -> None:
         """Mismatched genesis time raises a typed CheckpointSyncError."""
-        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
+        checkpoint_state = build_genesis_state(
+            num_validators=3, genesis_time=Uint64(1000), keyed=False
+        )
         local_genesis = GenesisConfig.model_validate(
             {"GENESIS_TIME": 2000, "GENESIS_VALIDATORS": []}
         )
@@ -76,7 +86,9 @@ class TestAnchorFromCheckpoint:
 
     async def test_verification_failure_raises(self) -> None:
         """Structural verification failure raises CheckpointSyncError."""
-        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
+        checkpoint_state = build_genesis_state(
+            num_validators=3, genesis_time=Uint64(1000), keyed=False
+        )
         local_genesis = GenesisConfig.model_validate(
             {"GENESIS_TIME": 1000, "GENESIS_VALIDATORS": []}
         )
@@ -130,7 +142,9 @@ class TestAnchorFromCheckpoint:
 
     async def test_state_fetch_failure_propagates(self) -> None:
         """Network errors on the state fetch surface as CheckpointSyncError."""
-        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=1000)
+        checkpoint_state = build_genesis_state(
+            num_validators=3, genesis_time=Uint64(1000), keyed=False
+        )
         local_genesis = GenesisConfig.model_validate(
             {"GENESIS_TIME": 1000, "GENESIS_VALIDATORS": []}
         )
@@ -159,7 +173,9 @@ class TestAnchorFromCheckpoint:
     async def test_success_builds_store_and_status(self) -> None:
         """Successful checkpoint sync produces a populated anchor."""
         genesis_time = 1000
-        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=genesis_time)
+        checkpoint_state = build_genesis_state(
+            num_validators=3, genesis_time=Uint64(genesis_time), keyed=False
+        )
         signed_block = _signed_genesis_block(checkpoint_state)
         local_genesis = GenesisConfig.model_validate(
             {"GENESIS_TIME": genesis_time, "GENESIS_VALIDATORS": []}
@@ -196,8 +212,12 @@ class TestAnchorFromCheckpoint:
     async def test_block_state_pairing_mismatch_raises(self) -> None:
         """A block not matching the fetched state raises instead of falling back."""
         genesis_time = 1000
-        checkpoint_state = make_genesis_state(num_validators=3, genesis_time=genesis_time)
-        other_state = make_genesis_state(num_validators=4, genesis_time=genesis_time)
+        checkpoint_state = build_genesis_state(
+            num_validators=3, genesis_time=Uint64(genesis_time), keyed=False
+        )
+        other_state = build_genesis_state(
+            num_validators=4, genesis_time=Uint64(genesis_time), keyed=False
+        )
         mismatched_block = _signed_genesis_block(other_state)
         local_genesis = GenesisConfig.model_validate(
             {"GENESIS_TIME": genesis_time, "GENESIS_VALIDATORS": []}
