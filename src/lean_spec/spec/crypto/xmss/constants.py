@@ -16,45 +16,48 @@ class XmssConfig(StrictBaseModel):
     """A model holding the configuration constants for an XMSS preset."""
 
     LOG_LIFETIME: int
-    """The base-2 logarithm of the scheme's maximum lifetime."""
+    """Base-2 logarithm of the scheme's maximum lifetime, the Merkle tree height."""
 
     DIMENSION: int
-    """The total number of hash chains, v."""
+    """Number of hash chains per signature, v.
+    Security-derived: it sets how many codeword chunks a signature commits to."""
 
     BASE: int
-    """The alphabet size for the digits of the encoded message."""
+    """Alphabet size for the digits of the encoded message, the Winternitz parameter."""
 
     Z: int
     """Number of base-BASE digits extracted from each field element."""
 
     Q: int
-    """Quotient such that Q * BASE^Z == P - 1."""
+    """Quotient fixing the digit decomposition, constrained by Q * BASE^Z == P - 1."""
 
     TARGET_SUM: int
-    """The required sum of all codeword chunks for a signature to be valid."""
+    """Required sum of all codeword chunks for a signature to be valid.
+    Security-derived: it tunes the forgery resistance of the encoding."""
 
     MAX_TRIES: int
-    """How often one should try at most to resample a random value."""
+    """Maximum resampling attempts when searching for a codeword that meets the target sum.
+    Performance knob: a higher cap trades signing time for fewer hard failures."""
 
     PARAMETER_LENGTH: int
-    """The length of the public parameter P.
-
-    It is used to specialize the hash function."""
+    """Length of the public parameter P, in field elements."""
 
     TWEAK_LENGTH_FIELD_ELEMENTS: int
-    """The length of a domain-separating tweak."""
+    """Length of a domain-separating tweak, in field elements."""
 
     MESSAGE_LENGTH_FIELD_ELEMENTS: int
-    """The length of a message after being encoded into field elements."""
+    """Length of a message after being encoded into field elements."""
 
     RAND_LENGTH_FIELD_ELEMENTS: int
-    """The length of the randomness rho used during message encoding."""
+    """Length of the randomness rho used during message encoding, in field elements."""
 
     HASH_LENGTH_FIELD_ELEMENTS: int
-    """The output length of the main tweakable hash function."""
+    """Output length of the main tweakable hash function, in field elements.
+    Security-derived: it sets the collision resistance of every digest."""
 
     CAPACITY: int
-    """The capacity of the Poseidon sponge, defining its security level."""
+    """Capacity of the Poseidon sponge, in field elements.
+    Security-derived: the capacity sets the sponge's security level."""
 
     @model_validator(mode="after")
     def _validate_decomposition(self) -> Self:
