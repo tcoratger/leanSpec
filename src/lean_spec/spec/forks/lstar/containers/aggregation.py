@@ -60,8 +60,6 @@ class SingleMessageAggregate(Container):
         """
         Fold fresh signatures and child proofs into one single-message proof.
 
-        # Overview
-
         Two kinds of contribution merge into one proof.
 
         - A fresh signer contributes a single raw signature.
@@ -311,8 +309,6 @@ class MultiMessageAggregate(Container):
     ) -> None:
         """
         Verify this multi-message proof against its per-component bindings.
-
-        # The message bindings
 
         Each component is checked against one message and slot supplied by the caller.
         Without that binding the proof would accept attacker-chosen data.
