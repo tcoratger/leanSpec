@@ -60,7 +60,8 @@ class Slot(Uint64):
 
         # Rule 2: Slots at perfect square distances are justifiable.
         #
-        # Examples: delta = 1, 4, 9, 16, 25, 36, 49, 64, ...
+        # Smaller squares 1 and 4 already returned under Rule 1.
+        # First square that reaches here is 9: delta = 9, 16, 25, 36, 49, 64, ...
         # Check: integer square root squared equals delta
         if math.isqrt(delta) ** 2 == delta:
             return True
@@ -68,6 +69,8 @@ class Slot(Uint64):
         # Rule 3: Slots at pronic number distances are justifiable.
         #
         # Pronic numbers have the form n(n+1): 2, 6, 12, 20, 30, 42, 56, ...
+        # The smallest pronic 2 already returned under Rule 1.
+        # First pronic that reaches here is 6: delta = 6, 12, 20, 30, 42, 56, ...
         # Mathematical insight: For pronic delta = n(n+1), we have:
         #   4*delta + 1 = 4n(n+1) + 1 = (2n+1)^2
         # Check: 4*delta+1 is an odd perfect square
