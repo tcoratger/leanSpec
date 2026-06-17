@@ -741,7 +741,7 @@ class ForkChoiceMixin(LstarSpecBase):
         store: LstarStore,
         start_root: Bytes32,
         attestations: dict[ValidatorIndex, AttestationData],
-        min_score: int = 0,
+        min_score: int | None = None,
     ) -> Bytes32:
         """
         Walk the block tree according to the LMD GHOST rule.
@@ -778,7 +778,7 @@ class ForkChoiceMixin(LstarSpecBase):
 
         for root, block in store.blocks.items():
             # Prune low-weight branches early when a threshold is set.
-            if min_score > 0 and weights[root] < min_score:
+            if min_score is not None and weights[root] < min_score:
                 continue
 
             children_map[block.parent_root].append(root)
