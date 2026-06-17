@@ -142,9 +142,16 @@ class ForkChoiceMixin(LstarSpecBase):
         Drop attestation data whose head can no longer influence fork choice.
 
         Fork choice only ever descends from the latest finalized block.
-        A vote whose head sits at or below the finalized slot cannot name a descendant of it.
-        Such a vote carries no fork-choice weight.
-        Dropping it never changes the chosen chain.
+        A vote carries no fork-choice weight, and is dropped, when either holds:
+
+        - Its head sits at or below the finalized slot.
+        - Its head is not a descendant of the finalized block.
+
+        The first head is no later than the finalized block.
+        The second head is on a sibling branch the finalized block orphaned.
+        Neither head lies under the finalized block.
+        So neither credits any block the forward walk from the justified root can reach.
+        Dropping such a vote never changes the chosen chain.
 
         The same cutoff prunes all three attestation-keyed pools:
 
@@ -152,25 +159,35 @@ class ForkChoiceMixin(LstarSpecBase):
         - Pending aggregated proofs not yet counted.
         - Aggregated proofs already counted toward fork choice.
         """
-        # Keep only entries whose attested head sits strictly above the finalized slot.
+
+        # An entry survives only when its head still lives under the finalized block.
         #
+        # The slot guard rejects heads at or below the finalized slot cheaply.
+        # The ancestry guard then rejects heads on a finalized-orphaned sibling branch.
+        # Such heads sit above the finalized slot yet never descend from the finalized block.
         # Every pool shares the same vote key, so one staleness test filters all three.
+        def head_lives_under_finalized(attestation_data: AttestationData) -> bool:
+            head = attestation_data.head
+            return head.slot > store.latest_finalized.slot and self._checkpoint_is_ancestor(
+                store, store.latest_finalized, head
+            )
+
         return store.model_copy(
             update={
                 "attestation_signatures": {
                     attestation_data: signatures
                     for attestation_data, signatures in store.attestation_signatures.items()
-                    if attestation_data.head.slot > store.latest_finalized.slot
+                    if head_lives_under_finalized(attestation_data)
                 },
                 "latest_new_aggregated_payloads": {
                     attestation_data: proofs
                     for attestation_data, proofs in store.latest_new_aggregated_payloads.items()
-                    if attestation_data.head.slot > store.latest_finalized.slot
+                    if head_lives_under_finalized(attestation_data)
                 },
                 "latest_known_aggregated_payloads": {
                     attestation_data: proofs
                     for attestation_data, proofs in store.latest_known_aggregated_payloads.items()
-                    if attestation_data.head.slot > store.latest_finalized.slot
+                    if head_lives_under_finalized(attestation_data)
                 },
             }
         )
