@@ -20,7 +20,7 @@ from lean_spec.spec.forks.lstar.containers.participation import AggregationBits
 from lean_spec.spec.forks.lstar.slot import Slot
 from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Container
 
-LOG_INV_RATE: int = 1 if LEAN_ENV == "test" else 2
+LOG_INVERSE_RATE: int = 1 if LEAN_ENV == "test" else 2
 """
 Inverse-rate exponent forwarded to the SNARK backend.
 
@@ -112,7 +112,7 @@ class SingleMessageAggregate(Container):
                 raw_signatures_ssz,
                 bytes(message),
                 int(slot),
-                LOG_INV_RATE,
+                LOG_INVERSE_RATE,
                 children_bytes or None,
                 mode=LEAN_ENV,
             )
@@ -242,7 +242,7 @@ class MultiMessageAggregate(Container):
         try:
             _, multi_message_aggregate_wire = merge_many_single_message_proof(
                 single_message_aggregate_entries,
-                LOG_INV_RATE,
+                LOG_INVERSE_RATE,
                 mode=LEAN_ENV,
             )
         except Exception as exception:
@@ -291,7 +291,7 @@ class MultiMessageAggregate(Container):
                 public_keys_per_component_ssz,
                 bytes(self.proof.data),
                 bytes(message),
-                LOG_INV_RATE,
+                LOG_INVERSE_RATE,
                 mode=LEAN_ENV,
             )
         except Exception as exception:
