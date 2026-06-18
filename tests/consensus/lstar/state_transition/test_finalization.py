@@ -7,7 +7,7 @@ from consensus_testing import (
     BlockSpec,
     StateExpectation,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import Slot, ValidatorIndex
@@ -238,7 +238,7 @@ def test_no_finalization_when_intermediate_justifiable_slot_exists(
     - the justified-slots bitfield marks slots 1 and 4.
     - no pending votes remain.
     """
-    pre = generate_pre_state()
+    pre = build_genesis_state()
     anchor_state = LstarSpec().process_slots(pre, Slot(1))
     anchor_root = hash_tree_root(anchor_state.latest_block_header)
 

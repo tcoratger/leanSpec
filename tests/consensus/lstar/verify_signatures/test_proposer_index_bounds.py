@@ -7,7 +7,7 @@ from consensus_testing import (
     ExpectedRejection,
     SetProposerIndex,
     VerifySignaturesTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
@@ -36,7 +36,7 @@ def test_proposer_index_out_of_range_rejected(
     - this is distinct from the wrong-but-in-range proposer check during state transition.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[],

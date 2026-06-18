@@ -12,7 +12,7 @@ from consensus_testing import (
     GossipAttestationSpec,
     StoreChecks,
     TickStep,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -146,7 +146,7 @@ def test_interval_2_aggregator_aggregates_raw_signatures(
     - the raw signature pool drops the absorbed copies.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),

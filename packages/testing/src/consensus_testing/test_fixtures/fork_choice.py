@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from pydantic import Field
 
-from consensus_testing.genesis import generate_pre_state, reconstruct_block_from_header
+from consensus_testing.genesis import build_genesis_state, reconstruct_block_from_header
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import (
@@ -85,7 +85,7 @@ class ForkChoiceTest(BaseTestSpec):
     description: ClassVar[str] = "Tests event-driven fork choice through Store operations"
     """Human-readable summary for fixture documentation."""
 
-    anchor_state: State = Field(default_factory=generate_pre_state)
+    anchor_state: State = Field(default_factory=build_genesis_state)
     """
     Initial trusted consensus state.
 
@@ -136,10 +136,7 @@ class ForkChoiceTest(BaseTestSpec):
         """
         if self.anchor_block is not None:
             return self.anchor_block
-        # Build a minimal genesis block from the state's header fields.
-        #
-        # The state already contains the block header.
-        # We extract its fields to create a matching Block.
+        # The state already carries the block header, so rebuild the matching block.
         return reconstruct_block_from_header(self.anchor_state)
 
     def _resolved_max_slot(self) -> Slot:

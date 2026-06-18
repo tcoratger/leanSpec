@@ -8,7 +8,7 @@ from consensus_testing import (
     BlockStep,
     ForkChoiceTestFiller,
     StoreChecks,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -49,7 +49,7 @@ def test_head_retreats_onto_shorter_justified_fork(
     - head becomes b_2 at slot 2, retreating from slot 10.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(2), parent_label="genesis", label="a_2"),
@@ -143,7 +143,7 @@ def test_block_that_justifies_reanchors_within_one_import(
     - head switches to other_5, abandoning the lead fork in the same import.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
@@ -229,7 +229,7 @@ def test_equal_slot_justified_candidate_keeps_original_root(
     - head stays on fork A at a_2, never anchoring to fork B.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), parent_label="genesis", label="a_1"),

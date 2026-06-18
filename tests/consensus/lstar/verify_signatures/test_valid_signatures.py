@@ -6,7 +6,7 @@ from consensus_testing import (
     AggregatedAttestationSpec,
     BlockSpec,
     VerifySignaturesTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -33,7 +33,7 @@ def test_proposer_signature(
     - verification passes against the proposer public key in the state.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=2),
+        anchor_state=build_genesis_state(num_validators=2),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[],
@@ -64,7 +64,7 @@ def test_proposer_and_attester_signatures(
     - verification passes for the aggregated attester signatures.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=3),
+        anchor_state=build_genesis_state(num_validators=3),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[
@@ -100,7 +100,7 @@ def test_all_four_validators_attesting(
     - verification passes for the complete validator set.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[
@@ -136,7 +136,7 @@ def test_single_validator_attestation(
     - verification passes for the single-validator aggregate.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[
@@ -174,7 +174,7 @@ def test_multiple_attestation_groups_same_data(
     - verification passes for the merged group.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=4),
+        anchor_state=build_genesis_state(num_validators=4),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[

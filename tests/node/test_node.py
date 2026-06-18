@@ -12,8 +12,7 @@ import pytest
 from consensus_testing import (
     MockEventSource,
     MockNetworkRequester,
-    make_genesis_state,
-    make_validators,
+    build_genesis_state,
 )
 from consensus_testing.keys import XmssKeyManager
 from lean_spec.node.api import ApiServerConfig
@@ -42,10 +41,11 @@ from lean_spec.spec.forks.lstar.containers import (
     JustifiedSlots,
     MultiMessageAggregate,
     SignedBlock,
+    Validator,
     Validators,
 )
 from lean_spec.spec.forks.lstar.spec import LstarSpec
-from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Uint64
+from lean_spec.spec.ssz import ByteList512KiB, Bytes32, Bytes52, Uint64
 
 GENESIS_TIME = Uint64(1704067200)
 
@@ -108,7 +108,16 @@ def node_config() -> NodeConfig:
     """Provide a basic node configuration for tests."""
     return NodeConfig(
         genesis_time=GENESIS_TIME,
-        validators=make_validators(3),
+        validators=Validators(
+            data=[
+                Validator(
+                    attestation_public_key=Bytes52(b"\x00" * 52),
+                    proposal_public_key=Bytes52(b"\x00" * 52),
+                    index=ValidatorIndex(validator_position),
+                )
+                for validator_position in range(3)
+            ]
+        ),
         event_source=MockEventSource(),
         network=MockNetworkRequester(),
         fork=LstarSpec(),
@@ -781,7 +790,7 @@ class TestNodeFromGenesisAnchorStore:
 
     def test_anchor_store_is_used_when_provided(self, spec: LstarSpec) -> None:
         """The node adopts the provided anchor store rather than synthesising one."""
-        state = make_genesis_state(num_validators=3, genesis_time=1000)
+        state = build_genesis_state(num_validators=3, genesis_time=Uint64(1000), keyed=False)
         anchor_block = Block(
             slot=state.latest_block_header.slot,
             proposer_index=state.latest_block_header.proposer_index,

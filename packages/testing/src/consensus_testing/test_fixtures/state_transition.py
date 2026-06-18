@@ -4,7 +4,7 @@ from typing import ClassVar
 
 from pydantic import Field, model_validator
 
-from consensus_testing.genesis import generate_pre_state
+from consensus_testing.genesis import build_genesis_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import AggregatedAttestationSpec, BlockSpec, StateExpectation
@@ -74,7 +74,7 @@ class StateTransitionTest(BaseTestSpec):
         "epochs, and finality"
     )
 
-    pre: State = Field(default_factory=generate_pre_state)
+    pre: State = Field(default_factory=build_genesis_state)
     """
     The initial consensus state before processing.
 

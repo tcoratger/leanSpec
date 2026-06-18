@@ -8,7 +8,7 @@ from consensus_testing import (
     BlockStep,
     ForkChoiceTestFiller,
     StoreChecks,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
@@ -520,7 +520,7 @@ def test_head_selection_by_weight_not_depth(
     - justified stays at slot 0.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=6),
+        anchor_state=build_genesis_state(num_validators=6),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="common"),
@@ -620,7 +620,7 @@ def test_fork_from_before_finalization_not_considered(
     - the walk never descends into the dead fork, so its weight cannot count.
     """
     fork_choice_test(
-        anchor_state=generate_pre_state(num_validators=8),
+        anchor_state=build_genesis_state(num_validators=8),
         steps=[
             BlockStep(
                 block=BlockSpec(slot=Slot(1), label="block_1"),

@@ -3,11 +3,7 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from consensus_testing.genesis import (
-    build_anchor,
-    generate_pre_state,
-    reconstruct_block_from_header,
-)
+from consensus_testing.genesis import build_anchor
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from lean_spec.base import StrictBaseModel
 from lean_spec.spec.forks import Slot
@@ -50,15 +46,8 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
     historical roots, and multi-node fork-choice trees.
     """
     fork = LstarSpec()
-    if anchor_slot == 0:
-        state = generate_pre_state(
-            fork=fork, genesis_time=Uint64(genesis_time), num_validators=num_validators
-        )
-        block = reconstruct_block_from_header(state)
-        # No validator identity — fixture only reads store data, never signs.
-        return fork.create_store(state, block, validator_index=None)
-
     # Walk the chain from genesis through anchor_slot using empty blocks.
+    # Slot 0 makes the builder return the genesis pair with no advance.
     # The returned pair (state, block) is internally consistent with the
     # historical chain the fixture wants to present to the endpoint.
     state, block = build_anchor(
@@ -67,6 +56,7 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
         anchor_slot=Slot(anchor_slot),
         genesis_time=Uint64(genesis_time),
     )
+    # No validator identity — fixture only reads store data, never signs.
     return fork.create_store(state, block, validator_index=None)
 
 

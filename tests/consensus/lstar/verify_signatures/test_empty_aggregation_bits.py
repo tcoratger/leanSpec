@@ -8,7 +8,7 @@ from consensus_testing import (
     ClearFirstAttestationBits,
     ExpectedRejection,
     VerifySignaturesTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
 
@@ -35,7 +35,7 @@ def test_empty_aggregation_bits_rejected(
     - verification is rejected because the aggregate names no participants.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=3),
+        anchor_state=build_genesis_state(num_validators=3),
         block=BlockSpec(
             slot=Slot(1),
             attestations=[

@@ -12,7 +12,7 @@ from consensus_testing import (
     SwapFirstTwoAttestations,
     VerifySignaturesTestFiller,
     build_anchor,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import RejectionReason, Slot, ValidatorIndex
@@ -43,7 +43,7 @@ def test_corrupt_proof_rejected(
     - the aggregate envelope cannot be decoded.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=1),
+        anchor_state=build_genesis_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=CorruptProof(),
         expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
@@ -72,7 +72,7 @@ def test_proof_component_count_mismatch_rejected(
     - the proof component count no longer matches the body plus the proposer.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=1),
+        anchor_state=build_genesis_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=AppendPhantomAttestation(),
         expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),
@@ -103,7 +103,7 @@ def test_proof_reused_under_different_message_rejected(
     - the proposer component no longer matches the recomputed block root.
     """
     verify_signatures_test(
-        anchor_state=generate_pre_state(num_validators=1),
+        anchor_state=build_genesis_state(num_validators=1),
         block=BlockSpec(slot=Slot(1), attestations=[]),
         tamper=MutateStateRoot(),
         expected_rejection=ExpectedRejection(reason=RejectionReason.INVALID_BLOCK_PROOF),

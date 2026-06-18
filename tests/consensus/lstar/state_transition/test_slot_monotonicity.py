@@ -6,7 +6,7 @@ from consensus_testing import (
     BlockSpec,
     ExpectedRejection,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import RejectionReason, Slot
 from lean_spec.spec.forks.lstar.spec import LstarSpec
@@ -33,7 +33,7 @@ def test_process_slots_target_equal_to_state_slot_rejected(
     - slot advancement targets slot 1, which is not in the future.
     - the block is rejected as not in the future.
     """
-    pre_state = generate_pre_state()
+    pre_state = build_genesis_state()
     pre_state = LstarSpec().process_slots(pre_state, Slot(1))
 
     state_transition_test(
@@ -70,7 +70,7 @@ def test_block_at_parent_slot_rejected_when_slot_processing_skipped(
     - the second block is not newer than the chain tip header.
     - the block is rejected as older than the latest header.
     """
-    pre_state = generate_pre_state()
+    pre_state = build_genesis_state()
     pre_state = LstarSpec().process_slots(pre_state, Slot(1))
 
     state_transition_test(

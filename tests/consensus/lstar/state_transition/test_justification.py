@@ -7,7 +7,7 @@ from consensus_testing import (
     BlockSpec,
     StateExpectation,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
@@ -91,7 +91,7 @@ def test_even_validator_threshold_boundary(
     - block_1's slot is justified.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=6),
+        pre=build_genesis_state(num_validators=6),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -142,7 +142,7 @@ def test_below_threshold_support_does_not_justify(
     - justified stays at slot 0.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=6),
+        pre=build_genesis_state(num_validators=6),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -195,7 +195,7 @@ def test_votes_accumulate_across_blocks(
     - no pending votes remain.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=6),
+        pre=build_genesis_state(num_validators=6),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -331,7 +331,7 @@ def test_repeated_validator_does_not_double_count_within_same_block(
     - the pending tally marks V0, V1, V2 only.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=6),
+        pre=build_genesis_state(num_validators=6),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -578,7 +578,7 @@ def test_split_supermajority_aggregations_in_same_block_justify(
     - no pending votes remain.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=6),
+        pre=build_genesis_state(num_validators=6),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -642,7 +642,7 @@ def test_odd_validator_threshold_boundary_justifies(
     - no pending votes remain.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=5),
+        pre=build_genesis_state(num_validators=5),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -699,7 +699,7 @@ def test_odd_validator_threshold_boundary_does_not_justify(
     - the pending tally marks V0, V1, V2 only.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=5),
+        pre=build_genesis_state(num_validators=5),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -935,7 +935,7 @@ def test_justification_clears_only_the_resolved_target_votes(
     - the pending tally for block_2 marks V0, V1 only.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=6),
+        pre=build_genesis_state(num_validators=6),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(

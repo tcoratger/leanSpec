@@ -11,8 +11,8 @@ if "LEAN_ENV" not in os.environ:
     os.environ["LEAN_ENV"] = "test"
 
 from consensus_testing import (  # noqa: E402
-    make_genesis_state,
-    make_genesis_store,
+    build_genesis_state,
+    build_genesis_store,
     reconstruct_block_from_header,
 )
 from consensus_testing.keys import XmssKeyManager  # noqa: E402
@@ -41,7 +41,7 @@ def key_manager() -> XmssKeyManager:
 @pytest.fixture
 def genesis_state() -> State:
     """Genesis state with 3 null-key validators at time 0."""
-    return make_genesis_state(num_validators=3)
+    return build_genesis_state(num_validators=3, keyed=False)
 
 
 @pytest.fixture
@@ -53,10 +53,10 @@ def genesis_block(genesis_state: State) -> Block:
 @pytest.fixture
 def base_store() -> Store:
     """Fork choice store on null-key genesis with 3 validators."""
-    return make_genesis_store(num_validators=3, keyed=False)
+    return build_genesis_store(num_validators=3, keyed=False)
 
 
 @pytest.fixture
 def keyed_store() -> Store:
     """Fork choice store on keyed genesis with 8 validators, owned by validator 0."""
-    return make_genesis_store(num_validators=8)
+    return build_genesis_store(num_validators=8)

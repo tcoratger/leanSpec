@@ -79,6 +79,15 @@ convention = "google"
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
+[tool.ruff.lint.flake8-bugbear]
+# These types are immutable, so constructing one as an argument default is safe.
+# Uint64 and ValidatorIndex are frozen integer types; the fork facade is stateless.
+extend-immutable-calls = [
+    "lean_spec.spec.ssz.Uint64",
+    "lean_spec.spec.forks.ValidatorIndex",
+    "lean_spec.spec.forks.lstar.spec.LstarSpec",
+]
+
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-single-line = false

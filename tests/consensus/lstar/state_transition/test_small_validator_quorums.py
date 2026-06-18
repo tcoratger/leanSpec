@@ -7,7 +7,7 @@ from consensus_testing import (
     BlockSpec,
     StateExpectation,
     StateTransitionTestFiller,
-    generate_pre_state,
+    build_genesis_state,
 )
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
@@ -45,7 +45,7 @@ def test_two_validators_single_vote_does_not_justify(
     - the pending tally marks V0 only.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=2),
+        pre=build_genesis_state(num_validators=2),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -104,7 +104,7 @@ def test_two_validators_unanimous_votes_justify(
     - no pending votes remain.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=2),
+        pre=build_genesis_state(num_validators=2),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(
@@ -160,7 +160,7 @@ def test_three_validators_two_votes_justify(
     - no pending votes remain.
     """
     state_transition_test(
-        pre=generate_pre_state(num_validators=3),
+        pre=build_genesis_state(num_validators=3),
         blocks=[
             BlockSpec(slot=Slot(1), label="block_1"),
             BlockSpec(

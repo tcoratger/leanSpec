@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from pydantic import Field
 
-from consensus_testing.genesis import generate_pre_state
+from consensus_testing.genesis import build_genesis_state
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
 from consensus_testing.test_types import BlockSpec
@@ -126,7 +126,7 @@ class VerifySignaturesTest(BaseTestSpec):
     format_name: ClassVar[str] = "verify_signatures_test"
     description: ClassVar[str] = "Tests signature verification for signed blocks."
 
-    anchor_state: State = Field(default_factory=generate_pre_state)
+    anchor_state: State = Field(default_factory=build_genesis_state)
     """
     The initial consensus state before processing.
 

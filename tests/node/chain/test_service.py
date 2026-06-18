@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from consensus_testing import make_genesis_store
+from consensus_testing import build_genesis_store
 from lean_spec.node.chain import SlotClock
 from lean_spec.node.chain.service import ChainService
 from lean_spec.spec.forks import Checkpoint, Interval, LstarSpec, Slot
@@ -126,7 +126,7 @@ def make_service(
         A chain service wired to the stub sync service and the clock.
     """
     sync_service = SyncServiceStub(
-        store=make_genesis_store(genesis_time=genesis_seconds),
+        store=build_genesis_store(genesis_time=genesis_seconds),
         is_aggregator=is_aggregator,
         publish_aggregated_attestation=publisher,
     )
@@ -209,7 +209,7 @@ class TestCatchUp:
         #
         # The swapped store carries a distinctive genesis time so the final store
         # can be traced back to it rather than to the stale original object.
-        swapped = make_genesis_store(genesis_time=2000, time=Interval(1))
+        swapped = build_genesis_store(genesis_time=2000, time=Interval(1))
         swap = {"done": False}
 
         async def swap_store_once(duration: float) -> None:
