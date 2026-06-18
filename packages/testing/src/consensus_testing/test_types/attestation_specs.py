@@ -172,24 +172,22 @@ class AggregatedAttestationSpec(AttestationSpec):
         validator_indices = self.validator_indices
         signer_indices = self.signer_indices or self.validator_indices
 
-        # Path 0: raw bit override with placeholder proof bytes.
-        # An honest aggregate can never carry zero participants.
-        # This is the only way to feed the gossip path an adversarial empty-bit aggregate.
-        if self.aggregation_bits is not None:
-            placeholder = ByteList512KiB(data=b"\x00" * 32)
-            proof = SingleMessageAggregate(
-                participants=self.aggregation_bits,
-                proof=placeholder,
+        # Path 0/1: placeholder proof bytes, two adversarial cases sharing one branch.
+        # Path 0 is a raw bit override: an honest aggregate can never carry zero
+        # participants, so this is the only way to feed the gossip path an adversarial
+        # empty-bit aggregate, with the override used verbatim as the participant bitfield.
+        # Path 1 is an invalid signature: the correct participant bitfield derived from the
+        # validator indices, with zeroed-out proof bytes to exercise rejection.
+        # The participants check is explicit `is not None`: an AggregationBits may be falsy.
+        if self.aggregation_bits is not None or not self.valid_signature:
+            participants = (
+                self.aggregation_bits
+                if self.aggregation_bits is not None
+                else AggregationBits.from_indices(validator_indices)
             )
-            return SignedAggregatedAttestation(data=attestation_data, proof=proof)
-
-        # Path 1: invalid signature.
-        # Correct participant bitfield, zeroed-out proof bytes to exercise rejection.
-        if not self.valid_signature:
-            placeholder = ByteList512KiB(data=b"\x00" * 32)
             proof = SingleMessageAggregate(
-                participants=AggregationBits.from_indices(validator_indices),
-                proof=placeholder,
+                participants=participants,
+                proof=ByteList512KiB(data=b"\x00" * 32),
             )
             return SignedAggregatedAttestation(data=attestation_data, proof=proof)
 
