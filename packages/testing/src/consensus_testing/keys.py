@@ -1,19 +1,7 @@
 """
-XMSS Key Management for Consensus Testing
+XMSS key management for test validators.
 
-Management of XMSS key pairs for test validators.
-
-Keys are pre-generated and cached on disk to avoid expensive generation
-during tests.
-The companion CLI module generates or downloads them.
-
-File format:
-
-- Each key pair is stored in a separate JSON file with hex-encoded SSZ.
-- Directory structure: `test_keys/{scheme}_scheme/{index}.json`
-- The top-level object has two roles, each containing a public and secret blob:
-  `{"attestation_keypair": {"public_key": ..., "secret_key": ...},
-    "proposal_keypair":    {"public_key": ..., "secret_key": ...}}`
+Keys are pre-generated and cached on disk to avoid expensive generation during tests.
 """
 
 from __future__ import annotations
@@ -60,40 +48,20 @@ LEAN_ENV_TO_SCHEMES: dict[str, GeneralizedXmssScheme] = {
     "test": TEST_SIGNATURE_SCHEME,
     "prod": PROD_SIGNATURE_SCHEME,
 }
-"""
-Maps short scheme names to their XMSS scheme instances.
-
-Used for:
-
-- CLI argument validation
-- Deriving on-disk directory names for cached keys
-- Keying the per-scheme manager cache in test fixtures
-"""
+"""Short scheme names mapped to their XMSS scheme instances."""
 
 
 def create_dummy_signature() -> Signature:
-    """
-    Create a structurally valid but cryptographically meaningless signature.
-
-    All fields are zero-filled.
-    The result has correct dimensions so it passes structural checks,
-    but it will fail any cryptographic verification.
-
-    Returns:
-        A zero-valued signature with correct field sizes.
-    """
-    # Build a single zero-filled hash digest with the scheme's hash length.
+    """Create a zero-filled signature that passes structural checks but fails verification."""
     zero_digest = HashDigestVector(data=[Fp(0)] * TARGET_CONFIG.HASH_LENGTH_FIELD_ELEMENTS)
 
     # The Merkle authentication path needs one sibling per tree level.
-    #
     # The tree height equals the log of the key lifetime.
     siblings = HashDigestList(data=[zero_digest] * TARGET_CONFIG.LOG_LIFETIME)
 
     # Winternitz one-time signatures use one hash chain per dimension.
     hashes = HashDigestList(data=[zero_digest] * TARGET_CONFIG.DIMENSION)
 
-    # Assemble a complete signature with all components zeroed out.
     return Signature(
         path=HashTreeOpening(siblings=siblings),
         rho=Randomness(data=[Fp(0)] * TARGET_CONFIG.RAND_LENGTH_FIELD_ELEMENTS),
@@ -102,23 +70,11 @@ def create_dummy_signature() -> Signature:
 
 
 DEFAULT_MAX_SLOT = Slot(10)
-"""
-Default max slot for the shared key manager.
-
-Slot 10 is high enough for most unit tests while keeping key generation fast.
-"""
+"""Default max slot, high enough for most unit tests while keeping key generation fast."""
 
 
 def get_keys_directory(scheme_name: str) -> Path:
-    """
-    Resolve the on-disk directory that holds key files for a scheme.
-
-    Args:
-        scheme_name: Short scheme identifier (e.g. "test" or "prod").
-
-    Returns:
-        Absolute path to the scheme's key directory.
-    """
+    """Resolve the on-disk directory that holds key files for a scheme."""
     return Path(__file__).parent / "test_keys" / f"{scheme_name}_scheme"
 
 
@@ -126,11 +82,7 @@ def compute_key_set_digest(keys_directory: Path) -> str:
     """
     Compute the SHA-256 digest identifying a directory's key set.
 
-    Hashes every validator's public keys in ascending index order.
     Two fills agree on vectors only if they agree on this digest.
-
-    Args:
-        keys_directory: Directory holding per-validator key files.
 
     Returns:
         Hex digest prefixed with 0x.
@@ -149,16 +101,8 @@ class XmssKeyManager:
     """
     Stateful manager for XMSS signing in tests.
 
-    XMSS is a stateful signature scheme.
-
-    Each signing operation consumes a one-time leaf and advances the key state forward.
-    This manager tracks that state across slots and validators.
-
-    Keys are lazily loaded from disk on first access, with a three-tier cache:
-
-    - Raw JSON (lightweight hex strings, ~2.7 KB per validator)
-    - Deserialized public keys only (avoids the heavy secret key objects)
-    - Advanced secret key state as live Python objects
+    Each signing operation consumes a one-time leaf and advances the key.
+    Keys load lazily into a three-tier cache: raw JSON, public keys, advanced secret state.
     """
 
     __slots__ = (
@@ -174,27 +118,11 @@ class XmssKeyManager:
     )
 
     _cache: ClassVar[dict[str, XmssKeyManager]] = {}
-    """
-    Per-scheme singleton cache for shared managers.
-
-    Replaced when a caller requests a larger max slot than what is cached.
-    """
+    """Per-scheme singleton cache, replaced when a wider max slot is requested."""
 
     @classmethod
     def shared(cls, max_slot: Slot = DEFAULT_MAX_SLOT) -> XmssKeyManager:
-        """
-        Return a shared manager, creating or replacing it as needed.
-
-        The cache holds one manager per scheme.
-        If the cached manager already covers the requested slot range, reuse it.
-        Otherwise, create a fresh one with the wider range.
-
-        Args:
-            max_slot: Highest slot the manager must support. Defaults to 10.
-
-        Returns:
-            A manager valid for at least the requested slot range.
-        """
+        """Return a shared manager, reusing the cache when its range covers the requested slot."""
         # A cached manager is usable if its range covers the requested max slot.
         cached = cls._cache.get(LEAN_ENV)
         if cached is not None and cached.max_slot >= max_slot:
@@ -210,12 +138,8 @@ class XmssKeyManager:
         """
         Clear advanced secret-key state from the cached manager.
 
-        XMSS keys are stateful — signing advances the key past used slots.
-        Without resetting, a test that signs at high slots poisons the cache
-        for later tests that need low-slot signatures.
-
-        Only the mutable signing state is cleared. The JSON and public-key
-        caches are immutable and preserved to avoid expensive re-loading.
+        Without a reset, signing at high slots poisons low-slot signing for later tests.
+        Only the mutable signing state is cleared; the immutable caches stay to avoid re-loading.
         """
         cached = cls._cache.get(LEAN_ENV)
         if cached is not None:
@@ -233,7 +157,7 @@ class XmssKeyManager:
         # Raw JSON cache: nested dict of hex-encoded SSZ strings, very lightweight.
         self._json_cache: dict[ValidatorIndex, dict[str, dict[str, str]]] = {}
 
-        # Deserialized public key pairs, still avoids secret key overhead.
+        # Deserialized public key pairs, avoiding secret key overhead.
         self._public_cache: dict[ValidatorIndex, tuple[PublicKey, PublicKey]] = {}
 
         # Populated lazily on first directory scan.
@@ -247,18 +171,12 @@ class XmssKeyManager:
 
     def _scan_indices(self) -> set[ValidatorIndex]:
         """
-        Discover which validator indices have key files on disk.
-
-        The result is cached after the first call.
-
-        Returns:
-            Set of validator indices with available key files.
+        Discover which validator indices have key files on disk, caching the result.
 
         Raises:
             FileNotFoundError: If the directory is missing or empty.
         """
         if self._available_indices is None:
-            # Verify the key directory exists before scanning.
             if not self._keys_directory.exists():
                 raise FileNotFoundError(
                     f"Keys directory not found: {self._keys_directory} - "
@@ -283,20 +201,12 @@ class XmssKeyManager:
         """
         Load raw JSON for a single validator, caching the result.
 
-        The JSON has two role keys, each holding hex-encoded SSZ blobs.
-        Keeping them as strings avoids the cost of deserializing secret keys.
-
-        Args:
-            index: Validator index to load.
-
-        Returns:
-            Nested dictionary of hex-encoded SSZ strings keyed by role then field.
+        Keeping the blobs as hex strings avoids the cost of deserializing secret keys.
 
         Raises:
             KeyError: If no key file exists for the index.
         """
         if index not in self._json_cache:
-            # Resolve the per-validator JSON file path.
             key_file = self._keys_directory / f"{index}.json"
             try:
                 with key_file.open() as key_file_handle:
@@ -309,17 +219,8 @@ class XmssKeyManager:
         """
         Deserialize a single secret key from disk.
 
-        Only the requested role's secret is decoded into a full Python object.
-        The other three fields remain as lightweight hex strings in the cache.
-
-        Args:
-            index: Validator index to look up.
-            role: Which signing role's secret to decode (attestation or proposal).
-
-        Returns:
-            The deserialized secret key.
+        Only the requested role's secret is decoded; the rest stay as lightweight hex strings.
         """
-        # Load the raw JSON (cached), then decode only the requested field.
         data = self._load_json(index)
         return SecretKey.decode_bytes(bytes.fromhex(data[f"{role}_keypair"]["secret_key"]))
 
@@ -327,8 +228,7 @@ class XmssKeyManager:
         """
         Fully deserialize a key pair including secrets.
 
-        Prefer using the public-key or signing accessors to avoid loading
-        heavy secret key objects unnecessarily.
+        Prefer the public-key or signing accessors to avoid loading heavy secret key objects.
         """
         try:
             return ValidatorKeyPair.model_validate(self._load_json(index))
@@ -350,30 +250,21 @@ class XmssKeyManager:
         return iter(sorted(self._scan_indices()))
 
     def key_set_digest(self) -> str:
-        """
-        Return the digest identifying this manager's on-disk key set.
-
-        Computed once and cached for the manager's lifetime.
-        """
+        """Return the digest identifying this manager's on-disk key set, computed once."""
         if self._key_set_digest is None:
             self._key_set_digest = compute_key_set_digest(self._keys_directory)
         return self._key_set_digest
 
     def get_public_keys(self, index: ValidatorIndex) -> tuple[PublicKey, PublicKey]:
         """
-        Return attestation and proposal public keys without touching secrets.
+        Return the attestation and proposal public keys without touching secrets.
 
-        Only the public key portions are deserialized from the hex JSON.
-        Secret keys (~2.7 KB raw, ~370 MB as Python objects) are not touched.
-
-        Args:
-            index: Validator index to look up.
+        Decoding the secret keys would cost ~370 MB of Python objects, so it is avoided.
 
         Returns:
             Tuple of (attestation public key, proposal public key).
         """
         if index not in self._public_cache:
-            # Decode only the two public key fields from the raw JSON.
             data = self._load_json(index)
             self._public_cache[index] = (
                 PublicKey.decode_bytes(bytes.fromhex(data["attestation_keypair"]["public_key"])),
@@ -391,51 +282,34 @@ class XmssKeyManager:
         """
         Core signing logic shared by attestation and proposal paths.
 
-        XMSS keys have a "prepared interval" -- the range of slots the key
-        can currently sign for. If the target slot falls outside that range,
-        the key state must be advanced forward until the slot is covered.
-
-        Memory strategy:
-
-        1. On cache miss, deserialize the key once from disk
-        2. Advance and sign
-        3. Keep the advanced object for the next sign
-
-        Args:
-            validator_index: Which validator's key to use.
-            slot: Target slot to sign for.
-            message: The 32-byte message digest to sign.
-            role: Which signing role's key (attestation or proposal) to advance.
+        An XMSS key has a prepared interval, the range of slots it can currently sign.
+        A target slot outside that range forces the key state forward until the slot is covered.
 
         Raises:
             ValueError: If the slot exceeds the key's total lifetime.
         """
         cache_key = (validator_index, role)
 
-        # Reuse the cached object directly when present, else decode from disk.
-        # Holding the object avoids the bytes-to-object round-trip on every sign.
-        # That round-trip dominated prod-scheme runtime under the compact-bytes cache.
+        # Reuse the cached object when present, else decode from disk.
+        # Holding the object avoids a bytes-to-object round-trip that dominated prod-scheme runtime.
         if cache_key in self._secret_state:
             secret_key = self._secret_state[cache_key]
         else:
             secret_key = self._get_secret_key(validator_index, role)
 
-        # Advance the key state until the target slot falls within the prepared interval.
-        #
-        # Each advancement step extends the interval by consuming the next one-time signing leaf.
+        # Advance the key until the target slot falls within the prepared interval.
+        # Each step extends the interval by consuming the next one-time signing leaf.
         prepared = self.scheme.get_prepared_interval(secret_key)
         while int(slot) not in prepared:
             activation = self.scheme.get_activation_interval(secret_key)
 
-            # If the prepared interval already reaches the activation boundary,
-            # no further advancement is possible, the key is exhausted.
+            # Reaching the activation boundary means the key is exhausted.
             if prepared.stop >= activation.stop:
                 raise ValueError(f"Slot {slot} exceeds key lifetime {activation.stop}")
 
             secret_key = self.scheme.advance_preparation(secret_key)
             prepared = self.scheme.get_prepared_interval(secret_key)
 
-        # Produce the signature for the target slot.
         signature = self.scheme.sign(secret_key, slot, message)
 
         # Park the advanced object back in the cache for the next sign.
@@ -451,12 +325,7 @@ class XmssKeyManager:
         """
         Sign attestation data using the validator's attestation key.
 
-        Advances only the attestation key state.
-        The proposal key remains untouched.
-
-        Args:
-            validator_index: Which validator signs.
-            attestation_data: The attestation to sign.
+        Advances only the attestation key state, leaving the proposal key untouched.
 
         Returns:
             XMSS signature over the attestation data root.
@@ -464,8 +333,6 @@ class XmssKeyManager:
         Raises:
             ValueError: If the attestation slot exceeds key lifetime.
         """
-        # Derive the message digest from the attestation data and delegate
-        # to the shared signing logic with the attestation secret.
         return self._sign_with_secret(
             validator_index,
             attestation_data.slot,
@@ -482,13 +349,7 @@ class XmssKeyManager:
         """
         Sign a block root using the validator's proposal key.
 
-        Advances only the proposal key state.
-        The attestation key remains untouched.
-
-        Args:
-            validator_index: Which validator signs.
-            slot: Slot of the block being proposed.
-            block_root: The hash tree root of the block.
+        Advances only the proposal key state, leaving the attestation key untouched.
 
         Returns:
             XMSS signature over the block root.
@@ -507,22 +368,16 @@ class XmssKeyManager:
         """
         Sign attestation data with each validator and aggregate the result.
 
-        Returns a single-message aggregate proof binding all participants
-        to the (data, slot) pair.
-
-        Each validator's XMSS attestation key signs the attestation data
-        root. The signatures are then handed to the multi-signature
-        binding to produce a single cryptographically valid single-message aggregate proof
-        binding all participants to (data, slot).
+        Each key signs the data root, then a binding folds them into one proof over data and slot.
 
         Args:
             validator_indices: Validators to sign with.
             attestation_data: The attestation data to sign.
-            precomputed_signatures: Optional pre-computed signatures keyed by
-                validator index. Missing entries are signed on the fly.
+            precomputed_signatures: Optional signatures keyed by validator index.
+                Missing entries are signed on the fly.
 
         Returns:
-            Cryptographically valid single-message aggregate proof covering validator_indices.
+            A single-message aggregate proof covering the given validators.
         """
         signatures = precomputed_signatures or {}
         raw_xmss = [
@@ -548,31 +403,19 @@ class XmssKeyManager:
         | None = None,
     ) -> list[SingleMessageAggregate]:
         """
-        Produce single-message aggregate proofs aligned with the given attestations.
+        Produce one single-message aggregate proof per attestation, parallel to the input.
 
-        For each aggregated attestation:
-
-        1. Identify participating validators from the aggregation bitfield.
-        2. Collect each participant's attestation public key and signature.
-        3. Combine them into a single single-message aggregate single-message proof via the
-           multi-signature binding.
-
-        Pre-computed signatures can be supplied via the lookup to avoid
-        redundant signing. Missing entries are signed on the fly.
+        Participants come from each attestation's bitfield.
+        The lookup supplies pre-computed signatures; missing entries are signed on the fly.
 
         Args:
             aggregated_attestations: Attestations with aggregation bitfields set.
-            signature_lookup: Optional pre-computed signatures keyed by
-                attestation data then validator index.
+            signature_lookup: Optional signatures keyed by attestation data then validator index.
 
         Returns:
-            One single-message aggregate proof per attestation, parallel to the input.
+            One proof per attestation, parallel to the input.
         """
         lookup = signature_lookup or {}
-
-        # Produce one aggregated proof per attestation that the leanVM can
-        # verify in one pass over all participants.
-        # Participants are decoded from each attestation's bitfield.
         return [
             self.sign_and_aggregate(
                 list(aggregate.aggregation_bits.to_validator_indices()),

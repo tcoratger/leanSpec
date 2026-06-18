@@ -132,12 +132,7 @@ class MockForkchoiceStore:
     """
     In-memory forkchoice store double for sync-service tests.
 
-    One instance plays two roles at once.
-    It answers reads for the head, blocks, and checkpoints.
-    It also processes incoming blocks and attestations.
-
-    Processing reads its own fields, not a separate store.
-    So the leading store argument the protocol passes is accepted and ignored.
+    Processing reads its own fields, so the leading store argument is accepted and ignored.
     """
 
     head: Bytes32 = field(default_factory=Bytes32.zero)
@@ -175,9 +170,7 @@ class MockForkchoiceStore:
     """When it returns true for an aggregate, processing raises a spec rejection."""
 
     rejection_reason: RejectionReason = RejectionReason.UNKNOWN_TARGET_BLOCK
-    """Reason carried by a triggered rejection.
-    The default names a missing block, which the sync service buffers for replay.
-    Set a permanent reason to exercise the logged-and-dropped path."""
+    """Reason carried by a triggered rejection, defaulting to a missing block kept for replay."""
 
     on_block_post_state: State | None = None
     """Post-state recorded for each processed block, when set."""
@@ -205,7 +198,7 @@ class MockForkchoiceStore:
         root = hash_tree_root(signed_block.block)
         self.blocks[root] = signed_block.block
         self.head = root
-        # The double has no real safe-target rule, so the head doubles as it.
+        # No real safe-target rule here, so the head doubles as it.
         self.safe_target = root
         self.head_slot = signed_block.block.slot
         if self.on_block_post_state is not None:
@@ -333,9 +326,7 @@ def create_mock_sync_service(
     peer_manager = PeerManager()
     peer_manager.add_peer(PeerInfo(peer_id=peer_id, state=ConnectionState.CONNECTED))
 
-    # One double fills both roles the service expects.
-    # Its fields answer store reads.
-    # Its methods answer the processing the service drives.
+    # One double fills both roles: its fields answer reads, its methods drive processing.
     forkchoice_double = MockForkchoiceStore()
 
     return SyncService(

@@ -64,7 +64,7 @@ class VarintRoundtrip(StrictBaseModel):
         """Encode, decode back, and emit the reference bytes."""
         encoded = encode_varint(self.value)
 
-        # Decode must recover the original value and consume all bytes.
+        # Decoding must recover the value and consume every byte.
         decoded, byte_length = decode_varint(encoded)
         assert decoded == self.value, (
             f"Varint roundtrip: {self.value} -> {encoded.hex()} -> {decoded}"
@@ -86,12 +86,9 @@ class GossipTopicOutput(StrictBaseModel):
 
 class GossipTopicRoundtrip(StrictBaseModel):
     """
-    Build a topic string from components, parse it back, assert roundtrip.
+    Build a topic string, parse it back, and assert roundtrip.
 
-    When an expected network name is given, also run fork validation
-    against the parsed topic and report whether the network name matched.
-    This pins the accept / reject branches clients must agree on when
-    deciding which mesh to admit a topic into.
+    When an expected network name is given, fork validation pins the accept and reject branches.
     """
 
     kind: Literal["gossip_topic"] = "gossip_topic"
@@ -118,7 +115,7 @@ class GossipTopicRoundtrip(StrictBaseModel):
         )
         topic_string = topic.to_topic_id()
 
-        # Parse the string back to verify it reconstructs the same topic.
+        # Parsing back must reconstruct the same topic.
         parsed = GossipTopic.from_string(topic_string)
         assert parsed == topic, f"Topic roundtrip: {topic} -> {topic_string!r} -> {parsed}"
 
@@ -320,7 +317,7 @@ class GossipsubRpcRoundtrip(StrictBaseModel):
         )
         encoded = rpc.encode()
 
-        # Decode and re-encode must produce identical bytes.
+        # Decode then re-encode must reproduce the bytes exactly.
         re_encoded = RPC.decode(encoded).encode()
         assert encoded == re_encoded, "RPC roundtrip produced different bytes"
 
@@ -398,10 +395,7 @@ class ReqRespResponseStream(StrictBaseModel):
     """
     Encode a sequence of response chunks as a concatenated stream.
 
-    Multi-chunk responses (for example BlocksByRoot returning N blocks)
-    send their chunks back-to-back on a single libp2p stream: each
-    chunk is its own [code][varint][snappy_frame] triple, and the
-    receiver reads them in order until EOF.
+    Each chunk is its own code-varint-snappy_frame triple, read back-to-back in order until EOF.
     """
 
     kind: Literal["reqresp_response_stream"] = "reqresp_response_stream"
@@ -493,14 +487,14 @@ class EnrRoundtrip(StrictBaseModel):
         """Roundtrip the record through text and RLP, then emit its properties."""
         enr = ENR.from_string(self.enr_string)
 
-        # Text roundtrip: parse → serialize → must match original.
+        # Text roundtrip: re-serializing must match the original string.
         assert enr.to_string() == self.enr_string, "ENR text roundtrip failed"
 
-        # RLP roundtrip: serialize → parse → serialize → must match.
+        # RLP roundtrip: serialize, parse, serialize again must be stable.
         rlp_bytes = enr.to_rlp()
         assert ENR.from_rlp(rlp_bytes).to_rlp() == rlp_bytes, "ENR RLP roundtrip failed"
 
-        # Invariant: every record that survives the roundtrips names its scheme.
+        # Invariant: every record surviving the roundtrips names its scheme.
         assert enr.identity_scheme is not None, "ENR record carries no identity scheme"
 
         eth2_data = enr.eth2_data
@@ -530,11 +524,9 @@ class EnrRoundtrip(StrictBaseModel):
                 else None
             ),
             is_aggregator=enr.is_aggregator,
-            # The accept/reject verdict is the canonical contract a client must reproduce.
-            # Both verdicts are a deterministic function of the record bytes alone.
-            # Structural validity reads the record fields.
-            # Signature validity is secp256k1 ECDSA verification over keccak256 of the content.
-            # Verification takes no time, nonce, or RNG input, so the emitted value is stable.
+            # The accept/reject verdict is a deterministic function of the record bytes.
+            # Signature validity is secp256k1 ECDSA over keccak256 of the content.
+            # No nonce or RNG input, so the emitted verdict is stable.
             signature_valid=enr.verify_signature(),
             is_valid=enr.is_valid(),
         )
@@ -571,7 +563,7 @@ class PeerIdentifierDerivation(StrictBaseModel):
         peer_id = PeerId.from_public_key(protobuf)
         peer_id_string = str(peer_id)
 
-        # Roundtrip: Base58 decode → re-encode must match.
+        # Base58 roundtrip: decode then re-encode must match.
         roundtrip = PeerId.from_base58(peer_id_string)
         assert roundtrip == peer_id, "PeerId Base58 roundtrip failed"
 
@@ -736,11 +728,7 @@ NetworkingCodecOutput = (
 
 
 class NetworkingCodecFixture(BaseConsensusFixture):
-    """
-    Emitted vector for networking wire-format conformance.
-
-    JSON output: codec, output.
-    """
+    """Emitted vector for networking wire-format conformance."""
 
     codec: NetworkingCodec
     """Codec case under test, with its typed inputs."""
@@ -750,11 +738,7 @@ class NetworkingCodecFixture(BaseConsensusFixture):
 
 
 class NetworkingCodecTest(BaseTestSpec):
-    """
-    Spec for networking wire-format conformance.
-
-    Verifies encode/decode roundtrips for networking codecs.
-    """
+    """Spec for networking wire-format conformance."""
 
     format_name: ClassVar[str] = "networking_codec_test"
     description: ClassVar[str] = "Tests networking codec encode/decode roundtrip"

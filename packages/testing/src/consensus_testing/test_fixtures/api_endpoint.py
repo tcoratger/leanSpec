@@ -26,30 +26,17 @@ class EndpointResponseContract(StrictBaseModel):
 
 
 EndpointHandler = Callable[[Store, "ApiEndpointTest"], EndpointResponseContract]
-"""Uniform signature for all endpoint response builders.
-
-Every handler receives both arguments even if it only needs one.
-This keeps the dispatch table simple: one signature, one call site.
-"""
+"""Uniform signature for endpoint response builders, so the dispatch table has one call site."""
 
 
 def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -> Store:
     """
-    Build a deterministic store rooted at genesis or at an advanced anchor.
+    Build a deterministic store, genesis-only or an empty chain advanced to the anchor slot.
 
-    At anchor_slot 0 the store is genesis-only. At higher slots the store
-    is seeded with a real (state, block) pair produced by advancing an
-    empty chain through anchor_slot; the store then carries non-empty
-    historical block hashes but leaves justification and finalization at
-    genesis (no attestations are injected). This is enough to exercise
-    endpoint responses whose shape depends on post-genesis slot numbers,
-    historical roots, and multi-node fork-choice trees.
+    No attestations are injected, so justification and finalization stay at genesis.
     """
     fork = LstarSpec()
-    # Walk the chain from genesis through anchor_slot using empty blocks.
-    # Slot 0 makes the builder return the genesis pair with no advance.
-    # The returned pair (state, block) is internally consistent with the
-    # historical chain the fixture wants to present to the endpoint.
+    # Walk the chain from genesis using empty blocks; slot 0 returns the genesis pair unchanged.
     state, block = build_anchor(
         fork=fork,
         num_validators=num_validators,
@@ -61,7 +48,7 @@ def _build_store(num_validators: int, genesis_time: int, anchor_slot: int = 0) -
 
 
 def _health_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointResponseContract:
-    """Static liveness check. Independent of consensus state."""
+    """Static liveness check, independent of consensus state."""
     return EndpointResponseContract(
         status_code=200,
         content_type="application/json",
@@ -70,7 +57,7 @@ def _health_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointResp
 
 
 def _justified_response(store: Store, _fixture: "ApiEndpointTest") -> EndpointResponseContract:
-    """Latest justified checkpoint: slot + root. Root varies with validator count."""
+    """Latest justified checkpoint as slot and root, with the root varying by validator count."""
     return EndpointResponseContract(
         status_code=200,
         content_type="application/json",
@@ -147,15 +134,11 @@ def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointRes
     """
     Prometheus-format metrics scrape.
 
-    The body of /metrics is dynamic (counters accumulate, timestamps shift)
-    so the fixture pins only the stable contract: status, content-type,
-    and the full list of metric names clients must expose.
+    The body is dynamic, so the fixture pins only status, content type, and the metric names.
     """
     from lean_spec.node.metrics.registry import registry as metrics_registry
 
-    # Names enumerated from the leanMetrics spec. Any change to this list
-    # is a cross-client-visible metrics surface change and should be
-    # reflected in the spec first.
+    # Enumerated from the metrics spec; changing the list is a cross-client surface change.
     required_metric_names = [
         "lean_node_info",
         "lean_node_start_time_seconds",
@@ -177,8 +160,7 @@ def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointRes
         "lean_validators_count",
         "lean_connected_peers",
     ]
-    # Touch the module import so spec refactors that remove the registry
-    # trip the fixture instead of failing silently.
+    # Touch the registry so its removal trips this fixture instead of failing silently.
     assert metrics_registry is not None
     return EndpointResponseContract(
         status_code=200,
@@ -190,13 +172,7 @@ def _metrics_response(_store: Store, _fixture: "ApiEndpointTest") -> EndpointRes
 def _aggregator_toggle_response(
     _store: Store, fixture: "ApiEndpointTest"
 ) -> EndpointResponseContract:
-    """
-    Expected response after toggling the aggregator role.
-
-    The fixture models a single POST against a node whose starting state is
-    initial_is_aggregator. The response reflects the new value and the
-    previous value as an is_aggregator / previous dict.
-    """
+    """Expected response after toggling the aggregator role, with the new and previous values."""
     body = fixture.request_body
     if not isinstance(body, dict) or not isinstance(body.get("enabled"), bool):
         raise ValueError(
@@ -227,13 +203,7 @@ _ENDPOINT_HANDLERS: dict[tuple[str, str], EndpointHandler] = {
 
 
 class ApiEndpointFixture(BaseConsensusFixture):
-    """
-    Emitted vector for API endpoint response conformance.
-
-    JSON output: endpoint, method, genesisParams, requestBody,
-    initialIsAggregator, expectedStatusCode, expectedContentType,
-    expectedBody.
-    """
+    """Emitted vector for API endpoint response conformance."""
 
     endpoint: str
     """API path under test."""
@@ -275,26 +245,17 @@ class ApiEndpointTest(BaseTestSpec):
     genesis_params: dict[str, int]
     """Genesis store inputs.
 
-    - numValidators: validator-set size (defaults to 4 when absent).
-    - genesisTime: unix genesis timestamp (defaults to 0 when absent).
-    - anchorSlot: optional post-genesis slot to advance the chain to
-      before building the store. Defaults to 0 (genesis-only).
+    - numValidators: validator-set size, default 4.
+    - genesisTime: unix genesis timestamp, default 0.
+    - anchorSlot: post-genesis slot to advance to, default 0 for genesis-only.
     """
 
     request_body: Any = None
-    """Optional request body for non-GET methods. JSON-serializable.
-
-    Consumed by admin endpoints (e.g. POST /lean/v0/admin/aggregator). Read-only
-    GET fixtures leave this as None.
-    """
+    """Optional JSON request body for non-GET methods."""
 
     initial_is_aggregator: bool = False
-    """Seeds the node's aggregator role before the request is sent.
-
-    Consumed by the admin aggregator endpoints. Clients must configure their
-    node with this value (e.g. via CLI or controller) before replaying the
-    fixture. Ignored by other endpoints.
-    """
+    """Aggregator role seeded before the request is sent.
+    Clients must configure their node with this value before replaying."""
 
     def generate(self) -> ApiEndpointFixture:
         """Build genesis store, compute expected response, emit the vector."""

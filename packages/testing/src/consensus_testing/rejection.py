@@ -5,18 +5,7 @@ from lean_spec.spec.forks.lstar.containers import AggregationError
 
 
 def classify_rejection(exception: Exception) -> RejectionReason:
-    """
-    Resolve the language-neutral reason behind a spec rejection.
-
-    Args:
-        exception: The exception the spec raised for the invalid input.
-
-    Returns:
-        The reason emitted into the test vector.
-
-    Raises:
-        ValueError: If the exception carries no reason.
-    """
+    """Resolve the language-neutral reason behind a spec rejection."""
     # Typed rejections carry their reason directly.
     if isinstance(exception, SpecRejectionError):
         return exception.reason

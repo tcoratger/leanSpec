@@ -27,8 +27,7 @@ class AttestationPoolEntry(StrictBaseModel):
     """
     Validator coverage of one attestation data in the raw signature pool.
 
-    Signature bytes are excluded: coverage is the consensus-relevant
-    observable, and it keeps vectors lean.
+    Signature bytes are excluded since coverage is the consensus-relevant observable.
     """
 
     data_root: Bytes32
@@ -42,8 +41,7 @@ class AggregatedPoolEntry(StrictBaseModel):
     """
     Participant coverage of one attestation data in an aggregated payload pool.
 
-    Proof bytes are excluded: the aggregation prover is randomized,
-    so they differ between two fills of identical inputs.
+    Proof bytes are excluded since the randomized prover differs between identical fills.
     """
 
     data_root: Bytes32
@@ -57,11 +55,7 @@ class StoreSnapshot(StrictBaseModel):
     """
     Canonical store observables captured after a fork choice step.
 
-    Recorded by the framework after every step, including rejected ones.
-    Clients must reproduce every field, not just authored checks.
-
-    Explicit fields avoid needing a spec-defined canonical store encoding.
-    They are self-describing and language-neutral.
+    Recorded after every step, including rejected ones, so clients reproduce every field.
     """
 
     time: Interval
@@ -80,32 +74,24 @@ class StoreSnapshot(StrictBaseModel):
     """Highest slot finalized checkpoint known to the store."""
 
     block_roots: list[Bytes32]
-    """
-    Every block root the store retains, ascending.
+    """Every block root the store retains, ascending.
 
-    Pruning behavior stays invisible without the full membership.
-    An over- or under-pruning client must fail here.
+    Full membership makes pruning observable, so an over- or under-pruning client fails here.
     """
 
     block_weights: list[BlockWeightEntry]
-    """
-    Fork-choice weight per block above the finalized slot, ascending by root.
+    """Fork-choice weight per block above the finalized slot, ascending by root.
 
-    Zero-weight blocks are included.
-    Two clients can agree on the head while holding divergent weights.
-    They then split on the next attestation.
-    The weights drive head selection and must match exactly.
+    Weights drive head selection and must match exactly, even where two clients agree on the head.
     """
 
     attestation_signatures: list[AttestationPoolEntry]
     """Raw signature pool coverage, ascending by data root."""
 
     new_aggregated_payloads: list[AggregatedPoolEntry]
-    """
-    Pending aggregated payload pool, ascending by data root.
+    """Pending aggregated payload pool, ascending by data root.
 
-    These payloads do not contribute to fork choice yet.
-    The new-to-known migration timing is consensus-relevant.
+    These payloads do not contribute to fork choice yet, but their migration timing is observable.
     """
 
     known_aggregated_payloads: list[AggregatedPoolEntry]

@@ -22,13 +22,7 @@ from lean_spec.spec.forks.lstar.containers import (
 
 
 class BaseForkChoiceStep(CamelModel):
-    """
-    Base class for fork choice event steps.
-
-    All step types inherit from this base and include:
-    - valid flag for expected success/failure
-    - optional Store state checks to validate after processing
-    """
+    """Base class for fork choice event steps."""
 
     model_config = CamelModel.model_config | {"frozen": True}
 
@@ -36,30 +30,17 @@ class BaseForkChoiceStep(CamelModel):
     """Whether this step is expected to succeed."""
 
     expected_rejection: ExpectedRejection | None = None
-    """
-    Expected rejection when valid=False.
-
-    The classified reason must match.
-    The exception message must contain the optional substring.
-    Never serialized: the emitted contract is the filled step's reason field.
-    """
+    """Expected rejection when invalid, never serialized into the emitted contract."""
 
     checks: StoreChecks | None = None
-    """
-    Store state checks to validate after processing this step.
-
-    If provided, the fixture will validate the Store state matches
-    these checks after executing the step.
-    Only fields that are explicitly set will be validated.
-    """
+    """Store state checks to validate after this step, limited to fields explicitly set."""
 
     @model_validator(mode="after")
     def validate_rejection_is_declared(self) -> "BaseForkChoiceStep":
         """
         Require a declared rejection on every step expected to fail.
 
-        A vector saying only "reject this" lets a client reject
-        for the wrong reason and still pass.
+        A vector saying only "reject this" lets a client reject for the wrong reason and pass.
         """
         if not self.valid and self.expected_rejection is None:
             raise ValueError("steps with valid=False must declare their expected_rejection")
@@ -67,13 +48,7 @@ class BaseForkChoiceStep(CamelModel):
 
 
 class TickStep(BaseForkChoiceStep):
-    """
-    Time advancement step.
-
-    Advances the fork choice store time to a specific unix timestamp or
-    exact interval count. This triggers interval-based actions like
-    attestation processing.
-    """
+    """Advance store time to a unix timestamp or interval count, triggering interval actions."""
 
     step_type: Literal["tick"] = "tick"
     """Discriminator field for serialization."""
@@ -96,66 +71,38 @@ class TickStep(BaseForkChoiceStep):
 
 
 class BlockStep(BaseForkChoiceStep):
-    """
-    Block processing step.
-
-    Processes a block through the fork choice store.
-    This updates the store's block tree and may trigger head updates.
-
-    Input: BlockSpec (can be partial or fully specified).
-    Output: Block object built and processed through the spec.
-    """
+    """Process a block through the store, updating the block tree and possibly the head."""
 
     step_type: Literal["block"] = "block"
     """Discriminator field for serialization."""
 
     block: BlockSpec
-    """
-    Block specification for this step.
-
-    Tests provide a BlockSpec with required slot and optional field overrides.
-    Generation fills a complete Block and emits it in the filled step.
-    """
+    """Block specification with required slot and optional overrides, filled during generation."""
 
     tick_to_slot: bool = True
-    """
-    Whether to advance the store clock to the block's slot before import.
+    """Whether to advance the store clock to the block's slot before import.
 
-    Default True matches a node whose clock reached the slot already.
-    Set False to deliver the block while the store clock lags behind,
-    pinning how clients treat a block ahead of their local time.
+    Set False to pin how clients treat a block ahead of their local time.
     """
 
 
 class AttestationStep(BaseForkChoiceStep):
     """
-    Attestation processing step.
+    Process a gossip attestation, updating validator attestation tracking.
 
-    Processes an attestation received from gossip.
-    This updates validator attestation tracking in the store.
-
-    Note: Attestations included in blocks are processed automatically
-    when the block is processed. This step is for gossip attestations.
+    Attestations inside blocks are processed with the block, not here.
     """
 
     step_type: Literal["attestation"] = "attestation"
     """Discriminator field for serialization."""
 
     attestation: GossipAttestationSpec
-    """
-    Gossip attestation specification for this step.
-
-    Tests provide a GossipAttestationSpec with required fields.
-    Generation fills in the attestation data and signature.
-    """
+    """Gossip attestation specification, with data and signature filled during generation."""
 
     is_aggregator: bool = False
-    """
-    Whether the node holds the aggregator role for this attestation.
+    """Whether the node holds the aggregator role for this attestation.
 
     Only aggregator nodes store gossip signatures in the raw signature pool.
-    Defaults to False so existing fillers preserve the behavior where gossip
-    attestations are validated but not stored.
     """
 
 
@@ -166,12 +113,9 @@ class GossipAggregatedAttestationStep(BaseForkChoiceStep):
     """Discriminator field for serialization."""
 
     attestation: AggregatedAttestationSpec
-    """
-    Specification for the aggregated gossip attestation.
-    """
+    """Specification for the aggregated gossip attestation."""
 
 
-# Discriminated union type for all fork choice steps
 ForkChoiceStep = Annotated[
     TickStep | BlockStep | AttestationStep | GossipAggregatedAttestationStep,
     Field(discriminator="step_type"),
@@ -179,11 +123,7 @@ ForkChoiceStep = Annotated[
 
 
 class BaseFilledStep(CamelModel):
-    """
-    Base class for emitted fork choice steps.
-
-    Carries the authored flags plus the generation outputs every step shares.
-    """
+    """Base class for emitted fork choice steps, carrying the shared generation outputs."""
 
     model_config = CamelModel.model_config | {"frozen": True}
 
@@ -191,23 +131,15 @@ class BaseFilledStep(CamelModel):
     """Whether this step succeeded."""
 
     rejection_reason: RejectionReason | None = None
-    """
-    Language-neutral reason this step's input must be rejected.
-
-    Filled during generation for invalid steps.
-    This is the field clients assert against.
-    """
+    """Language-neutral reason the input was rejected, the field clients assert against."""
 
     checks: StoreChecks | None = None
     """Store state checks the step was validated against."""
 
     store_snapshot: StoreSnapshot
-    """
-    Canonical store observables after this step.
+    """Canonical store observables after this step, populated even for rejected steps.
 
-    Populated for every step, including rejected ones.
-    A rejected input leaves the store unchanged, and the snapshot
-    pins that no-op so a client cannot corrupt state on rejection.
+    Pins the no-op on rejection so a client cannot corrupt state on a rejected input.
     """
 
 
@@ -247,8 +179,7 @@ class FilledBlockStep(BaseFilledStep):
         """
         Serialize the block, merging the authored label into its payload.
 
-        The label rides inside the block object so consumers can resolve
-        fork references without a side table.
+        The label rides inside the block object so consumers resolve forks without a side table.
         """
         serialized_block = filled_block.to_json()
         if self.block_root_label:
@@ -279,7 +210,6 @@ class FilledGossipAggregatedAttestationStep(BaseFilledStep):
     """The filled SignedAggregatedAttestation, processed through the spec."""
 
 
-# Discriminated union type for all emitted fork choice steps
 FilledForkChoiceStep = Annotated[
     FilledTickStep
     | FilledBlockStep

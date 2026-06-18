@@ -27,13 +27,7 @@ class FixtureCollector:
     """Collects generated fixtures and writes them to disk."""
 
     def __init__(self, output_directory: Path, fork: str):
-        """
-        Initialize the fixture collector.
-
-        Args:
-            output_directory: Root directory for generated fixtures.
-            fork: The fork name (e.g., "Lstar").
-        """
+        """Initialize the fixture collector."""
         self.output_directory = output_directory
         self.fork = fork
         self.fixtures: list[tuple[str, Any, str]] = []
@@ -42,32 +36,14 @@ class FixtureCollector:
         """
         Compute the fixture file for one test function.
 
-        Layout: {output}/consensus/{format}/{test_path}/{function}.json
-        The format directory drops the redundant test suffix.
-
-        Args:
-            test_nodeid: Complete pytest node ID.
-            fixture_format: Format name (e.g., "state_transition_test").
-
-        Returns:
-            The path of the JSON file this test function's fixtures land in.
-
-        Raises:
-            ValueError: If the test file is not under the consensus spec
-                tests, where the output layout is defined.
-                Collection normally excludes such paths already;
-                this guards against misconfiguration.
+        Raises if the test file is not under the consensus spec tests.
         """
-        # Split the node ID into the test file path and bare function name.
-        # Parametrization suffixes (the bracketed part) are stripped so every
-        # parametrized case of one function shares one fixture file.
+        # Strip parametrization suffixes so every case of one function shares one file.
         nodeid_parts = test_nodeid.split("::")
         test_file_path = nodeid_parts[0]
         function_name_with_params = nodeid_parts[1] if len(nodeid_parts) > 1 else ""
         base_function_name = function_name_with_params.split("[")[0]
 
-        # Extract test path relative to the consensus spec tests
-        # e.g., tests/consensus/lstar/... -> lstar/...
         try:
             relative_path = Path(test_file_path).relative_to("tests/consensus")
         except ValueError as exception:
@@ -78,7 +54,6 @@ class FixtureCollector:
 
         test_path = relative_path.with_suffix("")
 
-        # Build output path: fixtures/consensus/{format}/{test_path}
         format_directory = fixture_format.removesuffix("_test")
         return (
             self.output_directory
@@ -95,15 +70,7 @@ class FixtureCollector:
         test_nodeid: str,
         config: pytest.Config | None = None,
     ) -> None:
-        """
-        Add a fixture to the collection.
-
-        Args:
-            fixture_format: Format name (e.g., "state_transition_test").
-            fixture: The fixture object.
-            test_nodeid: Complete pytest node ID.
-            config: Pytest config object to attach fixture path metadata.
-        """
+        """Add a fixture to the collection."""
         self.fixtures.append((fixture_format, fixture, test_nodeid))
 
         if config is not None:
@@ -182,23 +149,20 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_ignore_collect(collection_path: Path) -> bool | None:
     """
-    Ignore test collection for paths outside the consensus spec tests.
+    Ignore paths outside the consensus spec tests.
 
-    This prevents pytest from collecting unit tests during fill,
-    reducing overhead significantly when there are many tests.
+    Skipping unit tests during fill cuts collection overhead sharply.
     """
-    # Check if path is under tests/ directory
     try:
         relative_path = collection_path.relative_to(Path.cwd() / "tests")
     except ValueError:
-        # Not under tests/, let pytest handle it normally
+        # Not under tests/, let pytest handle it normally.
         return None
 
-    # If it's directly under tests/consensus, don't ignore
     if str(relative_path).startswith("consensus"):
         return None
 
-    # Anything else under tests/ (unit, api, interop tests) is skipped during fill
+    # Anything else under tests/ is skipped during fill.
     if relative_path.parts:
         return True
 
@@ -207,7 +171,6 @@ def pytest_ignore_collect(collection_path: Path) -> bool | None:
 
 def pytest_configure(config: pytest.Config) -> None:
     """Setup the fixture generation session."""
-    # Register fork validity markers
     config.addinivalue_line(
         "markers",
         "valid_until(fork): specifies until which fork a test case is valid",
@@ -221,14 +184,12 @@ def pytest_configure(config: pytest.Config) -> None:
     # Crypto mode is chosen explicitly and applies to either scheme.
     AggregationProver.set_mode(CryptoMode(config.getoption("--crypto")))
 
-    # Get options
     output_directory = Path(config.getoption("--output"))
     fork_name = config.getoption("--fork")
     clean = config.getoption("--clean")
 
     available_fork_names = sorted(fork.name() for fork in FORKS_BY_NAME.values())
 
-    # Validate fork
     if not fork_name:
         print("Error: --fork is required", file=sys.stderr)
         print(
@@ -251,7 +212,6 @@ def pytest_configure(config: pytest.Config) -> None:
 
     fork_class = FORKS_BY_NAME[fork_name_normalized]
 
-    # Check output directory
     if output_directory.exists() and any(output_directory.iterdir()):
         if not clean:
             leftover_fixture_paths = list(output_directory.iterdir())
@@ -276,10 +236,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """
-    Deselect tests not valid for the fork, and full real-crypto tests in the mocked lane.
+    Deselect tests invalid for the fork, and full real-crypto tests in the mocked lane.
 
-    Real-crypto vectors cannot be mocked, so the fast mocked lane keeps only the
-    smoke subset and leaves the rest to the real lane.
+    Real-crypto vectors cannot be mocked, so the fast lane keeps only their smoke subset.
     """
     if TEST_FORK_CLASS_KEY not in config.stash:
         return
@@ -312,11 +271,7 @@ def _check_markers_valid_for_fork(
     markers: list[Any],
     fork_class: type,
 ) -> bool:
-    """
-    Check if test markers indicate validity for the given fork.
-
-    Shared logic for both collection-time and parametrization-time fork filtering.
-    """
+    """Check whether test markers indicate validity for the given fork."""
     has_valid_until = False
     valid_until_forks = []
 
@@ -336,15 +291,9 @@ def _check_markers_valid_for_fork(
 
 def pytest_sessionstart(session: pytest.Session) -> None:
     """
-    Fail the session fast if re-signing the same message is not byte-identical.
+    Abort the fill if re-signing a message is not byte-identical.
 
-    A signature must depend only on the key, the slot, and the message.
-    Prior signing activity must never influence the bytes.
-
-    A scheme change breaking this invariant must abort the fill.
-    Emitting order-dependent vectors would be worse than failing.
-
-    Under sharded runs every worker process probes its own key state.
+    Order-dependent vectors are worse than failing.
     """
     probe_message = Bytes32(b"\x07" * 32)
     fresh_signature = XmssKeyManager.shared().sign_block_root(
@@ -424,26 +373,14 @@ def reset_xmss_signing_state() -> Iterator[None]:
     """
     Reset shared XMSS signing state before every test.
 
-    XMSS signing is stateful.
-    Each signature consumes a one-time leaf and advances the shared key state.
-
-    Every test must start from the same fresh key state.
-    Otherwise emitted vectors could depend on test order or worker sharding.
+    Signing consumes a one-time leaf, so a stale key would make vectors depend on test order.
     """
     XmssKeyManager.reset_signing_state()
     yield
 
 
 def base_spec_filler_parametrizer(spec_class: Any) -> Any:
-    """
-    Generate pytest.fixture for a given test spec class.
-
-    Args:
-        spec_class: The input spec class to create a filler for.
-
-    Returns:
-        A pytest fixture function whose value fills and collects a fixture.
-    """
+    """Build a pytest fixture whose value fills and collects a fixture for the spec class."""
 
     @pytest.fixture(
         scope="function",
@@ -469,8 +406,7 @@ def base_spec_filler_parametrizer(spec_class: Any) -> Any:
             else:
                 generated_fixture = test_spec.generate()
 
-            # A mocked proof is never verified.
-            # A real proof must fail only when the rejection is itself a proof failure.
+            # A real proof is invalid only when the rejection is itself a proof failure.
             # A non-crypto rejection (such as an unknown parent) still carries a valid proof.
             expected_rejection = test_spec.expected_rejection
             if mock_prover:
@@ -538,9 +474,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     )
 
 
-# Pytest fixtures for every consensus fixture format.
-# Each spec test requests one by its format name and calls it to build a test vector.
-# Registration iterates the canonical registry.
+# Register one filler fixture per consensus format from the canonical registry.
 # A new format needs no edit here.
 for fixture_format_class in FIXTURE_FORMATS:
     globals()[fixture_format_class.format_name] = base_spec_filler_parametrizer(

@@ -14,12 +14,7 @@ from lean_spec.spec.ssz.ssz_base import SSZType
 
 
 class SSZFixture(BaseConsensusFixture):
-    """
-    Emitted vector for SSZ conformance.
-
-    JSON output: typeName, value, rawBytes (decode-failure mode only),
-    serialized, root.
-    """
+    """Emitted vector for SSZ conformance."""
 
     type_name: str
     """SSZ type class name."""
@@ -28,13 +23,13 @@ class SSZFixture(BaseConsensusFixture):
     """The SSZ value under test."""
 
     raw_bytes: str | None = None
-    """Hex-encoded malformed input, present in decode-failure mode only."""
+    """Hex malformed input, present in decode-failure mode only."""
 
     serialized: str
-    """Hex SSZ bytes; carries the malformed input verbatim on decode failure."""
+    """Hex SSZ bytes, or the malformed input verbatim on decode failure."""
 
     root: str
-    """Hex hash_tree_root. Empty in decode-failure mode."""
+    """Hex tree root, empty in decode-failure mode."""
 
     @field_serializer("value", when_used="json")
     def serialize_value(self, ssz_value: SSZType) -> Any:
@@ -54,18 +49,7 @@ class SSZFixture(BaseConsensusFixture):
 
 
 class SSZTest(BaseTestSpec):
-    """
-    Spec for SSZ conformance testing.
-
-    Supports two modes:
-
-    - Roundtrip mode (default): encode `value`, decode back, verify equality
-      and compute `hash_tree_root`. JSON output: typeName, value, serialized, root.
-    - Decode-failure mode: when `expected_rejection` is set, `raw_bytes` holds
-      the malformed input. Generation decodes the input as `type(value)` and
-      asserts the decoder rejects it. JSON output keeps the same shape;
-      `serialized` holds the malformed bytes and `root` is empty.
-    """
+    """Spec for SSZ conformance, running either a roundtrip or a decode-failure check."""
 
     format_name: ClassVar[str] = "ssz_test"
     description: ClassVar[str] = "Tests SSZ serialization roundtrip and hash_tree_root"
@@ -74,34 +58,15 @@ class SSZTest(BaseTestSpec):
     """SSZ type class name."""
 
     value: SSZType
-    """
-    The SSZ value under test.
+    """The SSZ value under test.
 
-    Roundtrip mode: the value to encode and round-trip.
-    Decode-failure mode: acts as a type tag; its class is used as the decoder.
-    Supply any instance of the target type (often a default-constructed one).
-    """
+    In decode-failure mode only its class matters, since the class supplies the decoder."""
 
     raw_bytes: str | None = None
-    """
-    Hex-encoded malformed input for decode-failure mode.
-
-    Only consulted when `expected_rejection` is set. Generation decodes these
-    bytes using `type(value).decode_bytes` and asserts the decoder raises.
-    """
+    """Hex malformed input, consulted only in decode-failure mode."""
 
     def generate(self) -> SSZFixture:
-        """
-        Verify SSZ roundtrip or decode-failure and produce the reference output.
-
-        Returns:
-            The emitted vector with serialized bytes and root populated.
-
-        Raises:
-            AssertionError:
-                - In roundtrip mode, if `decode(encode(value)) != value`.
-                - In decode-failure mode, if the decoder does not reject.
-        """
+        """Verify SSZ roundtrip or decode-failure and produce the reference output."""
         if self.expected_rejection is not None:
             return self._generate_decode_failure()
 
@@ -127,14 +92,9 @@ class SSZTest(BaseTestSpec):
 
     def _generate_decode_failure(self) -> SSZFixture:
         """
-        Run the decode-failure path: assert decoding `raw_bytes` raises.
+        Assert decoding the malformed bytes raises.
 
-        The class of `value` is used as the decoder. `serialized` carries
-        the malformed bytes verbatim so consumers can reproduce the input.
-
-        Raises:
-            AssertionError: If the decoder succeeds.
-            ValueError: If `raw_bytes` is missing.
+        The bytes are emitted verbatim so consumers can reproduce the rejected input.
         """
         if self.raw_bytes is None:
             raise ValueError("raw_bytes is required when expected_rejection is set")

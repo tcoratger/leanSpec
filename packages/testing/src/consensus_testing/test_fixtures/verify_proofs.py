@@ -28,68 +28,47 @@ ALTERNATE_HEAD_ROOT: Bytes32 = Bytes32(b"\xee" * 32)
 
 
 class RebindToAlternateHeadRoot(StrictBaseModel):
-    """
-    Rebind one component's proof to an alternate head root.
-
-    The honest attestation data is still emitted.
-    Only the targeted component's proof bytes carry the alternate binding.
-    """
+    """Rebind one component's proof to an alternate head root while emitting honest data."""
 
     component_index: int = 0
-    """Index of the component whose proof is rebound (0 for single-message vectors)."""
+    """Index of the component whose proof is rebound."""
 
 
 class IncrementEmittedSlot(StrictBaseModel):
     """Bump one component's emitted slot while its proof stays bound to the original slot."""
 
     component_index: int = 0
-    """Index of the component whose emitted slot is bumped (0 for single-message vectors)."""
+    """Index of the component whose emitted slot is bumped."""
 
 
 class SwapParticipantPublicKey(StrictBaseModel):
-    """
-    Replace one participant's public key with another validator's attestation key.
-
-    The honest proof is still emitted.
-    Only the targeted component's public key layout carries the swap.
-    """
+    """Replace one participant's public key while emitting the honest proof."""
 
     component_index: int = 0
-    """Index of the component whose participant list is edited (0 for single-message vectors)."""
+    """Index of the component whose participant list is edited."""
 
     participant_index: int
-    """Position in that component's participant list whose key is replaced."""
+    """Position in the participant list whose key is replaced."""
 
     with_validator_index: ValidatorIndex
     """Validator whose attestation key replaces the original."""
 
 
 class SwapMessageBindings(StrictBaseModel):
-    """
-    Swap the emitted message-slot bindings of two components.
-
-    The merged proof and the per-component key layout stay honest.
-    Each component's proof is then checked against the other component's binding.
-    A conforming verifier rejects this transposition.
-    """
+    """Swap the emitted message-slot bindings of two components against an honest proof."""
 
     first_component_index: int
-    """Index of one component whose emitted message-slot binding is swapped."""
+    """Index of one component whose binding is swapped."""
 
     second_component_index: int
-    """Index of the other component whose emitted message-slot binding is swapped."""
+    """Index of the other component whose binding is swapped."""
 
 
 class DropMessageBinding(StrictBaseModel):
-    """
-    Drop one component's emitted message-slot binding while keeping its keys.
-
-    The emitted binding list ends up shorter than the per-component key list.
-    A conforming verifier rejects the length mismatch.
-    """
+    """Drop one component's emitted message-slot binding while keeping its keys."""
 
     component_index: int
-    """Index of the component whose emitted message-slot binding is removed."""
+    """Index of the component whose binding is removed."""
 
 
 SingleMessageTamper = RebindToAlternateHeadRoot | IncrementEmittedSlot | SwapParticipantPublicKey
@@ -130,21 +109,15 @@ def _swap_participant_public_key(
     replacement_validator_index: ValidatorIndex,
     component_index: int,
 ) -> None:
-    """
-    Replace one participant's emitted public key in place.
-
-    Raises:
-        ValueError: If the position is out of range, or the replacement matches
-            the original key and would leave the bundle honest.
-    """
+    """Replace one participant's emitted public key in place."""
     if not 0 <= participant_index < len(public_keys):
         raise ValueError(
             f"participant_index {participant_index} out of range "
             f"for component {component_index} with {len(public_keys)} keys"
         )
     replacement = key_manager.get_public_keys(replacement_validator_index)[0]
-    # A replacement matching the original key would leave the bundle honest.
-    # The verifier would then accept and the rejection would be a false positive.
+    # A replacement matching the original key leaves the bundle honest.
+    # The verifier would accept and the rejection would be a false positive.
     if replacement == public_keys[participant_index]:
         raise ValueError(
             f"participant key replacement at component {component_index} "
@@ -158,18 +131,14 @@ class VerifySingleMessageProofsFixture(BaseConsensusFixture):
     """
     Emitted vector for single-message aggregate proof verification.
 
-    JSON output: attestationData, publicKeys, aggregationBits, message,
-    slot, proof.
+    JSON output: attestationData, publicKeys, aggregationBits, message, slot, proof.
     """
 
     attestation_data: AttestationData
     """The signed object."""
 
     public_keys: list[PublicKey]
-    """Attestation public keys for the participating validators.
-
-    Ordered consistently with the participation bitfield.
-    """
+    """Attestation public keys, ordered to match the participation bitfield."""
 
     aggregation_bits: AggregationBits
     """Participation bitfield naming the contributing validators."""
@@ -210,13 +179,12 @@ class VerifySingleMessageProofsTest(BaseTestSpec):
         Generate the proof, optionally tamper, self-verify, and emit the vector.
 
         Raises:
-            AssertionError: If the verifier outcome disagrees with the configured expectation.
+            AssertionError: If the outcome disagrees with the expectation.
             ValueError: If the tamper is misconfigured.
         """
         key_manager = XmssKeyManager.shared()
 
-        # A single-message vector carries exactly one component.
-        # The shared tampers must therefore target component 0.
+        # A single-message vector carries exactly one component, so tampers target component 0.
         if self.tamper is not None:
             _check_component_index(self.tamper.component_index, component_count=1)
 
@@ -230,9 +198,8 @@ class VerifySingleMessageProofsTest(BaseTestSpec):
         # Phase 2: optionally mutate exactly one binding of that bundle.
         match self.tamper:
             case RebindToAlternateHeadRoot():
-                # Regenerate the proof against an alternate head root.
-                # - The honest attestation data, message, slot, keys, and bits stay emitted.
-                # - Only the proof bytes carry the alternate binding.
+                # Regenerate only the proof bytes against an alternate head root.
+                # The emitted data, message, slot, keys, and bits stay honest.
                 proof = self._aggregate_proof(
                     key_manager, _alternate_head_data(self.attestation_data)
                 )
@@ -260,7 +227,6 @@ class VerifySingleMessageProofsTest(BaseTestSpec):
         self.assert_expected_outcome(exception_raised)
 
         # Phase 4: publish the client-visible outputs.
-        # Every tamper breaks the proof's cryptographic binding.
         return VerifySingleMessageProofsFixture(
             attestation_data=self.attestation_data,
             public_keys=public_keys,
@@ -291,15 +257,12 @@ class VerifySingleMessageProofsTest(BaseTestSpec):
         """
         Build a two-level proof so the verifier is exercised on the recursive path.
 
-        Children are leaf-only sub-proofs, so the folded tree is exactly two levels deep.
-
         Raises:
             ValueError: If a child group names an unknown validator or reuses one.
             AggregationError: If the prover rejects the inputs.
         """
         # Phase 1: reject a malformed partition before signing anything.
-        #
-        # Every grouped index must name a participant the bundle already carries.
+        # Every grouped index must name a carried participant.
         # No validator may appear in more than one child group.
         grouped_indices = [i for group in self.child_groups for i in group]
         grouped_index_set = set(grouped_indices)
@@ -392,8 +355,8 @@ class VerifyMultiMessageProofsTest(BaseTestSpec):
         Generate the merged proof, optionally tamper one binding, self-verify, emit the vector.
 
         Raises:
-            AssertionError: If the verifier outcome disagrees with the configured expectation.
-            ValueError: If the tamper is misconfigured or the input has no components.
+            AssertionError: If the outcome disagrees with the expectation.
+            ValueError: If the tamper is misconfigured or has no components.
         """
         key_manager = XmssKeyManager.shared()
         component_count = len(self.attestation_data_per_message)
@@ -435,9 +398,9 @@ class VerifyMultiMessageProofsTest(BaseTestSpec):
         match self.tamper:
             case RebindToAlternateHeadRoot(component_index=component_index):
                 _check_component_index(component_index, component_count)
-                # Regenerate the targeted component against an alternate head root and re-merge.
-                # The emitted attestation data, message, slot, keys, and bits stay honest.
-                # Only the merged proof bytes carry the alternate binding for this component.
+                # Regenerate the component against an alternate head root and re-merge.
+                # Only the merged proof bytes carry the alternate binding.
+                # The emitted data, message, slot, keys, and bits stay honest.
                 components[component_index] = key_manager.sign_and_aggregate(
                     self.validator_indices_per_message[component_index],
                     _alternate_head_data(self.attestation_data_per_message[component_index]),
@@ -450,8 +413,8 @@ class VerifyMultiMessageProofsTest(BaseTestSpec):
             case IncrementEmittedSlot(component_index=component_index):
                 _check_component_index(component_index, component_count)
                 bumped = slots[component_index] + Slot(1)
-                # A bumped slot landing on another component's slot would make the rejection
-                # ambiguous, since the verifier could then fail on the wrong binding.
+                # A bump landing on another component's slot makes the rejection ambiguous.
+                # The verifier could then fail on the wrong binding.
                 if any(
                     other_index != component_index and other_slot == bumped
                     for other_index, other_slot in enumerate(slots)
@@ -486,8 +449,8 @@ class VerifyMultiMessageProofsTest(BaseTestSpec):
                 _check_component_index(second_index, component_count)
                 if first_index == second_index:
                     raise ValueError("swap message bindings requires two distinct components")
-                # Swap each component's emitted message and slot so its proof faces the other's
-                # binding, while the merged proof and key layout stay honest.
+                # Swap the emitted message and slot of each component so its proof faces a mismatch.
+                # The merged proof and key layout stay honest.
                 messages[first_index], messages[second_index] = (
                     messages[second_index],
                     messages[first_index],
@@ -518,7 +481,6 @@ class VerifyMultiMessageProofsTest(BaseTestSpec):
         self.assert_expected_outcome(exception_raised)
 
         # Phase 5: publish the client-visible outputs.
-        # Every tamper breaks the proof's cryptographic binding.
         return VerifyMultiMessageProofsFixture(
             attestation_data_per_message=self.attestation_data_per_message,
             public_keys_per_message=public_keys_per_message,

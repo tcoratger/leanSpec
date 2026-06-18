@@ -70,8 +70,8 @@ class ReaggregationTest(BaseTestSpec):
     """
     Split one attestation's proof out of a block, then merge it with the local partial.
 
-    The reference proof bytes are not deterministic.
-    Each vector is checked by verifying against the expected attesters' keys, not by byte match.
+    Proof bytes are not deterministic, so a vector is checked against the attesters' keys,
+    not by byte match.
     """
 
     format_name: ClassVar[str] = "reaggregation_test"

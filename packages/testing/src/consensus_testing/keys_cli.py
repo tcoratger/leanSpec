@@ -30,52 +30,25 @@ KEY_DOWNLOAD_URLS = {
     "test": "https://github.com/leanEthereum/leansig-test-keys/releases/download/latest/test_scheme.tar.gz",
     "prod": "https://github.com/leanEthereum/leansig-test-keys/releases/download/latest/prod_scheme.tar.gz",
 }
-"""
-GitHub release URLs for pre-generated key archives.
-
-Keyed by scheme name ("test" or "prod").
-Each URL points to a tar.gz containing per-validator JSON files.
-"""
+"""Release archive URL per scheme, each a tar.gz of per-validator key files."""
 
 PINNED_KEY_ARCHIVE_SHA256 = {
     "test": "2d616857f4936cde4e2720fa95a76f2644015390f4b8c188acbaa756f521dac8",
     "prod": "a40aa60fc0c0d1b4c761f19fb1678039400ae318da85f782dd57bc8cc0eb617d",
 }
-"""
-SHA-256 of each scheme's key archive.
-
-The release tag is mutable, so these checksums are the real pin.
-A re-cut release fails the download instead of silently changing vectors.
-Update together with the key-set digests when adopting a new release.
-"""
+"""SHA-256 of each scheme's key archive, the real pin since the release tag is mutable."""
 
 PINNED_KEY_SET_DIGESTS = {
     "test": "0x49306dfdb6dddd72afe265ec3b20a1901834dde9b3dfe4fee6b4f7ca58c7aa43",
     "prod": "0xc2b5fc4c1f1fbc181ddf07db3df985f79e1dcedcfb7df732ef20863d7cbcf491",
 }
-"""
-Expected key-set digest per scheme.
-
-Guards the on-disk keys, which the archive checksum cannot see.
-
-- test: the key set committed to this repository.
-- prod: the key set served by the current release.
-"""
+"""Expected key-set digest per scheme, guarding on-disk keys the archive checksum cannot see."""
 
 NUM_VALIDATORS: int = 8
-"""
-Default number of validator key pairs.
-
-Eight validators is enough to exercise committee logic and 2/3 supermajority
-thresholds while keeping key generation and test execution fast.
-"""
+"""Default validator count, enough to exercise committee logic and 2/3 thresholds while fast."""
 
 CLI_DEFAULT_MAX_SLOT = Slot(100)
-"""
-Maximum slot when generating keys via CLI (inclusive).
-
-One hundred slots provides ample signing headroom for typical test scenarios.
-"""
+"""Maximum slot when generating keys via CLI, inclusive."""
 
 
 def _generate_single_keypair(
@@ -85,19 +58,8 @@ def _generate_single_keypair(
     Generate attestation and proposal key pairs for one validator.
 
     Defined at module level so it can be pickled for multiprocessing.
-
-    Args:
-        scheme: XMSS scheme instance to use for key generation.
-        num_slots: Total number of slots the keys must cover.
-        index: Validator index (used only for progress logging).
-
-    Returns:
-        Complete key pair with both attestation and proposal keys.
     """
-    # Generate two independent key pairs: one for attestations, one for proposals.
-    #
-    # Separate keys allow signing both roles within the same slot
-    # without exhausting a one-time leaf.
+    # Separate keys let one validator sign both roles in a slot without exhausting a one-time leaf.
     start = time.monotonic()
     print(f"[key #{index}] generating attestation key...", flush=True)
     attestation_keypair = scheme.key_gen(Slot(0), Uint64(num_slots))
@@ -118,17 +80,7 @@ def _generate_single_keypair(
 
 
 def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
-    """
-    Generate XMSS key pairs in parallel and write each to a separate file.
-
-    Each validator gets its own JSON file to keep individual files small,
-    which matters especially for production-scheme keys.
-
-    Args:
-        lean_env: Scheme name (e.g. "test" or "prod").
-        count: Number of validator key pairs to generate.
-        max_slot: Maximum signable slot (key lifetime = max_slot + 1 slots).
-    """
+    """Generate XMSS key pairs in parallel, one small JSON file per validator."""
     scheme = LEAN_ENV_TO_SCHEMES[lean_env]
     keys_directory = get_keys_directory(lean_env)
     num_slots = max_slot + 1
@@ -139,16 +91,13 @@ def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
         f"({num_slots} slots) using {num_workers} cores..."
     )
 
-    # Ensure the output directory exists.
     keys_directory.mkdir(parents=True, exist_ok=True)
 
-    # Remove stale key files from previous runs that may have generated
-    # a different number of keys.
+    # Drop stale files from a prior run that may have made a different key count.
     for old_file in keys_directory.glob("*.json"):
         old_file.unlink()
 
-    # Generate key pairs in parallel across all CPU cores.
-    # Results arrive in index order thanks to executor.map.
+    # Results arrive in index order from the parallel map.
     gen_start = time.monotonic()
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         worker_func = partial(_generate_single_keypair, scheme, num_slots)
@@ -167,35 +116,23 @@ def _generate_keys(lean_env: str, count: int, max_slot: int) -> None:
 
 
 def download_keys(scheme: str) -> None:
-    """
-    Download pre-generated key pairs from a GitHub release.
-
-    Downloads a tar.gz archive for the specified scheme, removes any
-    existing keys for that scheme, and extracts the archive in place.
-
-    Args:
-        scheme: Scheme name ("test" or "prod").
-    """
+    """Download a scheme's key archive from a GitHub release and extract it in place."""
     base_directory = get_keys_directory(scheme).parent
     url = KEY_DOWNLOAD_URLS[scheme]
 
     print(f"Downloading {scheme} keys from {url}...")
 
-    # Reserve a temp path; we open it explicitly below so the writer can close
-    # before the reader opens.
     temporary_fd, temporary_name = tempfile.mkstemp(suffix=".tar.gz")
     os.close(temporary_fd)
     tmp_path = Path(temporary_name)
 
     try:
         # Close the writer before opening the reader.
-        # Otherwise Python's userspace buffer can withhold the tail of the gzip stream.
-        # That produces a near-end decompression failure that looks like a truncated download.
+        # Otherwise a buffered tail can look like a truncated, undecompressable download.
         with urllib.request.urlopen(url) as response, tmp_path.open("wb") as out:
             shutil.copyfileobj(response, out)
 
-        # Verify the archive against the pinned checksum before extracting.
-        # The release tag is mutable, so the checksum is the real pin.
+        # The release tag is mutable, so verify the pinned checksum before extracting.
         with tmp_path.open("rb") as archive_handle:
             archive_sha256 = hashlib.file_digest(archive_handle, "sha256").hexdigest()
         if archive_sha256 != PINNED_KEY_ARCHIVE_SHA256[scheme]:
@@ -207,16 +144,14 @@ def download_keys(scheme: str) -> None:
                 "updating the pinned checksum and key-set digest on purpose."
             )
 
-        # Extract into a scratch directory and verify there first.
-        # A rejected archive must never destroy working keys.
+        # Extract and verify in scratch first, so a rejected archive never destroys working keys.
         # The archive root is the scheme directory itself.
         with tempfile.TemporaryDirectory() as scratch_name:
             scratch_directory = Path(scratch_name)
             with tarfile.open(tmp_path, "r:gz") as tar:
                 tar.extractall(path=scratch_directory, filter="data")
 
-            # Verify the extracted key set against the pinned digest.
-            # Catches content drift the checksum pin alone would miss.
+            # The digest catches content drift the checksum pin alone would miss.
             extracted_directory = scratch_directory / f"{scheme}_scheme"
             extracted_digest = compute_key_set_digest(extracted_directory)
             if extracted_digest != PINNED_KEY_SET_DIGESTS[scheme]:
@@ -228,7 +163,7 @@ def download_keys(scheme: str) -> None:
                     "For the test scheme, restore the committed keys from version control."
                 )
 
-            # Replace the live key set only after both verifications pass.
+            # Replace the live key set only after both checks pass.
             target_directory = base_directory / f"{scheme}_scheme"
             if target_directory.exists():
                 shutil.rmtree(target_directory)
@@ -237,7 +172,6 @@ def download_keys(scheme: str) -> None:
 
         print(f"Extracted {scheme} keys to {target_directory}/")
     finally:
-        # Always clean up the temporary download file.
         tmp_path.unlink(missing_ok=True)
 
     print("Download complete!")
@@ -284,12 +218,10 @@ Regenerating keys:
 )
 def keys(download: bool, scheme: str, count: int, max_slot: int) -> None:
     """Generate XMSS key pairs for consensus testing."""
-    # Download pre-generated keys instead of generating locally.
     if download:
         download_keys(scheme=scheme)
         return
 
-    # Generate fresh keys with the specified parameters.
     _generate_keys(lean_env=scheme, count=count, max_slot=max_slot)
 
 

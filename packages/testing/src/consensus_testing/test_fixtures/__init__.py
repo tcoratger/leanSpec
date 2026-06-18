@@ -112,12 +112,7 @@ FIXTURE_FORMATS: tuple[type[BaseTestSpec], ...] = (
     VerifySignaturesTest,
     VerifySingleMessageProofsTest,
 )
-"""
-Canonical registry of every consensus fixture format.
-
-The pytest plugin registers one filler fixture per entry.
-A new format becomes fillable by adding its class here.
-"""
+"""Canonical registry of every consensus fixture format; add a class here to make it fillable."""
 
 __all__ = [
     "CachedMessage",

@@ -31,9 +31,7 @@ class VerifyCheckpoint(StrictBaseModel):
     """
     Build a state for a validator count and anchor slot, then report the verdict.
 
-    Zero (default) anchor slot yields a genesis state.
-    Positive values walk an empty-block chain through the slot so
-    historical block hashes reflect a real advanced anchor.
+    Anchor slot zero yields a genesis state, while a positive slot walks an empty-block chain.
     """
 
     kind: Literal["verify_checkpoint"] = "verify_checkpoint"
@@ -68,11 +66,7 @@ SyncOperation = VerifyCheckpoint
 
 
 class SyncFixture(BaseConsensusFixture):
-    """
-    Emitted vector for sync-layer conformance.
-
-    JSON output: operation, output.
-    """
+    """Emitted vector for sync-layer conformance."""
 
     operation: SyncOperation
     """Sync operation under test, with its typed inputs."""
@@ -85,8 +79,7 @@ class SyncTest(BaseTestSpec):
     """
     Spec for sync-layer conformance.
 
-    Each vector pins the expected verdict on a given input so clients
-    can align their sync-layer decisions bit-for-bit.
+    Each vector pins the expected verdict so clients align their sync decisions bit-for-bit.
     """
 
     format_name: ClassVar[str] = "sync_test"

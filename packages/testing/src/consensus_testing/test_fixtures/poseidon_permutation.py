@@ -30,13 +30,7 @@ class PoseidonPermutationFixture(BaseConsensusFixture):
 
 
 class PoseidonPermutationTest(BaseTestSpec):
-    """
-    Spec for Poseidon permutation conformance.
-
-    Each vector names the permutation width and supplies an input state
-    as decimal strings. Generation runs the spec's permutation engine
-    and emits the output state as decimal strings.
-    """
+    """Input spec for a Poseidon permutation conformance vector."""
 
     format_name: ClassVar[str] = "poseidon_permutation_test"
     description: ClassVar[str] = "Tests Poseidon permutation at widths 16 and 24"

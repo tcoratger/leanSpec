@@ -24,8 +24,7 @@ from lean_spec.node.networking.gossipsub.rpc import (
 )
 from lean_spec.node.networking.gossipsub.types import MessageId, Timestamp, TopicId
 
-# Sentinel that satisfies `outbound_stream is not None` checks.
-# The patched _send_rpc never touches the stream, so any non-None value works.
+# Sentinel for a non-None outbound stream; the patched sender never touches it.
 _FAKE_STREAM: Any = object()
 
 
@@ -311,11 +310,7 @@ class GossipsubExpectation(StrictBaseModel):
 
 
 class GossipsubHandlerFixture(BaseConsensusFixture):
-    """
-    Emitted vector for gossipsub handler behavior conformance.
-
-    JSON output: handlerName, params, initialState, event, now, expected.
-    """
+    """Emitted vector for gossipsub handler behavior conformance."""
 
     handler_name: str
     """Handler under test."""
@@ -337,27 +332,22 @@ class GossipsubHandlerFixture(BaseConsensusFixture):
 
 
 class GossipsubHandlerTest(BaseTestSpec):
-    """
-    Spec for gossipsub handler behavior conformance.
-
-    Tests protocol decisions: given initial state + incoming event,
-    what RPCs are sent and how does the mesh change?
-    """
+    """Spec for gossipsub handler behavior, pinning which RPCs are sent and how the mesh changes."""
 
     format_name: ClassVar[str] = "gossipsub_handler_test"
     description: ClassVar[str] = "Tests gossipsub handler protocol decisions"
 
     handler_name: str
-    """Handler being tested: graft, prune, ihave, iwant, message."""
+    """Handler being tested."""
 
     params: GossipsubMeshParameters = GossipsubMeshParameters()
     """Mesh degree parameters."""
 
     initial_state: GossipsubInitialState
-    """Behavior state to seed before the event: subscriptions, meshes, peers, caches."""
+    """Behavior state to seed before the event."""
 
     event: GossipsubEvent
-    """Incoming event: sending peer plus RPC content."""
+    """Incoming event to dispatch."""
 
     now: float = 1000.0
     """Current timestamp for backoff checks."""
@@ -374,12 +364,7 @@ class GossipsubHandlerTest(BaseTestSpec):
         )
 
     async def _execute(self) -> GossipsubExpectation:
-        """
-        Run the handler against a fully-configured behavior instance.
-
-        Builds the gossipsub behavior from fixture inputs, dispatches the
-        incoming RPC, and returns the outbound RPCs and final mesh state.
-        """
+        """Dispatch the incoming RPC and return the outbound RPCs and the final mesh state."""
         behavior = GossipsubBehavior(
             params=GossipsubParameters(
                 d=self.params.d,
@@ -393,19 +378,15 @@ class GossipsubHandlerTest(BaseTestSpec):
         capture = _SendCapture()
         behavior._send_rpc = capture  # type: ignore[assignment]
 
-        # Map between human-readable test names and opaque peer identifiers.
+        # Map opaque peer identifiers back to human-readable test names.
         peer_names: dict[PeerId, str] = {}
 
-        # Subscriptions define which topics the local node participates in.
-        #
-        # Handlers ignore messages for topics we are not subscribed to.
+        # Handlers ignore messages for topics the local node is not subscribed to.
         for topic in self.initial_state.subscriptions:
             behavior.mesh.subscribe(TopicId(topic))
 
         # Register each peer with its subscriptions and protocol state.
-        #
-        # Peer properties like backoff timers and IDONTWANT sets directly
-        # influence handler decisions (e.g., reject GRAFTs, skip forwarding).
+        # Backoff timers and IDONTWANT sets drive handler decisions like GRAFT rejection.
         for peer_name, peer_configuration in self.initial_state.peers.items():
             peer_id = PeerId.from_base58(peer_name)
             peer_names[peer_id] = peer_name
@@ -426,26 +407,17 @@ class GossipsubHandlerTest(BaseTestSpec):
                 peer_state.dont_want_ids.add(MessageId(from_hex(message_id_hex)))
             behavior._peers[peer_id] = peer_state
 
-        # Mesh topology determines who receives forwarded messages.
-        #
-        # Handlers check mesh membership for GRAFT acceptance, PRUNE removal,
-        # and message forwarding decisions.
+        # Mesh membership gates GRAFT acceptance, PRUNE removal, and forwarding.
         for topic_string, mesh_peer_names in self.initial_state.meshes.items():
             topic = TopicId(topic_string)
             for peer_name in mesh_peer_names:
                 behavior.mesh.add_to_mesh(topic, PeerId.from_base58(peer_name))
 
-        # Seen cache tracks previously-received message IDs.
-        #
-        # Duplicate messages are silently dropped; IHAVE for seen IDs
-        # does not trigger an IWANT response.
+        # Seen IDs are dropped as duplicates, and IHAVE for them triggers no IWANT.
         for message_id_hex in self.initial_state.seen_message_ids:
             behavior.seen_cache.add(MessageId(from_hex(message_id_hex)), Timestamp(self.now))
 
-        # Message cache holds full message payloads for IWANT responses.
-        #
-        # When a peer requests a message via IWANT, the handler looks it up
-        # here and sends the payload back.
+        # The message cache holds full payloads the handler returns on IWANT.
         for cached_message in self.initial_state.cached_messages:
             message = GossipsubMessage(
                 topic=cached_message.topic.encode("utf-8"),
@@ -454,7 +426,6 @@ class GossipsubHandlerTest(BaseTestSpec):
             message._cached_id = MessageId(from_hex(cached_message.message_id))
             behavior.message_cache.put(TopicId(cached_message.topic), message)
 
-        # Build the incoming RPC from the event.
         from_peer = PeerId.from_base58(self.event.from_peer)
         peer_names.setdefault(from_peer, self.event.from_peer)
 
@@ -463,8 +434,8 @@ class GossipsubHandlerTest(BaseTestSpec):
             await behavior._handle_rpc(from_peer, self.event.build_rpc())
 
         sent_rpcs = []
-        # The send order to mesh peers is set-driven, so it is not consensus-relevant.
-        # Sort by recipient name to keep the emitted vector reproducible across runs.
+        # Send order to mesh peers is set-driven.
+        # Sort by recipient name for a reproducible vector.
         for recipient_peer_id, rpc in sorted(
             capture.sent, key=lambda entry: peer_names.get(entry[0], str(entry[0]))
         ):
@@ -538,8 +509,7 @@ class GossipsubHandlerTest(BaseTestSpec):
                 )
             )
 
-        # Snapshot the mesh topology after handler execution.
-        # Sorting ensures deterministic output for fixture comparison.
+        # Snapshot the post-handler mesh topology, sorted for deterministic comparison.
         mesh_after = {
             str(topic): sorted(
                 peer_names.get(peer_id, str(peer_id))

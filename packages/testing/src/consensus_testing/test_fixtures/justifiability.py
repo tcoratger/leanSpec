@@ -18,11 +18,7 @@ class JustifiabilityOutput(StrictBaseModel):
 
 
 class JustifiabilityFixture(BaseConsensusFixture):
-    """
-    Emitted vector for 3SF-mini justifiability conformance.
-
-    JSON output: slot, finalizedSlot, output.
-    """
+    """Emitted vector for 3SF-mini justifiability conformance."""
 
     slot: int
     """Candidate slot under test."""
@@ -35,12 +31,7 @@ class JustifiabilityFixture(BaseConsensusFixture):
 
 
 class JustifiabilityTest(BaseTestSpec):
-    """
-    Spec for 3SF-mini justifiability conformance.
-
-    Tests Slot.is_justifiable_after(finalized_slot) which determines
-    whether a slot can be a justification target.
-    """
+    """Spec for 3SF-mini justifiability conformance."""
 
     format_name: ClassVar[str] = "justifiability_test"
     description: ClassVar[str] = "Tests 3SF-mini slot justifiability rules"

@@ -32,57 +32,30 @@ from lean_spec.spec.ssz import Boolean, ByteList512KiB, Bytes32
 
 
 class SetProposerIndex(StrictBaseModel):
-    """
-    Rewrite the block's proposer index.
-
-    Exercises the validator-bounds check that the builder skips
-    because its round-robin selection stays within range by
-    construction.
-    """
+    """Rewrite the proposer index to exercise the validator-bounds check the builder skips."""
 
     proposer_index: ValidatorIndex
     """Replacement proposer index written into the block."""
 
 
 class ClearFirstAttestationBits(StrictBaseModel):
-    """
-    Replace the first body attestation with one whose participation bits carry no set bit.
-
-    Exercises the empty-participants check inside signature verification.
-    """
+    """Clear the first attestation's bits to exercise the empty-participants check."""
 
 
 class CorruptProof(StrictBaseModel):
-    """
-    Replace the merged proof with a short non-decodable blob.
-
-    Exercises the multi-message aggregate decode check.
-    """
+    """Replace the merged proof with a non-decodable blob to exercise the decode check."""
 
 
 class AppendPhantomAttestation(StrictBaseModel):
-    """
-    Add a body attestation with no matching proof component.
-
-    Exercises the component count check between the body and the merged proof.
-    """
+    """Add an attestation with no proof component to exercise the component-count check."""
 
 
 class MutateStateRoot(StrictBaseModel):
-    """
-    Change a block field after signing so the block root differs.
-
-    Exercises the per-component message binding that prevents
-    reusing an honest proof under a different message.
-    """
+    """Change a block field after signing to break the proposer's per-component message binding."""
 
 
 class SwapFirstTwoAttestations(StrictBaseModel):
-    """
-    Swap the first two body attestations and re-sign only the proposer.
-
-    Exercises body/proof ordering without relying on a block-root mismatch.
-    """
+    """Swap the first two attestations and re-sign the proposer to exercise body/proof ordering."""
 
 
 SignedBlockTamper = (
@@ -111,46 +84,19 @@ class VerifySignaturesFixture(BaseConsensusFixture):
 
 
 class VerifySignaturesTest(BaseTestSpec):
-    """
-    Spec for verifying signatures on a signed block.
-
-    Generates a complete signed block from the block specification,
-    then verifies that signatures pass or fail as expected.
-
-    An optional `tamper` hook mutates the built signed block before
-    verification runs. This is the only supported way to exercise
-    signature-verification rejection paths that lie behind structural
-    invariants the block builder normally upholds.
-    """
+    """Input spec for verifying signatures on a generated signed block."""
 
     format_name: ClassVar[str] = "verify_signatures_test"
     description: ClassVar[str] = "Tests signature verification for signed blocks."
 
     anchor_state: State = Field(default_factory=build_genesis_state)
-    """
-    The initial consensus state before processing.
-
-    Defaults to the standard genesis state.
-    """
+    """The initial consensus state before processing."""
 
     block: BlockSpec
-    """
-    Block specifications to generate signatures for.
-
-    This defines the block parameters including attestations. Generation
-    builds a complete signed block with all necessary signatures.
-    """
+    """Block parameters from which the complete signed block is generated."""
 
     tamper: SignedBlockTamper | None = None
-    """
-    Optional post-build mutation applied before verification.
-
-    Each tamper type documents the rejection path it exercises.
-
-    Tampered blocks bypass the builder's structural invariants. The
-    resulting fixture pins the exact rejection a client must raise when
-    receiving such a block from a peer.
-    """
+    """Optional post-build mutation that reaches rejection paths the builder prevents."""
 
     def generate(self) -> VerifySignaturesFixture:
         """
@@ -160,29 +106,21 @@ class VerifySignaturesTest(BaseTestSpec):
             The emitted vector carrying the signed block.
 
         Raises:
-            AssertionError: If signature verification fails unexpectedly.
+            AssertionError: If verification fails unexpectedly.
         """
-        # Use shared key manager
         key_manager = XmssKeyManager.shared()
-
-        # Build the signed block
         signed_block = self.block.build_signed_block(self.anchor_state, key_manager)
 
-        # Apply optional post-build tamper before verification runs.
-        # This is the only way to exercise rejection paths the builder would
-        # otherwise prevent by construction.
+        # A tamper is the only way to reach rejection paths the builder prevents by construction.
         if self.tamper is not None:
             signed_block = self._apply_tamper(signed_block, self.tamper)
 
         exception_raised: Exception | None = None
-
-        # Verify signatures
         try:
             LstarSpec().verify_signatures(signed_block, self.anchor_state.validators)
         except SpecRejectionError as exception:
             exception_raised = exception
 
-        # Validate exception expectations
         self.assert_expected_outcome(exception_raised)
         rejection_reason = None
         if exception_raised is not None:
@@ -204,7 +142,7 @@ class VerifySignaturesTest(BaseTestSpec):
             tamper: The mutation to apply.
 
         Returns:
-            A new signed block with the requested mutation applied.
+            A new signed block with the mutation applied.
 
         Raises:
             ValueError: If the mutation cannot be applied to this block.
@@ -249,8 +187,7 @@ class VerifySignaturesTest(BaseTestSpec):
                 )
 
             case CorruptProof():
-                # Replace the merged proof with a short bogus payload.
-                # The verifier rejects the malformed proof bytes.
+                # Replace the merged proof with a short bogus payload the verifier cannot decode.
                 return signed_block.model_copy(
                     update={
                         "proof": MultiMessageAggregate(
@@ -260,10 +197,8 @@ class VerifySignaturesTest(BaseTestSpec):
                 )
 
             case AppendPhantomAttestation():
-                # Add a body attestation with no matching proof component.
-                # The proof binds one component per original attestation plus
-                # the proposer, so the body now claims more components than the
-                # proof carries.
+                # The proof binds one component per original attestation plus the proposer.
+                # An unbacked attestation makes the body claim more components than the proof.
                 phantom_data = AttestationData(
                     slot=Slot(0),
                     head=Checkpoint(root=Bytes32(b"\x00" * 32), slot=Slot(0)),
@@ -294,11 +229,9 @@ class VerifySignaturesTest(BaseTestSpec):
                 )
 
             case MutateStateRoot():
-                # Change a block field after signing so the block root differs.
-                # The proposer component's bound message no longer matches the
-                # recomputed block root, even though the signature is honest.
-                # This is the repackaging vector: an honest proof reused under
-                # a different message.
+                # Change a block field after signing so the recomputed block root differs.
+                # The proposer's honest signature now binds a message no client will recompute.
+                # This is the repackaging vector: an honest proof reused under a different message.
                 return signed_block.model_copy(
                     update={
                         "block": signed_block.block.model_copy(
@@ -333,8 +266,8 @@ class VerifySignaturesTest(BaseTestSpec):
                 )
                 swapped_block = signed_block.block.model_copy(update={"body": swapped_body})
 
-                # Keep the block root honestly signed; only the attestation
-                # proof order remains mismatched with the body order.
+                # Keep the block root honestly signed.
+                # Only the attestation proof order stays mismatched with the body order.
                 post_state = LstarSpec().process_slots(self.anchor_state, swapped_block.slot)
                 post_state = LstarSpec().process_block(post_state, swapped_block)
                 swapped_block = swapped_block.model_copy(

@@ -26,15 +26,7 @@ def build_genesis_state(
     keyed: bool = True,
     fork: LstarSpec = LstarSpec(),
 ) -> State:
-    """
-    Build a genesis pre-state for consensus tests.
-
-    Keyed validators get real signing keys from the shared key manager.
-    Unkeyed validators get zeroed keys, for tests that never check signatures.
-
-    Raises:
-        ValueError: If keyed and the key manager holds fewer keys than requested.
-    """
+    """Build a genesis pre-state for consensus tests, with real or zeroed validator keys."""
     if keyed:
         key_manager = XmssKeyManager.shared()
         if num_validators > len(key_manager):
@@ -72,12 +64,7 @@ def build_genesis_state(
 
 
 def reconstruct_block_from_header(state: State) -> Block:
-    """
-    Rebuild the block matching a state's latest header.
-
-    The body is empty by the genesis and empty-block convention.
-    For a genesis state this is the genesis block.
-    """
+    """Rebuild the block matching a state's latest header, with an empty body by convention."""
     return Block(
         slot=state.latest_block_header.slot,
         proposer_index=state.latest_block_header.proposer_index,
@@ -96,11 +83,7 @@ def build_anchor(
     keyed: bool = True,
     synced: bool = False,
 ) -> tuple[State, Block]:
-    """
-    Build an anchor by advancing the genesis state through a slot.
-
-    At slot 0 the advance loop is empty, so this returns the genesis pair.
-    """
+    """Build an anchor by advancing the genesis state through a slot, genesis pair at slot 0."""
     state = build_genesis_state(num_validators, genesis_time=genesis_time, keyed=keyed, fork=fork)
 
     current_block = reconstruct_block_from_header(state)
@@ -109,7 +92,7 @@ def build_anchor(
     num_validators_u64 = Uint64(num_validators)
 
     # Advance one empty block per slot, up to and including the anchor.
-    # Using the spec's own builder gives the state real mid-chain history.
+    # The spec's own builder gives the state real mid-chain history.
     for next_slot in range(1, int(anchor_slot) + 1):
         slot = Slot(next_slot)
         proposer_index = ValidatorIndex.proposer_for_slot(slot, num_validators_u64)
@@ -162,11 +145,7 @@ def build_genesis_store(
     keyed: bool = True,
     time: Interval | None = None,
 ) -> Store:
-    """
-    Build a genesis fork-choice store.
-
-    Set observer for a store with no owning validator.
-    """
+    """Build a genesis fork-choice store, owned by a validator unless observer is set."""
     # Slot 0 makes the anchor builder produce the genesis state and block pair.
     state, genesis_block = build_anchor(
         num_validators, Slot(0), genesis_time=Uint64(genesis_time), keyed=keyed

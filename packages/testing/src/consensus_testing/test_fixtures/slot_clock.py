@@ -19,13 +19,9 @@ from lean_spec.spec.ssz import Uint64
 
 def _reject_non_integral_timestamp(timestamp: float) -> float:
     """
-    Reject a fractional timestamp that cannot round-trip across JSON parsers.
+    Reject a fractional timestamp.
 
-    Every timing input here is a whole second or whole millisecond.
-    A fractional float in a serialized vector is a portability hazard.
-    Its decimal text can parse back to a different binary value in another
-    language, breaking cross-client determinism.
-    The fractional part must therefore be zero.
+    A fractional float can parse back to a different binary value in another language.
     """
     if not math.isfinite(timestamp) or not float(timestamp).is_integer():
         raise ValueError(f"slot-clock timestamp must be a whole number, got {timestamp!r}")
@@ -80,7 +76,7 @@ class FromUnixTime(StrictBaseModel):
     """Unix genesis timestamp in seconds."""
 
     unix_seconds: IntegralTimestamp
-    """Wall-clock timestamp to convert. Must be a whole number of seconds."""
+    """Wall-clock timestamp to convert, in whole seconds."""
 
     def run(self) -> IntervalOutput:
         """Compute intervals since genesis at the given timestamp."""
@@ -112,7 +108,7 @@ class CurrentSlot(StrictBaseModel):
     """Unix genesis timestamp in seconds."""
 
     current_time_milliseconds: IntegralTimestamp
-    """Wall-clock timestamp in milliseconds. Must be a whole number of milliseconds."""
+    """Wall-clock timestamp in whole milliseconds."""
 
     def run(self) -> SlotOutput:
         """Compute the current slot at the given timestamp."""
@@ -133,7 +129,7 @@ class CurrentInterval(StrictBaseModel):
     """Unix genesis timestamp in seconds."""
 
     current_time_milliseconds: IntegralTimestamp
-    """Wall-clock timestamp in milliseconds. Must be a whole number of milliseconds."""
+    """Wall-clock timestamp in whole milliseconds."""
 
     def run(self) -> IntervalOutput:
         """Compute the in-slot interval at the given timestamp."""
@@ -154,7 +150,7 @@ class TotalIntervals(StrictBaseModel):
     """Unix genesis timestamp in seconds."""
 
     current_time_milliseconds: IntegralTimestamp
-    """Wall-clock timestamp in milliseconds. Must be a whole number of milliseconds."""
+    """Wall-clock timestamp in whole milliseconds."""
 
     def run(self) -> TotalIntervalsOutput:
         """Compute total intervals since genesis at the given timestamp."""
@@ -176,11 +172,7 @@ SlotClockOutput = IntervalOutput | SlotOutput | TotalIntervalsOutput
 
 
 class SlotClockFixture(BaseConsensusFixture):
-    """
-    Emitted vector for slot clock timing conformance.
-
-    JSON output: operation, config, output.
-    """
+    """Emitted vector for slot clock timing conformance."""
 
     operation: SlotClockOperation
     """Conversion under test, with its typed inputs."""
@@ -193,12 +185,7 @@ class SlotClockFixture(BaseConsensusFixture):
 
 
 class SlotClockTest(BaseTestSpec):
-    """
-    Spec for slot clock timing conformance.
-
-    Tests time-to-slot and time-to-interval conversions that every
-    consensus client must implement identically.
-    """
+    """Spec for slot clock timing conformance."""
 
     format_name: ClassVar[str] = "slot_clock_test"
     description: ClassVar[str] = "Tests slot clock time-to-slot/interval conversion"

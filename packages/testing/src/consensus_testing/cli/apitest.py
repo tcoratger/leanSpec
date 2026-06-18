@@ -37,14 +37,11 @@ def apitest(
     """
     Run API conformance tests against an external server, i.e. a client implementation.
 
-    SERVER_URL is the base URL of the API server (e.g., http://localhost:5052).
-
-    For testing the local leanSpec implementation, use the local pytest suite under
-    tests/node/api/endpoints, which automatically starts a local server.
+    SERVER_URL is the base URL of the API server.
     """
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-apitest.ini"
 
-    # Find project root
+    # The project root is the workspace pyproject.toml.
     project_root = Path.cwd()
     while project_root != project_root.parent:
         if (project_root / "pyproject.toml").exists():
@@ -53,7 +50,6 @@ def apitest(
                 break
         project_root = project_root.parent
 
-    # Build pytest arguments
     args = [
         "-c",
         str(config_path),

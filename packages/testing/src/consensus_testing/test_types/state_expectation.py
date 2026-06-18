@@ -19,15 +19,7 @@ from lean_spec.spec.ssz import Bytes32
 
 
 class StateExpectation(SelectiveCheck):
-    """
-    Expected State fields after state transition (selective validation).
-
-    All fields are optional - only specified fields are validated.
-    Uses Pydantic's model_fields_set to track which fields were explicitly set.
-
-    This allows test writers to specify only the fields they care about,
-    making tests more focused and maintainable.
-    """
+    """Expected state fields after a transition, validating only those a test set."""
 
     _SCALAR_ACCESSORS: ClassVar[dict[str, Callable[[State], Any]]] = {
         "slot": lambda s: s.slot,
@@ -63,12 +55,7 @@ class StateExpectation(SelectiveCheck):
     """Expected latest justified checkpoint root."""
 
     latest_justified_root_label: str | None = None
-    """
-    Expected latest justified checkpoint root by label reference.
-
-    Alternative to latest_justified_root that uses the block label system.
-    The framework resolves this label to the actual block root.
-    """
+    """Expected latest justified checkpoint root, by block label."""
 
     latest_finalized_slot: Slot | None = None
     """Expected latest finalized checkpoint slot."""
@@ -77,12 +64,7 @@ class StateExpectation(SelectiveCheck):
     """Expected latest finalized checkpoint root."""
 
     latest_finalized_root_label: str | None = None
-    """
-    Expected latest finalized checkpoint root by label reference.
-
-    Alternative to latest_finalized_root that uses the block label system.
-    The framework resolves this label to the actual block root.
-    """
+    """Expected latest finalized checkpoint root, by block label."""
 
     validator_count: int | None = None
     """Expected number of validators."""
@@ -121,12 +103,7 @@ class StateExpectation(SelectiveCheck):
     """Expected justifications roots collection."""
 
     justifications_roots_labels: list[str] | None = None
-    """
-    Expected pending justification roots by label reference.
-
-    Alternative to justifications_roots that uses the block label system.
-    The framework resolves each label to the actual block root.
-    """
+    """Expected pending justification roots, by block label."""
 
     justifications_roots_count: int | None = None
     """Expected number of pending justification target roots."""
@@ -143,10 +120,7 @@ class StateExpectation(SelectiveCheck):
         block_registry: dict[str, Block] | None = None,
     ) -> None:
         """
-        Validate this expectation against actual State.
-
-        Only validates fields that were explicitly set by the test writer.
-        Uses Pydantic's model_fields_set to determine which fields to check.
+        Validate this expectation against an actual state, checking only the fields a test set.
 
         Args:
             state: The actual state to validate against.
