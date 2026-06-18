@@ -22,4 +22,3 @@ class BaseFork(ABC, metaclass=BaseForkMeta):
     @abstractmethod
     def name(cls) -> str:
         """Fork name as it appears in the network field of generated fixtures."""
-        pass
