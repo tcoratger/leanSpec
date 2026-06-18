@@ -75,19 +75,16 @@ def fill(
     check_determinism: bool,
 ) -> None:
     """Generate consensus test fixtures from test specifications."""
-    # The spec config reads this flag once, at import time.
-    # The current process froze the old value when the package imported.
+    # The spec config reads this flag once at import time.
     # Only the pytest subprocess below starts fresh and sees this export.
     os.environ["LEAN_ENV"] = scheme.lower()
 
-    # Crypto mode is independent of the scheme.
-    # Both schemes mock by default and run the prover only when asked.
+    # Crypto mode is independent of scheme: both schemes mock unless asked to run the prover.
     crypto_mode = crypto.lower()
 
-    # Check and download keys if needed
     keys_directory = get_keys_directory(scheme.lower())
 
-    # Check if keys already exist, if not, download them
+    # Download the keys if they are missing.
     if not (keys_directory.exists() and any(keys_directory.glob("*.json"))):
         click.echo(f"Test keys for '{scheme}' scheme not found. Downloading...")
         download_keys(scheme.lower())
@@ -97,17 +94,15 @@ def fill(
         download_keys(scheme.lower())
 
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-fill.ini"
-    # Find project root by looking for pyproject.toml with [tool.uv.workspace]
+    # The project root is the workspace pyproject.toml.
     project_root = Path.cwd()
     while project_root != project_root.parent:
         if (project_root / "pyproject.toml").exists():
-            # Check if this is the workspace root
             pyproject = project_root / "pyproject.toml"
             if "[tool.uv.workspace]" in pyproject.read_text():
                 break
         project_root = project_root.parent
 
-    # Build pytest arguments
     args = [
         "-c",
         str(config_path),
@@ -120,13 +115,10 @@ def fill(
     if clean:
         args.append("--clean")
 
-    # Add all pytest args
     args.extend(pytest_args)
-
-    # Add extra click context args
     args.extend(ctx.args)
 
-    # Why a subprocess: a fresh interpreter imports the spec config anew.
+    # A subprocess gives a fresh interpreter that imports the spec config anew.
     # Only then does the scheme exported above take effect.
     exit_code = subprocess.run([sys.executable, "-m", "pytest", *args]).returncode
     if exit_code != 0:
@@ -142,25 +134,8 @@ def verify_fixture_determinism(config_path: Path, project_root: Path, fork: str)
     """
     Regenerate the full fixture tree under two hash seeds and diff them.
 
-    Set and dict iteration order is randomized per process by PYTHONHASHSEED.
-    A vector whose bytes depend on that order is not reproducible across clients.
-    Two seeds producing byte-identical output proves every vector is order-free.
-
-    Determinism is checked for all vectors by default, not an opt-in subset.
-    A new vector that emits set- or dict-derived fields is covered automatically.
-
-    The mocked prover is forced so proof bytes stay deterministic across both runs.
-    A single process pins each seed cleanly, so distribution is disabled.
-
-    This gate covers only hash-seed and iteration-order effects under the mocked prover.
-
-    The real prover emits randomized proof bytes by design.
-    Those proofs are intentionally outside this guarantee.
-    They never reproduce across two fills of identical inputs.
-
-    The non-proof fields of real-crypto vectors are not separately re-checked here.
-    Masking out exactly the randomized proof bytes would need a fragile per-container rule.
-    So no real-crypto diff is attempted.
+    Byte-identical output under two seeds proves every vector is order-free.
+    The mocked prover is forced, since the real prover emits randomized proofs by design.
     """
     consensus_tests = project_root / "tests" / "consensus"
     emitted_under_seed: list[Path] = []

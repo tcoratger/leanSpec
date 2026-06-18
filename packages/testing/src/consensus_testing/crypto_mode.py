@@ -47,12 +47,7 @@ class AggregationProver:
     @classmethod
     @contextmanager
     def mocked(cls) -> Iterator[None]:
-        """
-        Swap the Rust prover bindings on the spec module for in-process stubs.
-
-        - Provers return a placeholder proof.
-        - Verifiers accept that placeholder.
-        """
+        """Swap the Rust prover bindings for stubs that emit and accept a placeholder."""
         originals = {
             name: getattr(aggregation, name) for name in (*cls._prover_names, *cls._verifier_names)
         }

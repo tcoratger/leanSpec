@@ -34,99 +34,42 @@ class BlockSpec(CamelModel):
     """
     Block specification for test definitions.
 
-    Contains the same fields as Block, but all optional except slot.
-    The framework fills in any missing fields automatically.
+    Mirrors a block's fields, but all are optional except the slot.
+    The framework fills in any missing field automatically.
     """
 
     slot: Slot
     """The slot for this block (required)."""
 
     proposer_index: ValidatorIndex | None = None
-    """
-    The proposer index for this block.
-
-    If None, framework selects using round-robin based on slot and num_validators.
-    """
+    """Proposer index, defaulting to the slot's round-robin proposer."""
 
     parent_root: Bytes32 | None = None
-    """
-    The root of the parent block.
-
-    If None, framework computes from state.latest_block_header.
-    """
+    """Parent block root, defaulting to the latest block header."""
 
     state_root: Bytes32 | None = None
-    """
-    The state root after applying this block.
-
-    If None, framework computes via state_transition dry-run.
-    """
+    """Post-state root, defaulting to a state-transition dry-run result."""
 
     body: BlockBody | None = None
-    """
-    The block body containing attestations.
-
-    If None, framework creates body from the attestations field.
-    If both body and attestations are None, framework creates body with empty attestations.
-    Note: If body is provided, attestations field is ignored.
-    """
+    """Block body, built from the attestations field when unset, winning over it when provided."""
 
     attestations: list[AggregatedAttestationSpec] | None = None
-    """
-    List of aggregated attestations to include in this block's body.
-
-    Each entry specifies multiple validators attesting to the same data.
-    The framework generates signatures and aggregates them.
-
-    If None, framework uses default behavior (empty body).
-    If body is provided, this field is ignored.
-    """
+    """Aggregated attestations for this block's body, ignored when a body is provided directly."""
 
     forced_attestations: list[AggregatedAttestationSpec] | None = None
-    """
-    Raw aggregated attestations appended directly to the final block body.
-
-    Unlike attestations, these entries bypass the block builder's filtering.
-    Use this only for STF coverage when the builder would pre-filter the
-    attestation before state processing (e.g., unjustified source).
-    """
+    """Aggregated attestations appended directly, bypassing the builder's pre-filtering."""
 
     label: str | None = None
-    """
-    Optional label to tag this block for later reference.
-
-    Enables fork creation by referencing labeled ancestors.
-    Labels must be unique within a test.
-    """
+    """Unique label tagging this block so a fork can reference it as an ancestor."""
 
     parent_label: str | None = None
-    """
-    Optional label referencing a previously created block as parent.
-
-    If None, parent is determined by the current canonical head.
-    If specified, parent_root is computed from the labeled block.
-    """
+    """Label of a block to use as parent, defaulting to the current canonical head."""
 
     valid_signature: bool = True
-    """
-    Flag whether the proposer's signature in generated block should be valid.
-
-    Used for testing that verification properly rejects invalid block signatures.
-    When False, a structurally valid but cryptographically invalid signature
-    (all zeros) will be generated for the proposer attestation instead of a
-    proper XMSS signature.
-
-    Defaults to True (valid signature).
-    If False, the proposer attestation will be given a dummy/invalid signature.
-    """
+    """Whether the proposer's signature should be valid, all-zero when false to test rejection."""
 
     skip_slot_processing: bool = False
-    """
-    If True, the state transition fixture skips automatic slot advancement
-    before processing this block.
-
-    Useful for tests that intentionally exercise slot mismatch failures.
-    """
+    """Skip automatic slot advancement before processing, to exercise slot-mismatch failures."""
 
     def resolve_proposer_index(self, num_validators: int) -> ValidatorIndex:
         """Return the proposer index, falling back to the spec's round-robin schedule."""
@@ -140,28 +83,21 @@ class BlockSpec(CamelModel):
         default_root: Bytes32,
     ) -> Bytes32:
         """
-        Resolve the parent block root with a three-level fallback:
-
-        1. Explicit parent_root on the spec (for direct override)
-        2. parent_label lookup in the block registry (for fork building)
-        3. default_root provided by the caller (typically the current head
-           or the state's latest block header root)
+        Resolve the parent block root: explicit root, else labeled block, else the default.
 
         Args:
             block_registry: Map of labels to previously built blocks.
-            default_root: Root to use when neither parent_root nor parent_label is set.
+            default_root: Root used when neither an explicit root nor a label is set.
 
         Returns:
             Root hash of the parent block.
 
         Raises:
-            ValueError: If parent_label is set but not found in registry.
+            ValueError: If the label is set but not found in the registry.
         """
-        # Explicit override takes highest priority.
         if self.parent_root is not None:
             return self.parent_root
 
-        # Label-based resolution for fork building.
         if self.parent_label is not None:
             if not (parent_block := block_registry.get(self.parent_label)):
                 raise ValueError(
@@ -170,7 +106,6 @@ class BlockSpec(CamelModel):
                 )
             return hash_tree_root(parent_block)
 
-        # No explicit parent: use the caller-provided default.
         return default_root
 
     def build_attestations(
@@ -193,9 +128,9 @@ class BlockSpec(CamelModel):
 
         Returns:
             Tuple of:
-                - All built attestations (one per validator per spec)
-                - Signature lookup keyed by (attestation_data, validator_index)
-                - Subset of attestations that have valid (non-dummy) signatures
+                - All built attestations, one per validator per spec.
+                - Signature lookup keyed by data and validator.
+                - Subset of attestations with valid signatures.
         """
         if self.attestations is None:
             return [], {}, []
@@ -208,13 +143,11 @@ class BlockSpec(CamelModel):
         valid_attestations: list[Attestation] = []
 
         for aggregated_spec in self.attestations:
-            # Build attestation data once.
             # All validators in this aggregation vote for the same target.
             attestation_data = aggregated_spec.build_attestation_data(
                 block_registry, state.latest_justified
             )
 
-            # Create one attestation per validator.
             # Each validator signs independently; signatures aggregate later.
             for validator_index in aggregated_spec.validator_indices:
                 attestation = Attestation(
@@ -223,7 +156,6 @@ class BlockSpec(CamelModel):
                 )
                 attestations.append(attestation)
 
-                # Generate signature or use invalid placeholder.
                 # Invalid signatures test rejection paths.
                 if aggregated_spec.valid_signature:
                     signature = key_manager.sign_attestation_data(
@@ -234,7 +166,6 @@ class BlockSpec(CamelModel):
                 else:
                     signature = create_dummy_signature()
 
-                # Index signature by attestation data and validator ID.
                 signature_lookup.setdefault(attestation_data, {}).setdefault(
                     validator_index,
                     signature,
@@ -251,30 +182,17 @@ class BlockSpec(CamelModel):
         state: State,
     ) -> SignedBlock:
         """
-        Sign a block and assemble the final SignedBlock with the merged proof.
+        Sign a block and assemble the signed block with the merged proof.
 
-        Builds a single-message aggregate wrapping the proposer's XMSS
-        signature, then merges that with the per-attestation single-message
-        aggregate proofs into a single multi-message aggregate proof and
-        stores it on the envelope. Consumers of this filler feed the block
-        through spec.on_block / verify_signatures, which decodes the proof
-        and verifies it, so an honest merged proof is required.
-
-        When valid_signature is False, the proposer signature is a dummy
-        XMSS one and the binding-driven aggregation would reject it before
-        verify_signatures ever runs. The multi-message aggregate envelope is then assembled
-        directly from the info entries with empty proof bytes — that
-        decodes structurally and lets verify_signatures reach (and reject
-        at) the multi-message proof verification, which is the contract the test exercises.
+        A dummy proposer signature is hand-assembled with empty proof bytes so it still decodes,
+        letting verification reach and reject at the proof check under test.
 
         Args:
             final_block: The unsigned block.
-            attestation_proofs: Per-attestation single-message aggregate proofs (parallel to
-                final_block.body.attestations).
+            attestation_proofs: Per-attestation proofs, parallel to the block's attestations.
             proposer_index: Which validator proposes this block.
             key_manager: XMSS key manager for signing.
-            state: State providing the validator registry used to resolve
-                participant public_keys for the merge.
+            state: State providing the validator registry for resolving participant keys.
 
         Returns:
             Complete signed block.
@@ -282,11 +200,9 @@ class BlockSpec(CamelModel):
         block_root = hash_tree_root(final_block)
         proposer_public_key = key_manager.get_public_keys(proposer_index)[1]
 
-        # The binding rejects placeholder bytes; if anything in the merged
-        # input is a dummy (invalid proposer sig or a build_invalid_proof
-        # attestation), bypass the multi-message aggregation entirely and assemble the
-        # multi-message aggregate envelope by hand. The result still SSZ-decodes so
-        # verify_signatures reaches the multi-message proof verification for the rejection.
+        # The binding rejects placeholder bytes.
+        # If any merged input is a dummy, skip the real merge and assemble the envelope by hand.
+        # It still decodes, so verification reaches the proof check that performs the rejection.
         any_placeholder_attestation = any(not proof.proof.data for proof in attestation_proofs)
         use_placeholder = not self.valid_signature or any_placeholder_attestation
 
@@ -332,9 +248,7 @@ class BlockSpec(CamelModel):
         key_manager: XmssKeyManager,
     ) -> SignedBlock:
         """
-        Build a complete SignedBlock from this specification without a Store.
-
-        Used by signature verification tests where no fork choice is involved.
+        Build a complete signed block without a store, for signature tests with no fork choice.
 
         Args:
             state: The anchor state to build against.
@@ -346,19 +260,17 @@ class BlockSpec(CamelModel):
         spec = LstarSpec()
         proposer_index = self.resolve_proposer_index(len(state.validators))
 
-        # Build a genesis block registry so attestation specs can resolve labels.
+        # Seed a genesis registry so attestation specs can resolve labels.
         anchor_block = reconstruct_block_from_header(state)
         block_registry: dict[str, Block] = {"genesis": anchor_block}
 
-        # Resolve the parent root.
-        # The default is the latest block header from the slot-advanced state.
+        # Default the parent to the latest block header of the slot-advanced state.
         parent_state = spec.process_slots(state, self.slot)
         parent_root = self.resolve_parent_root(
             block_registry,
             default_root=hash_tree_root(parent_state.latest_block_header),
         )
 
-        # Separate valid and invalid attestation specs.
         # Valid specs go through normal aggregation; invalid specs get special proofs.
         invalid_specs = [
             attestation_spec
@@ -370,8 +282,7 @@ class BlockSpec(CamelModel):
             )
         ]
 
-        # Build a valid-only copy for normal attestation construction.
-        # A copy keeps this spec unchanged, so building twice gives the same result.
+        # Copy with only the valid specs so building twice leaves this spec unchanged.
         valid_specs = [
             attestation_spec
             for attestation_spec in (self.attestations or [])
@@ -379,20 +290,17 @@ class BlockSpec(CamelModel):
         ]
         valid_only = self.model_copy(update={"attestations": valid_specs})
 
-        # Build valid attestations and their signatures.
         valid_attestations, signature_lookup, _ = valid_only.build_attestations(
             state, block_registry, key_manager
         )
 
-        # Group attestations that share the same AttestationData.
-        # Validators seeing the same head/source/target produce identical data,
-        # so they can be merged into a single aggregated attestation.
+        # Validators seeing the same head, source, and target produce identical data.
+        # Group them so each unique data merges into one aggregated attestation.
         data_to_validator_indices: dict[AttestationData, list[ValidatorIndex]] = defaultdict(list)
         for attestation in valid_attestations:
             data_to_validator_indices[attestation.data].append(attestation.validator_index)
 
-        # Build one AggregatedAttestation per unique data.
-        # Each carries a bitfield marking which validators participated.
+        # One aggregate per unique data, with a bitfield of its participants.
         aggregated_attestations = [
             AggregatedAttestation(
                 aggregation_bits=AggregationBits.from_indices(validator_indices),
@@ -420,8 +328,7 @@ class BlockSpec(CamelModel):
             aggregated_payloads=aggregated_payloads,
         )
 
-        # Append proofs for invalid attestation specs.
-        # These exercise signature verification rejection paths.
+        # Append proofs for invalid specs to exercise verification rejection paths.
         for invalid_spec in invalid_specs:
             final_block, invalid_proof = invalid_spec.build_invalid_proof(
                 block_registry, state, key_manager, final_block
@@ -440,14 +347,13 @@ class BlockSpec(CamelModel):
         """
         Build a block whose parent the store never imported.
 
-        The unknown-parent guard rejects it before the state transition or
-        signature checks, so an empty body and placeholder proof suffice.
+        The unknown-parent guard rejects it before any other check, so an empty body and
+        placeholder proof suffice.
         """
         anchor_state = store.states[store.head]
         proposer_index = self.resolve_proposer_index(len(anchor_state.validators))
 
-        # An empty body keeps the block trivially well formed.
-        # The state root is left at zero: the guard rejects before checking it.
+        # Empty body, zero state root: the guard rejects before either is checked.
         block = Block(
             slot=self.slot,
             proposer_index=proposer_index,
@@ -456,9 +362,8 @@ class BlockSpec(CamelModel):
             body=BlockBody(attestations=AggregatedAttestations(data=[])),
         )
 
-        # An empty proof decodes structurally.
-        # The unknown-parent guard fires before proof verification, so a
-        # placeholder proof never reaches a verifier.
+        # An empty proof decodes structurally and never reaches a verifier:
+        # the unknown-parent guard fires before proof verification.
         return SignedBlock(block=block, proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"")))
 
     def build_signed_block_with_store(
@@ -469,51 +374,32 @@ class BlockSpec(CamelModel):
         deliver_unknown_parent: bool = False,
     ) -> tuple[SignedBlock, Store]:
         """
-        Build a complete signed block through the Store's attestation pipeline.
+        Build a signed block by replaying gossip, aggregation, and proposal through the store.
 
-        Simulates what a real node does when proposing a block.
-        Replays the gossip, aggregation, and proposal pipeline through the Store.
-
-        Returns a Store enriched with the aggregated single-message aggregate payloads built
-        during the simulated pipeline. The caller can persist these so future
-        block builds can re-aggregate the same attestations rather than
-        reconstructing them from on-chain block bodies (which would require
-        splitting the block-level multi-message aggregate proof — a heavy and, in the test
-        recursive-aggregation mode, unreliable operation). Other fields of
-        the original Store (gossip signatures, time, head, etc.) are
-        preserved so the simulated build does not consume state the caller
-        is tracking separately.
+        The returned store keeps the freshly aggregated payloads so future builds re-aggregate the
+        same attestations, avoiding a heavy and unreliable split of the block-level proof.
 
         Args:
             store: Fork choice store for head state lookup and gossip processing.
             block_registry: Labeled blocks for fork creation.
             key_manager: Key manager for signing.
-            deliver_unknown_parent: When True and the parent state is absent,
-                build a structurally valid block against the anchor state with
-                its parent root overridden, instead of raising.
-                This hands the block to the spec so its own unknown-parent
-                guard runs and rejects it.
+            deliver_unknown_parent: When the parent state is absent, build against the anchor
+                state with the parent root overridden so the unknown-parent guard rejects it.
 
         Returns:
-            The signed block and the Store with new known payloads merged in.
+            The signed block and the store with new known payloads merged in.
         """
         spec = LstarSpec()
         proposer_index = self.resolve_proposer_index(len(store.states[store.head].validators))
 
-        # Resolve parent block.
-        # Parent can be specified by label (for forks) or defaults to head.
+        # Parent is set by label for forks, else defaults to the head.
         parent_root = self.resolve_parent_root(block_registry, default_root=store.head)
 
-        # The parent's state is missing from the store.
-        #
-        # The normal path treats this as a hard harness error: no state means
+        # A missing parent state is normally a hard harness error:
         # the builder cannot run the state transition for this fork.
-        #
-        # The unknown-parent path is the one exception.
-        # A test may deliberately fabricate a parent root the store never saw,
-        # to exercise the spec's own unknown-parent rejection.
-        # That guard runs before the state transition, so the block needs no
-        # valid post-state — it only needs to be structurally well formed.
+        # The one exception is a deliberately fabricated unknown parent.
+        # Its guard runs before the state transition, so the block needs no valid post-state,
+        # only a structurally well-formed shape.
         if parent_root not in store.states:
             if deliver_unknown_parent:
                 return self._build_unknown_parent_block(store, parent_root), store
@@ -522,29 +408,26 @@ class BlockSpec(CamelModel):
                 "has no state in store - cannot build on this fork"
             )
 
-        # Preserve the caller's Store so unrelated fields (gossip signatures,
-        # head, finalization checkpoints, time) survive the simulated pipeline.
-        # Only the freshly aggregated single-message aggregate payloads merge back at the end.
+        # Preserve the caller's store so its unrelated fields survive the simulated pipeline.
+        # Only the freshly aggregated payloads merge back at the end.
         caller_store = store
         store = copy.deepcopy(store)
 
-        # Build attestations from this spec's attestation fields.
         parent_state = store.states[parent_root]
         _, attestation_signatures, valid_attestations = self.build_attestations(
             parent_state, block_registry, key_manager
         )
 
-        # Advance the local store clock to the block's slot before gossiping.
-        # In-body attestations carry data.slot = self.slot; the Store's time
-        # check rejects votes whose slot has not yet started locally.
+        # In-body attestations carry the block's slot.
+        # The store's time check rejects votes whose slot has not yet started locally,
+        # so advance the local clock first.
         block_slot_interval = Interval.from_slot(self.slot)
         if store.time < block_slot_interval:
             store, _ = spec.on_tick(
                 store, block_slot_interval, has_proposal=True, is_aggregator=True
             )
 
-        # Gossip valid attestation signatures into the Store.
-        # This runs signature verification through the spec's validation path.
+        # Gossip valid signatures so they run through the spec's verification path.
         for attestation in valid_attestations:
             signatures_for_data = attestation_signatures.get(attestation.data)
             if (
@@ -562,14 +445,12 @@ class BlockSpec(CamelModel):
                 is_aggregator=True,
             )
 
-        # Trigger Store aggregation to merge gossip signatures into known payloads.
-        # Aggregation runs on a local clone: gossip pools mutate here, but the
-        # caller's gossip-signature view must not be consumed by this simulated
-        # build. Only the freshly aggregated single-message aggregate payloads propagate back.
+        # Aggregate gossip signatures into known payloads on the local clone.
+        # Gossip pools mutate here, but the caller's gossip view must not be consumed.
+        # Only the freshly aggregated payloads propagate back.
         aggregation_store, _ = spec.aggregate(store)
         merged_store = spec.accept_new_attestations(aggregation_store)
 
-        # Build the block through the spec's State.build_block().
         final_block, _, _, block_proofs = spec.build_block(
             parent_state,
             slot=self.slot,
@@ -579,8 +460,7 @@ class BlockSpec(CamelModel):
             aggregated_payloads=merged_store.latest_known_aggregated_payloads,
         )
 
-        # Merge new known payloads (built locally) back into the caller's
-        # store while leaving every other field untouched.
+        # Merge the locally built known payloads back, leaving every other field untouched.
         merged_known = {
             attestation_data: set(proofs)
             for attestation_data, proofs in caller_store.latest_known_aggregated_payloads.items()
@@ -589,8 +469,8 @@ class BlockSpec(CamelModel):
             merged_known.setdefault(attestation_data, set()).update(proofs)
         store = caller_store.model_copy(update={"latest_known_aggregated_payloads": merged_known})
 
-        # Append forced attestations that bypass the builder's MAX cap.
-        # Each entry is signed and aggregated so the block carries valid proofs.
+        # Append forced attestations that bypass the builder's cap.
+        # Each is signed and aggregated so the block carries valid proofs.
         if self.forced_attestations:
             for attestation_spec in self.forced_attestations:
                 attestation_data = attestation_spec.build_attestation_data(
@@ -620,7 +500,7 @@ class BlockSpec(CamelModel):
                     }
                 )
 
-            # Recompute state root with the modified body.
+            # Recompute the state root for the modified body.
             post_state = spec.process_slots(parent_state, self.slot)
             post_state = spec.process_block(post_state, final_block)
             final_block = final_block.model_copy(update={"state_root": hash_tree_root(post_state)})

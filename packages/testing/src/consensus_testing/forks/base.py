@@ -4,37 +4,22 @@ from abc import ABC, ABCMeta, abstractmethod
 
 
 class BaseForkMeta(ABCMeta):
-    """
-    Metaclass for BaseFork enabling fork ordering via inheritance.
-
-    Fork ordering works by checking subclass relationships.
-    For example, if ForkB inherits from ForkA, then ForkA precedes ForkB.
-    """
+    """Metaclass ordering forks by inheritance: an older fork is a base of a newer one."""
 
     def __repr__(cls: "type[BaseFork]") -> str:
-        """Print the name of the fork, instead of the class."""
+        """Print the fork name instead of the class."""
         return cls.name()
 
     def __le__(cls: "type[BaseFork]", other: "type[BaseFork]") -> bool:
-        """Check if this fork is older or equal to another (cls <= other)."""
+        """Older-or-equal: a fork precedes any fork that inherits from it."""
         return cls is other or issubclass(other, cls)
 
 
 class BaseFork(ABC, metaclass=BaseForkMeta):
-    """
-    Base class for spec test forks.
-
-    Each fork represents a specific version of the protocol.
-    Forks form an inheritance hierarchy where newer forks inherit from older ones.
-    """
+    """Protocol version in the fork inheritance hierarchy."""
 
     @classmethod
     @abstractmethod
     def name(cls) -> str:
-        """
-        Return the name of the fork as it appears in test fixtures.
-
-        By default, this is the class name (e.g., "Lstar" for consensus).
-        This is used in the 'network' field of generated fixtures.
-        """
+        """Fork name as it appears in the network field of generated fixtures."""
         pass

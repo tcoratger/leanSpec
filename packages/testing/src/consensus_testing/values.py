@@ -24,12 +24,7 @@ TEST_VALIDATOR_INDEX = ValidatorIndex(0)
 
 
 def signed_block_with_empty_proof(block: Block) -> SignedBlock:
-    """
-    Wrap an unsigned block in an empty proof.
-
-    The fork-choice store retains only unsigned blocks.
-    A genesis or anchor block that no proposer ever signed carries an empty proof.
-    """
+    """Wrap an unsigned block in an empty proof, as a genesis or anchor block carries."""
     return SignedBlock(
         block=block,
         proof=MultiMessageAggregate(proof=ByteList512KiB(data=b"")),
@@ -39,11 +34,7 @@ def signed_block_with_empty_proof(block: Block) -> SignedBlock:
 def store_backed_signed_block_getter(
     store: Store,
 ) -> Callable[[Bytes32], SignedBlock | None]:
-    """
-    Build a signed-block lookup over a store's unsigned blocks.
-
-    Returns None for an unknown root, mirroring a node that lacks the block.
-    """
+    """Build a signed-block lookup over a store's unsigned blocks."""
 
     def signed_block_for(root: Bytes32) -> SignedBlock | None:
         block = store.blocks.get(root)
@@ -87,16 +78,7 @@ def make_signed_attestation(
     target: Checkpoint,
     source: Checkpoint | None = None,
 ) -> SignedAttestation:
-    """
-    Build a single-validator signed attestation with a dummy signature.
-
-    Head and target share the target checkpoint.
-    Source defaults to a zero checkpoint.
-
-    The output is structurally valid only, not guaranteed consistent with any chain.
-    The source, target, and head triple is never checked for realizability.
-    Keep this out of the real spec's attestation processing.
-    """
+    """Build a single-validator signed attestation that is structurally valid but chain-agnostic."""
     return SignedAttestation(
         validator_index=validator,
         data=AttestationData(

@@ -35,30 +35,20 @@ def _ancestor_set(blocks: dict[Bytes32, Block], head: Bytes32) -> set[Bytes32]:
 
 
 class AggregatedAttestationCheck(CamelModel):
-    """
-    Validation checks for an aggregated attestation in the block body.
-
-    Used to verify signature aggregation results by checking which validators
-    are covered by each aggregated attestation.
-    """
+    """Validation checks for one aggregated attestation in the block body."""
 
     participants: set[int]
     """Expected validator indices covered by this aggregated attestation."""
 
     attestation_slot: Slot | None = None
-    """Expected attestation data slot (optional - only check if set)."""
+    """Expected attestation data slot, checked only when set."""
 
     target_slot: Slot | None = None
-    """Expected target checkpoint slot (optional - only check if set)."""
+    """Expected target checkpoint slot, checked only when set."""
 
 
 class AttestationCheck(CamelModel):
-    """
-    Validation checks for a specific validator's attestation.
-
-    All fields optional - only check fields explicitly set.
-    Used to validate attestation content beyond just counting.
-    """
+    """Validation checks for one validator's attestation, limited to fields explicitly set."""
 
     validator: ValidatorIndex
     """Which validator's attestation to check."""
@@ -76,11 +66,7 @@ class AttestationCheck(CamelModel):
     """Expected target checkpoint slot."""
 
     location: Literal["new", "known"]
-    """
-    Expected attestation location:
-        - "new" for `latest_new_aggregated_payloads`
-        - "known" for `latest_known_aggregated_payloads`
-    """
+    """Which pool the attestation should sit in, the pending or the accepted pool."""
 
     def validate_attestation(
         self, attestation: AttestationData, location: str, step_index: int
@@ -97,12 +83,7 @@ class AttestationCheck(CamelModel):
 
 
 class StoreChecks(SelectiveCheck):
-    """
-    Store state checks for fork choice tests.
-
-    All fields are optional. Only specified fields are validated.
-    This allows tests to focus on the properties they care about.
-    """
+    """Store state checks for fork choice tests, validating only the fields a test sets."""
 
     _SCALAR_ACCESSORS: ClassVar[dict[str, Callable[[Store], Any]]] = {
         "time": lambda store: store.time,
@@ -144,20 +125,12 @@ class StoreChecks(SelectiveCheck):
     """Expected head block root."""
 
     head_root_label: str | None = None
-    """
-    Expected head block root by label reference.
-
-    Alternative to head_root that uses the block label system.
-    The framework resolves this label to the actual block root.
-    """
+    """Expected head block root, named by label and resolved to a root."""
 
     filled_block_root_label: str | None = None
-    """
-    Expected root of the block built for this step, resolved by label.
+    """Expected root of the block built for this step, named by label.
 
-    This is useful when a test needs to prove that the fixture rebuilt or
-    resubmitted an exact previously known block rather than merely producing a
-    different block that leaves the head unchanged.
+    Proves the fixture rebuilt the exact known block, not a different one with an unchanged head.
     """
 
     latest_justified_slot: Slot | None = None
@@ -167,12 +140,7 @@ class StoreChecks(SelectiveCheck):
     """Expected latest justified checkpoint root."""
 
     latest_justified_root_label: str | None = None
-    """
-    Expected latest justified checkpoint root by label reference.
-
-    Alternative to latest_justified_root that uses the block label system.
-    The framework resolves this label to the actual block root.
-    """
+    """Expected latest justified checkpoint root, named by label and resolved to a root."""
 
     latest_finalized_slot: Slot | None = None
     """Expected latest finalized checkpoint slot."""
@@ -181,12 +149,7 @@ class StoreChecks(SelectiveCheck):
     """Expected latest finalized checkpoint root."""
 
     latest_finalized_root_label: str | None = None
-    """
-    Expected latest finalized checkpoint root by label reference.
-
-    Alternative to latest_finalized_root that uses the block label system.
-    The framework resolves this label to the actual block root.
-    """
+    """Expected latest finalized checkpoint root, named by label and resolved to a root."""
 
     safe_target: Bytes32 | None = None
     """Expected safe target root."""
@@ -195,120 +158,52 @@ class StoreChecks(SelectiveCheck):
     """Expected safe target block slot."""
 
     safe_target_root_label: str | None = None
-    """
-    Expected safe target root by label reference.
-
-    Alternative to safe_target that uses the block label system.
-    The framework resolves this label to the actual block root.
-    """
+    """Expected safe target root, named by label and resolved to a root."""
 
     attestation_target_slot: Slot | None = None
-    """
-    Expected attestation target checkpoint slot.
+    """Expected attestation target checkpoint slot.
 
-    Validates the complete checkpoint (both slot and root):
-    - The checkpoint slot matches the expected value
-    - The checkpoint root references an actual block at that slot
+    The checkpoint root must also reference an actual block at that slot.
     """
 
     attestation_target_root_label: str | None = None
-    """
-    Expected attestation target checkpoint root by label reference.
-
-    The framework resolves this label to a block root and compares it to the
-    root that the spec would attest to from the current store.
-    """
+    """Expected attestation target root, named by label and resolved to a root."""
 
     attestation_checks: list[AttestationCheck] | None = None
-    """Optional list of attestation content checks for specific validators."""
+    """Attestation content checks for specific validators."""
 
     attestation_signature_target_slots: list[Slot] | None = None
-    """
-    Expected target slots present in attestation_signatures.
-
-    Compares the exact set of target checkpoint slots keyed in the raw gossip
-    signature map, independent of how many validators signed each target.
-    """
+    """Expected set of target slots keyed in the raw gossip signature map."""
 
     latest_new_aggregated_target_slots: list[Slot] | None = None
-    """
-    Expected target slots present in latest_new_aggregated_payloads.
-
-    Compares the exact set of target checkpoint slots keyed in the pending
-    aggregated proof map.
-    """
+    """Expected set of target slots keyed in the pending aggregated proof map."""
 
     latest_known_aggregated_target_slots: list[Slot] | None = None
-    """
-    Expected target slots present in latest_known_aggregated_payloads.
-
-    Compares the exact set of target checkpoint slots keyed in the accepted
-    aggregated proof map.
-    """
+    """Expected set of target slots keyed in the accepted aggregated proof map."""
 
     new_pool_proof_participants: dict[Slot, set[int]] | None = None
-    """
-    Expected union of participants across pending-pool proofs, keyed by target slot.
-
-    Compares the set of validator indices covered by every proof in the
-    pending aggregated proof map for each target slot.
-    Pins the coverage a fresh aggregation round produced in the pending pool.
-    """
+    """Expected union of validator indices across pending-pool proofs, per target slot."""
 
     block_attestation_count: int | None = None
-    """
-    Expected number of aggregated attestations in the block body.
+    """Expected number of aggregated attestations in the block body.
 
-    Use this to verify signature aggregation behavior:
-    - 1 = all attestations aggregated into a single proof
-    - >1 = attestations split due to incompatible sources
+    More than one means attestations split over incompatible sources rather than merging.
     """
 
     block_attestations: list[AggregatedAttestationCheck] | None = None
-    """
-    Detailed checks for each aggregated attestation in the block body.
-
-    Each check validates:
-    - participants: which validators are covered by this aggregation
-    - attestation_slot: the attestation data slot (optional)
-    - target_slot: the target checkpoint slot (optional)
-    """
+    """Detailed per-attestation checks for the block body."""
 
     lexicographic_head_among: list[str] | None = None
-    """
-    Verify that the head is chosen via lexicographic tiebreaker.
+    """Fork labels expected to tie, with the head chosen by the lexicographic tiebreaker.
 
-    When specified, validates that:
-    1. All listed fork labels have equal attestation weight
-    2. The current head is one of these forks
-    3. The head has the lexicographically highest block root among them
-
-    This is used to test the fork choice tiebreaker rule: when multiple forks
-    have equal weight, the fork with the highest block root (lexicographically)
-    should be selected as the head.
+    All listed forks must have equal attestation weight, and the head carries the highest root.
     """
 
     reorg_depth: int | None = None
-    """
-    Expected reorg depth after this step.
-
-    Reorg depth is the number of blocks reverted when the head switches
-    from the old chain to the new chain. Computed by finding the common
-    ancestor of the old and new heads, then counting blocks from the old
-    head back to that ancestor.
-
-    Only meaningful when the head actually changes. If the head didn't
-    change, the actual reorg depth is 0.
-    """
+    """Expected count of blocks from the old head back to its common ancestor with the new head."""
 
     labels_in_store: list[str] | None = None
-    """
-    Block labels that must be present in the store's block tree.
-
-    Each label is resolved to a block root via the block registry,
-    then checked for presence in `store.blocks`. This verifies
-    that blocks from abandoned forks are retained (not pruned).
-    """
+    """Block labels still present in the block tree, verifying abandoned forks are retained."""
 
     def validate_against_store(
         self,
@@ -319,17 +214,15 @@ class StoreChecks(SelectiveCheck):
         old_head: Bytes32 | None = None,
     ) -> None:
         """
-        Validate these checks against actual Store state.
-
-        Only validates fields that were explicitly set by the test writer.
+        Validate these checks against actual store state, limited to fields the test set.
 
         Args:
             store: The fork choice store to validate against.
             step_index: Index of the step being validated (for error messages).
             block_registry: Optional labeled blocks for resolving label-based checks.
             filled_block: Optional block for validating block body attestations.
-            old_head: Previous head root before this step executed. Required
-                for reorg_depth checks.
+            old_head: Previous head root before this step executed.
+                Required for reorg_depth checks.
         """
         fields = self.model_fields_set
 
@@ -347,7 +240,7 @@ class StoreChecks(SelectiveCheck):
         # Scalar store fields
         self.validate_scalar_fields(store, f"Step {step_index}")
 
-        # Label-based root checks (resolve label -> root, then compare)
+        # Resolve each label to a root, then compare.
         for field_name in fields & self._LABEL_ROOT_ACCESSORS.keys():
             expected_root = _resolve(getattr(self, field_name))
             _check(field_name, self._LABEL_ROOT_ACCESSORS[field_name](store), expected_root)

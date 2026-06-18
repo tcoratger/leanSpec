@@ -32,11 +32,7 @@ class AttestationSpec(CamelModel):
     """The slot of the target block being attested to (required)."""
 
     target_root_label: str | None = None
-    """
-    Label referencing a previously created block as the target.
-
-    The block must exist in the block registry with this label.
-    """
+    """Label of a previously created block to use as the target."""
 
     target_root: Bytes32 | None = None
     """Optional explicit target root (bypasses label lookup)."""
@@ -68,7 +64,7 @@ class AttestationSpec(CamelModel):
         default_source: Checkpoint,
     ) -> AttestationData:
         """
-        Build attestation data by resolving the three checkpoints (target, head, source).
+        Build attestation data by resolving the target, head, and source checkpoints.
 
         Args:
             block_registry: Labeled blocks for checkpoint resolution.
@@ -81,10 +77,7 @@ class AttestationSpec(CamelModel):
         Raises:
             ValueError: If the target has neither an explicit root nor a label.
         """
-        # Resolve the target checkpoint.
-        #
-        # An explicit root takes highest priority.
-        # A label triggers lookup in the block registry.
+        # Resolve the target: explicit root, else label lookup.
         # Unlike the other two checkpoints, the target is mandatory.
         if self.target_root is not None:
             target = Checkpoint(root=self.target_root, slot=self.target_slot)
@@ -93,13 +86,9 @@ class AttestationSpec(CamelModel):
         else:
             raise ValueError("attestation spec requires a target root")
 
-        # Resolve the head checkpoint.
-        #
-        # Priority: explicit root > label > target checkpoint.
-        # - When using an explicit root without a slot, the target slot is used.
-        # - When no head information is provided at all, the head mirrors the target.
-        #
-        # This matches honest validator behavior.
+        # Resolve the head: explicit root, else label, else mirror the target.
+        # An explicit root without a slot borrows the target slot.
+        # Mirroring the target when unset matches honest validator behavior.
         if self.head_root is not None:
             head = Checkpoint(
                 root=self.head_root,
@@ -113,11 +102,8 @@ class AttestationSpec(CamelModel):
                 slot=self.head_slot if self.head_slot is not None else target.slot,
             )
 
-        # Resolve the source checkpoint.
-        #
-        # Priority: explicit root > label > the provided default.
-        # The source represents the most recent justified checkpoint the attester is aware of.
-        # When not overridden, the caller-provided default supplies the correct value.
+        # Resolve the source: explicit root, else label, else the caller default.
+        # The source is the most recent justified checkpoint the attester knows.
         if self.source_root is not None:
             source = Checkpoint(
                 root=self.source_root,
@@ -147,26 +133,13 @@ class AggregatedAttestationSpec(AttestationSpec):
 
     signer_indices: list[ValidatorIndex] | None = None
     """
-    Override which validators actually sign the attestation.
+    Validators that actually sign, when different from the claimed participants.
 
-    - When None (default), signatures are generated using the validators in validator_indices.
-    - When specified, signatures are generated using these validator indices instead.
-
-    This creates a mismatch between claimed participants and actual signers.
-    Useful for testing that verification rejects attestations where valid signatures
-    don't correspond to the claimed validators.
-
-    Must have same length as validator_indices when specified.
+    A set differing from the claimed participants forces a signer mismatch to test rejection.
     """
 
     aggregation_bits: AggregationBits | None = None
-    """
-    Raw aggregation bits for the block body, overriding index derivation.
-
-    - When unset, bits are derived from the validator indices.
-    - When set, the bits are used verbatim, even when zero-length or padded.
-    - Only the unsigned forced-attestation path honors the override.
-    """
+    """Raw aggregation bits used verbatim, honored only on the unsigned forced-attestation path."""
 
     def resolve_aggregation_bits(self) -> AggregationBits:
         """Return the bit override when present, else bits derived from the validator indices."""
@@ -181,10 +154,7 @@ class AggregatedAttestationSpec(AttestationSpec):
         key_manager: XmssKeyManager,
     ) -> SignedAggregatedAttestation:
         """
-        Build a complete signed aggregated attestation from this specification.
-
-        Supports valid, invalid, and participant-mismatch scenarios
-        depending on the spec's signature and signer configuration.
+        Build a signed aggregated attestation, valid or adversarial per this spec's config.
 
         Args:
             block_registry: Labeled blocks for checkpoint resolution.
@@ -196,19 +166,15 @@ class AggregatedAttestationSpec(AttestationSpec):
         """
         attestation_data = self.build_attestation_data(block_registry, state.latest_justified)
 
-        # Separate "claimed" from "actual" participants.
-        #
-        # - Claimed validators appear in the proof's participant bitfield.
-        # - Actual signers produce the cryptographic material.
-        # They default to the same set for honest attestations.
+        # Claimed validators fill the proof's participant bitfield.
+        # Actual signers produce the cryptographic material.
+        # They are the same set for honest attestations.
         validator_indices = self.validator_indices
         signer_indices = self.signer_indices or self.validator_indices
 
-        # Path 0: Raw bit override.
-        #
-        # Use the bits verbatim with placeholder proof bytes.
-        # An honest aggregate can never carry zero participants, so this is the
-        # only way to feed the gossip path an adversarial empty-bit aggregate.
+        # Path 0: raw bit override with placeholder proof bytes.
+        # An honest aggregate can never carry zero participants.
+        # This is the only way to feed the gossip path an adversarial empty-bit aggregate.
         if self.aggregation_bits is not None:
             placeholder = ByteList512KiB(data=b"\x00" * 32)
             proof = SingleMessageAggregate(
@@ -217,10 +183,8 @@ class AggregatedAttestationSpec(AttestationSpec):
             )
             return SignedAggregatedAttestation(data=attestation_data, proof=proof)
 
-        # Path 1: Invalid signature.
-        #
-        # Correct participant bitfield but zeroed-out proof bytes.
-        # Exercises signature verification rejection.
+        # Path 1: invalid signature.
+        # Correct participant bitfield, zeroed-out proof bytes to exercise rejection.
         if not self.valid_signature:
             placeholder = ByteList512KiB(data=b"\x00" * 32)
             proof = SingleMessageAggregate(
@@ -232,13 +196,9 @@ class AggregatedAttestationSpec(AttestationSpec):
         # Path 2: Valid signature.
         proof = key_manager.sign_and_aggregate(signer_indices, attestation_data)
 
-        # Path 3: Participant mismatch.
-        #
-        # Replace the participant bitfield with different validator indices
-        # while keeping the original proof bytes intact.
-        # The proof is cryptographically valid for the actual signers,
-        # but the claimed participants no longer match.
-        # The store must detect and reject this inconsistency.
+        # Path 3: participant mismatch.
+        # Swap in different claimed participants but keep the original proof bytes.
+        # The proof stays valid for the real signers, so the store must reject the inconsistency.
         if self.signer_indices and self.signer_indices != self.validator_indices:
             proof = SingleMessageAggregate(
                 participants=AggregationBits.from_indices(validator_indices),
@@ -257,11 +217,6 @@ class AggregatedAttestationSpec(AttestationSpec):
         """
         Build an invalid attestation proof and append it to the block body.
 
-        Handles two invalidity scenarios:
-
-        - Invalid signature: correct participant bitfield, zeroed-out proof bytes
-        - Signer mismatch: valid proof from wrong validators, claimed participants differ
-
         Args:
             block_registry: Labeled blocks for checkpoint resolution.
             state: State for attestation data building.
@@ -279,8 +234,8 @@ class AggregatedAttestationSpec(AttestationSpec):
             data=attestation_data,
         )
 
-        # Empty proof bytes flag "no real single-message aggregate here" — the caller treats
-        # any such entry as a placeholder and bypasses real binding merges.
+        # Empty proof bytes signal "no real aggregate here".
+        # The caller treats any such entry as a placeholder and bypasses real binding merges.
         placeholder = ByteList512KiB(data=b"")
 
         if not self.valid_signature:
@@ -294,7 +249,6 @@ class AggregatedAttestationSpec(AttestationSpec):
         else:
             invalid_proof = SingleMessageAggregate(participants=aggregation_bits, proof=placeholder)
 
-        # Append invalid attestation to the block body.
         block = block.model_copy(
             update={
                 "body": block.body.model_copy(
@@ -312,12 +266,9 @@ class AggregatedAttestationSpec(AttestationSpec):
 
 class GossipAttestationSpec(AttestationSpec):
     """
-    Gossip attestation specification for test definitions.
+    Single validator attesting via the gossip network.
 
-    Specifies a single validator attesting via the gossip network.
-    The source defaults to the anchor (genesis) block instead of the
-    latest justified checkpoint.
-    Honest attestations without overrides use data produced by the Store.
+    The source defaults to the anchor block, not the latest justified checkpoint.
     """
 
     validator_index: ValidatorIndex
@@ -345,11 +296,10 @@ class GossipAttestationSpec(AttestationSpec):
         expected_valid: bool,
     ) -> SignedAttestation:
         """
-        Build a complete signed attestation from this specification.
+        Build a signed attestation from this specification.
 
-        Valid attestations without overrides use honest data from the Store.
-        Invalid or overridden attestations use this spec's checkpoint fields,
-        with the anchor block as the default source.
+        Valid attestations without overrides use honest data from the store, otherwise this spec's
+        checkpoint fields with the anchor block as default source.
 
         Args:
             block_registry: Labeled blocks for target resolution.
