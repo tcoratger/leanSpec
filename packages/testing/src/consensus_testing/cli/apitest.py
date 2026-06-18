@@ -7,6 +7,8 @@ from pathlib import Path
 import click
 import pytest
 
+from consensus_testing.cli import find_workspace_root
+
 
 @click.command(
     context_settings={
@@ -42,13 +44,7 @@ def apitest(
     config_path = Path(__file__).parent / "pytest_ini_files" / "pytest-apitest.ini"
 
     # The project root is the workspace pyproject.toml.
-    project_root = Path.cwd()
-    while project_root != project_root.parent:
-        if (project_root / "pyproject.toml").exists():
-            pyproject = project_root / "pyproject.toml"
-            if "[tool.uv.workspace]" in pyproject.read_text():
-                break
-        project_root = project_root.parent
+    project_root = find_workspace_root()
 
     args = [
         "-c",
