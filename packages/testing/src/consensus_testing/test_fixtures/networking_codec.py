@@ -1,7 +1,6 @@
 """Networking codec test fixture for wire-format conformance testing."""
 
-from collections.abc import Callable
-from typing import Annotated, ClassVar, Final, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import Field
 
@@ -654,18 +653,6 @@ class DecodeFailureOutput(StrictBaseModel):
     """Name of the decoder that must reject the input."""
 
 
-_DECODERS_BY_NAME: Final[dict[str, Callable[[bytes], object]]] = {
-    "varint": decode_varint,
-    "snappy_frame": frame_decompress,
-    "snappy_block": decompress,
-    "gossipsub_rpc": RPC.decode,
-    "reqresp_request": decode_request,
-    "reqresp_response": ResponseCode.decode,
-    "enr": ENR.from_rlp,
-}
-"""Wire-format decoders keyed by the name a rejection vector targets."""
-
-
 class DecodeFailure(StrictBaseModel):
     """Assert that a wire-format decoder rejects malformed input."""
 
@@ -689,7 +676,22 @@ class DecodeFailure(StrictBaseModel):
     def attempt_decode(self) -> Exception | None:
         """Run the decoder on the malformed input and return what it raised."""
         try:
-            _DECODERS_BY_NAME[self.decoder](from_hex(self.raw_bytes))
+            raw_bytes = from_hex(self.raw_bytes)
+            match self.decoder:
+                case "varint":
+                    decode_varint(raw_bytes)
+                case "snappy_frame":
+                    frame_decompress(raw_bytes)
+                case "snappy_block":
+                    decompress(raw_bytes)
+                case "gossipsub_rpc":
+                    RPC.decode(raw_bytes)
+                case "reqresp_request":
+                    decode_request(raw_bytes)
+                case "reqresp_response":
+                    ResponseCode.decode(raw_bytes)
+                case "enr":
+                    ENR.from_rlp(raw_bytes)
         except Exception as exception:
             return exception
         return None
