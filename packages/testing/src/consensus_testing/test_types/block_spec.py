@@ -73,9 +73,9 @@ class BlockSpec(CamelModel):
 
     def resolve_proposer_index(self, num_validators: int) -> ValidatorIndex:
         """Return the proposer index, falling back to the spec's round-robin schedule."""
-        return self.proposer_index or ValidatorIndex.proposer_for_slot(
-            self.slot, Uint64(num_validators)
-        )
+        if self.proposer_index is not None:
+            return self.proposer_index
+        return ValidatorIndex.proposer_for_slot(self.slot, Uint64(num_validators))
 
     def resolve_parent_root(
         self,
