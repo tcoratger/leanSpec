@@ -6,6 +6,7 @@ from typing import ClassVar
 
 from consensus_testing.keys import XmssKeyManager
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from consensus_testing.test_fixtures.hex_codec import to_hex
 from lean_spec.spec.crypto.merkleization import hash_tree_root
 from lean_spec.spec.forks import AggregationBits, Checkpoint, Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar.containers import (
@@ -198,17 +199,17 @@ class ReaggregationTest(BaseTestSpec):
         )
 
         return ReaggregationFixture(
-            block_proof="0x" + bytes(block_proof.proof.data).hex(),
+            block_proof=to_hex(bytes(block_proof.proof.data)),
             public_keys_per_message=[
-                ["0x" + public_key.encode_bytes().hex() for public_key in component_keys]
+                [to_hex(public_key.encode_bytes()) for public_key in component_keys]
                 for component_keys in public_keys_per_message
             ],
-            attestation_message="0x" + bytes(attestation_message).hex(),
+            attestation_message=to_hex(bytes(attestation_message)),
             attestation_slot=int(attestation_data.slot),
             block_attesters=[int(validator_index) for validator_index in self.block_attesters],
             local_attesters=[int(validator_index) for validator_index in self.local_attesters],
             combined_attesters=[
                 int(validator_index) for validator_index in combined_attester_indices
             ],
-            reaggregated_proof="0x" + bytes(reaggregated_proof.proof.data).hex(),
+            reaggregated_proof=to_hex(bytes(reaggregated_proof.proof.data)),
         )

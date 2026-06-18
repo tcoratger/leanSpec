@@ -4,6 +4,7 @@ from typing import ClassVar, Literal
 
 from consensus_testing.genesis import build_anchor
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from consensus_testing.test_fixtures.hex_codec import to_hex
 from lean_spec.base import StrictBaseModel
 from lean_spec.node.sync.checkpoint_sync import verify_checkpoint_state
 from lean_spec.spec.forks import Slot
@@ -55,7 +56,7 @@ class VerifyCheckpoint(StrictBaseModel):
         )
         return VerifyCheckpointOutput(
             valid=verify_checkpoint_state(state),
-            state_bytes="0x" + state.encode_bytes().hex(),
+            state_bytes=to_hex(state.encode_bytes()),
             validator_count=self.num_validators,
             anchor_slot=self.anchor_slot,
         )
