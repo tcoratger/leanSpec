@@ -97,7 +97,7 @@ class FixtureCollector:
                 test_id = f"{test_nodeid}[fork_{self.fork}-{fixture_format}]"
                 all_tests[test_id] = fixture.json_dict_with_info()
 
-            with open(output_file, "w") as output_handle:
+            with output_file.open("w") as output_handle:
                 json.dump(all_tests, output_handle, indent=4)
 
 
