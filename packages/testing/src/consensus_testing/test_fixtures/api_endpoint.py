@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 
 from consensus_testing.genesis import build_anchor
 from consensus_testing.test_fixtures.base import BaseConsensusFixture, BaseTestSpec
+from consensus_testing.test_fixtures.hex_codec import to_hex
 from lean_spec.base import StrictBaseModel
 from lean_spec.node.metrics.registry import registry as metrics_registry
 from lean_spec.spec.forks import Slot
@@ -148,7 +149,7 @@ class ApiEndpointTest(BaseTestSpec):
                     content_type="application/json",
                     body={
                         "slot": int(store.latest_justified.slot),
-                        "root": "0x" + store.latest_justified.root.hex(),
+                        "root": to_hex(store.latest_justified.root),
                     },
                 )
 
@@ -158,7 +159,7 @@ class ApiEndpointTest(BaseTestSpec):
                 return EndpointResponseContract(
                     status_code=200,
                     content_type="application/octet-stream",
-                    body="0x" + finalized_state.encode_bytes().hex(),
+                    body=to_hex(finalized_state.encode_bytes()),
                 )
 
             case ("GET", "/lean/v0/fork_choice"):
@@ -168,9 +169,9 @@ class ApiEndpointTest(BaseTestSpec):
                 # Only post-finalization blocks are relevant to head selection.
                 nodes = [
                     {
-                        "root": "0x" + root.hex(),
+                        "root": to_hex(root),
                         "slot": int(block.slot),
-                        "parent_root": "0x" + block.parent_root.hex(),
+                        "parent_root": to_hex(block.parent_root),
                         "proposer_index": int(block.proposer_index),
                         "weight": weights.get(root, 0),
                     }
@@ -185,16 +186,16 @@ class ApiEndpointTest(BaseTestSpec):
                     content_type="application/json",
                     body={
                         "nodes": nodes,
-                        "head": "0x" + store.head.hex(),
+                        "head": to_hex(store.head),
                         "justified": {
                             "slot": int(store.latest_justified.slot),
-                            "root": "0x" + store.latest_justified.root.hex(),
+                            "root": to_hex(store.latest_justified.root),
                         },
                         "finalized": {
                             "slot": int(store.latest_finalized.slot),
-                            "root": "0x" + store.latest_finalized.root.hex(),
+                            "root": to_hex(store.latest_finalized.root),
                         },
-                        "safe_target": "0x" + store.safe_target.hex(),
+                        "safe_target": to_hex(store.safe_target),
                         "validator_count": len(head_state.validators),
                     },
                 )
