@@ -34,19 +34,18 @@ def build_genesis_state(
                 f"Not enough keys: need {num_validators} validators "
                 f"but the key manager has only {len(key_manager)} keys"
             )
-        validators = []
-        for validator_position in range(num_validators):
-            validator_index = ValidatorIndex(validator_position)
-            attestation_public_key, proposal_public_key = key_manager.get_public_keys(
-                validator_index
+        validators = [
+            Validator(
+                attestation_public_key=Bytes52(
+                    key_manager.get_public_keys(ValidatorIndex(validator_index))[0].encode_bytes()
+                ),
+                proposal_public_key=Bytes52(
+                    key_manager.get_public_keys(ValidatorIndex(validator_index))[1].encode_bytes()
+                ),
+                index=ValidatorIndex(validator_index),
             )
-            validators.append(
-                Validator(
-                    attestation_public_key=Bytes52(attestation_public_key.encode_bytes()),
-                    proposal_public_key=Bytes52(proposal_public_key.encode_bytes()),
-                    index=validator_index,
-                )
-            )
+            for validator_index in range(num_validators)
+        ]
     else:
         validators = [
             Validator(
